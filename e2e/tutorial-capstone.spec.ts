@@ -3,7 +3,13 @@ import { expect, test } from "@playwright/test";
 test("guided objective reaches a retryable capstone and succeeds", async ({
   page,
 }, testInfo) => {
-  await page.addInitScript(() => window.localStorage.clear());
+  await page.addInitScript(
+    (theme) => {
+      window.localStorage.clear();
+      window.localStorage.setItem("theme", theme);
+    },
+    testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
+  );
   await page.goto("/");
   await page
     .getByRole("button", { name: "Start playing", exact: true })
@@ -12,7 +18,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByRole("heading", { name: "Step 1 of 4" }),
   ).toBeVisible();
-  await expect(page.getByText("Tap your gas plant")).toBeVisible();
+  await expect(page.getByText("Tap your coal plant")).toBeVisible();
   // The first step is a new player's first look at the game, so everything it doesn't use
   // stays out of the way until a later step needs it
   await expect(page.locator("#navfooter")).toBeHidden();
@@ -52,9 +58,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     await expect(page.locator("#eventsPane")).toHaveCount(0);
   }
 
-  await page
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await expect(
     page.getByText(/Supply must stay at or above demand/i),
   ).toBeVisible();
@@ -76,19 +80,25 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
   await page.getByRole("button", { name: "pause" }).click();
+  await expect(
+    page.getByText("Watch coal output climb slowly as sunlight fades."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("note").filter({ hasText: "Pause to inspect the chart" }),
+  ).toBeVisible();
+  await expectObjectiveDocked();
+  await page.screenshot({ path: testInfo.outputPath("capstone.png") });
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
   // objective is docked outside the game surface, so the same control remains operable at every
   // viewport without a small-screen workaround.
-  const naturalGas = page.locator(".facilityRow", { hasText: "Natural Gas" });
-  await naturalGas
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Pause Natural Gas" }).click();
+  const coal = page.locator(".facilityRow", { hasText: "Coal" });
+  await coal.getByRole("button", { name: "Inspect Coal", exact: true }).click();
+  await page.getByRole("button", { name: "Pause Coal" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("heading", { name: "Final challenge needs another try" }),
@@ -99,16 +109,12 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Retry final challenge" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Pause Coal" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Pause Natural Gas" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Resume Natural Gas", exact: true }),
+    page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toHaveCount(0);
 
   await page.getByRole("button", { name: "fast speed" }).click();

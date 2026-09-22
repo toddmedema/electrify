@@ -5,7 +5,11 @@ import {
   hydroSizing,
   snowFraction,
 } from "./Hydro";
-import { initWeatherFromRows } from "../data/Weather";
+import {
+  getRecordedWeatherRows,
+  getWeather,
+  initWeatherFromRows,
+} from "../data/Weather";
 import { RawWeatherType } from "../Types";
 
 const YEARS = 4;
@@ -134,5 +138,50 @@ describe("hydro watershed model", () => {
         hydroMeanMonthlyInflowWh: expect.any(Number),
       }),
     );
+  });
+
+  it("recalibrates reloaded records even when their endpoints match", () => {
+    const original = rows(
+      () => 12,
+      () => 2,
+    );
+    initWeatherFromRows("basin", original);
+    const before = getMeanAnnualRunoffMm("basin");
+    const wetter = original.map((row) => ({
+      ...row,
+      PRECIP_MM: row.MONTH === 6 ? row.PRECIP_MM * 4 : row.PRECIP_MM,
+    }));
+    initWeatherFromRows("basin", wetter);
+    expect(getMeanAnnualRunoffMm("basin")).toBeGreaterThan(before);
+  });
+
+  it.each([1, 2])("calibrates finite energy from a %i-year record", (years) => {
+    initWeatherFromRows(
+      "short",
+      rows(
+        () => 12,
+        () => 2,
+      ).slice(0, years * 12 * HOURS),
+    );
+    expect(getMeanAnnualRunoffMm("short")).toBeCloseTo(2 * 365 * 0.4);
+    expect(
+      Number.isFinite(hydroSizing(100_000_000, "short").hydroWhPerMm),
+    ).toBe(true);
+  });
+
+  it("keeps the recorded snapshot stable when forecasts append weather", () => {
+    initWeatherFromRows(
+      "basin",
+      rows(
+        () => 12,
+        () => 2,
+      ),
+    );
+    const recorded = getRecordedWeatherRows("basin");
+    const calibration = getMeanAnnualRunoffMm("basin");
+    getWeather(date(1985, 6), 1, 0, "basin");
+    expect(getRecordedWeatherRows("basin")).toBe(recorded);
+    expect(recorded).toHaveLength(YEARS * 12 * HOURS);
+    expect(getMeanAnnualRunoffMm("basin")).toBe(calibration);
   });
 });

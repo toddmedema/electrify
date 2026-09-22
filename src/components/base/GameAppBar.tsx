@@ -29,7 +29,6 @@ import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { recordTutorialLeft } from "../../reducers/Tutorial";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -373,15 +372,32 @@ export function GameAppBar(props: Props) {
           />
         )}
       </div>
+      {game.challenge && (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 0.5 }}
+        >
+          Friend’s target: {game.challenge.target.toLocaleString("en-US")} ·
+          Shared score · unverified
+        </Typography>
+      )}
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
       <div
         id="yearProgressBar"
-        style={{
-          width: `${date.percentOfYear * 100}%`,
-        }}
-      />
+        role="progressbar"
+        aria-label="Year progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(date.percentOfYear * 100)}
+      >
+        <div
+          className="yearProgressFill"
+          style={{ width: `${date.percentOfYear * 100}%` }}
+        />
+      </div>
       <ScenarioDetailsDialog
         open={scenarioDetailsOpen}
         game={game}
@@ -416,11 +432,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
-      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
-      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       dispatch(quit());
     },
   };

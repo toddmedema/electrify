@@ -10,9 +10,11 @@ import cloneDeep from "lodash.clonedeep";
 import * as React from "react";
 import { Provider } from "react-redux";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
+import { getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
@@ -30,6 +32,7 @@ jest.mock("../base/GameCard", () => ({
 }));
 
 interface ChartMockProps {
+  currentMinute?: number;
   title?: string;
   hideTitle?: boolean;
   id?: string;
@@ -156,13 +159,14 @@ jest.mock("../base/ChartForecastSupplyByFuel", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline, domain }: ChartMockProps) => {
+  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
     mockSupplyDemandPaints++;
     return (
       <div
         role="img"
         data-chart="supply-demand"
         data-testid="supply-demand-chart"
+        data-forecast-start={currentMinute}
         data-sync-key={syncKey}
         data-points={timeline?.length}
         data-domain={domainValue(domain)}
@@ -479,18 +483,134 @@ describe("Insights layers", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the customer growth rate visible for public utilities", () => {
-    renderInsights(107);
+  // Regression test. Construction progress was part of the projection's cache key, so every
+  // tick of a build re-simulated the long-range forecast from a start that had moved on by one
+  // tick, and its hourly samples (wind most visibly) jittered from frame to frame
+  it("keeps the long-range projection stable while a facility is under construction", () => {
+    const game = createGame({
+      scenarioId: 100,
+      initialBuild: { name: "Wind", peakW: 100000000, financed: true },
+    });
+    expect(game.facilities.some((f) => f.yearsToBuildLeft > 0)).toBe(true);
+    const generate = jest.spyOn(GameModule, "generateNewTimeline");
+    const props = {
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const { rerender } = render(<Insights game={game} {...props} />);
+    const calls = generate.mock.calls.length;
+
+    const nextTick = cloneDeep(game);
+    // Immer preserves completed history during ordinary ticks.
+    nextTick.monthlyHistory = game.monthlyHistory;
+    nextTick.date = { ...nextTick.date, minute: nextTick.date.minute + 15 };
+    nextTick.facilities.forEach((facility) => {
+      if (facility.yearsToBuildLeft > 0) facility.yearsToBuildLeft -= 0.001;
+    });
+    rerender(<Insights game={nextTick} {...props} />);
+
+    expect(generate.mock.calls.length).toBe(calls);
+    generate.mockRestore();
+  });
+
+  it("shows a public utility the points its rate earns over the next year", () => {
+    const game = createGame({ scenarioId: 107 });
+    const target = game.dollarsPerkWh;
+    renderInsights(107, { ...game, dollarsPerkWh: target - 0.02 });
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
-    expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
-    expect(levers).toHaveTextContent(/market benchmark/i);
-    expect(
-      within(levers).getByText("Customer growth / yr"),
-    ).toBeInTheDocument();
-    expect(
-      within(levers).getByText("+1.5%", { selector: "strong" }),
-    ).toBeVisible();
+    // Customers never switch and growth is fixed, so neither is worth the space
+    expect(levers).not.toHaveTextContent(/market/i);
+    expect(levers).not.toHaveTextContent(/growth/i);
+    expect(within(levers).getByText("Target")).toBeInTheDocument();
+    expect(within(levers).getByText("Points / yr")).toBeInTheDocument();
+    const points = within(levers).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^\+\d+ pts$/);
+    expect(points).toHaveClass("good");
+    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
+      /rate score \+\d+ pts over the next year/i,
+    );
+  });
+
+  it("marks a public utility rate above its target as losing points", () => {
+    const game = createGame({ scenarioId: 107 });
+    renderInsights(107, { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 });
+
+    const points = within(
+      screen.getByRole("region", { name: "Planning controls" }),
+    ).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^−\d+ pts$/);
+    expect(points).toHaveClass("bad");
+  });
+
+  it("shows a year's rate moving a long record's score less", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = Number(
+        within(screen.getByRole("region", { name: "Planning controls" }))
+          .getByText(/pts$/, {
+            selector: ".insightsRateMetricValue.insightsRateScore",
+          })
+          .textContent!.replace(/[^\d]/g, ""),
+      );
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const cheaper = { ...game, dollarsPerkWh: game.dollarsPerkWh - 0.02 };
+    // Years of sales at the target already on the record dilute the coming year
+    const established = {
+      ...cheaper,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+
+    expect(points(established)).toBeLessThan(points(cheaper));
+  });
+
+  it("always counts a public rate's points over a full year, even as the run ends", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = within(
+        screen.getByRole("region", { name: "Planning controls" }),
+      ).getByText(/pts$/, {
+        selector: ".insightsRateMetricValue.insightsRateScore",
+      }).textContent;
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const established = {
+      ...game,
+      dollarsPerkWh: game.dollarsPerkWh - 0.02,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+    // One month left; the projection is the same one, so only the window could differ
+    const ending = {
+      ...established,
+      date: {
+        ...established.date,
+        monthsElapsed: getScenario(107)!.durationMonths - 1,
+      },
+    };
+
+    expect(points(ending)).toBe(points(established));
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {
@@ -550,9 +670,9 @@ describe("Insights layers", () => {
     renderInsights(100, gameWithHistory(), [
       {
         key: "future",
-        startsMinute: 48 * MINUTES_PER_MONTH,
-        endsMinute: 49 * MINUTES_PER_MONTH,
-        label: "Expected Jan 2027",
+        startsMinute: 150 * MINUTES_PER_MONTH,
+        endsMinute: 151 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2032",
         title: "Future event",
         message: "Forecast only.",
       },
@@ -578,7 +698,7 @@ describe("Insights layers", () => {
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
-      screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
+      screen.getByLabelText("Displayed date range: 2023–28"),
     ).toBeVisible();
     expect(labelledButton("Pan earlier")).toBeEnabled();
     expect(labelledButton("Pan later")).toBeEnabled();
@@ -591,17 +711,17 @@ describe("Insights layers", () => {
       JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
     );
     expect(
-      screen.getByLabelText("Displayed date range: 2020–40"),
+      screen.getByLabelText("Displayed date range: 2020–39"),
     ).toBeVisible();
   });
 
-  it("advances the end while keeping a scenario-start viewport anchored", () => {
+  it("opens on the whole scenario and keeps it pinned as the game advances", () => {
     const game = createGame({ scenarioId: 100 });
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
     );
 
     const nextGame = {
@@ -623,7 +743,60 @@ describe("Insights layers", () => {
 
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 13 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
+    );
+  });
+
+  it("sizes the forecast shortfall to the displayed range", async () => {
+    const game = createGame({ scenarioId: 100 });
+    game.facilities = [];
+    renderInsights(100, game);
+    const note = screen.getByRole("note", {
+      name: /^Forecast shortfall for 2020–31:/,
+    });
+    expect(note).toHaveTextContent(
+      /^Forecast shortfall, 2020–31: ~.+ unmet · peak ~/,
+    );
+    const wholeScenario = note.textContent;
+
+    await user.click(labelledButton("Zoom in"));
+    expect(
+      screen.getByRole("note", { name: /^Forecast shortfall for 2023–28:/ }),
+    ).not.toHaveTextContent(wholeScenario!);
+  });
+
+  it("reports the viewport and reopens on it after the pane remounts", async () => {
+    const game = createGame({ scenarioId: 100 });
+    const onViewportChange = jest.fn();
+    const view = render(
+      <Insights
+        game={game}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+        onViewportChange={onViewportChange}
+      />,
+    );
+    await user.click(labelledButton("Zoom in"));
+    const saved = onViewportChange.mock.calls.at(-1)[0];
+    const zoomed = screen
+      .getByTestId("supply-demand-chart")
+      .getAttribute("data-domain");
+    expect(JSON.stringify(saved.viewport)).toBe(zoomed);
+    view.unmount();
+
+    render(
+      <Insights
+        game={game}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+        savedViewport={saved}
+      />,
+    );
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      zoomed!,
     );
   });
 
@@ -922,7 +1095,7 @@ describe("Insights layers", () => {
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
   });
 
-  it("refreshes a visible power exchange on every simulation tick", () => {
+  it("refreshes a visible power exchange on ticks and speed changes", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
     const game = cloneDeep(
       gameReducer(
@@ -943,6 +1116,18 @@ describe("Insights layers", () => {
     const ref = React.createRef<Insights>();
     render(<Insights {...props} ref={ref} />);
 
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            speed: game.speed === "PAUSED" ? "NORMAL" : "PAUSED",
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
     expect(
       ref.current!.shouldComponentUpdate(
         {
@@ -987,68 +1172,30 @@ function labelledButton(label: string | RegExp): HTMLElement {
   return button;
 }
 
-it("restores the investigation range against the live period and keeps newer layer configuration", () => {
-  const game = createGame({ scenarioId: 106, seed: 4 });
-  const origin = {
-    viewport: [0, 48 * MINUTES_PER_MONTH] as [number, number],
-    month: 0,
-    layers: ["supplyDemand"],
-    preset: "grid",
-    revision: 0,
-    temporaryLayer: "financeDetails",
-    anchor: "financeDetails",
-    scrollTop: 100,
-  };
+it("does not relabel cached simulated samples as recorded history as time advances", () => {
+  localStorage.clear();
+  localStorage.setItem("insightsLayers", JSON.stringify(["supplyDemand"]));
+  const game = createGame({ scenarioId: 100 });
   const props = {
     game,
-    onDelta: jest.fn(),
     selectedFacilityId: null,
     facilityDragActive: false,
-    journeyRestore: origin,
-    configurationRevision: 1,
-    onJourneyRestored: jest.fn(() => true),
+    onDelta: jest.fn(),
   };
-  const insights = new Insights(props);
-  const internals = insights as unknown as {
-    restoreJourney: () => void;
-    restoredViewport: (value: typeof origin) => [number, number];
-  };
-  const setState = jest
-    .spyOn(insights, "setState")
-    .mockImplementation(() => undefined);
-  internals.restoreJourney();
-  expect(props.onJourneyRestored).toHaveBeenCalledTimes(1);
-  expect(setState).toHaveBeenCalledWith(
-    expect.objectContaining({
-      layers: insights.state.layers,
-      preset: insights.state.preset,
-      temporaryLayer: "financeDetails",
-      viewport: origin.viewport,
-    }),
-    expect.any(Function),
+  const { rerender } = render(<Insights {...props} />);
+  expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+    "data-forecast-start",
+    "0",
   );
-  game.date.monthsElapsed = 2;
-  game.date.minute = 2 * MINUTES_PER_MONTH;
-  expect(internals.restoredViewport(origin)).toEqual([
-    0,
-    50 * MINUTES_PER_MONTH,
-  ]);
-  const moved = {
-    ...origin,
-    viewport: [MINUTES_PER_MONTH, 3 * MINUTES_PER_MONTH] as [number, number],
-  };
-  expect(internals.restoredViewport(moved)).toEqual([
-    3 * MINUTES_PER_MONTH,
-    5 * MINUTES_PER_MONTH,
-  ]);
-  const beyond = {
-    ...origin,
-    viewport: [1000 * MINUTES_PER_MONTH, 1002 * MINUTES_PER_MONTH] as [
-      number,
-      number,
-    ],
-  };
-  expect(internals.restoredViewport(beyond)[1]).toBeLessThanOrEqual(
-    game.date.minute + 240 * MINUTES_PER_MONTH,
+  rerender(
+    <Insights
+      {...props}
+      game={{ ...game, date: { ...game.date, minute: 120 } }}
+      selectedFacilityId={game.facilities[0].id}
+    />,
+  );
+  expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+    "data-forecast-start",
+    "0",
   );
 });

@@ -53,24 +53,57 @@ describe("authored tutorial capstones", () => {
     jest.useRealTimers();
   });
 
-  it("completes Mission 2 after buying a second, different generator type", () => {
-    const objective = capstone(1);
+  it.each([
+    ["Natural Gas", "Solar"],
+    ["Solar", "Wind"],
+    ["Solar", "Natural Gas"],
+  ])(
+    "completes Mission 2 when ordering %s then %s, in any fleet order",
+    (first, second) => {
+      const objective = capstone(1);
+      let game = createGame({
+        scenarioId: 1,
+        initialBuild: { name: first, peakW: 100000000, financed: true },
+      });
+
+      expect(objective.success(appState(game))).toBe(false);
+
+      const differentGenerator = GENERATORS(game, 100000000, [20], [500]).find(
+        (generator) => generator.available && generator.name === second,
+      )!;
+      game = gameReducer(
+        game,
+        buildFacility({ facility: differentGenerator, financed: true }),
+      );
+
+      expect(game.facilities[0].yearsToBuildLeft).toBeGreaterThan(0);
+      expect(objective.success(appState(game))).toBe(true);
+      for (const facilities of [
+        [...game.facilities].reverse(),
+        [...game.facilities].sort((a, b) => a.id - b.id),
+        game.facilities.map((facility) => ({
+          ...facility,
+          yearsToBuildLeft: 0,
+        })),
+      ]) {
+        expect(objective.success(appState({ ...game, facilities }))).toBe(true);
+      }
+    },
+  );
+
+  it("does not count repeated purchases of one type toward Mission 2", () => {
     let game = createGame({
       scenarioId: 1,
-      initialBuild: { name: "Oil", peakW: 100000000, financed: true },
+      initialBuild: { name: "Solar", peakW: 100000000, financed: true },
     });
-
-    expect(objective.success(appState(game))).toBe(false);
-
-    const differentGenerator = GENERATORS(game, 100000000, [20], [500]).find(
-      (generator) => generator.available && generator.fuel === "Natural Gas",
+    const solar = GENERATORS(game, 100000000, [20], [500]).find(
+      (generator) => generator.name === "Solar",
     )!;
     game = gameReducer(
       game,
-      buildFacility({ facility: differentGenerator, financed: true }),
+      buildFacility({ facility: solar, financed: true }),
     );
-
-    expect(objective.success(appState(game))).toBe(true);
+    expect(capstone(1).success(appState(game))).toBe(false);
   });
 
   it("cycles storage through charge and discharge before Mission 3's deadline", () => {
@@ -97,6 +130,9 @@ describe("authored tutorial capstones", () => {
     );
     // createGame loads the scenario's weather/economy fixtures used by initGame below.
     const baseline = createGame({ scenarioId: scenario.id });
+    // Entry preserves guided progress, so the lesson must already start at a loss-making rate.
+    expect(baseline.dollarsPerkWh).toBe(0.03);
+    expect(capstone(4).success(appState(baseline))).toBe(false);
     let game = gameReducer(undefined, start(scenario.id));
     game = gameReducer(game, delta({ tutorialStep: capstoneIndex }));
     game = gameReducer(

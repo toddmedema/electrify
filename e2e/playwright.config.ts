@@ -50,6 +50,15 @@ export default defineConfig({
       },
     },
     {
+      name: "foldable-unfolded",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { width: 844, height: 690 },
+      },
+    },
+    {
       name: "desktop-1440px",
       use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
     },

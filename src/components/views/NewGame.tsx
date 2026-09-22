@@ -203,15 +203,7 @@ function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
               alt={`${name} icon`}
             />
           }
-          title={
-            <span>
-              <span className="tutorialSpotlightEyebrow">
-                Continue learning · {completedTutorials} of {TUTORIALS.length}{" "}
-                complete
-              </span>
-              <span className="tutorialSpotlightTitle">{name}</span>
-            </span>
-          }
+          title={<span className="tutorialSpotlightTitle">{name}</span>}
           subheader={tutorial.summary}
           action={
             <span className="tutorialSpotlightAction" aria-hidden>

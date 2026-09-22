@@ -4,12 +4,19 @@ import {
   TICKS_PER_MONTH,
 } from "../Constants";
 import {
+  ConstructionEmissions,
   FacilityOperatingType,
   GameType,
   MonthlyHistoryType,
   StorageOperatingType,
   TickPresentFutureType,
 } from "../Types";
+import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
+import {
+  importAvailabilityFraction,
+  intertieContextForGame,
+  transmissionRatingW,
+} from "../helpers/Transmission";
 
 type TickFieldType = keyof TickPresentFutureType;
 type MonthFieldType = keyof MonthlyHistoryType;
@@ -48,6 +55,7 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "storageDischargeW",
   "localKgco2e",
   "importedKgco2e",
+  "constructionKgco2e",
   "importKgco2ePerMWh",
   "cash",
   "customers",
@@ -214,15 +222,39 @@ export function checkTick(
     );
   }
 
-  const emissionsTotal = (now.localKgco2e || 0) + (now.importedKgco2e || 0);
+  const emissionsTotal =
+    (now.localKgco2e || 0) +
+    (now.importedKgco2e || 0) +
+    (now.constructionKgco2e || 0);
   if (
     Math.abs(now.kgco2e - emissionsTotal) >
     Math.max(1, emissionsTotal) * RELATIVE_TOLERANCE
   ) {
     collector.add(
-      "local and purchased emissions sum to total",
+      "local, purchased and construction emissions sum to total",
       when,
       `${now.kgco2e} vs ${emissionsTotal}`,
+    );
+  }
+
+  // No project may emit more than it was quoted. This is the rule that matters: it bounds the
+  // accrual from above whatever the clock does, and a runaway or double charge trips it on the
+  // tick it happens. Its mirror -- that nothing accrues once everything is paid for -- cannot
+  // be checked here, because the tick that finishes a project both settles the last of its
+  // balance and zeroes it, so the charge and an empty balance are always seen together.
+  let constructionOverpaid = 0;
+  const trackConstruction = (asset: ConstructionEmissions) => {
+    const total = asset.constructionKgco2eTotal || 0;
+    const emitted = asset.constructionKgco2eEmitted || 0;
+    if (emitted > total) constructionOverpaid += emitted - total;
+  };
+  state.facilities.forEach(trackConstruction);
+  (state.transmission?.lines || []).forEach(trackConstruction);
+  if (constructionOverpaid > 1e-6) {
+    collector.add(
+      "no project emits more than it was quoted to",
+      when,
+      `${constructionOverpaid} beyond the quoted totals`,
     );
   }
 
@@ -268,6 +300,8 @@ export function checkTick(
       `expected ${Math.round(expectedSupplyW)}W but supplyW is ${Math.round(now.supplyW)}W`,
     );
   }
+
+  checkTrade(collector, state, now, when);
 
   if (now.customerBillingRate !== undefined) {
     const billedRevenue =
@@ -443,6 +477,85 @@ export function checkTick(
   if (prev) {
     checkStorageEnergyBalance(collector, state, prev, now, when);
     checkHydroEnergyBalance(collector, state, prev, now, when);
+  }
+}
+
+/**
+ * Trade stays within what the built lines and neighbours can carry, and is paid for exactly when it
+ * flows. The import bound is an upper limit composed from the same helpers the reducer uses, so it
+ * catches a flow that bypasses a neighbour's availability without restating how flows are split.
+ */
+function checkTrade(
+  collector: InvariantCollector,
+  state: GameType,
+  now: TickPresentFutureType,
+  when: string,
+) {
+  const importedW = now.importedW || 0;
+  const exportedW = now.exportedW || 0;
+  const capacityW = now.transmissionCapacityW || 0;
+  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+    collector.add(
+      "trade stays within transmission capacity",
+      when,
+      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+    );
+  }
+  if (importedW > 0 && exportedW > 0) {
+    collector.add(
+      "a tick never imports and exports at once",
+      when,
+      `imported ${importedW}W and exported ${exportedW}W`,
+    );
+  }
+  const importsFlow = importedW > 0;
+  const importsPaid = (now.expensesImports || 0) > 0;
+  if (importsFlow !== importsPaid) {
+    collector.add(
+      "imports are paid for exactly when they flow",
+      when,
+      `imported ${importedW}W, import expenses ${now.expensesImports}`,
+    );
+  }
+  const exportsFlow = exportedW > 0;
+  const exportsPaid = (now.revenueExports || 0) > 0;
+  if (exportsFlow !== exportsPaid) {
+    collector.add(
+      "exports are paid for exactly when they flow",
+      when,
+      `exported ${exportedW}W, export revenue ${now.revenueExports}`,
+    );
+  }
+  if (importedW > 0 && state.transmission && now.temperatureC !== undefined) {
+    const context = intertieContextForGame(state);
+    const conditions = {
+      temperatureC: now.temperatureC,
+      solarIrradianceWM2: now.solarIrradianceWM2 || 0,
+    };
+    const neighbourLimitW = state.transmission.lines
+      .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
+      .reduce(
+        (sum, line) =>
+          sum +
+          Math.min(
+            transmissionRatingW(line, conditions) *
+              importAvailabilityFraction(
+                line.corridorId,
+                context,
+                now.minute,
+                conditions,
+              ),
+            adjacentMarketForCorridor(line.corridorId)?.availableSupplyW || 0,
+          ),
+        0,
+      );
+    if (importedW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
+      collector.add(
+        "imports stay within what neighbours can spare",
+        when,
+        `imported ${Math.round(importedW)}W vs ${Math.round(neighbourLimitW)}W available`,
+      );
+    }
   }
 }
 

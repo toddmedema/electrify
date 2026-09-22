@@ -1,3 +1,5 @@
+import { captureRunIdentity } from "../../helpers/RunIdentity";
+import { SCENARIOS } from "../../data/Scenarios";
 import * as React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -179,7 +181,7 @@ describe("VictoryDialog", () => {
 
     await userEvent.click(screen.getByText("Review grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Choose game"));
+    await userEvent.click(screen.getByText("New game"));
     expect(onQuit).toHaveBeenCalled();
   });
 
@@ -215,4 +217,35 @@ describe("VictoryDialog", () => {
     // The compact breakdown remains: the override replaces the flavour text, not the score.
     expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
   });
+});
+
+it("previews a guest challenge, preserves native cancellation and announces successful copy", async () => {
+  const scenario = SCENARIOS.find((s) => s.id === 101)!;
+  const onShared = jest.fn(),
+    onShareFailed = jest.fn();
+  renderDialog({
+    victory: aVictory({
+      ranked: false,
+      runIdentity: captureRunIdentity(scenario, 42, "CEO"),
+    }),
+    loggedIn: false,
+    onShared,
+    onShareFailed,
+  });
+  await userEvent.click(
+    screen.getByRole("button", { name: "Challenge a friend" }),
+  );
+  const preview = screen.getByRole("dialog", { name: "Challenge a friend" });
+  expect(preview).toHaveAttribute("aria-describedby", "challenge-preview-copy");
+  expect(screen.getByRole("button", { name: "Share" })).toHaveFocus();
+  mockShareText.mockResolvedValueOnce("cancelled");
+  await userEvent.click(screen.getByRole("button", { name: "Share" }));
+  expect(preview).toBeInTheDocument();
+  expect(onShared).not.toHaveBeenCalled();
+  expect(onShareFailed).not.toHaveBeenCalled();
+  mockShareText.mockResolvedValueOnce("clipboard");
+  await userEvent.click(screen.getByRole("button", { name: "Share" }));
+  await waitFor(() =>
+    expect(onShared).toHaveBeenCalledWith(expect.anything(), "clipboard"),
+  );
 });

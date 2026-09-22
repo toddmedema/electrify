@@ -21,6 +21,7 @@ for (const theme of ["light", "dark"] as const) {
       const cards = page.locator(".buildOption");
       const first = cards.first();
       await expect(first).toBeVisible();
+      await expect(first).not.toContainText("Construction emits");
       await expect(page.locator("main.base_main")).toHaveCount(1);
       for (const card of await cards.all()) {
         expect(
@@ -45,18 +46,18 @@ for (const theme of ["light", "dark"] as const) {
         expect(strokes[0]).toBe(
           theme === "light" ? "rgb(84, 110, 122)" : "rgb(154, 169, 186)",
         );
-        // Cost, time and the output line share one row
+        // Metrics reflow at a readable minimum width.
         const cells = await metrics
           .locator(".buildOptionMetric")
           .evaluateAll((els) =>
-            els.map((el) => el.getBoundingClientRect().top),
+            els.map((el) => el.getBoundingClientRect().width),
           );
-        expect(new Set(cells.map(Math.round)).size).toBe(1);
+        expect(cells.every((width) => width >= 128)).toBe(true);
       }
       const review = first.getByRole("button", { name: /Review purchase of/ });
       const header = first.locator(".MuiCardHeader-root");
       const box = (await first.boundingBox())!;
-      expect(box.height).toBeLessThan(kind === "Generator" ? 230 : 285);
+      expect(box.height).toBeLessThan(kind === "Generator" ? 310 : 390);
       expect((await review.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
@@ -96,10 +97,11 @@ for (const theme of ["light", "dark"] as const) {
         const sortedCells = await first
           .locator(".buildOptionMetric")
           .evaluateAll((els) =>
-            els.map((el) => el.getBoundingClientRect().top),
+            els.map((el) => el.getBoundingClientRect().width),
           );
         expect(sortedCells).toHaveLength(4);
-        expect(new Set(sortedCells.map(Math.round)).size).toBe(1);
+        await expect(first).not.toContainText("Construction emits");
+        expect(sortedCells.every((width) => width >= 128)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
@@ -107,11 +109,53 @@ for (const theme of ["light", "dark"] as const) {
       await first.getByRole("button", { name: /Show .* details/ }).click();
       await expect(first.locator(".buildOptionDescription")).toBeVisible();
       await expect(first.getByRole("table")).toBeVisible();
+      await expect(
+        first.getByText("Construction emits", { exact: true }),
+      ).toBeVisible();
+      await first
+        .getByText("Construction emits", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await expect(
+        first.getByText("Construction emits", { exact: true }),
+      ).toBeInViewport();
+      await page.screenshot({
+        path: testInfo.outputPath(`${kind}-details-${theme}.png`),
+        animations: "disabled",
+      });
       await review.click();
       await expect(page.getByRole("dialog")).toBeVisible();
+      const dialog = page.getByRole("dialog");
+      const title = dialog.locator(".closableDialogTitleText");
+      const close = dialog.getByRole("button", { name: "close", exact: true });
+      const titleBox = (await title.boundingBox())!;
+      const closeBox = (await close.boundingBox())!;
+      expect(titleBox.x + titleBox.width + 7).toBeLessThanOrEqual(closeBox.x);
+      expect(closeBox.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      const actionStyles = await dialog
+        .locator(".MuiDialogActions-root")
+        .evaluate((element) => ({
+          gap: getComputedStyle(element).gap,
+          bottom: parseFloat(getComputedStyle(element).paddingBottom),
+          margins: Array.from(element.children).map(
+            (child) => getComputedStyle(child).marginLeft,
+          ),
+        }));
+      expect(actionStyles.gap).toBe("8px");
+      expect(actionStyles.bottom).toBeGreaterThanOrEqual(16);
+      expect(actionStyles.margins.every((margin) => margin === "0px")).toBe(
+        true,
+      );
       await expect(
         page.getByRole("button", { name: "Pay cash", exact: true }),
       ).toBeVisible();
+      if (kind === "Storage") {
+        await page.screenshot({
+          path: testInfo.outputPath(`Storage-purchase-${theme}.png`),
+          animations: "disabled",
+        });
+      }
       await page
         .getByRole("dialog")
         .getByRole("button", { name: "close" })
@@ -142,7 +186,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(battery).toBeVisible();
     await expect(page.locator("main.base_main")).toHaveCount(1);
-    await expect(battery.locator(".buildOptionMetrics")).toContainText("4 h");
+    await expect(battery.locator(".buildOptionMetrics")).toContainText("4 hr");
     await expect(battery.locator(".buildOptionMetrics")).toContainText("125MW");
     await expect(battery.locator(".buildOptionMetrics")).toContainText("85%");
     expect(

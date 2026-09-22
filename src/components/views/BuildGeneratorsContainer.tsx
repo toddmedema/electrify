@@ -1,9 +1,8 @@
-import { returnToEvidence } from "../../helpers/EvidenceJourney";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
 import { buildFacility } from "../../reducers/Game";
-import { selectFacility, snackbarOpen } from "../../reducers/UI";
+import { facilityPurchased, snackbarOpen } from "../../reducers/UI";
 import { getStore } from "../../StoreRegistry";
 import { buildConsequenceMessage } from "../../helpers/BuildConsequences";
 import { AppStateType, GeneratorShoppingType } from "../../Types";
@@ -15,7 +14,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     evidenceRequest: state.ui.evidenceRequest,
     facilityDragActive: state.ui.facilityDragActive,
     game: state.game,
-    hasEvidenceReturn: !!state.ui.evidenceJourney,
     focusFuel:
       state.card.storyTarget?.card === "FACILITIES"
         ? state.card.storyTarget.fuel
@@ -27,9 +25,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
-    },
-    onEvidenceReturn: () => {
-      dispatch(returnToEvidence());
     },
     onBack: () => {
       dispatch(navigate("FACILITIES"));
@@ -45,7 +40,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         .getState()
         .game.facilities.find((candidate) => !beforeIds.has(candidate.id));
       if (built) {
-        dispatch(selectFacility(built.id));
+        dispatch(facilityPurchased(built.id));
         dispatch(
           snackbarOpen({
             message: buildConsequenceMessage(facility, financed),

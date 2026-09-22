@@ -4,6 +4,7 @@ import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
 import { isValidLocation } from "./helpers/Locations";
+import { isValidDifficulty } from "./helpers/Difficulty";
 import {
   GameType,
   ReplayActionNameType,
@@ -65,6 +66,7 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "togglePauseFacility",
   "reprioritizeFacility",
   "buildTransmissionLine",
+  "upgradeTransmissionLine",
   "setTradingPolicy",
   "delta",
 ];
@@ -189,7 +191,8 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     )
       return null;
     if (
-      action.type === "buildTransmissionLine" &&
+      (action.type === "buildTransmissionLine" ||
+        action.type === "upgradeTransmissionLine") &&
       (typeof action.payload !== "object" ||
         action.payload === null ||
         typeof (action.payload as { corridorId?: unknown }).corridorId !==
@@ -240,7 +243,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
     typeof doc.appVersion !== "string" ||
-    typeof doc.difficulty !== "string" ||
+    !isValidDifficulty(doc.difficulty) ||
     (doc.meaningfulDecisionGateWaived !== undefined &&
       typeof doc.meaningfulDecisionGateWaived !== "boolean") ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file

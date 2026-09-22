@@ -9,7 +9,7 @@ test("custom setup and settings stay usable on a 320px phone", async ({
     window.localStorage.setItem(
       "plays",
       JSON.stringify({
-        plays: [{ scenarioId: 0, date: new Date().toString() }],
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
   });

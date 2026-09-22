@@ -5,21 +5,21 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Stack,
   Typography,
 } from "@mui/material";
+import {
+  challengeShareContent,
+  challengeComparison,
+} from "../../helpers/Challenge";
+import { logEvent } from "../../Globals";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import numbro from "numbro";
 import { VictoryDebriefType, VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
-import {
-  buildScoreShareContent,
-  canShare,
-  shareText,
-} from "../../helpers/Share";
+import { canShare, shareText } from "../../helpers/Share";
 import ConceptIcon from "./ConceptIcon";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { formatLargeMass } from "../../helpers/Units";
@@ -113,6 +113,8 @@ function RunDebrief({
  */
 export default function VictoryDialog(props: Props): React.JSX.Element {
   const { victory, loggedIn, onClose, onQuit, onLogin } = props;
+  const [preview, setPreview] = React.useState(false);
+  const [sharing, setSharing] = React.useState(false);
   const [rank, setRank] = React.useState<number | undefined>(undefined);
   const [rankFailed, setRankFailed] = React.useState(false);
 
@@ -168,14 +170,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     )
     .join(" · ");
 
+  const shared = challengeShareContent(victory);
+  const comparison = challengeComparison(victory);
   const onShare = () => {
-    const content = buildScoreShareContent({
+    setSharing(true);
+    logEvent("challenge_share_attempt", {
       scenarioId: victory.scenarioId,
-      score: victory.score,
-      scenarioName: victory.scenarioName,
-      difficulty: victory.difficulty,
+      eligible: shared.challenge,
     });
-    shareText(content).then((method) => {
+    shareText(shared.content).then((method) => {
+      setSharing(false);
       if (method === "cancelled") {
         return; // The player changed their mind, which is not a failure to report
       }
@@ -183,6 +187,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         props.onShareFailed();
         return;
       }
+      setPreview(false);
       props.onShared(victory, method);
     });
   };
@@ -252,6 +257,14 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           Points reflect the scenario's priorities. Compare reliability, cost,
           and emissions separately when deciding what worked.
         </Typography>
+        {comparison && (
+          <Typography role="status" sx={{ mt: 2 }}>
+            {comparison}{" "}
+            <Typography component="span" variant="body2" color="textSecondary">
+              Shared score · unverified.
+            </Typography>
+          </Typography>
+        )}
         {victory.debrief && <RunDebrief debrief={victory.debrief} />}
         {ranked && loggedIn && (
           <Typography
@@ -294,13 +307,13 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         }}
       >
         {canShare() && (
-          <IconButton
+          <Button
             color="primary"
-            onClick={onShare}
-            aria-label="Share score"
+            startIcon={<ShareIcon />}
+            onClick={() => setPreview(true)}
           >
-            <ShareIcon />
-          </IconButton>
+            {shared.challenge ? "Challenge a friend" : "Share result"}
+          </Button>
         )}
         {!failed && (
           <Button color="primary" onClick={onClose}>
@@ -308,7 +321,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Button>
         )}
         <Button color="primary" onClick={onQuit}>
-          Choose game
+          New game
         </Button>
         <Button
           color="primary"
@@ -318,6 +331,41 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           Try again
         </Button>
       </DialogActions>
+      <Dialog
+        open={preview}
+        onClose={() => !sharing && setPreview(false)}
+        aria-labelledby="challenge-preview-title"
+        aria-describedby="challenge-preview-copy"
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle id="challenge-preview-title">
+          {shared.challenge ? "Challenge a friend" : "Share result"}
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="challenge-preview-copy">
+            {shared.content.text}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+            {shared.challenge
+              ? "Your friend starts with the same conditions."
+              : "This shares your result and mission, without matching the starting conditions."}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={sharing} onClick={() => setPreview(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            autoFocus
+            disabled={sharing}
+            onClick={onShare}
+          >
+            Share
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

@@ -7,10 +7,12 @@ import {
   togglePauseFacility,
   reprioritizeFacility,
   buildTransmissionLine,
+  upgradeTransmissionLine,
   setTradingPolicy,
 } from "../../reducers/Game";
 import {
   selectFacility,
+  acknowledgeFacilityArrival,
   setFacilityDragActive,
   snackbarOpen,
 } from "../../reducers/UI";
@@ -25,11 +27,13 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     facilityDragActive: state.ui.facilityDragActive,
     game: state.game,
     selectedFacilityId: state.ui.selectedFacilityId,
+    arrivingFacilityId: state.ui.arrivingFacilityId,
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onArrivalShown: (id) => dispatch(acknowledgeFacilityArrival(id)),
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
     },
@@ -98,6 +102,14 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           ),
         );
       }
+    },
+    onTransmissionUpgrade: (corridorId, financed) => {
+      dispatch(upgradeTransmissionLine({ corridorId, financed }));
+      dispatch(
+        snackbarOpen(
+          "Upgrade approved — the line keeps carrying power while the work runs.",
+        ),
+      );
     },
     onTradingPolicy: (policy) => {
       dispatch(setTradingPolicy(policy));

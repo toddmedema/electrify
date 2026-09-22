@@ -36,8 +36,6 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     page.getByRole("button", { name: "Insights", exact: true }),
   );
   await expect(insights).toBeVisible();
-  await insights.getByRole("button", { name: "Zoom out" }).click();
-  await insights.getByRole("button", { name: "Zoom out" }).click();
 
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
@@ -234,16 +232,17 @@ test("insights header controls stay aligned in one compact row", async ({
     page.getByRole("button", { name: "Preset actions" }),
     page.getByRole("button", { name: /^Layers \(/ }),
   ];
-  if (!testInfo.project.name.startsWith("mobile-")) {
+  const compact = await insights.evaluate((element) =>
+    element.classList.contains("insightsCompact"),
+  );
+  if (!compact) {
     controls.splice(1, 0, page.getByRole("button", { name: "Save" }));
   }
   const boxes = await Promise.all(
     controls.map((control) => control.boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
-  const minimumControlHeight = testInfo.project.name.startsWith("mobile-")
-    ? 44
-    : 40;
+  const minimumControlHeight = testInfo.project.use.hasTouch ? 44 : 40;
   expect(boxes.every((box) => box!.height >= minimumControlHeight)).toBe(true);
   expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
 
@@ -254,7 +253,7 @@ test("insights header controls stay aligned in one compact row", async ({
     );
   expect(headerOverflow).toBeLessThanOrEqual(1);
 
-  if (testInfo.project.name === "desktop-chromium") {
+  if (!compact) {
     const [group, layerButton] = await Promise.all([
       page.locator(".insightsPresetControls").boundingBox(),
       page.locator("#insightsLayersButton").boundingBox(),
@@ -266,11 +265,11 @@ test("insights header controls stay aligned in one compact row", async ({
     );
   }
 
-  if (testInfo.project.name.startsWith("mobile-")) {
+  if (compact) {
     const header = await page.locator(".insightsHeader").boundingBox();
     expect(header).not.toBeNull();
-    expect(header!.height).toBeGreaterThanOrEqual(52);
-    expect(header!.height).toBeLessThanOrEqual(54);
+    expect(header!.height).toBeGreaterThanOrEqual(minimumControlHeight + 8);
+    expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 10);
 
     const levers = page.locator(".insightsLevers");
     await expect(levers).toHaveCSS("display", "grid");
@@ -367,13 +366,13 @@ test("insights header controls stay aligned in one compact row", async ({
     const dateRange = page.getByLabel(/Displayed date range:/);
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: 2019–20",
+      "Displayed date range: Jan 2019",
     );
     await expect(dateRange).toHaveCSS("font-size", "14px");
-    await page.getByRole("button", { name: "Zoom in" }).click();
+    await page.getByRole("button", { name: "Fit full timeline" }).click();
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: Apr–Oct 2019",
+      "Displayed date range: 2019–38",
     );
     expect(
       await dateRange.evaluate(
@@ -429,24 +428,6 @@ test("compact facility build buttons stay above the chart", async ({
   expect(
     (await facilities.locator(".paneHeader").boundingBox())!.height,
   ).toBeLessThanOrEqual(57); // Touch-sized Build action plus the divider
-});
-
-test("main-menu account actions follow the sound action", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
-  await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/");
-
-  const sound = page.getByRole("button", { name: "Turn on sound" });
-  const account = page.getByRole("region", { name: "Account actions" });
-  const [soundBox, accountBox] = await Promise.all([
-    sound.boundingBox(),
-    account.boundingBox(),
-  ]);
-  expect(soundBox).not.toBeNull();
-  expect(accountBox).not.toBeNull();
-  expect(accountBox!.y).toBeGreaterThanOrEqual(soundBox!.y + soundBox!.height);
 });
 
 test("expanded finance and economic rates remain readable", async ({

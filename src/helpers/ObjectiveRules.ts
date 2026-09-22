@@ -51,7 +51,11 @@ export function scenarioObjectiveFailure(
     for (const target of targets) {
       const served = demandServed(target);
       if (served < reliabilityObjective.minimumDemandServed) {
-        return `You served ${(served * 100).toFixed(2)}% of demand during the ${reliabilityObjective.label}; this mission requires ${Math.round(reliabilityObjective.minimumDemandServed * 100)}%.`;
+        // Floored to two decimals rather than rounded: the objective can require exactly 100%,
+        // and a month that fell a hair short (99.996%) would round up to a whole "100.00%"
+        // sitting right next to "this mission requires 100%" -- an explanation that argues
+        // with itself. Two decimals are kept because precision is the point of this sentence.
+        return `You served ${(Math.floor(served * 10000) / 100).toFixed(2)}% of demand during the ${reliabilityObjective.label}; this mission requires ${Math.round(reliabilityObjective.minimumDemandServed * 100)}%.`;
       }
     }
   }

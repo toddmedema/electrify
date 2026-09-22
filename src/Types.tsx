@@ -1,6 +1,7 @@
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
+import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 export interface AudioType {
@@ -32,6 +33,9 @@ export interface AdjacentMarketDefinitionType {
   id: string;
   name: string;
   description: string;
+  archetype: IntertieArchetypeIdType;
+  /** Set when the neighbour's seasons differ from the player's, e.g. across the equator */
+  seasonHemisphere?: "NORTH" | "SOUTH";
   basePricePerMWh: number;
   availableSupplyW: number;
   availableDemandW: number;
@@ -68,6 +72,38 @@ export interface TransmissionLineOperatingType {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
   interestRate: number;
+  /**
+   * Net power over this line in the current tick: positive importing, negative selling.
+   * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
+   * current-tick dispatch of a player-action reforecast. Future forecasts use cloned lines.
+   * Set to 0 when ordered; older saves may omit it.
+   */
+  currentFlowW?: number;
+  /**
+   * Embodied emissions from building the corridor, accrued over its construction period. Derived
+   * from the corridor's cost per watt at purchase rather than stored per corridor, since the
+   * authored data carries no route length. Absent on legacy saves.
+   */
+  constructionKgco2eTotal?: number;
+  constructionKgco2eEmitted?: number;
+  /**
+   * Work in progress to widen a line that is already carrying power. The line keeps running at
+   * its present rating throughout and steps up on the day the work finishes, which is how a
+   * real reconductoring goes: crews restring one circuit at a time rather than taking the
+   * interconnector down for a year. Absent unless an upgrade is under way.
+   */
+  upgrade?: IntertieUpgradeType;
+}
+
+export interface IntertieUpgradeType {
+  targetCapacityW: number;
+  buildCost: number;
+  /** What the widened line will cost to run, replacing the current figure on completion. */
+  annualOperatingCost: number;
+  yearsToBuild: number;
+  yearsToBuildLeft: number;
+  constructionKgco2eTotal?: number;
+  constructionKgco2eEmitted?: number;
 }
 
 export interface TransmissionStateType {
@@ -160,6 +196,7 @@ export interface DifficultyMultipliersType {
   expensesOM: number;
   buildTime: number;
   blackoutPenalty: number; // for each % of demand unfulfilled, how much the regional growth rate is reduced
+  peakSharingImportLoss: number; // share of a peak-sharing neighbour's imports lost at full local heat/cold stress
   description: string; // shown in a tooltip on the difficulty picker
 }
 
@@ -176,7 +213,8 @@ export type CardNameType =
   | "NEW_GAME_DETAILS"
   | "MANUAL"
   | "SETTINGS"
-  | "CUSTOM_GAME";
+  | "CUSTOM_GAME"
+  | "CHALLENGE";
 
 export type ConceptNameType =
   | "money"
@@ -231,8 +269,6 @@ export interface NavigateActionType {
   url?: string;
   skipBrowserHistory?: boolean;
   replaceCurrentCard?: boolean;
-  journeyTraversal?: "origin" | "control";
-  journeyMarker?: { id: number; runId: number; role: "origin" | "control" };
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
   storyTarget?: StoryActionTargetType;
@@ -281,6 +317,7 @@ export type ReplayActionNameType =
   | "togglePauseFacility"
   | "reprioritizeFacility"
   | "buildTransmissionLine"
+  | "upgradeTransmissionLine"
   | "setTradingPolicy"
   | "delta";
 
@@ -461,9 +498,13 @@ interface HistoryForecastShared {
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-  kgco2e: number; // Local generation plus purchased-electricity emissions
+  kgco2e: number; // Local generation, purchased electricity and construction under way
   localKgco2e?: number;
   importedKgco2e?: number;
+  // Embodied emissions from everything currently being built, spread evenly across each
+  // project's construction period. Deliberately outside the carbon fee's base: a fee prices
+  // what a grid burns, while this is mostly incurred in someone else's supply chain.
+  constructionKgco2e?: number;
   // Point in time rather than totals: what a new loan would cost, and what prices were doing,
   // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
   // keeps the last one it sees, the way it does for cash and net worth.
@@ -481,7 +522,11 @@ export type FacilityOperatingType =
   GeneratorOperatingType | StorageOperatingType;
 
 export interface GeneratorOperatingType
-  extends GeneratorShoppingType, LoanInfo, LifetimeTotals {
+  extends
+    GeneratorShoppingType,
+    LoanInfo,
+    LifetimeTotals,
+    ConstructionEmissions {
   id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;
@@ -504,12 +549,29 @@ export interface GeneratorOperatingType
 }
 
 export interface StorageOperatingType
-  extends StorageShoppingType, LoanInfo, LifetimeTotals {
+  extends StorageShoppingType, LoanInfo, LifetimeTotals, ConstructionEmissions {
   id: number; // Monotonically increasing
   currentWh: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
   minuteOperational?: number;
+}
+
+/**
+ * What building this asset emits in total, resolved from the shopping quote at purchase so a
+ * later price or technology revision cannot retroactively change what a standing plant emitted.
+ * Accrued into the company's totals over the construction period rather than booked at once.
+ * Absent on the starting fleet, which was built before the run began, and on legacy saves.
+ */
+export interface ConstructionEmissions {
+  constructionKgco2eTotal?: number;
+  /**
+   * How much of that total the run has already booked. Kept per asset so accrual is driven by
+   * how far the build has actually got rather than by elapsed time: the month-boundary pre-roll
+   * advances a facility's clock on frames that are never recorded, so a tick-shaped share would
+   * quietly lose whatever the pre-roll moved. Catching up against progress cannot.
+   */
+  constructionKgco2eEmitted?: number;
 }
 
 /**
@@ -599,6 +661,15 @@ interface SharedShoppingType {
   viableLocationsRemaining?: number;
   lifespanYears: number;
   yearsToBuild: number;
+  /**
+   * Embodied emissions from building the thing: materials, manufacturing, transport and
+   * installation, excluding everything the plant does once it runs. Generators carry a per-watt
+   * figure and storage a per-watt-hour one; neither carries both, because each storage
+   * technology has a fixed duration, which would make a second coefficient unidentifiable.
+   * Resolved against the catalogue's year at purchase, so a quote locks its vintage.
+   */
+  constructionKgco2ePerW?: number;
+  constructionKgco2ePerWh?: number;
 }
 
 export interface TutorialStepType {
@@ -611,6 +682,8 @@ export interface TutorialStepType {
   // isn't replayed when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
   onNext?: () => Action;
+  // Name an explicit transition when continuing starts a fresh challenge.
+  nextLabel?: string;
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;
@@ -952,6 +1025,8 @@ export interface PolicyChangeType {
   startHour?: number;
 }
 export interface GameType {
+  runIdentity?: RunIdentity;
+  challenge?: ChallengeInvitationV1;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
   seed: number;
@@ -1065,6 +1140,8 @@ export interface SnackbarType {
  * the moment the scenario ends; the rank and the score write are enrichment that lands later.
  */
 export interface VictoryType {
+  runIdentity?: RunIdentity;
+  challenge?: ChallengeInvitationV1;
   scenarioId: number;
   scenarioName: string;
   difficulty: DifficultyType;
@@ -1092,6 +1169,7 @@ export interface VictoryFleetCapacityType {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];
   finalFleet: VictoryFleetCapacityType[];
   startingCash: number;
@@ -1110,22 +1188,12 @@ export interface VictoryDebriefType {
   >;
 }
 
-export interface InsightsOriginType {
-  viewport: [number, number];
-  month: number;
-  layers: string[];
-  preset: string;
-  revision: number;
-  temporaryLayer?: string;
-  anchor?: string;
-  scrollTop: number;
-}
-
 export interface UIType {
-  insightsConfigurationRevision?: number;
-  evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
-  evidenceJourneyMarker?: { id: number; runId: number };
-  insightsRestore?: InsightsOriginType;
+  challengeHref?: string;
+  scenarioPreview?: number;
+  previewDifficulty?: DifficultyType;
+  // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
+  insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
   evidenceSequence?: number;
   evidenceRunId?: number;
@@ -1140,6 +1208,7 @@ export interface UIType {
   // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Insights reports what
   // it has earned. Cleared when the run ends, or when the facility is sold out from under it
   selectedFacilityId: number | null;
+  arrivingFacilityId?: number;
   // The score screen for a run that just ended, or null when none has. Its own slot rather than a
   // `dialog`, because the shared dialog only holds a title and a message and this one fills
   // itself in as async results arrive
@@ -1201,4 +1270,37 @@ export interface ScenarioChoiceType {
     /** False for a response that preserves the baseline without changing the operating plan. */
     meaningful?: boolean;
   }[];
+}
+
+/** Canonical initial inputs, captured before the first simulation tick. */
+export interface RunIdentity {
+  identitySchemaVersion: 1;
+  scenarioId: number;
+  scenarioRevision: string;
+  seed: number;
+  difficulty: DifficultyType;
+  compatibilityId: string;
+  origin: "authored" | "custom" | "tutorial" | "replay";
+  inputs: {
+    scenario: string;
+    location: LocationType;
+    facilities: ScenarioFacilityType[];
+    cash: number;
+    customers: number;
+    meaningfulDecisionGateWaived: boolean;
+  };
+}
+export interface AuthoredRunReferenceV1 {
+  identitySchemaVersion: 1;
+  scenarioId: number;
+  scenarioRevision: string;
+  seed: number;
+  difficulty: DifficultyType;
+  compatibilityId: string;
+  optionsProfile: "canonical-v1";
+}
+export interface ChallengeInvitationV1 {
+  invitationSchemaVersion: 1;
+  run: AuthoredRunReferenceV1;
+  target: number;
 }

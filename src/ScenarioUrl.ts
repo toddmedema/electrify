@@ -22,6 +22,7 @@ export function scenarioDetailsUrl(
   location: LocationParts = window.location,
 ): string {
   const params = new URLSearchParams(location.search);
+  params.delete("challenge");
   params.set("scenario", String(scenarioId));
   return `${location.pathname}?${params.toString()}`;
 }
@@ -32,6 +33,7 @@ export function scenarioListUrl(
 ): string {
   const params = new URLSearchParams(location.search);
   params.delete("scenario");
+  params.delete("challenge");
   const search = params.toString();
   return `${location.pathname}${search ? `?${search}` : ""}`;
 }

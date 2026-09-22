@@ -4,6 +4,7 @@ import {
   YEARS_PER_TICK,
   TICKS_PER_HOUR,
   GAME_TO_REAL_YEARS,
+  DIFFICULTIES,
 } from "../Constants";
 import {
   getTimeFromTimeline,
@@ -19,12 +20,27 @@ import gameReducer, {
   tickState,
   togglePauseFacility,
 } from "./Game";
-import { AppStateType } from "../Types";
+import {
+  AppStateType,
+  DifficultyType,
+  GameType,
+  TickPresentFutureType,
+} from "../Types";
 import { getScenario } from "../data/Scenarios";
-import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
+import {
+  TRANSMISSION_CORRIDORS,
+  adjacentMarketForCorridor,
+} from "../data/AdjacentMarkets";
+import { IntertieArchetypeIdType } from "../data/IntertieArchetypes";
+import {
+  adjacentMarketPricePerMWh,
+  importAvailabilityFraction,
+  intertieContextForGame,
+  transmissionRatingW,
+} from "../helpers/Transmission";
 
-function buildNorthernIntertie() {
-  const game = createGame({ scenarioId: 100, seed: 61 });
+function buildNorthernIntertie(difficulty?: DifficultyType) {
+  const game = createGame({ scenarioId: 100, seed: 61, difficulty });
   getTimeFromTimeline(game.date.minute, game.timeline)!.cash = 1000000000;
   return cloneDeep(
     gameReducer(
@@ -35,6 +51,81 @@ function buildNorthernIntertie() {
       }),
     ),
   );
+}
+
+/** Representative-day watts on one live tick, as the megawatt-hours the month is billed for */
+function tickMWh(w: number): number {
+  return ((w / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1000000;
+}
+
+/** What each operating line could offer on this tick, from the same helpers the reducer uses */
+function lineOffers(state: GameType, now: TickPresentFutureType) {
+  const context = intertieContextForGame(state);
+  return state
+    .transmission!.lines.filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
+    .map((line) => {
+      const market = adjacentMarketForCorridor(line.corridorId)!;
+      const ratingW = transmissionRatingW(line, now);
+      return {
+        corridorId: line.corridorId,
+        ratingW,
+        pricePerMWh: adjacentMarketPricePerMWh(
+          line.corridorId,
+          context,
+          now.minute,
+          now,
+        ),
+        importLimitW: Math.min(
+          ratingW *
+            importAvailabilityFraction(
+              line.corridorId,
+              context,
+              now.minute,
+              now,
+            ),
+          market.availableSupplyW,
+        ),
+        emissionsKgco2ePerMWh: market.emissionsKgco2ePerMWh,
+      };
+    });
+}
+
+function corridorFor(archetype: IntertieArchetypeIdType): string {
+  const corridor = TRANSMISSION_CORRIDORS.find(
+    ({ id }) => adjacentMarketForCorridor(id)?.archetype === archetype,
+  );
+  if (!corridor) {
+    throw new Error(`No intertie corridor reaches a ${archetype} neighbour`);
+  }
+  return corridor.id;
+}
+
+/** Two operating California lines and no local plants, in mild, dark weather */
+function twoIntertiesWithoutPlants() {
+  const state = buildNorthernIntertie();
+  state.facilities = [];
+  const north = state.transmission!.lines[0];
+  north.yearsToBuildLeft = 0;
+  state.transmission!.lines.push({
+    ...north,
+    id: 2,
+    corridorId: "california-south",
+  });
+  state.timeline.forEach((t) => {
+    t.temperatureC = 20;
+    t.solarIrradianceWM2 = 0;
+  });
+  return state;
+}
+
+/** The tick the next `tickState` will settle, found on a throwaway copy */
+function nextTick(state: GameType) {
+  const probe = cloneDeep(state);
+  tickState(probe);
+  return {
+    probe,
+    now: getTimeFromTimeline(probe.date.minute, probe.timeline)!,
+  };
 }
 
 describe("transmission actions", () => {
@@ -181,10 +272,23 @@ describe("transmission actions", () => {
     const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
     const principalPaid = debtBefore - line.loanAmountLeft;
     expect(line.yearsToBuildLeft).toBe(0);
+    // With no local plants the whole demand is short; the neighbour fills what it can spare.
+    const [offer] = lineOffers(state, now);
+    const expectedImportW = Math.min(
+      now.demandW,
+      offer.ratingW,
+      offer.importLimitW,
+    );
     expect(now.importedW).toBeGreaterThan(0);
+    expect(now.importedW).toBeCloseTo(expectedImportW, 0);
     expect(now.exportedW).toBe(0);
-    expect(now.supplyW).toBe(now.demandW);
-    expect(now.expensesImports).toBeGreaterThan(0);
+    expect(now.supplyW).toBeCloseTo(expectedImportW, 0);
+    expect(now.transmissionCapacityW).toBe(offer.ratingW);
+    expect(now.marketPricePerMWh).toBeCloseTo(offer.pricePerMWh, 6);
+    expect(now.expensesImports).toBeCloseTo(
+      tickMWh(now.importedW!) * offer.pricePerMWh,
+      6,
+    );
     expect(now.expensesOM).toBeCloseTo(3600000 / TICKS_PER_YEAR, 5);
     expect(now.expensesInterest).toBeGreaterThan(0);
     expect(line.loanAmountLeft).toBeLessThan(debtBefore);
@@ -269,7 +373,11 @@ describe("transmission actions", () => {
       expect(getTimeFromTimeline(state.date.minute, state.timeline)!.cash).toBe(
         startingCash - 36000000,
       );
-      expect(steps[1].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Tap Take loan")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       let constructionTicks = 0;
       while (state.transmission!.lines[0].yearsToBuildLeft > 0) {
@@ -279,17 +387,39 @@ describe("transmission actions", () => {
       state.speed = "NORMAL";
       expect(constructionTicks).toBeGreaterThanOrEqual(TICKS_PER_YEAR - 1);
       expect(constructionTicks).toBeLessThanOrEqual(TICKS_PER_YEAR + 1);
-      expect(steps[2].advanceOn?.(appState())).toBe(false);
+      expect(
+        steps
+          .find(
+            (step) =>
+              step.action === "Pause when the line shows a power reading",
+          )!
+          .advanceOn?.(appState()),
+      ).toBe(false);
       state.speed = "PAUSED";
-      expect(steps[2].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find(
+            (step) =>
+              step.action === "Pause when the line shows a power reading",
+          )!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       state = cloneDeep(
         gameReducer(state, setTradingPolicy("RELIABILITY_FIRST")),
       );
       const gas = state.facilities.find(({ fuel }) => fuel === "Natural Gas")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
-      expect(steps[3].advanceOn?.(appState())).toBe(true);
-      expect(steps[5].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Choose “Buy for shortages only”")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Tap Pause on the gas plant")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       const operatingTicks = [] as Array<{
         importedW: number;
@@ -306,7 +436,11 @@ describe("transmission actions", () => {
         });
       }
       state.speed = "PAUSED";
-      expect(steps[6].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Pause after an importing month")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
       expect(
         state.monthlyHistory.some(
           (month) => (month.chartAverage?.importedW || 0) > 0,
@@ -316,7 +450,7 @@ describe("transmission actions", () => {
         false,
       );
 
-      const capstone = steps[9].capstone!;
+      const capstone = steps.find((step) => step.capstone)!.capstone!;
       state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
       const solar = state.facilities.find(({ fuel }) => fuel === "Sun")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
@@ -395,33 +529,238 @@ describe("transmission actions", () => {
     expect(month.localKgco2e).toBe(0);
     expect(summarizeHistory([month]).importedKgco2e).toBe(now.importedKgco2e);
   });
-  it("weights purchased emissions by usable neighboring capacity", () => {
-    const state = buildNorthernIntertie();
-    state.facilities = [];
-    const north = state.transmission!.lines[0];
-    north.yearsToBuildLeft = 0;
-    north.capacityW = 100000000;
-    state.transmission!.lines.push({
-      ...north,
-      id: 2,
-      corridorId: "california-south",
-      capacityW: 300000000,
-    });
+  it("weights purchased emissions by the imports each line actually carries", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.transmission!.lines[0].capacityW = 100000000;
+    state.transmission!.lines[1].capacityW = 300000000;
     state.timeline.forEach((t) => {
       t.demandW = 200000000;
-      t.temperatureC = 20;
-      t.solarIrradianceWM2 = 0;
     });
     tickState(state);
     const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-    const northwest =
-      adjacentMarketForCorridor("california-north")!.emissionsKgco2ePerMWh;
-    expect(now.importKgco2ePerMWh).toBeCloseTo((northwest + 3 * 445) / 4);
-    expect(now.importedW).toBe(200000000);
-    expect(now.kgco2e).toBeCloseTo(
-      ((((200000000 / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1000000) *
-        (northwest + 3 * 445)) /
-        4,
+    const offers = lineOffers(state, now);
+    // Merit order: fill the cheaper neighbour first, then the other with what remains
+    const [cheap, dear] = [...offers].sort(
+      (a, b) => a.pricePerMWh - b.pricePerMWh,
+    );
+    const importedW = Math.min(
+      200000000,
+      cheap.importLimitW + dear.importLimitW,
+    );
+    const cheapW = Math.min(importedW, cheap.importLimitW);
+    const dearW = importedW - cheapW;
+    const intensity =
+      (cheapW * cheap.emissionsKgco2ePerMWh +
+        dearW * dear.emissionsKgco2ePerMWh) /
+      importedW;
+    expect(now.importedW).toBeCloseTo(importedW, 0);
+    expect(now.importKgco2ePerMWh).toBeCloseTo(intensity, 6);
+    expect(now.kgco2e).toBeCloseTo(tickMWh(importedW) * intensity, 3);
+  });
+
+  it("records each line's own signed flow, not just the fleet total", () => {
+    const state = twoIntertiesWithoutPlants();
+    // Too little room on the cheaper line for the whole shortfall, so both must carry some
+    state.transmission!.lines[0].capacityW = 100000000;
+    state.transmission!.lines[1].capacityW = 300000000;
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const lines = state.transmission!.lines;
+    expect(now.importedW).toBeGreaterThan(0);
+    // Buying reads positive, and the parts add up to the total the tick reported
+    lines.forEach((line) => expect(line.currentFlowW).toBeGreaterThan(0));
+    expect(
+      lines.reduce((sum, line) => sum + (line.currentFlowW || 0), 0),
+    ).toBeCloseTo(now.importedW! - (now.exportedW || 0), 0);
+    lines.forEach((line) =>
+      expect(Math.abs(line.currentFlowW!)).toBeLessThanOrEqual(
+        transmissionRatingW(line, now) + 1,
+      ),
+    );
+  });
+
+  it("signs a line that is selling power the other way", () => {
+    const state = twoIntertiesWithoutPlants();
+    // A large must-run fleet against tiny demand leaves surplus with nowhere to go but out
+    const source = createGame({ scenarioId: 100, seed: 61 });
+    state.facilities = cloneDeep(source.facilities).map((facility) => ({
+      ...facility,
+      yearsToBuildLeft: 0,
+      peakW: 2000000000,
+    }));
+    state.timeline.forEach((t) => {
+      t.demandW = 1000000;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const lines = state.transmission!.lines;
+    expect(now.exportedW).toBeGreaterThan(0);
+    expect(lines.some((line) => (line.currentFlowW || 0) < 0)).toBe(true);
+    expect(
+      lines.reduce((sum, line) => sum + (line.currentFlowW || 0), 0),
+    ).toBeCloseTo((now.importedW || 0) - now.exportedW!, 0);
+  });
+
+  it("leaves per-line flow alone during a forecast", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    const recorded = state.transmission!.lines.map(
+      ({ currentFlowW }) => currentFlowW,
+    );
+    expect(recorded.some((value) => (value || 0) > 0)).toBe(true);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    generateNewTimeline(state, now.cash, now.customers, 8);
+
+    // A forecast dispatches against hypothetical weather; the list must keep showing the
+    // trade that actually happened.
+    expect(
+      state.transmission!.lines.map(({ currentFlowW }) => currentFlowW),
+    ).toEqual(recorded);
+  });
+
+  it("keeps line readings aligned with the current tick at a month boundary", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 1000000;
+    });
+    while (state.date.monthsElapsed === 0) tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.importedW).toBeGreaterThan(1000000);
+    expect(
+      state.transmission!.lines.reduce(
+        (sum, line) => sum + (line.currentFlowW || 0),
+        0,
+      ),
+    ).toBeCloseTo((now.importedW || 0) - (now.exportedW || 0), 0);
+  });
+
+  it("refreshes per-line flow when the rule changes with the clock paused", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    state.speed = "PAUSED";
+    expect(
+      state.transmission!.lines.some((line) => (line.currentFlowW || 0) > 0),
+    ).toBe(true);
+
+    // Every policy decision is made with the clock stopped, so there is no next real tick to
+    // correct a stale reading: the section header says "No power flowing" while the row still
+    // shows the megawatts the line was carrying a moment ago.
+    const after = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+
+    expect(after.transmission!.tradingPolicy).toBe("CLOSED");
+    after.transmission!.lines.forEach((line) =>
+      expect(line.currentFlowW).toBe(0),
+    );
+  });
+
+  it("imports from the cheaper line first and pays each line its own price", () => {
+    const state = twoIntertiesWithoutPlants();
+    const { now: upcoming } = nextTick(state);
+    const [cheap, dear] = [...lineOffers(state, upcoming)].sort(
+      (a, b) => a.pricePerMWh - b.pricePerMWh,
+    );
+    expect(cheap.pricePerMWh).toBeLessThan(dear.pricePerMWh);
+    const dearW = dear.importLimitW / 2;
+    const demandW = cheap.importLimitW + dearW;
+    state.timeline.forEach((t) => {
+      t.demandW = demandW;
+    });
+
+    tickState(state);
+
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.minute).toBe(upcoming.minute);
+    expect(now.importedW).toBeCloseTo(demandW, 0);
+    const expectedCost =
+      tickMWh(cheap.importLimitW) * cheap.pricePerMWh +
+      tickMWh(dearW) * dear.pricePerMWh;
+    expect(now.expensesImports).toBeCloseTo(expectedCost, 4);
+    // More than the cheap price alone, less than buying everything from the dear line
+    expect(now.expensesImports).toBeGreaterThan(
+      tickMWh(demandW) * cheap.pricePerMWh,
+    );
+    expect(now.expensesImports).toBeLessThan(
+      tickMWh(demandW) * dear.pricePerMWh,
+    );
+    expect(now.marketPricePerMWh).toBeCloseTo(
+      (cheap.importLimitW * cheap.pricePerMWh + dearW * dear.pricePerMWh) /
+        demandW,
+      6,
+    );
+  });
+
+  it("books only the supplying line's emissions when the cheaper line covers the shortage", () => {
+    const state = twoIntertiesWithoutPlants();
+    const { now: upcoming } = nextTick(state);
+    const [cheap, dear] = [...lineOffers(state, upcoming)].sort(
+      (a, b) => a.pricePerMWh - b.pricePerMWh,
+    );
+    expect(cheap.emissionsKgco2ePerMWh).not.toBe(dear.emissionsKgco2ePerMWh);
+    const demandW = cheap.importLimitW / 2;
+    state.timeline.forEach((t) => {
+      t.demandW = demandW;
+    });
+
+    tickState(state);
+
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.importedW).toBeCloseTo(demandW, 0);
+    expect(now.importKgco2ePerMWh).toBe(cheap.emissionsKgco2ePerMWh);
+    expect(now.importedKgco2e).toBeCloseTo(
+      tickMWh(demandW) * cheap.emissionsKgco2ePerMWh,
+      3,
+    );
+    expect(now.expensesImports).toBeCloseTo(
+      tickMWh(demandW) * cheap.pricePerMWh,
+      4,
+    );
+  });
+
+  it("imports less from a peak-sharing neighbour on a hot peak at CEO than at Intern", () => {
+    const corridorId = corridorFor("PEAK_SHARING");
+    const importedAt = (difficulty: DifficultyType) => {
+      const state = buildNorthernIntertie(difficulty);
+      state.facilities = [];
+      const line = state.transmission!.lines[0];
+      line.corridorId = corridorId;
+      line.yearsToBuildLeft = 0;
+      state.timeline.forEach((t) => {
+        t.temperatureC = 40;
+        t.solarIrradianceWM2 = 0;
+        t.demandW = 20000000000;
+      });
+      tickState(state);
+      const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+      const [offer] = lineOffers(state, now);
+      expect(now.importedW).toBeCloseTo(
+        Math.min(now.demandW, offer.ratingW, offer.importLimitW),
+        0,
+      );
+      return { importedW: now.importedW!, offer, minute: now.minute };
+    };
+    const intern = importedAt("Intern");
+    const ceo = importedAt("CEO");
+    expect(ceo.minute).toBe(intern.minute);
+    expect(ceo.importedW).toBeLessThan(intern.importedW);
+    // Full heat stress takes the difficulty's share of the neighbour's spare supply
+    // The market's absolute spare supply is far larger than one line, so the line binds here
+    expect(intern.offer.importLimitW).toBeLessThan(
+      adjacentMarketForCorridor(corridorId)!.availableSupplyW,
+    );
+    expect(ceo.importedW / intern.importedW).toBeCloseTo(
+      (1 - DIFFICULTIES.CEO.peakSharingImportLoss) /
+        (1 - DIFFICULTIES.Intern.peakSharingImportLoss),
+      6,
     );
   });
 });

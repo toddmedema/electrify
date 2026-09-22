@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForPaneOrNav } from "./layout";
+import { isPaneLayout, waitForPaneOrNav, waitForSettled } from "./layout";
 
 for (const mission of [
   "Generators",
@@ -30,6 +30,7 @@ for (const mission of [
               )
               .map((scenarioId) => ({
                 scenarioId,
+                timesPlayed: 1,
                 date: "2026-09-10",
               })),
           }),
@@ -51,19 +52,26 @@ for (const mission of [
     if (mission === "Generators" || mission === "Storage") {
       await page.locator(".button-buildFacility").click();
       if (mission === "Storage") {
-        await page.getByRole("tab", { name: "Storage", exact: true }).click();
+        const storageTab = page.getByRole("tab", {
+          name: "Storage",
+          exact: true,
+        });
+        await expect(hud).toContainText("Tap Storage");
+        await expect(storageTab).toHaveClass(/tutorialTarget/);
+        await storageTab.click();
       }
       await expect(hud).toContainText(
-        mission === "Generators" ? "Compare cost" : "Choose storage",
+        mission === "Generators" ? "Review a generator" : "Review a storage",
       );
       await page
         .getByRole("button", { name: /Review purchase of/ })
         .first()
         .click();
-      // Opening a purchase review does not mean a purchase succeeded.
-      await expect(hud).toContainText(
-        mission === "Generators" ? "Compare cost" : "Choose storage",
-      );
+      // Reviewing and approving are distinct steps; highlight the payment controls in the dialog.
+      await expect(hud).toContainText("Buy it with cash, or take a loan");
+      await expect(
+        page.getByRole("button", { name: "Take loan", exact: true }),
+      ).toHaveClass(/tutorialTarget/);
       await page
         .getByRole("button", { name: "Take loan", exact: true })
         .click();
@@ -77,17 +85,29 @@ for (const mission of [
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();
+      // The step after the pause is the navigation itself. Wide layouts advance it on their
+      // own; narrow layouts wait for the player to tap the bottom navigation.
+      if (!isPaneLayout(page)) {
+        await expect(
+          page.getByRole("heading", { name: "Step 3 of 14" }),
+        ).toBeVisible();
+        // The card transition briefly mounts the outgoing layout beside the new one
+        await waitForSettled(page, "#insightsNav");
+        await expect(page.locator("#insightsNav")).toHaveClass(
+          /tutorialTarget/,
+        );
+        await page.locator("#insightsNav").click();
+      }
       await expect(
-        page.getByRole("heading", { name: "Step 2 of 9" }),
+        page.getByRole("heading", { name: "Step 4 of 14" }),
       ).toBeVisible();
     } else {
       const nav = page.locator("#insightsNav");
       await waitForPaneOrNav(page.locator(".insights"), nav);
+      // In the pane layout the navigation step advanced on its own, so there is no Next to
+      // press and the click is at most a no-op on the card it already opened
       if (await nav.isVisible()) {
         await nav.click();
-      } else {
-        // The desktop pane is already visible, so its explanation must remain dismissible.
-        await hud.getByRole("button", { name: "Next" }).click();
       }
       if (mission === "Pricing") {
         await expect(hud).toContainText("Drag the rate slider");
@@ -96,9 +116,10 @@ for (const mission of [
         await rate.press("ArrowLeft");
         await expect(hud).toContainText("Find customer growth");
       } else {
-        await expect(hud).toContainText("Choose a measure or time period");
+        await expect(hud).toContainText("Change the chart time period");
+        // Short tutorials open on their whole run, already the narrowest span.
         await page
-          .getByRole("button", { name: "Zoom in", exact: true })
+          .getByRole("button", { name: "Zoom out", exact: true })
           .click();
         await expect(hud).toContainText(
           "Tap Layers, or choose a preset question",
@@ -108,8 +129,59 @@ for (const mission of [
       }
     }
     await expect(page.locator(".buildOption")).toHaveCount(0);
+    if (mission === "Generators" || mission === "Storage") {
+      await expect(
+        page.locator(".facilityRowHeader.tutorialTarget").first(),
+      ).toBeVisible();
+    }
     await page.screenshot({
       path: testInfo.outputPath(`${mission}-advanced.png`),
     });
+    if (mission === "Finances") {
+      await page.locator("#insightsLayersButton").click();
+      await page
+        .getByRole("button", { name: "slow speed", exact: true })
+        .click();
+      await expect(hud).toContainText(
+        "Set a rate that turns next month’s loss into profit",
+      );
+      await expect(
+        page.getByRole("button", { name: "slow speed", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await page.screenshot({
+        path: testInfo.outputPath("finances-running.png"),
+      });
+    }
+    if (mission === "Generators") {
+      const progress = page.getByRole("progressbar", { name: "Year progress" });
+      await expect(progress).toHaveAttribute("aria-valuenow", "0");
+      const initialBox = await progress.boundingBox();
+      expect(initialBox!.width).toBeGreaterThan(300);
+      await hud.getByRole("button", { name: "Next" }).click();
+      await expect(hud).toContainText("Tap 20× to start construction time");
+      await page
+        .getByRole("button", { name: "slow speed", exact: true })
+        .click();
+      await expect(hud).toContainText("Tap 20× to start construction time");
+      const fastSpeed = page.getByRole("button", {
+        name: "fast speed",
+        exact: true,
+      });
+      await expect(fastSpeed).toHaveClass(/tutorialTarget/);
+      await fastSpeed.click();
+      await expect(hud).toContainText("Watch the year bar advance");
+      await expect(progress).toHaveClass(/tutorialTarget/);
+      await expect(page.locator(".tutorialTargetRing")).toBeVisible();
+      await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
+      expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
+      await page.screenshot({ path: testInfo.outputPath("year-progress.png") });
+      await hud.getByRole("button", { name: "Next" }).click();
+      await expect(hud).toContainText(
+        "Order a second generator of a different type",
+      );
+      await expect(progress).not.toHaveClass(/tutorialTarget/);
+    }
   });
 }

@@ -26,7 +26,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -37,7 +37,7 @@ import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
-import { getFuelEscalation } from "../../data/FuelPrices";
+import { inEraMoney } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
@@ -92,9 +92,6 @@ const STARTING_YEARS = Array.from(
   (_v: unknown, i: number) => WEATHER_STARTING_YEAR + i * STARTING_YEAR_STEP,
 );
 const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
-// The era the cash, rates and fees below are written in: amounts a player recognises, against the
-// fuel prices the data ends on.
-const MONEY_BASE_YEAR = 2020;
 const FORECAST_DEBOUNCE_MS = 250;
 
 type OutlookState =
@@ -102,26 +99,6 @@ type OutlookState =
   | { status: "invalid" }
   | { status: "error" }
   | { status: "ready"; outlook: YearOneOutlook };
-
-/**
- * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
- *
- * Fuel is the one price the game reads at face value for the year it is in - build costs and O&M
- * are anchored on whatever year a game starts, so they always open at what the tables say. A 2080
- * game therefore opens against sixty years of escalated fuel, and offering it a literal seven
- * cents a kilowatt hour is offering a game that is bankrupt inside a quarter.
- *
- * Only forwards. A game starting before MONEY_BASE_YEAR is played against real recorded prices
- * rather than a projection, so there is no escalation to undo, and deflating those rates would
- * change every historical scenario's balance for no reason.
- */
-function inEraMoney(base: number, startingYear: number): number {
-  const factor =
-    getFuelEscalation(Math.max(startingYear, MONEY_BASE_YEAR)) /
-    getFuelEscalation(MONEY_BASE_YEAR);
-  // Two significant figures, so the offered numbers stay round enough to choose between
-  return Number((base * factor).toPrecision(2));
-}
 
 // The option nearest a value, used to keep the player's position in a list when the era under it
 // moves.
@@ -388,7 +365,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
         difficulty: game.difficulty,
         seed: scenario.seed ?? previewSeed.current,
       };
-      ensureForecastWorker().postMessage(request);
+      try {
+        ensureForecastWorker().postMessage(request);
+      } catch {
+        // Startup and structured-clone failures happen synchronously, outside onerror.
+        const worker = forecastWorker.current;
+        forecastWorker.current = undefined;
+        if (worker) {
+          worker.onmessage = null;
+          worker.onerror = null;
+          worker.terminate();
+        }
+        setOutlook({ status: "error" });
+      }
     }, FORECAST_DEBOUNCE_MS);
 
     return () => {
@@ -960,17 +949,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
       >
-        <DialogTitle>
+        <ClosableDialogTitle onClose={() => setVictoryDialogOpen(false)}>
           Victory Conditions: {scenario.ownership}-Owned
-          <IconButton
-            aria-label="close"
-            onClick={() => setVictoryDialogOpen(false)}
-            className="top-right"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+        </ClosableDialogTitle>
         <DialogContent>
           <VictoryConditions
             ownership={scenario.ownership}

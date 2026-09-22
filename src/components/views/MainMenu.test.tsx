@@ -6,7 +6,6 @@ function props(overrides: Partial<Props> = {}): Props {
   return {
     audioEnabled: true,
     hasSavedGame: false,
-    uid: "player",
     onAudioChange: jest.fn(),
     onContinue: jest.fn(),
     onSettings: jest.fn(),

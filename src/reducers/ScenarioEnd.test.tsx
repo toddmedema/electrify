@@ -1,3 +1,4 @@
+import { projectAuthoredRunReference } from "../helpers/RunIdentity";
 import { createNextState as produce } from "@reduxjs/toolkit";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
@@ -168,6 +169,13 @@ describe("ending a scenario from inside the reducer", () => {
       (s: ScenarioType) => s.id === 100,
     ) as ScenarioType;
     const state = createGame({ scenarioId: scenario.id });
+    state.challenge = {
+      invitationSchemaVersion: 1,
+      run: projectAuthoredRunReference(state.runIdentity)!,
+      target: -25,
+    };
+    const identity = JSON.parse(JSON.stringify(state.runIdentity));
+    const invitation = JSON.parse(JSON.stringify(state.challenge));
     // Start the month already overdrawn so this test reaches the bankruptcy path without relying
     // on the removed marketing expense as an artificial cash drain.
     state.timeline.forEach((tick) => {
@@ -176,7 +184,10 @@ describe("ending a scenario from inside the reducer", () => {
 
     playOutOnTheStore(state, 1);
     expect(getStore().getState().game.monthlyHistory[0].cash).toBeLessThan(0);
+    getStore().dispatch(quit());
     jest.runOnlyPendingTimers();
+    expect(getStore().getState().ui.victory?.runIdentity).toEqual(identity);
+    expect(getStore().getState().ui.victory?.challenge).toEqual(invitation);
 
     const victory = getStore().getState().ui.victory;
     expect(victory).toEqual(

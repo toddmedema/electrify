@@ -4,7 +4,6 @@ import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import { login } from "../../Globals";
 import {
   buildGameShareContent,
   canShare,
@@ -15,7 +14,6 @@ import InstallAppButton from "../base/InstallAppButton";
 export interface StateProps {
   audioEnabled?: boolean;
   hasSavedGame: boolean;
-  uid?: string;
 }
 
 export interface DispatchProps {
@@ -135,23 +133,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
               </Button>
             )}
           </Stack>
-          {!props.uid && (
-            <Stack
-              component="section"
-              aria-label="Account actions"
-              className="accountActions"
-              spacing={0.5}
-            >
-              <Button variant="text" color="primary" onClick={login}>
-                Sign in
-              </Button>
-              {!props.hasSavedGame && (
-                <Typography variant="caption" color="text.secondary">
-                  Free · no sign-up needed
-                </Typography>
-              )}
-            </Stack>
-          )}
         </Box>
         <Typography className="srOnly" role="status" aria-live="polite">
           {shareStatus}

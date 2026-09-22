@@ -1,8 +1,17 @@
+import type { Middleware } from "@reduxjs/toolkit";
+import type { AppStateType } from "../Types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { getHistoryApi, logEvent } from "../Globals";
 import { NAVIGATION_DEBOUNCE_MS } from "../Constants";
 import { CardNameType, CardType, NavigateActionType } from "../Types";
-import { start, loaded, quit, resume, startReplay } from "./GameActions";
+import {
+  launchRun,
+  start,
+  loaded,
+  quit,
+  resume,
+  startReplay,
+} from "./GameActions";
 import type { RootState } from "../Store";
 
 /**
@@ -34,11 +43,7 @@ export const cardSlice = createSlice({
       }
       logEvent("card_view", { card: a.name });
       if (!a.skipBrowserHistory) {
-        getHistoryApi().pushState(
-          a.journeyMarker ? { evidenceJourney: a.journeyMarker } : null,
-          "",
-          a.url || "#",
-        );
+        getHistoryApi().pushState(null, "", a.url || "#");
       }
       // TODO better implementation for don't remember, right now it still makes an entry!
       return {
@@ -50,17 +55,14 @@ export const cardSlice = createSlice({
         storyTarget: a.storyTarget,
         history: [
           a.dontRemember ? state.name : a.name,
-          ...(a.journeyTraversal === "origin" &&
-          state.name === "BUILD_GENERATORS"
-            ? (state.history || []).slice(2)
-            : a.replaceCurrentCard
-              ? (state.history || []).slice(1)
-              : state.history || []),
+          ...(a.replaceCurrentCard
+            ? (state.history || []).slice(1)
+            : state.history || []),
         ],
         toPrevious: false,
       };
     },
-    navigateBack: (state) => {
+    navigateBack: (state, _action: PayloadAction<CardNameType | undefined>) => {
       return {
         name: (state.history || [])[1] || "MAIN_MENU", // Look 2 back since first is current card
         ts: Date.now(),
@@ -70,6 +72,11 @@ export const cardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(launchRun, (state) => {
+      state.history = [];
+      state.name = "LOADING";
+      state.ts = Date.now();
+    });
     builder.addCase(start, (state) => {
       state = {
         name: "LOADING",
@@ -123,3 +130,16 @@ export const { navigate, navigateBack } = cardSlice.actions;
 export const selectCardName = (state: RootState) => state.card.name;
 
 export default cardSlice.reducer;
+
+/** Resolve Back before reducing, so the game knows whether its destination still blocks play. */
+export const navigationDestinationMiddleware: Middleware<
+  object,
+  AppStateType
+> = (api) => (next) => (action) => {
+  if (navigateBack.match(action))
+    return next({
+      ...action,
+      payload: api.getState().card.history?.[1] || "MAIN_MENU",
+    });
+  return next(action);
+};

@@ -7,19 +7,13 @@ import {
   FORECAST_AXIS_RIGHT,
   padRange,
   SPLINE,
-  stepTicks,
-  xAxis,
+  forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
-import {
-  axisTicksAreYearly,
-  formatMinuteAsMonthAxis,
-  formatMinuteAsTooltipHeader,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatWattHours, formatWattsInUnit } from "../../helpers/Format";
-import { chartPalette } from "../../Theme";
+import { waterDashArrays, chartPalette } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -65,20 +59,7 @@ function buildOptions(showXLabels: boolean) {
       },
     },
     axes: [
-      xAxis(scale, {
-        showLabels: showXLabels,
-        splits: () => {
-          const [min, max] = getState().domain.x;
-          return stepTicks(min, max, MINUTES_PER_MONTH);
-        },
-        values: (_u, splits) => {
-          const s = getState();
-          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
-          return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
-          );
-        },
-      }),
+      forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         grid: true,
         label: "Water (mm)",
@@ -103,6 +84,7 @@ function buildOptions(showXLabels: boolean) {
       },
       {
         stroke: chartPalette().snowpack,
+        dash: waterDashArrays.snowpack.split(",").map(Number),
         width: 1,
         points: { show: false },
         paths: SPLINE,
@@ -110,6 +92,7 @@ function buildOptions(showXLabels: boolean) {
       {
         scale: RESERVOIR_SCALE,
         stroke: chartPalette().reservoir,
+        dash: waterDashArrays.reservoir.split(",").map(Number),
         width: 2,
         points: { show: false },
         paths: SPLINE,

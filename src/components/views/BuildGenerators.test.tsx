@@ -1,13 +1,3 @@
-import { configureStore } from "@reduxjs/toolkit";
-import gameReducer, { buildFacility } from "../../reducers/Game";
-import card, { navigate } from "../../reducers/Card";
-import ui from "../../reducers/UI";
-import {
-  beginGeneratorJourney,
-  returnToEvidence,
-  traverseEvidenceJourney,
-} from "../../helpers/EvidenceJourney";
-import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
   fireEvent,
@@ -54,7 +44,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
   expect(
     screen.getByRole("row", {
-      name: /Base operations & maintenance.*45% expected output.*\$4\.93M/,
+      name: /Base O&M.*\$4\.93M/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -64,7 +54,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated operations & maintenance.*Base operating cost plus one start per simulated day.*\$13\.4M\/yr/,
+      name: /Estimated annual O&M.*\$13\.4M\/yr/,
     }),
   ).toBeInTheDocument();
 
@@ -183,17 +173,17 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Fixed operations & maintenance.*Standing annual expense.*\$3\.09M\/yr/,
+      name: /Fixed O&M.*\$3\.09M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable operations & maintenance.*\$25\.71\/MWh generated/,
+      name: /Variable O&M.*\$25\.71\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated operations & maintenance.*20% expected output.*\$7\.59M\/yr/,
+      name: /Estimated annual O&M.*\$7\.59M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
@@ -220,9 +210,9 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   );
 
   expect(screen.getByText("Natural Gas")).toBeInTheDocument();
-  expect(screen.getByText("Any month")).toBeInTheDocument();
+  expect(screen.getByText("On demand")).toBeInTheDocument();
   expect(
-    screen.getByRole("img", { name: "Available in any month." }),
+    screen.getByRole("img", { name: "Available on demand." }),
   ).toBeInTheDocument();
   expect(
     screen.queryByText(/largest forecast shortage/),
@@ -240,8 +230,8 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   expect(
     screen.getByRole("group", { name: "Generator advantages" }),
   ).toHaveTextContent("Fastest online");
-  expect(screen.getByText("Estimated lifetime cost per MWh")).toBeVisible();
-  expect(screen.getByText("Direct greenhouse gas emissions")).toBeVisible();
+  expect(screen.getByText("Lifetime cost")).toBeVisible();
+  expect(screen.getByText("Direct emissions")).toBeVisible();
 });
 
 it("keeps the active lifetime-cost sort metric visible on collapsed cards", () => {
@@ -377,7 +367,7 @@ it("draws each generator's typical year against one shared scale", () => {
   monthly.mockRestore();
 
   expect(
-    screen.getAllByRole("img", { name: /^Typical year|any month/ }),
+    screen.getAllByRole("img", { name: /^Typical year|on demand/ }),
   ).toHaveLength(cards.length);
   expect(
     screen.getAllByRole("img", { name: /^Typical year: .*lowest in/ }).length,
@@ -385,7 +375,7 @@ it("draws each generator's typical year against one shared scale", () => {
   expect(
     screen.getAllByText(/^Low [A-Z][a-z]{2} \d+%$/).length,
   ).toBeGreaterThan(0);
-  expect(screen.getAllByText("Any month").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("On demand").length).toBeGreaterThan(0);
   expect(screen.getByText(/^Low [A-Z][a-z]{2} \d+% water in$/)).toBeVisible();
   expect(
     screen.getByRole("img", { name: /^Typical year of water inflow: / }),
@@ -410,63 +400,25 @@ it("pins up to three current-grid choices into a comparison tray", () => {
   ).toHaveTextContent("Comparing 2/3");
 });
 
-it("commits a loan purchase then closes the selected journey through browser Return without resuming", () => {
-  const store = configureStore({
-    reducer: { card, ui, game: gameReducer },
-    preloadedState: {
-      game: {
-        ...createGame({ scenarioId: 100, difficulty: "Employee" }),
-        inGame: true,
-        speed: "FAST" as const,
-      },
-    },
-  });
-  const dispatch = store.dispatch as AppDispatch;
-  dispatch(navigate("INSIGHTS"));
-  const origin = {
-    viewport: [0, 69120] as [number, number],
-    month: 0,
-    layers: ["supplyDemand"],
-    preset: "grid",
-    revision: 0,
-    scrollTop: 120,
-    anchor: "supplyDemand",
-  };
-  dispatch(beginGeneratorJourney(origin));
-  const marker = store.getState().ui.evidenceJourneyMarker!;
-  const back = jest
-    .spyOn(window.history, "back")
-    .mockImplementation(() => undefined);
-  const onBack = jest.fn();
-  const beforeCount = store.getState().game.facilities.length;
-  render(
-    <BuildGenerators
-      game={store.getState().game}
-      hasEvidenceReturn
-      onBack={onBack}
-      onBuildGenerator={(facility, financed) => {
-        dispatch(buildFacility({ facility, financed }));
-      }}
-      onEvidenceReturn={() => {
-        dispatch(returnToEvidence());
-      }}
-    />,
+it("keeps expanded details with their generator when tutorial choices expand", () => {
+  const game = createGame({ scenarioId: 1 });
+  game.tutorialStep = 1;
+  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
+  const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
+  expect(
+    screen.getAllByRole("button", { name: /^Review purchase of/ }),
+  ).toHaveLength(3);
+  fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
+  rerender(
+    <BuildGenerators game={{ ...game, tutorialStep: 2 }} {...callbacks} />,
   );
-  const purchase = screen
-    .getAllByRole("button", { name: /^Review purchase/ })
-    .find((button) => !(button as HTMLButtonElement).disabled)!;
-  fireEvent.click(purchase);
-  fireEvent.click(screen.getByRole("button", { name: /Take loan/i }));
-  expect(store.getState().game.facilities).toHaveLength(beforeCount + 1);
-  expect(back).toHaveBeenCalledTimes(1);
-  expect(onBack).not.toHaveBeenCalled();
-  const purchasedGame = store.getState().game;
-  dispatch(
-    traverseEvidenceJourney({ evidenceJourney: { ...marker, role: "origin" } }),
-  );
-  expect(store.getState().card.name).toBe("INSIGHTS");
-  expect(store.getState().ui.insightsRestore).toEqual(origin);
-  expect(store.getState().game).toBe(purchasedGame);
-  expect(store.getState().game.speed).toBe("PAUSED");
-  back.mockRestore();
+  expect(
+    screen.getByRole("button", { name: "Hide Wind details" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(
+    screen.getAllByRole("button", { name: /^Hide .* details/ }),
+  ).toHaveLength(1);
+  expect(
+    screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
+  ).toBeGreaterThan(3);
 });

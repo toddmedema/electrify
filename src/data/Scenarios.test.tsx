@@ -14,6 +14,17 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
+import { isPaneLayout } from "../Globals";
+
+// Registered above the imports by babel's jest.mock hoisting, so the step predicates (which
+// call isPaneLayout) see the mock. Kept after the imports for import/first.
+jest.mock("../Globals", () => ({
+  ...jest.requireActual("../Globals"),
+  isPaneLayout: jest.fn(),
+}));
+const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
+  typeof isPaneLayout
+>;
 
 describe("getScenario", () => {
   it("returns the custom scenario for the custom id", () => {
@@ -69,18 +80,46 @@ describe("getNextTutorial", () => {
 });
 
 describe("tutorial mission metadata", () => {
+  afterEach(() => {
+    mockIsPaneLayout.mockReset();
+  });
+
   it("advances the finances tutorial when the mobile Insights tab opens", () => {
+    // A phone: the switch itself is the deed, and the pane escape hatch does not apply
+    mockIsPaneLayout.mockReturnValue(false);
     const finances = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 4: Finances",
     )!;
     const firstStep = finances.tutorialSteps![0];
 
+    // Gated rather than explained: the Next button used to jump the player there instead
+    expect(isGatedStep(firstStep)).toBe(true);
     expect(
-      firstStep.continueOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
     ).toBe(true);
     expect(
-      firstStep.continueOn?.({ card: { name: "FACILITIES" } } as AppStateType),
+      firstStep.advanceOn?.({ card: { name: "FACILITIES" } } as AppStateType),
     ).toBe(false);
+  });
+
+  it("advances the mission 5 opening the same way, keeping its rate escape hatch", () => {
+    mockIsPaneLayout.mockReturnValue(false);
+    const pricing = TUTORIALS.find(
+      (tutorial) => tutorial.name === "Mission 5: Pricing",
+    )!;
+    const firstStep = pricing.tutorialSteps![0];
+
+    expect(isGatedStep(firstStep)).toBe(true);
+    expect(
+      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+    ).toBe(true);
+    // Already did the next step's deed, so no tap is owed
+    expect(
+      firstStep.advanceOn?.({
+        card: { name: "FACILITIES" },
+        game: { dollarsPerkWh: 0.06 },
+      } as unknown as AppStateType),
+    ).toBe(true);
   });
 
   it("gives every mission one deterministic unguided capstone", () => {
@@ -105,7 +144,7 @@ describe("tutorial mission metadata", () => {
       expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
       expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(10);
+    expect(interties.tutorialSteps).toHaveLength(15);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
@@ -166,25 +205,14 @@ describe("tutorial step actions", () => {
     });
   });
 
-  // A gated step has no Next button, and a step whose only way forward is Next has to say so.
-  // Steps that also advance on a deed may say either: their desktop layout can leave Next as
-  // the only way on, where the phone's tab tap does not exist
-  it("mentions Next only where there is one, and always where it's the only way on", () => {
-    allSteps.forEach(({ step, label }) => {
-      const gated = isGatedStep(step);
-      const onlyNext = !gated && !step.continueOn && !step.continueOnClick;
-      [step.action, step.desktop?.action]
-        .filter((action) => action !== undefined)
-        .forEach((action) => {
-          const saysNext = /\bNext\b/.test(action!);
-          // Steps that may also advance on a deed are free to say either
-          const allowed = gated ? [false] : onlyNext ? [true] : [true, false];
-          expect({ label, action, ok: allowed.includes(saysNext) }).toEqual({
-            label,
-            action,
-            ok: true,
-          });
-        });
+  it("does not combine sequential player actions in a step", () => {
+    allSteps.forEach(({ step }) => {
+      [step.action, step.desktop?.action].filter(Boolean).forEach((action) => {
+        expect(action).not.toMatch(
+          /,? then | and (?:tap|click|choose|drag|run)/i,
+        );
+        expect(isGatedStep(step) && /\bNext\b/.test(action!)).toBe(false);
+      });
     });
   });
 

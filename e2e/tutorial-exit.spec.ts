@@ -6,9 +6,7 @@ async function reachStartTimeStep(page: Page) {
   await page
     .getByRole("button", { name: "Start playing", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
 }
@@ -21,7 +19,7 @@ test("tapping 1x carries a running clock into Mission 1's final step", async ({
   await reachStartTimeStep(page);
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "normal speed" }),
@@ -70,3 +68,39 @@ test("closing a walkthrough offers a working way to the missions", async ({
     page.getByRole("heading", { name: "Choose a game" }),
   ).toBeVisible();
 });
+
+for (const explicitlyExit of [false, true]) {
+  test(`main menu records completion only after explicit Exit (exit=${explicitlyExit})`, async ({
+    page,
+  }) => {
+    await reachStartTimeStep(page);
+    await page
+      .getByRole("button", { name: "normal speed", exact: true })
+      .click();
+    await expect(
+      page.getByText("Reach midnight without a blackout"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "pause", exact: true }).click();
+    if (explicitlyExit) {
+      await page
+        .locator(".tutorialHud")
+        .getByRole("button", { name: "Exit", exact: true })
+        .click();
+      await expect(page.locator(".tutorialHud")).toBeHidden();
+    }
+    await page.getByRole("button", { name: "menu", exact: true }).click();
+    await page
+      .getByRole("menuitem", { name: "Main menu", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Start playing", exact: true })
+      .click();
+    if (explicitlyExit) {
+      await expect(
+        page.getByRole("heading", { name: "Choose a game" }),
+      ).toBeVisible();
+    } else {
+      await expect(page.getByText("Tap your coal plant")).toBeVisible();
+    }
+  });
+}

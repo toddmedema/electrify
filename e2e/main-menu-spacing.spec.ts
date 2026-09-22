@@ -20,24 +20,21 @@ for (const theme of ["light", "dark"]) {
     const primary = page.getByRole("region", { name: "Primary actions" });
     const resources = page.getByRole("navigation", { name: "Game resources" });
     const discovery = page.locator(".discoveryActions");
-    const account = page.getByRole("region", { name: "Account actions" });
     await expect(primary).toBeVisible();
+    await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
+    await expect(page.getByText(/free.*no sign.?in required/i)).toHaveCount(0);
     await expectGap(page.locator(".gameSubtitle"), primary, 16);
     await expectGap(primary, resources, 8);
     await expectGap(resources, discovery, 0);
-    await expectGap(discovery, account, 0);
-    await expectGap(
-      account.getByRole("button"),
-      account.locator(".MuiTypography-caption"),
-      4,
-    );
     const button = await primary.getByRole("button").boundingBox();
     expect(button!.width).toBeLessThanOrEqual(260);
     expect(button!.x).toBeGreaterThanOrEqual(24);
 
+    // The sound prompt is the last thing in the discovery row here, so taking it removes the
+    // row, and with nothing else left in the utility block that block goes too.
     await page.getByRole("button", { name: "Turn on sound" }).click();
     await expect(discovery).toBeHidden();
-    await expectGap(resources, account, 0);
+    await expect(page.locator(".utilityActions")).toBeHidden();
     const overflow = await page
       .locator("#menuCard")
       .evaluate((element) => element.scrollWidth - element.clientWidth);

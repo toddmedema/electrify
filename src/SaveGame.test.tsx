@@ -1,5 +1,6 @@
 import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
 import { emptyPolicies } from "./helpers/Policies";
+import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
   delta,
@@ -57,6 +58,76 @@ describe("SaveGame", () => {
         ?.variableOperatingCostPerMWh,
     );
   });
+
+  it.each([
+    { minute: NaN },
+    { minute: Infinity },
+    { minute: -1 },
+    { year: undefined },
+    { year: NaN },
+    { monthNumber: undefined },
+    { monthsElapsed: Infinity },
+    { hourOfDay: "noon" },
+    { month: "Unknown" },
+  ])("rejects malformed saved clocks %p before resuming", (date) => {
+    expect(
+      parseSave({
+        ...serializeSave(game),
+        game: { ...game, date: { ...game.date, ...date } },
+      }),
+    ).toBeNull();
+  });
+
+  it.each([NaN, Infinity, -Infinity])(
+    "rejects a non-finite starting year %p",
+    (startingYear) => {
+      expect(
+        parseSave({
+          ...serializeSave(game),
+          game: { ...game, startingYear },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([
+    { constructionKgco2eTotal: "bad" },
+    { constructionKgco2eTotal: null },
+    { constructionKgco2eTotal: -1 },
+    { constructionKgco2eTotal: 1e300 },
+    { constructionKgco2eEmitted: -1 },
+    { constructionKgco2eEmitted: 1 },
+  ])("rejects invalid facility construction bookkeeping %p", (patch) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    Object.assign(raw.game.facilities[0], patch);
+    expect(parseSave(raw)).toBeNull();
+  });
+
+  it.each([undefined, null, 1, "", "Expert", "constructor", "toString"])(
+    "rejects an unsupported difficulty %p before resuming",
+    (difficulty) => {
+      const save = serializeSave(game);
+      expect(
+        parseSave({
+          ...save,
+          game: { ...game, runIdentity: undefined, difficulty },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each(Object.keys(DIFFICULTIES))(
+    "accepts the authored difficulty %s",
+    (difficulty) => {
+      const save = serializeSave(game);
+      expect(
+        parseSave({
+          ...save,
+          game: { ...game, runIdentity: undefined, difficulty },
+        })?.game.difficulty,
+      ).toBe(difficulty);
+    },
+  );
 
   it.each(["active", "occurrences"] as const)(
     "validates every persisted world-event %s entry",
@@ -162,7 +233,7 @@ describe("SaveGame", () => {
     save.game.transmission.lines.push({
       id: 1,
       corridorId: "california-north",
-      name: "Northern intertie upgrade",
+      name: "Northern intertie",
       capacityW: 500000000,
       buildCost: 180000000,
       annualOperatingCost: 3600000,
@@ -399,7 +470,10 @@ describe("SaveGame", () => {
   it("ignores a save whose location isn't one", () => {
     const save = serializeSave(game);
     const withLocation = (location: unknown) =>
-      parseSave({ ...save, game: { ...save.game, location } });
+      parseSave({
+        ...save,
+        game: { ...save.game, runIdentity: undefined, location },
+      });
     expect(withLocation(undefined)).toBeNull();
     expect(withLocation({})).toBeNull();
     // Straight into `/data/weather/<id>.bin`

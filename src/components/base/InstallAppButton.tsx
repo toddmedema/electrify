@@ -8,7 +8,12 @@ import {
   Typography,
 } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
-import { getPlayedScenarioIds } from "../../LocalStorage";
+import {
+  getPlayedScenarioIds,
+  getStorageNumber,
+  removeStorageKey,
+  setStorageKeyValue,
+} from "../../LocalStorage";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -46,13 +51,19 @@ export function useIsInstalledApp(): boolean {
 export function useCanInstallApp(afterMilestone = false): boolean {
   const install = React.useContext(InstallContext);
   const [repeatVisit] = React.useState(() => {
-    let visits = Number(localStorage.getItem(INSTALL_VISITS_KEY) || 0);
-    if (!sessionStorage.getItem(INSTALL_VISIT_COUNTED_KEY)) {
-      visits += 1;
-      localStorage.setItem(INSTALL_VISITS_KEY, String(visits));
-      sessionStorage.setItem(INSTALL_VISIT_COUNTED_KEY, "1");
+    try {
+      let visits = getStorageNumber(INSTALL_VISITS_KEY, 0);
+      if (!sessionStorage.getItem(INSTALL_VISIT_COUNTED_KEY)) {
+        visits += 1;
+        // Mark the session first so a failed session write cannot inflate the count.
+        sessionStorage.setItem(INSTALL_VISIT_COUNTED_KEY, "1");
+        setStorageKeyValue(INSTALL_VISITS_KEY, visits);
+      }
+      return visits > 1;
+    } catch {
+      // Install suggestions are optional when browser storage is unavailable.
+      return false;
     }
-    return visits > 1;
   });
   const iosEligible =
     afterMilestone || repeatVisit || getPlayedScenarioIds().length > 0;
@@ -91,8 +102,12 @@ export function InstallPromptProvider(props: {
     React.useState<BeforeInstallPromptEvent>();
   const [installed, setInstalled] = React.useState(standalone);
   const [snoozed, setSnoozed] = React.useState(() => {
-    const dismissed = Number(localStorage.getItem(INSTALL_SNOOZE_KEY) || 0);
-    return Date.now() - dismissed < SNOOZE_MS;
+    try {
+      const dismissed = getStorageNumber(INSTALL_SNOOZE_KEY, 0);
+      return Date.now() - dismissed < SNOOZE_MS;
+    } catch {
+      return false;
+    }
   });
   const isIos = iosDevice();
   const isIosSafari =
@@ -108,7 +123,7 @@ export function InstallPromptProvider(props: {
     const onInstalled = () => {
       setInstallPrompt(undefined);
       setInstalled(true);
-      localStorage.removeItem(INSTALL_SNOOZE_KEY);
+      removeStorageKey(INSTALL_SNOOZE_KEY);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
@@ -119,7 +134,7 @@ export function InstallPromptProvider(props: {
   }, []);
 
   const snooze = React.useCallback(() => {
-    localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now()));
+    setStorageKeyValue(INSTALL_SNOOZE_KEY, Date.now());
     setSnoozed(true);
   }, []);
 

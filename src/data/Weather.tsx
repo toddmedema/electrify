@@ -4,6 +4,7 @@ import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
 import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
+import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -40,7 +41,7 @@ interface WeatherSeriesType {
   // city it supplies can be walked independently without one replacing the other.
   weather: RawWeatherType[];
   climatology: MonthClimatologyType[];
-  recordedRows: number;
+  recordedRows: readonly RawWeatherType[];
 }
 
 const weatherSeries = new Map<string, WeatherSeriesType>();
@@ -154,7 +155,7 @@ function buildClimatology(rows: RawWeatherType[]): MonthClimatologyType[] {
   const fields = activeForecastFields({
     weather: rows,
     climatology: [],
-    recordedRows: rows.length,
+    recordedRows: rows,
   });
   const loadedDays = Math.floor(rows.length / ROWS_PER_DAY);
   const dailyMeans: number[][][] = [];
@@ -239,7 +240,7 @@ export function initWeatherFromRows(
   weatherSeries.set(location, {
     weather: calibratedRows,
     climatology: buildClimatology(calibratedRows),
-    recordedRows: calibratedRows.length,
+    recordedRows: calibratedRows.slice(),
   });
   if (rows.length < EXPECTED_ROWS) {
     console.warn(
@@ -265,7 +266,7 @@ export function getRecordedWeatherRows(
   seriesId?: string,
 ): readonly RawWeatherType[] {
   const series = getSeries(seriesId) || getSeries();
-  return series ? series.weather.slice(0, series.recordedRows) : [];
+  return series ? series.recordedRows : [];
 }
 
 /**
@@ -313,7 +314,10 @@ export function initWeather(
   }
   Promise.all(
     ids.map((id) =>
-      fetch(`/data/weather/${id}.bin`).then((response: Response) => {
+      fetch(
+        `/data/weather/${id}.bin`,
+        simulationDataRequest(`/data/weather/${id}.bin`),
+      ).then((response: Response) => {
         if (!response.ok) {
           throw new Error(`${response.status} fetching ${id}'s weather file`);
         }

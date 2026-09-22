@@ -1,24 +1,39 @@
 import { configureStore, UnknownAction } from "@reduxjs/toolkit";
 import * as React from "react";
 import { getPlayedScenarioIds } from "../LocalStorage";
+import { isPaneLayout } from "../Globals";
 import {
   AppStateType,
   CardNameType,
   GameType,
   TutorialStepType,
 } from "../Types";
-import { DEFAULT_CUSTOM_SCENARIO, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import {
+  DEFAULT_CUSTOM_SCENARIO,
+  CUSTOM_SCENARIO_ID,
+  getScenario,
+} from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
 import {
-  recordTutorialLeft,
+  recordTutorialExited,
   restartTutorialAtStep,
   selectTutorialHiddenUi,
   tutorialGateMiddleware,
 } from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
+
+// Registered above the imports by babel's jest.mock hoisting, so the scenario step predicates
+// (which call isPaneLayout) see the mock. Kept after the imports for import/first.
+jest.mock("../Globals", () => ({
+  ...jest.requireActual("../Globals"),
+  isPaneLayout: jest.fn(),
+}));
+const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
+  typeof isPaneLayout
+>;
 
 function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
   return {
@@ -138,6 +153,48 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
+  it.each([2, 5])(
+    "keeps mission %s on its reset disclosure even while time runs",
+    (id) => {
+      const steps = getScenario(id)!.tutorialSteps!;
+      const preparation = steps.length - 2;
+      const store = tutorialStore(steps, {
+        speed: "FAST",
+        tutorialStep: preparation,
+      });
+      store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
+      expect(store.getState().game.tutorialStep).toBe(preparation);
+      expect(store.getState().game.speed).toBe("SLOW");
+      expect(steps[preparation].nextLabel).toBe("Start final challenge");
+    },
+  );
+
+  it("keeps the chosen price and running clock when entering the customer challenge", () => {
+    const steps = getScenario(3)!.tutorialSteps!;
+    const store = tutorialStore(steps, { rate: 0.069, tutorialStep: 3 });
+    store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
+    expect(store.getState().game.tutorialStep).toBe(4);
+    expect(store.getState().game.dollarsPerkWh).toBe(0.069);
+    expect(store.getState().game.speed).toBe("SLOW");
+  });
+  it.each([
+    [2, "BUILD_STORAGE"],
+    [112, "BUILD_INTERTIES"],
+  ] as const)(
+    "gives mission %s a separate highlighted category action",
+    (scenarioId, category) => {
+      const steps = getScenario(scenarioId)!.tutorialSteps!;
+      const store = tutorialStore(steps);
+      store.dispatch({ type: "card/navigate", payload: "BUILD_GENERATORS" });
+      expect(store.getState().game.tutorialStep).toBe(1);
+      expect(store.getState().card.name).toBe("BUILD_GENERATORS");
+      expect(steps[1].target).toBe(`#tab-${category}`);
+      store.dispatch({ type: "card/navigate", payload: category });
+      expect(store.getState().game.tutorialStep).toBe(2);
+      expect(store.getState().card.name).toBe(category);
+    },
+  );
+
   it("continues an explanation after a successful deed and skips its already-completed gate", () => {
     const satisfied = (state: AppStateType) => state.game.dollarsPerkWh < 0.07;
     const store = tutorialStore([
@@ -294,22 +351,103 @@ describe("tutorialGateMiddleware", () => {
   });
 });
 
-describe("recordTutorialLeft", () => {
+describe("navigation steps that teach the Insights and Events switch", () => {
+  afterEach(() => {
+    mockIsPaneLayout.mockReset();
+  });
+
+  it.each([4, 3])(
+    "gates the mission %s opening on the navigation itself",
+    (id) => {
+      const [opening] = getScenario(id)!.tutorialSteps!;
+      expect(opening.target).toBe("#insightsNav");
+      // Gated, not a quiet Next that still jumps the player
+      expect(opening.advanceOn).toBeDefined();
+      expect(opening.continueOn).toBeUndefined();
+    },
+  );
+
+  it("routes Mission 6 through the player's navigation before each new pane", () => {
+    const steps = getScenario(5)!.tutorialSteps!;
+    const navSteps = steps
+      .map((step, index) => [step, index] as const)
+      .filter(([step]) => step.card === undefined);
+    expect(navSteps).toHaveLength(3);
+    for (const [step, index] of navSteps) {
+      const nextCard = steps[index + 1]?.card;
+      const name = typeof nextCard === "string" ? nextCard : nextCard?.name;
+      const insights = name !== "EVENTS";
+      expect(step.advanceOn).toBeDefined();
+      expect(step.target).toBe(insights ? "#insightsNav" : "#eventsNav");
+      expect(step.desktop?.target).toBe(
+        insights ? "#insightsPane" : "#eventsPane",
+      );
+    }
+  });
+
+  it.each([4, 3])(
+    "advances the mission %s opening when the player navigates to Insights",
+    (id) => {
+      mockIsPaneLayout.mockReturnValue(false);
+      const steps = getScenario(id)!.tutorialSteps!;
+      const store = tutorialStore(steps, { tutorialStep: 0 });
+      expect(store.getState().game.tutorialStep).toBe(0);
+      store.dispatch({ type: "card/navigate", payload: "INSIGHTS" });
+      expect(store.getState().card.name).toBe("INSIGHTS");
+      expect(store.getState().game.tutorialStep).toBe(1);
+    },
+  );
+
+  it("waits for the tap on a narrow layout", () => {
+    mockIsPaneLayout.mockReturnValue(false);
+    const steps = getScenario(5)!.tutorialSteps!;
+    const store = tutorialStore(steps, { tutorialStep: 2 });
+    // A dispatch that changes nothing: the step must still be where it was
+    store.dispatch({ type: "test/pane-check" });
+    expect(store.getState().game.tutorialStep).toBe(2);
+  });
+
+  it.each([2, 5, 9] as const)(
+    "advances Mission 6's step %d on its own in a pane layout",
+    (index) => {
+      mockIsPaneLayout.mockReturnValue(true);
+      const steps = getScenario(5)!.tutorialSteps!;
+      expect(steps[index].card).toBeUndefined();
+      const store = tutorialStore(steps, { tutorialStep: index });
+      store.dispatch({ type: "test/pane-check" });
+      expect(store.getState().game.tutorialStep).toBe(index + 1);
+    },
+  );
+
+  it.each([2, 5, 9] as const)(
+    "advances Mission 6's step %d when the player makes its navigation",
+    (index) => {
+      mockIsPaneLayout.mockReturnValue(false);
+      const steps = getScenario(5)!.tutorialSteps!;
+      const step = steps[index];
+      const card = step.target === "#eventsNav" ? "EVENTS" : "INSIGHTS";
+      const store = tutorialStore(steps, { tutorialStep: index });
+      expect(store.getState().game.tutorialStep).toBe(index);
+      store.dispatch({ type: "card/navigate", payload: card });
+      expect(store.getState().game.tutorialStep).toBe(index + 1);
+    },
+  );
+});
+
+describe("recordTutorialExited", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
   const steps = [informational(), informational()];
 
-  // Regression test. Start playing sends a player with no finished mission back into Mission 1,
-  // so leaving it unfinished used to make the rest of the missions unreachable
-  it("counts a walkthrough left partway as done", () => {
-    recordTutorialLeft(initialState(steps, { tutorialStep: 1 }).game);
+  it("counts a walkthrough explicitly exited partway as done", () => {
+    recordTutorialExited(initialState(steps, { tutorialStep: 1 }).game);
     expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
   });
 
   it("doesn't count a finished or closed walkthrough a second time", () => {
-    recordTutorialLeft(
+    recordTutorialExited(
       initialState(steps, { tutorialStep: steps.length }).game,
     );
     expect(getPlayedScenarioIds()).toEqual([]);
@@ -317,11 +455,11 @@ describe("recordTutorialLeft", () => {
 
   it("ignores scenarios without a walkthrough, and replays", () => {
     const game = initialState(steps, { tutorialStep: 0 }).game;
-    recordTutorialLeft({
+    recordTutorialExited({
       ...game,
       customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
     });
-    recordTutorialLeft({
+    recordTutorialExited({
       ...game,
       replayPlayback: {} as GameType["replayPlayback"],
     });

@@ -3,7 +3,11 @@ import { IconButton, Tab, Tabs, Toolbar, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
-import { buildTransmissionLine, setTradingPolicy } from "../../reducers/Game";
+import {
+  buildTransmissionLine,
+  setTradingPolicy,
+  upgradeTransmissionLine,
+} from "../../reducers/Game";
 import { snackbarOpen } from "../../reducers/UI";
 import {
   corridorsForLocation,
@@ -26,15 +30,17 @@ export default function BuildFacilities(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
+  const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
   const intertiesAvailable =
     !!game.transmission && corridorsForLocation(game.location).length > 0;
   // Isolated grids have nothing to connect to, so the tab would only ever be empty.
   const visibleCategories = categories.filter(
     ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",
   );
-  const active =
-    visibleCategories.find(([name]) => name === card)?.[0] ||
-    "BUILD_GENERATORS";
+  const active = introductoryChoices
+    ? "BUILD_GENERATORS"
+    : visibleCategories.find(([name]) => name === card)?.[0] ||
+      "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const close = () => dispatch(navigate("FACILITIES"));
 
@@ -47,6 +53,16 @@ export default function BuildFacilities(): React.JSX.Element {
               <ConceptIcon concept="build" fontSize="small" />
               Build
             </span>
+            {/* The build screen carries no game bar, so the paused clock it opened with needs
+                saying. Replays hide it: their speed is the player's own, not a stopped game */}
+            {game.inGame && !game.replayPlayback && game.speed === "PAUSED" && (
+              <span className="pausedChip">
+                <span aria-hidden="true">
+                  <ConceptIcon concept="pause" fontSize="small" />
+                </span>
+                Paused
+              </span>
+            )}
             <span
               className="weak constructionCash"
               aria-label={`Available cash ${formatMoneyStable(cash)}`}
@@ -64,38 +80,41 @@ export default function BuildFacilities(): React.JSX.Element {
             <CloseIcon />
           </IconButton>
         </Toolbar>
-        <Tabs
-          className="constructionTabs"
-          value={active}
-          variant="fullWidth"
-          aria-label="Build categories"
-          onChange={(_event, value) =>
-            dispatch(
-              navigate({
-                name: value,
-                dontRemember: true,
-                replaceCurrentCard: true,
-                skipBrowserHistory: true,
-              }),
-            )
-          }
-        >
-          {visibleCategories.map(([name, label, className]) => (
-            <Tab
-              key={name}
-              id={`tab-${name}`}
-              aria-controls={`panel-${name}`}
-              value={name}
-              label={label}
-              className={`button-build${className}`}
-            />
-          ))}
-        </Tabs>
+        {!introductoryChoices && (
+          <Tabs
+            className="constructionTabs"
+            value={active}
+            variant="fullWidth"
+            aria-label="Build categories"
+            onChange={(_event, value) =>
+              dispatch(
+                navigate({
+                  name: value,
+                  dontRemember: true,
+                  replaceCurrentCard: true,
+                  skipBrowserHistory: true,
+                }),
+              )
+            }
+          >
+            {visibleCategories.map(([name, label, className]) => (
+              <Tab
+                key={name}
+                id={`tab-${name}`}
+                aria-controls={`panel-${name}`}
+                value={name}
+                label={label}
+                className={`button-build${className}`}
+              />
+            ))}
+          </Tabs>
+        )}
       </header>
       <div
         role="tabpanel"
         id={`panel-${active}`}
-        aria-labelledby={`tab-${active}`}
+        aria-labelledby={introductoryChoices ? undefined : `tab-${active}`}
+        aria-label={introductoryChoices ? "Generators" : undefined}
         className="constructionPanel"
       >
         {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer embedded />}
@@ -106,6 +125,9 @@ export default function BuildFacilities(): React.JSX.Element {
               game={game}
               projectsOnly
               onPolicy={(policy) => dispatch(setTradingPolicy(policy))}
+              onUpgrade={(corridorId, financed) =>
+                dispatch(upgradeTransmissionLine({ corridorId, financed }))
+              }
               onBuild={(corridorId, financed) => {
                 dispatch(buildTransmissionLine({ corridorId, financed }));
                 const corridor = TRANSMISSION_CORRIDORS.find(

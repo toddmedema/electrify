@@ -1,4 +1,5 @@
 import { LOCATIONS } from "./Constants";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import {
   describeSave,
@@ -16,6 +17,7 @@ import { GameType, ScenarioType } from "./Types";
 function fakeGame(overrides: Partial<GameType> = {}): GameType {
   return {
     scenarioId: 101, // Rise of Renewables
+    difficulty: "Employee",
     seed: 31337,
     startingYear: 2020,
     customerMarketSize: 2_000_000,
@@ -23,7 +25,7 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     startingDemandScale: 1,
     loadAdditions: [],
     location: LOCATIONS.PIT,
-    date: { minute: 1000, year: 2035, month: 6 },
+    date: getDateFromMinute(185 * MINUTES_PER_MONTH + 1000, 2020),
     facilities: [],
     timeline: [],
     monthlyHistory: [],

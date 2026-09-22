@@ -44,6 +44,35 @@ describe("scenario play history", () => {
     getLocalStorage().removeItem("plays");
   });
 
+  it.each([{}, { plays: null }, { plays: {} }, "invalid", 42])(
+    "recovers from malformed history: %p",
+    (stored) => {
+      setStorageKeyValue("plays", stored);
+      expect(getScenarioPlayCounts()).toEqual({});
+      recordScenarioPlayed(100);
+      expect(getScenarioPlayCounts()).toEqual({ 100: 1 });
+    },
+  );
+
+  it("keeps valid history while dropping malformed entries", () => {
+    const valid = { scenarioId: 100, date: "today", timesPlayed: 2 };
+    setStorageKeyValue("plays", {
+      plays: [
+        valid,
+        null,
+        {},
+        { ...valid, scenarioId: "__proto__" },
+        { ...valid, timesPlayed: "3" },
+        { ...valid, timesPlayed: -1 },
+        { ...valid, timesPlayed: 0.5 },
+        { ...valid, date: null },
+      ],
+    });
+    expect(getScenarioPlayCounts()).toEqual({ 100: 2 });
+    recordScenarioPlayed(100);
+    expect(getScenarioPlayCounts()).toEqual({ 100: 3 });
+  });
+
   it("increments a compact count instead of appending repeat plays", () => {
     recordScenarioPlayed(100);
     recordScenarioPlayed(100);

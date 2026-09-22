@@ -1,7 +1,7 @@
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
 import { delta, quit } from "../reducers/Game";
-import { changeTutorialStep, recordTutorialLeft } from "../reducers/Tutorial";
+import { changeTutorialStep, recordTutorialExited } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import { getScenario } from "../data/Scenarios";
 import {
@@ -60,7 +60,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       changeTutorialStep(dispatch, change);
     },
     onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
-      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
+      dispatch((_dispatch, getState) => recordTutorialExited(getState().game));
       // Past the last step, which is how a finished walkthrough is represented too
       dispatch(delta({ tutorialStep: (tutorialSteps || []).length }));
       // On its own, closing just makes the overlay vanish and leaves the player sitting in

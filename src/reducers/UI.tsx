@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createAction, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   DialogType,
   SnackbarType,
@@ -7,8 +7,18 @@ import {
   EvidenceTargetType,
   EvidenceRequestType,
 } from "../Types";
-import { quit, start, resume, startReplay, loaded } from "./GameActions";
+import {
+  launchRun,
+  quit,
+  start,
+  resume,
+  startReplay,
+  loaded,
+} from "./GameActions";
 import { navigate, navigateBack } from "./Card";
+
+// Re-evaluate layout-dependent tutorial gates even while the simulation is paused.
+export const layoutChanged = createAction("ui/layoutChanged");
 
 export const initialUI: UIType = {
   dialog: {
@@ -30,9 +40,16 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    // Highlight the new row without expanding it: its controls are rarely the next decision
+    facilityPurchased: (state, action: PayloadAction<number>) => {
+      state.arrivingFacilityId = action.payload;
+    },
+    acknowledgeFacilityArrival: (state, action: PayloadAction<number>) => {
+      if (state.arrivingFacilityId === action.payload) {
+        delete state.arrivingFacilityId;
+      }
+    },
     requestEvidence: (state, action: PayloadAction<EvidenceTargetType>) => {
-      delete state.evidenceJourney;
-      delete state.insightsRestore;
       const id = (state.evidenceSequence ?? 0) + 1;
       state.evidenceSequence = id;
       state.evidenceRequest = {
@@ -113,6 +130,7 @@ export const uiSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
+      delete state.arrivingFacilityId;
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
       state.victory = null;
@@ -120,9 +138,7 @@ export const uiSlice = createSlice({
       state.selectedFacilityId = null;
       state.facilityDragActive = false;
       delete state.evidenceRequest;
-      delete state.evidenceJourney;
-      delete state.evidenceJourneyMarker;
-      delete state.insightsRestore;
+      delete state.insightsViewport;
       state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
     builder.addMatcher(
@@ -131,37 +147,30 @@ export const uiSlice = createSlice({
           start.type,
           resume.type,
           startReplay.type,
+          launchRun.type,
           loaded.type,
           "game/initGame",
         ].includes(action.type),
       (state) => {
+        delete state.arrivingFacilityId;
         delete state.evidenceRequest;
-        delete state.evidenceJourney;
-        delete state.evidenceJourneyMarker;
-        delete state.insightsRestore;
+        delete state.insightsViewport;
         state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
       },
     );
     builder.addMatcher(
       (action) =>
         action.type === navigate.type || action.type === navigateBack.type,
-      (state, action) => {
+      (state) => {
         delete state.evidenceRequest;
-        const payload = (
-          action as PayloadAction<import("../Types").NavigateActionType>
-        ).payload;
-        if (
-          !payload?.journeyMarker ||
-          payload.journeyMarker.id !== state.evidenceJourney?.id
-        )
-          delete state.evidenceJourney;
-        delete state.insightsRestore;
       },
     );
   },
 });
 
 export const {
+  facilityPurchased,
+  acknowledgeFacilityArrival,
   requestEvidence,
   acknowledgeEvidence,
   manualHelpOpen,

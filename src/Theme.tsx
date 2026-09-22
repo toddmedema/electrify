@@ -110,9 +110,21 @@ export const fuelDashArrays = {
   Uranium: "9,3,2,3",
 };
 
+export const waterDashArrays = {
+  precipitation: undefined,
+  snowpack: "6,3",
+  reservoir: "12,3,2,3",
+};
+
 interface ChartPaletteType {
   /** Facilities that burn or catch nothing, which borrow the battery UI's blue */
   storage: string;
+  /**
+   * Interties, which are not a fuel and must not be mistaken for one in the fleet list. Grid
+   * steel rather than another saturated hue: it sits beside every fuel colour without reading
+   * as a twelfth generation source.
+   */
+  intertie: string;
   demand: string;
   supply: string;
   /** The wash under the supply line marking history vs. forecast on the Facilities chart */
@@ -145,6 +157,7 @@ interface ChartPaletteType {
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     storage: blue[800],
+    intertie: "#455a64", // blueGrey800, 7.24:1 on white and clear of every fuel hue
     demand: grey[900],
     supply: blue[600],
     historicFill: blue[50],
@@ -154,7 +167,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
     offshoreWind: FUEL_COLORS.light["Offshore Wind"],
-    precipitation: blue[400],
+    precipitation: blue[700],
     snowpack: "#6d4c9a",
     reservoir: FUEL_COLORS.light.Hydro,
     cursor: grey[600],
@@ -170,6 +183,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     storage: blue[300],
+    intertie: "#90a4ae", // blueGrey300, 7.37:1 on --bg-primary #0b1016 (7.02:1 on the #0f161f chart surface)
     // Near-white demand used to glare against the plot and visually overpower supply. This
     // cooler off-white still clears 13:1 while behaving like a peer rather than a highlight.
     demand: "#dce6f0",
@@ -320,6 +334,17 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           },
         },
       },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: {
+            textTransform: "none",
+            fontWeight: 600,
+            minHeight: 40,
+            minWidth: 40,
+            "@media (pointer: coarse)": { minHeight: 44, minWidth: 44 },
+          },
+        },
+      },
       MuiIconButton: {
         styleOverrides: {
           root: {
@@ -327,6 +352,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             minHeight: 40,
             "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 },
           },
+        },
+      },
+      MuiSelect: {
+        defaultProps: { size: "small" },
+        styleOverrides: {
+          select: { paddingTop: 8, paddingBottom: 8 },
+          standard: { paddingLeft: 8 },
         },
       },
       MuiInputBase: {
@@ -358,7 +390,15 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiDialogTitle: { styleOverrides: { root: { padding: 16 } } },
       MuiDialogContent: { styleOverrides: { root: { padding: 16 } } },
       MuiDialogActions: {
-        styleOverrides: { root: { padding: 16, gap: 8, flexWrap: "wrap" } },
+        defaultProps: { disableSpacing: true },
+        styleOverrides: {
+          root: {
+            padding: 16,
+            paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+            gap: 8,
+            flexWrap: "wrap",
+          },
+        },
       },
       MuiButtonBase: {
         defaultProps: {

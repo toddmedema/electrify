@@ -1,4 +1,6 @@
-import { traverseEvidenceJourney } from "./helpers/EvidenceJourney";
+import { parseChallengeUrl } from "./helpers/Challenge";
+import { delta as uiDelta } from "./reducers/UI";
+import { logEvent } from "./Globals";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -6,12 +8,13 @@ import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
 import { navigate, navigateBack } from "./reducers/Card";
+import { pageHidden, pageVisible } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
-import { snackbarOpen } from "./reducers/UI";
+import { layoutChanged, snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
-import { delta as gameDelta } from "./reducers/Game";
+
 import {
   scenarioDetailsUrl,
   scenarioFromSearch,
@@ -36,8 +39,15 @@ function setupDevice(): () => void {
   document.body.className += " " + platform;
 
   const onBackButton = () => store.dispatch(navigateBack());
-  const onPause = () => store.dispatch(pauseAudio());
-  const onResume = () => store.dispatch(resumeAudio());
+  const onPause = () => {
+    store.dispatch(pauseAudio());
+    // In a WebView visibilitychange is not reliable, so the device events pause the clock too
+    store.dispatch(pageHidden());
+  };
+  const onResume = () => {
+    store.dispatch(resumeAudio());
+    store.dispatch(pageVisible());
+  };
 
   document.addEventListener("backbutton", onBackButton, false);
   document.addEventListener("pause", onPause, false);
@@ -158,26 +168,43 @@ export default function App() {
     // site. The ref makes this safe under StrictMode's development effect replay.
     if (!scenarioRouteInitialized.current) {
       scenarioRouteInitialized.current = true;
-      const sharedScenario = scenarioFromSearch(window.location.search);
+      const challenge = parseChallengeUrl(window.location.href);
+      if (challenge) {
+        const href = window.location.href;
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(uiDelta({ challengeHref: href }));
+        store.dispatch(navigate({ name: "CHALLENGE", url: href }));
+        logEvent("challenge_view", { compatible: !!challenge.invitation });
+      }
+      const sharedScenario =
+        !challenge && scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
         getHistoryApi().replaceState(null, "", scenarioListUrl());
         store.dispatch(
           navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
         );
-        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(uiDelta({ scenarioPreview: sharedScenario.id }));
         store.dispatch(navigate({ name: "NEW_GAME_DETAILS", url: detailsUrl }));
       }
     }
 
     const onPopState = (e: PopStateEvent) => {
-      if (store.dispatch(traverseEvidenceJourney(e.state))) {
+      const challenge = parseChallengeUrl(window.location.href);
+      if (challenge) {
+        store.dispatch(uiDelta({ challengeHref: window.location.href }));
+        store.dispatch(
+          navigate({ name: "CHALLENGE", skipBrowserHistory: true }),
+        );
         e.preventDefault();
         return;
       }
       const sharedScenario = scenarioFromSearch(window.location.search);
       if (sharedScenario) {
-        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(uiDelta({ scenarioPreview: sharedScenario.id }));
         store.dispatch(
           navigate({
             name: "NEW_GAME_DETAILS",
@@ -194,11 +221,22 @@ export default function App() {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         store.dispatch(pauseAudio());
+        store.dispatch(pageHidden());
       } else if (document.visibilityState === "visible") {
         store.dispatch(resumeAudio());
+        store.dispatch(pageVisible());
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange, false);
+    // Some mobile browsers never fire visibilitychange before the page goes away
+    const onPageHide = () => {
+      store.dispatch(pageHidden());
+    };
+    window.addEventListener("pagehide", onPageHide, false);
+    // A bfcache restore can pair pageshow with pagehide without visibilitychange.
+    window.addEventListener("pageshow", onVisibilityChange, false);
+    const onResize = () => store.dispatch(layoutChanged());
+    window.addEventListener("resize", onResize);
 
     // Registered here rather than next to the store because the tutorial lookup needs the
     // scenarios, and reducers/Game already reaches back into SaveGame -- App sits above both, so
@@ -248,6 +286,9 @@ export default function App() {
         onVisibilityChange,
         false,
       );
+      window.removeEventListener("pagehide", onPageHide, false);
+      window.removeEventListener("pageshow", onVisibilityChange, false);
+      window.removeEventListener("resize", onResize);
       stopAutosave();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);

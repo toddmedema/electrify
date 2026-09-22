@@ -9,8 +9,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  IconButton,
   List,
   Table,
   TableBody,
@@ -21,7 +19,7 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { getMonthlyPayment } from "../../helpers/Financials";
 import {
@@ -37,21 +35,26 @@ import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import {
   getBuildAvailability,
+  getSiteInventory,
+  siteCountLabel,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
-import BuildMetric from "../base/BuildMetric";
+import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
+import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
-import { GameType, StorageShoppingType } from "../../Types";
+import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
   interestRate: number;
+  location?: LocationType;
   storage: StorageShoppingType;
   onBuild: (financed: boolean) => void;
 }
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
+  const units = useUnits();
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [financingExpanded, setFinancingExpanded] = React.useState(false);
@@ -65,11 +68,18 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     LOAN_MONTHS,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const { buildable, secondaryText } = getBuildAvailability(
-    storage.description,
-    storage.available,
+  const { buildable, secondaryText } = getBuildAvailability({
+    name: storage.name,
+    description: storage.description,
+    available: storage.available,
     sizeBuildable,
-    `${formatWatts(storage.maxPeakWh)}h`,
+    maxSizeLabel: `${formatWatts(storage.maxPeakWh)}h`,
+    location: props.location,
+    viableLocationsRemaining: storage.viableLocationsRemaining,
+  });
+  const sites = getSiteInventory(
+    storage.name,
+    props.location,
     storage.viableLocationsRemaining,
   );
   const financingGap = Math.max(0, downpayment - cash);
@@ -129,6 +139,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         }
         title={storage.name}
       />
+      {buildable && sites && (
+        <Typography className="buildOptionContext" variant="body2">
+          {siteCountLabel(sites)}
+        </Typography>
+      )}
       {(!buildable || financingGap > 0) && (
         <Typography
           component="div"
@@ -157,7 +172,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         />
         <BuildMetric
           label="At full power"
-          value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} h`}
+          value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
         />
         <BuildMetric
           label="Round-trip efficiency"
@@ -185,6 +200,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         >
           {storage.description}
         </Typography>
+        <Box className="buildOptionMetrics">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={
+              (storage.constructionKgco2ePerWh || 0) * storage.peakWh
+            }
+            yearsToBuild={storage.yearsToBuild}
+            units={units}
+          />
+        </Box>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>
@@ -219,26 +243,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                   {Number((storage.hourlyLoss * 100).toFixed(3))}%
                 </TableCell>
               </TableRow>
-              <ViableLocationsRow
-                remaining={storage.viableLocationsRemaining}
-              />
+              <ViableLocationsRow sites={sites} />
             </TableBody>
           </Table>
         </TableContainer>
       </Collapse>
 
       <Dialog open={open} onClose={toggleOpen}>
-        <DialogTitle>
+        <ClosableDialogTitle onClose={toggleOpen}>
           Build {formatWatts(storage.peakWh)}h {storage.name}?
-          <IconButton
-            aria-label="close"
-            onClick={toggleOpen}
-            className="top-right"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+        </ClosableDialogTitle>
         <DialogContent className="noPadding">
           <DecisionImpactPreview
             facts={[
@@ -263,31 +277,37 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
-                detail: "No storage until built.",
               },
               {
                 concept: "storage",
-                label: "Energy capacity",
-                value: `+${formatWattHours(storage.peakWh)} stored energy`,
-                detail: `${formatWatts(storage.peakW)} maximum charge or discharge rate`,
+                label: "Energy storage",
+                value: formatWattHours(storage.peakWh),
+              },
+              {
+                concept: "supply",
+                label: "Charge/discharge rate",
+                value: formatWatts(storage.peakW),
               },
               {
                 concept: "supply",
                 label: "Round-trip efficiency",
                 value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
               },
+              ...(sites
+                ? [
+                    {
+                      concept: "build" as const,
+                      label: "Project site",
+                      value:
+                        sites.remaining === 1
+                          ? "Uses your last site"
+                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                      detail: "Each project takes one site, whatever its size.",
+                    },
+                  ]
+                : []),
             ]}
           />
-          <Box className="buildOptionHelp">
-            <ManualLink
-              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
-              text="Power, energy & duration"
-            />
-            <ManualLink
-              entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
-              text="Charging & losses"
-            />
-          </Box>
           <Button
             color="primary"
             size="small"
@@ -455,6 +475,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             key={i}
             cash={cash}
             interestRate={game.interestRate}
+            location={game.location}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
               onBack();

@@ -1,6 +1,11 @@
 import uPlot from "uplot";
 import { chartPalette, withAlpha } from "../../Theme";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
+import {
+  axisTicksAreYearly,
+  formatMinuteAsMonthAxis,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 
 /**
  * Shared pieces for the game's uPlot charts: axis styling that matches what the charts looked
@@ -25,7 +30,7 @@ export const DESIGN_WIDTH = 350;
  * extra width as plot rather than as type -- which is also where the room for a fifth chart on
  * screen comes from, since heights are quoted in the same space.
  */
-const MAX_CHART_SCALE = 1.4;
+export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {
@@ -210,6 +215,37 @@ export function xAxis(scale: number, o: AxisOptions): uPlot.Axis {
   };
 }
 
+/** Shared month spacing and year-aware labels for forecast charts. Read live state on redraw. */
+export function forecastMonthAxis(
+  scale: number,
+  getState: () => {
+    domain: { x: [number, number] };
+    startingYear: number;
+    multiyear: boolean;
+  },
+  showLabels?: boolean,
+): uPlot.Axis {
+  return xAxis(scale, {
+    showLabels,
+    splits: () => {
+      const [min, max] = getState().domain.x;
+      return stepTicks(min, max, MINUTES_PER_MONTH);
+    },
+    values: (_u, splits) => {
+      const state = getState();
+      const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
+      return splits.map((minute) =>
+        formatMinuteAsMonthAxis(
+          minute,
+          state.startingYear,
+          state.multiyear,
+          yearOnly,
+        ),
+      );
+    },
+  });
+}
+
 /**
  * The y axis every chart shares.
  *
@@ -243,6 +279,96 @@ export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
     gap: LABEL_GAP * scale,
     splits: o.splits ?? ((_u, _i, min, max) => niceSplits(min, max)),
   };
+}
+
+/**
+ * One series into a recorded half and a forecast half, on the shared rule every chart uses:
+ * recorded points draw solid, forecast points dashed, and the halves meet at the boundary.
+ *
+ * The forecast row also carries the last recorded point, so its dashed line starts exactly
+ * where the solid one ends instead of a step adrift; `bridgeEnd` mirrors that on the recorded
+ * row for charts whose recorded and forecast points are a step apart in x (a day-scale chart)
+ * rather than adjacent points on the same grid (a month-scale chart, where reaching into the
+ * forecast would draw one projected month solid).
+ */
+export function splitPastProjected(
+  values: Array<number | null>,
+  isProjected: boolean[],
+  options: { bridgeEnd?: boolean } = {},
+): {
+  past: Array<number | null>;
+  projected: Array<number | null>;
+} {
+  const past = new Array<number | null>(values.length).fill(null);
+  const projected = new Array<number | null>(values.length).fill(null);
+  let lastPast = -1;
+  let firstProjected = -1;
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i];
+    if (value == null) continue;
+    if (isProjected[i]) {
+      projected[i] = value;
+      if (firstProjected === -1) firstProjected = i;
+    } else {
+      past[i] = value;
+      lastPast = i;
+    }
+  }
+  if (lastPast > -1 && lastPast + 1 < values.length) {
+    projected[lastPast] = values[lastPast];
+  }
+  if (options.bridgeEnd && firstProjected > 0) {
+    past[firstProjected] = values[firstProjected];
+  }
+  return { past, projected };
+}
+
+/**
+ * Spans where a series sits below a threshold, for the red bands a negative cash or loss gets.
+ *
+ * A below-threshold stretch runs from the crossing into it to the crossing out of it, so a band
+ * ends where the line re-emerges above the axis rather than a full interval past; a stretch that
+ * is still running at the last point runs to the last x. Null values end any open stretch, since
+ * the split halves of a series only null out where the other half takes over.
+ */
+export function spansBelow(
+  x: Array<number>,
+  values: Array<number | null>,
+  threshold = 0,
+): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  let start: number | null = null;
+  let prevX: number | null = null;
+  let prevV: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v == null || !isFinite(v)) {
+      if (start !== null && prevX !== null) spans.push([start, prevX]);
+      start = null;
+      prevX = null;
+      prevV = null;
+      continue;
+    }
+    if (v < threshold) {
+      if (start === null) {
+        start =
+          prevV !== null && prevV >= threshold && prevX !== null && v !== prevV
+            ? prevX + ((threshold - prevV) / (v - prevV)) * (x[i] - prevX)
+            : x[i];
+      }
+    } else if (start !== null) {
+      const end =
+        prevV !== null && prevV < threshold && prevX !== null && v !== prevV
+          ? prevX + ((threshold - prevV) / (v - prevV)) * (x[i] - prevX)
+          : x[i];
+      spans.push([start, end]);
+      start = null;
+    }
+    prevX = x[i];
+    prevV = v;
+  }
+  if (start !== null && prevX !== null) spans.push([start, prevX]);
+  return spans;
 }
 
 /**

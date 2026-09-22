@@ -24,11 +24,9 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
   const hud = page.locator(".tutorialHud");
   await hud.waitFor({ timeout: 20_000 });
 
-  // Step one asks for a tap on the gas plant; step two is the supply/demand chart, which runs
+  // Step one asks for a tap on the coal plant; step two is the supply/demand chart, which runs
   // edge to edge in every layout.
-  await page
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await expect(hud.getByText("Find the supply and demand lines")).toBeVisible();
   const chart = page.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
@@ -96,8 +94,8 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
 
   // The ring's line sits at most a gap plus its own width outside the control, and never
   // inside both the control's edge and the clipping boundary. The ring is positioned in whole
-  // pixels, so allow for rounding on top of the gap. The ring follows its target at ~15fps,
-  // so poll until it has caught up after the scroll above.
+  // pixels, so allow for rounding on top of the gap. Poll through the next animation frame
+  // after the scroll above so layout and the overlay have both been painted.
   const MAX_OFFSET = 6; // 3px gap + 2px line, plus rounding
   const ROUNDING = 1;
   await expect

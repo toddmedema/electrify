@@ -18,7 +18,7 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -49,17 +49,18 @@ import {
   formatWattsOfPeak,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
-import TransmissionPanel, {
-  TransmissionTradingSummary,
-} from "./TransmissionPanel";
+import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
 interface FacilityListItemProps {
+  arriving: boolean;
+  onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
@@ -96,12 +97,9 @@ function facilityIconName(facility: FacilityOperatingType): string {
 }
 
 const getDraggableStyle = (
-  isDragging: boolean,
   draggableStyle: DraggingStyle | NotDraggingStyle | undefined,
 ): React.CSSProperties => ({
   userSelect: "none",
-  border: isDragging ? `1px solid rgba(30, 136, 229, 0.5)` : "none", // Match buttons
-  borderRadius: isDragging ? `4px` : "0",
   ...draggableStyle,
 });
 
@@ -118,7 +116,7 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
-      return <PowerSettingsNewIcon style={style} />;
+      return <RemoveIcon style={style} />;
     case "CHARGING":
       return <ArrowUpwardIcon style={style} />;
     case "DISCHARGING":
@@ -138,6 +136,13 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   CHARGING: "charging",
   DISCHARGING: "discharging",
 };
+
+// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
+// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
+// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
+// (HydroOutlook), which marks the point where output is already being held back and drives the
+// "Nearly empty." forecast lead -- the row warns before that bites.
+const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
@@ -179,10 +184,13 @@ function FacilityActions(props: {
               : onPause(facility.id, facility.name)
           }
         >
-          {facility.paused ? "Resume" : "Pause"}
+          <span className="facilityActionLabel">
+            {facility.paused ? "Resume" : "Pause"}
+          </span>
         </Button>
       )}
       <Button
+        className={underConstruction ? "facilityCancelConstruction" : undefined}
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
@@ -190,7 +198,9 @@ function FacilityActions(props: {
         }
         onClick={onOpenSell}
       >
-        {underConstruction ? "Cancel construction" : "Sell"}
+        <span className="facilityActionLabel">
+          {underConstruction ? "Cancel construction" : "Sell"}
+        </span>
       </Button>
       {listLength > 1 && (
         <>
@@ -202,7 +212,7 @@ function FacilityActions(props: {
             disabled={spotInList === 0}
             onClick={() => onReprioritize(spotInList, -1)}
           >
-            Move up
+            <span className="facilityActionLabel">Move up</span>
           </Button>
           <Button
             startIcon={<KeyboardArrowDownIcon />}
@@ -212,7 +222,7 @@ function FacilityActions(props: {
             disabled={spotInList === listLength - 1}
             onClick={() => onReprioritize(spotInList, 1)}
           >
-            Move down
+            <span className="facilityActionLabel">Move down</span>
           </Button>
         </>
       )}
@@ -258,17 +268,37 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     spotInList,
     storyOutputMultiplier,
+    arriving: arrivalRequested,
+    onArrivalShown,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
-
-  // Storage is charging or discharging depending on which way its stored energy moved since the
-  // last tick, which is only knowable by remembering the last one
-  const previousWh = React.useRef(facility.currentWh);
-  const whDelta = facility.currentWh - previousWh.current;
+  const wasBuilding = React.useRef(underConstruction);
+  const [arriving, setArriving] = React.useState(arrivalRequested);
+  const [ready, setReady] = React.useState(false);
   React.useEffect(() => {
-    previousWh.current = facility.currentWh;
-  });
+    if (arrivalRequested) {
+      setArriving(true);
+      onArrivalShown?.(facility.id);
+    }
+  }, [arrivalRequested, onArrivalShown, facility.id]);
+  React.useEffect(() => {
+    if (!arriving) return;
+    // Also consume the cue when reduced motion prevents animationend from firing.
+    const timer = window.setTimeout(() => setArriving(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [arriving]);
+  React.useEffect(() => {
+    if (wasBuilding.current && !underConstruction && !readOnly) {
+      setReady(true);
+    }
+    wasBuilding.current = underConstruction;
+  }, [underConstruction, readOnly]);
+  React.useEffect(() => {
+    if (!ready) return;
+    const timer = window.setTimeout(() => setReady(false), 2400);
+    return () => window.clearTimeout(timer);
+  }, [ready]);
 
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
@@ -276,16 +306,31 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else if (facility.paused) {
     activity = "PAUSED";
   } else if (isStorage) {
-    // A battery holding steady is neither charging nor discharging, so don't claim either
-    activity = whDelta > 0 ? "CHARGING" : whDelta < 0 ? "DISCHARGING" : "IDLE";
+    // Use the same dispatch reading as the flow bar. Render-to-render energy deltas
+    // disappear on selection and cannot describe an already-running battery on mount.
+    activity =
+      facility.currentW < 0
+        ? "CHARGING"
+        : facility.currentW > 0
+          ? "DISCHARGING"
+          : "IDLE";
   } else if (facility.currentW <= 0) {
     activity = "IDLE";
   }
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const accentColor = facilityColor(fuel);
+  const capacityFraction = isStorage
+    ? facility.currentWh / facility.peakWh
+    : fuel === "Hydro" && facility.reservoirCapacityWh
+      ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
+      : null;
+  // Signed: storage sets a negative currentW while it charges, which used to scaleX the row
+  // bar backwards off its own left edge and read as an idle battery.
   const outputFraction =
-    facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
+    facility.peakW > 0
+      ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
+      : 0;
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
   // storage power and the reservoir's absolute size are both in the opened details.
@@ -311,24 +356,30 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-      const reservoirPercent = Math.round(
-        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
-      );
+      const reservoirFraction =
+        (facility.reservoirWh || 0) / facility.reservoirCapacityWh;
+      const reservoirPercent = Math.round(reservoirFraction * 100);
+      // A dam this far down is heading for the minimum generating level, which is worth seeing
+      // without opening the row. The reading turns red, and an off-screen "low" carries the
+      // same message for anyone who can't use the colour.
+      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
       // Only one of these shows, picked by how wide the row is
       detail = (
-        <>
+        <span className={low ? "facilityStatusLow" : undefined}>
           <span className="facilityStatusLong">
             reservoir {reservoirPercent}%
           </span>
-          <span className="facilityStatusShort">{reservoirPercent}% full</span>
-        </>
+          <span className="facilityStatusShort">{reservoirPercent}%</span>
+          {low && <span className="srOnly"> low</span>}
+        </span>
       );
     }
   }
-  // "Building 40%" already says what the construction badge does
-  const status = underConstruction
-    ? reading
-    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
+  // Output communicates normal operation; keep explicit labels for other states.
+  const status =
+    underConstruction || activity === "RUNNING"
+      ? reading
+      : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -342,25 +393,22 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={selected ? "facilityRow selected" : "facilityRow"}
+          className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           data-fuel={fuel}
-          style={getDraggableStyle(
-            snapshot.isDragging,
-            provided.draggableProps.style,
-          )}
+          style={getDraggableStyle(provided.draggableProps.style)}
         >
-          <div className="facilityRowHeader">
+          <div
+            className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
+            data-storage={isStorage || undefined}
+            onAnimationEnd={(event) => {
+              if (event.animationName === "facilityArrival") setArriving(false);
+            }}
+          >
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!underConstruction && (
-              <div
-                className="outputProgressBar"
-                style={{
-                  transform: `scaleX(${outputFraction})`,
-                  background: withAlpha(accentColor, 0.18),
-                }}
-              />
+              <FlowBar fraction={outputFraction} color={accentColor} />
             )}
             {!readOnly && (
               <button
@@ -375,7 +423,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             <button
               type="button"
               className="facilityDisclosure"
-              aria-label={"Inspect " + facility.name}
+              aria-label={
+                `Inspect ${facility.name}` + (isStorage ? `, ${status}` : "")
+              }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
@@ -400,16 +450,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <ListItemAvatar>
                   <div>
                     <Avatar
-                      className={facility.currentWh === 0 ? "offline" : ""}
+                      className={activity === "IDLE" ? "facilityIconIdle" : ""}
                       alt={facility.name}
                       src={`/images/${facilityIconName(facility)}.svg`}
                     />
-                    {facility.peakWh > 0 && !underConstruction && (
-                      <div className="capacityProgressBar">
+                    {capacityFraction !== null && !underConstruction && (
+                      <div className="capacityProgressBar" aria-hidden="true">
                         <div
                           className="capacityProgressBarFill"
                           style={{
-                            transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                            transform: `scaleY(${capacityFraction})`,
                             backgroundColor:
                               activity === "CHARGING"
                                 ? chartPalette().storage
@@ -436,6 +486,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     primary={
                       <>
                         <span className="facilityName">{facility.name}</span>
+                        {ready && (
+                          <span className="facilityReadyLabel">Ready</span>
+                        )}
                         {storyOutputMultiplier < 1 && (
                           <Chip
                             className="storyDerateBadge"
@@ -452,7 +505,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                         <span className="facilityStatus">{status}</span>
                         {detail && (
                           <span className="facilityStatusDetail">
-                            {" · "}
+                            <span
+                              className="facilityStatusSeparator"
+                              aria-hidden="true"
+                            >
+                              {" · "}
+                            </span>
                             {detail}
                           </span>
                         )}
@@ -469,7 +527,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <span
                         className="constructionProgressFill"
                         style={{
-                          transform: `scaleX(${builtFraction})`,
+                          width: `${builtFraction * 100}%`,
                           background: accentColor,
                         }}
                       />
@@ -546,6 +604,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               date={game.date}
               seed={game.seed}
               location={game.location}
+              game={game}
             />
           )}
         </div>
@@ -584,6 +643,7 @@ function FacilitySupplyChart({
 }
 
 export interface StateProps {
+  arrivingFacilityId?: number;
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
   game: GameType;
@@ -593,6 +653,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onArrivalShown?: (id: number) => void;
   onEvidenceReady?: (
     request: EvidenceRequestType,
     element: HTMLElement | null,
@@ -611,6 +672,7 @@ export interface DispatchProps {
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
   onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -642,6 +704,7 @@ export default class Facilities extends React.Component<Props> {
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       nextProps.game.speed !== "FAST" ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -704,6 +767,7 @@ export default class Facilities extends React.Component<Props> {
       onReprioritize,
       onSelect,
       onTransmissionBuild,
+      onTransmissionUpgrade,
       onTradingPolicy,
       selectedFacilityId,
     } = this.props;
@@ -741,12 +805,6 @@ export default class Facilities extends React.Component<Props> {
           </Toolbar>
           <div className="scrollable facilitiesBody">
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {intertiesAvailable && (
-              <TransmissionTradingSummary
-                game={game}
-                onPolicy={onTradingPolicy}
-              />
-            )}
             <List dense className="scrollable unifiedFacilitiesList">
               {intertiesAvailable && (
                 <Typography
@@ -767,6 +825,8 @@ export default class Facilities extends React.Component<Props> {
                       {game.facilities.map(
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem
+                            arriving={this.props.arrivingFacilityId === g.id}
+                            onArrivalShown={this.props.onArrivalShown}
                             facility={g}
                             game={game}
                             key={g.id}
@@ -775,15 +835,7 @@ export default class Facilities extends React.Component<Props> {
                             onPause={onPause}
                             onReprioritize={onReprioritize}
                             onSelect={onSelect}
-                            selected={
-                              (game.scenarioId === 5 &&
-                                [0, 4].includes(game.tutorialStep)) ||
-                              selectedFacilityId === g.id ||
-                              (game.scenarioId === 112 &&
-                                game.tutorialStep === 5 &&
-                                "fuel" in g &&
-                                g.fuel === "Natural Gas")
-                            }
+                            selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplierForFacility(
                               g,
                               storyEffects,
@@ -812,6 +864,7 @@ export default class Facilities extends React.Component<Props> {
                 <TransmissionPanel
                   game={game}
                   onBuild={onTransmissionBuild}
+                  onUpgrade={onTransmissionUpgrade}
                   onPolicy={onTradingPolicy}
                 />
               )}

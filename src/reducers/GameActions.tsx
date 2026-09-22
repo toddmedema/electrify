@@ -1,3 +1,4 @@
+import type { RunIdentity, ChallengeInvitationV1 } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
 import type { GameType, ReplayType, PolicyChangeType } from "../Types";
 
@@ -25,6 +26,10 @@ export const closePolicyDecision = createAction<string>(
  * The type strings are the ones createSlice generated for a slice named "game", so devtools traces
  * and anything matching on action type are unaffected.
  */
+export const launchRun = createAction<{
+  identity: RunIdentity;
+  challenge?: ChallengeInvitationV1;
+}>("game/launchRun");
 export const start = createAction<number>("game/start");
 export const loaded = createAction("game/loaded");
 /**
@@ -51,3 +56,11 @@ export const chooseScenarioResponse = createAction<{
   decisionId: string;
   optionId: string;
 }>("game/chooseScenarioResponse");
+
+/**
+ * The page (or app) went to the background: pause the clock, remembering the speed it was at.
+ * Cordova's pause/resume and visibilitychange both dispatch these from App.tsx, so the game
+ * slice -- which owns the tick loop -- reacts without App importing its action creators.
+ */
+export const pageHidden = createAction("game/pageHidden");
+export const pageVisible = createAction("game/pageVisible");

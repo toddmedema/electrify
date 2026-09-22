@@ -301,13 +301,36 @@ function buildFuelTrends() {
  * anchored on whatever year a game starts in, so they open at exactly what the tables say, but a
  * game starting in 2080 opens against fuel that has escalated for sixty years. The retail rate it
  * is played at has to be quoted in that same money, or the run is bankrupt in its first quarter -
- * which is what the custom game screen uses this for.
+ * which is what inEraMoney below does for the cash, rate and fee a run opens with.
  */
 export function getFuelEscalation(year: number): number {
   return Math.pow(
     1 + TREND_ESCALATION_YEARLY,
     Math.max(0, year - LATEST_DATA_YEAR),
   );
+}
+
+// Custom-game option amounts are written in this era.
+export const MONEY_BASE_YEAR = 2020;
+
+/**
+ * Re-quote money between starting eras using the projected fuel trend. Historical years share
+ * the base era: their recorded fuel prices are not a projection to inflate or undo. Authored
+ * scenarios supply their own starting year; custom-game options default to the base era.
+ * Preserve exact amounts when the eras agree, otherwise round to two significant figures.
+ */
+export function inEraMoney(
+  base: number,
+  startingYear: number,
+  sourceYear = MONEY_BASE_YEAR,
+): number {
+  const targetEra = Math.max(startingYear, MONEY_BASE_YEAR);
+  const sourceEra = Math.max(sourceYear, MONEY_BASE_YEAR);
+  if (targetEra === sourceEra) {
+    return base;
+  }
+  const factor = getFuelEscalation(targetEra) / getFuelEscalation(sourceEra);
+  return Number((base * factor).toPrecision(2));
 }
 
 /** What a fuel costs on its trend in a given month, before any departure from it. */

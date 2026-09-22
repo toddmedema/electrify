@@ -19,6 +19,20 @@ interface TransmissionProfileDefinition {
   corridors: readonly TransmissionCorridorDefinitionType[];
 }
 
+/**
+ * Near the equator a neighbour's wet season can sit on the other side of it from the player's
+ * city. Without these, the same Ethiopian dams would peak in opposite months seen from Khartoum
+ * and from Nairobi.
+ */
+const MARKET_SEASON_HEMISPHERE: Readonly<Record<string, "NORTH" | "SOUTH">> = {
+  "geo-nairobi-ethiopian-hydro": "NORTH",
+  "geo-daressalaam-kenyan-market": "NORTH",
+  "geo-kigali-uganda-market": "NORTH",
+  "geo-kampala-great-lakes-market": "SOUTH",
+  "ec-national-colombia-market": "NORTH",
+  "co-national-ecuador-market": "SOUTH",
+};
+
 function expandProfile(
   tuple: TransmissionProfileTuple,
 ): TransmissionProfileDefinition {
@@ -31,6 +45,7 @@ function expandProfile(
         basePricePerMWh,
         availableSupplyW,
         availableDemandW,
+        archetype,
       ]) => ({
         id,
         name,
@@ -38,6 +53,10 @@ function expandProfile(
         basePricePerMWh,
         availableSupplyW,
         availableDemandW,
+        archetype,
+        ...(MARKET_SEASON_HEMISPHERE[id]
+          ? { seasonHemisphere: MARKET_SEASON_HEMISPHERE[id] }
+          : {}),
         ...importEmissionsAssumption(id),
       }),
     ),
@@ -141,6 +160,13 @@ export function adjacentMarketsForLocation(
 ): readonly AdjacentMarketDefinitionType[] {
   const profileId = transmissionProfileIdForLocation(location);
   return profileId ? (TRANSMISSION_PROFILES[profileId]?.markets ?? []) : [];
+}
+
+/** The authored corridor an operating line was built from, by id. */
+export function corridorById(
+  corridorId: string,
+): TransmissionCorridorDefinitionType | undefined {
+  return uniqueCorridors.get(corridorId);
 }
 
 export function adjacentMarketForCorridor(

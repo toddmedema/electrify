@@ -5,6 +5,7 @@ import {
   formatWattHoursOfPeak,
   formatWatts,
   formatWattsAxis,
+  formatSignedWattsOfPeak,
   formatWattsOfPeak,
 } from "./Format";
 
@@ -59,6 +60,22 @@ describe("formatWattsOfPeak", () => {
 
   it("should handle an idle facility", () => {
     expect(formatWattsOfPeak(0, 500000000)).toEqual("0/500MW");
+  });
+});
+
+describe("formatSignedWattsOfPeak", () => {
+  it("reads like the unsigned pair when power flows the normal way", () => {
+    expect(formatSignedWattsOfPeak(100000000, 1000000000)).toEqual("0.1/1GW");
+  });
+
+  it("keeps the sign that formatWattsOfPeak strips", () => {
+    expect(formatWattsOfPeak(-100000000, 1000000000)).toEqual("0.1/1GW");
+    expect(formatSignedWattsOfPeak(-100000000, 1000000000)).toEqual("-0.1/1GW");
+  });
+
+  it("does not write a negative zero when a trickle rounds away", () => {
+    expect(formatSignedWattsOfPeak(-1000, 500000000)).toEqual("0/500MW");
+    expect(formatSignedWattsOfPeak(0, 500000000)).toEqual("0/500MW");
   });
 });
 

@@ -1,4 +1,9 @@
 import {
+  captureRunIdentity,
+  projectAuthoredRunReference,
+} from "../helpers/RunIdentity";
+import { launchRun } from "./GameActions";
+import {
   hasChronicBlackouts,
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
@@ -26,6 +31,8 @@ import {
   cancelPolicy,
   openPolicyDecision,
   closePolicyDecision,
+  pageHidden,
+  pageVisible,
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
@@ -82,13 +89,20 @@ import {
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
   adjacentMarketForCorridor,
+  corridorById,
   corridorsForLocation,
   emptyTransmissionState,
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
 import {
   adjacentMarketPricePerMWh,
+  allocateIntertieFlows,
   clearTransmissionMarket,
+  corridorConstructionKgco2e,
+  intertieContextForGame,
+  intertieUpgradeQuote,
+  intertieImportLimitW,
+  IntertieOffer,
   transmissionRatingW,
 } from "../helpers/Transmission";
 import {
@@ -163,6 +177,7 @@ import { clearSaveFor } from "../SaveGame";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   ActiveWorldEventType,
+  ConstructionEmissions,
   DateType,
   FacilityOperatingType,
   FacilityShoppingType,
@@ -199,6 +214,10 @@ interface ReprioritizeFacilityAction {
   delta: number;
 }
 
+interface UpgradeTransmissionLineAction {
+  corridorId: string;
+  financed: boolean;
+}
 interface BuildTransmissionLineAction {
   corridorId: string;
   financed: boolean;
@@ -225,7 +244,20 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
 let speedBeforeManualHelp: SpeedType | undefined;
-const BLOCKING_CARDS = new Set(["MANUAL", "BUILD_GENERATORS", "BUILD_STORAGE"]);
+// While hidden, pause owners read and update this foreground speed; the real clock stays
+// paused even if a dialog or card opens or closes before the page returns.
+let speedBeforeHidden: SpeedType | undefined;
+const BLOCKING_CARDS = new Set([
+  "MAIN_MENU",
+  "MANUAL",
+  "BUILD_GENERATORS",
+  "BUILD_STORAGE",
+  "BUILD_INTERTIES",
+  "CHALLENGE",
+  "NEW_GAME",
+  "NEW_GAME_DETAILS",
+  "CUSTOM_GAME",
+]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
@@ -758,12 +790,26 @@ function ensureTicking(state: GameType) {
   }
 }
 
+// Backgrounding is an outer pause: UI transitions still update the speed to restore,
+// but may never restart the actual clock until the page is visible.
+function foregroundSpeed(state: GameType): SpeedType {
+  return speedBeforeHidden ?? state.speed;
+}
+
+function setForegroundSpeed(state: GameType, speed: SpeedType) {
+  if (speedBeforeHidden !== undefined) {
+    speedBeforeHidden = speed;
+  } else {
+    state.speed = speed;
+  }
+}
+
 // Puts the clock back the way the player left it before a full-screen card paused it
 function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  state.speed = speedBeforeBlockingCard;
+  setForegroundSpeed(state, speedBeforeBlockingCard);
   speedBeforeBlockingCard = undefined;
   ensureTicking(state);
 }
@@ -811,6 +857,22 @@ export const gameSlice = createSlice({
         policyPause: _policyPause,
         ...payload
       } = action.payload;
+      if (
+        state.runIdentity &&
+        [
+          "seed",
+          "difficulty",
+          "scenarioId",
+          "customScenario",
+          "location",
+          "storyEffectsDisabled",
+          "meaningfulDecisionGateWaived",
+        ].some((key) =>
+          Object.prototype.hasOwnProperty.call(action.payload, key),
+        )
+      ) {
+        state.runIdentity = undefined;
+      }
       const recorded = recordedDelta(action.payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
@@ -846,6 +908,30 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      const canonicalIdentity = captureRunIdentity(
+        scenario,
+        state.seed,
+        state.difficulty,
+        {
+          location: a.location,
+          facilities: a.facilities,
+          cash: a.cash,
+          customers: a.customers,
+          meaningfulDecisionGateWaived: !!state.meaningfulDecisionGateWaived,
+        },
+        state.replayPlayback
+          ? "replay"
+          : scenario.tutorialSteps
+            ? "tutorial"
+            : state.customScenario
+              ? "custom"
+              : "authored",
+      );
+      state.runIdentity =
+        !state.storyEffectsDisabled &&
+        projectAuthoredRunReference(canonicalIdentity)
+          ? canonicalIdentity
+          : undefined;
       const checkpoint =
         scenario.tutorialSteps?.[state.tutorialStep]?.capstone?.checkpoint;
       const startingCash = checkpoint?.cash ?? a.cash;
@@ -1014,6 +1100,14 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "buildTransmissionLine", action.payload);
       }
     },
+    upgradeTransmissionLine: (
+      state,
+      action: PayloadAction<UpgradeTransmissionLineAction>,
+    ) => {
+      if (applyUpgradeTransmissionLine(state, action.payload)) {
+        recordReplayAction(state, "upgradeTransmissionLine", action.payload);
+      }
+    },
     setTradingPolicy: (state, action: PayloadAction<TradingPolicyType>) => {
       if (applyTradingPolicy(state, action.payload)) {
         recordReplayAction(state, "setTradingPolicy", action.payload);
@@ -1041,10 +1135,12 @@ export const gameSlice = createSlice({
       if (pendingScenarioChoice(state) && action.payload !== "PAUSED") return;
       delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
-      // instructions frozen until the player actually closes the card.
+      // instructions frozen until the player actually closes the card. A backgrounded page
+      // freezes the same way: pageVisible is the caller that resumes it.
       if (
         (speedBeforeBlockingCard !== undefined ||
-          speedBeforeManualHelp !== undefined) &&
+          speedBeforeManualHelp !== undefined ||
+          speedBeforeHidden !== undefined) &&
         action.payload !== "PAUSED"
       ) {
         return;
@@ -1059,7 +1155,26 @@ export const gameSlice = createSlice({
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
   // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(launchRun, (_state, action) => {
+      const { identity, challenge } = action.payload;
+      if (!projectAuthoredRunReference(identity)) return;
+      speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
+      speedBeforeDialog = "PAUSED";
+      return {
+        ...cloneDeep(initialGame),
+        scenarioId: identity.scenarioId,
+        difficulty: identity.difficulty,
+        seed: identity.seed,
+        location: cloneDeep(identity.inputs.location),
+        runIdentity: cloneDeep(identity),
+        challenge: cloneDeep(challenge),
+      };
+    });
     builder.addCase(start, (state, action) => {
+      state.runIdentity = undefined;
+      state.challenge = undefined;
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
@@ -1076,6 +1191,7 @@ export const gameSlice = createSlice({
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
@@ -1094,6 +1210,7 @@ export const gameSlice = createSlice({
       const replay = action.payload;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -1135,51 +1252,60 @@ export const gameSlice = createSlice({
     builder.addCase(quit, () => {
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       return cloneDeep(initialGame);
     });
     // Opening a reading or construction card pauses the game, and closing it puts the speed back.
     // The sim should not punish the player for reading, or mutate a quote during a decision.
     builder.addCase(navigate, (state, action) => {
       const payload = action.payload;
-      if (
-        typeof payload === "object" &&
-        payload?.journeyTraversal === "origin"
-      ) {
-        // Return restores presentation only. Discard the construction card's pending resume.
-        speedBeforeBlockingCard = undefined;
-        return;
-      }
       const name = typeof payload === "string" ? payload : payload?.name;
       if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        speedBeforeBlockingCard = state.policyPause?.speed ?? state.speed;
+        speedBeforeBlockingCard =
+          state.policyPause?.speed ?? foregroundSpeed(state);
         delete state.policyPause;
-        state.speed = "PAUSED";
+        setForegroundSpeed(state, "PAUSED");
       }
     });
-    builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
+    builder.addCase(navigateBack, (state, action) => {
+      if (!action.payload || !BLOCKING_CARDS.has(action.payload))
+        restoreSpeedAfterBlockingCard(state);
+    });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
-        speedBeforeManualHelp = state.speed;
-        state.speed = "PAUSED";
+        speedBeforeManualHelp = foregroundSpeed(state);
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(manualHelpClose, (state) => {
       if (speedBeforeManualHelp !== undefined) {
-        state.speed = speedBeforeManualHelp;
+        setForegroundSpeed(state, speedBeforeManualHelp);
         speedBeforeManualHelp = undefined;
         ensureTicking(state);
       }
     });
+    builder.addCase(pageHidden, (state) => {
+      if (state.inGame && speedBeforeHidden === undefined) {
+        speedBeforeHidden = state.speed;
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(pageVisible, (state) => {
+      if (speedBeforeHidden === undefined) return;
+      state.speed = speedBeforeHidden;
+      speedBeforeHidden = undefined;
+      ensureTicking(state);
+    });
     builder.addCase(dialogOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(dialogClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
@@ -1199,13 +1325,17 @@ export const gameSlice = createSlice({
     });
     builder.addCase(openPolicyDecision, (state, action) => {
       if (!state.policyPause) {
-        state.policyPause = { token: action.payload, speed: state.speed };
-        state.speed = "PAUSED";
+        state.policyPause = {
+          token: action.payload,
+          speed: foregroundSpeed(state),
+        };
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(closePolicyDecision, (state, action) => {
       if (state.policyPause?.token === action.payload) {
-        if (state.speed === "PAUSED") state.speed = state.policyPause.speed;
+        if (foregroundSpeed(state) === "PAUSED")
+          setForegroundSpeed(state, state.policyPause.speed);
         delete state.policyPause;
         ensureTicking(state);
       }
@@ -1214,11 +1344,11 @@ export const gameSlice = createSlice({
     // resumes at whatever speed the run was going when it ended
     builder.addCase(victoryOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(victoryClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
   },
@@ -1230,6 +1360,7 @@ export const {
   initGame,
   buildFacility,
   buildTransmissionLine,
+  upgradeTransmissionLine,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -1468,6 +1599,9 @@ function applyBuildTransmissionLine(
       ? getMonthlyPayment(loanAmount, state.interestRate, LOAN_MONTHS)
       : 0,
     interestRate: financed ? state.interestRate : 0,
+    // Nothing flows until the line is energised, which is years away
+    currentFlowW: 0,
+    constructionKgco2eTotal: corridorConstructionKgco2e(corridor),
   };
   state.transmission.lines.push(line);
   recordMeaningfulDecision(state, {
@@ -1481,6 +1615,76 @@ function applyBuildTransmissionLine(
     state,
     "BUILD",
     `Started ${corridor.name}: ${formatWatts(corridor.capacityW)} to ${adjacentMarketForCorridor(corridor.id)?.name}`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+/**
+ * Widen a line that is already carrying power. The capacity itself does not move until the work
+ * finishes -- crews restring one circuit at a time rather than taking an interconnector out of
+ * service for a year -- so everything here books the money and starts a clock.
+ */
+function applyUpgradeTransmissionLine(
+  state: GameType,
+  payload: Partial<UpgradeTransmissionLineAction>,
+): boolean {
+  if (typeof payload.corridorId !== "string") return false;
+  const line = state.transmission?.lines.find(
+    ({ corridorId }) => corridorId === payload.corridorId,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  // Only a finished line can be widened, and only one job at a time.
+  if (!line || !now || line.yearsToBuildLeft > 0 || line.upgrade) return false;
+  // Priced straight off the authored corridor, with no difficulty or inflation multiplier, the
+  // same way building the line was: interties are quoted from TRANSMISSION_PROFILE_DATA as-is.
+  const quote = intertieUpgradeQuote(line, state.date.year);
+  if (!quote) return false;
+  const financed = !!payload.financed;
+  const amountDue = financed
+    ? quote.buildCost * DOWNPAYMENT_PERCENT
+    : quote.buildCost;
+  if (now.cash < amountDue) return false;
+  now.cash -= amountDue;
+  const loanAmount = financed ? quote.buildCost - amountDue : 0;
+  if (financed) {
+    // One line, one loan. Rolling the new borrowing into the existing balance at the current
+    // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
+    // needing a second schedule of its own.
+    line.loanAmountLeft += loanAmount;
+    line.loanMonthlyPayment = getMonthlyPayment(
+      line.loanAmountLeft,
+      state.interestRate,
+      LOAN_MONTHS,
+    );
+    line.interestRate = state.interestRate;
+    line.financed = true;
+  }
+  line.buildCost += quote.buildCost;
+  line.upgrade = {
+    targetCapacityW: quote.targetCapacityW,
+    buildCost: quote.buildCost,
+    annualOperatingCost: quote.annualOperatingCost,
+    yearsToBuild: quote.yearsToBuild,
+    yearsToBuildLeft: quote.yearsToBuild,
+    constructionKgco2eTotal: quote.constructionKgco2eTotal,
+    constructionKgco2eEmitted: 0,
+  };
+  recordMeaningfulDecision(state, {
+    lever: `intertie-upgrade:${line.id}`,
+    label: `Upgrade ${line.name}`,
+    kind: "asset",
+    before: formatWatts(line.capacityW),
+    after: formatWatts(quote.targetCapacityW),
+  });
+  logGameEvent(
+    state,
+    "BUILD",
+    `Upgrade started: ${line.name}, ${formatWatts(line.capacityW)} to ${formatWatts(quote.targetCapacityW)}`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1618,6 +1822,11 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     case "buildTransmissionLine": {
       const build = payload as Partial<BuildTransmissionLineAction>;
       applyBuildTransmissionLine(state, build);
+      break;
+    }
+    case "upgradeTransmissionLine": {
+      const upgrade = payload as Partial<UpgradeTransmissionLineAction>;
+      applyUpgradeTransmissionLine(state, upgrade);
       break;
     }
     case "setTradingPolicy":
@@ -1898,6 +2107,12 @@ export function tickState(state: GameType) {
         const difficulty = state.difficulty;
         const { id: scoredScenarioId, name: scenarioName } = scenario;
         const submitsScore = ranked;
+        const runIdentity = state.runIdentity
+          ? cloneDeep(state.runIdentity)
+          : undefined;
+        const challenge = state.challenge
+          ? cloneDeep(state.challenge)
+          : undefined;
         const replay = submitsScore ? serializeReplay(state) : undefined;
         const debrief = buildVictoryDebrief(
           scenario,
@@ -1920,6 +2135,11 @@ export function tickState(state: GameType) {
             difficulty,
             score: finalScore,
           });
+          if (challenge)
+            logEvent("challenge_complete", {
+              scenarioId: scoredScenarioId,
+              outcome,
+            });
         }
         setTimeout(() => {
           // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
@@ -1933,6 +2153,8 @@ export function tickState(state: GameType) {
             getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
           getStore().dispatch(
             victoryOpen({
+              runIdentity,
+              challenge,
               scenarioId: scoredScenarioId,
               scenarioName,
               difficulty,
@@ -2348,6 +2570,7 @@ function updateSupplyFacilitiesFinances(
   preRoll?: boolean,
   optimizeCommitment = true,
   stepMinutes = TICK_MINUTES,
+  advanceConstruction = true,
 ) {
   const { facilities, date } = state;
   const tickScale = stepMinutes / TICK_MINUTES;
@@ -2357,9 +2580,41 @@ function updateSupplyFacilitiesFinances(
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
   const difficulty = DIFFICULTIES[state.difficulty];
 
+  // Everything being built right now emits while it is being built, spread evenly across each
+  // project's schedule. Derived from how far each clock actually moved rather than from elapsed
+  // time: the decrements below are clamped at zero, so a project finishing mid-tick advances by
+  // less than a full tick, and only the delta makes the lifetime total come out exact.
+  // At rollover getTimeFromTimeline clamps both now and prev to the final frame. Keep that
+  // frame's already-recorded construction charge when booking the boundary's additional work.
+  let constructionKgco2e =
+    !simulated && now === prev ? now.constructionKgco2e || 0 : 0;
+  const accrueConstruction = (
+    asset: ConstructionEmissions & { yearsToBuildLeft: number },
+    yearsToBuild: number,
+  ) => {
+    const total = asset.constructionKgco2eTotal;
+    if (!total || !(yearsToBuild > 0)) return;
+    const complete = Math.min(
+      1,
+      Math.max(0, 1 - asset.yearsToBuildLeft / yearsToBuild),
+    );
+    // A month-boundary pre-roll moves the live build clock, but its frames are re-run and its
+    // tick is not the one that gets recorded. Booking nothing here and leaving the marker alone
+    // lets the next real tick charge for everything the clock moved, pre-roll included, so the
+    // schedule is unchanged and the lifetime total still comes out exact.
+    if (preRoll) return;
+    const owed = total * complete - (asset.constructionKgco2eEmitted || 0);
+    if (owed <= 0) return;
+    // Charged against how far the build actually got rather than against elapsed time, which is
+    // what makes the last partial tick land on the total instead of overshooting it.
+    asset.constructionKgco2eEmitted =
+      (asset.constructionKgco2eEmitted || 0) + owed;
+    constructionKgco2e += owed;
+  };
+
   // Update facility construction status
   facilities.forEach((f: FacilityOperatingType) => {
-    if (f.yearsToBuildLeft > 0) {
+    if (advanceConstruction && f.yearsToBuildLeft > 0) {
       f.yearsToBuildLeft = Math.max(
         0,
         f.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
@@ -2377,17 +2632,56 @@ function updateSupplyFacilitiesFinances(
     }
   });
 
+  // A facility can finish during pre-roll; its remaining emissions still belong to the next
+  // recorded tick even though its construction clock has already reached zero.
+  if (advanceConstruction) {
+    facilities.forEach((facility) =>
+      accrueConstruction(facility, facility.yearsToBuild),
+    );
+  }
+
   const transmission = state.transmission ?? emptyTransmissionState();
   transmission.lines.forEach((line) => {
     // Month-boundary pre-roll stabilizes generator output against the new weather frame. It is
     // not elapsed game time and must not quietly shorten an intertie's authored build schedule.
-    if (preRoll || line.yearsToBuildLeft <= 0) return;
+    if (!advanceConstruction || preRoll || line.yearsToBuildLeft <= 0) return;
     line.yearsToBuildLeft = Math.max(
       0,
       line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
     );
+    accrueConstruction(line, corridorById(line.corridorId)?.yearsToBuild ?? 0);
     if (line.yearsToBuildLeft === 0 && !simulated) {
       logGameEvent(state, "CONSTRUCTION", `Intertie open: ${line.name}`);
+    }
+  });
+  // Widening a line that is already open. Kept in its own pass rather than folded into the one
+  // above, whose early return is for lines still being built: an upgrade only exists on a line
+  // that finished long ago, and it must advance on exactly the same frames a build does.
+  transmission.lines.forEach((line) => {
+    const upgrade = line.upgrade;
+    if (
+      !advanceConstruction ||
+      preRoll ||
+      !upgrade ||
+      upgrade.yearsToBuildLeft <= 0
+    )
+      return;
+    upgrade.yearsToBuildLeft = Math.max(
+      0,
+      upgrade.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
+    );
+    accrueConstruction(upgrade, upgrade.yearsToBuild);
+    if (upgrade.yearsToBuildLeft > 0) return;
+    // The new capacity arrives the day the work is signed off, not before.
+    line.capacityW = upgrade.targetCapacityW;
+    line.annualOperatingCost = upgrade.annualOperatingCost;
+    delete line.upgrade;
+    if (!simulated) {
+      logGameEvent(
+        state,
+        "CONSTRUCTION",
+        `Upgrade complete: ${line.name} now carries ${formatWatts(line.capacityW)}`,
+      );
     }
   });
 
@@ -2719,30 +3013,38 @@ function updateSupplyFacilitiesFinances(
   const operatingLines = transmission.lines.filter(
     ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
   );
+  const intertieContext = intertieContextForGame(state);
   let transmissionCapacity = 0;
-  let weightedMarketPrice = 0;
   let marketImportLimitW = 0;
-  let weightedImportEmissions = 0;
   let marketExportLimitW = 0;
+  const offers: (IntertieOffer & { emissionsKgco2ePerMWh: number })[] = [];
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
     const market = adjacentMarketForCorridor(line.corridorId);
-    const price = adjacentMarketPricePerMWh(
+    const pricePerMWh = adjacentMarketPricePerMWh(
       line.corridorId,
-      state.seed,
+      intertieContext,
       now.minute,
       now,
     );
+    // The neighbour's archetype decides how much of the line it can fill right now.
+    const importLimitW = intertieImportLimitW(
+      line,
+      intertieContext,
+      now.minute,
+      now,
+    );
+    const exportLimitW = Math.min(rating, market?.availableDemandW || 0);
     transmissionCapacity += rating;
-    weightedMarketPrice += rating * price;
-    const importCapacityW = Math.min(rating, market?.availableSupplyW || 0);
-    marketImportLimitW += importCapacityW;
-    weightedImportEmissions +=
-      importCapacityW * (market?.emissionsKgco2ePerMWh || 0);
-    marketExportLimitW += Math.min(rating, market?.availableDemandW || 0);
+    marketImportLimitW += importLimitW;
+    marketExportLimitW += exportLimitW;
+    offers.push({
+      importLimitW,
+      exportLimitW,
+      pricePerMWh,
+      emissionsKgco2ePerMWh: market?.emissionsKgco2ePerMWh || 0,
+    });
   }
-  const marketPricePerMWh =
-    transmissionCapacity > 0 ? weightedMarketPrice / transmissionCapacity : 0;
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
   const grossLocalSupplyW = supply;
@@ -2755,6 +3057,34 @@ function updateSupplyFacilitiesFinances(
     policy: transmission.tradingPolicy,
   });
   const { importedW, exportedW } = clearing;
+  // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
+  const flows = allocateIntertieFlows(offers, importedW, exportedW);
+  // Keep the row readings aligned with the aggregate flow written to this tick, including
+  // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
+  // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
+  operatingLines.forEach((line, index) => {
+    line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
+  });
+  let importCostPerHour = 0;
+  let exportRevenuePerHour = 0;
+  let importEmissionsWeight = 0;
+  let importEmissionsBasisW = 0;
+  offers.forEach((offer, index) => {
+    importCostPerHour += flows.importedW[index] * offer.pricePerMWh;
+    exportRevenuePerHour += flows.exportedW[index] * offer.pricePerMWh;
+    // Actual imports carry their own mix; with none flowing, show the mix that would arrive.
+    const basisW = importedW > 0 ? flows.importedW[index] : offer.importLimitW;
+    importEmissionsWeight += basisW * offer.emissionsKgco2ePerMWh;
+    importEmissionsBasisW += basisW;
+  });
+  const flowW = importedW + exportedW;
+  const marketPricePerMWh =
+    flowW > 0
+      ? (importCostPerHour + exportRevenuePerHour) / flowW
+      : transmissionCapacity > 0
+        ? offers.reduce((sum, offer) => sum + offer.pricePerMWh, 0) /
+          offers.length
+        : 0;
   supply = clearing.localAvailableSupplyW;
   now.importedW = importedW;
   now.exportedW = exportedW;
@@ -2766,7 +3096,9 @@ function updateSupplyFacilitiesFinances(
   // Surplus exports are interruptible under the game policy and can be redirected locally.
   now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
   now.importKgco2ePerMWh =
-    marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
+    importEmissionsBasisW > 0
+      ? importEmissionsWeight / importEmissionsBasisW
+      : 0;
 
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
@@ -2790,8 +3122,14 @@ function updateSupplyFacilitiesFinances(
     (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
-  const revenueExports = (exportedWh / 1000000) * marketPricePerMWh;
+  const expensesImports =
+    importedW > 0
+      ? (importedWh / 1000000) * (importCostPerHour / importedW)
+      : 0;
+  const revenueExports =
+    exportedW > 0
+      ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
+      : 0;
   const choiceGrant = state.worldEvents.occurrences
     .filter(
       (event) =>
@@ -3007,7 +3345,12 @@ function updateSupplyFacilitiesFinances(
   now.expensesInterest = expensesInterest;
   now.localKgco2e = kgco2e;
   now.importedKgco2e = (importedWh / 1000000) * now.importKgco2ePerMWh;
-  now.kgco2e = now.localKgco2e + now.importedKgco2e;
+  // Deliberately added here and not to the `kgco2e` accumulator above, which is what
+  // expensesCarbonFee is charged on. A carbon fee prices what a grid burns in the jurisdiction
+  // levying it; embodied emissions are mostly incurred in someone else's supply chain, years
+  // earlier, and are not what such a scheme reaches. They still count towards the score.
+  now.constructionKgco2e = constructionKgco2e;
+  now.kgco2e = now.localKgco2e + now.importedKgco2e + now.constructionKgco2e;
   // Deliberately this tick's own month rather than `date`, which is the month the game is
   // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
   // the same line serve the record and the projection: history keeps what the rate was, and the
@@ -3063,11 +3406,18 @@ function supplyForecastPass(
         undefined,
         !withoutMinimumStableOutput,
         stepMinutes,
+        // Re-evaluating this tick is not elapsed construction time. Advancing the clone here
+        // would drop one tick's emissions from the future and open projects one tick early.
+        t.minute !== state.date.minute,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
       // rebuilding from the previous tick erases a purchase refund (and, symmetrically, a cost).
       if (t.minute === state.date.minute) {
+        // A player's action changes the forecast, not emissions already recorded this tick.
+        t.constructionKgco2e = current?.constructionKgco2e || 0;
+        t.kgco2e =
+          (t.localKgco2e || 0) + (t.importedKgco2e || 0) + t.constructionKgco2e;
         if (currentCash !== undefined) {
           t.cash = currentCash;
         }
@@ -3083,6 +3433,22 @@ function supplyForecastPass(
           // equity before the matching principal has actually left cash.
           state.transmission?.lines,
         );
+        // The clone just re-dispatched this very tick against the action that triggered the
+        // reforecast, so its per-line flow is the fresh answer and the live lines' is the one
+        // from before it. Copy it back, or an intertie row keeps last tick's reading until the
+        // clock moves again -- and the clock is paused for every policy decision.
+        const forecastFlows = new Map(
+          newState.transmission.lines.map((line) => [
+            line.id,
+            line.currentFlowW,
+          ]),
+        );
+        state.transmission?.lines.forEach((line) => {
+          const flow = forecastFlows.get(line.id);
+          if (flow !== undefined) {
+            line.currentFlowW = flow;
+          }
+        });
       }
     }
     prev = t;
@@ -3206,6 +3572,7 @@ export function generateNewTimeline(
       kgco2e: 0,
       localKgco2e: 0,
       importedKgco2e: 0,
+      constructionKgco2e: 0,
       reserveW: 0,
       importKgco2ePerMWh: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
@@ -3328,6 +3695,13 @@ function buildFacilityHelper(
       generatingLastRealTick:
         g.tracksStarts && newGame && g.peakWh === undefined,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
+      // Resolved from the quote rather than recomputed later, so a standing plant keeps the
+      // embodied emissions of the year it was actually built. The starting fleet was built
+      // before the run opened and carries none: nothing of it is emitted on the player's watch.
+      constructionKgco2eTotal: newGame
+        ? 0
+        : (g.constructionKgco2ePerW || 0) * g.peakW +
+          (g.constructionKgco2ePerWh || 0) * (g.peakWh || 0),
       minuteCreated: state.date.minute,
       minuteOperational: newGame
         ? state.date.minute - initialAgeYears * DAYS_PER_YEAR * 24 * 60

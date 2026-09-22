@@ -49,16 +49,8 @@ export function restartTutorialAtStep(
   dispatch(delta({ tutorialStep }));
 }
 
-/**
- * Counts a tutorial the player walks away from as done, the same as one they finish.
- *
- * The missions are a sequence, and Start playing sends anyone with no finished mission straight
- * back into Mission 1 - so a player who closed or quit it without reaching the end could never get
- * past it. Only an unfinished walkthrough is recorded: finishing or closing one already recorded
- * it, and recording again on the way out would count one attempt twice. Replays are someone
- * else's run.
- */
-export function recordTutorialLeft(game: GameType): void {
+/** Records an explicit tutorial Exit, without counting a completed walkthrough twice. */
+export function recordTutorialExited(game: GameType): void {
   const steps = getScenario(
     game.scenarioId,
     game.customScenario,

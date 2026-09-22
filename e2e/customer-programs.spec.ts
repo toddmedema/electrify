@@ -70,7 +70,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).not.toContainText("Funding stops");
     await expect(dialog).not.toContainText("Charges start");
     await dialog.getByRole("radio", { name: /^Large/ }).check();
-    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialog.getByRole("button", { name: "Back", exact: true }).click();
     await expect(dialog).toContainText("Small starts Feb 2020");
     await dialog
       .getByRole("button", { name: "Rooftop solar rebates · Off" })

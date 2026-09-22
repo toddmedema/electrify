@@ -37,7 +37,8 @@ This runs the app at [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-This starts Jest in watch mode. Test files use the `.test.ts` or `.test.tsx` suffix.
+This starts Jest in watch mode. Test files use the `.test.ts` or `.test.tsx` suffix. Use
+`npm run test:once -- <name>` to run matching suites once and exit.
 
 ### Check everything
 

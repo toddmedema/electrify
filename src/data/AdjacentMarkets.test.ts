@@ -9,6 +9,7 @@ import {
   corridorsForLocation,
   transmissionAvailable,
 } from "./AdjacentMarkets";
+import { INTERTIE_ARCHETYPE_IDS } from "./IntertieArchetypes";
 import {
   NO_INTERTIE_LOCATION_IDS,
   TRANSMISSION_PROFILE_DATA,
@@ -179,5 +180,37 @@ describe("researched transmission profiles", () => {
     expect(
       corridorsForLocation(location("SanJoseCR")).map(({ id }) => id),
     ).toEqual(["siepac-panama-upgrade"]);
+  });
+});
+
+describe("intertie archetypes", () => {
+  const profiles = Object.values(TRANSMISSION_PROFILE_DATA).map(
+    ([markets]) => markets,
+  );
+  const archetypes = profiles.flat().map((market) => market[6]);
+
+  it("gives every neighbouring market a known archetype", () => {
+    expect(archetypes).toHaveLength(ADJACENT_MARKETS.length);
+    for (const archetype of archetypes) {
+      expect(INTERTIE_ARCHETYPE_IDS).toContain(archetype);
+    }
+  });
+
+  it("uses every archetype for a meaningful share of markets", () => {
+    for (const id of INTERTIE_ARCHETYPE_IDS) {
+      const count = archetypes.filter((archetype) => archetype === id).length;
+      expect(count).toBeGreaterThanOrEqual(15);
+      expect(count / archetypes.length).toBeLessThan(0.3);
+    }
+  });
+
+  it("offers two different kinds of neighbour where a region has two corridors", () => {
+    const multiMarket = profiles.filter((markets) => markets.length > 1);
+    const distinct = multiMarket.filter(
+      (markets) => new Set(markets.map((market) => market[6])).size > 1,
+    );
+
+    expect(multiMarket.length).toBeGreaterThan(100);
+    expect(distinct.length / multiMarket.length).toBeGreaterThanOrEqual(0.9);
   });
 });

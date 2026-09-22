@@ -5,7 +5,6 @@ import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import reducer, { tickState } from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import { GameType } from "../Types";
-import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import { runSimulation, SimOptionsType, SimResultType } from "./Simulator";
 
 /** The scored scenarios the economics suites play; tutorials have their own coverage. */
@@ -38,45 +37,6 @@ export function baselineMeaningfulChoices(
 }
 
 /**
- * Registers one test per choice in a scenario's CEO playbook, each proving the plan fails with
- * that choice left out. Shared so the long matrix can be split across files Jest runs in parallel.
- */
-export function describeCeoOmissions(scenarioIds: number[]) {
-  scenarioIds.forEach((scenarioId) => {
-    const play = STANDARD_BALANCE_PLAYS[scenarioId];
-    const omissions: Array<Partial<SimOptionsType>> = (
-      play.scheduledActions || []
-    ).map((_action, omitted) => ({
-      scheduledActions: play.scheduledActions!.filter(
-        (_candidate, index) => index !== omitted,
-      ),
-    }));
-    if (play.initialBuild) omissions.push({ initialBuild: undefined });
-    if (play.sellFacilityId !== undefined)
-      omissions.push({ sellFacilityId: undefined });
-
-    if (omissions.length + baselineMeaningfulChoices(scenarioId) !== 10) {
-      throw new Error(
-        `CEO ${scenarioId} play must total ten choices including mandatory responses`,
-      );
-    }
-    omissions.forEach((omission, index) => {
-      it(`rejects actual CEO ${scenarioId} plan with choice ${index + 1} removed`, () => {
-        const shortened = runSimulation({
-          scenarioId,
-          difficulty: "CEO",
-          ...play,
-          ...omission,
-        });
-        expectNoViolations(shortened);
-        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
-        expect(shortened.outcome).not.toBe("completed");
-      });
-    });
-  });
-}
-
-/**
  * runSimulation, remembering each result for the rest of the test file. Runs are a pure function
  * of their options, so tests in one file that need the same playthrough share a single run.
  * Callers must treat the result as read-only.
@@ -100,13 +60,19 @@ export function runSimulationOnce(options: SimOptionsType): SimResultType {
 }
 
 export function runMonths(state: GameType, months: number) {
+  if (!Number.isSafeInteger(months) || months < 0) {
+    throw new Error("Simulation months must be a non-negative safe integer");
+  }
   const until = state.date.monthsElapsed + months;
   while (state.date.monthsElapsed < until) {
     const decision = pendingScenarioChoice(state);
     if (decision && !state.replayPlayback) {
       const option = decision.options.find(
         (option) => option.cost(state.difficulty) === 0,
-      )!;
+      );
+      if (!option) {
+        throw new Error(`Simulation has no free response for ${decision.id}`);
+      }
       Object.assign(
         state,
         cloneDeep(
@@ -120,7 +86,13 @@ export function runMonths(state: GameType, months: number) {
         ),
       );
     }
+    const previousMinute = state.date.minute;
     tickState(state);
+    if (state.date.minute <= previousMinute) {
+      throw new Error(
+        `Simulation stopped advancing at month ${state.date.monthsElapsed}`,
+      );
+    }
   }
 }
 

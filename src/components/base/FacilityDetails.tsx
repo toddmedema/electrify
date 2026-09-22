@@ -18,10 +18,12 @@ import {
   DateType,
   FacilityOperatingType,
   FuelNameType,
+  GameType,
   GeneratorOperatingType,
   LocationType,
   StorageOperatingType,
 } from "../../Types";
+import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
 
 /**
@@ -42,11 +44,13 @@ export interface Props {
   date: DateType;
   seed: number;
   location: LocationType;
+  /** Needed only by a hydro plant, whose water outlook is a forecast of the whole game */
+  game?: GameType;
 }
 
 interface StatProps {
   label: string;
-  value: string;
+  value: React.ReactNode;
   // Profit is the one number here that means something different either side of zero
   tone?: "good" | "bad";
 }
@@ -54,13 +58,13 @@ interface StatProps {
 function Stat(props: StatProps): React.JSX.Element {
   return (
     <div className="facilityStat">
-      <Typography variant="caption" color="textSecondary" component="div">
+      <Typography variant="caption" color="textSecondary" component="dt">
         {props.label}
       </Typography>
       <Typography
         variant="body2"
-        component="div"
-        className={props.tone ? `facilityStatValue ${props.tone}` : undefined}
+        component="dd"
+        className={`facilityStatValue${props.tone ? ` ${props.tone}` : ""}`}
       >
         {props.value}
       </Typography>
@@ -153,167 +157,172 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
 
   return (
     <div className="facilityDetails">
-      <div className="facilityStats">
-        {underConstruction ? (
-          <Stat
-            label="Completes in"
-            value={`${Math.ceil(facility.yearsToBuildLeft * 12)} months`}
-          />
-        ) : (
-          <>
+      <section className="facilityDetailSection" aria-label="Operation">
+        <Typography component="h3" className="facilityDetailHeading">
+          Operation
+        </Typography>
+        <dl className="facilityStats">
+          {underConstruction ? (
             <Stat
-              label="Age"
-              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
+              label="Completes in"
+              value={`${Math.ceil(facility.yearsToBuildLeft * 12)} months`}
             />
+          ) : (
+            <>
+              <Stat
+                label="Age"
+                value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
+              />
+              <Stat
+                // Capacity factor is the generator's word for it; a battery isn't producing
+                // anything, it's being used or it isn't
+                label={isStorage ? "Time in use" : "Avg output"}
+                value={
+                  lifetime.capacityFactor === undefined
+                    ? "—"
+                    : percent(lifetime.capacityFactor)
+                }
+              />
+            </>
+          )}
+          <Stat label="Delivered" value={formatWattHours(lifetime.wh)} />
+          {isStorage && (
             <Stat
-              // Capacity factor is the generator's word for it; a battery isn't producing
-              // anything, it's being used or it isn't
-              label={isStorage ? "Time in use" : "Avg output"}
+              label="Charge"
+              value={formatWattHoursOfPeak(
+                facility.currentWh,
+                (facility as StorageOperatingType).peakWh,
+              )}
+            />
+          )}
+          {facility.name === "Battery" && equivalentCycles !== undefined && (
+            <Stat
+              label="Cycles"
+              value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+            />
+          )}
+          {minimumStableOutput !== undefined && (
+            <Stat
+              label="Minimum stable output"
+              value={`${percent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
+            />
+          )}
+          {facility.tracksStarts && (
+            <Stat
+              label="Starts"
+              value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
+            />
+          )}
+          {isStorage && (
+            <Stat
+              label="Round-trip efficiency"
+              value={percent(
+                (facility as StorageOperatingType).roundTripEfficiency,
+              )}
+            />
+          )}
+          {!isStorage && outputFactor < 1 && (
+            <Stat
+              label="Current maximum output"
               value={
-                lifetime.capacityFactor === undefined
-                  ? "—"
-                  : percent(lifetime.capacityFactor)
+                <>
+                  {formatWatts(facility.peakW * outputFactor)}
+                  <span className="facilityStatNote">
+                    Limited to {percent(outputFactor)}
+                  </span>
+                </>
               }
             />
-          </>
-        )}
-        <Stat
-          label="Lifetime cost per MWh"
-          value={
-            lifetime.costPerMWh === undefined
-              ? "—"
-              : `${formatMoneyConcise(lifetime.costPerMWh)}/MWh`
-          }
-        />
-        <Stat
-          label="Revenue per MWh"
-          value={
-            lifetime.revenuePerMWh === undefined
-              ? "—"
-              : `${formatMoneyConcise(lifetime.revenuePerMWh)}/MWh`
-          }
-        />
-        <Stat
-          label="Lifetime profit"
-          value={formatMoneyConcise(lifetime.profit)}
-          tone={lifetime.profit < 0 ? "bad" : "good"}
-        />
-        <Stat label="Delivered" value={formatWattHours(lifetime.wh)} />
-        {isStorage && (
+          )}
+        </dl>
+      </section>
+      {isHydro && props.game && (
+        <HydroWaterSection facility={facility} game={props.game} />
+      )}
+      <section className="facilityDetailSection" aria-label="Economics">
+        <Typography component="h3" className="facilityDetailHeading">
+          Economics
+        </Typography>
+        <dl className="facilityStats">
           <Stat
-            label="Charge"
-            value={formatWattHoursOfPeak(
-              facility.currentWh,
-              (facility as StorageOperatingType).peakWh,
-            )}
+            label="Lifetime cost per MWh"
+            value={
+              lifetime.costPerMWh === undefined
+                ? "—"
+                : `${formatMoneyConcise(lifetime.costPerMWh)}/MWh`
+            }
           />
-        )}
-        {facility.name === "Battery" && equivalentCycles !== undefined && (
           <Stat
-            label="Cycles"
-            value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+            label="Revenue per MWh"
+            value={
+              lifetime.revenuePerMWh === undefined
+                ? "—"
+                : `${formatMoneyConcise(lifetime.revenuePerMWh)}/MWh`
+            }
           />
-        )}
-        {minimumStableOutput !== undefined && (
           <Stat
-            label="Minimum stable output"
-            value={`${percent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
+            label="Lifetime profit"
+            value={`${lifetime.profit > 0 ? "+" : ""}${formatMoneyConcise(lifetime.profit)}`}
+            tone={
+              lifetime.profit < 0
+                ? "bad"
+                : lifetime.profit > 0
+                  ? "good"
+                  : undefined
+            }
           />
-        )}
-        {variableOperatingCostPerMWh !== undefined && (
-          <Stat
-            label="Fixed upkeep"
-            value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
-          />
-        )}
-        {variableOperatingCostPerMWh !== undefined && (
-          <Stat
-            label="Variable upkeep"
-            value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
-          />
-        )}
-        {facility.tracksStarts && (
-          <Stat
-            label="Starts"
-            value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
-          />
-        )}
-        {facility.costPerStart !== undefined && (
-          <Stat
-            label="Non-fuel start cost"
-            value={`${formatMoneyConcise(facility.costPerStart)}/start`}
-          />
-        )}
-        {isHydro && (
-          <Stat
-            label="Reservoir"
-            value={formatWattHoursOfPeak(
-              facility.reservoirWh || 0,
-              facility.reservoirCapacityWh || 0,
-            )}
-          />
-        )}
-        {isHydro && (
-          <Stat
-            label="Water added last month"
-            value={formatWattHours(facility.hydroLastInflowWh || 0)}
-          />
-        )}
-        {isHydro && (
-          <Stat
-            label="Spilled last month"
-            value={formatWattHours(facility.hydroLastSpillWh || 0)}
-          />
-        )}
-        {isStorage && (
-          <Stat
-            label="Round-trip efficiency"
-            value={percent(
-              (facility as StorageOperatingType).roundTripEfficiency,
-            )}
-          />
-        )}
-        {!isStorage && (
-          <Stat
-            label="Rated maximum output"
-            value={formatWatts(facility.peakW)}
-          />
-        )}
-        {!isStorage && outputFactor < 1 && (
-          <Stat
-            label="Current maximum output"
-            value={`${formatWatts(facility.peakW * outputFactor)} · limited to ${percent(outputFactor)}`}
-          />
-        )}
-        {facility.loanAmountLeft > 0 && (
-          <Stat
-            label="Loan balance"
-            value={formatMoneyConcise(facility.loanAmountLeft)}
-          />
-        )}
-        {trend.length > 1 && fuel && (
-          <div className="facilityStat">
-            <Typography variant="caption" color="textSecondary" component="div">
-              {fuel} price, {trend.length}mo
-            </Typography>
-            <div className="facilityTrend">
-              <Sparkline
-                values={trend}
-                color={accentColor}
-                ariaLabel={`${fuel} price over the last ${trend.length} months, ${trendChange >= 0 ? "up" : "down"} ${Math.abs(Math.round(trendChange * 100))} percent`}
-              />
+          {facility.loanAmountLeft > 0 && (
+            <Stat
+              label="Loan balance"
+              value={formatMoneyConcise(facility.loanAmountLeft)}
+            />
+          )}
+          {variableOperatingCostPerMWh !== undefined && (
+            <Stat
+              label="Fixed upkeep"
+              value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+            />
+          )}
+          {variableOperatingCostPerMWh !== undefined && (
+            <Stat
+              label="Variable upkeep"
+              value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
+            />
+          )}
+          {facility.costPerStart !== undefined && (
+            <Stat
+              label="Non-fuel start cost"
+              value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+            />
+          )}
+          {trend.length > 1 && fuel && (
+            <div className="facilityStat facilityFuelTrend">
               <Typography
-                variant="body2"
-                component="span"
-                className={`facilityStatValue ${trendChange > 0 ? "bad" : "good"}`}
+                variant="caption"
+                color="textSecondary"
+                component="dt"
               >
-                {trendChange >= 0 ? "+" : ""}
-                {Math.round(trendChange * 100)}%
+                {fuel} price, {trend.length}mo
               </Typography>
+              <dd className="facilityTrend">
+                <Sparkline
+                  values={trend}
+                  color={accentColor}
+                  ariaLabel={`${fuel} price over the last ${trend.length} months, ${trendChange === 0 ? "unchanged" : `${trendChange > 0 ? "up" : "down"} ${Math.abs(Math.round(trendChange * 100))} percent`}`}
+                />
+                <Typography
+                  variant="body2"
+                  component="span"
+                  className={`facilityStatValue${trendChange > 0 ? " bad" : trendChange < 0 ? " good" : ""}`}
+                >
+                  {trendChange > 0 ? "+" : ""}
+                  {Math.round(trendChange * 100)}%
+                </Typography>
+              </dd>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </dl>
+      </section>
     </div>
   );
 }

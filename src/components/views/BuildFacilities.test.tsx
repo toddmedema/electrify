@@ -12,8 +12,9 @@ jest.mock("./BuildGeneratorsContainer", () => () => (
 ));
 jest.mock("./BuildStorageContainer", () => () => <div>Storage catalog</div>);
 
-function setup() {
-  const game = createGame({ scenarioId: 103 });
+function setup(scenarioId = 103, tutorialStep = 0) {
+  const game = createGame({ scenarioId });
+  game.tutorialStep = tutorialStep;
   game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
   const store = configureStore({
     reducer: { game: () => game, card: cardReducer, ui: uiReducer },
@@ -66,4 +67,12 @@ it("supports standard keyboard navigation between build tabs", async () => {
     "aria-selected",
     "true",
   );
+});
+
+it("hides build categories only while introducing Mission 2 generator choices", () => {
+  setup(1, 1);
+  expect(screen.queryByRole("tablist")).toBeNull();
+  expect(
+    screen.getByRole("tabpanel", { name: "Generators" }),
+  ).toHaveTextContent("Generator catalog");
 });

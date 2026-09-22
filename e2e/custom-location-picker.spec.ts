@@ -6,7 +6,7 @@ async function openCustomSetup(page: Page) {
     window.localStorage.setItem(
       "plays",
       JSON.stringify({
-        plays: [{ scenarioId: 0, date: new Date().toString() }],
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
   });
@@ -40,6 +40,43 @@ async function activateFocusedNeighbor(
     await expect(focusedMarker).toHaveAttribute("aria-pressed", "true");
     await expect(search).not.toHaveValue(previousSelection);
   }
+}
+
+async function mapBackgroundPoint(map: Locator) {
+  await map.scrollIntoViewIfNeeded();
+  const point = await map.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    // Touch adjustment snaps a finger onto a nearby tappable marker, so take the background
+    // point with the most room around it, not merely one that is off every marker.
+    const avoid = Array.from(
+      element.querySelectorAll(".worldMapControls, .worldMapMarker"),
+    ).map((candidate) => candidate.getBoundingClientRect());
+    let best: { x: number; y: number; room: number } | null = null;
+    for (let row = 1; row < 12; row++) {
+      for (let column = 1; column < 12; column++) {
+        const x = Math.round(box.x + (box.width * column) / 12);
+        const y = Math.round(box.y + (box.height * row) / 12);
+        const target = document.elementFromPoint(x, y);
+        if (!target || !element.contains(target)) continue;
+        const room = Math.min(
+          Infinity,
+          ...avoid.map((rect) =>
+            Math.hypot(
+              Math.max(rect.left - x, 0, x - rect.right),
+              Math.max(rect.top - y, 0, y - rect.bottom),
+            ),
+          ),
+        );
+        if (room > 0 && (!best || room > best.room)) best = { x, y, room };
+      }
+    }
+    return best && { x: best.x, y: best.y };
+  });
+  expect(
+    point,
+    "map must expose a background target for dragging",
+  ).not.toBeNull();
+  return point!;
 }
 
 test("world map location picker works with pointer, touch, search, and keyboard", async ({
@@ -175,7 +212,7 @@ test("a city marker still selects after the map has zoomed", async ({
   await expect(search).not.toHaveValue(startingSelection);
 });
 
-test("custom setup uses side-by-side settings and facilities only at desktop widths", async ({
+test("custom setup uses side-by-side settings and facilities only in two-pane layouts", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -224,7 +261,11 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
     facilitiesBox!.x + facilitiesBox!.width,
   );
 
-  if (testInfo.project.name.startsWith("desktop")) {
+  // Unfolded foldables get the two-pane layout too (see $pane_media in app.scss).
+  if (
+    testInfo.project.name.startsWith("desktop") ||
+    testInfo.project.name === "foldable-unfolded"
+  ) {
     expect(Math.abs(settingsBox!.y - facilitiesBox!.y)).toBeLessThanOrEqual(1);
     expect(settingsBox!.x + settingsBox!.width).toBeLessThan(facilitiesBox!.x);
   } else {
@@ -373,17 +414,14 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   const startingTransform = await land.getAttribute("transform");
   const mapBox = await map.boundingBox();
   expect(mapBox).not.toBeNull();
+  // Cluster positions vary by viewport and loaded catalogue. Starting over a marker
+  // selects it instead of panning, so hit-test an actual background point.
 
   if (testInfo.project.name.startsWith("desktop")) {
-    await page.mouse.move(
-      mapBox!.x + mapBox!.width / 2,
-      mapBox!.y + mapBox!.height / 2,
-    );
+    const panStart = await mapBackgroundPoint(map);
+    await page.mouse.move(panStart.x, panStart.y);
     await page.mouse.down();
-    await page.mouse.move(
-      mapBox!.x + mapBox!.width / 2 - 80,
-      mapBox!.y + mapBox!.height / 2 - 30,
-    );
+    await page.mouse.move(panStart.x - 80, panStart.y - 30);
     await page.mouse.up();
     await expect
       .poll(() => land.getAttribute("transform"))
@@ -412,12 +450,7 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   await map.scrollIntoViewIfNeeded();
   const touchMapBox = await map.boundingBox();
   expect(touchMapBox).not.toBeNull();
-  // Start over the open ocean in the lower-left. Coarse-pointer marker hit areas deliberately
-  // reach 44px, so the geometric center can belong to a marker on a 320px map.
-  const panStart = {
-    x: Math.round(touchMapBox!.x + 24),
-    y: Math.round(touchMapBox!.y + touchMapBox!.height - 24),
-  };
+  const panStart = await mapBackgroundPoint(map);
   const session = await page.context().newCDPSession(page);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",

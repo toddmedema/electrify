@@ -15,6 +15,13 @@ async function openInsights(page: Page) {
     await settle(page);
   }
 }
+async function openBuildGenerators(page: Page) {
+  const fleet = page.locator(".facilities:visible");
+  await openPane(fleet, page.locator("#faciltiesNav"));
+  await fleet.getByRole("button", { name: "Build", exact: true }).click();
+  await page.locator(".button-buildGenerator").click();
+  await expect(page.locator(".buildOption").first()).toBeVisible();
+}
 async function range(page: Page) {
   return page
     .locator(".insights:visible .accessibleChart [role=img]")
@@ -30,12 +37,25 @@ for (const theme of ["light", "dark"]) {
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
     await page.addInitScript((mode) => {
-      localStorage.clear();
+      if (!sessionStorage.getItem("mission-evidence")) {
+        localStorage.clear();
+        sessionStorage.setItem("mission-evidence", "true");
+      }
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    // Keep this layout/focus fixture solvent so a valid long-term cash warning does not
+    // replace the upcoming-event label under test.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("pagehide"));
+      const save = JSON.parse(localStorage.getItem("savedGame")!);
+      for (const tick of save.game.timeline) tick.cash = 1e12;
+      localStorage.setItem("savedGame", JSON.stringify(save));
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );
@@ -141,7 +161,10 @@ test("status boundary follows the saved movable pane divider and window width", 
         const grids = page.locator(".gridHealth:visible");
         if ((await grids.count()) !== 1) return Infinity;
         const grid = await grids.boundingBox();
-        const divider = await splitter.boundingBox();
+        const divider = await page
+          .locator(".pane-splitter")
+          .first()
+          .boundingBox();
         if (!grid || !divider) return Infinity;
         return Math.abs(grid.x + grid.width - divider.x);
       })
@@ -152,7 +175,9 @@ test("status boundary follows the saved movable pane divider and window width", 
   const before = (await splitter.boundingBox())!;
   await page.mouse.move(before.x + before.width / 2, before.y + 20);
   await page.mouse.down();
-  await page.mouse.move(before.x + 100, before.y + 20, { steps: 8 });
+  await page.mouse.move(before.x + before.width / 2 + 100, before.y + 20, {
+    steps: 8,
+  });
   await page.mouse.up();
   await aligned();
   expect((await splitter.boundingBox())!.x).toBeGreaterThan(before.x + 80);
@@ -175,7 +200,7 @@ test("status boundary follows the saved movable pane divider and window width", 
   await aligned();
 });
 
-test("one Generator edge restores evidence range through Return and browser traversal", async ({
+test("Insights keeps its date range while the build screen is open", async ({
   page,
 }, info) => {
   test.skip(!reviewProjects.has(info.project.name));
@@ -187,32 +212,13 @@ test("one Generator edge restores evidence range through Return and browser trav
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
   await openInsights(page);
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.getByRole("button", { name: "Pan later", exact: true }).click();
   const origin = await range(page);
-  const selected = await page.evaluate(() =>
-    localStorage.getItem("insightsLayers"),
-  );
-  const history = await page.evaluate(() => window.history.length);
-  await page.locator("#insightsGeneratorJourney").click();
-  await expect(page.locator(".buildOption").first()).toBeVisible();
-  expect(await page.evaluate(() => window.history.length)).toBe(history + 1);
-  await page
-    .getByRole("button", { name: "Return to evidence", exact: true })
-    .click();
-  await expect(page.locator(".insights:visible")).toBeVisible();
-  await settle(page);
+  await openBuildGenerators(page);
+  await page.getByRole("button", { name: "close", exact: true }).click();
+  await openInsights(page);
   expect(await range(page)).toEqual(origin);
-  expect(
-    await page.evaluate(() => localStorage.getItem("insightsLayers")),
-  ).toBe(selected);
-  await page.goForward();
-  await expect(page.locator(".buildOption").first()).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Return to evidence", exact: true }),
-  ).toHaveCount(0);
-  await page.goBack();
-  await expect(page.locator(".insights:visible")).toBeVisible();
 });
 
 test("cash evidence is temporary, explicit layer edits are configured, and reload remains paused", async ({
@@ -266,21 +272,6 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
       JSON.parse(localStorage.getItem("insightsLayers")!),
     ),
   ).toEqual(["supplyDemand", "financeDetails"]);
-  await page.locator("#insightsGeneratorJourney").click();
-  await page
-    .getByRole("button", { name: "Return to evidence", exact: true })
-    .click();
-  await expect(
-    page.locator('.insights:visible [data-layer="financeDetails"]'),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await page.locator("#insightsGeneratorJourney").click();
-  await page
-    .getByRole("button", { name: "Return to evidence", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "pause", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("large text and landscape keep mission controls and navigation reachable", async ({
@@ -367,25 +358,22 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
     "Supply and demand",
   );
   await openInsights(page);
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   const origin = await range(page);
-  const history = await page.evaluate(() => window.history.length);
   const countBefore = await page.evaluate(() => {
     window.dispatchEvent(new Event("pagehide"));
     return JSON.parse(localStorage.getItem("savedGame")!).game.facilities
       .length;
   });
-  await page.locator("#insightsGeneratorJourney").click();
+  await openBuildGenerators(page);
   await page
     .getByRole("button", { name: /Review purchase of/ })
     .first()
     .click();
   await page.getByRole("button", { name: "Take loan", exact: true }).click();
-  await expect(page.locator(".insights:visible")).toBeVisible();
-  await settle(page);
+  await expect(page.locator(".MuiSnackbar-root")).toContainText("online in");
+  await openInsights(page);
   expect(await range(page)).toEqual(origin);
-  expect(await page.evaluate(() => window.history.length)).toBe(history + 1);
   expect(
     await page.evaluate(() => {
       window.dispatchEvent(new Event("pagehide"));
@@ -396,5 +384,4 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".MuiSnackbar-root")).toContainText("online in");
 });

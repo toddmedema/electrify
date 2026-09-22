@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DisplayNameDialog, { Props } from "./DisplayNameDialog";
 
@@ -87,5 +87,23 @@ describe("DisplayNameDialog", () => {
 
     await userEvent.type(nameField(), "Grace{Enter}");
     await waitFor(() => expect(onSave).toHaveBeenCalledWith("Grace"));
+  });
+
+  it("ignores repeated Enter presses until the pending save finishes", async () => {
+    let finish!: (failure: string | undefined) => void;
+    const onSave = jest.fn(
+      () =>
+        new Promise<string | undefined>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderDialog({ currentName: "Grace", onSave });
+
+    await userEvent.type(nameField(), "{Enter}{Enter}");
+    expect(onSave).toHaveBeenCalledTimes(1);
+    await act(async () => finish("Please try again."));
+    await userEvent.type(nameField(), "{Enter}");
+    expect(onSave).toHaveBeenCalledTimes(2);
+    await act(async () => finish(undefined));
   });
 });

@@ -1,3 +1,4 @@
+import ChallengeLanding from "./views/ChallengeLanding";
 import {
   Button,
   Dialog,
@@ -466,15 +467,15 @@ export default class Compositor extends React.Component<Props, {}> {
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            {this.props.card.name === "EVENTS" ? (
-              <EventLogContainer />
-            ) : (
-              <InsightsContainer />
-            )}
+            <div className="secondary-pane">
+              {this.props.card.name === "EVENTS" ? (
+                <EventLogContainer />
+              ) : (
+                <InsightsContainer />
+              )}
+              <NavigationContainer />
+            </div>
           </DesktopPanes>
-          {/* The panes supply no nav of their own in this layout, and it is still what
-              switches the second column */}
-          <NavigationContainer />
         </div>
       );
     }
@@ -501,6 +502,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <NewGameContainer />;
       case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
+      case "CHALLENGE":
+        return <ChallengeLanding />;
       case "CUSTOM_GAME":
         return <CustomGameContainer />;
       default:

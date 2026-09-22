@@ -1,4 +1,11 @@
 import {
+  validRunIdentity,
+  sameRunIdentity,
+  expandAuthoredRunReference,
+  normalizedInputs,
+} from "./helpers/RunIdentity";
+import { validInvitation } from "./helpers/Challenge";
+import {
   emptyPolicies,
   validPolicies,
   validDeferredResidential,
@@ -7,13 +14,29 @@ import packageJson from "../package.json";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
+import { isValidDifficulty } from "./helpers/Difficulty";
 import {
   getStorageJson,
   removeStorageKey,
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { GameType, TransmissionLineOperatingType } from "./Types";
+import {
+  DOWNPAYMENT_PERCENT,
+  INTERTIE_UPGRADE_STEP,
+  MAX_INTERTIE_UPGRADES,
+  MONTHS,
+} from "./Constants";
+import {
+  corridorConstructionKgco2e,
+  intertieUpgradeQuote,
+} from "./helpers/Transmission";
+import {
+  GameType,
+  IntertieUpgradeType,
+  TransmissionCorridorDefinitionType,
+  TransmissionLineOperatingType,
+} from "./Types";
 import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
 import {
   emptyTransmissionState,
@@ -52,8 +75,132 @@ export interface SaveGameType {
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
 
+function approximatelyEqual(actual: unknown, expected: number): boolean {
+  return (
+    typeof actual === "number" &&
+    Number.isFinite(actual) &&
+    Math.abs(actual - expected) <= Math.max(1, expected) * 1e-9
+  );
+}
+
+function validConstruction(
+  raw: {
+    constructionKgco2eTotal?: unknown;
+    constructionKgco2eEmitted?: unknown;
+  },
+  maximum: number,
+): boolean {
+  const total =
+    raw.constructionKgco2eTotal === undefined ? 0 : raw.constructionKgco2eTotal;
+  const emitted =
+    raw.constructionKgco2eEmitted === undefined
+      ? 0
+      : raw.constructionKgco2eEmitted;
+  return (
+    [total, emitted].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    ) &&
+    typeof total === "number" &&
+    typeof emitted === "number" &&
+    total <= maximum &&
+    emitted <= total
+  );
+}
+
+/**
+ * Capacity must be the corridor's authored rating times a whole number of upgrade steps, within
+ * the allowed count. Compared as a ratio rather than by equality: the reducer compounds
+ * `capacityW * 1.5` one upgrade at a time, and recomputing the same power here is a different
+ * floating-point operation that need not agree to the last bit.
+ */
+function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
+  if (!(corridorW > 0) || !(capacityW > 0)) return false;
+  const steps = Math.round(
+    Math.log(capacityW / corridorW) / Math.log(INTERTIE_UPGRADE_STEP),
+  );
+  if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
+  return (
+    Math.abs(
+      capacityW / (corridorW * Math.pow(INTERTIE_UPGRADE_STEP, steps)) - 1,
+    ) <= 1e-9
+  );
+}
+
+/** Reconstruct the same quotes used by live purchases, including the pending job's cost. */
+function validLineInvestment(
+  line: Partial<TransmissionLineOperatingType>,
+  corridor: TransmissionCorridorDefinitionType,
+  year: number,
+): boolean {
+  let expected = {
+    corridorId: corridor.id,
+    capacityW: corridor.capacityW,
+    annualOperatingCost: corridor.annualOperatingCost,
+  };
+  let buildCost = corridor.buildCost;
+  const steps = Math.round(
+    Math.log(line.capacityW! / corridor.capacityW) /
+      Math.log(INTERTIE_UPGRADE_STEP),
+  );
+  for (let step = 0; step < steps; step++) {
+    const quote = intertieUpgradeQuote(expected, year);
+    if (!quote) return false;
+    expected = {
+      ...expected,
+      capacityW: quote.targetCapacityW,
+      annualOperatingCost: quote.annualOperatingCost,
+    };
+    buildCost += quote.buildCost;
+  }
+  if (
+    !approximatelyEqual(line.annualOperatingCost, expected.annualOperatingCost)
+  )
+    return false;
+  if (line.upgrade !== undefined) {
+    if (
+      typeof line.upgrade !== "object" ||
+      line.upgrade === null ||
+      line.yearsToBuildLeft !== 0
+    )
+      return false;
+    const quote = intertieUpgradeQuote(expected, year);
+    const upgrade = line.upgrade;
+    if (
+      !quote ||
+      ![
+        "targetCapacityW",
+        "buildCost",
+        "annualOperatingCost",
+        "yearsToBuild",
+      ].every((key) =>
+        approximatelyEqual(
+          upgrade[key as keyof IntertieUpgradeType],
+          quote[key as keyof typeof quote],
+        ),
+      )
+    )
+      return false;
+    if (
+      !Number.isFinite(upgrade.yearsToBuildLeft) ||
+      upgrade.yearsToBuildLeft <= 0 ||
+      upgrade.yearsToBuildLeft > quote.yearsToBuild ||
+      !validConstruction(upgrade, quote.constructionKgco2eTotal)
+    )
+      return false;
+    buildCost += quote.buildCost;
+  }
+  return (
+    approximatelyEqual(line.buildCost, buildCost) &&
+    line.loanAmountLeft! <=
+      buildCost * (1 - DOWNPAYMENT_PERCENT) + Math.max(1, buildCost) * 1e-9 &&
+    validConstruction(line, corridorConstructionKgco2e(corridor))
+  );
+}
+
 function validTransmissionLine(
   raw: unknown,
+  year: number,
 ): raw is TransmissionLineOperatingType {
   if (typeof raw !== "object" || raw === null) return false;
   const line = raw as Partial<TransmissionLineOperatingType>;
@@ -80,14 +227,19 @@ function validTransmissionLine(
       (value) =>
         typeof value === "number" && Number.isFinite(value) && value >= 0,
     ) &&
-    line.capacityW === corridor.capacityW &&
-    line.buildCost === corridor.buildCost &&
-    line.annualOperatingCost === corridor.annualOperatingCost &&
+    validUpgradedCapacity(line.capacityW!, corridor.capacityW) &&
+    validLineInvestment(line, corridor, year) &&
     line.yearsToBuildLeft! <= corridor.yearsToBuild &&
     Number.isInteger(line.minuteCreated) &&
     line.interestRate! <= 1 &&
-    line.loanAmountLeft! <= corridor.buildCost &&
     line.loanMonthlyPayment! <= corridor.buildCost &&
+    // Derived display state rather than a decision: the next real tick overwrites it, but it
+    // is rendered before that tick lands, so an imported save cannot claim a line is moving
+    // more power than it is rated for. Saves written before this field existed omit it.
+    (line.currentFlowW === undefined ||
+      (typeof line.currentFlowW === "number" &&
+        Number.isFinite(line.currentFlowW) &&
+        Math.abs(line.currentFlowW) <= line.capacityW!)) &&
     typeof line.financed === "boolean" &&
     (line.financed
       ? line.loanMonthlyPayment! > 0
@@ -103,6 +255,7 @@ function validEmissions(raw: unknown): boolean {
     kgco2e?: number;
     localKgco2e?: number;
     importedKgco2e?: number;
+    constructionKgco2e?: number;
   };
   if (
     ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
@@ -111,8 +264,17 @@ function validEmissions(raw: unknown): boolean {
     )
   )
     return false;
+  // Saves written before construction emissions existed have two components rather than three,
+  // and their total is still the sum of what they do carry.
+  const construction = record.constructionKgco2e ?? 0;
+  if (!Number.isFinite(construction) || construction < 0) return false;
   return (
-    Math.abs(record.kgco2e! - record.localKgco2e! - record.importedKgco2e!) <=
+    Math.abs(
+      record.kgco2e! -
+        record.localKgco2e! -
+        record.importedKgco2e! -
+        construction,
+    ) <=
     Math.max(1, record.kgco2e!) * 1e-9
   );
 }
@@ -143,9 +305,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   if (
+    !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
+    !Number.isFinite(game.startingYear) ||
     typeof game.customerMarketSize !== "number" ||
     !Number.isFinite(game.customerMarketSize) ||
     game.customerMarketSize <= 0 ||
@@ -189,7 +353,21 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     typeof game.date !== "object" ||
     game.date === null ||
-    typeof game.date.minute !== "number"
+    // Every field is consumed by the UI or simulation before the next tick rebuilds it.
+    // Do not compare derived fields against minute: synthetic clocks may still be valid.
+    [
+      game.date.minute,
+      game.date.minuteOfDay,
+      game.date.hourOfDay,
+      game.date.hourOfFullYear,
+      game.date.percentOfMonth,
+      game.date.percentOfYear,
+      game.date.monthNumber,
+      game.date.monthsElapsed,
+      game.date.year,
+    ].some((value) => typeof value !== "number" || !Number.isFinite(value)) ||
+    game.date.minute < 0 ||
+    !MONTHS.includes(game.date.month)
   ) {
     return null;
   }
@@ -227,6 +405,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
+        !validConstruction(
+          current,
+          Number(current.peakW) * 20 + Number(current.peakWh || 0),
+        ) ||
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
@@ -348,7 +530,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
         transmission.tradingPolicy,
       ) ||
       !Array.isArray(transmission.lines) ||
-      transmission.lines.some((line) => !validTransmissionLine(line)) ||
+      transmission.lines.some(
+        (line) => !validTransmissionLine(line, game.date!.year),
+      ) ||
       new Set(transmission.lines.map(({ id }) => id)).size !==
         transmission.lines.length ||
       new Set(transmission.lines.map(({ corridorId }) => corridorId)).size !==
@@ -420,6 +604,28 @@ export function parseSave(raw: unknown): SaveGameType | null {
       revenueExports: t.revenueExports ?? 0,
     })),
   };
+  if (
+    normalized.runIdentity &&
+    (!validRunIdentity(normalized.runIdentity) ||
+      normalized.runIdentity.seed !== normalized.seed ||
+      normalized.runIdentity.scenarioId !== normalized.scenarioId ||
+      normalized.runIdentity.difficulty !== normalized.difficulty ||
+      normalizedInputs(normalized.location) !==
+        normalizedInputs(normalized.runIdentity.inputs.location) ||
+      normalized.meaningfulDecisionGateWaived ||
+      normalized.storyEffectsDisabled ||
+      normalized.customScenario)
+  )
+    return null;
+  if (
+    normalized.challenge &&
+    (!validInvitation(normalized.challenge) ||
+      !sameRunIdentity(
+        normalized.runIdentity,
+        expandAuthoredRunReference(normalized.challenge.run),
+      ))
+  )
+    return null;
   return { ...save, game: normalized } as SaveGameType;
 }
 

@@ -32,6 +32,24 @@ function props(overrides: Partial<TutorialHudProps> = {}): TutorialHudProps {
 }
 
 describe("TutorialHud", () => {
+  it("names a deliberate challenge transition without advancing from unrelated controls", async () => {
+    const user = userEvent.setup();
+    const hudProps = props({
+      step: objective({ nextLabel: "Start final challenge" }),
+    });
+    render(
+      <>
+        <button>1×</button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByRole("button", { name: "1×" }));
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", { name: "Start final challenge" }),
+    );
+    expect(hudProps.onNext).toHaveBeenCalledTimes(1);
+  });
   it("continues on explicit UI controls, including keyboard activation, and cleans up", async () => {
     const user = userEvent.setup();
     const hudProps = props({ step: objective({ continueOnClick: "#tab" }) });
@@ -217,6 +235,55 @@ describe("TutorialHud", () => {
       }) as DOMRect;
   }
 
+  it("reveals the first choice once and leaves subsequent player scrolling alone", () => {
+    jest.useFakeTimers();
+    const scroller = document.createElement("div");
+    scroller.style.overflowY = "auto";
+    Object.defineProperties(scroller, {
+      scrollHeight: { value: 1600 },
+      clientHeight: { value: 400 },
+    });
+    stubRect(scroller, 0, 100, 500, 500);
+    const targets = [600, 1000].map((top) => {
+      const target = document.createElement("button");
+      target.className = "purchase-choice";
+      target.getBoundingClientRect = () =>
+        ({
+          left: 0,
+          right: 500,
+          top: top - scroller.scrollTop,
+          bottom: top + 44 - scroller.scrollTop,
+          width: 500,
+          height: 44,
+        }) as DOMRect;
+      scroller.appendChild(target);
+      return target;
+    });
+    document.body.appendChild(scroller);
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ target: ".purchase-choice" }) })}
+      />,
+    );
+    act(() => jest.advanceTimersByTime(500));
+    expect(scroller.scrollTop).toBe(144);
+    expect(targets[0].getBoundingClientRect().bottom).toBe(500);
+    scroller.scrollTop = 0;
+    act(() => jest.advanceTimersByTime(1000));
+    expect(scroller.scrollTop).toBe(0);
+    // Responsive CSS can move a target without replacing its node. A settled resize
+    // should reveal it once more, while later manual scrolling remains respected.
+    act(() => window.dispatchEvent(new Event("resize")));
+    act(() => jest.advanceTimersByTime(500));
+    expect(scroller.scrollTop).toBe(144);
+    scroller.scrollTop = 0;
+    act(() => jest.advanceTimersByTime(1000));
+    expect(scroller.scrollTop).toBe(0);
+    unmount();
+    scroller.remove();
+    jest.useRealTimers();
+  });
+
   it("gives the ring a small gap when the control is not flush with a clipping edge", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";
@@ -256,6 +323,70 @@ describe("TutorialHud", () => {
 
     unmount();
     target.remove();
+  });
+
+  it("tracks moving targets on every animation frame and stops after unmount", () => {
+    let nextFrame: FrameRequestCallback | undefined;
+    const requestFrame = jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        nextFrame = callback;
+        return 1;
+      });
+    const cancelFrame = jest.spyOn(window, "cancelAnimationFrame");
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 200, 150, 400, 250);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    // Scroll motion must be reflected at the next paint, including frames less than 66ms
+    // apart. This also covers pane dragging and layout animation without scroll events.
+    for (const [time, top] of [
+      [16, 130],
+      [32, 110],
+      [48, 90],
+    ]) {
+      stubRect(target, 200, top, 400, top + 100);
+      const frame = nextFrame!;
+      act(() => frame(time));
+      expect(ring.style.top).toBe(`${top - 5}px`);
+    }
+
+    unmount();
+    expect(cancelFrame).toHaveBeenCalledWith(1);
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+    target.remove();
+    requestFrame.mockRestore();
+    cancelFrame.mockRestore();
+  });
+
+  it("restores target hooks overwritten by a render without replacing its ring", () => {
+    jest.useFakeTimers();
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 200, 150, 400, 250);
+    document.body.appendChild(target);
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    target.className = "facilityRowHeader ready";
+    act(() => jest.advanceTimersByTime(20));
+    expect(target).toHaveClass("tutorialTarget", "ready");
+    expect(screen.getByTestId("tutorial-target-ring")).toBe(ring);
+    act(() => jest.advanceTimersByTime(10_000));
+    target.className = "facilityRowHeader ready";
+    act(() => jest.advanceTimersByTime(20));
+    expect(target).toHaveClass(
+      "tutorialTarget",
+      "tutorialTargetReminder",
+      "ready",
+    );
+    expect(screen.getByTestId("tutorial-target-ring")).toBe(ring);
+    unmount();
+    expect(target).not.toHaveClass("tutorialTarget", "tutorialTargetReminder");
+    target.remove();
+    jest.useRealTimers();
   });
 
   it("keeps the gap even on every side when one side has only a little room", () => {

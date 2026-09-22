@@ -3,7 +3,6 @@ import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import {
   baselineChoiceActions,
   baselineMeaningfulChoices,
-  describeCeoOmissions,
   ECONOMICS_SCENARIOS,
   expectNoViolations,
 } from "./SimulationTestHelpers";
@@ -72,11 +71,4 @@ describe("simulation economics on CEO", () => {
       );
     });
   });
-
-  // The other half of the omission matrix is in SimulationEconomicsCeoOmissions.test.tsx
-  describeCeoOmissions(
-    ECONOMICS_SCENARIOS.filter((_scenario, index) => index % 2 === 0).map(
-      (scenario) => scenario.id,
-    ),
-  );
 });

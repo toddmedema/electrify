@@ -19,6 +19,7 @@ import {
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyConcise } from "./Format";
+import { selectProjection } from "./Projection";
 
 export interface MissionRequirement {
   id: string;
@@ -30,6 +31,14 @@ export interface MissionRequirement {
   status:
     "pending" | "in-progress" | "completed" | "failed" | "unknown" | "waived";
   deadline: number;
+}
+
+// A month that fell a hair short must never print as a whole "100%": the reliability
+// objective can require exactly 100% served, and a rounded-up reading would contradict the
+// FAILED chip beside it. Rounding down keeps the number on the honest side of the threshold.
+function formatServed(fraction: number): string {
+  const floored = Math.floor(fraction * 1000) / 10;
+  return Number.isInteger(floored) ? `${floored}%` : `${floored.toFixed(1)}%`;
 }
 
 export function completedMissionHistory(game: GameType): MonthlyHistoryType[] {
@@ -71,15 +80,15 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : `${(minimum * 100).toFixed(2)}%`})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
-          : `${(minimum * 100).toFixed(2)}% minimum served · ${observed}/${count} completed months`) +
+          : `Lowest ${formatServed(minimum)} · ${observed} of ${count} months counted`) +
         (missing || (monthsRemaining === 0 && observed < count)
-          ? " · Missing required history: not verifiable"
+          ? " · history incomplete, not verifiable"
           : ""),
-      target: `Serve at least ${Math.round(objective.minimumDemandServed * 100)}% of demand in each required month`,
+      target: `Every required month needs ${Math.round(objective.minimumDemandServed * 100)}% served`,
       timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; checked at term end`,
       status: missing
         ? "unknown"
@@ -108,7 +117,7 @@ export function getMissionStatus(game: GameType) {
       current: now
         ? `${Math.round(now.customers).toLocaleString()} current customers`
         : "Current customers unavailable",
-      target: `At least ${Math.ceil(threshold).toLocaleString()} customers (${Math.round(scenario.minimumCustomerRetention * 100)}% of starting customers)`,
+      target: `Keep ${Math.ceil(threshold).toLocaleString()} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
       timing: "Required at term end; current customers can still change",
       status: now ? "in-progress" : "unknown",
       deadline: end,
@@ -120,8 +129,8 @@ export function getMissionStatus(game: GameType) {
       id: "decisions",
       label: "Meaningful decisions",
       compact: `Decisions ≥ ${gate.count} (${game.meaningfulDecisions.length}) · Categories ≥ ${gate.categories} (${meaningfulDecisionCategoryCount(game.meaningfulDecisions)})`,
-      current: `${game.meaningfulDecisions.length} retained decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
-      target: `${gate.count} decisions across ${gate.categories} categories; reverting a decision removes it`,
+      current: `${game.meaningfulDecisions.length} decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
+      target: `Needs ${gate.count} decisions across ${gate.categories} categories; reverting one removes it`,
       timing: "Required at term end",
       status: game.meaningfulDecisionGateWaived ? "waived" : "in-progress",
       deadline: end,
@@ -134,7 +143,7 @@ export function getMissionStatus(game: GameType) {
     current: now
       ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
       : "Current cash unavailable",
-    target: "Cash must be at least $0 at each month-end check",
+    target: "Cash must be $0 or more at every month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",
@@ -150,17 +159,23 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "survival",
     label: "Avoid chronic blackouts",
-    compact: `Avoid 3 consecutive months < 90% served (${latest.length ? latest.map((row) => `${(demandServed(row) * 100).toFixed(1)}%`).join(", ") : "no completed months"})`,
+    compact: `Avoid 3 consecutive months < 90% served (${
+      latest.length
+        ? latest
+            .slice()
+            .reverse()
+            .map((row) => formatServed(demandServed(row)))
+            .join(", ")
+        : "no completed months"
+    })`,
     current: latest.length
-      ? latest
-          .map(
-            (row) =>
-              `${row.month}/${row.year}: ${(demandServed(row) * 100).toFixed(1)}% served`,
-          )
-          .join(" · ")
+      ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
+          .slice()
+          .reverse()
+          .map((row) => formatServed(demandServed(row)))
+          .join(" · ")}`
       : "No completed months",
-    target:
-      "Supply below 90% of demand in each of the latest three completed months ends the term",
+    target: "Ends if under 90% served 3 months in a row",
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive
@@ -226,29 +241,35 @@ export function projectedShortfall(
   return result;
 }
 
-// Warn about insolvency this far ahead, from the average cash change over this many recent months.
-const CASH_RUNWAY_WARNING_MONTHS = 12;
-const CASH_RUNWAY_TREND_MONTHS = 3;
-
-/** Months until cash reaches zero at the recent completed-month pace; undefined when not burning. */
+/**
+ * Whole months until the projected cash first falls below zero; undefined when it never does.
+ *
+ * Judged from the forward projection Insights already runs rather than from the average of the
+ * recent completed months. The average is what a single down payment, a restoration bill or a
+ * seasonal swing looked like, and it took months of history before a rate change moved it. The
+ * projection answers the question that is actually being asked -- where does the cash sit in
+ * month six, given the rates, prices and fleet in force? -- and it already reflects a new rate
+ * in the same call that sets one.
+ *
+ * The projected months start where the simulation started, so they are anchored to the balance
+ * on hand before being read. Only deviations from the original within-month cash path are
+ * carried along; ordinary operating cash flow is already included in the projected balances.
+ */
 export function cashRunwayMonths(game: GameType): number | undefined {
-  const current = absoluteMonth(game.date.year, game.date.monthNumber);
-  const history = completedMissionHistory(game);
-  const recent: MonthlyHistoryType[] = [];
-  for (const row of history) {
-    if (absoluteMonth(row.year, row.month) !== current - recent.length - 1)
-      break;
-    recent.push(row);
-    if (recent.length > CASH_RUNWAY_TREND_MONTHS) break;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  // Negative cash now has its own, more urgent warning; this one is about the months ahead
+  if (!now || now.cash < 0) return undefined;
+  const projection = selectProjection(game, now);
+  const expectedCash =
+    getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
+    projection.startingCash;
+  const anchor = now.cash - expectedCash;
+  for (let i = 0; i < projection.cashProjected.length; i++) {
+    if (projection.cashProjected[i].cash + anchor < 0) {
+      return i + 1;
+    }
   }
-  if (recent.length < 2) return undefined;
-  const burn =
-    (recent[recent.length - 1].cash - recent[0].cash) / (recent.length - 1);
-  if (burn <= 0) return undefined;
-  const cash =
-    getTimeFromTimeline(game.date.minute, game.timeline)?.cash ??
-    recent[0].cash;
-  return cash < 0 ? undefined : cash / burn;
+  return undefined;
 }
 
 export function selectMissionRisk(
@@ -288,20 +309,7 @@ export function selectMissionRisk(
       shortLabel: "Reliability missed",
       target: "mission-details",
     };
-  const runway = cashRunwayMonths(game);
-  if (
-    runway !== undefined &&
-    runway <= CASH_RUNWAY_WARNING_MONTHS &&
-    runway < mission.monthsRemaining
-  ) {
-    const months = Math.max(1, Math.round(runway));
-    return {
-      id: "cash-runway",
-      label: `At the recent pace, cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
-      shortLabel: `Cash out in ~${months} mo`,
-      target: "finances",
-    };
-  }
+  // A shortage in today's operating sample needs action before a future cash deficit.
   const projected = projectedShortfall(game.timeline, game.date.minute);
   if (projected)
     return {
@@ -310,6 +318,16 @@ export function selectMissionRisk(
       shortLabel: "Projected shortfall",
       target: "supply-demand",
     };
+  const runway = cashRunwayMonths(game);
+  if (runway !== undefined) {
+    const months = Math.max(1, Math.round(runway));
+    return {
+      id: "cash-runway",
+      label: `Projected cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
+      shortLabel: `Cash out in ~${months} mo`,
+      target: "finances",
+    };
+  }
   const event = upcoming
     .filter(
       (event) =>
