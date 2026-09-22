@@ -37,9 +37,9 @@ for (const theme of ["light", "dark"]) {
         });
       animation.currentTime = 320;
       const before = bounds();
-      const firstPosition = getComputedStyle(pulse).transform;
+      const firstPosition = getComputedStyle(pulse).strokeDashoffset;
       animation.currentTime = 800;
-      const secondPosition = getComputedStyle(pulse).transform;
+      const secondPosition = getComputedStyle(pulse).strokeDashoffset;
       const endTime = animation.effect!.getComputedTiming().endTime;
       animation.play();
       await animation.finished;
@@ -66,7 +66,7 @@ for (const theme of ["light", "dark"]) {
   });
 }
 
-test("reduced motion keeps only the static home trace", async ({ page }) => {
+test("reduced motion keeps the original static logo", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const trace = page.locator(".homeEnergyTrace");
@@ -81,3 +81,35 @@ test("reduced motion keeps only the static home trace", async ({ page }) => {
     page.getByRole("button", { name: "Start playing" }),
   ).toBeEnabled();
 });
+
+for (const shortLandscape of [false, true]) {
+  test(`the arc overlay stays aligned with the logo${shortLandscape ? " in short landscape" : ""}`, async ({
+    page,
+  }) => {
+    if (shortLandscape) await page.setViewportSize({ width: 844, height: 390 });
+    await page.goto("/");
+    await expect(page.locator("#logo img")).toBeVisible();
+    const alignment = await page
+      .locator(".homeEnergyTrace")
+      .evaluate(async (element) => {
+        const image = document.querySelector<HTMLImageElement>("#logo img")!;
+        await image.decode();
+        const rect = image.getBoundingClientRect();
+        const scale = Math.min(rect.width / 300, rect.height / 70);
+        const expectedStart = {
+          x: rect.x + (rect.width - 300 * scale) / 2 + 57.7873 * scale,
+          y: rect.y + (rect.height - 70 * scale) / 2 + 5.39465 * scale,
+        };
+        const path = element.querySelector("path")!;
+        const actualStart = new DOMPoint(57.7873, 5.39465).matrixTransform(
+          path.getScreenCTM()!,
+        );
+        return {
+          expectedStart,
+          actualStart: { x: actualStart.x, y: actualStart.y },
+        };
+      });
+    expect(alignment.actualStart.x).toBeCloseTo(alignment.expectedStart.x, 1);
+    expect(alignment.actualStart.y).toBeCloseTo(alignment.expectedStart.y, 1);
+  });
+}

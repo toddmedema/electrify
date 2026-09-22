@@ -42,14 +42,21 @@ const MainMenu = (props: Props): React.JSX.Element => {
   return (
     <div id="menuCard">
       <div id="logo">
-        <img
-          src="images/logo.svg"
-          alt="Electrify"
-          style={{ maxWidth: 680 }}
-        ></img>
-        <span className="homeEnergyTrace" aria-hidden="true">
-          <span className="homeEnergyPulse" />
-        </span>
+        <div className="homeLogo">
+          <img src="images/logo.svg" alt="Electrify" />
+          <svg
+            className="homeEnergyTrace"
+            viewBox="0 0 300 70"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              className="homeEnergyPulse"
+              d="M57.7873 5.39465C57.7873 5.39465 85.2179 11.978 107.162 11.978C129.107 11.978 150.32 8.22915 150.32 8.22915"
+              pathLength="100"
+            />
+          </svg>
+        </div>
       </div>
       <Typography component="h1" className="srOnly">
         Electrify
