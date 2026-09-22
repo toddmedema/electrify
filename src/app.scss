@@ -559,6 +559,11 @@ $topbar_height: 56px;
   font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
+
+  > span {
+    display: flex;
+    align-items: center;
+  }
 }
 
 .constructionTitleBar #close-button {
