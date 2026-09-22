@@ -44,6 +44,8 @@ export interface ProjectionView {
   // What the simulation started from; callers that anchor on live balances diff against these
   startingCash: number;
   startingCustomers: number;
+  // Original within-month balances: ordinary operating drift is already in the forecast.
+  cashBaseline: TickPresentFutureType[];
 }
 
 interface BlackoutEdges {
@@ -117,6 +119,14 @@ export function facilitySignature(game: GameType): string {
 export function projectionSignature(game: GameType): string {
   return [
     game.scenarioId,
+    game.difficulty,
+    JSON.stringify(game.location),
+    game.customerMarketSize,
+    game.startingDemandScale,
+    game.creditPremium,
+    JSON.stringify(game.loadAdditions),
+    game.storyEffectsDisabled,
+    JSON.stringify(game.worldEvents),
     game.startingYear,
     game.seed,
     game.customScenario ? JSON.stringify(game.customScenario) : "",
@@ -209,13 +219,16 @@ function buildProjection(
     projectionStepMinutes,
     startingCash: now.cash,
     startingCustomers: now.customers,
+    cashBaseline: game.timeline,
   };
 }
 
 // One entry is enough: a game has one game. Whichever caller asks last wins, and the key keeps
 // it honest, so the top bar and the Insights pane agree on the same numbers without one of them
 // paying for a rebuild the other just paid for.
-let cachedProjection: { key: string; projection: ProjectionView } | undefined;
+let cachedProjection:
+  | { key: string; history: MonthlyHistoryType[]; projection: ProjectionView }
+  | undefined;
 
 /**
  * The game's long-range projection, memoized on the inputs that can change it.
@@ -229,10 +242,15 @@ export function selectProjection(
   now: TickPresentFutureType,
 ): ProjectionView {
   const key = projectionSignature(game);
-  if (cachedProjection?.key === key) {
+  // History identity is stable during ordinary ticks, but changes on restart or save import,
+  // even when both runs happen to have the same seed, decisions and month count.
+  if (
+    cachedProjection?.key === key &&
+    cachedProjection.history === game.monthlyHistory
+  ) {
     return cachedProjection.projection;
   }
   const projection = buildProjection(game, now);
-  cachedProjection = { key, projection };
+  cachedProjection = { key, history: game.monthlyHistory, projection };
   return projection;
 }

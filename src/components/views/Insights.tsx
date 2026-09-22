@@ -80,9 +80,8 @@ import {
   setStorageKeyValue,
 } from "../../LocalStorage";
 import {
-  facilitySignature,
   forecastViewportBounds,
-  policySignature,
+  projectionSignature,
   ProjectionView,
   selectProjection,
 } from "../../helpers/Projection";
@@ -737,8 +736,9 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.focusLayer !== this.props.focusLayer ||
       nextProps.upcomingEvents !== this.props.upcomingEvents ||
-      policySignature(nextProps.game) !== policySignature(this.props.game) ||
-      facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
+      nextProps.game.monthlyHistory !== this.props.game.monthlyHistory ||
+      projectionSignature(nextProps.game) !==
+        projectionSignature(this.props.game)
     );
   }
 
@@ -1719,7 +1719,8 @@ export default class Insights extends React.Component<Props, State> {
                 domain={projection.domain}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
-                currentMinute={game.date.minute}
+                // Cached simulated hours never become recorded observations as the clock advances.
+                currentMinute={projection.forecast[0]?.minute}
                 syncKey={SYNC_KEY}
               />
               {projection.shortfall && (

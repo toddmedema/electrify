@@ -255,15 +255,18 @@ const CASH_RUNWAY_WARNING_MONTHS = 12;
  * in the same call that sets one.
  *
  * The projected months start where the simulation started, so they are anchored to the balance
- * on hand before being read: a month's drift since the projection was built is carried along
- * with them.
+ * on hand before being read. Only deviations from the original within-month cash path are
+ * carried along; ordinary operating cash flow is already included in the projected balances.
  */
 export function cashRunwayMonths(game: GameType): number | undefined {
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
   const projection = selectProjection(game, now);
-  const anchor = now.cash - projection.startingCash;
+  const expectedCash =
+    getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
+    projection.startingCash;
+  const anchor = now.cash - expectedCash;
   for (let i = 0; i < projection.financeProjected.length; i++) {
     if (projection.financeProjected[i].cash + anchor < 0) {
       return i + 1;
