@@ -2527,6 +2527,7 @@ function updateSupplyFacilitiesFinances(
   preRoll?: boolean,
   optimizeCommitment = true,
   stepMinutes = TICK_MINUTES,
+  advanceConstruction = true,
 ) {
   const { facilities, date } = state;
   const tickScale = stepMinutes / TICK_MINUTES;
@@ -2540,7 +2541,10 @@ function updateSupplyFacilitiesFinances(
   // project's schedule. Derived from how far each clock actually moved rather than from elapsed
   // time: the decrements below are clamped at zero, so a project finishing mid-tick advances by
   // less than a full tick, and only the delta makes the lifetime total come out exact.
-  let constructionKgco2e = 0;
+  // At rollover getTimeFromTimeline clamps both now and prev to the final frame. Keep that
+  // frame's already-recorded construction charge when booking the boundary's additional work.
+  let constructionKgco2e =
+    !simulated && now === prev ? now.constructionKgco2e || 0 : 0;
   const accrueConstruction = (
     asset: ConstructionEmissions & { yearsToBuildLeft: number },
     yearsToBuild: number,
@@ -2567,12 +2571,11 @@ function updateSupplyFacilitiesFinances(
 
   // Update facility construction status
   facilities.forEach((f: FacilityOperatingType) => {
-    if (f.yearsToBuildLeft > 0) {
+    if (advanceConstruction && f.yearsToBuildLeft > 0) {
       f.yearsToBuildLeft = Math.max(
         0,
         f.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
       );
-      accrueConstruction(f, f.yearsToBuild);
       if (f.yearsToBuildLeft === 0) {
         f.minuteOperational = now.minute;
         if (!simulated) {
@@ -2586,11 +2589,19 @@ function updateSupplyFacilitiesFinances(
     }
   });
 
+  // A facility can finish during pre-roll; its remaining emissions still belong to the next
+  // recorded tick even though its construction clock has already reached zero.
+  if (advanceConstruction) {
+    facilities.forEach((facility) =>
+      accrueConstruction(facility, facility.yearsToBuild),
+    );
+  }
+
   const transmission = state.transmission ?? emptyTransmissionState();
   transmission.lines.forEach((line) => {
     // Month-boundary pre-roll stabilizes generator output against the new weather frame. It is
     // not elapsed game time and must not quietly shorten an intertie's authored build schedule.
-    if (preRoll || line.yearsToBuildLeft <= 0) return;
+    if (!advanceConstruction || preRoll || line.yearsToBuildLeft <= 0) return;
     line.yearsToBuildLeft = Math.max(
       0,
       line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
@@ -2605,7 +2616,13 @@ function updateSupplyFacilitiesFinances(
   // that finished long ago, and it must advance on exactly the same frames a build does.
   transmission.lines.forEach((line) => {
     const upgrade = line.upgrade;
-    if (preRoll || !upgrade || upgrade.yearsToBuildLeft <= 0) return;
+    if (
+      !advanceConstruction ||
+      preRoll ||
+      !upgrade ||
+      upgrade.yearsToBuildLeft <= 0
+    )
+      return;
     upgrade.yearsToBuildLeft = Math.max(
       0,
       upgrade.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
@@ -3350,11 +3367,18 @@ function supplyForecastPass(
         undefined,
         !withoutMinimumStableOutput,
         stepMinutes,
+        // Re-evaluating this tick is not elapsed construction time. Advancing the clone here
+        // would drop one tick's emissions from the future and open projects one tick early.
+        t.minute !== state.date.minute,
       );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
       // rebuilding from the previous tick erases a purchase refund (and, symmetrically, a cost).
       if (t.minute === state.date.minute) {
+        // A player's action changes the forecast, not emissions already recorded this tick.
+        t.constructionKgco2e = current?.constructionKgco2e || 0;
+        t.kgco2e =
+          (t.localKgco2e || 0) + (t.importedKgco2e || 0) + t.constructionKgco2e;
         if (currentCash !== undefined) {
           t.cash = currentCash;
         }

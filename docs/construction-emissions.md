@@ -72,7 +72,7 @@ Floating is 1.7-2.0x that, around 1.1-1.3, if that option is ever split out.
 | Option       | Value | Ref year |     k | Floor | Confidence |
 | ------------ | ----: | -------: | ----: | ----: | ---------- |
 | Battery      | 0.080 |     2025 | 0.045 | 0.025 | high       |
-| Pumped Hydro | 0.060 |     2025 | 0.010 | 0.035 | medium     |
+| Pumped Hydro | 0.060 |     2025 |     0 |     — | medium     |
 
 The battery figure is LFP, now the dominant grid chemistry. NMC is about 20% higher with a much
 fatter upper tail, to 0.140.
@@ -88,7 +88,7 @@ The authored corridors record what a route costs but not how long it is, so cost
 for length and terrain:
 
 ```
-kgCO2e/W = 0.08 * (costPerW / 0.00056) ** 0.7 * (EXISTING ? 0.7 : 1)
+kgCO2e/W = 0.08 * (costPerW / 0.56) ** 0.7 * (EXISTING ? 0.7 : 1)
 ```
 
 Two things about that formula are deliberate.
@@ -146,10 +146,10 @@ figures net out recycling credits and will therefore look lower than these for t
 added to the headline total after that multiplication, and a regression test asserts the identity
 directly on every tick.
 
-The reasoning is not merely that it would be inconvenient. A carbon price reaches what a grid burns
-inside the jurisdiction levying it. Embodied emissions are mostly incurred in someone else's
-factories, in another country, years before the plant produces a watt. No real carbon fee reaches
-them, and pretending otherwise would teach the wrong thing about what such a scheme does.
+This is a boundary of the game's accounting model: the operating carbon fee applies to local
+combustion, while construction emissions come from the project's supply chain. The game does not
+model a separate supply-chain carbon charge. This is not a claim that embodied emissions are
+exempt from every real-world carbon-pricing scheme.
 
 They still count towards the score, which is the point: a player who builds their way to a clean
 grid should see that the building itself was not free.

@@ -5,7 +5,12 @@ import {
   getTimeFromTimeline,
 } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
-import gameReducer, { buildFacility, tickState } from "./Game";
+import gameReducer, {
+  buildFacility,
+  generateNewTimeline,
+  tickState,
+  setTradingPolicy,
+} from "./Game";
 import { GameType, GeneratorShoppingType } from "../Types";
 import { GENERATORS, constructionKgco2eCurve } from "../data/Facilities";
 import { corridorConstructionKgco2e } from "../helpers/Transmission";
@@ -76,13 +81,94 @@ describe("construction emissions", () => {
     const built2 = state.facilities.find((f) => f.name === "Wind")!;
     expect(built2.constructionKgco2eEmitted).toBeCloseTo(expected, 6);
 
-    // The monthly record lands a hair under it. Month boundaries re-run their opening frames to
-    // settle generator output against new weather, and those frames move build clocks without
-    // being the tick that gets written down; the next real tick charges for them, but the last
-    // one before a rollover has nowhere to put its share. Under a percent, and never over.
-    const recorded = recordedConstructionKgco2e(state);
-    expect(recorded).toBeLessThanOrEqual(expected);
-    expect(recorded / expected).toBeGreaterThan(0.98);
+    expect(recordedConstructionKgco2e(state)).toBeCloseTo(expected, 5);
+  });
+
+  it("finishes accruing a facility that completes during month-boundary pre-roll", () => {
+    let state = richGame();
+    const quote = quoteFor(state, "Wind", 100000000);
+    quote.yearsToBuild = (TICKS_PER_MONTH + 2) / TICKS_PER_YEAR;
+    state = cloneDeep(
+      gameReducer(state, buildFacility({ facility: quote, financed: false })),
+    );
+    const expected = state.facilities.find(
+      (f) => f.name === "Wind",
+    )!.constructionKgco2eTotal!;
+    runMonths(state, 3);
+    expect(
+      state.facilities.find((f) => f.name === "Wind")!
+        .constructionKgco2eEmitted,
+    ).toBeCloseTo(expected, 5);
+    expect(recordedConstructionKgco2e(state)).toBeCloseTo(expected, 5);
+  });
+
+  it("does not rewrite already-booked construction emissions when reforecasting", () => {
+    let state = richGame();
+    state = cloneDeep(
+      gameReducer(
+        state,
+        buildFacility({
+          facility: quoteFor(state, "Wind", 100000000),
+          financed: false,
+        }),
+      ),
+    );
+    for (let i = 0; i < 5; i++) tickState(state);
+    const booked = getTimeFromTimeline(
+      state.date.minute,
+      state.timeline,
+    )!.constructionKgco2e;
+    state = cloneDeep(
+      gameReducer(
+        state,
+        buildFacility({
+          facility: quoteFor(state, "Solar", 500000000),
+          financed: false,
+        }),
+      ),
+    );
+    state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)!
+        .constructionKgco2e,
+    ).toBe(booked);
+    const expected = state.facilities.reduce(
+      (sum, f) => sum + (f.constructionKgco2eTotal || 0),
+      0,
+    );
+    runMonths(state, 36);
+    expect(recordedConstructionKgco2e(state)).toBeCloseTo(expected, 5);
+  });
+
+  it("forecasts the full remaining embodied total without booking it in the live game", () => {
+    let state = richGame();
+    state = cloneDeep(
+      gameReducer(
+        state,
+        buildFacility({
+          facility: quoteFor(state, "Wind", 100000000),
+          financed: false,
+        }),
+      ),
+    );
+    for (let i = 0; i < 20; i++) tickState(state);
+    const asset = state.facilities.find((f) => f.name === "Wind")!;
+    const before = cloneDeep(asset);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const forecast = generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      TICKS_PER_YEAR * 2,
+    );
+    const remaining = forecast
+      .filter((t) => t.minute > state.date.minute)
+      .reduce((sum, t) => sum + (t.constructionKgco2e || 0), 0);
+    expect(remaining).toBeCloseTo(
+      asset.constructionKgco2eTotal! - asset.constructionKgco2eEmitted!,
+      5,
+    );
+    expect(asset).toEqual(before);
   });
 
   it("keeps construction emissions out of the carbon fee", () => {

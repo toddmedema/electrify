@@ -21,7 +21,15 @@ import {
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { INTERTIE_UPGRADE_STEP, MAX_INTERTIE_UPGRADES } from "./Constants";
+import {
+  DOWNPAYMENT_PERCENT,
+  INTERTIE_UPGRADE_STEP,
+  MAX_INTERTIE_UPGRADES,
+} from "./Constants";
+import {
+  corridorConstructionKgco2e,
+  intertieUpgradeQuote,
+} from "./helpers/Transmission";
 import {
   GameType,
   IntertieUpgradeType,
@@ -66,13 +74,38 @@ export interface SaveGameType {
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
 
-// 1.5 ** 3, the most upgrades a corridor allows. Cost is checked against the same bound rather
-// than against the exact ladder: the escalation makes each step dearer than the last, so an
-// honest three-times-widened line sits well inside this while nothing arbitrary does.
-const MAX_UPGRADED_COST_MULTIPLE = Math.pow(
-  INTERTIE_UPGRADE_STEP,
-  MAX_INTERTIE_UPGRADES,
-);
+function approximatelyEqual(actual: unknown, expected: number): boolean {
+  return (
+    typeof actual === "number" &&
+    Number.isFinite(actual) &&
+    Math.abs(actual - expected) <= Math.max(1, expected) * 1e-9
+  );
+}
+
+function validConstruction(
+  raw: {
+    constructionKgco2eTotal?: unknown;
+    constructionKgco2eEmitted?: unknown;
+  },
+  maximum: number,
+): boolean {
+  const total =
+    raw.constructionKgco2eTotal === undefined ? 0 : raw.constructionKgco2eTotal;
+  const emitted =
+    raw.constructionKgco2eEmitted === undefined
+      ? 0
+      : raw.constructionKgco2eEmitted;
+  return (
+    [total, emitted].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    ) &&
+    typeof total === "number" &&
+    typeof emitted === "number" &&
+    total <= maximum &&
+    emitted <= total
+  );
+}
 
 /**
  * Capacity must be the corridor's authored rating times a whole number of upgrade steps, within
@@ -93,40 +126,80 @@ function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
   );
 }
 
-function validUpgrade(
-  raw: unknown,
-  capacityW: number,
+/** Reconstruct the same quotes used by live purchases, including the pending job's cost. */
+function validLineInvestment(
+  line: Partial<TransmissionLineOperatingType>,
   corridor: TransmissionCorridorDefinitionType,
+  year: number,
 ): boolean {
-  if (raw === undefined) return true;
-  if (typeof raw !== "object" || raw === null) return false;
-  const upgrade = raw as Partial<IntertieUpgradeType>;
+  let expected = {
+    corridorId: corridor.id,
+    capacityW: corridor.capacityW,
+    annualOperatingCost: corridor.annualOperatingCost,
+  };
+  let buildCost = corridor.buildCost;
+  const steps = Math.round(
+    Math.log(line.capacityW! / corridor.capacityW) /
+      Math.log(INTERTIE_UPGRADE_STEP),
+  );
+  for (let step = 0; step < steps; step++) {
+    const quote = intertieUpgradeQuote(expected, year);
+    if (!quote) return false;
+    expected = {
+      ...expected,
+      capacityW: quote.targetCapacityW,
+      annualOperatingCost: quote.annualOperatingCost,
+    };
+    buildCost += quote.buildCost;
+  }
   if (
-    ![
-      upgrade.targetCapacityW,
-      upgrade.buildCost,
-      upgrade.annualOperatingCost,
-      upgrade.yearsToBuild,
-      upgrade.yearsToBuildLeft,
-    ].every(
-      (value) =>
-        typeof value === "number" && Number.isFinite(value) && value >= 0,
-    )
+    !approximatelyEqual(line.annualOperatingCost, expected.annualOperatingCost)
   )
     return false;
+  if (line.upgrade !== undefined) {
+    if (
+      typeof line.upgrade !== "object" ||
+      line.upgrade === null ||
+      line.yearsToBuildLeft !== 0
+    )
+      return false;
+    const quote = intertieUpgradeQuote(expected, year);
+    const upgrade = line.upgrade;
+    if (
+      !quote ||
+      ![
+        "targetCapacityW",
+        "buildCost",
+        "annualOperatingCost",
+        "yearsToBuild",
+      ].every((key) =>
+        approximatelyEqual(
+          upgrade[key as keyof IntertieUpgradeType],
+          quote[key as keyof typeof quote],
+        ),
+      )
+    )
+      return false;
+    if (
+      !Number.isFinite(upgrade.yearsToBuildLeft) ||
+      upgrade.yearsToBuildLeft <= 0 ||
+      upgrade.yearsToBuildLeft > quote.yearsToBuild ||
+      !validConstruction(upgrade, quote.constructionKgco2eTotal)
+    )
+      return false;
+    buildCost += quote.buildCost;
+  }
   return (
-    upgrade.yearsToBuildLeft! <= upgrade.yearsToBuild! &&
-    upgrade.yearsToBuild! <= corridor.yearsToBuild &&
-    // The job in flight must be the next rung of the same ladder the line is standing on, so a
-    // save cannot hand itself an arbitrary rating by way of a pending upgrade.
-    validUpgradedCapacity(upgrade.targetCapacityW!, corridor.capacityW) &&
-    upgrade.targetCapacityW! > capacityW &&
-    upgrade.buildCost! <= corridor.buildCost * MAX_UPGRADED_COST_MULTIPLE
+    approximatelyEqual(line.buildCost, buildCost) &&
+    line.loanAmountLeft! <=
+      buildCost * (1 - DOWNPAYMENT_PERCENT) + Math.max(1, buildCost) * 1e-9 &&
+    validConstruction(line, corridorConstructionKgco2e(corridor))
   );
 }
 
 function validTransmissionLine(
   raw: unknown,
+  year: number,
 ): raw is TransmissionLineOperatingType {
   if (typeof raw !== "object" || raw === null) return false;
   const line = raw as Partial<TransmissionLineOperatingType>;
@@ -154,20 +227,10 @@ function validTransmissionLine(
         typeof value === "number" && Number.isFinite(value) && value >= 0,
     ) &&
     validUpgradedCapacity(line.capacityW!, corridor.capacityW) &&
-    // A widened line has paid for its upgrades on top of the corridor's authored price and
-    // costs more to run, so neither can be asserted equal any more. Both are still bounded by
-    // what the ladder above could possibly have cost: an import cannot claim a cheap corridor
-    // that somehow carries three times the power for the original price, nor the reverse.
-    line.buildCost! >= corridor.buildCost &&
-    line.buildCost! <= corridor.buildCost * MAX_UPGRADED_COST_MULTIPLE &&
-    line.annualOperatingCost! >= corridor.annualOperatingCost &&
-    line.annualOperatingCost! <=
-      corridor.annualOperatingCost * MAX_UPGRADED_COST_MULTIPLE &&
+    validLineInvestment(line, corridor, year) &&
     line.yearsToBuildLeft! <= corridor.yearsToBuild &&
-    validUpgrade(line.upgrade, line.capacityW!, corridor) &&
     Number.isInteger(line.minuteCreated) &&
     line.interestRate! <= 1 &&
-    line.loanAmountLeft! <= corridor.buildCost &&
     line.loanMonthlyPayment! <= corridor.buildCost &&
     // Derived display state rather than a decision: the next real tick overwrites it, but it
     // is rendered before that tick lands, so an imported save cannot claim a line is moving
@@ -326,6 +389,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
+        !validConstruction(
+          current,
+          Number(current.peakW) * 20 + Number(current.peakWh || 0),
+        ) ||
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
@@ -447,7 +514,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
         transmission.tradingPolicy,
       ) ||
       !Array.isArray(transmission.lines) ||
-      transmission.lines.some((line) => !validTransmissionLine(line)) ||
+      transmission.lines.some(
+        (line) => !validTransmissionLine(line, game.date!.year),
+      ) ||
       new Set(transmission.lines.map(({ id }) => id)).size !==
         transmission.lines.length ||
       new Set(transmission.lines.map(({ corridorId }) => corridorId)).size !==

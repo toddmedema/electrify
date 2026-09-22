@@ -349,21 +349,24 @@ function IntertieUpgradeControl(props: {
   line: TransmissionLineOperatingType;
   cash?: number;
   year: number;
+  interestRate: number;
   units: UnitSystemType;
   readOnly?: boolean;
   onUpgrade: (corridorId: string, financed: boolean) => void;
 }): React.JSX.Element | null {
-  const { line, cash, year, units, readOnly, onUpgrade } = props;
+  const { line, cash, year, interestRate, units, readOnly, onUpgrade } = props;
+  const [reviewing, setReviewing] = React.useState(false);
+  const titleId = React.useId();
   if (line.upgrade) {
     const years = line.upgrade.yearsToBuildLeft;
     return (
       <Typography variant="body2" color="textSecondary">
-        Upgrading to {formatWatts(line.upgrade.targetCapacityW)} ·{" "}
+        Upgrading to {formatWatts(line.upgrade.targetCapacityW, 3)} ·{" "}
         {years < 1
           ? `${Math.max(1, Math.round(years * 12))} months`
           : `${years.toFixed(1)} years`}{" "}
-        remaining. The line keeps carrying {formatWatts(line.capacityW)} until
-        it is done.
+        remaining. The line keeps carrying {formatWatts(line.capacityW, 3)}{" "}
+        until it is done.
       </Typography>
     );
   }
@@ -375,7 +378,7 @@ function IntertieUpgradeControl(props: {
       <Typography variant="body2" color="textSecondary">
         {atStepLimit
           ? "This corridor is full. Its towers and substations cannot carry another circuit; more capacity needs a new route."
-          : `${formatWatts(line.capacityW)} is as much as this connection can carry, limited by ${
+          : `${formatWatts(line.capacityW, 3)} is as much as this connection can carry, limited by ${
               intertieTechnologyCeilingW(year) <=
               intertieCapacityCeilingW(line.corridorId, year)
                 ? "what can be built today"
@@ -391,7 +394,7 @@ function IntertieUpgradeControl(props: {
   return (
     <div className="transmissionUpgrade">
       <Typography variant="body2">
-        Upgrade to {formatWatts(quote.targetCapacityW)} ·{" "}
+        Upgrade to {formatWatts(quote.targetCapacityW, 3)} ·{" "}
         {formatMoneyConcise(quote.buildCost)} · {months} mo ·{" "}
         {formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)}{" "}
         {largeMassUnit(units)} CO2e to build
@@ -407,12 +410,87 @@ function IntertieUpgradeControl(props: {
         variant="outlined"
         color="primary"
         disabled={!affordable}
-        aria-label={`Upgrade ${line.name} to ${formatWatts(quote.targetCapacityW)}`}
+        aria-label={`Upgrade ${line.name} to ${formatWatts(quote.targetCapacityW, 3)}`}
         startIcon={<ConceptIcon concept="build" fontSize="small" />}
-        onClick={() => onUpgrade(line.corridorId, true)}
+        onClick={() => setReviewing(true)}
       >
-        Upgrade
+        Review upgrade
       </Button>
+      {reviewing && (
+        <Dialog
+          open
+          onClose={() => setReviewing(false)}
+          fullWidth
+          maxWidth="sm"
+          aria-labelledby={titleId}
+        >
+          <ClosableDialogTitle id={titleId} onClose={() => setReviewing(false)}>
+            Upgrade {line.name}?
+          </ClosableDialogTitle>
+          <DialogContent className="noPadding">
+            <DecisionImpactPreview
+              facts={[
+                {
+                  concept: "supply",
+                  label: "Connection capacity",
+                  value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
+                  detail:
+                    "The line keeps operating at its current capacity during construction. Imports still depend on the neighbor's spare supply.",
+                },
+                {
+                  concept: "money",
+                  label: "Cash purchase",
+                  value: `${formatMoneyConcise(cash ?? 0)} → ${formatMoneyConcise((cash ?? 0) - quote.buildCost)}`,
+                },
+                {
+                  concept: "finances",
+                  label: "Loan option",
+                  value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(getMonthlyPayment(line.loanAmountLeft + quote.buildCost - downpayment, interestRate, LOAN_MONTHS))}/mo`,
+                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(interestRate * 100).toFixed(2)}%.${line.loanAmountLeft > 0 ? ` Includes refinancing the existing ${formatMoneyConcise(line.loanAmountLeft)} balance at this rate and term.` : ""}`,
+                },
+                {
+                  concept: "money",
+                  label: "Upkeep after upgrade",
+                  value: `${formatMoneyConcise(line.annualOperatingCost / 12)} → ${formatMoneyConcise(quote.annualOperatingCost / 12)}/mo`,
+                  detail: "Electricity purchases and loan payments are extra.",
+                },
+                {
+                  concept: "time",
+                  label: "Upgrade complete in",
+                  value: `${months} months`,
+                },
+                {
+                  concept: "construction",
+                  label: "Building emits",
+                  value: `${formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)} ${largeMassUnit(units)} CO2e`,
+                },
+              ]}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="contained"
+              disabled={(cash ?? 0) < quote.buildCost}
+              onClick={() => {
+                setReviewing(false);
+                onUpgrade(line.corridorId, false);
+              }}
+            >
+              Pay cash
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={!affordable}
+              onClick={() => {
+                setReviewing(false);
+                onUpgrade(line.corridorId, true);
+              }}
+            >
+              Take loan
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -510,9 +588,15 @@ export default function TransmissionPanel({
     game,
     projectsOnly || selectedLine !== null,
   );
-  const outlookFor = (corridorId: string) =>
+  const outlookFor = (corridorId: string, capacityW?: number) =>
     forecast &&
-    intertieOutlook(corridorId, intertieContext, forecast, game.date.minute);
+    intertieOutlook(
+      corridorId,
+      intertieContext,
+      forecast,
+      game.date.minute,
+      capacityW,
+    );
   const flowText = tradingFlowText(game);
   // The guided mission names the northern project. Showing only that choice until it is approved
   // makes an exploratory tap recoverable instead of letting a much dearer three-year project
@@ -579,7 +663,7 @@ export default function TransmissionPanel({
               : rating;
             const outlook =
               selectedLine === line.id
-                ? outlookFor(line.corridorId)
+                ? outlookFor(line.corridorId, line.capacityW)
                 : undefined;
             // Signed against the line's current rating, so the row reads the same way a
             // facility row does: positive is power arriving, negative is power being sold.
@@ -654,7 +738,7 @@ export default function TransmissionPanel({
                     <Typography variant="body2">
                       {market?.name} · {formatWatts(rating)} rating now
                       {Math.round(rating) !== Math.round(line.capacityW) &&
-                        ` · ${formatWatts(line.capacityW)} rated`}
+                        ` · ${formatWatts(line.capacityW, 3)} rated`}
                     </Typography>
                     {outlook && (
                       <div className="transmissionArchetype">
@@ -717,6 +801,7 @@ export default function TransmissionPanel({
                         line={line}
                         cash={now?.cash}
                         year={game.date.year}
+                        interestRate={game.interestRate}
                         units={units}
                         readOnly={readOnly}
                         onUpgrade={onUpgrade}

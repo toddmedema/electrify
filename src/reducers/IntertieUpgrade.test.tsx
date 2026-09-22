@@ -25,13 +25,13 @@ import { parseSave, serializeSave } from "../SaveGame";
 const CORRIDOR = "california-north";
 
 /** A California run whose northern intertie is already open and carrying power. */
-function openIntertie(): GameType {
+function openIntertie(financed = false): GameType {
   const game = createGame({ scenarioId: 100, seed: 61 });
   getTimeFromTimeline(game.date.minute, game.timeline)!.cash = 100000000000;
   const state = cloneDeep(
     gameReducer(
       game,
-      buildTransmissionLine({ corridorId: CORRIDOR, financed: false }),
+      buildTransmissionLine({ corridorId: CORRIDOR, financed }),
     ),
   );
   state.transmission!.lines[0].yearsToBuildLeft = 0;
@@ -221,7 +221,6 @@ describe("intertie upgrades", () => {
 
   it("replays an upgrade to the same capacity it reached live", () => {
     let state = createGame({ scenarioId: 112, seed: 249007 });
-    getTimeFromTimeline(state.date.minute, state.timeline)!.cash = 100000000000;
     const corridorId = state.transmission
       ? TRANSMISSION_CORRIDORS.find(({ id }) => id.startsWith("california"))!.id
       : CORRIDOR;
@@ -243,9 +242,8 @@ describe("intertie upgrades", () => {
     ).toBe(true);
     const replayed = createGameFromReplay(replay);
     for (let i = 0; i < 28 * TICKS_PER_MONTH; i++) tickState(replayed);
-    expect(replayed.transmission!.lines[0].capacityW).toBe(
-      state.transmission!.lines[0].capacityW,
-    );
+    expect(replayed.transmission).toEqual(state.transmission);
+    expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
   });
 
   it("survives a save round trip once widened", () => {
@@ -267,6 +265,65 @@ describe("intertie upgrades", () => {
     expect(restored!.game.transmission!.lines[0].capacityW).toBe(
       state.transmission!.lines[0].capacityW,
     );
+  });
+
+  it.each([false, true])(
+    "round trips every upgrade stage (financed=%s)",
+    (financed) => {
+      let state = openIntertie(financed);
+      for (let step = 0; step < MAX_INTERTIE_UPGRADES; step++) {
+        state = cloneDeep(
+          gameReducer(
+            state,
+            upgradeTransmissionLine({ corridorId: CORRIDOR, financed }),
+          ),
+        );
+        expect(state.transmission!.lines[0].upgrade).toBeDefined();
+        expect(
+          parseSave(JSON.parse(JSON.stringify(serializeSave(state)))),
+        ).not.toBeNull();
+        runMonths(state, 12);
+        expect(state.transmission!.lines[0].upgrade).toBeUndefined();
+        expect(
+          parseSave(JSON.parse(JSON.stringify(serializeSave(state)))),
+        ).not.toBeNull();
+      }
+    },
+  );
+
+  it("rejects malformed pending upgrades and construction bookkeeping", () => {
+    const state = cloneDeep(
+      gameReducer(
+        openIntertie(),
+        upgradeTransmissionLine({ corridorId: CORRIDOR, financed: false }),
+      ),
+    );
+    const good = JSON.parse(JSON.stringify(serializeSave(state)));
+    expect(parseSave(good)).not.toBeNull();
+    for (const patch of [
+      { targetCapacityW: corridor().capacityW * INTERTIE_UPGRADE_STEP ** 2 },
+      { annualOperatingCost: 0 },
+      { buildCost: 0 },
+      { yearsToBuild: 0, yearsToBuildLeft: 0 },
+      { yearsToBuildLeft: 0 },
+      { constructionKgco2eTotal: "bad" },
+      { constructionKgco2eEmitted: -1 },
+      { constructionKgco2eEmitted: 1e30 },
+    ]) {
+      const raw = cloneDeep(good);
+      Object.assign(raw.game.transmission.lines[0].upgrade, patch);
+      expect(parseSave(raw)).toBeNull();
+    }
+    for (const patch of [
+      { buildCost: corridor().buildCost },
+      { annualOperatingCost: 0 },
+      { constructionKgco2eTotal: "bad" },
+      { constructionKgco2eEmitted: -1 },
+    ]) {
+      const raw = cloneDeep(good);
+      Object.assign(raw.game.transmission.lines[0], patch);
+      expect(parseSave(raw)).toBeNull();
+    }
   });
 
   it("rejects an imported line claiming a rating it could not have reached", () => {

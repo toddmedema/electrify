@@ -98,7 +98,10 @@ for (const theme of ["light", "dark"] as const) {
           .evaluateAll((els) =>
             els.map((el) => el.getBoundingClientRect().width),
           );
-        expect(sortedCells).toHaveLength(4);
+        expect(sortedCells).toHaveLength(5);
+        await expect(first.locator(".buildOptionMetrics")).toContainText(
+          "Building emits",
+        );
         expect(sortedCells.every((width) => width >= 128)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),

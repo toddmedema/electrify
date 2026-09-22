@@ -558,12 +558,6 @@ export interface StorageOperatingType
 }
 
 /**
- * What one facility has actually done since it came online, so a row can report whether it is
- * earning its keep rather than only what it cost to build. Accumulated per tick by
- * updateSupplyFacilitiesFinances, and only while the game is really ticking -- a forecast runs
- * against a deep clone of the fleet and throws the clone away, so its ticks never land here.
- */
-/**
  * What building this asset emits in total, resolved from the shopping quote at purchase so a
  * later price or technology revision cannot retroactively change what a standing plant emitted.
  * Accrued into the company's totals over the construction period rather than booked at once.
@@ -580,6 +574,12 @@ export interface ConstructionEmissions {
   constructionKgco2eEmitted?: number;
 }
 
+/**
+ * What one facility has actually done since it came online, so a row can report whether it is
+ * earning its keep rather than only what it cost to build. Accumulated per tick by
+ * updateSupplyFacilitiesFinances, and only while the game is really ticking -- a forecast runs
+ * against a deep clone of the fleet and throws the clone away, so its ticks never land here.
+ */
 export interface LifetimeTotals {
   lifetimeWh: number; // Delivered to the grid. Storage counts discharge only, not charging
   // What it could have delivered running flat out over the same span, ie the denominator of its
