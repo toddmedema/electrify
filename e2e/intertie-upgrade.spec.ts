@@ -114,7 +114,7 @@ for (const theme of ["light", "dark"] as const) {
     // The collapsed reading uses the weather-dependent operating rating, not nameplate
     // capacity. Verify the purchased nameplate in the expanded details instead.
     await expect(line.locator(".transmissionLineDetails")).toContainText(
-      "750MW rated capacity",
+      "0.75GW rated capacity",
     );
     await expect(
       line.getByRole("button", {

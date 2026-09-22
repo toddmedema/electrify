@@ -1,4 +1,5 @@
 import { LOCATIONS } from "./Constants";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import {
   describeSave,
@@ -24,7 +25,7 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     startingDemandScale: 1,
     loadAdditions: [],
     location: LOCATIONS.PIT,
-    date: { minute: 1000, year: 2035, month: 6 },
+    date: getDateFromMinute(185 * MINUTES_PER_MONTH + 1000, 2020),
     facilities: [],
     timeline: [],
     monthlyHistory: [],
