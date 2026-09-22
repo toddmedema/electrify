@@ -622,7 +622,7 @@ async function fetchBatch(
   return { rows, meta };
 }
 
-function readPackedWeather(city, expectedOffshore = Boolean(city.offshore)) {
+function readPackedWeather(city, expectedOffshore) {
   const file = fs.readFileSync(binaryPath(city.id));
   if (file.length < HEADER_BYTES || file.toString("ascii", 0, 4) !== MAGIC) {
     throw new Error(`${city.id}: existing file is not ${MAGIC} weather data`);
@@ -647,7 +647,7 @@ function readPackedWeather(city, expectedOffshore = Boolean(city.offshore)) {
     file.readUInt8(12) !== TEMP_SCALE ||
     file.readUInt8(13) !== WIND_SCALE ||
     file.readUInt8(14) !== PRECIP_SCALE ||
-    expectedOffshore !== offshore
+    (expectedOffshore !== undefined && expectedOffshore !== offshore)
   ) {
     throw new Error(
       `${city.id}: existing weather layout is incompatible with this updater`,
@@ -663,6 +663,7 @@ function readPackedWeather(city, expectedOffshore = Boolean(city.offshore)) {
   return {
     file,
     bytesPerRow,
+    offshore,
     endingYear: startingYear + yearCount - 1,
   };
 }
@@ -740,7 +741,7 @@ async function updateExisting(catalogue) {
       total +
       (options.through - entry.endingYear) *
         MONTHS_PER_YEAR *
-        (entry.city.offshore ? 2 : 1),
+        (entry.offshore ? 2 : 1),
     0,
   );
   log(
@@ -755,7 +756,13 @@ async function updateExisting(catalogue) {
     for (const [firstYear, entries] of groups) {
       for (let at = 0; at < entries.length; at += CITIES_PER_BATCH) {
         const batch = entries.slice(at, at + CITIES_PER_BATCH);
-        const cities = batch.map((entry) => entry.city);
+        // Extend the layout already on disk. A city can gain offshore capability in the
+        // catalogue after its original onshore-only file was fetched; upgrading all historical
+        // rows is a separate fetch operation, while appending years must remain safe on its own.
+        const cities = batch.map((entry) => ({
+          ...entry.city,
+          offshore: entry.offshore,
+        }));
         log(
           `\n${cities.map((city) => city.id).join(", ")} (${firstYear}-${options.through})`,
         );
