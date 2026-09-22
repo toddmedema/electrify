@@ -22,14 +22,17 @@ import { GameType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 const MAX_FORECAST_YEARS = 20;
 const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
 
-/** Include the final scenario month; unbounded games get a rolling year of warning. */
+/** Warn through the scenario end, capped at 20 years; unbounded games get one year. */
 export function cashRunwayHorizon(game: GameType): number {
   const duration = getScenario(
     game.scenarioId,
     game.customScenario,
   )?.durationMonths;
   return duration !== undefined && Number.isFinite(duration) && duration > 0
-    ? Math.max(0, duration - game.date.monthsElapsed)
+    ? Math.min(
+        MAX_FORECAST_YEARS * 12,
+        Math.max(0, duration - game.date.monthsElapsed),
+      )
     : 12;
 }
 
@@ -161,19 +164,15 @@ function buildProjection(
   const ticks = (TICKS_PER_YEAR * MAX_FORECAST_YEARS) / tickScale;
   const monthsAhead = MAX_FORECAST_YEARS * 12;
 
-  // Cash risk covers the entire term, while chart data keeps its established 20-year window.
+  // Cash risk and charts share one simulation, never longer than 20 years.
   const cashMonths = cashRunwayHorizon(game);
-  const cashTimeline = generateNewTimeline(
+  const timeline = generateNewTimeline(
     game,
     now.cash,
     now.customers,
-    Math.max(
-      ticks,
-      Math.ceil((cashMonths * MINUTES_PER_MONTH) / projectionStepMinutes),
-    ),
+    ticks,
     projectionStepMinutes,
   );
-  const timeline = cashTimeline.slice(0, ticks);
   const historicalSupplyDemand = [...game.monthlyHistory]
     .reverse()
     .map((month) => {
@@ -217,13 +216,9 @@ function buildProjection(
 
   const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
   const projectedMonths = summarizeTimelineByMonth(
-    cashTimeline,
+    timeline,
     game.startingYear,
   ).slice(1);
-  const chartMonths =
-    cashTimeline.length > timeline.length
-      ? summarizeTimelineByMonth(timeline, game.startingYear).slice(1)
-      : projectedMonths;
   return {
     timeline: [...historicalCharts, ...timeline],
     sampled: [...historicalCharts, ...sampled],
@@ -238,7 +233,7 @@ function buildProjection(
       game.facilities.some((facility) => facility.fuel === "Hydro") ||
       historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
     financePast: game.monthlyHistory,
-    financeProjected: [currentMonth, ...chartMonths.slice(0, monthsAhead)],
+    financeProjected: [currentMonth, ...projectedMonths.slice(0, monthsAhead)],
     cashProjected: [currentMonth, ...projectedMonths].slice(0, cashMonths),
     projectionStepMinutes,
     startingCash: now.cash,

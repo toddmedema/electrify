@@ -404,6 +404,10 @@ test("real immutable tick profiling samples cache invalidation without simulatio
 });
 
 test.each([
+  [0, 1200, 240, true],
+  [0, 1200, 241, false],
+  [360, 1200, 240, true],
+  [360, 1200, 241, false],
   [0, 36, 13, true],
   [0, 36, 36, true],
   [0, 36, 37, false],
