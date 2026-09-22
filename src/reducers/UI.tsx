@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createAction, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   DialogType,
   SnackbarType,
@@ -16,6 +16,9 @@ import {
   loaded,
 } from "./GameActions";
 import { navigate, navigateBack } from "./Card";
+
+// Re-evaluate layout-dependent tutorial gates even while the simulation is paused.
+export const layoutChanged = createAction("ui/layoutChanged");
 
 export const initialUI: UIType = {
   dialog: {

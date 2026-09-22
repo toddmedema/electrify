@@ -10,7 +10,7 @@ import UnitsProvider from "./components/base/UnitsContext";
 import { navigate, navigateBack } from "./reducers/Card";
 import { pageHidden, pageVisible } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
-import { snackbarOpen } from "./reducers/UI";
+import { layoutChanged, snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
@@ -233,6 +233,10 @@ export default function App() {
       store.dispatch(pageHidden());
     };
     window.addEventListener("pagehide", onPageHide, false);
+    // A bfcache restore can pair pageshow with pagehide without visibilitychange.
+    window.addEventListener("pageshow", onVisibilityChange, false);
+    const onResize = () => store.dispatch(layoutChanged());
+    window.addEventListener("resize", onResize);
 
     // Registered here rather than next to the store because the tutorial lookup needs the
     // scenarios, and reducers/Game already reaches back into SaveGame -- App sits above both, so
@@ -283,6 +287,8 @@ export default function App() {
         false,
       );
       window.removeEventListener("pagehide", onPageHide, false);
+      window.removeEventListener("pageshow", onVisibilityChange, false);
+      window.removeEventListener("resize", onResize);
       stopAutosave();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);

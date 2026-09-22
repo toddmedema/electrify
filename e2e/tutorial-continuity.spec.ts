@@ -223,3 +223,15 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   await expect(pause).toHaveCount(1);
   await expect(pause).toHaveAttribute("aria-pressed", "true");
 });
+
+test("a paused navigation gate advances when resizing into the pane layout", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startLesson(page, "Pricing");
+  await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator(".tutorialHud")).toContainText(
+    "Drag the rate slider",
+  );
+});

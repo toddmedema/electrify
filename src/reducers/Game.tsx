@@ -236,8 +236,8 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
 let speedBeforeManualHelp: SpeedType | undefined;
-// The page went to the background. Captured like the others so that, nested under a blocking
-// card, the capture is the card's own pause and the card's close is what restores the speed.
+// While hidden, pause owners read and update this foreground speed; the real clock stays
+// paused even if a dialog or card opens or closes before the page returns.
 let speedBeforeHidden: SpeedType | undefined;
 const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
@@ -782,12 +782,26 @@ function ensureTicking(state: GameType) {
   }
 }
 
+// Backgrounding is an outer pause: UI transitions still update the speed to restore,
+// but may never restart the actual clock until the page is visible.
+function foregroundSpeed(state: GameType): SpeedType {
+  return speedBeforeHidden ?? state.speed;
+}
+
+function setForegroundSpeed(state: GameType, speed: SpeedType) {
+  if (speedBeforeHidden !== undefined) {
+    speedBeforeHidden = speed;
+  } else {
+    state.speed = speed;
+  }
+}
+
 // Puts the clock back the way the player left it before a full-screen card paused it
 function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  state.speed = speedBeforeBlockingCard;
+  setForegroundSpeed(state, speedBeforeBlockingCard);
   speedBeforeBlockingCard = undefined;
   ensureTicking(state);
 }
@@ -1234,9 +1248,10 @@ export const gameSlice = createSlice({
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        speedBeforeBlockingCard = state.policyPause?.speed ?? state.speed;
+        speedBeforeBlockingCard =
+          state.policyPause?.speed ?? foregroundSpeed(state);
         delete state.policyPause;
-        state.speed = "PAUSED";
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(navigateBack, (state, action) => {
@@ -1245,21 +1260,17 @@ export const gameSlice = createSlice({
     });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
-        speedBeforeManualHelp = state.speed;
-        state.speed = "PAUSED";
+        speedBeforeManualHelp = foregroundSpeed(state);
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(manualHelpClose, (state) => {
       if (speedBeforeManualHelp !== undefined) {
-        state.speed = speedBeforeManualHelp;
+        setForegroundSpeed(state, speedBeforeManualHelp);
         speedBeforeManualHelp = undefined;
         ensureTicking(state);
       }
     });
-    // The clock should not run in a backgrounded tab: it would burn battery, skip ahead of
-    // the player, and make a returned player find a changed game. The capture follows the
-    // blocking card and manual nesting, so a tab hidden while a catalog is open already
-    // captured PAUSED, stays paused on return, and the catalog's close restores the speed.
     builder.addCase(pageHidden, (state) => {
       if (state.inGame && speedBeforeHidden === undefined) {
         speedBeforeHidden = state.speed;
@@ -1267,30 +1278,18 @@ export const gameSlice = createSlice({
       }
     });
     builder.addCase(pageVisible, (state) => {
-      if (speedBeforeHidden === undefined) {
-        return;
-      }
-      // A full-screen card or the manual owns the pause while they are open, and restores
-      // their own remembered speed on close. Resuming underneath them would let the sim
-      // change the quotes they are being read, so the capture is dropped rather than applied.
-      if (
-        speedBeforeBlockingCard !== undefined ||
-        speedBeforeManualHelp !== undefined
-      ) {
-        speedBeforeHidden = undefined;
-        return;
-      }
+      if (speedBeforeHidden === undefined) return;
       state.speed = speedBeforeHidden;
       speedBeforeHidden = undefined;
       ensureTicking(state);
     });
     builder.addCase(dialogOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(dialogClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
@@ -1310,13 +1309,17 @@ export const gameSlice = createSlice({
     });
     builder.addCase(openPolicyDecision, (state, action) => {
       if (!state.policyPause) {
-        state.policyPause = { token: action.payload, speed: state.speed };
-        state.speed = "PAUSED";
+        state.policyPause = {
+          token: action.payload,
+          speed: foregroundSpeed(state),
+        };
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(closePolicyDecision, (state, action) => {
       if (state.policyPause?.token === action.payload) {
-        if (state.speed === "PAUSED") state.speed = state.policyPause.speed;
+        if (foregroundSpeed(state) === "PAUSED")
+          setForegroundSpeed(state, state.policyPause.speed);
         delete state.policyPause;
         ensureTicking(state);
       }
@@ -1325,11 +1328,11 @@ export const gameSlice = createSlice({
     // resumes at whatever speed the run was going when it ended
     builder.addCase(victoryOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(victoryClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
   },

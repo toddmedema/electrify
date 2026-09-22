@@ -1,7 +1,13 @@
 import gameReducer, { setSpeed } from "./Game";
 import { navigate, navigateBack } from "./Card";
-import { manualHelpOpen, manualHelpClose } from "./UI";
-import { pageHidden, pageVisible, quit } from "./GameActions";
+import { manualHelpOpen, manualHelpClose, dialogOpen, dialogClose } from "./UI";
+import {
+  pageHidden,
+  pageVisible,
+  quit,
+  openPolicyDecision,
+  closePolicyDecision,
+} from "./GameActions";
 import { GameType } from "../Types";
 
 // The remembered speeds live in module-level state shared by every test in this file, so a
@@ -90,8 +96,8 @@ describe("nesting with the pause owners it can sit under", () => {
 
   // The other interleaving: hidden first, then a catalog opened on top. The catalog captures
   // the hidden pause, and returning must not resume underneath it - the sim would change the
-  // quotes being read. The hidden capture is dropped; the catalog's close takes the speed
-  // back to the pause it captured, and the player restarts the clock deliberately.
+  // quotes being read. The catalog's close preserves the speed
+  // from before the page was hidden.
   it("does not resume under a catalog opened while hidden", () => {
     let state = gameReducer(running("NORMAL"), pageHidden());
     expect(state.speed).toBe("PAUSED");
@@ -99,6 +105,52 @@ describe("nesting with the pause owners it can sit under", () => {
     expect(state.speed).toBe("PAUSED");
     const visible = gameReducer(state, pageVisible());
     expect(visible.speed).toBe("PAUSED");
-    expect(gameReducer(visible, navigate("FACILITIES")).speed).toBe("PAUSED");
+    expect(gameReducer(visible, navigate("FACILITIES")).speed).toBe("NORMAL");
   });
+});
+
+describe("pause owners changing while the page is hidden", () => {
+  const owners = [
+    {
+      name: "build catalog",
+      open: () => navigate("BUILD_INTERTIES"),
+      close: () => navigateBack(),
+    },
+    {
+      name: "manual",
+      open: () => manualHelpOpen("Interties"),
+      close: () => manualHelpClose(),
+    },
+    {
+      name: "dialog",
+      open: () =>
+        dialogOpen({ open: true, title: "Review", message: "Review purchase" }),
+      close: () => dialogClose(),
+    },
+    {
+      name: "policy decision",
+      open: () => openPolicyDecision("review"),
+      close: () => closePolicyDecision("review"),
+    },
+  ];
+  it.each(owners)(
+    "keeps the clock frozen when $name closes in the background",
+    ({ open, close }) => {
+      let state = gameReducer(running("FAST"), open());
+      state = gameReducer(state, pageHidden());
+      state = gameReducer(state, close());
+      expect(state.speed).toBe("PAUSED");
+      expect(gameReducer(state, pageVisible()).speed).toBe("FAST");
+    },
+  );
+  it.each(owners)(
+    "preserves the original speed when $name opens in the background",
+    ({ open, close }) => {
+      let state = gameReducer(running("NORMAL"), pageHidden());
+      state = gameReducer(state, open());
+      state = gameReducer(state, pageVisible());
+      expect(state.speed).toBe("PAUSED");
+      expect(gameReducer(state, close()).speed).toBe("NORMAL");
+    },
+  );
 });
