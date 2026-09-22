@@ -1276,9 +1276,7 @@ export default class Insights extends React.Component<Props, State> {
               · target {formatMoneyConcise(targetRate)} · rate score{" "}
               <strong className={rateScoreClass}>
                 {formattedRateScore}/yr
-              </strong>{" "}
-              ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢ below target, weighted
-              by energy sold)
+              </strong>
             </>
           )}
         </Typography>

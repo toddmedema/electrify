@@ -308,12 +308,10 @@ test("a rate below break-even warns immediately and clears when restored", () =>
   expect(selectMissionRisk(restored)?.id).not.toBe("cash-runway");
 });
 
-test("a deficit whose crossing sits beyond the warning horizon stays quiet", () => {
-  const deepPocket = runwayGame(0, 50_000_000);
+test("cash that stays solvent through the scenario end stays quiet", () => {
+  const deepPocket = runwayGame(0, 50_000_000_000);
   const runway = cashRunwayMonths(deepPocket);
-  // It burns, just not fast enough to matter within a year; or so slowly that the horizon
-  // ends first, which reads as the same quiet warning
-  expect(runway === undefined || runway > 12).toBe(true);
+  expect(runway).toBeUndefined();
   expect(selectMissionRisk(deepPocket)?.id).not.toBe("cash-runway");
 });
 
@@ -404,3 +402,44 @@ test("real immutable tick profiling samples cache invalidation without simulatio
   // At most a rollover or two in a day of ticks
   expect(rebuildCount).toBeLessThanOrEqual(2);
 });
+
+test.each([
+  [0, 36, 13, true],
+  [0, 36, 36, true],
+  [0, 36, 37, false],
+  [34, 36, 2, true],
+  [34, 36, 3, false],
+  [36, 36, 2, false],
+  [0, undefined, 12, true],
+  [0, undefined, 13, false],
+])(
+  "cash warning at elapsed %i, duration %s, crossing %i: %s",
+  (elapsed, duration, crossing, warns) => {
+    const game = createNextState(fixture(elapsed), (draft) => {
+      draft.scenarioId = CUSTOM_SCENARIO_ID;
+      draft.customScenario =
+        duration === undefined
+          ? undefined
+          : { ...wildfire, durationMonths: duration };
+    });
+    const generate = jest
+      .spyOn(GameModule, "generateNewTimeline")
+      .mockImplementation((_game, _cash, _customers, ticks = 0, step = 60) =>
+        Array.from({ length: ticks }, (_, i) =>
+          Object.assign({}, game.timeline[0], {
+            minute: game.date.minute + i * step,
+            cash:
+              Math.floor((i * step) / MINUTES_PER_MONTH) + 1 >= crossing
+                ? -1
+                : 100,
+          }),
+        ),
+      );
+    try {
+      expect(cashRunwayMonths(game)).toBe(warns ? crossing : undefined);
+      expect(selectMissionRisk(game)?.id === "cash-runway").toBe(warns);
+    } finally {
+      generate.mockRestore();
+    }
+  },
+);

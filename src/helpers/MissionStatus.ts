@@ -241,9 +241,6 @@ export function projectedShortfall(
   return result;
 }
 
-// Warn about insolvency this far ahead. A projection that stays solvent to the horizon is quiet.
-const CASH_RUNWAY_WARNING_MONTHS = 12;
-
 /**
  * Whole months until the projected cash first falls below zero; undefined when it never does.
  *
@@ -267,8 +264,8 @@ export function cashRunwayMonths(game: GameType): number | undefined {
     getTimeFromTimeline(game.date.minute, projection.cashBaseline)?.cash ??
     projection.startingCash;
   const anchor = now.cash - expectedCash;
-  for (let i = 0; i < projection.financeProjected.length; i++) {
-    if (projection.financeProjected[i].cash + anchor < 0) {
+  for (let i = 0; i < projection.cashProjected.length; i++) {
+    if (projection.cashProjected[i].cash + anchor < 0) {
       return i + 1;
     }
   }
@@ -313,11 +310,7 @@ export function selectMissionRisk(
       target: "mission-details",
     };
   const runway = cashRunwayMonths(game);
-  if (
-    runway !== undefined &&
-    runway <= CASH_RUNWAY_WARNING_MONTHS &&
-    runway < mission.monthsRemaining
-  ) {
+  if (runway !== undefined) {
     const months = Math.max(1, Math.round(runway));
     return {
       id: "cash-runway",

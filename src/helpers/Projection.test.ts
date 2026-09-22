@@ -3,6 +3,7 @@ import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import reducer, { generateNewTimeline } from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DATA_CENTER_DECISION_KEY } from "../data/ScenarioChoices";
 import { WILDFIRE_DECISION_KEY } from "../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
@@ -84,3 +85,17 @@ it.each([
     );
   },
 );
+
+it("covers a long custom term without extending the chart window", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  game.scenarioId = CUSTOM_SCENARIO_ID;
+  game.customScenario = {
+    ...SCENARIOS.find((scenario) => scenario.id === 111)!,
+    durationMonths: 480,
+  };
+  const projection = selectProjection(game, game.timeline[0]);
+  expect(projection.cashProjected).toHaveLength(480);
+  expect(projection.financeProjected).toHaveLength(240);
+  expect(projection.forecast).toHaveLength(20 * 12 * 24);
+  expect(projection.domain.x[1]).toBe(20 * 12 * MINUTES_PER_MONTH);
+});
