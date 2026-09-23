@@ -58,6 +58,7 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "beginIntertieStress",
   "chooseScenarioResponse",
   "schedulePolicy",
   "cancelPolicy",
@@ -210,6 +211,8 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       action.type === "chooseScenarioResponse" &&
       !validScenarioResponse(action.payload)
     )
+      return null;
+    if (action.type === "beginIntertieStress" && action.payload !== null)
       return null;
     if (action.type === "buildFacility" && !validBuildFacility(action.payload))
       return null;

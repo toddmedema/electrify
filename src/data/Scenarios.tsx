@@ -1,3 +1,4 @@
+import { beginIntertieStress } from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
@@ -966,6 +967,53 @@ export const SCENARIOS = [
             "You bought power at night and sold extra solar by day, while keeping your own grid safe.",
           failureMessage:
             "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
+        },
+      },
+      {
+        card: "FACILITIES",
+        action: "Prepare for a regional shortage",
+        nextLabel: "Inspect shortage safely",
+        onNext: () => beginIntertieStress(),
+        content: (
+          <TutorialPrompt text="Your neighbor will have only 150 MW to spare before seasonal limits. The clock stays paused while you inspect the shortage and restore backup." />
+        ),
+        hint: "This practice starts only when you continue. Your existing gas plant can cover the gap; no new construction is needed.",
+      },
+      {
+        card: "FACILITIES",
+        target: ".transmissionLine",
+        action: "Inspect the neighbor supply limit",
+        content: (
+          <TutorialPrompt text="The wire is still rated at 500 MW, but a wider wire cannot create power in the neighboring grid. Open the intertie to compare its line rating with available imports." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        action: "Restore your gas backup",
+        advanceOn: (s: AppStateType) =>
+          s.game.facilities.some(
+            (f) => "fuel" in f && f.fuel === "Natural Gas" && !f.paused,
+          ),
+        content: (
+          <TutorialPrompt text="Open the gas plant and resume it before running time. Keep Solar on too." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        action: "Supply a full month with limited imports",
+        content: (
+          <TutorialPrompt text="Run time to prove your local fleet and limited imports can serve the grid together." />
+        ),
+        hint: "The clock pauses after one continuously supplied month. Normal neighboring supply then returns.",
+        capstone: {
+          preserveProgress: true,
+          success: (s: AppStateType) =>
+            s.game.tutorialIntertieStress?.completed === true,
+          successMessage:
+            "You kept demand supplied through a regional shortage. The neighbor’s normal supply is restored; imports work best with a prepared local fleet.",
+          failureMessage:
+            "Keep local backup and Solar available, then run a full supplied month.",
         },
       },
     ],

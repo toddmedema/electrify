@@ -4,8 +4,8 @@
  * gameplay abstractions of the researched market descriptions, not hourly historical reconstructions.
  *
  * Monthly shapes are written for the northern hemisphere and shift six months for southern cities.
- * Availability is a share of the line's weather-adjusted rating the neighbour can fill; the market's
- * absolute `availableSupplyW` still caps it.
+ * Availability is a share of the utility's independent neighboring supply allocation. The line's
+ * weather-adjusted rating separately limits delivery; wider wires cannot create supply.
  */
 
 export type IntertieArchetypeIdType =
@@ -24,7 +24,7 @@ export interface IntertieArchetypeType {
   label: string;
   /** One plain sentence: when this neighbour helps and when it does not */
   summary: string;
-  /** Jan..Dec (northern hemisphere), 0..1 share of the line the neighbour can typically fill */
+  /** Jan..Dec (northern hemisphere), 0..1 share of allocated neighboring supply typically available */
   monthlyAvailability: readonly number[];
   /** Hour 0..23, multiplies the monthly share */
   hourlyAvailability: readonly number[];

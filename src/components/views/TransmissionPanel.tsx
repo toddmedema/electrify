@@ -1,3 +1,14 @@
+import { getScenario } from "../../data/Scenarios";
+import {
+  accessContextForGame,
+  corridorsForGame,
+  effectiveMarket,
+  IntertieAccessContext,
+} from "../../data/IntertieAccess";
+import {
+  intertiePortfolioOutlook,
+  intertieForecastKey,
+} from "../../helpers/IntertiePortfolio";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
@@ -34,7 +45,7 @@ import {
 } from "../../Constants";
 import {
   adjacentMarketForCorridor,
-  corridorsForLocation,
+  corridorById,
 } from "../../data/AdjacentMarkets";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
@@ -52,6 +63,7 @@ import {
   intertieUpgradeQuote,
   intertieImportLimitW,
   transmissionRatingW,
+  neighborImportSupplyW,
 } from "../../helpers/Transmission";
 import {
   intertieOutlook,
@@ -104,9 +116,9 @@ const OUTLOOK_STEP_MINUTES = 60;
 const OUTLOOK_YEARS = 2;
 
 /**
- * A two-year hourly forecast for the intertie outlooks, rebuilt once per game year rather than on
- * every tick: the typical year it feeds barely moves month to month, and the fleet list stays
- * mounted while the game runs. Undefined while disabled or before the first tick exists.
+ * A two-year hourly forecast, refreshed each month and whenever a portfolio, policy or story
+ * decision changes its inputs. Excludes unfinished assets; the comparison assumes the candidate
+ * is already open. Undefined while disabled or before the first tick exists.
  */
 function useIntertieForecast(
   game: GameType,
@@ -117,14 +129,25 @@ function useIntertieForecast(
     timeline?: TickPresentFutureType[];
   }>();
   if (!enabled) return undefined;
-  const key = [game.date.year, game.location.id, game.seed].join("|");
+  const key = intertieForecastKey(game);
   if (cache.current?.key !== key) {
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
     cache.current = {
       key,
       timeline: now
         ? generateNewTimeline(
-            game,
+            {
+              ...game,
+              facilities: game.facilities.filter(
+                (f) => f.yearsToBuildLeft <= 0,
+              ),
+              transmission: {
+                tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
+                lines: (game.transmission?.lines || [])
+                  .filter((l) => l.yearsToBuildLeft <= 0)
+                  .map((l) => ({ ...l, upgrade: undefined })),
+              },
+            },
             now.cash,
             now.customers,
             (TICKS_PER_YEAR * OUTLOOK_YEARS * TICK_MINUTES) /
@@ -193,6 +216,7 @@ function IntertieBuildItem(props: {
   readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
+  renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
   const [expanded, setExpanded] = React.useState(false);
@@ -263,7 +287,10 @@ function IntertieBuildItem(props: {
         </Typography>
       )}
       <Box className="buildOptionMetrics">
-        <BuildMetric label="Capacity" value={formatWatts(corridor.capacityW)} />
+        <BuildMetric
+          label="Your access"
+          value={formatWatts(corridor.capacityW)}
+        />
         <BuildMetric
           label="Build time"
           value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
@@ -315,6 +342,19 @@ function IntertieBuildItem(props: {
         </Button>
       </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 1 }}
+          component="div"
+        >
+          Your access {formatWatts(corridor.capacityW)} of a{" "}
+          {formatWatts(
+            corridorById(corridor.id)?.capacityW || corridor.capacityW,
+          )}{" "}
+          regional corridor.
+        </Typography>
+        {expanded && props.renderPortfolio()}
         {market && (
           <Typography
             className="buildOptionDescription"
@@ -354,8 +394,18 @@ function IntertieUpgradeControl(props: {
   units: UnitSystemType;
   readOnly?: boolean;
   onUpgrade: (corridorId: string, financed: boolean) => void;
+  context: IntertieAccessContext;
 }): React.JSX.Element | null {
-  const { line, cash, year, interestRate, units, readOnly, onUpgrade } = props;
+  const {
+    line,
+    cash,
+    year,
+    interestRate,
+    units,
+    readOnly,
+    onUpgrade,
+    context,
+  } = props;
   const [reviewing, setReviewing] = React.useState(false);
   const titleId = React.useId();
   if (line.upgrade) {
@@ -371,10 +421,11 @@ function IntertieUpgradeControl(props: {
       </Typography>
     );
   }
-  const quote = intertieUpgradeQuote(line, year);
+  const quote = intertieUpgradeQuote(line, year, 1, 1, context);
   if (!quote) {
     // Say which ceiling was reached. "No further upgrades" on its own reads as a bug.
-    const atStepLimit = intertieUpgradeCount(line) >= MAX_INTERTIE_UPGRADES;
+    const atStepLimit =
+      intertieUpgradeCount(line, context) >= MAX_INTERTIE_UPGRADES;
     return (
       <Typography variant="body2" color="textSecondary">
         {atStepLimit
@@ -399,6 +450,29 @@ function IntertieUpgradeControl(props: {
         {formatMoneyConcise(quote.buildCost)} · {months} mo ·{" "}
         {formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)}{" "}
         {largeMassUnit(units)} CO2e to build
+      </Typography>
+      <Typography variant="body2" color="textSecondary">
+        Neighbor supply ceiling{" "}
+        {formatWatts(
+          effectiveMarket(line.corridorId, context)?.availableSupplyW || 0,
+        )}
+        . Extra import room before weather and seasonal limits:{" "}
+        {formatWatts(
+          Math.max(
+            0,
+            Math.min(
+              quote.targetCapacityW,
+              effectiveMarket(line.corridorId, context)?.availableSupplyW || 0,
+            ) -
+              Math.min(
+                line.capacityW,
+                effectiveMarket(line.corridorId, context)?.availableSupplyW ||
+                  0,
+              ),
+          ),
+        )}
+        . Wider wires do not increase the neighbor’s spare supply or export
+        budget.
       </Typography>
       {!affordable && (
         <Typography variant="caption" color="textSecondary" component="div">
@@ -445,7 +519,7 @@ function IntertieUpgradeControl(props: {
                 },
                 {
                   concept: "finances",
-                  label: "Loan option",
+                  label: "Loan",
                   value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(getMonthlyPayment(line.loanAmountLeft + quote.buildCost - downpayment, interestRate, LOAN_MONTHS))}/mo`,
                   detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(interestRate * 100).toFixed(2)}%.${line.loanAmountLeft > 0 ? ` Includes refinancing the existing ${formatMoneyConcise(line.loanAmountLeft)} balance at this rate and term.` : ""}`,
                 },
@@ -570,7 +644,7 @@ export default function TransmissionPanel({
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
-  const availableCorridors = corridorsForLocation(game.location);
+  const availableCorridors = corridorsForGame(game);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readOnly = !!game.replayPlayback;
   const intertieContext = intertieContextForGame(game);
@@ -603,8 +677,6 @@ export default function TransmissionPanel({
   const review = unbuiltCorridors.find(({ id }) => id === reviewId);
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
   const reviewDownpayment = (review?.buildCost || 0) * DOWNPAYMENT_PERCENT;
-  const reviewOutlook = review && outlookFor(review.id);
-  const reviewPeriods = reviewOutlook && pricePeriodCaption(reviewOutlook);
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed);
@@ -784,10 +856,54 @@ export default function TransmissionPanel({
                         )}
                       </dl>
                     )}
+                    {!building && now && (
+                      <Typography variant="body2" color="textSecondary">
+                        Limiting factor:{" "}
+                        {state.tradingPolicy === "CLOSED" ||
+                        (state.tradingPolicy === "SURPLUS_ONLY" && flowW >= 0)
+                          ? "trading rule"
+                          : flowW < 0
+                            ? Math.abs(flowW) >=
+                              (effectiveMarket(line.corridorId, intertieContext)
+                                ?.availableDemandW || 0) -
+                                1
+                              ? "neighbor export demand"
+                              : Math.abs(flowW) >= rating - 1
+                                ? "own line rating"
+                                : "local surplus"
+                            : Math.abs(flowW) < importableW - 1
+                              ? "local need / trading rule"
+                              : neighborImportSupplyW(
+                                    line.corridorId,
+                                    intertieContext,
+                                    now.minute,
+                                    now,
+                                  ) < rating
+                                ? "neighbor spare supply"
+                                : "own line rating"}
+                        . Line rating {formatWatts(rating)}; neighbor spare
+                        supply{" "}
+                        {formatWatts(
+                          neighborImportSupplyW(
+                            line.corridorId,
+                            intertieContext,
+                            now.minute,
+                            now,
+                          ),
+                        )}
+                        ; neighbor export demand{" "}
+                        {formatWatts(
+                          effectiveMarket(line.corridorId, intertieContext)
+                            ?.availableDemandW || 0,
+                        )}
+                        .
+                      </Typography>
+                    )}
                     {outlook && <IntertieYear outlook={outlook} />}
                     {!building && (
                       <IntertieUpgradeControl
                         line={line}
+                        context={accessContextForGame(game)}
                         cash={now?.cash}
                         year={game.date.year}
                         interestRate={game.interestRate}
@@ -831,6 +947,60 @@ export default function TransmissionPanel({
                 outlook={outlookFor(corridor.id)}
                 readOnly={readOnly}
                 units={units}
+                renderPortfolio={() => {
+                  const portfolio =
+                    forecast &&
+                    intertiePortfolioOutlook(
+                      game,
+                      corridor.id,
+                      forecast,
+                      OUTLOOK_STEP_MINUTES,
+                    );
+                  return portfolio ? (
+                    <Box className="buildOptionDetailBody">
+                      <Typography variant="subtitle2">
+                        Portfolio outlook
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Next-year demand, current fleet and trading rule.
+                        Assumes this connection is open; excludes unfinished
+                        assets and upgrades.
+                      </Typography>
+                      <dl className="transmissionMetrics">
+                        <div>
+                          <dt>Shortfall covered</dt>
+                          <dd>{percent(portfolio.shortfallCoverage)}</dd>
+                          <dd className="transmissionMetricNote">
+                            Adds {percent(portfolio.marginalCoverage)} with this
+                            connection
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Largest remaining gap</dt>
+                          <dd>{formatWatts(portfolio.worstGapW)}</dd>
+                        </div>
+                        <div>
+                          <dt>Electricity purchases / year</dt>
+                          <dd>
+                            {formatMoneyConcise(portfolio.annualEnergyCost)}
+                          </dd>
+                          <dd className="transmissionMetricNote">
+                            Change{" "}
+                            {formatMoneyConcise(portfolio.additionalEnergyCost)}
+                            ; excludes upkeep and financing
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Gap with half the spare supply</dt>
+                          <dd>{formatWatts(portfolio.stressGapW)}</dd>
+                          <dd className="transmissionMetricNote">
+                            Illustration, not a forecast
+                          </dd>
+                        </div>
+                      </dl>
+                    </Box>
+                  ) : null;
+                }}
                 onReview={() => setReviewId(corridor.id)}
               />
             ))}
@@ -855,54 +1025,37 @@ export default function TransmissionPanel({
             Build {reviewMarket?.name} intertie?
           </ClosableDialogTitle>
           <DialogContent className="noPadding">
+            <Box sx={{ px: 2, pb: 1 }}>
+              <Typography variant="body2">
+                {formatWatts(review.capacityW)} access · Ready in{" "}
+                {Math.round(review.yearsToBuild * 12)} months
+              </Typography>
+              {game.date.monthsElapsed + review.yearsToBuild * 12 >=
+                (getScenario(game.scenarioId, game.customScenario)
+                  ?.durationMonths ?? Infinity) && (
+                <Typography variant="body2" color="warning.main">
+                  Won’t open before this mission ends.
+                </Typography>
+              )}
+            </Box>
             <DecisionImpactPreview
               facts={[
                 {
                   concept: "money",
-                  label: "Cash purchase",
-                  value: `${formatMoneyConcise(now?.cash || 0)} → ${formatMoneyConcise((now?.cash || 0) - review.buildCost)}`,
+                  label: "Cash",
+                  value: `${formatMoneyConcise(review.buildCost)} · ${formatMoneyConcise((now?.cash || 0) - review.buildCost)} left`,
                 },
                 {
                   concept: "finances",
-                  label: "Loan option",
+                  label: "Loan",
                   value: `${formatMoneyConcise(reviewDownpayment)} now + ${formatMoneyConcise(getMonthlyPayment(review.buildCost - reviewDownpayment, game.interestRate, LOAN_MONTHS))}/mo`,
-                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(game.interestRate * 100).toFixed(2)}%.`,
+                  detail: `${LOAN_MONTHS / 12} years at ${(game.interestRate * 100).toFixed(2)}%; payments start now.`,
                 },
                 {
                   concept: "money",
-                  label: "Estimated upkeep",
-                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo`,
-                  detail: "Electricity purchases and loan payments are extra.",
+                  label: "Upkeep",
+                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo + power purchases`,
                 },
-                {
-                  concept: "time",
-                  label: "Online in",
-                  value: `${Math.round(review.yearsToBuild * 12)} months`,
-                },
-                {
-                  concept: "supply",
-                  label: "Connection capacity",
-                  value: formatWatts(review.capacityW),
-                  detail: reviewOutlook
-                    ? undefined
-                    : "Imports depend on neighboring supply and line conditions; backup is not guaranteed.",
-                },
-                ...(reviewOutlook
-                  ? [
-                      {
-                        concept: "supply" as const,
-                        label: "Import room",
-                        value: `~${percent(reviewOutlook.atPeak)} at your peak`,
-                        detail: `Typically ${percent(reviewOutlook.mean)} of the line; least in ${MONTH_NAMES[reviewOutlook.lowMonth]} (${percent(reviewOutlook.monthly[reviewOutlook.lowMonth])}). ${reviewMarket?.description ?? ""}`,
-                      },
-                      {
-                        concept: "money" as const,
-                        label: "Neighbor price",
-                        value: priceRange(reviewOutlook),
-                        detail: `${reviewPeriods ? reviewPeriods + ". " : ""}Imports come from your cheapest connected neighbor first.`,
-                      },
-                    ]
-                  : []),
               ]}
             />
           </DialogContent>

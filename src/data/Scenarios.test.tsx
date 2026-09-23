@@ -122,13 +122,15 @@ describe("tutorial mission metadata", () => {
     ).toBe(true);
   });
 
-  it("gives every mission one deterministic unguided capstone", () => {
+  it("gives every mission deterministic unguided proof points", () => {
     TUTORIALS.forEach((tutorial) => {
       expect(tutorial.seed).toEqual(expect.any(Number));
       const capstones = tutorial.tutorialSteps!.filter((step) => step.capstone);
-      expect(capstones).toHaveLength(1);
-      expect(capstones[0].target).toBeUndefined();
-      expect(capstones[0].hint).toBeTruthy();
+      expect(capstones).toHaveLength(tutorial.id === 112 ? 2 : 1);
+      capstones.forEach((step) => {
+        expect(step.target).toBeUndefined();
+        expect(step.hint).toBeTruthy();
+      });
     });
   });
   it("authors the Interties mission as a fixed two-plant California lesson", () => {
@@ -144,7 +146,7 @@ describe("tutorial mission metadata", () => {
       expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
       expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(15);
+    expect(interties.tutorialSteps).toHaveLength(19);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {

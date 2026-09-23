@@ -1,3 +1,4 @@
+import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
 
@@ -154,6 +155,7 @@ for (const theme of ["light", "dark"] as const) {
       await detailReview.click();
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");
+      await expectContinuousDialogSurface(dialog);
       const title = dialog.locator(".closableDialogTitleText");
       const close = dialog.getByRole("button", { name: "close", exact: true });
       const titleBox = (await title.boundingBox())!;

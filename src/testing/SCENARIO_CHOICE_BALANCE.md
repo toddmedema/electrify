@@ -1,5 +1,11 @@
 # Major scenario choice balance QA
 
+**Historical results:** the cash table and Wildfire keep-cash comparison below predate the
+scenario-sized intertie calibration. See the [current intertie balance report](../../docs/intertie-balance.md)
+for measured results and the updated reference plans. The researched choice costs are unchanged,
+including $200k for wildfire preparedness. Preparedness is now worthwhile in the CEO plan with
+smaller import access; the earlier $44.6M balances and keep-cash preference are not current results.
+
 See the [cost research report](SCENARIO_CHOICE_RESEARCH.md) for sources, monetary
 normalization, and uncertainty behind the final amounts.
 

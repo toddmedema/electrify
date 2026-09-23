@@ -714,7 +714,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Interties connect neighboring grids. Your trading rule buys during
           shortages and sells surplus after serving customers and charging
-          storage.
+          storage. Your utility buys access to a limited share of a regional
+          connection, not the entire neighboring grid. A wider wire cannot
+          create more neighboring generation; multiple paths share the same
+          neighbor’s spare supply and export demand.
         </p>
         <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s
@@ -732,7 +735,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Imports come from the cheapest available neighbor first, and exports
           go to the best-paying one. Hot, sunny weather can also reduce line
           capacity. Check construction time, loan payments and upkeep before
-          relying on imports.
+          relying on imports. The purchase review compares the candidate with
+          your existing connections and operating fleet against next-year
+          demand: how much shortfall energy it covers, the worst remaining gap,
+          and the annual electricity bill. This comparison assumes the new line
+          is open; it does not bring construction forward or include unfinished
+          plants. Its regional-stress example is an illustration, not a
+          predicted event. Live line details identify whether your wire, the
+          neighbor, or your own demand and trading rule limits actual flow.
         </p>
         <p>
           Purchased electricity adds estimated emissions to your score. Each

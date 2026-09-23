@@ -12,11 +12,12 @@ import {
   StorageOperatingType,
   TickPresentFutureType,
 } from "../Types";
-import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
+import { effectiveMarket } from "../data/IntertieAccess";
 import {
-  importAvailabilityFraction,
+  allocateIntertieFlows,
+  neighborImportSupplyW,
+  intertieImportLimitW,
   intertieContextForGame,
-  transmissionRatingW,
 } from "../helpers/Transmission";
 
 type TickFieldType = keyof TickPresentFutureType;
@@ -534,29 +535,78 @@ function checkTrade(
       `exported ${exportedW}W, export revenue ${now.revenueExports}`,
     );
   }
+  if (state.transmission && now.temperatureC !== undefined) {
+    const context = intertieContextForGame(state);
+    const conditions = {
+      temperatureC: now.temperatureC,
+      solarIrradianceWM2: now.solarIrradianceWM2 || 0,
+    };
+    const markets = new Map<
+      string,
+      { imported: number; exported: number; supply: number; demand: number }
+    >();
+    for (const line of state.transmission.lines.filter(
+      (l) => l.yearsToBuildLeft <= 0,
+    )) {
+      const market = effectiveMarket(line.corridorId, context);
+      if (!market) continue;
+      const entry = markets.get(market.id) || {
+        imported: 0,
+        exported: 0,
+        supply: neighborImportSupplyW(
+          line.corridorId,
+          context,
+          now.minute,
+          conditions,
+        ),
+        demand: market.availableDemandW,
+      };
+      entry.imported += Math.max(0, line.currentFlowW || 0);
+      entry.exported += Math.max(0, -(line.currentFlowW || 0));
+      markets.set(market.id, entry);
+    }
+    for (const [id, market] of markets) {
+      if (
+        market.imported > market.supply * (1 + RELATIVE_TOLERANCE) + 1 ||
+        market.exported > market.demand * (1 + RELATIVE_TOLERANCE) + 1
+      )
+        collector.add(
+          "each neighboring market has one shared trade budget",
+          when,
+          `${id}: imports ${market.imported}/${market.supply}W, exports ${market.exported}/${market.demand}W`,
+        );
+    }
+  }
   if (importedW > 0 && state.transmission && now.temperatureC !== undefined) {
     const context = intertieContextForGame(state);
     const conditions = {
       temperatureC: now.temperatureC,
       solarIrradianceWM2: now.solarIrradianceWM2 || 0,
     };
-    const neighbourLimitW = state.transmission.lines
+    const offers = state.transmission.lines
       .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
-      .reduce(
-        (sum, line) =>
-          sum +
-          Math.min(
-            transmissionRatingW(line, conditions) *
-              importAvailabilityFraction(
-                line.corridorId,
-                context,
-                now.minute,
-                conditions,
-              ),
-            adjacentMarketForCorridor(line.corridorId)?.availableSupplyW || 0,
-          ),
-        0,
-      );
+      .map((line) => ({
+        marketId: effectiveMarket(line.corridorId, context)?.id,
+        marketImportLimitW: neighborImportSupplyW(
+          line.corridorId,
+          context,
+          now.minute,
+          conditions,
+        ),
+        importLimitW: intertieImportLimitW(
+          line,
+          context,
+          now.minute,
+          conditions,
+        ),
+        exportLimitW: 0,
+        pricePerMWh: 0,
+      }));
+    const neighbourLimitW = allocateIntertieFlows(
+      offers,
+      Infinity,
+      0,
+    ).importedW.reduce((sum, w) => sum + w, 0);
     if (importedW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
       collector.add(
         "imports stay within what neighbours can spare",

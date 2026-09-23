@@ -310,6 +310,7 @@ export interface ScoreType {
 // The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
 // prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
 export type ReplayActionNameType =
+  | "beginIntertieStress"
   | "chooseScenarioResponse"
   | "schedulePolicy"
   | "cancelPolicy"
@@ -1086,6 +1087,12 @@ export interface GameType {
   interestRate: number;
   creditPremium: number;
   tutorialStep: number;
+  tutorialIntertieStress?: {
+    active: boolean;
+    startsMinute: number;
+    suppliedTicks: number;
+    completed: boolean;
+  };
   date: DateType;
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast

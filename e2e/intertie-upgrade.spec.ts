@@ -1,3 +1,4 @@
+import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -61,6 +62,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await review.click();
     const dialog = page.getByRole("dialog");
+    await expectContinuousDialogSurface(dialog);
     await expect(dialog).toContainText("Includes refinancing the existing");
     await expect(dialog).toContainText("Construction emits");
     await expect(dialog).toContainText("Upkeep after upgrade");
@@ -97,8 +99,8 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(line).toContainText("Upgrading to 0.75GW");
-    await expect(line).toContainText("keeps carrying 0.5GW");
+    await expect(line).toContainText("Upgrading to 225MW");
+    await expect(line).toContainText("keeps carrying 150MW");
     // Exercise the actual autosave and resume path while the upgrade is in progress.
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
     await page.goto("/");
@@ -107,18 +109,18 @@ for (const theme of ["light", "dark"] as const) {
     await line
       .getByRole("button", { name: "Inspect Northern intertie" })
       .click();
-    await expect(line).toContainText("Upgrading to 0.75GW");
+    await expect(line).toContainText("Upgrading to 225MW");
     await speed("fast speed").click();
     await expect(line).not.toContainText("Upgrading to", { timeout: 45000 });
     await speed("pause").click();
     // The collapsed reading uses the weather-dependent operating rating, not nameplate
     // capacity. Verify the purchased nameplate in the expanded details instead.
     await expect(line.locator(".transmissionLineDetails")).toContainText(
-      "0.75GW rated capacity",
+      "225MW rated capacity",
     );
     await expect(
       line.getByRole("button", {
-        name: "Upgrade Northern intertie to 1.13GW",
+        name: "Upgrade Northern intertie to 338MW",
       }),
     ).toBeVisible();
     expect(
