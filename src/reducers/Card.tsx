@@ -29,15 +29,22 @@ export const cardSlice = createSlice({
   name: "card",
   initialState: initialCard,
   reducers: {
-    navigate: (state, action: PayloadAction<string | NavigateActionType>) => {
-      let a = action.payload;
-      if (typeof a === "string" || a == null) {
-        a = { name: a } as NavigateActionType;
-      }
+    navigate: (
+      state,
+      action: PayloadAction<CardNameType | NavigateActionType>,
+    ) => {
+      const a =
+        typeof action.payload === "string"
+          ? { name: action.payload }
+          : action.payload;
+      const now = Date.now();
       if (
         !a.replaceCurrentCard &&
         a.name === state.name &&
-        Date.now() - state.ts < NAVIGATION_DEBOUNCE_MS
+        a.entry === state.entry &&
+        JSON.stringify(a.storyTarget) === JSON.stringify(state.storyTarget) &&
+        a.url === state.url &&
+        now - state.ts < NAVIGATION_DEBOUNCE_MS
       ) {
         return state;
       }
@@ -49,6 +56,8 @@ export const cardSlice = createSlice({
       return {
         ...state,
         name: a.name,
+        ts: now,
+        url: a.url,
         // Cleared rather than carried over, so a plain visit to the manual doesn't reopen
         // whichever entry the last deep link pointed at
         entry: a.entry,

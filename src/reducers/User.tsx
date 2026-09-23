@@ -241,19 +241,19 @@ export const logout = createAsyncThunk("user/logout", async () => {
  * firing network calls out of a reducer is what made that impossible.
  */
 export const submitHighscore = createAsyncThunk<
-  { scenarioId: number; best?: BestScoreType },
+  { uid?: string; scenarioId: number; best?: BestScoreType },
   HighscoreSubmissionType,
   { state: UserSliceStateType }
 >("user/submitHighscore", async (submission, { getState }) => {
   const { uid, displayName, bests } = getState().user;
   if (!uid) {
-    return { scenarioId: submission.scenarioId };
+    return { uid, scenarioId: submission.scenarioId };
   }
   await submitScore(uid, displayName, submission);
 
   const previous = (bests || {})[String(submission.scenarioId)];
   if (previous && previous.score >= submission.score) {
-    return { scenarioId: submission.scenarioId };
+    return { uid, scenarioId: submission.scenarioId };
   }
   const best: BestScoreType = {
     score: submission.score,
@@ -261,7 +261,7 @@ export const submitHighscore = createAsyncThunk<
     date: Date.now(),
   };
   await saveBest(uid, submission.scenarioId, best);
-  return { scenarioId: submission.scenarioId, best };
+  return { uid, scenarioId: submission.scenarioId, best };
 });
 
 export const userSlice = createSlice({
@@ -269,7 +269,10 @@ export const userSlice = createSlice({
   initialState: initialUser,
   reducers: {
     delta: (state, action: PayloadAction<Partial<UserType>>) => {
-      return { ...state, ...action.payload };
+      return state.uid !== action.payload.uid &&
+        action.payload.uid !== undefined
+        ? { ...initialUser, ...action.payload }
+        : { ...state, ...action.payload };
     },
     // Everything about the signed-in player, gone. Dispatched when auth reports nobody is signed
     // in, so that one player's name and bests can't survive into the next player's session
@@ -279,7 +282,23 @@ export const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(loadProfile.pending, (state, action) => {
+        if (state.uid === action.meta.arg.uid)
+          state.profileRequestId = action.meta.requestId;
+      })
+      .addCase(saveDisplayName.pending, (state, action) => {
+        state.nameRequestId = action.meta.requestId;
+      })
+      .addCase(logout.pending, (state, action) => {
+        state.logoutRequestId = action.meta.requestId;
+      })
       .addCase(loadProfile.fulfilled, (state, action) => {
+        if (
+          state.uid !== action.meta.arg.uid ||
+          state.profileRequestId !== action.meta.requestId
+        )
+          return;
+        delete state.profileRequestId;
         state.displayName = action.payload.displayName;
         state.bests = action.payload.bests;
         state.profileLoaded = true;
@@ -288,24 +307,45 @@ export const userSlice = createSlice({
         state.needsDisplayName = !action.payload.displayName;
       })
       .addCase(loadProfile.rejected, (state, action) => {
+        if (
+          state.uid !== action.meta.arg.uid ||
+          state.profileRequestId !== action.meta.requestId
+        )
+          return;
+        delete state.profileRequestId;
         // A profile that can't be read (rules not deployed yet, offline) mustn't block play, and
         // mustn't prompt for a name that couldn't be saved either
         console.warn("Couldn't load your profile: ", action.error.message);
         state.profileLoaded = true;
       })
       .addCase(saveDisplayName.fulfilled, (state, action) => {
+        if (state.nameRequestId !== action.meta.requestId) return;
+        delete state.nameRequestId;
         state.displayName = action.payload;
         state.needsDisplayName = false;
       })
-      .addCase(logout.fulfilled, () => {
+      .addCase(saveDisplayName.rejected, (state, action) => {
+        if (state.nameRequestId === action.meta.requestId)
+          delete state.nameRequestId;
+      })
+      .addCase(logout.fulfilled, (state, action) => {
+        if (state.logoutRequestId !== action.meta.requestId) return;
         return { ...initialUser };
       })
       .addCase(logout.rejected, (state, action) => {
+        if (state.logoutRequestId !== action.meta.requestId) return;
+        delete state.logoutRequestId;
         // Sign-out failed, so the player is still signed in and the state is still accurate
         console.warn("Couldn't log out: ", action.error.message);
       })
       .addCase(submitHighscore.fulfilled, (state, action) => {
-        if (action.payload.best) {
+        if (state.uid !== action.payload.uid) return;
+        if (
+          action.payload.best &&
+          action.payload.best.score >
+            (state.bests?.[String(action.payload.scenarioId)]?.score ??
+              -Infinity)
+        ) {
           state.bests = {
             ...state.bests,
             [String(action.payload.scenarioId)]: action.payload.best,

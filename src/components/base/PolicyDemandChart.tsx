@@ -54,7 +54,7 @@ export default function PolicyDemandChart({
         height: 0,
         legend: { show: false },
         scales: {
-          x: { time: false },
+          x: { time: false, range: [0, 24] },
           y: { range: (_u, _min, max) => [0, max * 1.1] },
         },
         axes: [
@@ -62,6 +62,7 @@ export default function PolicyDemandChart({
             stroke: chartPalette().tickLabel,
             grid: { stroke: chartPalette().grid },
             ticks: { stroke: chartPalette().tick },
+            incrs: [6, 12, 24],
             values: (_u, ticks) => ticks.map((t) => `${t}:00`),
           },
           {

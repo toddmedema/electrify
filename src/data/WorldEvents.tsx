@@ -172,7 +172,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Cheaper gas forecast",
         message:
-          "Local gas prices are expected to fall in January 2010, but cheap gas may not last, so avoid relying on one fuel.",
+          "Gas prices may fall in January 2010. Diversify: cheap gas may not last.",
         concept: "fuel",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -646,7 +646,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 119 },
       describe: () => ({
         title: "Fuel delivery restored",
-        message: "Oil deliveries and prices return to normal after the delay.",
+        message: "Oil deliveries and prices return to normal.",
         concept: "fuel",
         kind: "WORLD_EVENT",
         importance: "ROUTINE",
@@ -1241,7 +1241,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "A hot, dry summer ahead",
         message:
-          "From June through August 2026, heat will raise demand while drought constrains hydro and nuclear output, so add heat-ready generators and stored energy.",
+          "June–August 2026 heat will raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1378,7 +1378,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose whether to fund advance inspections, staged backup equipment and response resources or preserve cash. The game is paused until you select.",
+          "After a dry fall, extreme Santa Ana winds are forecast for January. Fund inspections, backup equipment and response crews, or keep cash. Choose to resume the game.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "CRITICAL",
@@ -1504,7 +1504,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Backup-power review",
         message:
-          "The grid regulator asks whether backup resources could replace the largest generator during a possible reactor shutdown between July 2026 and January 2027.",
+          "The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator?",
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1529,7 +1529,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
         return {
           title: "Grand Nuclear Unit shuts down",
           message:
-            "The grid has suddenly lost its largest generator for the rest of the mission, so backup generators and storage must replace the missing power.",
+            "Your largest generator is offline for the rest of the mission. Replace its power with backup generation and storage.",
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1603,7 +1603,7 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "The maintenance backlog is growing",
         message:
-          "Unplanned breakdowns across the coal fleet are rising and the oldest stations are missing their scheduled outages. Expect less coal output every year from here, and build replacement capacity before the gap opens.",
+          "Coal breakdowns and missed maintenance are rising. Expect less output each year; build replacement capacity before shortages begin.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1691,7 +1691,7 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "A weak rainy season is forecast",
         message:
-          "Forecasters expect El Nino to suppress the rains over the Zambezi catchment. Inflow to the reservoir will fall through 2015 and 2016, and almost every megawatt you own depends on it.",
+          "El Nino is forecast to reduce Zambezi rainfall and reservoir inflow through 2015 and 2016. Nearly all your generation depends on this water.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1790,7 +1790,7 @@ const DELHI_SUMMER_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "A hotter summer than the last",
         message:
-          "Each pre-monsoon season is peaking higher than the one before, and the heat that drives the peak also takes output away from the coal and gas plants meeting it. Build for the peak, not the average.",
+          "Pre-monsoon demand peaks rise each year as heat cuts coal and gas output. Build for the peak, not the average.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",

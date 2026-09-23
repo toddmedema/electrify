@@ -359,8 +359,8 @@ export default function Settings(props: Props): React.JSX.Element {
                 props.loggedIn
                   ? props.displayName
                     ? props.displayName
-                    : "Choose a name to appear with your scores."
-                  : "Sign in to add a public name and score to the leaderboard."
+                    : "Choose a public name for your scores."
+                  : "Sign in to post scores under a public name."
               }
               stackOnMobile
             >
@@ -400,7 +400,7 @@ export default function Settings(props: Props): React.JSX.Element {
               description={
                 props.savedGame
                   ? `Export “${props.savedGame}” to keep or share. Importing replaces your current save.`
-                  : "Start a game to enable export. You can still import a shared save."
+                  : "Start a game to export it, or import a shared save."
               }
               stackOnMobile
             >

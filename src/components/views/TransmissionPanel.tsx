@@ -379,7 +379,7 @@ function IntertieUpgradeControl(props: {
     return (
       <Typography variant="body2" color="textSecondary">
         {atStepLimit
-          ? "This corridor is full. Its towers and substations cannot carry another circuit; more capacity needs a new route."
+          ? "Corridor full. More capacity needs a new route; these towers and substations cannot carry another circuit."
           : `${formatWatts(line.capacityW, 3)} is as much as this connection can carry, limited by ${
               intertieTechnologyCeilingW(year) <=
               intertieCapacityCeilingW(line.corridorId, year)
@@ -437,7 +437,7 @@ function IntertieUpgradeControl(props: {
                   label: "Connection capacity",
                   value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
                   detail:
-                    "The line keeps operating at its current capacity during construction. Imports still depend on the neighbor's spare supply.",
+                    "The line keeps its current capacity during construction. Imports still need spare neighboring supply.",
                 },
                 {
                   concept: "money",

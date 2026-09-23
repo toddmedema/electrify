@@ -695,6 +695,6 @@ describe("the intertie upgrade control", () => {
     await user.click(
       screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
     );
-    expect(screen.getByText(/corridor is full/)).toBeInTheDocument();
+    expect(screen.getByText(/Corridor full/)).toBeInTheDocument();
   });
 });

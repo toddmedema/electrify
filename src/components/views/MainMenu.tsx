@@ -33,7 +33,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
     if (result === "clipboard") {
-      setShareStatus("Game link copied. Paste it wherever you like.");
+      setShareStatus("Game link copied.");
     } else if (result === "unavailable") {
       setShareStatus("Sharing isn't available in this browser.");
     }

@@ -335,6 +335,7 @@ interface State {
   presetNameError: string;
   layersOpen: boolean;
   leversOpen: boolean;
+  shortRateOpen: boolean;
   activeEventKey?: string;
   viewport: ChartViewportRange;
   viewportAnnouncement: string;
@@ -701,6 +702,7 @@ export default class Insights extends React.Component<Props, State> {
       presetNameError: "",
       layersOpen: false,
       leversOpen: true,
+      shortRateOpen: false,
       activeEventKey: undefined,
       viewport: props.savedViewport
         ? this.restoredViewport(props.savedViewport)
@@ -1243,8 +1245,44 @@ export default class Insights extends React.Component<Props, State> {
           ? "bad"
           : ""
     }`;
+    const rateMetrics = (
+      <>
+        <span className="insightsRateMetric">
+          <span className="insightsRateMetricLabel">Your rate</span>
+          <strong className="insightsRateMetricValue">
+            {formatRateCompact(game.dollarsPerkWh)}/kWh
+          </strong>
+        </span>
+        <span className="insightsRateMetric">
+          <span className="insightsRateMetricLabel">
+            {investor ? "Market" : "Target"}
+          </span>
+          <span className="insightsRateMetricValue">
+            {formatRateCompact(investor ? marketRate : targetRate)}
+          </span>
+        </span>
+        {investor ? (
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Customers / mo</span>
+            <strong className="insightsRateMetricValue">
+              {formattedCustomerChange}
+            </strong>
+          </span>
+        ) : (
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Points / yr</span>
+            <strong className={`insightsRateMetricValue ${rateScoreClass}`}>
+              {formattedRateScore}
+            </strong>
+          </span>
+        )}
+      </>
+    );
     return (
-      <section className="insightsLevers" aria-label="Planning controls">
+      <section
+        className={`insightsLevers ${!scenario.tutorialSteps ? "insightsShortRateDisclosure" : ""} ${this.state.shortRateOpen ? "insightsShortRateOpen" : ""}`}
+        aria-label="Planning controls"
+      >
         <Button
           className="insightsRateToggle"
           startIcon={<TuneIcon />}
@@ -1281,36 +1319,28 @@ export default class Insights extends React.Component<Props, State> {
           )}
         </Typography>
         <div className="insightsRateMetrics" aria-hidden="true">
-          <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Your rate</span>
-            <strong className="insightsRateMetricValue">
-              {formatRateCompact(game.dollarsPerkWh)}/kWh
-            </strong>
-          </span>
-          <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">
-              {investor ? "Market" : "Target"}
-            </span>
-            <span className="insightsRateMetricValue">
-              {formatRateCompact(investor ? marketRate : targetRate)}
-            </span>
-          </span>
-          {investor ? (
-            <span className="insightsRateMetric">
-              <span className="insightsRateMetricLabel">Customers / mo</span>
-              <strong className="insightsRateMetricValue">
-                {formattedCustomerChange}
-              </strong>
-            </span>
-          ) : (
-            <span className="insightsRateMetric">
-              <span className="insightsRateMetricLabel">Points / yr</span>
-              <strong className={`insightsRateMetricValue ${rateScoreClass}`}>
-                {formattedRateScore}
-              </strong>
-            </span>
-          )}
+          {rateMetrics}
         </div>
+        {!scenario.tutorialSteps && (
+          <button
+            type="button"
+            className="insightsShortRateToggle"
+            aria-label={`${this.state.shortRateOpen ? "Hide" : "Show"} rate slider`}
+            aria-expanded={this.state.shortRateOpen}
+            aria-controls="rateSliderControl"
+            aria-describedby="insightsRateSummary"
+            onClick={() =>
+              this.setState({ shortRateOpen: !this.state.shortRateOpen })
+            }
+          >
+            <span className="insightsRateMetrics" aria-hidden="true">
+              {rateMetrics}
+            </span>
+            <ChevronRightIcon
+              className={this.state.shortRateOpen ? "expanded" : ""}
+            />
+          </button>
+        )}
         <span id="insightsRateSummary" className="srOnly">
           {rateSummary}
         </span>

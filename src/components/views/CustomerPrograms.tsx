@@ -129,7 +129,7 @@ function Decision({
             });
         };
         worker.postMessage({
-          game: JSON.parse(JSON.stringify(game)),
+          game,
           change: {
             id: selected,
             tier,

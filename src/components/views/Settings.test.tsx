@@ -115,9 +115,7 @@ describe("Settings", () => {
   it("disables Export and says what's missing when there's no saved game", () => {
     renderSettings();
     expect(exportButton().disabled).toBe(true);
-    expect(
-      screen.getByText(/Start a game to enable export/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Start a game to export it/)).toBeInTheDocument();
   });
 
   it("offers a way in when nobody is logged in", () => {
@@ -140,7 +138,7 @@ describe("Settings", () => {
   it("prompts for a name when a logged-in player hasn't picked one", () => {
     renderSettings({ loggedIn: true });
     expect(
-      screen.getByText(/Choose a name to appear with your scores/),
+      screen.getByText(/Choose a public name for your scores/),
     ).toBeInTheDocument();
     expect(screen.getByText("Choose a name")).toBeInTheDocument();
   });

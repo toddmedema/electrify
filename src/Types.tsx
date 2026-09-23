@@ -275,6 +275,7 @@ export interface NavigateActionType {
 }
 
 export interface CardType {
+  url?: string;
   name: CardNameType;
   ts: number;
   history?: CardNameType[];
@@ -1228,6 +1229,9 @@ export interface BestScoreType {
 }
 
 export interface UserType {
+  profileRequestId?: string;
+  nameRequestId?: string;
+  logoutRequestId?: string;
   uid?: string;
   // The leaderboard name, once one has been claimed
   displayName?: string;

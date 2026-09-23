@@ -34,7 +34,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   if (!url.searchParams.has("challenge")) return;
   const failed: ChallengeRoute = {
     error:
-      "This challenge link is invalid or uses different game conditions. You can play a current mission instead.",
+      "This challenge link is invalid or uses different conditions. Choose a current mission.",
   };
   if (
     href.length > MAX_CHALLENGE_URL ||

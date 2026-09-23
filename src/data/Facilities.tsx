@@ -301,7 +301,7 @@ export function GENERATORS(
       name: "Coal",
       fuel: "Coal",
       description:
-        "Can run on demand, but ramps slowly and produces high direct emissions",
+        "Runs on demand, with slow ramping and high direct emissions",
       available: true, // Coal was first type of electric plant
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 3.676 * CPI_2019_TO_2023, 2023, 4.103),
@@ -366,7 +366,7 @@ export function GENERATORS(
       name: "Natural Gas",
       fuel: "Natural Gas",
       description:
-        "Runs on demand and ramps faster than coal, with lower but still significant direct emissions",
+        "Runs on demand; ramps faster than coal with lower, still significant direct emissions",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
@@ -433,7 +433,7 @@ export function GENERATORS(
       name: "Biomass",
       fuel: "Biomass",
       description:
-        "Can run on demand using renewable fuel, but burns large amounts of material and releases CO2",
+        "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
       available: true,
       // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
       // to the table's 2018 base with CPI-U (251.107 / 321.943), then split into the same
@@ -540,7 +540,7 @@ export function GENERATORS(
       name: "Airborne Wind",
       fuel: "Airborne Wind",
       description:
-        "Uses steadier high-altitude winds, but the technology is new and needs frequent maintenance",
+        "Uses steadier high-altitude wind; new technology with frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
       available: year >= 2030,
       buildCost: scaledBuildCost(airborneWindCostPerW(year), 1200000, peakW),
@@ -721,7 +721,7 @@ export function STORAGE(state: GameType, peakWh: number) {
     {
       name: "Battery",
       description:
-        "Builds quickly and responds almost instantly, but stores a limited amount of energy",
+        "Quick to build and nearly instant to respond, with limited stored energy",
       available: year > 2008, // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + batteryCostPerWh(year) * peakWh,
       // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
@@ -752,7 +752,7 @@ export function STORAGE(state: GameType, peakWh: number) {
     {
       name: "Pumped Hydro",
       description:
-        "Pumps water uphill between two reservoirs to store large amounts of energy. Needs no river inflow, but needs a suitable site and takes years to build",
+        "Stores large amounts of energy by pumping water between two reservoirs. Needs a suitable site and years to build, but no river inflow",
       available: year > 1930 && (pumpedHydroLocations || 0) > 0, // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
