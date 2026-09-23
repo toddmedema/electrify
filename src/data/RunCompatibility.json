@@ -1,6 +1,6 @@
 {
   "rulesRevision": 1,
-  "compatibilityId": "rules-1-993bdd09a5663fba37c02e588b0617c3255980f5eec9275181f16833914a9a54",
+  "compatibilityId": "rules-1-399d312290be08dc9037b5af5e54a18eaf33f8495de18b7ba77567f08372d699",
   "dataIntegrity": {
     "/data/EconomyRaw.csv": "sha256-k/hCW/VGPtEOOUIkyEhvZuqTcSyJ03ojGTsD9p+SQt4=",
     "/data/FuelPricesRaw.csv": "sha256-rRMPMbjt+Z5nzNmbJlUlXZYQPO/IMXOONXng61jxiSc=",
@@ -94,8 +94,10 @@
     "/data/weather/Hyderabad.bin": "sha256-hB3wsO3UpGg3IilxWPKztlzWRSavH9mw/KQ2nV3sMrc=",
     "/data/weather/Indianapolis.bin": "sha256-pBi0u/HRm0V8MQjJSabmtMwZRDgpbksI1ABDantcxPE=",
     "/data/weather/Iqaluit.bin": "sha256-S0PGZ2mCWHp4N4th29HjjPyRwyp6H7MVGMJ1m0CKhsw=",
+    "/data/weather/Islamabad.bin": "sha256-jQutw9NLi35A6fDbHKBD0Js4uFKM8O8/LKm0mDq+4iU=",
     "/data/weather/Istanbul.bin": "sha256-HN9zXAHLlmZRfPnGbffoex+jQFvuFUIcQ6t4ZFymZ8w=",
     "/data/weather/Jacksonville.bin": "sha256-6/c1bUKRrXnvfcY2VirZIQ/Mb/lXFzx0erCqH4WyMcY=",
+    "/data/weather/Jaipur.bin": "sha256-bXfPTrSTjxAl2nZMEXuFNbX+vV21x75v5ywCMuZdB1g=",
     "/data/weather/Jeddah.bin": "sha256-ZbEy4cMoQ36d1S9oh8Kz/4HxTn2rn/goYeEzS58P5Wg=",
     "/data/weather/Jerusalem.bin": "sha256-sakcEc5RYCMWlzCCn8s+kWkEN9lt++ElQ2lQIDHnXxI=",
     "/data/weather/Johannesburg.bin": "sha256-0VOOpTwOk1e+swjNp3Bhy1BKvbfCexPbML/YwngydcM=",
@@ -103,6 +105,7 @@
     "/data/weather/Kampala.bin": "sha256-KCTTlk49YqY1PZlZvkqZXjMo83o5qE4Kv3htJYkorY4=",
     "/data/weather/Kano.bin": "sha256-yFCCk3qOw/EBQ4zBx2LVx12Lg+f7Zu/0NTNYgTUCzeM=",
     "/data/weather/KansasCity.bin": "sha256-81uG/OJTvyidUcCl8sXwVqc5Qgasiwgm3ycqKq73Xe0=",
+    "/data/weather/Karachi.bin": "sha256-9JZbP6enm5MAziwEsLEuzKfNVbeq9JJbUo8Lt9oFZsA=",
     "/data/weather/Khartoum.bin": "sha256-wkziTMGZoepTNaNF5+xO+7DfGkAa0+7sewNB6Z7lW8Q=",
     "/data/weather/Kigali.bin": "sha256-tdgYe3PyClHDJISgNcf8OW6qqSqRej3UogVlucp/3d4=",
     "/data/weather/Kingston.bin": "sha256-+nHuEdKPLXh4SjqHYRvaBCmXO5N2tL6MGg1gBwjUEcE=",
@@ -114,12 +117,14 @@
     "/data/weather/LA.bin": "sha256-AVVQqLPsEJIvscObyctv19zBwdfFi44Uegun0jiSJYE=",
     "/data/weather/LaPaz.bin": "sha256-LRvRlGlQvUNwxgnK+63mP4Ad5vVLSTVZlgsARUOmszA=",
     "/data/weather/Lagos.bin": "sha256-ncauLrc6Zzjld3rzRELw6oBJnqKOlPPQLdbLhqIaxBo=",
+    "/data/weather/Lahore.bin": "sha256-Kmh++NUtKg2vb+hFaB3wTKfg9FRy5pm7AoKWUO2dL2U=",
     "/data/weather/LasVegas.bin": "sha256-/D+S/YvBt+0/WeawUrNbXaaBSIprC04Mjd8oR5Eay6g=",
     "/data/weather/Lima.bin": "sha256-t2xKugJQdZOcx8UnZ3LLYppF+Ayek9xJJa1uh6nnFP4=",
     "/data/weather/Lisbon.bin": "sha256-8yjowBENlfqE6Z3OyyEq1JaVg/sF2tUZyfiby23Tcxk=",
     "/data/weather/Lista.bin": "sha256-N3gZdcy4DB9U3ULHdJYhefUQiQDPKhKZRf1j9sipLDA=",
     "/data/weather/London.bin": "sha256-JleKr+Lxps6z9CTlsrcG5zfLjvF8/+oSxaU/gBp89oc=",
     "/data/weather/Luanda.bin": "sha256-SAzVO+6yxX8c+TuC8dt3bjguboH0cy4twoTtEqEXSqY=",
+    "/data/weather/Lucknow.bin": "sha256-sIDn0PXzj1W5/EU9Vhy02pRPaNFu9k7St5/ffPpDUTk=",
     "/data/weather/Lusaka.bin": "sha256-t/QdUCHjoAauHuw6ezjuN5uKpkRz/vLzbHu3HNPA0nk=",
     "/data/weather/Lyon.bin": "sha256-GZ2CR2OPCYsVtfKSpxqqjdmDFm6uAAn1Eh7KLlnRQ8k=",
     "/data/weather/Madrid.bin": "sha256-uUlf0OcSKxyR19HDbAIHPsHxJg4SKWhAhET+zSix/eo=",
@@ -171,6 +176,7 @@
     "/data/weather/Porto.bin": "sha256-Q1sb7KGgAnan89SVeuLyt+v8KtM//G6NIbhBTstTGvU=",
     "/data/weather/PortoAlegre.bin": "sha256-dS825YzAKZ/pTcrMHFBz/0tr/E0wQKesKjsZzABONso=",
     "/data/weather/Prague.bin": "sha256-oAF2DOfhk/L4gUQJOBuAb4Qdk8UKeQA0LeJg20JEqNY=",
+    "/data/weather/Pune.bin": "sha256-LuOmvjcyen87Vi9URarOZuslXGvlphzlzr92JkFnUzQ=",
     "/data/weather/Quito.bin": "sha256-xVuJjV0tqwEKwMpL6sYLhRBt1wk7Ceh6FrkmkM/ECQ4=",
     "/data/weather/Recife.bin": "sha256-xFUELIl5ExiGLB5o9W/vryIIQSLo7CfTVuHDFNf6PN4=",
     "/data/weather/Reykjavik.bin": "sha256-oRlxs6fhYjZGCDDqIg/KCtTyouPeOaeJKb+1qZ0p7JI=",
@@ -220,6 +226,6 @@
     "/data/weather/Yerevan.bin": "sha256-V2kMSds9kEM8h4EanhXxLBPiYsOKlBrDUL4ICpBf3JQ=",
     "/data/weather/Zagreb.bin": "sha256-RcWhQyDMTtyTk3Ezumy6FYJd9qpM63iojyp45IylyKY=",
     "/data/weather/Zurich.bin": "sha256-rnEoc2y/aYpVtsBlm2rCku+RyXYX2QPsQbdhubn52s4=",
-    "/data/weather/index.json": "sha256-UefGXoPaYfmvo1PANIPZD9MhX86yg1nMDIBal56vESI="
+    "/data/weather/index.json": "sha256-s7/09uYZ1yS2e18eaLhE4IHC4Y2cD52HRnOk4ZryGoY="
   }
 }

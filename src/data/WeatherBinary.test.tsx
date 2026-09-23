@@ -229,7 +229,9 @@ describe("the shipped weather files", () => {
     "Rome",
     "Naples",
     "Mumbai",
+    "Karachi",
     "PortLouis",
+    "Pune",
     "Reykjavik",
   ];
   const ids = fs
