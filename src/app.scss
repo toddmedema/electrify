@@ -3550,6 +3550,22 @@ html[data-theme="dark"] .uplot {
     }
   }
 
+  // A seasonal fire-risk notice: a warning, not an emergency. Amber carries the signal while the
+  // copy stays full-contrast; it never reveals a seeded ignition date, only that risk is elevated.
+  .wildfireRiskNotice {
+    border-left: 3px solid var(--warning-icon);
+    background: var(--warning-fill);
+    padding: $space-2;
+
+    .eventLogSectionHeader {
+      padding: 0 0 $space-1;
+    }
+
+    .MuiTypography-body2 {
+      color: $font_color_primary;
+    }
+  }
+
   // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
   // event should not look like a red, active emergency before it has happened.
   .upcomingEvents {

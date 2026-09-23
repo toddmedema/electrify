@@ -2,6 +2,7 @@ import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
+import { wildfirePreparednessChoice } from "./Wildfire";
 
 /** Keep the price and consequence in one sentence, using the active difficulty's terms. */
 export function scenarioChoiceDescription(
@@ -28,12 +29,17 @@ export function pendingScenarioChoice(
   definitions: ScenarioChoiceType[] = SCENARIO_CHOICES,
 ) {
   if (game.storyEffectsDisabled) return undefined;
-  return definitions.find(
+  const authored = definitions.find(
     (choice) =>
       choice.scenarioId === game.scenarioId &&
       game.date.minute >= choice.atMonth * MINUTES_PER_MONTH &&
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );
+  if (authored) return authored;
+  // Recurring, season-scoped wildfire preparedness for eligible custom games. It is built from
+  // live game state (system size, location) rather than the authored table, and is answered at
+  // most once per season through the same replayable chooseScenarioResponse action.
+  return wildfirePreparednessChoice(game);
 }
 export function validScenarioResponse(
   value: unknown,

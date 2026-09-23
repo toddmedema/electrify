@@ -9,6 +9,10 @@ import {
   STORY_ARC_DEFINITIONS,
   upcomingStoryPhases,
 } from "../../data/WorldEvents";
+import {
+  wildfireRiskNotice,
+  WildfireRiskNoticeType,
+} from "../../helpers/Wildfire";
 import { formatWatts } from "../../helpers/Format";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
@@ -132,4 +136,34 @@ export function selectUpcomingStoryEvents(
   events.sort((a, b) => (a.startsMinute ?? 0) - (b.startsMinute ?? 0));
   upcomingCache = { key, events };
   return events;
+}
+
+let riskNoticeCache:
+  { key: string; notice: WildfireRiskNoticeType | undefined } | undefined;
+
+/**
+ * The seasonal fire-risk notice for the Events pane, or undefined when there is none. Cached by
+ * the inputs that can change it (the weather reading is not free to recompute on every render).
+ */
+export function selectWildfireRiskNotice(
+  state: AppStateType,
+): WildfireRiskNoticeType | undefined {
+  const game = state.game;
+  if (!game.inGame) {
+    return undefined;
+  }
+  const key = [
+    game.seed,
+    game.scenarioId,
+    game.location.id,
+    game.date.monthsElapsed,
+    game.storyEffectsDisabled ? 1 : 0,
+    game.wildfireHazardDisabled ? 1 : 0,
+  ].join("|");
+  if (riskNoticeCache?.key === key) {
+    return riskNoticeCache.notice;
+  }
+  const notice = wildfireRiskNotice(game);
+  riskNoticeCache = { key, notice };
+  return notice;
 }
