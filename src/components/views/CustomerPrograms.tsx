@@ -16,6 +16,7 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
+import GroupsIcon from "@mui/icons-material/Groups";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import {
@@ -518,6 +519,7 @@ export default function CustomerPrograms({
   );
   return (
     <Box
+      className="customerProgramsControl"
       sx={{
         maxWidth: "100%",
         display: "flex",
@@ -526,23 +528,19 @@ export default function CustomerPrograms({
         gap: 1,
       }}
     >
-      <Button onClick={() => setOpen(true)} sx={{ minHeight: 44 }}>
-        Customer programs
-      </Button>
-      {pending ? (
-        <Typography variant="caption">
-          Change starts {labelMonth(game, game.date.monthsElapsed + 1)}
-        </Typography>
-      ) : (
-        active > 0 && (
-          <Typography variant="caption">
-            {active} program{active > 1 ? "s" : ""} active
-            {budget > 0 && (
-              <> · up to {formatMoneyConcise(budget)}/month in rebates</>
-            )}
-          </Typography>
-        )
-      )}
+      <IconButton
+        aria-label="Customer programs"
+        title={
+          pending
+            ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
+            : `Customer programs: ${active} active${budget > 0 ? ` · up to ${formatMoneyConcise(budget)}/month in rebates` : ""}`
+        }
+        color="primary"
+        onClick={() => setOpen(true)}
+        sx={{ minHeight: 44, minWidth: 44 }}
+      >
+        <GroupsIcon />
+      </IconButton>
       {open && (
         <Decision onClose={() => setOpen(false)} onViewDemand={onViewDemand} />
       )}

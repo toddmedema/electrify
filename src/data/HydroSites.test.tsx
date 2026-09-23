@@ -92,6 +92,12 @@ it("reserves explicit starts first and preserves authored fleet order and exact 
 it("rejects forged identities and capacity before any side effects; stale quotes allocate authoritatively", () => {
   const s = state();
   const largest = getHydroAvailability(s, MW).largest!;
+  // Rounding creates equal ceilings; leave one largest site for these exhaustion checks.
+  s.commissionedHydroSiteIds = getHydroAvailability(s, MW)
+    .remaining.filter(
+      (site) => site.maxPeakW === largest.maxPeakW && site.id !== largest.id,
+    )
+    .map((site) => site.id);
   const q = quote(s, largest.maxPeakW);
   const first = gameReducer(
     s,
@@ -118,6 +124,12 @@ it("rejects forged identities and capacity before any side effects; stale quotes
 it("releases cancellations but commissioning and sale preserve claims; projections own claims", () => {
   const s = state();
   const largest = getHydroAvailability(s, MW).largest!;
+  // Rounding creates equal ceilings; leave one largest site for these exhaustion checks.
+  s.commissionedHydroSiteIds = getHydroAvailability(s, MW)
+    .remaining.filter(
+      (site) => site.maxPeakW === largest.maxPeakW && site.id !== largest.id,
+    )
+    .map((site) => site.id);
   const built = gameReducer(
     s,
     buildFacility({ facility: quote(s, largest.maxPeakW), financed: false }),
@@ -125,7 +137,7 @@ it("releases cancellations but commissioning and sale preserve claims; projectio
   let copy = cloneDeep(built);
   copy.facilities[0].yearsToBuildLeft = 0.00000001;
   generateNewTimeline(copy, 1e12, 100);
-  expect(copy.commissionedHydroSiteIds).toEqual([]);
+  expect(copy.commissionedHydroSiteIds).toEqual(s.commissionedHydroSiteIds);
   const cancelled = gameReducer(copy, sellFacility(copy.facilities[0].id));
   expect(getHydroAvailability(cancelled, largest.maxPeakW).selected?.id).toBe(
     largest.id,
@@ -142,7 +154,10 @@ it("releases cancellations but commissioning and sale preserve claims; projectio
     s,
     buildFacility({ facility: quote(s, largest.maxPeakW, 0), financed: false }),
   );
-  expect(immediate.commissionedHydroSiteIds).toEqual([largest.id]);
+  expect(immediate.commissionedHydroSiteIds).toEqual([
+    ...s.commissionedHydroSiteIds,
+    largest.id,
+  ]);
 });
 it("validates historical claims, labeled facilities, reservation collisions and prohibition separately", () => {
   const s = state();

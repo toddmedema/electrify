@@ -30,17 +30,21 @@ for (const scenario of [106, 107]) {
             : "Prepare for the deep freeze",
       });
       await expect(dialog).toBeVisible({ timeout: 60000 });
-      await expect(dialog).toContainText("Game paused");
+      await expect(dialog).toContainText("Paused");
       await expect(dialog.getByRole("button")).toHaveCount(2);
       if (scenario === 106) {
-        await expect(dialog).toContainText("One-time funding: $15.0M");
+        await expect(dialog).toContainText(
+          "Receive $15M in exchange for the full 100 MW coming online in January 2026.",
+        );
         await expect(dialog).toContainText("2026");
         await expect(dialog).toContainText("2028");
       } else {
-        await expect(dialog).toContainText("One-time cost: $90.0M");
+        await expect(dialog).toContainText("Spend $90M");
         await expect(dialog).toContainText(/gas.price/i);
       }
-      await expect(dialog).toContainText("No upfront cost");
+      await expect(dialog).toContainText(
+        scenario === 106 ? "Forgo funding" : "Keep your cash",
+      );
       const paused = await page.locator("#appbar:visible").first().innerText();
       await page.keyboard.press("Escape");
       await page.keyboard.press("3");

@@ -9,7 +9,8 @@ import {
   STORY_ARC_DEFINITIONS,
   upcomingStoryPhases,
 } from "../../data/WorldEvents";
-import { getDateFromMinute } from "../../helpers/DateTime";
+import { formatWatts } from "../../helpers/Format";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
 
 export interface UpcomingStoryEventType {
@@ -34,6 +35,7 @@ export function selectUpcomingStoryEvents(
 ): UpcomingStoryEventType[] {
   const game = state.game;
   if (
+    !game.loadAdditions?.length &&
     !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === game.scenarioId)
   ) {
     return NO_UPCOMING;
@@ -82,13 +84,14 @@ export function selectUpcomingStoryEvents(
     game.worldEvents.occurrences.find(
       (event) => event.key === WILDFIRE_DECISION_KEY,
     )?.attributes.choice || "standard",
+    JSON.stringify(game.loadAdditions),
     historyKey,
     fleetKey,
   ].join("|");
   if (upcomingCache?.key === key) {
     return upcomingCache.events;
   }
-  const events = upcomingStoryPhases({
+  const events: UpcomingStoryEventType[] = upcomingStoryPhases({
     seed: game.seed,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
@@ -107,6 +110,26 @@ export function selectUpcomingStoryEvents(
       label: `Expected ${date.month} ${date.year}`,
     };
   });
+  for (const addition of game.loadAdditions ?? []) {
+    const startsMinute =
+      ((addition.startsYear - game.startingYear) * 12 +
+        (addition.startsMonth ?? 1) -
+        1) *
+      MINUTES_PER_MONTH;
+    if (startsMinute <= game.date.minute) continue;
+    const date = getDateFromMinute(startsMinute, game.startingYear);
+    events.push({
+      key: `load:${addition.id}`,
+      startsMinute,
+      label: `Expected ${date.month} ${date.year}`,
+      title: `${addition.label} online`,
+      message: `${formatWatts(addition.peakW)} of new ${addition.demandType.toLowerCase()} demand comes online in ${date.month} ${date.year}.`,
+      concept: "demand",
+      importance: "NOTABLE",
+      actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+    });
+  }
+  events.sort((a, b) => (a.startsMinute ?? 0) - (b.startsMinute ?? 0));
   upcomingCache = { key, events };
   return events;
 }

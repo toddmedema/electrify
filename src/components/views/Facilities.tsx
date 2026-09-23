@@ -813,7 +813,7 @@ export default class Facilities extends React.Component<Props> {
           <div className="scrollable facilitiesBody">
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             <List dense className="scrollable unifiedFacilitiesList">
-              {intertiesAvailable && (
+              {intertiesAvailable && !!game.transmission?.lines.length && (
                 <Typography
                   id="dispatch-order"
                   className="facilitySectionLabel"
@@ -867,7 +867,7 @@ export default class Facilities extends React.Component<Props> {
                   Choose Build to add a generator or storage.
                 </Typography>
               )}
-              {intertiesAvailable && (
+              {intertiesAvailable && !!game.transmission?.lines.length && (
                 <TransmissionPanel
                   game={game}
                   onBuild={onTransmissionBuild}

@@ -179,6 +179,10 @@ describe("VictoryDialog", () => {
     const onQuit = jest.fn();
     renderDialog({ onClose, onQuit });
 
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.getByRole("button", { name: "New game" })).toHaveClass(
+      "MuiButton-contained",
+    );
     await userEvent.click(screen.getByText("Review grid"));
     expect(onClose).toHaveBeenCalled();
     await userEvent.click(screen.getByText("New game"));
@@ -191,7 +195,9 @@ describe("VictoryDialog", () => {
       ["fired", "Fired!"],
     ] as const) {
       const onClose = jest.fn();
-      renderDialog({ victory: aVictory({ outcome }), onClose });
+      const onRetry = jest.fn();
+      const victory = aVictory({ outcome });
+      renderDialog({ victory, onClose, onRetry });
 
       expect(screen.getByText(title)).toBeInTheDocument();
       expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
@@ -199,6 +205,13 @@ describe("VictoryDialog", () => {
         screen.getByLabelText("Final score 812 points"),
       ).toBeInTheDocument();
       expect(screen.queryByText("Review grid")).not.toBeInTheDocument();
+      const retry = screen.getByRole("button", { name: "Try again" });
+      expect(retry).toHaveClass("MuiButton-contained");
+      expect(screen.getByRole("button", { name: "New game" })).toHaveClass(
+        "MuiButton-text",
+      );
+      await userEvent.click(retry);
+      expect(onRetry).toHaveBeenCalledWith(victory);
       await userEvent.keyboard("{Escape}");
       expect(onClose).not.toHaveBeenCalled();
       cleanup();

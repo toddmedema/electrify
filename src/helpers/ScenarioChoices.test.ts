@@ -3,11 +3,35 @@ import reducer from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import {
   pendingScenarioChoice,
+  scenarioChoiceDescription,
   validScenarioResponse,
 } from "./ScenarioChoices";
 import { createGame } from "../testing/Simulator";
-import { ScenarioChoiceType } from "../Types";
+import { DifficultyType, ScenarioChoiceType } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
+
+test("choice descriptions include actual funding and difficulty-specific costs", () => {
+  const dataCenter = SCENARIO_CHOICES.find(
+    (choice) => choice.scenarioId === 106,
+  )!;
+  expect(scenarioChoiceDescription(dataCenter.options[0], "Manager")).toBe(
+    "Receive $15M in exchange for the full 100 MW coming online in January 2026.",
+  );
+  const pricedOption = {
+    id: "protection",
+    label: "Fund protection",
+    message: "Funded",
+    cost: (difficulty: DifficultyType) =>
+      difficulty === "Intern" ? 200000 : 2500000,
+    description: "Spend {cost} to protect plant output.",
+  };
+  expect(scenarioChoiceDescription(pricedOption, "Intern")).toBe(
+    "Spend $200k to protect plant output.",
+  );
+  expect(scenarioChoiceDescription(pricedOption, "CEO")).toBe(
+    "Spend $2.5M to protect plant output.",
+  );
+});
 
 test("other scenarios can queue timed choices using only authored definitions", () => {
   const game = createGame({ scenarioId: 101 });

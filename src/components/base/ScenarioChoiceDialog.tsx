@@ -7,9 +7,13 @@ import {
   Typography,
 } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { pendingScenarioChoice } from "../../helpers/ScenarioChoices";
+import {
+  pendingScenarioChoice,
+  scenarioChoiceDescription,
+} from "../../helpers/ScenarioChoices";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { chooseScenarioResponse } from "../../reducers/GameActions";
+import ConceptIcon from "./ConceptIcon";
 
 export default function ScenarioChoiceDialog() {
   const game = useAppSelector((state) => state.game);
@@ -43,14 +47,26 @@ export default function ScenarioChoiceDialog() {
     >
       <DialogTitle
         id="scenarioChoiceTitle"
-        sx={{ "&&": { px: { xs: 2, sm: 3 }, pt: 2, pb: 1 } }}
+        sx={{
+          "&&": {
+            px: { xs: 2, sm: 3 },
+            pt: 2,
+            pb: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+          },
+        }}
       >
-        {decision.title}
+        <span style={{ flex: 1 }}>{decision.title}</span>
+        <span className="pausedChip">
+          <span aria-hidden="true">
+            <ConceptIcon concept="pause" fontSize="small" />
+          </span>
+          Paused
+        </span>
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
-        <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
-          Game paused — choose a response to continue.
-        </Typography>
         <Typography id="scenarioChoiceDescription">
           {decision.message}
         </Typography>
@@ -66,7 +82,6 @@ export default function ScenarioChoiceDialog() {
         >
           {decision.options.map((option, index) => {
             const cost = option.cost(game.difficulty);
-            const grant = option.upfrontGrant?.(game.difficulty) || 0;
             const affordable = cost === 0 || cash >= cost;
             return (
               <Box key={option.id}>
@@ -93,17 +108,8 @@ export default function ScenarioChoiceDialog() {
                   variant="body2"
                   sx={{ color: "text.secondary", mt: 0.5 }}
                 >
-                  {grant > 0
-                    ? `One-time funding: $${(grant / 1000000).toFixed(1)}M`
-                    : cost > 0
-                      ? `One-time cost: $${(cost / 1000000).toFixed(1)}M`
-                      : "No upfront cost"}
+                  {scenarioChoiceDescription(option, game.difficulty)}
                   {!affordable && " · Insufficient cash"}
-                  {option.description && (
-                    <Box component="span" sx={{ display: "block", mt: 1 }}>
-                      {option.description}
-                    </Box>
-                  )}
                 </Typography>
               </Box>
             );

@@ -18,7 +18,6 @@ import {
   DialogActions,
   DialogContent,
   FormControl,
-  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -505,13 +504,6 @@ export interface TransmissionPanelProps {
   onPolicy: (policy: TradingPolicyType) => void;
 }
 
-const POLICY_DETAILS: Record<TradingPolicyType, string> = {
-  BALANCED: "Imports cover shortages; spare power is sold to neighbors.",
-  RELIABILITY_FIRST: "Imports cover shortages; spare power is not sold.",
-  SURPLUS_ONLY: "Spare power is sold; shortages are not covered by imports.",
-  CLOSED: "No power moves over your interties.",
-};
-
 // Live state for the section header, beside the rule it results from
 function tradingFlowText(game: GameType): string | null {
   const lines = game.transmission?.lines ?? [];
@@ -552,7 +544,6 @@ function TradingControls({
           labelId="trading-policy-label"
           label="Trading rule"
           value={state.tradingPolicy}
-          aria-describedby="trading-policy-detail"
           onChange={(event) =>
             onPolicy(event.target.value as TradingPolicyType)
           }
@@ -563,9 +554,6 @@ function TradingControls({
             </MenuItem>
           ))}
         </Select>
-        <FormHelperText id="trading-policy-detail">
-          {POLICY_DETAILS[state.tradingPolicy]}
-        </FormHelperText>
       </FormControl>
     </div>
   );
@@ -641,7 +629,6 @@ export default function TransmissionPanel({
               {flowText && (
                 <span className="networkTradingFlow">{flowText}</span>
               )}
-              <ManualLink entry={MANUAL_ENTRY.INTERTIES} label="an intertie" />
             </span>
           </Typography>
           <TradingControls game={game} onPolicy={onPolicy} />

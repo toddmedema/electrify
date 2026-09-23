@@ -126,7 +126,12 @@ for (const theme of ["light", "dark"] as const) {
         await detailCard
           .getByRole("button", { name: "Use site maximum" })
           .click();
-        await expect(detailCard).toContainText("Plant: 51.2MW");
+        await expect(detailCard).not.toContainText("Plant:");
+        await expect(page.getByRole("slider")).toHaveAttribute(
+          "aria-valuenow",
+          "13",
+        );
+        await expect(detailCard).toContainText("50MW max");
         await expect(detailCard).toContainText("Site: Lake Lynn Hydro Station");
       }
       await expect(detailReview).toBeEnabled();

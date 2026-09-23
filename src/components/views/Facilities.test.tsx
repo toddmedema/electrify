@@ -440,12 +440,12 @@ describe("the interties view", () => {
     }
   });
 
-  it("shows one list and one build action in Mission 7", () => {
+  it("hides the empty interties section while keeping the build action in Mission 7", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.getByRole("button", { name: "Build" })).toBeInTheDocument();
-    expect(screen.getByText(/Plants & storage/)).toBeInTheDocument();
-    expect(screen.getByText(/Interties/)).toBeInTheDocument();
+    expect(screen.queryByText(/Plants & storage/)).toBeNull();
+    expect(screen.queryByText(/Interties/)).toBeNull();
   });
 
   it("does not render an empty interties destination where no corridor exists", () => {
