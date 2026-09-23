@@ -929,6 +929,35 @@ export interface GameEventType {
 export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
+/**
+ * Authored regional wildfire hazard for recurring, location-aware emergencies.
+ *
+ * These are explicitly simplified game balance values, not observed fire statistics: the monthly
+ * weights shape a seasonal risk that is never a guaranteed fire, and the severity bounds are the
+ * readable range an incident may land in. Unknown locations carry no profile and therefore no
+ * inferred risk.
+ */
+export interface WildfireProfileType {
+  /** Expected disruptive incidents per year at baseline weather (sum of monthly weights is one). */
+  annualHazard: number;
+  /** Twelve monthly weights, index 0 = January, summing to one over the year. */
+  monthlyWeights: number[];
+  /** Share of customer load disconnected by safety shutoffs, sampled per incident. */
+  disconnectedDemand: { min: number; max: number };
+  /** Output retained by affected generators, sampled per incident. */
+  outputMultiplier: { min: number; max: number };
+  /** Share of fleet peak capacity constrained, sampled per incident. */
+  targetCapacityShare: { min: number; max: number };
+  /** Restoration cost per MWh of exposed monthly demand, charged each active month. */
+  restorationCostPerMWh: number;
+  /** Months after an incident before the next one may start. */
+  cooldownMonths: number;
+  /** Month (0-based) the season's preparedness choice is offered. */
+  preparednessMonth: number;
+  /** How many months a funded preparedness remains in force. */
+  preparednessDurationMonths: number;
+}
+
 export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
@@ -1080,6 +1109,9 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
+  // Headless balance harness only: run the identical strategy with the recurring regional wildfire
+  // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
+  wildfireHazardDisabled?: boolean;
   commissionedHydroSiteIds: string[];
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled

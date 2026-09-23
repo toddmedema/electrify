@@ -36,6 +36,7 @@ import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
+import { summarizeWildfireImpact } from "../helpers/Wildfire";
 import {
   ActiveWorldEventType,
   DifficultyType,
@@ -115,6 +116,9 @@ export interface SimOptionsType {
   sellFacilityId?: number;
   sellAtMonth?: number;
   storyEffectsEnabled?: boolean;
+  // Recurring regional wildfire hazard, on by default. Off runs the identical strategy without it,
+  // isolating its effect for balance comparison.
+  wildfireHazardEnabled?: boolean;
   scheduledActions?: ScheduledSimActionType[];
 }
 
@@ -131,6 +135,7 @@ export interface ResolvedSimOptionsType {
   sellFacilityId: number | null;
   sellAtMonth: number;
   storyEffectsEnabled: boolean;
+  wildfireHazardEnabled: boolean;
   scheduledActions: ScheduledSimActionType[];
 }
 
@@ -168,6 +173,9 @@ export interface SimResultType {
   violationCountByRule: { [rule: string]: number };
   violationCount: number;
   storyOccurrences: ActiveWorldEventType[];
+  // Aggregate impact of the recurring regional wildfire hazard over the run (zeroed when it never
+  // fired or was disabled), for many-seed balance comparison.
+  wildfireImpact: import("../helpers/Wildfire").WildfireImpactSummaryType;
 }
 
 const DEFAULT_SEED = 12345;
@@ -230,6 +238,9 @@ function setUpGame(
   }
   if (!options.storyEffectsEnabled) {
     state = gameReducer(state, delta({ storyEffectsDisabled: true }));
+  }
+  if (!options.wildfireHazardEnabled) {
+    state = gameReducer(state, delta({ wildfireHazardDisabled: true }));
   }
   if (options.initialBuild) {
     const build =
@@ -377,6 +388,7 @@ function resolveOptions(
     sellFacilityId: options.sellFacilityId ?? null,
     sellAtMonth: options.sellAtMonth || 0,
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
+    wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
     scheduledActions: options.scheduledActions || [],
   };
 }
@@ -722,5 +734,10 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     violationCountByRule: collector.getCountByRule(),
     violationCount: collector.getTotalCount(),
     storyOccurrences: state.worldEvents.occurrences,
+    wildfireImpact: summarizeWildfireImpact(
+      [...state.monthlyHistory].reverse(),
+      state.worldEvents.occurrences,
+      state.startingYear,
+    ),
   };
 }

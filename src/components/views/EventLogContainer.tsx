@@ -11,6 +11,7 @@ import { focusEvidence, openEvidence } from "../../helpers/Evidence";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
   selectUpcomingStoryEvents,
+  selectWildfireRiskNotice,
   UpcomingStoryEventType,
 } from "./StoryEventSelectors";
 
@@ -68,6 +69,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     ),
     ongoing,
     upcoming: selectUpcomingStoryEvents(state),
+    riskNotice: selectWildfireRiskNotice(state),
   };
 };
 
