@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`scenario-sized intertie purchase explains portfolio limits in ${theme}`, async ({
+  test(`intertie purchase keeps forecasts in build details in ${theme}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((mode) => {
@@ -27,24 +27,25 @@ for (const theme of ["light", "dark"] as const) {
     });
     const card = page.locator(".transmissionProject").filter({ has: review });
     await expect(card).toContainText("$1.8M");
+    await expect(card).not.toContainText("Portfolio outlook");
+    await card
+      .getByRole("button", { name: "Show Pacific Northwest details" })
+      .click();
+    await expect(card).toContainText("Portfolio outlook");
+    await expect(card).toContainText("Shortfall covered");
+    await expect(card).toContainText("Gap with half the spare supply");
     await review.click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText(
-      "next-year demand, current operating fleet",
-    );
-    await expect(dialog).toContainText(
-      "Assumes this connection is already open",
-    );
-    for (const label of [
-      "Shortfall energy covered",
-      "Worst remaining gap",
-      "Annual electricity purchases",
-      "Regional-stress example",
-    ]) {
-      await expect(dialog.getByText(label, { exact: true })).toBeVisible();
+    await expect(dialog).not.toContainText("Portfolio outlook");
+    await expect(dialog).not.toContainText("Shortfall covered");
+    await expect(dialog).toContainText("5MW access · Ready in 12 months");
+    await expect(dialog).toContainText("$1.8M · $48.2M left");
+    await expect(dialog).toContainText("payments start now");
+    await expect(dialog).toContainText("$3k/mo + power purchases");
+    // Every purchase fact fits alongside both actions on desktop and a 390px phone.
+    for (const fact of await dialog.locator(".decisionImpactFact").all()) {
+      await expect(fact).toBeInViewport();
     }
-    await expect(dialog).toContainText("This is not a predicted event");
-    await expect(dialog).toContainText("financing extra");
     await expect(dialog).not.toContainText(/NaN|Infinity/);
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -78,7 +79,7 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
     await expect(page.getByRole("dialog")).toContainText(
-      "will not open before this mission ends",
+      "Won’t open before this mission ends",
     );
   });
 }

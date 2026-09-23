@@ -216,6 +216,7 @@ function IntertieBuildItem(props: {
   readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
+  renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
   const [expanded, setExpanded] = React.useState(false);
@@ -274,18 +275,6 @@ function IntertieBuildItem(props: {
             </span>
           </>
         )}
-      </Typography>
-      <Typography
-        variant="caption"
-        color="textSecondary"
-        sx={{ px: 2, pb: 1 }}
-        component="div"
-      >
-        Your access {formatWatts(corridor.capacityW)} of a{" "}
-        {formatWatts(
-          corridorById(corridor.id)?.capacityW || corridor.capacityW,
-        )}{" "}
-        regional corridor.
       </Typography>
       {!readOnly && !buildable && (
         <Typography
@@ -353,6 +342,19 @@ function IntertieBuildItem(props: {
         </Button>
       </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 1 }}
+          component="div"
+        >
+          Your access {formatWatts(corridor.capacityW)} of a{" "}
+          {formatWatts(
+            corridorById(corridor.id)?.capacityW || corridor.capacityW,
+          )}{" "}
+          regional corridor.
+        </Typography>
+        {expanded && props.renderPortfolio()}
         {market && (
           <Typography
             className="buildOptionDescription"
@@ -517,7 +519,7 @@ function IntertieUpgradeControl(props: {
                 },
                 {
                   concept: "finances",
-                  label: "Loan option",
+                  label: "Loan",
                   value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(getMonthlyPayment(line.loanAmountLeft + quote.buildCost - downpayment, interestRate, LOAN_MONTHS))}/mo`,
                   detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(interestRate * 100).toFixed(2)}%.${line.loanAmountLeft > 0 ? ` Includes refinancing the existing ${formatMoneyConcise(line.loanAmountLeft)} balance at this rate and term.` : ""}`,
                 },
@@ -675,12 +677,6 @@ export default function TransmissionPanel({
   const review = unbuiltCorridors.find(({ id }) => id === reviewId);
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
   const reviewDownpayment = (review?.buildCost || 0) * DOWNPAYMENT_PERCENT;
-  const reviewOutlook = review && outlookFor(review.id);
-  const portfolio =
-    review &&
-    forecast &&
-    intertiePortfolioOutlook(game, review.id, forecast, OUTLOOK_STEP_MINUTES);
-  const reviewPeriods = reviewOutlook && pricePeriodCaption(reviewOutlook);
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed);
@@ -951,6 +947,60 @@ export default function TransmissionPanel({
                 outlook={outlookFor(corridor.id)}
                 readOnly={readOnly}
                 units={units}
+                renderPortfolio={() => {
+                  const portfolio =
+                    forecast &&
+                    intertiePortfolioOutlook(
+                      game,
+                      corridor.id,
+                      forecast,
+                      OUTLOOK_STEP_MINUTES,
+                    );
+                  return portfolio ? (
+                    <Box className="buildOptionDetailBody">
+                      <Typography variant="subtitle2">
+                        Portfolio outlook
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Next-year demand, current fleet and trading rule.
+                        Assumes this connection is open; excludes unfinished
+                        assets and upgrades.
+                      </Typography>
+                      <dl className="transmissionMetrics">
+                        <div>
+                          <dt>Shortfall covered</dt>
+                          <dd>{percent(portfolio.shortfallCoverage)}</dd>
+                          <dd className="transmissionMetricNote">
+                            Adds {percent(portfolio.marginalCoverage)} with this
+                            connection
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Largest remaining gap</dt>
+                          <dd>{formatWatts(portfolio.worstGapW)}</dd>
+                        </div>
+                        <div>
+                          <dt>Electricity purchases / year</dt>
+                          <dd>
+                            {formatMoneyConcise(portfolio.annualEnergyCost)}
+                          </dd>
+                          <dd className="transmissionMetricNote">
+                            Change{" "}
+                            {formatMoneyConcise(portfolio.additionalEnergyCost)}
+                            ; excludes upkeep and financing
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Gap with half the spare supply</dt>
+                          <dd>{formatWatts(portfolio.stressGapW)}</dd>
+                          <dd className="transmissionMetricNote">
+                            Illustration, not a forecast
+                          </dd>
+                        </div>
+                      </dl>
+                    </Box>
+                  ) : null;
+                }}
                 onReview={() => setReviewId(corridor.id)}
               />
             ))}
@@ -975,107 +1025,37 @@ export default function TransmissionPanel({
             Build {reviewMarket?.name} intertie?
           </ClosableDialogTitle>
           <DialogContent className="noPadding">
-            {portfolio && (
-              <Box sx={{ p: 2 }}>
-                <Typography variant="subtitle2">
-                  Your portfolio: next-year demand, current operating fleet
+            <Box sx={{ px: 2, pb: 1 }}>
+              <Typography variant="body2">
+                {formatWatts(review.capacityW)} access · Ready in{" "}
+                {Math.round(review.yearsToBuild * 12)} months
+              </Typography>
+              {game.date.monthsElapsed + review.yearsToBuild * 12 >=
+                (getScenario(game.scenarioId, game.customScenario)
+                  ?.durationMonths ?? Infinity) && (
+                <Typography variant="body2" color="warning.main">
+                  Won’t open before this mission ends.
                 </Typography>
-                <Typography variant="body2">
-                  Assumes this connection is already open; excludes unfinished
-                  assets and upgrades. Uses your current trading rule.
-                  Construction still takes{" "}
-                  {Math.round(review.yearsToBuild * 12)} months.
-                </Typography>
-                {game.date.monthsElapsed + review.yearsToBuild * 12 >=
-                  (getScenario(game.scenarioId, game.customScenario)
-                    ?.durationMonths ?? Infinity) && (
-                  <Typography variant="body2" color="warning.main">
-                    This connection will not open before this mission ends.
-                  </Typography>
-                )}
-                <dl className="transmissionMetrics">
-                  <div>
-                    <dt>Shortfall energy covered</dt>
-                    <dd>
-                      {percent(portfolio.shortfallCoverage)} with all
-                      connections
-                    </dd>
-                    <dd className="transmissionMetricNote">
-                      Adds {percent(portfolio.marginalCoverage)} of local
-                      shortfall coverage
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Worst remaining gap</dt>
-                    <dd>{formatWatts(portfolio.worstGapW)}</dd>
-                  </div>
-                  <div>
-                    <dt>Annual electricity purchases</dt>
-                    <dd>{formatMoneyConcise(portfolio.annualEnergyCost)}</dd>
-                    <dd className="transmissionMetricNote">
-                      Change{" "}
-                      {formatMoneyConcise(portfolio.additionalEnergyCost)}; line
-                      upkeep {formatMoneyConcise(review.annualOperatingCost)}
-                      /year and financing extra
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Regional-stress example</dt>
-                    <dd>{formatWatts(portfolio.stressGapW)} remaining gap</dd>
-                    <dd className="transmissionMetricNote">
-                      Illustration: every neighbor has half its usual spare
-                      supply. This is not a predicted event.
-                    </dd>
-                  </div>
-                </dl>
-              </Box>
-            )}
+              )}
+            </Box>
             <DecisionImpactPreview
               facts={[
                 {
                   concept: "money",
-                  label: "Cash purchase",
-                  value: `${formatMoneyConcise(now?.cash || 0)} → ${formatMoneyConcise((now?.cash || 0) - review.buildCost)}`,
+                  label: "Cash",
+                  value: `${formatMoneyConcise(review.buildCost)} · ${formatMoneyConcise((now?.cash || 0) - review.buildCost)} left`,
                 },
                 {
                   concept: "finances",
-                  label: "Loan option",
+                  label: "Loan",
                   value: `${formatMoneyConcise(reviewDownpayment)} now + ${formatMoneyConcise(getMonthlyPayment(review.buildCost - reviewDownpayment, game.interestRate, LOAN_MONTHS))}/mo`,
-                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(game.interestRate * 100).toFixed(2)}%.`,
+                  detail: `${LOAN_MONTHS / 12} years at ${(game.interestRate * 100).toFixed(2)}%; payments start now.`,
                 },
                 {
                   concept: "money",
-                  label: "Estimated upkeep",
-                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo`,
-                  detail: "Electricity purchases and loan payments are extra.",
+                  label: "Upkeep",
+                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo + power purchases`,
                 },
-                {
-                  concept: "time",
-                  label: "Online in",
-                  value: `${Math.round(review.yearsToBuild * 12)} months`,
-                },
-                {
-                  concept: "supply",
-                  label: "Your connection access",
-                  value: formatWatts(review.capacityW),
-                  detail: `Your utility’s share of a ${formatWatts(corridorById(review.id)?.capacityW || review.capacityW)} regional corridor. Imports also need spare neighboring generation.`,
-                },
-                ...(reviewOutlook
-                  ? [
-                      {
-                        concept: "supply" as const,
-                        label: "Import room",
-                        value: `~${percent(reviewOutlook.atPeak)} at your peak`,
-                        detail: `Typically ${percent(reviewOutlook.mean)} of the line; least in ${MONTH_NAMES[reviewOutlook.lowMonth]} (${percent(reviewOutlook.monthly[reviewOutlook.lowMonth])}). ${reviewMarket?.description ?? ""}`,
-                      },
-                      {
-                        concept: "money" as const,
-                        label: "Neighbor price",
-                        value: priceRange(reviewOutlook),
-                        detail: `${reviewPeriods ? reviewPeriods + ". " : ""}Imports come from your cheapest connected neighbor first.`,
-                      },
-                    ]
-                  : []),
               ]}
             />
           </DialogContent>

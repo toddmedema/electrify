@@ -425,9 +425,9 @@ describe("the interties view", () => {
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent(/Import room~\d+% at your peak/);
-    expect(dialog).toHaveTextContent(/Neighbor price\$\d+–\d+\/MWh/);
-    expect(dialog).toHaveTextContent("cheapest connected neighbor first");
+    expect(dialog).toHaveTextContent("150MW access · Ready in 36 months");
+    expect(dialog).not.toHaveTextContent("Portfolio outlook");
+    expect(dialog).not.toHaveTextContent("Typical price");
     expect(dialog).not.toHaveTextContent("backup is not guaranteed");
   });
 
@@ -487,7 +487,7 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("Loan option");
+    expect(screen.getByRole("dialog")).toHaveTextContent("payments start now");
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
