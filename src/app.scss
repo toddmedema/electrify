@@ -1882,7 +1882,7 @@ $pane_header_height: 48px;
 .decisionImpact {
   padding: 12px 16px 14px;
   border-bottom: 1px solid var(--border-selected);
-  background: var(--bg-selected);
+  background: transparent;
 
   & > .MuiTypography-overline {
     font-weight: 800;
@@ -5143,7 +5143,8 @@ $sizemap: (
 }
 .decisionImpact {
   padding: 16px;
-  background: var(--bg-primary);
+  // Purchase and upgrade facts share the dialog surface in both themes.
+  background: transparent;
   border-bottom: 1px solid var(--border-subtle);
 }
 .decisionImpactFacts {

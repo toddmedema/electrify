@@ -1,3 +1,4 @@
+import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -61,6 +62,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await review.click();
     const dialog = page.getByRole("dialog");
+    await expectContinuousDialogSurface(dialog);
     await expect(dialog).toContainText("Includes refinancing the existing");
     await expect(dialog).toContainText("Construction emits");
     await expect(dialog).toContainText("Upkeep after upgrade");

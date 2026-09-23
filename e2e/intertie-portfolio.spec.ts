@@ -1,3 +1,4 @@
+import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -36,6 +37,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(card).toContainText("Gap with half the spare supply");
     await review.click();
     const dialog = page.getByRole("dialog");
+    await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
     await expect(dialog).toContainText("5MW access · Ready in 12 months");
