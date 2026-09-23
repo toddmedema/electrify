@@ -1341,6 +1341,10 @@ export default class Insights extends React.Component<Props, State> {
             />
           </button>
         )}
+        <CustomerPrograms
+          game={game}
+          onViewDemand={() => this.setLayers(["demandByType"])}
+        />
         <span id="insightsRateSummary" className="srOnly">
           {rateSummary}
         </span>
@@ -1390,10 +1394,6 @@ export default class Insights extends React.Component<Props, State> {
             }
           />
         </div>
-        <CustomerPrograms
-          game={game}
-          onViewDemand={() => this.setLayers(["demandByType"])}
-        />
       </section>
     );
   }

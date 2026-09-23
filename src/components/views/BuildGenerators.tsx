@@ -244,7 +244,7 @@ export function GeneratorBuildItem(
   const canBuild = buildable && financingGap === 0;
   const buildSubtitle =
     buildable && financingGap > 0
-      ? `Can't afford the loan down payment. Need ${formatMoneyConcise(financingGap)} more cash.`
+      ? `${formatMoneyConcise(financingGap)} cash needed to afford loan downpayment`
       : secondaryText;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
@@ -375,9 +375,6 @@ export function GeneratorBuildItem(
       )}
       {props.hydroAvailability && (
         <Box sx={{ px: 2, pb: 1 }}>
-          <Typography variant="body2">
-            Plant: {formatWatts(generator.peakW, 6)}
-          </Typography>
           <Typography variant="body2">
             {props.hydroAvailability.remaining.length} sites left ·{" "}
             {props.hydroAvailability.eligible.length}{" "}
@@ -1036,7 +1033,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 hydroAvailability={
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
-                onUseSiteMaximum={setExactHydroW}
+                onUseSiteMaximum={(peakW) => {
+                  setSliderTick(getTickFromW(peakW));
+                  setExactHydroW(peakW);
+                }}
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

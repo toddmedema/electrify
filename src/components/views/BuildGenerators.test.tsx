@@ -306,7 +306,9 @@ it("explains affordability and hides comparison when a build is disabled", () =>
     />,
   );
 
-  expect(screen.getByText(/Can't afford the loan down payment/)).toBeVisible();
+  expect(
+    screen.getByText(/cash needed to afford loan downpayment/),
+  ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Natural Gas/ }),
   ).toBeNull();
@@ -425,7 +427,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   ).toBeGreaterThan(3);
 });
 
-it("quotes an exact Hydro site maximum without changing the shared slider", () => {
+it("quotes a Hydro site maximum and updates the shared slider", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   game.location = LOCATIONS.PIT;
   game.facilities = [];
@@ -452,7 +454,7 @@ it("quotes an exact Hydro site maximum without changing the shared slider", () =
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
-  expect(slider).toHaveAttribute("aria-valuenow", before!);
+  expect(slider).not.toHaveAttribute("aria-valuenow", before!);
   expect(
     screen.getByText(new RegExp("Site: " + HYDRO_SITES[site.id].name)),
   ).toBeInTheDocument();

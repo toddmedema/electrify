@@ -87,3 +87,40 @@ describe("upcoming story events", () => {
     );
   });
 });
+
+test("scheduled data-center connections appear and update when the schedule changes", () => {
+  const game = createGame({ scenarioId: 106 });
+  const initial = selectUpcomingStoryEvents({ game } as AppStateType);
+  expect(initial).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        key: "load:manassas-data-centers",
+        startsMinute: 72 * MINUTES_PER_MONTH,
+        title: "New data centers online",
+        message: expect.stringContaining("100MW"),
+      }),
+    ]),
+  );
+  game.loadAdditions = [
+    { ...game.loadAdditions[0], id: "phase-one", peakW: 50000000 },
+    {
+      ...game.loadAdditions[0],
+      id: "phase-two",
+      peakW: 50000000,
+      startsYear: 2028,
+    },
+  ];
+  const phased = selectUpcomingStoryEvents({ game } as AppStateType).filter(
+    (event) => event.key.startsWith("load:"),
+  );
+  expect(phased.map((event) => event.startsMinute)).toEqual(
+    [72, 96].map((month) => month * MINUTES_PER_MONTH),
+  );
+  expect(phased.every((event) => event.message.includes("50MW"))).toBe(true);
+  game.date = getDateFromMinute(72 * MINUTES_PER_MONTH, game.startingYear);
+  expect(
+    selectUpcomingStoryEvents({ game } as AppStateType)
+      .filter((event) => event.key.startsWith("load:"))
+      .map((event) => event.key),
+  ).toEqual(["load:phase-two"]);
+});

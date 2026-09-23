@@ -85,7 +85,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const financingGap = Math.max(0, downpayment - cash);
   const buildSubtitle =
     buildable && financingGap > 0
-      ? `Can't afford the loan down payment. Need ${formatMoneyConcise(financingGap)} more cash.`
+      ? `${formatMoneyConcise(financingGap)} cash needed to afford loan downpayment`
       : secondaryText;
 
   const toggleExpand = () => {

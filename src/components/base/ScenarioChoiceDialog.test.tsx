@@ -21,6 +21,7 @@ jest.mock("../../Store", () => ({
   useAppSelector: () => ({ inGame: true, difficulty: "CEO", date: {} }),
 }));
 jest.mock("../../helpers/ScenarioChoices", () => ({
+  ...jest.requireActual("../../helpers/ScenarioChoices"),
   pendingScenarioChoice: () => mockDecision,
 }));
 jest.mock("../../helpers/DateTime", () => ({
@@ -42,14 +43,16 @@ beforeEach(() => {
         label: "Accept funding",
         cost: () => 0,
         upfrontGrant: () => 10000000,
-        description: "100 MW arrives in January 2026.",
+        description:
+          "Receive {grant} in exchange for the full 100 MW coming online in January 2026.",
         message: "Funding accepted.",
       },
       {
         id: "phased",
         label: "Phase connections",
         cost: () => 0,
-        description: "50 MW in 2026, another 50 MW in 2028.",
+        description:
+          "Forgo funding to connect 50 MW in 2026 and another 50 MW in 2028.",
         message: "Connections phased.",
       },
     ],
@@ -60,12 +63,12 @@ test("explains funding and both binding schedules accessibly before a choice", (
   renderDialog();
   const funded = screen.getByRole("button", { name: "Accept funding" });
   expect(funded).toHaveAccessibleDescription(
-    "One-time funding: $10.0M 100 MW arrives in January 2026.",
+    "Receive $10M in exchange for the full 100 MW coming online in January 2026.",
   );
   expect(
     screen.getByRole("button", { name: "Phase connections" }),
   ).toHaveAccessibleDescription(
-    "No upfront cost 50 MW in 2026, another 50 MW in 2028.",
+    "Forgo funding to connect 50 MW in 2026 and another 50 MW in 2028.",
   );
   fireEvent.click(funded);
   expect(mockDispatch).toHaveBeenCalledWith({
@@ -80,14 +83,15 @@ test("an unaffordable paid option explains the shortfall and leaves a free respo
     id: "winterize",
     label: "Winterize plants",
     cost: () => 40000000,
-    description: "Halve output losses; demand and gas prices still surge.",
+    description:
+      "Spend {cost} to halve output losses while demand and gas prices still surge.",
     message: "Winterization funded.",
   };
   renderDialog();
   const paid = screen.getByRole("button", { name: "Winterize plants" });
   expect(paid).toBeDisabled();
   expect(paid).toHaveAccessibleDescription(
-    /One-time cost: \$40.0M · Insufficient cash.*Halve output losses/,
+    "Spend $40M to halve output losses while demand and gas prices still surge. · Insufficient cash",
   );
   expect(
     screen.getByRole("button", { name: "Phase connections" }),

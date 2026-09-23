@@ -146,7 +146,7 @@ for (const [id, site] of Object.entries(input.sites)) {
   candidates.push({
     id,
     name: site.name,
-    maxPeakW: site.maxPeakW,
+    maxPeakW: Number(site.maxPeakW.toPrecision(1)),
     lat: site.lat,
     lon: site.lon,
     source: site.source,
@@ -174,19 +174,21 @@ const inventories = {};
 for (const city of cities) {
   const point = { lat: city.lat, lon: city.long };
   const siteIds = sites
-    .filter((s) => distance(point, s) <= 250)
+    .filter((s) => s.originalValue >= 10 && distance(point, s) <= 250)
     .map((s) => s.id);
   const originalIds = input.locations[city.id]?.siteIds;
   if (!originalIds) throw new Error(`Missing research disposition: ${city.id}`);
   const inEiaCoverage = city.country === "United States" && city.id !== "SJU";
   const status =
-    siteIds.length || inEiaCoverage ? "researched" : "unresearched";
+    sites.some((s) => distance(point, s) <= 250) || inEiaCoverage
+      ? "researched"
+      : "unresearched";
   inventories[city.id] = {
     status,
     locationLat: city.lat,
     locationLong: city.long,
     siteIds,
-    researchDisposition: `Reviewed issue #417 GPPD/EIA candidate inventory (${originalIds.length} records), plus JRC conventional cross-check; ${siteIds.length} qualifying verified sites within 250 km. ${inEiaCoverage ? "EIA coverage: US conventional HY units >=1 MW; excludes non-powered-dam potential and cross-border projects without corroboration." : siteIds.length ? "Partial source coverage only: EIA US plants, JRC-correlated European plants and individually reviewed Zambian sites. Remaining GPPD records lack corroborated technology, capacity or physical-site identity; omitted pending source resolution." : "Source gap: GPPD Hydro does not identify pumped storage and includes aggregate/mislocated records; no candidate passed the conventional physical-site corroboration method. This is unavailable research, not a zero-potential finding."}`,
+    researchDisposition: `Reviewed issue #417 GPPD/EIA candidate inventory (${originalIds.length} records), plus JRC conventional cross-check; ${siteIds.length} qualifying verified sites within 250 km. ${inEiaCoverage ? "EIA coverage: US conventional HY units >=1 MW; excludes non-powered-dam potential and cross-border projects without corroboration." : status === "researched" ? "Partial source coverage only: EIA US plants, JRC-correlated European plants and individually reviewed Zambian sites. Remaining GPPD records lack corroborated technology, capacity or physical-site identity; omitted pending source resolution." : "Source gap: GPPD Hydro does not identify pumped storage and includes aggregate/mislocated records; no candidate passed the conventional physical-site corroboration method. This is unavailable research, not a zero-potential finding."}`,
   };
 }
 inventories["scenario:114"] = {
@@ -202,7 +204,7 @@ const output = {
   metadata: {
     accessed,
     radiusKm: 250,
-    minimumPeakW: 1000000,
+    minimumPeakW: 10000000,
     researchRevision: "d102fef109030842710643c979f171ef67d014e1",
     jrcVersion,
     inputHashes: {

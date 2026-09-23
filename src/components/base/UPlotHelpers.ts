@@ -150,7 +150,7 @@ interface AxisOptions {
  * leaves N pixels between labels?"), and its ladder includes 2.5, so it would answer a
  * 400-950MW axis with 200MW steps where Victory answered 100MW, and label a 250MW step "0.3GW".
  */
-export function niceSplits(min: number, max: number, target = 5): number[] {
+export function niceSplits(min: number, max: number, target = 4): number[] {
   const raw = (max - min) / target;
   if (!(raw > 0)) {
     return [min];

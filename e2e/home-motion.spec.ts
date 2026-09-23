@@ -43,8 +43,8 @@ for (const theme of ["light", "dark"]) {
       };
       const first = sample(150);
       const second = sample(450);
-      const quiet = [600, 1500, 5000, 9900].map(sample);
-      const nextSweep = sample(10150);
+      const quiet = [601, 1500, 5000, 7000].map(sample);
+      const nextSweep = sample(10000 / 1.4 + 150);
       const timing = animation.effect!.getComputedTiming();
       return {
         before,
@@ -61,8 +61,15 @@ for (const theme of ["light", "dark"]) {
     expect(Number(result.first.opacity)).toBeGreaterThan(0);
     expect(Number(result.second.opacity)).toBeGreaterThan(0);
     expect(result.quiet.every((sample) => sample.opacity === "0")).toBe(true);
-    expect(result.nextSweep).toEqual(result.first);
-    expect(result.duration).toBe(10000);
+    expect(Number(result.nextSweep.offset.replace("px", ""))).toBeCloseTo(
+      Number(result.first.offset.replace("px", "")),
+      2,
+    );
+    expect(Number(result.nextSweep.opacity)).toBeCloseTo(
+      Number(result.first.opacity),
+      2,
+    );
+    expect(result.duration).toBeCloseTo(10000 / 1.4, 1);
     expect(result.recurring).toBe(true);
     expect(result.after).toEqual(result.before);
     await expect(

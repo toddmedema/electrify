@@ -520,7 +520,7 @@ $topbar_height: 56px;
 }
 
 #topbar .constructionTitleBar.MuiToolbar-root {
-  padding-left: max($space-2, env(safe-area-inset-left)) !important;
+  padding-left: max($space-4, env(safe-area-inset-left)) !important;
   padding-right: max($space-2, env(safe-area-inset-right)) !important;
 }
 
@@ -875,6 +875,11 @@ $topbar_height: 56px;
 .gridHealthState {
   gap: 4px;
   white-space: nowrap;
+}
+
+.gridHealth .statusLabel,
+.gridHealthMetric {
+  font-weight: 400;
 }
 
 .gridHealthMetric {
@@ -1548,7 +1553,7 @@ $pane_header_height: 48px;
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin: 0 12px 8px;
+  margin: 8px 12px;
   color: var(--delta-bad);
 
   .MuiSvgIcon-root {
@@ -2592,7 +2597,7 @@ html[data-theme="dark"] .uplot {
       stroke-dasharray: 16 100;
       stroke-dashoffset: 16;
       opacity: 0;
-      animation: homeEnergySweep 10s ease-in-out infinite;
+      animation: homeEnergySweep calc(10s / 1.4) ease-in-out infinite;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -4121,7 +4126,8 @@ html[data-theme="dark"] .uplot {
   initial-value: 1;
 }
 
-.tutorialTargetRing {
+.tutorialTargetRing,
+.missionList .tutorialSpotlight {
   position: fixed;
   z-index: 1240; // above the game, below the objective HUD (1250) and any dialog
   box-sizing: border-box;
@@ -4193,6 +4199,12 @@ html[data-theme="dark"] .uplot {
   }
 }
 
+.missionList .tutorialSpotlight {
+  position: relative;
+  z-index: auto;
+  pointer-events: auto;
+}
+
 @keyframes tutorialGlint {
   to {
     --tutorial-glint-angle: 360deg;
@@ -4246,7 +4258,8 @@ html[data-theme="dark"] .uplot {
   }
 
   // Without the pulse or glint, a slightly heavier line keeps the cue obvious.
-  .tutorialTargetRing {
+  .tutorialTargetRing,
+  .missionList .tutorialSpotlight {
     border-width: 3px;
 
     &::before,
@@ -4406,11 +4419,11 @@ $sizemap: (
     stroke-dashoffset: 16;
     opacity: 0;
   }
-  1%,
-  5% {
+  1.4%,
+  7% {
     opacity: 1;
   }
-  6%,
+  8.4%,
   100% {
     stroke-dashoffset: -100;
     opacity: 0;
@@ -5614,4 +5627,14 @@ $sizemap: (
       display: block;
     }
   }
+}
+
+.insights .insightsLevers {
+  position: relative;
+  padding-right: 64px;
+}
+.customerProgramsControl {
+  position: absolute;
+  right: 12px;
+  top: 0;
 }

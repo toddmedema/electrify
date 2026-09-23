@@ -53,14 +53,16 @@ describe("researched conventional Hydro catalogue", () => {
       }
   });
 
-  it("uses unique physical records with integer source watts and provenance", () => {
+  it("uses unique physical records with rounded gameplay watts and provenance", () => {
     expect(new Set(catalogue.sites.map((site) => site.id)).size).toBe(
       catalogue.sites.length,
     );
     for (const site of catalogue.sites) {
       expect(Number.isSafeInteger(site.maxPeakW)).toBe(true);
-      expect(site.maxPeakW).toBeGreaterThanOrEqual(1000000);
-      expect(site.maxPeakW).toBe(Math.round(site.originalValue * 1000000));
+      expect(site.maxPeakW).toBeGreaterThanOrEqual(10000000);
+      expect(site.maxPeakW).toBe(
+        Number((site.originalValue * 1000000).toPrecision(1)),
+      );
       expect(site.originalUnit).toBe("MW");
       expect(Number.isFinite(site.lat) && Math.abs(site.lat) <= 90).toBe(true);
       expect(Number.isFinite(site.lon) && Math.abs(site.lon) <= 180).toBe(true);
@@ -89,7 +91,7 @@ describe("researched conventional Hydro catalogue", () => {
   it("corroborates Pittsburgh and every authored starting Hydro fleet", () => {
     const pittsburgh = HYDRO_INVENTORIES.PIT;
     expect(pittsburgh.status).toBe("researched");
-    expect(pittsburgh.siteIds).toHaveLength(24);
+    expect(pittsburgh.siteIds).toHaveLength(13);
     expect(
       Math.max(...pittsburgh.siteIds.map((id) => HYDRO_SITES[id].maxPeakW)),
     ).toBe(HYDRO_SITES["lake-lynn-hydro-station-us"].maxPeakW);

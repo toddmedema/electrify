@@ -15,13 +15,13 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "fast speed" })
       .first();
     await fast.click();
-    const region = page.getByRole("dialog", { name: "Wildfire preparedness" });
+    const region = page.getByRole("dialog", { name: /Wildfire preparedness/ });
     await expect(region).toBeVisible({ timeout: 30000 });
     const fund = region.getByRole("button", { name: "Fund preparedness" });
     await expect(fund).toBeEnabled();
-    await expect(region).toContainText("Game paused");
-    await expect(region).toContainText("One-time cost: $0.2M");
-    await expect(region).toContainText("Restoration costs still apply");
+    await expect(region).toContainText("Paused");
+    await expect(region).toContainText("Spend $200k");
+    await expect(region).toContainText("restoration costs apply either way");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")
       .evaluate(
@@ -43,7 +43,7 @@ for (const theme of ["light", "dark"]) {
       );
       const fundBox = (await fund.boundingBox())!;
       const costBox = (await region
-        .getByText("One-time cost:", { exact: false })
+        .getByText("Spend $200k", { exact: false })
         .boundingBox())!;
       const keepCashBox = (await region
         .getByRole("button", { name: "Keep cash" })

@@ -1,6 +1,26 @@
-import { GameType, ScenarioChoiceType } from "../Types";
+import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
+import { formatMoneyConcise } from "./Format";
+
+/** Keep the price and consequence in one sentence, using the active difficulty's terms. */
+export function scenarioChoiceDescription(
+  option: ScenarioChoiceType["options"][number],
+  difficulty: DifficultyType,
+) {
+  const cost = option.cost(difficulty);
+  const grant = option.upfrontGrant?.(difficulty) ?? 0;
+  const description =
+    option.description ??
+    (grant > 0
+      ? "Receive {grant} in one-time funding."
+      : cost > 0
+        ? "Spend {cost} upfront."
+        : "No upfront cost.");
+  return description
+    .replaceAll("{cost}", formatMoneyConcise(cost))
+    .replaceAll("{grant}", formatMoneyConcise(grant));
+}
 /** Due choices remain pending until explicitly answered, including after loading a save.
  * Array order breaks ties so simultaneous choices appear sequentially. */
 export function pendingScenarioChoice(

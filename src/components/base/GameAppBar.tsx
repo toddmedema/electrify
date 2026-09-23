@@ -266,14 +266,6 @@ export function GameAppBar(props: Props) {
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Settings</MenuItem>
-          <MenuItem
-            onClick={() => {
-              setScenarioDetailsOpen(true);
-              handleMenuClose();
-            }}
-          >
-            Scenario details
-          </MenuItem>
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>

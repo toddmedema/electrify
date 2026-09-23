@@ -29,7 +29,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         upfrontGrant: (difficulty) => DATA_CENTER_GRANT[difficulty],
         description:
-          "Receive funding toward capacity and connection work, not the full cost. Connect 100 MW in January 2026, when sales begin.",
+          "Receive {grant} in exchange for the full 100 MW coming online in January 2026.",
         message:
           "Funding received. Your agreement commits you to connect 100 MW in January 2026.",
       },
@@ -38,7 +38,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         label: "Require phased connections",
         cost: () => 0,
         description:
-          "No funding. Connect 50 MW in January 2026 and 50 MW in January 2028, delaying half the demand and sales by two years.",
+          "Forgo funding to connect 50 MW in January 2026 and 50 MW in January 2028, delaying half the demand and sales by two years.",
         message:
           "Phased connection agreed: 50 MW in January 2026 and 50 MW in January 2028, with no funding.",
         loadAdditions: [
@@ -68,14 +68,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 36,
     title: "Prepare for the deep freeze",
     message:
-      "Fund plant protection and supplier coordination before February 2021 to reduce output losses. Demand and gas prices will still surge.",
+      "Choose whether to protect plant output before February 2021; demand and gas prices will surge either way.",
     options: [
       {
         id: "winterize",
         label: "Fund winterization",
         cost: winterizationCost,
         description:
-          "Halve February output losses: gas retains 81%, coal 86.5%, nuclear 88.5%, and wind 72% of normal output. Demand and gas-price shocks still apply.",
+          "Spend {cost} to halve February output losses, retaining 81% of gas, 86.5% of coal, 88.5% of nuclear, and 72% of wind output.",
         message:
           "Winterization funded. February 2021 plant output losses will be halved; the demand surge and gas-price spike still apply.",
       },
@@ -85,7 +85,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         meaningful: false,
         description:
-          "Keep your cash for generation and storage. February output falls to 62% for gas, 73% for coal, 77% for nuclear, and 44% for wind; demand and gas prices also surge.",
+          "Keep your cash for construction and accept February output falling to 62% for gas, 73% for coal, 77% for nuclear, and 44% for wind.",
         message:
           "Construction budget preserved. Full February 2021 output losses, demand surge, and gas-price spike apply.",
       },
@@ -97,12 +97,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Extreme Santa Ana winds are forecast for January. Inspections, staged backup equipment and response crews halve customer disconnections and generator output losses in January and February. Restoration costs still apply.",
+      "Prepare for January's extreme Santa Ana winds; restoration costs apply either way.",
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
+        description:
+          "Spend {cost} on inspections, backup equipment, and crews to halve customer disconnections and generator output losses in January and February.",
         message:
           "Preparedness funded. January and February customer disconnections and generator output losses are halved. Restoration costs still apply.",
       },
@@ -111,6 +113,8 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         meaningful: false,
         label: "Keep cash",
         cost: () => 0,
+        description:
+          "Keep your cash and accept the full customer disconnections and generator output losses in January and February.",
         message:
           "Cash preserved. The full January and February outage impact and restoration costs apply.",
       },
