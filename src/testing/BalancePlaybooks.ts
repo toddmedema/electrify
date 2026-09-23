@@ -159,8 +159,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   110: {
-    // Oil cannot economically serve this long replacement duty at its corrected carbon cost.
-    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
+    // Fast construction covers the nuclear trip before a new gas plant could arrive.
+    initialBuild: { name: "Oil", peakW: 300000000, financed: true },
     scheduledActions: [
       rate(0.141),
       ...line("france-core-upgrade"),
@@ -170,11 +170,14 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   111: {
+    // Limited import access makes preparing the local grid a real reliability decision.
+    scenarioResponses: {
+      "story:111:california-wildfire-2025:preparedness": "prepare",
+    },
     scheduledActions: [
       rate(0.171),
       ...line("california-north"),
       ...dispatch([1, 2, 3, 4]),
-      { month: 35, type: "toggle", facilityId: 5 },
       ...programs(34),
     ],
   },

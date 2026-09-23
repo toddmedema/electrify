@@ -1,3 +1,7 @@
+import {
+  accessContextForGame,
+  effectiveCorridor,
+} from "../data/IntertieAccess";
 import cloneDeep from "lodash.clonedeep";
 import {
   DOWNPAYMENT_PERCENT,
@@ -43,7 +47,7 @@ function runMonths(state: GameType, months: number) {
 }
 
 function corridor() {
-  return TRANSMISSION_CORRIDORS.find(({ id }) => id === CORRIDOR)!;
+  return effectiveCorridor(CORRIDOR, { scenarioId: 100, locationId: "SF" })!;
 }
 
 describe("intertie upgrades", () => {
@@ -99,6 +103,9 @@ describe("intertie upgrades", () => {
     const quote = intertieUpgradeQuote(
       before.transmission!.lines[0],
       before.date.year,
+      1,
+      1,
+      accessContextForGame(before),
     )!;
     const state = cloneDeep(
       gameReducer(
@@ -161,7 +168,13 @@ describe("intertie upgrades", () => {
     let state = openIntertie();
     for (let i = 0; i < MAX_INTERTIE_UPGRADES; i++) {
       expect(
-        intertieUpgradeQuote(state.transmission!.lines[0], state.date.year),
+        intertieUpgradeQuote(
+          state.transmission!.lines[0],
+          state.date.year,
+          1,
+          1,
+          accessContextForGame(state),
+        ),
       ).toBeDefined();
       state = cloneDeep(
         gameReducer(
@@ -173,10 +186,20 @@ describe("intertie upgrades", () => {
       runMonths(state, 25);
     }
     const line = state.transmission!.lines[0];
-    expect(intertieUpgradeCount(line)).toBe(MAX_INTERTIE_UPGRADES);
+    expect(intertieUpgradeCount(line, accessContextForGame(state))).toBe(
+      MAX_INTERTIE_UPGRADES,
+    );
     // The right of way and the substation land at either end are what run out, and no amount of
     // money buys past them: more capacity now needs a different route.
-    expect(intertieUpgradeQuote(line, state.date.year)).toBeUndefined();
+    expect(
+      intertieUpgradeQuote(
+        line,
+        state.date.year,
+        1,
+        1,
+        accessContextForGame(state),
+      ),
+    ).toBeUndefined();
     const refused = gameReducer(
       state,
       upgradeTransmissionLine({ corridorId: CORRIDOR, financed: false }),
@@ -209,6 +232,9 @@ describe("intertie upgrades", () => {
     const quote = intertieUpgradeQuote(
       state.transmission!.lines[0],
       state.date.year,
+      1,
+      1,
+      accessContextForGame(state),
     )!;
     getTimeFromTimeline(state.date.minute, state.timeline)!.cash =
       quote.buildCost * DOWNPAYMENT_PERCENT - 1;

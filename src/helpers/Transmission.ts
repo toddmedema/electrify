@@ -17,12 +17,17 @@ import {
 import {
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
-  corridorById,
 } from "../data/AdjacentMarkets";
 import {
   INTERTIE_ARCHETYPES,
   IntertieArchetypeType,
 } from "../data/IntertieArchetypes";
+import {
+  accessContextForGame,
+  effectiveCorridor,
+  effectiveMarket,
+  IntertieAccessContext,
+} from "../data/IntertieAccess";
 import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
 import {
   AdjacentMarketDefinitionType,
@@ -67,7 +72,9 @@ export function transmissionCapacityW(
     .reduce((sum, line) => sum + transmissionRatingW(line, conditions), 0);
 }
 
-export interface IntertieContext {
+export interface IntertieContext extends IntertieAccessContext {
+  /** Acknowledged tutorial exercise only; never a random market shock. */
+  tutorialSupplyLimitW?: number;
   seed: number;
   /** Monthly archetype shapes are written for the north and shift six months in the south */
   southernHemisphere: boolean;
@@ -81,9 +88,16 @@ export interface IntertieContext {
 }
 
 export function intertieContextForGame(
-  game: Pick<GameType, "seed" | "location" | "difficulty">,
+  game: Pick<GameType, "seed" | "location" | "difficulty"> &
+    Partial<
+      Pick<GameType, "scenarioId" | "customScenario" | "tutorialIntertieStress">
+    >,
 ): IntertieContext {
   return {
+    ...accessContextForGame({ ...game, scenarioId: game.scenarioId ?? -1 }),
+    tutorialSupplyLimitW: game.tutorialIntertieStress?.active
+      ? 150e6
+      : undefined,
     seed: game.seed,
     southernHemisphere: game.location.lat < 0,
     peakSharingImportLoss:
@@ -242,8 +256,8 @@ export function neighbourLullFactor(
 }
 
 /**
- * Share (0..1) of a line's weather-adjusted rating the neighbour can fill with imports right now.
- * The market's absolute `availableSupplyW` still applies on top.
+ * Share (0..1) of the independent neighboring supply allocation available right now.
+ * Physical line rating is a separate constraint.
  */
 export function importAvailabilityFraction(
   corridorId: string,
@@ -269,8 +283,8 @@ export function importAvailabilityFraction(
 }
 
 /**
- * Watts the neighbour can send over the line right now: the weather-adjusted rating, times the
- * share the neighbour can fill, capped by the market's spare supply. Mirrors the reducer's tick.
+ * Watts the neighbour can send: the smaller of weather-adjusted wire capacity and available
+ * neighboring generation. Additional paths still share the same market budget at allocation.
  */
 export function intertieImportLimitW(
   line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
@@ -278,11 +292,9 @@ export function intertieImportLimitW(
   minute: number,
   conditions: TransmissionConditions,
 ): number {
-  const market = adjacentMarketForCorridor(line.corridorId);
   return Math.min(
-    transmissionRatingW(line, conditions) *
-      importAvailabilityFraction(line.corridorId, context, minute, conditions),
-    market?.availableSupplyW || 0,
+    transmissionRatingW(line, conditions),
+    neighborImportSupplyW(line.corridorId, context, minute, conditions),
   );
 }
 
@@ -327,7 +339,26 @@ export function adjacentMarketPricePerMWh(
   );
 }
 
+export function neighborImportSupplyW(
+  corridorId: string,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): number {
+  const market = effectiveMarket(corridorId, context);
+  const supply =
+    corridorId === "california-north" &&
+    context.tutorialSupplyLimitW !== undefined
+      ? Math.min(market?.availableSupplyW || 0, context.tutorialSupplyLimitW)
+      : market?.availableSupplyW || 0;
+  return (
+    supply * importAvailabilityFraction(corridorId, context, minute, conditions)
+  );
+}
 export interface IntertieOffer {
+  marketId?: string;
+  marketImportLimitW?: number;
+  marketExportLimitW?: number;
   importLimitW: number;
   exportLimitW: number;
   pricePerMWh: number;
@@ -353,16 +384,44 @@ export function allocateIntertieFlows(
   const dearestFirst = [...indexed].sort(
     (a, b) => b.offer.pricePerMWh - a.offer.pricePerMWh || a.index - b.index,
   );
+  const importUsed = new Map<string, number>();
+  const exportUsed = new Map<string, number>();
   let remaining = importedW;
   for (const { offer, index } of cheapestFirst) {
     if (remaining <= 0) break;
-    imports[index] = Math.min(remaining, Math.max(0, offer.importLimitW));
+    imports[index] = Math.min(
+      remaining,
+      Math.max(0, offer.importLimitW),
+      Math.max(
+        0,
+        (offer.marketImportLimitW ?? Infinity) -
+          (offer.marketId ? importUsed.get(offer.marketId) || 0 : 0),
+      ),
+    );
+    if (offer.marketId)
+      importUsed.set(
+        offer.marketId,
+        (importUsed.get(offer.marketId) || 0) + imports[index],
+      );
     remaining -= imports[index];
   }
   remaining = exportedW;
   for (const { offer, index } of dearestFirst) {
     if (remaining <= 0) break;
-    exports[index] = Math.min(remaining, Math.max(0, offer.exportLimitW));
+    exports[index] = Math.min(
+      remaining,
+      Math.max(0, offer.exportLimitW),
+      Math.max(
+        0,
+        (offer.marketExportLimitW ?? Infinity) -
+          (offer.marketId ? exportUsed.get(offer.marketId) || 0 : 0),
+      ),
+    );
+    if (offer.marketId)
+      exportUsed.set(
+        offer.marketId,
+        (exportUsed.get(offer.marketId) || 0) + exports[index],
+      );
     remaining -= exports[index];
   }
   return { importedW: imports, exportedW: exports };
@@ -395,13 +454,14 @@ export function clearTransmissionMarket({
   const importedW = allowsImports(policy)
     ? Math.min(shortageW, capacityW, importLimitW)
     : 0;
-  const exportedW = allowsExports(policy)
-    ? Math.min(
-        Math.max(0, localSupplyW + importedW - demandW),
-        capacityW - importedW,
-        exportLimitW,
-      )
-    : 0;
+  const exportedW =
+    importedW === 0 && allowsExports(policy)
+      ? Math.min(
+          Math.max(0, localSupplyW + importedW - demandW),
+          capacityW - importedW,
+          exportLimitW,
+        )
+      : 0;
   const availableW = localSupplyW + importedW - exportedW;
   const roundingSlack =
     Number.EPSILON * Math.max(1, Math.abs(availableW), Math.abs(demandW)) * 8;
@@ -483,8 +543,9 @@ export interface IntertieUpgradeQuote {
 /** How many 1.5x steps this line has already taken above its corridor's authored rating. */
 export function intertieUpgradeCount(
   line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  context?: IntertieAccessContext,
 ): number {
-  const corridor = corridorById(line.corridorId);
+  const corridor = effectiveCorridor(line.corridorId, context);
   if (!corridor || !(corridor.capacityW > 0)) return 0;
   return Math.max(
     0,
@@ -497,8 +558,8 @@ export function intertieUpgradeCount(
 
 /**
  * The most this corridor may ever carry: whichever runs out first, the technology of the day or
- * the neighbour's own spare generation. A line to a market with nothing to sell is a line to
- * nowhere however thick the conductor.
+ * the regional market's physical supply/demand scale. Purchased utility supply is a separate
+ * budget, so a physical upgrade can be partly or entirely stranded; the UI discloses this.
  */
 export function intertieCapacityCeilingW(
   corridorId: string,
@@ -526,10 +587,11 @@ export function intertieUpgradeQuote(
   year: number,
   buildCostMultiplier = 1,
   buildTimeMultiplier = 1,
+  context?: IntertieAccessContext,
 ): IntertieUpgradeQuote | undefined {
-  const corridor = corridorById(line.corridorId);
+  const corridor = effectiveCorridor(line.corridorId, context);
   if (!corridor) return undefined;
-  const step = intertieUpgradeCount(line);
+  const step = intertieUpgradeCount(line, context);
   if (step >= MAX_INTERTIE_UPGRADES) return undefined;
   const targetCapacityW = Math.round(line.capacityW * INTERTIE_UPGRADE_STEP);
   if (targetCapacityW > intertieCapacityCeilingW(line.corridorId, year)) {

@@ -386,7 +386,7 @@ describe("the interties view", () => {
     ).not.toHaveLength(0);
     expect(screen.getAllByText("Total cost")).toHaveLength(2);
     expect(
-      screen.getByText(/Pay \$36M now · finance \$144M/),
+      screen.getByText(/Pay \$10.8M now · finance \$43.2M/),
     ).toBeInTheDocument();
   });
 

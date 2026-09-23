@@ -1,6 +1,9 @@
+import { beginIntertieStress } from "./GameActions";
+import { parseSave, serializeSave } from "../SaveGame";
 import cloneDeep from "lodash.clonedeep";
 import {
   TICKS_PER_YEAR,
+  TICKS_PER_MONTH,
   YEARS_PER_TICK,
   TICKS_PER_HOUR,
   GAME_TO_REAL_YEARS,
@@ -19,6 +22,7 @@ import gameReducer, {
   setTradingPolicy,
   tickState,
   togglePauseFacility,
+  setSpeed,
 } from "./Game";
 import {
   AppStateType,
@@ -34,7 +38,7 @@ import {
 import { IntertieArchetypeIdType } from "../data/IntertieArchetypes";
 import {
   adjacentMarketPricePerMWh,
-  importAvailabilityFraction,
+  intertieImportLimitW,
   intertieContextForGame,
   transmissionRatingW,
 } from "../helpers/Transmission";
@@ -75,16 +79,7 @@ function lineOffers(state: GameType, now: TickPresentFutureType) {
           now.minute,
           now,
         ),
-        importLimitW: Math.min(
-          ratingW *
-            importAvailabilityFraction(
-              line.corridorId,
-              context,
-              now.minute,
-              now,
-            ),
-          market.availableSupplyW,
-        ),
+        importLimitW: intertieImportLimitW(line, context, now.minute, now),
         emissionsKgco2ePerMWh: market.emissionsKgco2ePerMWh,
       };
     });
@@ -166,7 +161,7 @@ describe("transmission actions", () => {
       financed: true,
     });
     expect(getTimeFromTimeline(next.date.minute, next.timeline)!.cash).toBe(
-      1000000000 - 180000000 * 0.2,
+      1000000000 - 54000000 * 0.2,
     );
     const duplicate = gameReducer(
       next,
@@ -247,7 +242,7 @@ describe("transmission actions", () => {
     expect(line.yearsToBuildLeft).toBeGreaterThan(0);
     expect(principalPaid).toBeGreaterThan(0);
     expect(now.netWorth - now.cash).toBeCloseTo(
-      180000000 - debtBefore + principalPaid,
+      54000000 - debtBefore + principalPaid,
       5,
     );
   });
@@ -289,7 +284,7 @@ describe("transmission actions", () => {
       tickMWh(now.importedW!) * offer.pricePerMWh,
       6,
     );
-    expect(now.expensesOM).toBeCloseTo(3600000 / TICKS_PER_YEAR, 5);
+    expect(now.expensesOM).toBeCloseTo(1080000 / TICKS_PER_YEAR, 5);
     expect(now.expensesInterest).toBeGreaterThan(0);
     expect(line.loanAmountLeft).toBeLessThan(debtBefore);
     expect(now.cash).toBe(
@@ -499,6 +494,61 @@ describe("transmission actions", () => {
             (transmissionCapacityW || 0) < 500000000,
         ),
       ).toBe(true);
+      // Acknowledgement starts a real dispatch restriction, but inspection cannot run the clock.
+      expect(state.tutorialIntertieStress).toBeUndefined();
+      state.tutorialStep = 15;
+      state = cloneDeep(gameReducer(state, beginIntertieStress()));
+      expect(state.tutorialIntertieStress?.active).toBe(true);
+      const stressMinute = state.date.minute;
+      expect(state.timeline.some((t) => t.demandW > t.supplyW)).toBe(true);
+      state.tutorialStep = 16;
+      state = cloneDeep(gameReducer(state, setSpeed("FAST")));
+      tickState(state);
+      expect(state.speed).toBe("PAUSED");
+      expect(state.date.minute).toBe(stressMinute);
+      // The exercise is persistent, finite, validated, and replayed as a deliberate decision.
+      expect(
+        parseSave(serializeSave(state))?.game.tutorialIntertieStress,
+      ).toEqual(state.tutorialIntertieStress);
+      const bad = cloneDeep(state);
+      bad.tutorialIntertieStress!.suppliedTicks = Infinity;
+      expect(parseSave(serializeSave(bad))).toBeNull();
+      state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
+      state.tutorialStep = 18;
+      const finalCapstone = steps[18].capstone!;
+      expect(finalCapstone.success(appState())).toBe(false);
+      for (let i = 0; i < TICKS_PER_MONTH - 1; i++) tickState(state);
+      expect(finalCapstone.success(appState())).toBe(false);
+      tickState(state);
+      expect(finalCapstone.success(appState())).toBe(true);
+      expect(state.tutorialIntertieStress?.active).toBe(false);
+      expect(state.speed).toBe("PAUSED");
+      const restored = getTimeFromTimeline(state.date.minute, state.timeline)!;
+      const line = state.transmission!.lines[0];
+      expect(
+        intertieImportLimitW(
+          line,
+          intertieContextForGame(state),
+          restored.minute,
+          restored,
+        ),
+      ).toBeGreaterThan(150e6);
+      expect(
+        state.replayLog?.some((a) => a.type === "beginIntertieStress"),
+      ).toBe(true);
+      let replayed = createGameFromReplay(serializeReplay(state)!);
+      while (replayed.date.minute < stressMinute + 15) tickState(replayed);
+      expect(replayed.tutorialIntertieStress?.active).toBe(true);
+      replayed = cloneDeep(gameReducer(replayed, setSpeed("PAUSED")));
+      replayed = cloneDeep(gameReducer(replayed, setSpeed("FAST")));
+      expect(replayed.speed).toBe("FAST");
+      while (replayed.date.minute < state.date.minute) tickState(replayed);
+      expect(replayed.tutorialIntertieStress).toEqual(
+        state.tutorialIntertieStress,
+      );
+      expect(
+        getTimeFromTimeline(replayed.date.minute, replayed.timeline)?.supplyW,
+      ).toBeCloseTo(restored.supplyW, 0);
     } finally {
       jest.clearAllTimers();
       jest.useRealTimers();
@@ -733,6 +783,7 @@ describe("transmission actions", () => {
       state.facilities = [];
       const line = state.transmission!.lines[0];
       line.corridorId = corridorId;
+      line.capacityW = 10e9; // Let neighbor supply, rather than wire rating, bind.
       line.yearsToBuildLeft = 0;
       state.timeline.forEach((t) => {
         t.temperatureC = 40;

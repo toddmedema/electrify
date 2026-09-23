@@ -1,3 +1,8 @@
+import {
+  accessContextForGame,
+  effectiveCorridor,
+  IntertieAccessContext,
+} from "./data/IntertieAccess";
 import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
@@ -24,6 +29,7 @@ import {
 import { snackbarOpen } from "./reducers/UI";
 import {
   DOWNPAYMENT_PERCENT,
+  TICKS_PER_MONTH,
   INTERTIE_UPGRADE_STEP,
   MAX_INTERTIE_UPGRADES,
   MONTHS,
@@ -43,7 +49,6 @@ import {
   emptyTransmissionState,
   intertiesEnabledForScenario,
   corridorsForLocation,
-  TRANSMISSION_CORRIDORS,
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
@@ -133,6 +138,7 @@ function validLineInvestment(
   line: Partial<TransmissionLineOperatingType>,
   corridor: TransmissionCorridorDefinitionType,
   year: number,
+  context?: IntertieAccessContext,
 ): boolean {
   let expected = {
     corridorId: corridor.id,
@@ -145,7 +151,7 @@ function validLineInvestment(
       Math.log(INTERTIE_UPGRADE_STEP),
   );
   for (let step = 0; step < steps; step++) {
-    const quote = intertieUpgradeQuote(expected, year);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
     if (!quote) return false;
     expected = {
       ...expected,
@@ -165,7 +171,7 @@ function validLineInvestment(
       line.yearsToBuildLeft !== 0
     )
       return false;
-    const quote = intertieUpgradeQuote(expected, year);
+    const quote = intertieUpgradeQuote(expected, year, 1, 1, context);
     const upgrade = line.upgrade;
     if (
       !quote ||
@@ -202,12 +208,11 @@ function validLineInvestment(
 function validTransmissionLine(
   raw: unknown,
   year: number,
+  context?: IntertieAccessContext,
 ): raw is TransmissionLineOperatingType {
   if (typeof raw !== "object" || raw === null) return false;
   const line = raw as Partial<TransmissionLineOperatingType>;
-  const corridor = TRANSMISSION_CORRIDORS.find(
-    ({ id }) => id === line.corridorId,
-  );
+  const corridor = effectiveCorridor(line.corridorId || "", context);
   if (!corridor) return false;
   const nonNegative = [
     line.capacityW,
@@ -229,7 +234,7 @@ function validTransmissionLine(
         typeof value === "number" && Number.isFinite(value) && value >= 0,
     ) &&
     validUpgradedCapacity(line.capacityW!, corridor.capacityW) &&
-    validLineInvestment(line, corridor, year) &&
+    validLineInvestment(line, corridor, year, context) &&
     line.yearsToBuildLeft! <= corridor.yearsToBuild &&
     Number.isInteger(line.minuteCreated) &&
     line.interestRate! <= 1 &&
@@ -518,6 +523,23 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
+  const exercise = game.tutorialIntertieStress;
+  if (
+    exercise !== undefined &&
+    (game.scenarioId !== 112 ||
+      game.customScenario ||
+      !exercise ||
+      typeof exercise.active !== "boolean" ||
+      typeof exercise.completed !== "boolean" ||
+      !Number.isInteger(exercise.startsMinute) ||
+      exercise.startsMinute < 0 ||
+      exercise.startsMinute > game.date.minute ||
+      !Number.isInteger(exercise.suppliedTicks) ||
+      exercise.suppliedTicks < 0 ||
+      exercise.suppliedTicks > TICKS_PER_MONTH ||
+      (exercise.completed && exercise.active))
+  )
+    return null;
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   const transmissionEnabled = !!(
@@ -532,7 +554,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
       ) ||
       !Array.isArray(transmission.lines) ||
       transmission.lines.some(
-        (line) => !validTransmissionLine(line, game.date!.year),
+        (line) =>
+          !validTransmissionLine(
+            line,
+            game.date!.year,
+            accessContextForGame(game as GameType),
+          ),
       ) ||
       new Set(transmission.lines.map(({ id }) => id)).size !==
         transmission.lines.length ||

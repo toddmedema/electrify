@@ -1,7 +1,5 @@
-import {
-  adjacentMarketForCorridor,
-  TRANSMISSION_CORRIDORS,
-} from "../data/AdjacentMarkets";
+import { effectiveCorridor } from "../data/IntertieAccess";
+import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
 import {
   INTERTIE_ARCHETYPES,
   IntertieArchetypeType,
@@ -82,7 +80,7 @@ export function intertieOutlook(
   capacityW?: number,
 ): IntertieOutlook | undefined {
   const market = adjacentMarketForCorridor(corridorId);
-  const corridor = TRANSMISSION_CORRIDORS.find(({ id }) => id === corridorId);
+  const corridor = effectiveCorridor(corridorId, context);
   if (!market || !corridor || corridor.capacityW <= 0) return undefined;
   const ticks = timeline.filter((tick) => tick.minute >= nowMinute);
   const line = { corridorId, capacityW: capacityW ?? corridor.capacityW };

@@ -5,7 +5,9 @@ test("California players can build and understand an intertie", async ({
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-320px"]).has(testInfo.project.name),
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+      testInfo.project.name,
+    ),
   );
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/?scenario=100");
@@ -32,7 +34,7 @@ test("California players can build and understand an intertie", async ({
   await expect(projects.getByLabel("Trading rule")).toHaveCount(0);
   await expect(projects.getByText("Total cost").first()).toBeVisible();
   await expect(
-    projects.getByText("Pay $36M now · finance $144M").first(),
+    projects.getByText("Pay $10.8M now · finance $43.2M").first(),
   ).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
     const firstBuild = projects
@@ -91,7 +93,9 @@ test("island grids do not offer interties or power exchange", async ({
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-320px"]).has(testInfo.project.name),
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+      testInfo.project.name,
+    ),
   );
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/?scenario=105");
@@ -170,7 +174,8 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
     originalFirstId!,
   );
   await expect(rows.last().locator(".facilityDragHandle")).toBeFocused();
-  await expect(facilities.locator(".transmissionFleet")).toBeVisible();
+  // Reordering generators does not create an owned intertie section.
+  await expect(facilities.locator(".transmissionFleet")).toHaveCount(0);
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -200,9 +205,7 @@ for (const theme of ["light", "dark"] as const) {
       const review = heading.getByRole("button", {
         name: /Review purchase of/,
       });
-      await expect(
-        review.locator('[data-testid="ShoppingCartIcon"]'),
-      ).toBeVisible();
+      await expect(review.locator("svg")).toBeVisible();
       // h6, matching the dialog's own "Build..." title: a card list is what heading
       // navigation is for, and h3 under an h6 was a backwards jump.
       const title = heading.getByRole("heading", { level: 6 });
@@ -225,7 +228,9 @@ for (const theme of ["light", "dark"] as const) {
         /corridor/,
       );
       // The metric grid carries the decision; the archetype and outlook wait behind details
-      await expect(card.getByText("Capacity", { exact: true })).toBeVisible();
+      await expect(
+        card.getByText("Your access", { exact: true }),
+      ).toBeVisible();
       await expect(card.getByText("Emissions", { exact: true })).toBeVisible();
       await expect(
         card.getByRole("img", { name: /^Typical year of import room/ }),

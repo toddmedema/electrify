@@ -8,6 +8,8 @@ import { intertieOutlook, pricePeriodCaption } from "./IntertieOutlook";
 import { IntertieContext, intertieImportLimitW } from "./Transmission";
 
 const intern: IntertieContext = {
+  scenarioId: 112,
+  locationId: "SF",
   seed: 42,
   southernHemisphere: false,
   peakSharingImportLoss: DIFFICULTIES.Intern.peakSharingImportLoss,

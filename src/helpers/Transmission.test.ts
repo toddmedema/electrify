@@ -104,7 +104,7 @@ describe("intertie context", () => {
       location: { lat: -33 } as never,
       difficulty: "CEO",
     });
-    expect(north).toEqual({
+    expect(north).toMatchObject({
       seed: 7,
       southernHemisphere: false,
       peakSharingImportLoss: DIFFICULTIES.Intern.peakSharingImportLoss,
@@ -641,6 +641,19 @@ describe("intertie merit order", () => {
 });
 
 describe("market clearing", () => {
+  it("does not sell floating-point residue after covering a shortage", () => {
+    const result = clearTransmissionMarket({
+      localSupplyW: -1000000000.1,
+      demandW: 306641946.1,
+      capacityW: 2e9,
+      importLimitW: 2e9,
+      exportLimitW: 2e9,
+      policy: "BALANCED",
+    });
+    expect(result.importedW).toBeGreaterThan(0);
+    expect(result.exportedW).toBe(0);
+    expect(result.localAvailableSupplyW).toBe(306641946.1);
+  });
   it("imports only the shortage and respects line capacity", () => {
     expect(
       clearTransmissionMarket({

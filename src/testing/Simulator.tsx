@@ -1,3 +1,4 @@
+import { getTotalDebt } from "../helpers/Financials";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
@@ -14,6 +15,7 @@ import type {
 import "../Store";
 import gameReducer, {
   buildTransmissionLine,
+  upgradeTransmissionLine,
   buildFacility,
   delta,
   initGame,
@@ -73,7 +75,12 @@ export type ScheduledSimActionType =
   | { month: number; type: "reprioritize"; facilityId: number }
   | { month: number; type: "policy"; id: PolicyId; tier: PolicyTier }
   | { month: number; type: "trading"; policy: TradingPolicyType }
-  | { month: number; type: "intertie"; corridorId: string; financed: boolean };
+  | {
+      month: number;
+      type: "intertie" | "intertie-upgrade";
+      corridorId: string;
+      financed: boolean;
+    };
 
 /**
  * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
@@ -139,6 +146,8 @@ export interface SimResultType {
   ticks: number;
   months: MonthlyHistoryType[]; // Oldest first, unlike game.monthlyHistory which is newest first
   finalFacilities: FacilityOperatingType[];
+  finalDebt: number;
+  finalTransmissionLines: NonNullable<GameType["transmission"]>["lines"];
   finalCash: number;
   finalNetWorth: number;
   wentBankrupt: boolean;
@@ -502,6 +511,17 @@ export function runSimulation(options: SimOptionsType): SimResultType {
               gameReducer(state, setTradingPolicy(action.policy)),
             );
             break;
+          case "intertie-upgrade":
+            state = cloneDeep(
+              gameReducer(
+                state,
+                upgradeTransmissionLine({
+                  corridorId: action.corridorId,
+                  financed: action.financed,
+                }),
+              ),
+            );
+            break;
           case "intertie":
             state = cloneDeep(
               gameReducer(
@@ -665,6 +685,11 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     ticks,
     months: [...state.monthlyHistory].reverse(), // Game stores newest first
     finalFacilities: state.facilities as FacilityOperatingType[],
+    finalDebt: getTotalDebt([
+      ...state.facilities,
+      ...(state.transmission?.lines || []),
+    ]),
+    finalTransmissionLines: state.transmission?.lines || [],
     finalCash: lastTick ? lastTick.cash : 0,
     finalNetWorth: lastTick ? lastTick.netWorth : 0,
     wentBankrupt: bankruptAtMonth !== null,

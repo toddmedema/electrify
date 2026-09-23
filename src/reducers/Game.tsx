@@ -1,4 +1,10 @@
 import {
+  accessContextForGame,
+  corridorsForGame,
+  effectiveMarket,
+} from "../data/IntertieAccess";
+import { beginIntertieStress } from "./GameActions";
+import {
   getHydroAvailability,
   getHydroInventoryKey,
   isConventionalHydro,
@@ -96,13 +102,13 @@ import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
   adjacentMarketForCorridor,
   corridorById,
-  corridorsForLocation,
   emptyTransmissionState,
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
+  neighborImportSupplyW,
   clearTransmissionMarket,
   corridorConstructionKgco2e,
   intertieContextForGame,
@@ -895,6 +901,7 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
+      delete state.tutorialIntertieStress;
       delete state.policies;
       delete state.policyPause;
       const a = action.payload;
@@ -1163,6 +1170,13 @@ export const gameSlice = createSlice({
       }
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      if (
+        state.tutorialIntertieStress?.active &&
+        !state.replayPlayback &&
+        state.tutorialStep < 18 &&
+        action.payload !== "PAUSED"
+      )
+        return;
       if (pendingScenarioChoice(state) && action.payload !== "PAUSED") return;
       delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
@@ -1186,6 +1200,24 @@ export const gameSlice = createSlice({
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
   // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(beginIntertieStress, (state) => {
+      if (
+        state.scenarioId !== 112 ||
+        state.customScenario ||
+        state.tutorialStep !== 15 ||
+        state.tutorialIntertieStress
+      )
+        return;
+      state.speed = "PAUSED";
+      state.tutorialIntertieStress = {
+        active: true,
+        startsMinute: state.date.minute,
+        suppliedTicks: 0,
+        completed: false,
+      };
+      state.timeline = reforecastSupply(state, true);
+      recordReplayAction(state, "beginIntertieStress", null);
+    });
     builder.addCase(launchRun, (_state, action) => {
       const { identity, challenge } = action.payload;
       if (!projectAuthoredRunReference(identity)) return;
@@ -1603,7 +1635,7 @@ function applyBuildTransmissionLine(
   payload: Partial<BuildTransmissionLineAction>,
 ): boolean {
   if (typeof payload.corridorId !== "string") return false;
-  const corridor = corridorsForLocation(state.location).find(
+  const corridor = corridorsForGame(state).find(
     ({ id }) => id === payload.corridorId,
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
@@ -1686,7 +1718,13 @@ function applyUpgradeTransmissionLine(
   if (!line || !now || line.yearsToBuildLeft > 0 || line.upgrade) return false;
   // Priced straight off the authored corridor, with no difficulty or inflation multiplier, the
   // same way building the line was: interties are quoted from TRANSMISSION_PROFILE_DATA as-is.
-  const quote = intertieUpgradeQuote(line, state.date.year);
+  const quote = intertieUpgradeQuote(
+    line,
+    state.date.year,
+    1,
+    1,
+    accessContextForGame(state),
+  );
   if (!quote) return false;
   const financed = !!payload.financed;
   const amountDue = financed
@@ -1852,6 +1890,21 @@ function applyPolicyEdit(
 function applyReplayAction(state: GameType, entry: ReplayActionType) {
   const payload = entry.payload;
   switch (entry.type) {
+    case "beginIntertieStress":
+      if (
+        state.scenarioId === 112 &&
+        !state.customScenario &&
+        !state.tutorialIntertieStress
+      ) {
+        state.tutorialIntertieStress = {
+          active: true,
+          startsMinute: state.date.minute,
+          suppliedTicks: 0,
+          completed: false,
+        };
+        state.timeline = reforecastSupply(state, true);
+      }
+      break;
     case "chooseScenarioResponse":
       applyScenarioResponse(state, payload);
       break;
@@ -2002,6 +2055,15 @@ export function tutorialCompleteDialog({
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
 export function tickState(state: GameType) {
+  if (
+    state.tutorialIntertieStress?.active &&
+    !state.replayPlayback &&
+    state.tutorialStep < 18
+  ) {
+    state.speed = "PAUSED";
+    return;
+  }
+  const stressWasActive = !!state.tutorialIntertieStress?.active;
   applyPendingReplayActions(state);
   if (pendingScenarioChoice(state)) {
     state.speed = "PAUSED";
@@ -2019,6 +2081,16 @@ export function tickState(state: GameType) {
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
 
+    const exercise = state.tutorialIntertieStress;
+    if (exercise?.active) {
+      exercise.suppliedTicks =
+        now.supplyW >= now.demandW ? exercise.suppliedTicks + 1 : 0;
+      if (exercise.suppliedTicks >= TICKS_PER_MONTH) {
+        exercise.active = false;
+        exercise.completed = true;
+        state.speed = "PAUSED";
+      }
+    }
     // The pulsing top bar only tells a player who is looking at it, and by default they're
     // looking at Finances or Forecasts. Fire on the edges only, never per tick.
     const inBlackout = now.supplyW < now.demandW;
@@ -2366,6 +2438,9 @@ export function tickState(state: GameType) {
       }
     }
   }
+
+  if (stressWasActive && state.tutorialIntertieStress?.completed)
+    state.timeline = reforecastSupply(state, true);
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
   applyPendingReplayActions(state);
@@ -3070,7 +3145,7 @@ function updateSupplyFacilitiesFinances(
   const offers: (IntertieOffer & { emissionsKgco2ePerMWh: number })[] = [];
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
-    const market = adjacentMarketForCorridor(line.corridorId);
+    const market = effectiveMarket(line.corridorId, intertieContext);
     const pricePerMWh = adjacentMarketPricePerMWh(
       line.corridorId,
       intertieContext,
@@ -3089,12 +3164,30 @@ function updateSupplyFacilitiesFinances(
     marketImportLimitW += importLimitW;
     marketExportLimitW += exportLimitW;
     offers.push({
+      marketId: market?.id,
+      marketImportLimitW: neighborImportSupplyW(
+        line.corridorId,
+        intertieContext,
+        now.minute,
+        now,
+      ),
+      marketExportLimitW: market?.availableDemandW || 0,
       importLimitW,
       exportLimitW,
       pricePerMWh,
       emissionsKgco2ePerMWh: market?.emissionsKgco2ePerMWh || 0,
     });
   }
+  marketImportLimitW = allocateIntertieFlows(
+    offers,
+    Infinity,
+    0,
+  ).importedW.reduce((sum, w) => sum + w, 0);
+  marketExportLimitW = allocateIntertieFlows(
+    offers,
+    0,
+    Infinity,
+  ).exportedW.reduce((sum, w) => sum + w, 0);
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
   const grossLocalSupplyW = supply;

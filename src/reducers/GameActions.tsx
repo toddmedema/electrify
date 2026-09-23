@@ -64,3 +64,6 @@ export const chooseScenarioResponse = createAction<{
  */
 export const pageHidden = createAction("game/pageHidden");
 export const pageVisible = createAction("game/pageVisible");
+
+/** Player-acknowledged, tutorial-only stress exercise. */
+export const beginIntertieStress = createAction("game/beginIntertieStress");
