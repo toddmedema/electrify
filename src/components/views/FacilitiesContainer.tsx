@@ -107,7 +107,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(upgradeTransmissionLine({ corridorId, financed }));
       dispatch(
         snackbarOpen(
-          "Upgrade approved — the line keeps carrying power while the work runs.",
+          "Upgrade approved. The line stays operational during construction.",
         ),
       );
     },

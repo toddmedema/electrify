@@ -97,9 +97,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       }
       const scenario = getScenario(game.scenarioId, game.customScenario);
       if (!scenario) {
-        reportError(
-          "We couldn't find that mission. Return to the mission list and try another.",
-        );
+        reportError("Mission not found. Choose another from the mission list.");
         loadInProgress = false;
         loadListeners = [];
         return;
@@ -170,7 +168,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         reportError(
           error instanceof Error
             ? error.message
-            : "The game data couldn't be loaded. Check your connection and retry.",
+            : "Could not load game data. Check your connection and retry.",
         );
       } finally {
         loadInProgress = false;

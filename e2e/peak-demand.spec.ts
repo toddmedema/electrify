@@ -38,7 +38,7 @@ for (const theme of ["light", "dark"]) {
       await expect(dialog).toContainText(
         offer === "Time-of-use tariff"
           ? "02:00–05:00"
-          : "This load is eliminated",
+          : "This use is eliminated",
       );
       await dialog
         .getByRole("button", { name: "What is Customer programs?" })

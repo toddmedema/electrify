@@ -1,5 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer, {
+  delta,
+  reset,
   saveDisplayName,
   fetchGlobalRank,
   loadProfile,
@@ -385,5 +387,98 @@ describe("fetchGlobalRank", () => {
     // Strictly greater, so the player's own run never counts against them
     const { parts } = mockGetCount.mock.calls[0][0];
     expect(parts).toContainEqual({ field: "score", op: ">", value: 812 });
+  });
+});
+
+describe("async account ownership", () => {
+  it.each(["reset", "switch"])(
+    "ignores a previous profile after %s",
+    async (transition) => {
+      let finish!: (value: unknown) => void;
+      mockGetDoc.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const store = makeStore(SIGNED_IN);
+      const pending = store.dispatch(loadProfile({ uid: "player-1" }));
+      store.dispatch(
+        transition === "reset" ? reset() : delta({ uid: "player-2" }),
+      );
+      const current = store.getState().user;
+      finish({
+        exists: () => true,
+        data: () => ({ displayName: "Old player" }),
+      });
+      await pending;
+      expect(store.getState().user).toBe(current);
+    },
+  );
+
+  it("ignores rejected profiles from an old account", async () => {
+    let fail!: (reason: Error) => void;
+    mockGetDoc.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+    const store = makeStore(SIGNED_IN);
+    const pending = store.dispatch(loadProfile({ uid: "player-1" }));
+    store.dispatch(reset());
+    fail(new Error("offline"));
+    await pending;
+    expect(store.getState().user).toEqual({});
+  });
+
+  it("keeps the latest profile when requests finish out of order", async () => {
+    let finish!: (value: unknown) => void;
+    mockGetDoc.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const store = makeStore(SIGNED_IN);
+    const pending = store.dispatch(loadProfile({ uid: "player-1" }));
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ displayName: "New" }),
+    });
+    await store.dispatch(loadProfile({ uid: "player-1" }));
+    finish({ exists: () => true, data: () => ({ displayName: "Old" }) });
+    await pending;
+    expect(store.getState().user.displayName).toBe("New");
+  });
+
+  it("ignores a pending rename after account changes", async () => {
+    let finish!: () => void;
+    mockSetDoc.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const store = makeStore(SIGNED_IN);
+    const pending = store.dispatch(saveDisplayName("Ada"));
+    store.dispatch(delta({ uid: "player-2", displayName: "Grace" }));
+    finish();
+    expect((await pending).payload).toBe("Ada");
+    expect(store.getState().user).toEqual({
+      uid: "player-2",
+      displayName: "Grace",
+    });
+  });
+
+  it("ignores a pending score after sign-out", async () => {
+    let finish!: (value: { id: string }) => void;
+    mockAddDoc.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const store = makeStore(SIGNED_IN);
+    const pending = store.dispatch(submitHighscore(aSubmission()));
+    store.dispatch(reset());
+    finish({ id: "score" });
+    await pending;
+    expect(store.getState().user).toEqual({});
   });
 });

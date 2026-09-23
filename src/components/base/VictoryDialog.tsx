@@ -349,7 +349,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
             {shared.challenge
               ? "Your friend starts with the same conditions."
-              : "This shares your result and mission, without matching the starting conditions."}
+              : "Shares your result and mission without matching starting conditions."}
           </Typography>
         </DialogContent>
         <DialogActions>

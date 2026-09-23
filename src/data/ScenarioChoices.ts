@@ -21,8 +21,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     scenarioId: 106,
     atMonth: 48,
     title: "Negotiate the data-center connection",
-    message:
-      "Developers want their full 100 MW connection in January 2026. Accept a contribution toward capacity and connection work now, or require a slower schedule to give your grid more time.",
+    message: "Choose developer funding or more time to build capacity.",
     options: [
       {
         id: "fast-track",
@@ -30,18 +29,18 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         upfrontGrant: (difficulty) => DATA_CENTER_GRANT[difficulty],
         description:
-          "Receive a developer contribution toward capacity and connection work, not its full cost. All 100 MW arrives in January 2026; electricity sales begin then at the full load.",
+          "Receive funding toward capacity and connection work, not the full cost. Connect 100 MW in January 2026, when sales begin.",
         message:
-          "Developer funding received. Your binding agreement connects the full 100 MW in January 2026.",
+          "Funding received. Your agreement commits you to connect 100 MW in January 2026.",
       },
       {
         id: "phased",
         label: "Require phased connections",
         cost: () => 0,
         description:
-          "Receive no funding. Connect 50 MW in January 2026 and another 50 MW in January 2028, delaying half the demand and its electricity sales by two years.",
+          "No funding. Connect 50 MW in January 2026 and 50 MW in January 2028, delaying half the demand and sales by two years.",
         message:
-          "Phased connections agreed: 50 MW in January 2026 and another 50 MW in January 2028. No developer contribution is paid.",
+          "Phased connection agreed: 50 MW in January 2026 and 50 MW in January 2028, with no funding.",
         loadAdditions: [
           {
             id: "manassas-data-centers-phase-one",
@@ -69,7 +68,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 36,
     title: "Prepare for the deep freeze",
     message:
-      "Fund targeted plant protection and coordination with power suppliers in the run-up to February 2021. This program reduces output losses across your grid; it does not prevent the demand surge or gas-price spike.",
+      "Fund plant protection and supplier coordination before February 2021 to reduce output losses. Demand and gas prices will still surge.",
     options: [
       {
         id: "winterize",
@@ -98,14 +97,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Extreme Santa Ana winds are forecast for January. Advance inspections, staged backup equipment and response resources halve physical customer disconnections and generator output losses during January and February. Normal restoration costs still apply.",
+      "Extreme Santa Ana winds are forecast for January. Inspections, staged backup equipment and response crews halve customer disconnections and generator output losses in January and February. Restoration costs still apply.",
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
         message:
-          "Preparedness funded. Advance inspections, staged equipment and response resources halve physical disconnections and generator output losses in January and February; normal restoration costs still apply.",
+          "Preparedness funded. January and February customer disconnections and generator output losses are halved. Restoration costs still apply.",
       },
       {
         id: "standard",

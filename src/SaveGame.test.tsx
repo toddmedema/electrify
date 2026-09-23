@@ -514,7 +514,10 @@ describe("SaveGame", () => {
           listeners.push(fn);
           return () => listeners.splice(listeners.indexOf(fn), 1);
         },
-        dispatch: (a: unknown) => self.dispatched.push(a),
+        dispatch: (a: unknown) => {
+          self.dispatched.push(a);
+          listeners.forEach((fn) => fn());
+        },
         // Sets the slice the way a reducer would, then notifies like Redux does
         set: (next: GameType) => {
           self.state = next;
@@ -531,6 +534,48 @@ describe("SaveGame", () => {
 
     // What quit leaves behind
     const quit = { ...game, inGame: false };
+
+    it("backs off failed periodic writes and retries on the next year", () => {
+      const store = fakeStore(quit);
+      const stop = startAutosave(store as never, () => true);
+      const setItem = jest
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new Error("full");
+        });
+      try {
+        store.set(playing(game, 2020, 0));
+        store.set(playing(game, 2020, 100));
+        store.set(playing(game, 2020, 200));
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(store.dispatched).toHaveLength(1);
+        store.set(playing(game, 2021, 300));
+        expect(setItem).toHaveBeenCalledTimes(2);
+        expect(store.dispatched).toHaveLength(1);
+        setItem.mockRestore();
+        store.set(playing(game, 2022, 400));
+        expect(readSave()!.game.date.minute).toBe(400);
+      } finally {
+        setItem.mockRestore();
+        stop();
+      }
+    });
+
+    it("retries failed writes on pagehide while an existing save remains", () => {
+      const store = fakeStore(quit);
+      const stop = startAutosave(store as never, () => true);
+      store.set(playing(game, 2020, 0));
+      const setItem = jest
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new Error("full");
+        });
+      store.set(playing(game, 2021, 100));
+      setItem.mockRestore();
+      window.dispatchEvent(new Event("pagehide"));
+      expect(readSave()!.game.date.minute).toBe(100);
+      stop();
+    });
 
     it("writes once a year, at the turn of the year", () => {
       const store = fakeStore(quit);

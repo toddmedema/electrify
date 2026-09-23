@@ -32,7 +32,7 @@ test("generator capstone completes immediately after a different second purchase
     })
     .click();
   await page.getByRole("button", { name: "Take loan", exact: true }).click();
-  await expect(hud).toContainText("Construction has started");
+  await expect(hud).toContainText("Construction started");
   await hud.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await expect(hud).toContainText("Watch the year bar advance");

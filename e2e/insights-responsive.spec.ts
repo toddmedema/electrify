@@ -275,7 +275,7 @@ test("insights header controls stay aligned in one compact row", async ({
     await expect(levers).toHaveCSS("display", "grid");
     await expect(levers).toHaveCSS("row-gap", "0px");
     const rateToggle = levers.locator(".insightsRateToggle");
-    const rateMetrics = levers.locator(".insightsRateMetrics");
+    const rateMetrics = levers.locator(".insightsRateMetrics:visible");
     await expect(rateToggle).not.toBeVisible();
     const [leversBox, metricsBox, rateSlider, trackTitle] = await Promise.all([
       levers.boundingBox(),
@@ -491,4 +491,35 @@ test("expanded finance and economic rates remain readable", async ({
   await expect(
     insights.getByLabel("Inflation & interest rate", { exact: true }),
   ).toBeChecked();
+});
+
+test("short phones disclose rate controls while tall phones keep them inline", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-320px");
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/?scenario=106");
+  await page.getByRole("button", { name: "Start game" }).click();
+  const insights = page.locator(".insights:visible");
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const toggle = insights.getByRole("button", { name: "Show rate slider" });
+  const slider = insights.getByRole("slider", {
+    name: "The rate you charge for electricity generation",
+  });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(slider).not.toBeVisible();
+  await expect(insights.locator(".insightsRateMetrics:visible")).toContainText(
+    "Your rate",
+  );
+  await toggle.click();
+  await expect(slider).toBeVisible();
+  await insights.getByRole("button", { name: "Hide rate slider" }).click();
+  await expect(slider).not.toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(slider).toBeVisible();
+  await expect(insights.locator(".insightsShortRateToggle")).not.toBeVisible();
 });

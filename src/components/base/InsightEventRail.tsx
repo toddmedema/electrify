@@ -20,7 +20,12 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
   const selected = events.find((event) => event.key === activeKey);
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
 
-  const closeDetails = () => {
+  const focusDetails = React.useCallback((element: HTMLDivElement | null) => {
+    element?.focus();
+  }, []);
+
+  const closeDetails = (restoreFocus = false) => {
+    if (restoreFocus && anchor?.isConnected) anchor.focus();
     setAnchor(null);
     onActiveChange(undefined);
   };
@@ -32,7 +37,7 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
       onKeyDown={(keyEvent) => {
         if (keyEvent.key === "Escape" && selected) {
           keyEvent.preventDefault();
-          closeDetails();
+          closeDetails(true);
         }
       }}
     >
@@ -99,7 +104,10 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
             <Paper elevation={6}>
               <div
                 id={`insight-event-details-${events.indexOf(selected) + 1}`}
+                key={selected.key}
                 className="insightEventDetails"
+                tabIndex={-1}
+                ref={focusDetails}
                 role="dialog"
                 aria-label={selected.title || "Scenario event"}
               >
@@ -114,8 +122,8 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                   size="small"
                   variant="outlined"
                   onClick={() => {
+                    closeDetails(true);
                     onZoom(selected);
-                    closeDetails();
                   }}
                 >
                   Zoom to event

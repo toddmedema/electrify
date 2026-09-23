@@ -77,7 +77,7 @@ for (const mission of [
         .click();
       await expect(hud).toContainText(
         mission === "Generators"
-          ? "Construction has started"
+          ? "Construction started"
           : "bar shows usable stored energy",
       );
     } else if (mission === "Forecasting") {

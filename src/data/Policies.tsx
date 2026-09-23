@@ -16,7 +16,7 @@ export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Move home electricity use out of your chosen peak hours in exchange for a discount.",
+      "Shift home electricity use out of chosen peak hours for a discount.",
     mechanism:
       "When on, half of homes participate. Choose a four-hour daily window: participants shift 20% of that electricity use into the following three hours, such as charging cars later. They pay 30% more during the chosen peak window and 10% less during the following three hours. Total energy use is unchanged, including across midnight.",
     tradeoff:
@@ -27,7 +27,7 @@ export const POLICIES = {
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Pay industrial users and data centers to use less electricity during your chosen peak hours. This load is eliminated.",
+      "Pay industry and data centers to cut use during chosen peak hours. This use is eliminated.",
     mechanism:
       "When on, half of industrial and data-center load participates. Enrolled loads forgo 20% of consumption during your chosen four-hour daily window, for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
     tradeoff:
@@ -39,9 +39,9 @@ export const POLICIES = {
     name: "Efficiency rebates",
     description: "Help homes and businesses use less electricity.",
     mechanism:
-      "Grows gradually. Reduces residential and commercial electricity use throughout the day.",
+      "Gradually cuts home and business electricity use throughout the day.",
     tradeoff:
-      "Upgrades cost money and mean less electricity sold, in exchange for avoided generation costs and possible reliability benefits.",
+      "Upgrades cost money and reduce sales, but can lower generation costs and improve reliability.",
     cap: 0.2,
     costPerCustomer: 30,
   },
@@ -51,7 +51,7 @@ export const POLICIES = {
     mechanism:
       "Grows gradually. Helps in daylight; does not directly cover an evening peak.",
     tradeoff:
-      "Rebates cost money and mean less electricity sold. Surplus is curtailed: there are no export payments or utility generation credits.",
+      "Rebates cost money and reduce sales. Surplus is discarded, with no export payments or utility generation credits.",
     cap: 300, // Watts per initial market customer, scaled with scenario demand, at full adoption.
     costPerCustomer: 60,
   },

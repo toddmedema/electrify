@@ -86,7 +86,7 @@ export interface ImportedSaveType {
  */
 export async function readSaveFile(file: File): Promise<ImportedSaveType> {
   if (file.size > MAX_SAVE_FILE_BYTES) {
-    return { error: "That file is too big to be an Electrify save." };
+    return { error: "This save file is too large." };
   }
   let text: string;
   try {
@@ -108,8 +108,7 @@ export async function readSaveFile(file: File): Promise<ImportedSaveType> {
   }
   if (!getScenario(save.game.scenarioId, save.game.customScenario)) {
     return {
-      error:
-        "That save is from a scenario this version of Electrify doesn't have.",
+      error: "This save uses a scenario unavailable in this version.",
     };
   }
   return { save };

@@ -270,7 +270,7 @@ export const SCENARIOS = [
         target: ".facilityRowHeader:has(.constructionProgress)",
         action: "Find the construction progress",
         content: (
-          <TutorialPrompt text="Construction has started. The generator cannot supply the grid until it is complete." />
+          <TutorialPrompt text="Construction started. The generator supplies power only when complete." />
         ),
       },
       {
@@ -289,7 +289,7 @@ export const SCENARIOS = [
         target: "#yearProgressBar",
         action: "Watch the year bar advance",
         content: (
-          <TutorialPrompt text="This thin bar shows how far through the current year you are. Each simulated day represents one month. The bar starts over each January; construction continues across years." />
+          <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month. The bar resets in January; construction continues." />
         ),
       },
       {
@@ -297,9 +297,9 @@ export const SCENARIOS = [
         hideUi: EARLY_MISSION_HIDDEN,
         action: "Order a second generator of a different type",
         content: (
-          <TutorialPrompt text="Compare when it can generate and what it costs to run. Choose a plant that adds a useful strength to your grid." />
+          <TutorialPrompt text="Compare output timing and running costs. Choose a plant that complements your grid." />
         ),
-        hint: "Your starting coal plant does not count. Open Build and order a different type from your first purchase; you do not need to wait for construction.",
+        hint: "Open Build and order a different type from your first purchase. Your starting coal plant does not count; construction need not finish.",
         capstone: {
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
@@ -369,7 +369,7 @@ export const SCENARIOS = [
         advanceOn: (s: AppStateType) => s.game.facilities.length >= 3,
         action: "Buy it with cash, or take a loan",
         content: (
-          <TutorialPrompt text="The purchase starts construction. Loan payments and upkeep leave less money for other bills." />
+          <TutorialPrompt text="Buying starts construction. Budget for loan payments, upkeep and other bills." />
         ),
       },
       {
@@ -397,7 +397,7 @@ export const SCENARIOS = [
         nextLabel: "Start final challenge",
         action: "Try storage through the evening peak",
         content: (
-          <TutorialPrompt text="Start a fresh grid with a smaller coal plant and the original storage. Your practice purchase will be cleared." />
+          <TutorialPrompt text="Restart with a smaller coal plant and the original storage. Your practice purchase is cleared." />
         ),
       },
       {
@@ -464,7 +464,7 @@ export const SCENARIOS = [
           target: "#insightsPane",
           action: "Find the Insights pane",
           content: (
-            <TutorialPrompt text="The Insights pane shows your revenue, expenses, cash, and profit over time." />
+            <TutorialPrompt text="Insights tracks revenue, expenses, cash and profit." />
           ),
         },
       },
@@ -585,7 +585,7 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         action: "Grow customers 5% while staying profitable",
         content: <CustomerGrowthChallenge />,
-        hint: "A modest discount below the market rate attracts customers. Check the financial forecast too: a rate that is too low can grow sales while losing money.",
+        hint: "A modest discount below market attracts customers. Check finances too: pricing too low can grow sales at a loss.",
         capstone: {
           preserveProgress: true,
           success: pricingCapstoneSucceeded,
@@ -595,7 +595,7 @@ export const SCENARIOS = [
           successMessage:
             "Final challenge complete—the lower rate grew the customer base by 5% while monthly revenue covered costs and supply met demand.",
           failureMessage:
-            "The customer target, positive monthly profit and reliable supply did not all hold for six months. Balance the rate against both demand growth and cost before retrying.",
+            "You need six months of target customer numbers, positive monthly profit and reliable supply. Balance growth and costs before retrying.",
         },
       },
     ],
@@ -653,7 +653,7 @@ export const SCENARIOS = [
           target: "#insightsPane",
           action: "Find the Insights pane",
           content: (
-            <TutorialPrompt text="The supply forecast that shows the blackout lives in the Insights pane." />
+            <TutorialPrompt text="Open Insights to see the predicted blackout." />
           ),
         },
       },
@@ -745,7 +745,7 @@ export const SCENARIOS = [
         target: "#chartForecastFuelPrices",
         action: "Compare future fuel prices",
         content: (
-          <TutorialPrompt text="Possible fuel costs five years out show how prices could change. These examples leave your game unchanged." />
+          <TutorialPrompt text="Compare possible fuel costs in five years. These examples do not change your game." />
         ),
       },
       {
@@ -770,7 +770,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt text="Keep the grid supplied through month seven with new generation ready for the predicted summer shortage." />
         ),
-        hint: "Inspect the supply-and-demand forecast, then choose any generator with enough capacity and a construction time shorter than the shortage deadline.",
+        hint: "Check the supply-and-demand forecast. Choose a generator with enough capacity that can finish before the shortage.",
         capstone: {
           success: forecastingCapstoneSucceeded,
           failure: (s: AppStateType) =>
@@ -1140,7 +1140,7 @@ export const SCENARIOS = [
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
       objective:
-        "Build enough dependable generation and storage before data-center demand arrives.",
+        "Build dependable generation and storage before data centers connect.",
       threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
@@ -1258,8 +1258,7 @@ export const SCENARIOS = [
         "Guide Spain's renewable-rich grid through a summer of heat and drought.",
       objective:
         "Serve every customer through three months of rising demand and falling water availability.",
-      threat:
-        "Water flowing into hydro reservoirs and nuclear output will decline as the heat intensifies.",
+      threat: "Rising heat will cut hydro inflow and nuclear output.",
     },
     ownership: "Public",
     startingYear: 2024,
@@ -1508,7 +1507,7 @@ export const SCENARIOS = [
     briefing: {
       tone: "storm",
       fantasy:
-        "Run a grid that is almost entirely hydro as an El Nino drought empties the reservoir.",
+        "Run a nearly all-hydro grid as an El Nino drought drains the reservoir.",
       objective:
         "Serve Zambia's customers through two years of collapsing inflow to Kariba.",
       threat:
@@ -1613,7 +1612,7 @@ export const SCENARIOS = [
       objective:
         "Meet four rising summer peaks, ending with the record heat of May and June 2024.",
       threat:
-        "Extreme heat lifts demand and derates thermal plants at the same moment, and a late monsoon extends the worst of it.",
+        "Extreme heat raises demand and cuts thermal output. A late monsoon prolongs the strain.",
     },
     ownership: "Public",
     startingYear: 2021,

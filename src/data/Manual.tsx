@@ -378,10 +378,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Once you own hydro, the <strong>Water</strong> chart shows
-          precipitation, water held as snow, and reservoir levels. Winter snow
-          can delay water supply until spring. Select a dam in your fleet to see
-          why its output is what it is and where its reservoir is heading over
-          the next year.
+          precipitation, snow and reservoir levels. Winter snow can delay supply
+          until spring. Select a dam to see what limits its output and its
+          reservoir forecast for the next year.
         </p>
         <p>
           <strong>Water rights</strong> require releases for farms, cities and
@@ -465,13 +464,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           impact.
         </p>
         <p>
-          Building a plant emits too, in the steel, concrete, silicon and
-          drilling it takes to put one up. Each build card shows that total, and
-          it is charged evenly across the construction period rather than all at
-          once. It is why wind, solar, nuclear and storage are low-carbon rather
-          than no-carbon. Carbon fees do not apply to it: a fee prices what a
-          grid burns, while most of this is emitted in another country's
-          factories years earlier.
+          Construction also emits through materials and drilling. Each build
+          card shows the total, spread evenly over construction. Wind, solar,
+          nuclear and storage are therefore low-carbon, not carbon-free. These
+          emissions carry no carbon fee in the game; the fee applies to local
+          fuel burning.
         </p>
         <p>
           Emissions affect fees and score, but do not change local weather in
@@ -618,8 +615,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           More debt can make new loans costlier.
         </p>
         <p>
-          Each loan's interest rate stays fixed from signing. Later economic
-          changes do not alter it.
+          Each loan's interest rate stays fixed from signing, even as the
+          economy changes.
         </p>
         <p>
           <strong>Inflation</strong> means rising prices. It increases fuel,
@@ -720,11 +717,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           storage.
         </p>
         <p>
-          Neighbors differ in when they can spare power and what it costs. Each
-          intertie&rsquo;s build card names the kind of grid next door, such as
-          seasonal hydro or solar surplus. Opening Show details on that card
-          describes the neighbor and draws its typical year: how much of the
-          line it can usually fill each month.
+          Neighbors differ in spare power and prices. Each intertie&rsquo;s
+          build card names the neighboring grid type, such as seasonal hydro or
+          solar surplus. Open Show details for a description and monthly
+          estimates of how much line capacity it can fill.
         </p>
         <p>
           &ldquo;At your peak&rdquo; matters most. It is how much the neighbor

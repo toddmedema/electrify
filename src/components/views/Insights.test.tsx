@@ -452,8 +452,16 @@ describe("Insights layers", () => {
         selector: ".insightsRateSummaryDesktop",
       }).textContent,
     ).not.toMatch(/market [^·]*\/kWh/);
-    expect(within(levers).getByText("Market")).toBeInTheDocument();
-    expect(within(levers).getByText("Customers / mo")).toBeInTheDocument();
+    expect(
+      within(levers).getByText("Market", {
+        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(levers).getByText("Customers / mo", {
+        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
+      }),
+    ).toBeInTheDocument();
     expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
       /projected customers .* next month/i,
     );
@@ -479,7 +487,9 @@ describe("Insights layers", () => {
     expect(
       within(
         screen.getByRole("region", { name: "Planning controls" }),
-      ).getByText("Customers / mo"),
+      ).getByText("Customers / mo", {
+        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -523,10 +533,19 @@ describe("Insights layers", () => {
     // Customers never switch and growth is fixed, so neither is worth the space
     expect(levers).not.toHaveTextContent(/market/i);
     expect(levers).not.toHaveTextContent(/growth/i);
-    expect(within(levers).getByText("Target")).toBeInTheDocument();
-    expect(within(levers).getByText("Points / yr")).toBeInTheDocument();
+    expect(
+      within(levers).getByText("Target", {
+        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(levers).getByText("Points / yr", {
+        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
+      }),
+    ).toBeInTheDocument();
     const points = within(levers).getByText(/pts$/, {
-      selector: ".insightsRateMetricValue.insightsRateScore",
+      selector:
+        "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
     });
     expect(points.textContent).toMatch(/^\+\d+ pts$/);
     expect(points).toHaveClass("good");
@@ -542,7 +561,8 @@ describe("Insights layers", () => {
     const points = within(
       screen.getByRole("region", { name: "Planning controls" }),
     ).getByText(/pts$/, {
-      selector: ".insightsRateMetricValue.insightsRateScore",
+      selector:
+        "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
     });
     expect(points.textContent).toMatch(/^−\d+ pts$/);
     expect(points).toHaveClass("bad");
@@ -554,7 +574,8 @@ describe("Insights layers", () => {
       const value = Number(
         within(screen.getByRole("region", { name: "Planning controls" }))
           .getByText(/pts$/, {
-            selector: ".insightsRateMetricValue.insightsRateScore",
+            selector:
+              "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
           })
           .textContent!.replace(/[^\d]/g, ""),
       );
@@ -584,7 +605,8 @@ describe("Insights layers", () => {
       const value = within(
         screen.getByRole("region", { name: "Planning controls" }),
       ).getByText(/pts$/, {
-        selector: ".insightsRateMetricValue.insightsRateScore",
+        selector:
+          "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
       }).textContent;
       unmount();
       return value;
@@ -1166,7 +1188,9 @@ describe("Insights layers", () => {
 });
 
 function labelledButton(label: string | RegExp): HTMLElement {
-  const button = screen.getByLabelText(label, { selector: "button" });
+  const button = screen.getByLabelText(label, {
+    selector: "button:not(.insightsShortRateToggle)",
+  });
   expect(button).toBeVisible();
   expect(isInaccessible(button)).toBe(false);
   return button;

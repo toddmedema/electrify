@@ -180,7 +180,7 @@ describe("SaveFile", () => {
       });
       const { save, error } = await readSaveFile(file);
       expect(save).toBeUndefined();
-      expect(error).toMatch(/too big/);
+      expect(error).toMatch(/too large/);
     });
   });
 });

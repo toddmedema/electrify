@@ -39,3 +39,52 @@ describe("card reducer", () => {
     expect(window.location.search).toBe("?scenario=111");
   });
 });
+
+it("debounces only the same destination and records accepted navigation time", () => {
+  const now = jest.spyOn(Date, "now").mockReturnValue(1000);
+  const push = jest.spyOn(window.history, "pushState");
+  try {
+    const first = cardReducer(undefined, navigate("NEW_GAME"));
+    expect(first.ts).toBe(1000);
+    expect(cardReducer(first, navigate("NEW_GAME"))).toBe(first);
+    expect(push).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(2000);
+    expect(cardReducer(first, navigate("NEW_GAME")).history).toHaveLength(3);
+    const manual = cardReducer(
+      first,
+      navigate({ name: "MANUAL", entry: "one" }),
+    );
+    expect(
+      cardReducer(manual, navigate({ name: "MANUAL", entry: "two" })).entry,
+    ).toBe("two");
+    const story = cardReducer(
+      first,
+      navigate({
+        name: "INSIGHTS",
+        storyTarget: { card: "INSIGHTS", layer: "FINANCES" },
+      }),
+    );
+    expect(
+      cardReducer(
+        story,
+        navigate({
+          name: "INSIGHTS",
+          storyTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+        }),
+      ).storyTarget,
+    ).toEqual({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" });
+    const route = cardReducer(
+      first,
+      navigate({ name: "NEW_GAME_DETAILS", url: "/?scenario=106" }),
+    );
+    expect(
+      cardReducer(
+        route,
+        navigate({ name: "NEW_GAME_DETAILS", url: "/?scenario=107" }),
+      ).url,
+    ).toBe("/?scenario=107");
+  } finally {
+    now.mockRestore();
+    push.mockRestore();
+  }
+});
