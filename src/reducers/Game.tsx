@@ -121,7 +121,25 @@ import {
   resolveStoryAtDate,
   STORY_ARC_DEFINITIONS,
 } from "../data/WorldEvents";
-import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
+import {
+  getMonthlyClimatology,
+  getRawSolarIrradianceWM2,
+  getWeather,
+} from "../data/Weather";
+import {
+  activePreparedness,
+  activeWildfire,
+  dailyFireWeatherReading,
+  isWildfireHazardEligible,
+  sampleWildfireIncident,
+  WILDFIRE_DEFINITION_ID,
+  wildfireDraw,
+  wildfireInCooldown,
+  wildfireMonthlyProbability,
+  wildfireOccurrenceKey,
+  weatherFireRiskModifier,
+} from "../helpers/Wildfire";
+import { getWildfireProfile } from "../data/WildfireProfiles";
 import {
   getHydroConditions,
   HYDRO_DEADPOOL_FRACTION,
@@ -588,6 +606,181 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
     );
   }
   return storyPriceFuels;
+}
+
+/**
+ * Runs the recurring regional wildfire hazard check at monthly rollover, before this month's
+ * forecast is built. An eligible location (a profiled area in a custom game -- never the authored
+ * scenario 111, whose fixed firestorm is preserved) rolls one addressed draw per month. An
+ * ignition persists a time-bounded occurrence whose effects flow through the same story-effect
+ * machinery as authored events, so disconnected load, constrained generators and restoration cost
+ * are accounted exactly once. The check is a pure function of (seed, location, absolute month),
+ * so saving, forecasting or reordering evaluation cannot reroll it; the dedupe key keeps a resumed
+ * month from announcing twice.
+ */
+function updateWildfireHazards(state: GameType): void {
+  if (!isWildfireHazardEligible(state)) {
+    return;
+  }
+  const profile = getWildfireProfile(state.location.id);
+  if (!profile) {
+    return;
+  }
+  const locationId = state.location.id;
+  const monthsElapsed = state.date.monthsElapsed;
+  // Report restoration for any wildfire that just expired at the start of this month. Occurrences
+  // retain expired incidents, so this is detected from them (active no longer holds it).
+  state.worldEvents.occurrences.forEach((event) => {
+    if (event.definitionId !== WILDFIRE_DEFINITION_ID) {
+      return;
+    }
+    if (!event.key.startsWith(`wildfire:${locationId}:`)) {
+      return;
+    }
+    if (event.endsMinute !== state.date.minute) {
+      return; // Still active, or expired in an earlier month.
+    }
+    const selectedNames = (event.attributes.selectedFacilityNames ||
+      []) as string[];
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      `Wildfire restoration complete: safety shutoffs are lifted and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal.`,
+      {
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        title: "Wildfire restoration complete",
+        concept: "supply",
+        storyPhaseKey: event.key,
+        reportedKey: `wildfire-recovery:${event.key}`,
+      },
+    );
+  });
+  // One active wildfire per region, and a cooldown after each incident.
+  if (activeWildfire(state.worldEvents.active, locationId)) {
+    return;
+  }
+  if (
+    wildfireInCooldown(
+      state.worldEvents.occurrences,
+      locationId,
+      monthsElapsed,
+      profile,
+    )
+  ) {
+    return;
+  }
+  const occurrenceKey = wildfireOccurrenceKey(locationId, monthsElapsed);
+  if (state.worldEvents.checkedKeys.includes(occurrenceKey)) {
+    return; // Already checked this month (e.g. a save resumed mid-month).
+  }
+  const monthIndex = state.date.monthNumber - 1;
+  const modifier = weatherFireRiskModifier(
+    dailyFireWeatherReading(state.date, state.seed),
+    getMonthlyClimatology(monthIndex),
+  );
+  const probability = wildfireMonthlyProbability(profile, monthIndex, modifier);
+  const ignites =
+    wildfireDraw(state.seed, locationId, monthsElapsed, "occurrence") <
+    probability;
+  if (!ignites) {
+    state.worldEvents.checkedKeys.push(occurrenceKey);
+    if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
+      state.worldEvents.checkedKeys.splice(
+        0,
+        state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
+      );
+    }
+    return;
+  }
+  const snapshot = buildStorySnapshot(
+    state.monthlyHistory,
+    state.facilities,
+    state.date.minute,
+  );
+  const prepared = activePreparedness(
+    state.worldEvents.occurrences,
+    locationId,
+    monthsElapsed,
+  );
+  const incident = sampleWildfireIncident({
+    profile,
+    seed: state.seed,
+    locationId,
+    monthsElapsed,
+    snapshot,
+    prepared,
+  });
+  const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
+  const endsMinute =
+    (monthsElapsed + incident.durationMonths) * MINUTES_PER_MONTH;
+  const outputMultipliers = Object.fromEntries(
+    incident.selectedFacilityIds.map((id) => [
+      String(id),
+      incident.outputMultiplier,
+    ]),
+  );
+  const affected = incident.selectedFacilityNames.length
+    ? incident.selectedFacilityNames.join(", ")
+    : "no operating generators";
+  const endLabel = getDateFromMinute(endsMinute - 1, state.startingYear);
+  const message = `${prepared ? "Prepared crews are in place. " : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
+  const occurrence: ActiveWorldEventType = {
+    key: occurrenceKey,
+    definitionId: WILDFIRE_DEFINITION_ID,
+    startsMinute,
+    endsMinute,
+    // A hidden surprise until it happens; once persisted its effects still enter forecasts.
+    forecastable: false,
+    title: "Wildfire emergency",
+    message,
+    concept: "danger",
+    importance: "CRITICAL",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    attributes: {
+      locationId,
+      monthsElapsed,
+      prepared,
+      severity: incident.severity,
+      disconnectedDemand: incident.disconnectedDemand,
+      outputMultiplier: incident.outputMultiplier,
+      targetCapacityShare: incident.targetCapacityShare,
+      durationMonths: incident.durationMonths,
+      selectedFacilityIds: incident.selectedFacilityIds,
+      selectedFacilityNames: incident.selectedFacilityNames,
+      restorationCostPerMonth: incident.restorationCostPerMonth,
+    },
+    effects: {
+      demandMultiplier: 1 - incident.disconnectedDemand,
+      facilityOutputMultipliersById: outputMultipliers,
+      operatingExpensePerMonth: incident.restorationCostPerMonth,
+    },
+  };
+  state.worldEvents.checkedKeys.push(occurrenceKey);
+  state.worldEvents.active.push(occurrence);
+  state.worldEvents.occurrences.push(occurrence);
+  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.checkedKeys.splice(
+      0,
+      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+  logGameEvent(state, "WORLD_EVENT", message, {
+    importance: "CRITICAL",
+    actionTarget: occurrence.actionTarget,
+    title: occurrence.title,
+    concept: occurrence.concept,
+    storyPhaseKey: occurrence.key,
+    turningPointPriority: 120,
+    reportedKey: occurrence.key,
+    pause: true,
+  });
 }
 
 /**
@@ -2086,6 +2279,9 @@ export function tickState(state: GameType) {
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
       const storyPriceFuels = updateWorldEvents(state);
+      // The recurring regional hazard resolves on its own path, after the authored story, so a
+      // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
+      updateWildfireHazards(state);
       const activatedPrograms = advancePolicies(
         state,
         state.date.monthsElapsed,

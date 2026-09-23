@@ -269,6 +269,42 @@ export function getRecordedWeatherRows(
   return series ? series.recordedRows : [];
 }
 
+/** Multi-decade monthly normals for the fields a hazard model may compare against. */
+export interface MonthlyClimatologyType {
+  tempMean: number;
+  tempSd: number;
+  windMean: number;
+  windSd: number;
+}
+
+/**
+ * The loaded location's observed monthly normals (mean and interannual standard deviation of the
+ * daily mean) for temperature and wind, indexed 0-based by calendar month. Undefined until a
+ * series is loaded or for a month with no record, so callers must treat absence as "no anomaly
+ * signal" rather than a zero reading.
+ */
+export function getMonthlyClimatology(
+  monthIndex: number,
+  seriesId?: string,
+): MonthlyClimatologyType | undefined {
+  const series = getSeries(seriesId) || getSeries();
+  if (!series) {
+    return undefined;
+  }
+  const month = series.climatology[monthIndex];
+  if (!month) {
+    return undefined;
+  }
+  const temp = month.stats.TEMP_C;
+  const wind = month.stats.WIND_KPH;
+  return {
+    tempMean: temp.mean,
+    tempSd: temp.sd,
+    windMean: wind.mean,
+    windSd: wind.sd,
+  };
+}
+
 /**
  * Downloads a location's record, for the browser.
  *

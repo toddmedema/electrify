@@ -19,6 +19,7 @@ import {
 } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
+import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -83,6 +84,7 @@ export interface StateProps {
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
   ongoing?: UpcomingStoryEventType[];
+  riskNotice?: WildfireRiskNoticeType;
 }
 
 export interface DispatchProps {
@@ -111,7 +113,14 @@ export default function EventLog(props: Props): React.JSX.Element {
       onEvidenceReady?.(request, evidenceAnchor.current);
     }
   }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
-  const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
+  const {
+    events,
+    onOpen,
+    onSelect,
+    upcoming = [],
+    ongoing = [],
+    riskNotice,
+  } = props;
   const [historyFilter, setHistoryFilter] =
     React.useState<EventHistoryFilterType>("ALL");
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(
@@ -139,6 +148,21 @@ export default function EventLog(props: Props): React.JSX.Element {
         tabIndex={-1}
         aria-label="Announced events and event history evidence"
       >
+        {riskNotice && (
+          <section
+            className="eventLogSection wildfireRiskNotice"
+            aria-labelledby="wildfireRiskNoticeTitle"
+          >
+            <header className="eventLogSectionHeader">
+              <Typography id="wildfireRiskNoticeTitle" variant="subtitle2">
+                {riskNotice.title}
+              </Typography>
+            </header>
+            <Typography variant="body2" color="textSecondary">
+              {riskNotice.message}
+            </Typography>
+          </section>
+        )}
         {ongoing.length > 0 && (
           <section
             className="eventLogSection ongoingEvents"
