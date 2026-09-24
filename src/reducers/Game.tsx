@@ -1083,7 +1083,8 @@ function logHailRepairsCompleted(state: GameType) {
         importance: "NOTABLE",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
         title: "Hail repairs complete",
-        concept: "severeWeather",
+        // Restored output is good news, so it takes the green supply icon, not the amber storm.
+        concept: "supply",
         storyPhaseKey: event.key,
         reportedKey: `hail-repair:${event.key}`,
       },

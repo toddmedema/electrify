@@ -630,9 +630,7 @@ describe("weather hardening in the purchase dialog", () => {
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",
     });
-    expect(impact).toHaveTextContent(
-      "Incl. insurance. Plus fuel and loan payments.",
-    );
+    expect(impact).toHaveTextContent("Incl. insurance. Plus loan payments.");
   });
 
   function gasItem(cash: number, onBuild = jest.fn()) {

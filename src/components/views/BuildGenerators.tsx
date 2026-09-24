@@ -743,10 +743,9 @@ export function GeneratorBuildItem(
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise((estimatedAnnualOperatingCost(quote) + quoteInsurance) / 12)}/mo`,
-                detail:
-                  quoteInsurance > 0
-                    ? "Incl. insurance. Plus fuel and loan payments."
-                    : "Plus fuel and loan payments.",
+                detail: `${quoteInsurance > 0 ? "Incl. insurance. " : ""}Plus ${
+                  quote.fuel === "Sun" ? "" : "fuel and "
+                }loan payments.`,
               },
               {
                 concept: "time",

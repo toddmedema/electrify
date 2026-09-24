@@ -254,15 +254,23 @@ function coldExposure(
   };
 }
 
+// Rarer winters than one in twelve still reach a few degrees below the rare low, so the package is
+// offered wherever that low comes within this margin of the standard rating. Without it, places
+// such as Atlanta or London saw occasional derates the player had no way to prevent.
+const COLD_PACKAGE_OFFER_MARGIN_C = 3;
+
 /**
  * Whether a standard gas plant's rating is ever plausibly breached here, so a cold-weather package
- * could help: the place's one-winter-in-twelve low reaches the standard rating. Cities without a
- * weather record count as exposed outside the lowland subtropics and tropics.
+ * could help: the place's one-winter-in-twelve low comes within a few degrees of the standard
+ * rating. Cities without a weather record count as exposed outside the lowland subtropics and
+ * tropics.
  */
 export function coldPackageCanHelp(location: LocationType): boolean {
   const climate = COLD_CLIMATE_BY_LOCATION[location.id];
   if (climate) {
-    return climate[1] <= STANDARD_GAS_DESIGN_MIN_TEMP_C;
+    return (
+      climate[1] <= STANDARD_GAS_DESIGN_MIN_TEMP_C + COLD_PACKAGE_OFFER_MARGIN_C
+    );
   }
   return Math.abs(location.lat) >= 30 || (location.elevation ?? 0) >= 1500;
 }
