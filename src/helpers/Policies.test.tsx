@@ -217,8 +217,11 @@ test("Off preserves installed upgrades through save/load and actions replay dete
 test("neutral saves round-trip; malformed stocks and policy actions are rejected", () => {
   const game = createGame({ scenarioId: 106 });
   const restored = parseSave(serializeSave(game))!;
-  expect(restored.game.policies!.programs.solar.adoption).toBe(0);
+  // A game that never touched a program has no policy record, and resuming it must not add one
+  expect(restored.game.policies).toBeUndefined();
   const bad = cloneDeep(restored);
+  bad.game.policies = emptyPolicies(restored.game.date.monthsElapsed);
+  expect(parseSave(bad)).not.toBeNull();
   bad.game.policies!.programs.solar.adoption = 2;
   expect(parseSave(bad)).toBeNull();
   const replay = serializeReplay(game)!;
