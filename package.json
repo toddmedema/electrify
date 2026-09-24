@@ -41,7 +41,7 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "npm run compatibility:check && react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "test:once": "react-scripts test --watchAll=false",
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\"",
@@ -57,10 +57,16 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" --fix",
     "typecheck": "tsc --noEmit && tsc -p e2e",
     "check": "node scripts/check.js",
-    "fix": "npm run compatibility:generate && npm run lint:fix && npm run format",
+    "fix": "npm run lint:fix && npm run format",
     "deploy": "./scripts/deploy.sh",
     "compatibility:generate": "node scripts/run-compatibility.js",
-    "compatibility:check": "node scripts/run-compatibility.js --check"
+    "prestart": "npm run compatibility:generate",
+    "prebuild": "npm run compatibility:generate",
+    "pretest": "npm run compatibility:generate",
+    "pretest:once": "npm run compatibility:generate",
+    "pretest:ci": "npm run compatibility:generate",
+    "presim": "npm run compatibility:generate",
+    "pretypecheck": "npm run compatibility:generate"
   },
   "eslintConfig": {
     "extends": [
