@@ -50,6 +50,7 @@ describe("the keyboard shortcuts", () => {
     expect(keyMap.SLOW).toEqual("1");
     expect(keyMap.NORMAL).toEqual("2");
     expect(keyMap.FAST).toEqual("3");
+    expect(keyMap.ULTRA).toEqual("4");
     expect(bound.has("shift+1")).toBe(true);
     expect(bound.has("shift+9")).toBe(true);
   });

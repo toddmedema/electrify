@@ -59,9 +59,21 @@ jobs:
         if: '!cancelled()'
         run: npm run sim -- --all
 
+      # Same-process ratios (Immer overhead, month rollover vs an ordinary tick) cancel runner
+      # speed, so they can gate; the milliseconds are reported only. See docs/perf-plan.md.
+      - name: Tick performance ratios
+        if: '!cancelled()'
+        run: npm run perf:bench
+
       - name: Production build
+        id: build
         if: '!cancelled()'
         run: npm run build
+
+      # Gzip bytes are deterministic for a given build, so they gate at 1% tolerance.
+      - name: Bundle size
+        if: "!cancelled() && steps.build.outcome == 'success'"
+        run: npm run perf:bundle
 
       - name: Install browser
         id: browser

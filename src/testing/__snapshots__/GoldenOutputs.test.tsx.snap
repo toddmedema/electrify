@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`keeps every scenario's golden output 1`] = `
+Object {
+  "0 Mission 1: Electricity": "3ba751a1a1183c2548bec7309be827e2d8d1c46ebfb5c94d36998f816bc5d00f",
+  "1 Mission 2: Generators": "aa304694e36baebbccee7cc936aeea2eb8a93986c9f9424c64d7c86e0e630160",
+  "100 Carbon Fee": "e6a57ae3b2013878ca7a26e654c1926b30ce6415c65190e5777e76db2a66731a",
+  "101 Rise of Renewables": "dc1ac21ff9f4748e9885ea5fe2578cf9742fa9c1e704dc7865174e62b09f05b1",
+  "102 The End of an Era": "c7b776e8632a605467aee0d5b00ec52d20532efd65927c2678fba95e85eba17f",
+  "103 The Shale Boom": "fe8228286e417fed4ade691abcc5bd5d3c9373d087f992c253393a90441ae99c",
+  "104 Hurricane Season": "01c33b81d7989421790a27e8789e9d5fcd2d6e63331cd10764d8e137c607dc8d",
+  "105 Paradise": "4adfa253773385c3d0b283dfca7b61a3f8d418ff3e92b187103a3e5282f59bfe",
+  "106 Data Center Boom": "3898810f2ca32374b1160d40dfbb35a6b15015634ebe173a1dcf8e7c2cc6c959",
+  "107 Deep Freeze": "88ede9c36e6048b9fbb4c71a00b996713987e0a48247de75ad5e1edcc5c2a343",
+  "108 Heatwave + Drought": "a73bdce7068be1c9b927aadf7f683a226b3aadfe6cce0166206b30153277cdf2",
+  "110 Sudden Nuclear Shutdown": "402ee31b21c23bbe12212a658ee94b3642c37d548340f0977ef3e76f27f580f9",
+  "111 Wildfire Emergency": "51aa018ac7a012e2be422061613e5816cff14ba90f71b14ec764b6b026a9b354",
+  "112 Mission 7: Interties": "014d7127d6ddcc20a6a4591726121ecbfded2ac1ed099ce703c8561f9066272a",
+  "113 Load Shedding": "2f7d843eb39c31084b274661051a40116f5a685c060cd1890cb3057710a82d70",
+  "114 The River Runs Dry": "72361872b85385b06ccc855067703aca12049ba4d30e8144e516dc0934cc147a",
+  "115 Delhi Summer": "a96465aba7b811d9d6c58c3687b06e21572830640b2a1f9e4e7c3cdff667ccf1",
+  "2 Mission 3: Storage": "4ed775e0ccca48ef8dc258e430e024fcd47010e33c63a150bc4bc0d6ac5d3f28",
+  "3 Mission 5: Pricing": "5dba6bf886033fd19d79210598e6df139c5395713eae06e6e16ace3ef624ac6f",
+  "4 Mission 4: Finances": "7f4ddb7dd6da62e23d190faf96aebdd3f06bbff1c676e9a66a0f4e51248c31fa",
+  "5 Mission 6: Forecasting": "d1a15f9542faaa38746db38e8614866af7a57c7200aeec9211fdee4a9c26075f",
+}
+`;
