@@ -73,7 +73,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     description: storage.description,
     available: storage.available,
     sizeBuildable,
-    maxSizeLabel: `${formatWatts(storage.maxPeakWh)}h`,
+    maxSizeLabel: formatWattHours(storage.maxPeakWh),
     location: props.location,
     viableLocationsRemaining: storage.viableLocationsRemaining,
   });
@@ -251,7 +251,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
 
       <Dialog open={open} onClose={toggleOpen}>
         <ClosableDialogTitle onClose={toggleOpen}>
-          Build {formatWatts(storage.peakWh)}h {storage.name}?
+          Build {formatWattHours(storage.peakWh)} {storage.name}?
         </ClosableDialogTitle>
         <DialogContent className="noPadding">
           <DecisionImpactPreview

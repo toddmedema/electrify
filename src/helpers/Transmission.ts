@@ -621,3 +621,46 @@ export function intertieUpgradeQuote(
       (corridorConstructionKgco2e(corridor) / corridor.capacityW) * addedW,
   };
 }
+
+/** Build a chosen tier in one project using the same costs, timing and limits as staged upgrades. */
+export function intertieBuildQuote(
+  corridorId: string,
+  year: number,
+  tier = 1,
+  context?: IntertieAccessContext,
+):
+  | (TransmissionCorridorDefinitionType & { constructionKgco2eTotal: number })
+  | undefined {
+  const corridor = effectiveCorridor(corridorId, context);
+  if (
+    !corridor ||
+    !Number.isInteger(tier) ||
+    tier < 1 ||
+    tier > MAX_INTERTIE_UPGRADES + 1
+  )
+    return undefined;
+  const result = {
+    ...corridor,
+    constructionKgco2eTotal: corridorConstructionKgco2e(corridor),
+  };
+  for (let step = 1; step < tier; step++) {
+    const upgrade = intertieUpgradeQuote(
+      {
+        corridorId,
+        capacityW: result.capacityW,
+        annualOperatingCost: result.annualOperatingCost,
+      },
+      year,
+      1,
+      1,
+      context,
+    );
+    if (!upgrade) return undefined;
+    result.capacityW = upgrade.targetCapacityW;
+    result.buildCost += upgrade.buildCost;
+    result.yearsToBuild += upgrade.yearsToBuild;
+    result.annualOperatingCost = upgrade.annualOperatingCost;
+    result.constructionKgco2eTotal += upgrade.constructionKgco2eTotal;
+  }
+  return result;
+}

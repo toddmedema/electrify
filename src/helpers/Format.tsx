@@ -1,31 +1,8 @@
 import numbro from "numbro";
 
-/**
- * This function formats a number representing watts into a string with appropriate units.
- * It uses the numbro library to format the number with a specified mantissa and a maximum length of max(2, mantissa).
- * The function also replaces certain characters to use the correct abbreviations for MegaWatts, GigaWatts, and TeraWatts.
- * The result is appended with 'W' to indicate watts.
- *
- * @param {number} i - The number to be formatted.
- * @param {number} mantissa - The number of significant digits to display after the decimal point. Default is 1.
- * @returns {string} - The formatted string representing the number in watts with appropriate units.
- */
+/** Format power using its actual magnitude, without promoting sub-GW values to GW. */
 export function formatWatts(i: number, mantissa = 1): string {
-  return (
-    numbro(i)
-      .format({
-        spaceSeparated: false,
-        average: true,
-        trimMantissa: true,
-        totalLength: Math.max(2, mantissa),
-        mantissa,
-      })
-      // lowercase k for thousands in both cases
-      .replace("m", "M") // Capitalize MegaWatts
-      .replace("b", "G") // Billions -> Giga
-      .replace("t", "T") + // Capitalize TeraWatts
-    "W"
-  );
+  return formatWattsInUnit(i, getWattUnit(i), mantissa);
 }
 
 export function formatWattHours(i: number, mantissa = 1): string {
@@ -106,11 +83,7 @@ const WATT_UNITS: WattUnitType[] = [
   { suffix: "", divisor: 1 },
 ];
 
-/**
- * The unit a value of this magnitude reads most naturally in, eg 5e8 -> MegaWatts.
- * Unlike formatWatts this never promotes to the next unit to save a digit
- * (formatWatts renders 500MW as "0.5GW"), so a set of related numbers can share one unit.
- */
+/** The SI unit selected from the absolute value, before rounding. */
 export function getWattUnit(i: number): WattUnitType {
   const abs = Math.abs(i);
   return (
@@ -139,43 +112,33 @@ export function formatWattsInUnit(
   );
 }
 
-/**
- * tickFormat for a watts axis. Victory calls tickFormat with (tick, index, ticks), so every
- * tick is rendered in the unit of the largest one - no more "0.5GW / 400MW / 300MW" axes.
- */
-export function formatWattsAxis(t: number, ticks: number[]): string {
-  return formatWattsInUnit(t, getWattUnit(Math.max(...ticks.map(Math.abs))));
+/** Axis values follow the same unit thresholds as cards and tooltips. */
+export function formatWattsAxis(t: number, _ticks: number[]): string {
+  return formatWatts(t);
 }
 
-export function formatWattHoursAxis(t: number, ticks: number[]): string {
-  return formatWattsAxis(t, ticks) + "h";
+export function formatWattHoursAxis(t: number, _ticks: number[]): string {
+  return formatWattHours(t);
 }
 
-/**
- * A current-out-of-peak pair sharing the peak's unit, eg "356/500MW" rather than "356/0.5GW".
- */
+/** Share a suffix only when both values naturally use the same unit. */
 export function formatWattsOfPeak(current: number, peak: number): string {
-  const unit = getWattUnit(peak);
-  // A current well below the peak's unit would round away at one decimal, eg 100MW of a 1GW peak
-  const mantissa = Math.abs(current) >= unit.divisor ? 1 : 2;
-  return (
-    formatWattsInUnit(current, unit, mantissa).replace(/[^0-9.,]/g, "") +
-    "/" +
-    formatWattsInUnit(peak, unit)
-  );
+  const value = Math.abs(current);
+  const peakUnit = getWattUnit(peak);
+  const currentUnit = getWattUnit(value);
+  const shared = value === 0 || currentUnit.divisor === peakUnit.divisor;
+  return shared
+    ? formatWattsInUnit(value, peakUnit).replace(/[^0-9.,]/g, "") +
+        "/" +
+        formatWatts(peak)
+    : formatWatts(value) + "/" + formatWatts(peak);
 }
 
 export function formatWattHoursOfPeak(current: number, peak: number): string {
-  return formatWattsOfPeak(current, peak) + "h";
+  return formatWattsOfPeak(current, peak).replace(/W/g, "Wh");
 }
 
-/**
- * The same pair for a value whose sign carries meaning, eg an intertie that can buy power one
- * hour and sell it the next. formatWattsOfPeak strips everything but digits from the leading
- * number -- the minus sign included -- so the sign is reattached here rather than lost.
- */
 export function formatSignedWattsOfPeak(current: number, peak: number): string {
-  const pair = formatWattsOfPeak(Math.abs(current), peak);
-  // Guard against "-0/500MW" when a trickle rounds away
+  const pair = formatWattsOfPeak(current, peak);
   return current < 0 && !/^0(\.0*)?\//.test(pair) ? "-" + pair : pair;
 }

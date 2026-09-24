@@ -2,9 +2,9 @@
 
 **Historical results:** the cash table and Wildfire keep-cash comparison below predate the
 scenario-sized intertie calibration. See the [current intertie balance report](../../docs/intertie-balance.md)
-for measured results and the updated reference plans. The researched choice costs are unchanged,
-including $200k for wildfire preparedness. Preparedness is now worthwhile in the CEO plan with
-smaller import access; the earlier $44.6M balances and keep-cash preference are not current results.
+for measured results and the updated reference plans. Wildfire preparedness now costs $2M at every difficulty (10× the historical $200k proxy),
+so protecting the grid competes meaningfully with construction funds; restoration costs and
+the 50% protection remain unchanged. The historical balances below predate this change.
 
 See the [cost research report](SCENARIO_CHOICE_RESEARCH.md) for sources, monetary
 normalization, and uncertainty behind the final amounts.
@@ -80,7 +80,7 @@ other operating-plan actions, loses under fast connection (12,473 residents at t
 wins under phasing (17,653 residents; $853.8M cash). Phasing gives time rather than a free
 cash reward, and does not protect a player who never expands.
 
-**Wildfire preparedness now costs a fixed $200k**, decoupled from restoration charges.
+**Historical wildfire preparedness cost: a fixed $200k**, decoupled from restoration charges.
 Customer-scaled 2024 SCE operational preparedness and aerial standby costs give a broad
 $191k annual proxy, rounded to $200k for advance inspections, staged backup equipment and
 response resources. This is a conservative transferred benchmark rather than a direct

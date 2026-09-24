@@ -32,8 +32,8 @@ it("makes precipitation, snowpack, and reservoir level readable without the canv
   expect(chart).toHaveAccessibleName(/Reservoir:/);
 });
 
-it("formats reservoir ticks as gigawatt-hour values without repeating the unit", () => {
+it("formats reservoir ticks with the shared energy helper", () => {
   expect(
     [0, 20e9, 100e9, 1e12].map((value) => formatReservoirAxisValue(value)),
-  ).toEqual(["0", "20", "100", "1,000"]);
+  ).toEqual(["0Wh", "20GWh", "100GWh", "1TWh"]);
 });

@@ -1,4 +1,5 @@
 import cloneDeep from "lodash.clonedeep";
+import { TICK_MINUTES } from "../Constants";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import reducer, { generateNewTimeline, tickState, delta } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
@@ -192,3 +193,30 @@ test.each(["Intern", "Employee", "Manager", "VP", "CEO"] as const)(
   "winterization keeps the research-based allowance on %s",
   (difficulty) => expect(winterizationCost(difficulty)).toBe(90000000),
 );
+
+describe("scenario decision speed restoration", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it.each(["SLOW", "NORMAL", "FAST", "PAUSED"] as const)(
+    "restores %s after a valid response",
+    (speed) => {
+      const game = ready(106, 48 - TICK_MINUTES / MINUTES_PER_MONTH);
+      game.speed = speed;
+      tickState(game);
+      expect(game.speed).toBe("PAUSED");
+      expect(game.scenarioChoicePause).toBe(speed);
+      const invalid = reducer(
+        game,
+        choose(DATA_CENTER_DECISION_KEY, "invalid"),
+      );
+      expect(invalid.speed).toBe("PAUSED");
+      const chosen = reducer(
+        invalid,
+        choose(DATA_CENTER_DECISION_KEY, "phased"),
+      );
+      expect(chosen.speed).toBe(speed);
+      expect(chosen.scenarioChoicePause).toBeUndefined();
+    },
+  );
+});

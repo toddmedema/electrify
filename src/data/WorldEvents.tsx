@@ -1362,9 +1362,10 @@ export function wildfirePrepared(
   );
 }
 // Advance inspection, staged backup equipment and response resources for the small
-// municipal system. This is separate from severity-dependent post-fire restoration.
+// municipal system, priced for a meaningful cash-versus-resilience decision rather
+// than the lower historical spending proxy; post-fire restoration is separate.
 export function wildfirePreparationCost(_difficulty: DifficultyType): number {
-  return 200000;
+  return 2000000;
 }
 
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {

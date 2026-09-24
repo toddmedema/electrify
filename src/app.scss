@@ -2444,17 +2444,64 @@ html[data-theme="dark"] .uplot {
   margin-top: 12px !important;
 }
 
+.victoryDialogActions {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  border-top: 1px solid var(--border-subtle);
+
+  .MuiButton-root {
+    min-height: 40px;
+  }
+}
+
+.victoryUtilityActions,
+.victoryNextActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.victoryUtilityActions {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
+
+.victoryNextActions {
+  margin-left: auto;
+}
+
+@media (pointer: coarse) {
+  .victoryDialogActions .MuiButton-root {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 599px) {
+  .victoryDialogActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .victoryUtilityActions,
+  .victoryNextActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-left: 0;
+  }
+
+  .victoryUtilityActions .MuiButton-root {
+    padding-inline: 4px;
+    line-height: 1.4;
+
+    .MuiButton-startIcon {
+      display: none;
+    }
+  }
+}
+
 @media (max-width: 520px) {
   .victoryDebrief {
     gap: 8px 12px;
-  }
-
-  .victoryDialogActions {
-    justify-content: center;
-
-    & > .MuiButton-root {
-      min-height: 40px;
-    }
   }
 }
 

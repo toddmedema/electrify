@@ -11,7 +11,7 @@ import {
 } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
-import { serializeReplay } from "../Replay";
+import { serializeReplay, encodeReplay, decodeReplay } from "../Replay";
 import gameReducer, {
   buildTransmissionLine,
   tickState,
@@ -22,6 +22,7 @@ import {
   intertieTechnologyCeilingW,
   intertieUpgradeCount,
   intertieUpgradeQuote,
+  intertieBuildQuote,
 } from "../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -394,5 +395,114 @@ describe("intertie upgrades", () => {
     expect(
       tamper((line) => (line.currentFlowW = line.capacityW * 2)),
     ).toBeNull();
+  });
+});
+
+describe("building intertie tiers directly", () => {
+  it.each([false, true])(
+    "books the selected tier, total cost and emissions (financed: %s)",
+    (financed) => {
+      const before = createGame({ scenarioId: 100, seed: 61 });
+      const cash = 100000000000;
+      getTimeFromTimeline(before.date.minute, before.timeline)!.cash = cash;
+      const quote = intertieBuildQuote(
+        CORRIDOR,
+        before.date.year,
+        3,
+        accessContextForGame(before),
+      )!;
+      const result = gameReducer(
+        before,
+        buildTransmissionLine({ corridorId: CORRIDOR, financed, tier: 3 }),
+      );
+      const line = result.transmission!.lines[0];
+      expect(line.capacityW).toBe(
+        Math.round(corridor().capacityW * INTERTIE_UPGRADE_STEP ** 2),
+      );
+      expect(line.buildCost).toBe(quote.buildCost);
+      expect(line.yearsToBuildLeft).toBe(quote.yearsToBuild);
+      expect(line.constructionKgco2eTotal).toBe(quote.constructionKgco2eTotal);
+      expect(line.annualOperatingCost).toBe(quote.annualOperatingCost);
+      expect(line.currentFlowW).toBe(0);
+      expect(intertieUpgradeCount(line, accessContextForGame(result))).toBe(2);
+      const paid = quote.buildCost * (financed ? DOWNPAYMENT_PERCENT : 1);
+      expect(
+        getTimeFromTimeline(result.date.minute, result.timeline)!.cash,
+      ).toBeCloseTo(cash - paid);
+      expect(line.loanAmountLeft).toBeCloseTo(
+        financed ? quote.buildCost - paid : 0,
+      );
+    },
+  );
+
+  it.each([0, -1, 1.5, NaN, MAX_INTERTIE_UPGRADES + 2])(
+    "rejects invalid tier %s without spending cash",
+    (tier) => {
+      const before = createGame({ scenarioId: 100, seed: 61 });
+      expect(
+        gameReducer(
+          before,
+          buildTransmissionLine({
+            corridorId: CORRIDOR,
+            financed: false,
+            tier,
+          }),
+        ),
+      ).toBe(before);
+    },
+  );
+
+  it("rejects an unaffordable larger tier even when the base tier is affordable", () => {
+    const before = createGame({ scenarioId: 100, seed: 61 });
+    getTimeFromTimeline(before.date.minute, before.timeline)!.cash =
+      corridor().buildCost;
+    expect(
+      gameReducer(
+        before,
+        buildTransmissionLine({
+          corridorId: CORRIDOR,
+          financed: false,
+          tier: 2,
+        }),
+      ),
+    ).toBe(before);
+  });
+
+  it("round trips a directly built tier through saves and deterministic replays", () => {
+    const before = createGame({ scenarioId: 112, seed: 249007 });
+    const state = cloneDeep(
+      gameReducer(
+        before,
+        buildTransmissionLine({
+          corridorId: CORRIDOR,
+          financed: true,
+          tier: 3,
+        }),
+      ),
+    );
+    expect(state.transmission!.lines).toHaveLength(1);
+    const saved = parseSave(serializeSave(state));
+    expect(saved?.game.transmission).toEqual(state.transmission);
+    runMonths(state, 2);
+    const replay = serializeReplay(state)!;
+    expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
+    const replayed = createGameFromReplay(replay);
+    runMonths(replayed, 2);
+    expect(replayed.transmission).toEqual(state.transmission);
+    expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
+    const action = replay.actions.find(
+      ({ type }) => type === "buildTransmissionLine",
+    )!;
+    action.payload = { corridorId: CORRIDOR, financed: true, tier: 99 };
+    expect(decodeReplay(encodeReplay(replay))).toBeNull();
+  });
+
+  it("retains the existing physical capacity ceiling", () => {
+    expect(
+      intertieBuildQuote(CORRIDOR, 1900, 4, {
+        scenarioId: 100,
+        locationId: "SF",
+      }),
+    ).toBeUndefined();
   });
 });

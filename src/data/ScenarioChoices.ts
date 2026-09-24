@@ -28,17 +28,16 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         label: "Accept funded connection",
         cost: () => 0,
         upfrontGrant: (difficulty) => DATA_CENTER_GRANT[difficulty],
-        description:
-          "Receive {grant} in exchange for the full 100 MW coming online in January 2026.",
+        description: "Receive {grant} to connect all 100 MW in January 2026.",
         message:
-          "Funding received. Your agreement commits you to connect 100 MW in January 2026.",
+          "Funding received for your commitment to connect 100 MW in January 2026.",
       },
       {
         id: "phased",
         label: "Require phased connections",
         cost: () => 0,
         description:
-          "Forgo funding to connect 50 MW in January 2026 and 50 MW in January 2028, delaying half the demand and sales by two years.",
+          "Forgo funding and delay half the demand and sales: connect 50 MW in January 2026 and 50 MW in January 2028.",
         message:
           "Phased connection agreed: 50 MW in January 2026 and 50 MW in January 2028, with no funding.",
         loadAdditions: [
@@ -68,16 +67,16 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 36,
     title: "Prepare for the deep freeze",
     message:
-      "Choose whether to protect plant output before February 2021; demand and gas prices will surge either way.",
+      "Protect plant output during February 2021’s freeze or save cash for construction; demand and gas prices surge either way.",
     options: [
       {
         id: "winterize",
         label: "Fund winterization",
         cost: winterizationCost,
         description:
-          "Spend {cost} to halve February output losses, retaining 81% of gas, 86.5% of coal, 88.5% of nuclear, and 72% of wind output.",
+          "Spend {cost} to halve February’s output losses at gas, coal, nuclear, and wind plants.",
         message:
-          "Winterization funded. February 2021 plant output losses will be halved; the demand surge and gas-price spike still apply.",
+          "Winterization halves February 2021 plant output losses, but demand and gas prices still surge.",
       },
       {
         id: "standard",
@@ -85,9 +84,9 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         meaningful: false,
         description:
-          "Keep your cash for construction and accept February output falling to 62% for gas, 73% for coal, 77% for nuclear, and 44% for wind.",
+          "Save cash for construction and accept February’s full output losses, including a 38% drop at gas plants.",
         message:
-          "Construction budget preserved. Full February 2021 output losses, demand surge, and gas-price spike apply.",
+          "Construction funds are preserved, with full plant output losses and surging demand and gas prices in February 2021.",
       },
     ],
   },
@@ -104,9 +103,9 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
         description:
-          "Spend {cost} on inspections, backup equipment, and crews to halve customer disconnections and generator output losses in January and February.",
+          "Spend {cost} to halve customer disconnections and generator output losses in January and February.",
         message:
-          "Preparedness funded. January and February customer disconnections and generator output losses are halved. Restoration costs still apply.",
+          "Preparedness halves January and February customer disconnections and generator output losses, with restoration costs unchanged.",
       },
       {
         id: "standard",
@@ -114,9 +113,9 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         label: "Keep cash",
         cost: () => 0,
         description:
-          "Keep your cash and accept the full customer disconnections and generator output losses in January and February.",
+          "Save cash and accept January and February’s full customer disconnections and generator output losses.",
         message:
-          "Cash preserved. The full January and February outage impact and restoration costs apply.",
+          "Cash is preserved, with the full January and February outage impact and restoration costs.",
       },
     ],
   },

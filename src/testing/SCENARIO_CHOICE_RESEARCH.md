@@ -3,6 +3,11 @@
 Research date: September 10, 2026. Applies to scenarios 106 (Data Center Boom),
 107 (Deep Freeze), and 111 (California Wildfires) in PR #347.
 
+**Balance update (September 23, 2026):** scenario wildfire preparedness now costs
+$2M at every difficulty to create a meaningful construction-versus-resilience choice.
+The $200k recommendation below is the historical spending proxy, not the current
+game price; restoration charges and protection effects are unchanged.
+
 ## Findings
 
 Keep the **$15M data-center contribution**, reduce **winterization from $250M to
