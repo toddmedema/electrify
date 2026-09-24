@@ -142,12 +142,15 @@ export const LOCATIONS = {
 } as { [id: string]: LocationType };
 export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 
-// How long between each simulated frame
+// How long between each simulated frame. FAST and ULTRA divide evenly into both 60 and 120 Hz
+// display frames (one or two ticks per frame), so neither stutters the way a 10 ms step did.
+// ULTRA is only offered on desktop-sized screens.
 export const TICK_MS = {
   PAUSED: 250, // pause doesn't actually simulate frames, this is just for setTimeout timers
   SLOW: 200,
   NORMAL: 60,
-  FAST: 10,
+  FAST: 1000 / 60,
+  ULTRA: 1000 / 120,
 };
 
 // Fallbacks for the screens that run before any economic data has been loaded, and the anchor

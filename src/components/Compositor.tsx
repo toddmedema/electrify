@@ -128,6 +128,7 @@ export const keyMap = {
   SLOW: "1",
   NORMAL: "2",
   FAST: "3",
+  ULTRA: "4",
   FACILITIES: "q",
   INSIGHTS: ["w", "e"],
   EVENTS: "r",
@@ -235,6 +236,12 @@ const shortcutHandlers = {
   FAST: () => {
     if (!uiHidden("speed")) {
       store.dispatch(setSpeed("FAST"));
+    }
+  },
+  // Desktop only, like its button
+  ULTRA: () => {
+    if (!uiHidden("speed") && isDesktopScreen()) {
+      store.dispatch(setSpeed("ULTRA"));
     }
   },
   FACILITIES: () => {

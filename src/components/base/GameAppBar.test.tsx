@@ -9,9 +9,11 @@ import {
   reserveCapacityW,
 } from "./GameAppBar";
 
+let mockDesktop = false;
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
   isBigScreen: () => true,
+  isDesktopScreen: () => mockDesktop,
 }));
 
 function renderAppBar(overrides: Partial<Props> = {}) {
@@ -29,6 +31,46 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  afterEach(() => {
+    mockDesktop = false;
+  });
+
+  it("labels the frame-aligned speeds and offers ULTRA only on desktop-sized screens", () => {
+    const { unmount } = renderAppBar();
+    expect(
+      screen.getByRole("button", { name: "fast speed" }),
+    ).toHaveTextContent("12×");
+    expect(screen.queryByRole("button", { name: "ultra speed" })).toBeNull();
+    unmount();
+
+    mockDesktop = true;
+    renderAppBar();
+    expect(
+      screen.getByRole("button", { name: "ultra speed" }),
+    ).toHaveTextContent("24×");
+  });
+
+  it("drops ULTRA to FAST once the screen is no longer desktop-sized", () => {
+    const onSpeedChange = jest.fn();
+    const game = createGame({ scenarioId: 101 });
+    renderAppBar({
+      game: { ...game, inGame: true, speed: "ULTRA" },
+      onSpeedChange,
+    });
+    expect(onSpeedChange).toHaveBeenCalledWith("FAST");
+  });
+
+  it("keeps ULTRA on a desktop-sized screen", () => {
+    mockDesktop = true;
+    const onSpeedChange = jest.fn();
+    const game = createGame({ scenarioId: 101 });
+    renderAppBar({
+      game: { ...game, inGame: true, speed: "ULTRA" },
+      onSpeedChange,
+    });
+    expect(onSpeedChange).not.toHaveBeenCalled();
+  });
+
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
