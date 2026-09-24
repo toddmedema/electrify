@@ -829,6 +829,11 @@ $topbar_height: 56px;
   }
   #gameCard .scrollable {
     overflow: visible;
+    // Size to content rather than the card's height. A sticky header can only pin within its
+    // parent's content box, and with the list at 100% height that box is shorter than its
+    // overflowing content - the header would release as soon as the list's box scrolled past
+    // the top of #gameCard
+    height: auto;
   }
   #gameCard #navfooter {
     position: sticky;
@@ -2788,6 +2793,15 @@ html[data-theme="dark"] .uplot {
   }
 
   #manual {
+    // The sticky headers below pin to the top of this scroller's content box, so a padding-top
+    // here would leave a gap between the top bar and the pinned header. The gutter lives on
+    // the first child instead, where it doesn't affect pinning.
+    padding-top: 0 !important;
+
+    > :first-child {
+      margin-top: size(base);
+    }
+
     figure {
       margin: $space-4 0;
     }
@@ -2811,7 +2825,9 @@ html[data-theme="dark"] .uplot {
       text-align: center;
     }
 
-    // Sticky so the player can still tell which section they're scrolling through
+    // Sticky so the player can still tell which section they're scrolling through. The
+    // line-height is the header's full height (MUI adds no vertical padding) and sets where
+    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx
     .manual-group {
       background: var(--bg-sunken);
       line-height: 32px;
@@ -2838,8 +2854,28 @@ html[data-theme="dark"] .uplot {
       display: none;
     }
 
+    // MUI v9 wraps the summary button in an <h3>, so a single "inherit" would pick up the
+    // heading's transparent background. Give both levels the card surface: a pinned title
+    // must be opaque, or the content scrolling behind it shows through. The top radius on
+    // each follows the card's own corners, which these children would otherwise square off
+    .MuiAccordion-heading {
+      background: inherit;
+      border-top-left-radius: 7px;
+      border-top-right-radius: 7px;
+    }
+
     .MuiAccordionSummary-root {
       padding: 0 $space-4;
+
+      // While a long entry scrolls, its title pins below the group header (32px =
+      // .manual-group's line-height) so the player keeps their place. Pinned entries have no
+      // group header above them, so they pin flush with the top bar instead (.manual-pinned
+      // below)
+      position: sticky;
+      top: 32px;
+      background: inherit;
+      border-top-left-radius: 7px;
+      border-top-right-radius: 7px;
 
       &:hover {
         background: var(--bg-raised);
@@ -2851,6 +2887,12 @@ html[data-theme="dark"] .uplot {
         outline: 2px solid $interactive_blue;
         outline-offset: -2px;
       }
+    }
+
+    // A divider under the title while expanded: it gives the pinned bar a bottom edge, and
+    // collapsed entries keep their single card border instead of doubling it
+    &.Mui-expanded .MuiAccordionSummary-root {
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     .MuiAccordionDetails-root {
@@ -2880,6 +2922,13 @@ html[data-theme="dark"] .uplot {
         }
       }
     }
+  }
+
+  // Pinned entries sit above every group header, so their title pins flush with the top bar
+  // rather than below a header that isn't there. Must follow .manual-entry's summary rule so
+  // the top offset wins at equal specificity
+  .manual-pinned .MuiAccordionSummary-root {
+    top: 0;
   }
 
   #gameSetupTable {

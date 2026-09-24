@@ -2,7 +2,14 @@ import cloneDeep from "lodash.clonedeep";
 import gameReducer, { loaded, resume, start, tickState } from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame } from "../testing/Simulator";
-import { GameType } from "../Types";
+import { getSimLocation } from "../testing/SimData";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
+import {
+  copyCommitmentMetadata,
+  serializeCommitmentMetadata,
+} from "../helpers/Commitment";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+import { GameType, ScenarioType } from "../Types";
 
 jest.setTimeout(60000);
 
@@ -83,5 +90,88 @@ describe("resume", () => {
 
   it("starts a new game with an empty timeline so the loading screen can tell them apart", () => {
     expect(gameReducer(played, start(101)).timeline).toEqual([]);
+  });
+});
+
+/**
+ * A custom game modeled on Carbon Fee, moved to Dallas. Saved a few ticks before the end of month
+ * 31, the resumed run used to drift from the one that kept going: parseSave invented an empty
+ * policies record the live game never had, and loaded() rebuilt the unit-commitment forecast by
+ * re-dispatching the tick that had already happened, which rewrote its supply and fuel and moved
+ * the month's totals.
+ */
+describe("resuming a save mid-month", () => {
+  const SAVED_AT_MINUTE = 46035; // Month 31, three ticks before it rolls over
+  let played: GameType;
+  let saved: GameType;
+
+  // Unfreezes reducer output the way restore() does, but keeps the commitment forecast that
+  // cloneDeep would drop, so the resumed run steers by the same forecast the game would
+  function thaw(state: GameType): GameType {
+    const thawed = cloneDeep(state);
+    state.timeline.forEach((tick, i) =>
+      copyCommitmentMetadata(tick, thawed.timeline[i]),
+    );
+    return thawed;
+  }
+
+  function resumed(): GameType {
+    return thaw(gameReducer(gameReducer(undefined, resume(saved)), loaded()));
+  }
+
+  beforeAll(() => {
+    const base = SCENARIOS.find((s: ScenarioType) => s.id === 100)!;
+    const scenario = {
+      ...base,
+      id: CUSTOM_SCENARIO_ID,
+      locationId: "Dallas",
+      location: getSimLocation("Dallas"),
+    } as ScenarioType;
+    played = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario, seed: 11 });
+    while (played.date.minute < SAVED_AT_MINUTE) {
+      tickState(played);
+    }
+    saved = serialized(played);
+  });
+
+  it("carries the commitment forecast through the save", () => {
+    const forecast = serializeCommitmentMetadata(played.timeline);
+    expect(forecast?.some((tick) => tick !== null)).toBe(true);
+    expect(serializeCommitmentMetadata(resumed().timeline)).toEqual(forecast);
+  });
+
+  it("leaves the tick that already happened as it was recorded", () => {
+    const restored = resumed();
+    expect(
+      getTimeFromTimeline(restored.date.minute, restored.timeline),
+    ).toEqual(getTimeFromTimeline(played.date.minute, played.timeline));
+  });
+
+  it("keeps a missing forecast from rewriting the recorded timeline", () => {
+    const envelope = JSON.parse(JSON.stringify(serializeSave(played)));
+    delete envelope.commitmentForecast;
+    const withoutForecast = parseSave(envelope)!.game;
+    const reloaded = gameReducer(
+      gameReducer(undefined, resume(withoutForecast)),
+      loaded(),
+    );
+    expect(reloaded.timeline).toEqual(withoutForecast.timeline);
+  });
+
+  it("doesn't invent policies the live game never had", () => {
+    expect(played.policies).toBeUndefined();
+    expect(saved.policies).toBeUndefined();
+  });
+
+  it("follows the uninterrupted run through the month's end", () => {
+    const restored = resumed();
+    const uninterrupted = thaw(played);
+    for (let i = 0; i < 100; i++) {
+      tickState(uninterrupted);
+      tickState(restored);
+      expect(restored.policies).toEqual(uninterrupted.policies);
+      expect(restored.facilities).toEqual(uninterrupted.facilities);
+    }
+    expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
   });
 });

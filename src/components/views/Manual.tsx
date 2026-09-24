@@ -38,6 +38,11 @@ export interface Props extends StateProps, DispatchProps {}
 
 const FEEDBACK_URL = "/about.html#feedback";
 
+// The pinned group header's height (.manual-group's line-height in app.scss). A grouped entry
+// scrolled into view must land below it, and its title pins at this offset while open. Keep
+// the two in sync.
+const GROUP_HEADER_HEIGHT = 32;
+
 // Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
 // once here rather than on every keystroke
 const SORTED_ENTRIES = [...MANUAL_ENTRIES].sort((a, b) => {
@@ -69,6 +74,19 @@ export function clearManualMemory() {
 
 function entryId(title: string): string {
   return `manual-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
+// The list is the scroller, except on short windows where #gameCard takes over and the list
+// stops scrolling (see app.scss). Scroll adjustments have to target whichever one actually is
+function scrollContainerOf(el: HTMLElement): HTMLElement {
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    if (/(auto|scroll)/.test(window.getComputedStyle(node).overflowY)) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return document.documentElement;
 }
 
 // Wraps each occurrence of the search term in a <mark>, so a hit inside a long entry is
@@ -154,7 +172,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
   const id = entryId(entry.title);
   return (
     <Accordion
-      className="manual-entry"
+      className={entry.pinned ? "manual-entry manual-pinned" : "manual-entry"}
       expanded={expanded}
       onChange={(_event: React.SyntheticEvent, isExpanded: boolean) =>
         props.onToggle(entry.title, isExpanded)
@@ -254,6 +272,17 @@ export default function Manual(props: Props): React.JSX.Element {
     // jsdom has no layout, and so no scrollIntoView
     if (focusEntry && focused) {
       focused.scrollIntoView?.({ block: "start" });
+      // scrollIntoView aligns the entry with the top of the list, where a grouped entry's
+      // title would sit under the pinned group header; nudge it down below that bar. Pinned
+      // entries have no header above them, so they stay flush with the top of the list.
+      const list = listRef.current;
+      if (list && !focused.classList.contains("manual-pinned")) {
+        const scroller = scrollContainerOf(list);
+        scroller.scrollTop = Math.max(
+          0,
+          scroller.scrollTop - GROUP_HEADER_HEIGHT,
+        );
+      }
       focused
         .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
         ?.focus();

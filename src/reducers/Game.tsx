@@ -51,7 +51,7 @@ import {
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, original, PayloadAction } from "@reduxjs/toolkit";
 import { submitHighscore } from "./User";
 import {
   getDateFromMinute,
@@ -1802,6 +1802,10 @@ export const gameSlice = createSlice({
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
+      // cloneDeep drops the non-enumerable commitment forecast parseSave reattached
+      action.payload.timeline.forEach((tick, i) =>
+        copyCommitmentMetadata(tick, restored.timeline[i]),
+      );
       // The tick loop's remaining module-level locals have to line up with restored state.
       const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
       previouslyInBlackout = now ? now.supplyW < now.demandW : false;
@@ -1845,9 +1849,10 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(loaded, (state) => {
-      // Forecast metadata is intentionally absent from JSON saves. Rebuild only that derived
-      // forecast after the data tables have loaded, so a resumed thermal plant makes the same
-      // commitment decision as an uninterrupted one.
+      // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
+      // Rebuild just that metadata after the data tables have loaded, and keep every recorded
+      // value: a full reforecast re-dispatches the tick that already happened, rewriting its
+      // supply, fuel and emissions and everything the next tick carries forward from them.
       const currentTick = getTimeFromTimeline(
         state.date.minute,
         state.timeline,
@@ -1861,7 +1866,12 @@ export const gameSlice = createSlice({
         );
       });
       if (needsCommitmentForecast) {
-        state.timeline = reforecastSupply(state, true);
+        const forecast = reforecastSupply(state, true);
+        state.timeline = original(state.timeline)!.map((tick, i) => {
+          const recorded = { ...tick };
+          copyCommitmentMetadata(forecast[i], recorded);
+          return recorded;
+        });
       }
       // Start ticking in game
       setTimeout(() => {

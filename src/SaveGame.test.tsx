@@ -1,5 +1,4 @@
 import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
-import { emptyPolicies } from "./helpers/Policies";
 import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
@@ -307,10 +306,42 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save!.game).not.toBe(game);
-    expect(save!.game).toEqual({
-      ...JSON.parse(JSON.stringify(game)),
-      policies: emptyPolicies(),
-    });
+    expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
+  });
+
+  it("validates the commitment forecast it carries beside the timeline", () => {
+    // A month's rollover forecasts afresh, which is what attaches the commitment metadata
+    const played = createGame(OPTIONS);
+    const month = played.date.monthsElapsed;
+    while (played.date.monthsElapsed === month) {
+      tickState(played);
+    }
+    const save = JSON.parse(JSON.stringify(serializeSave(played)));
+    const forecast = save.commitmentForecast;
+    expect(forecast).toHaveLength(played.timeline.length);
+    const entry = forecast.find((tick: unknown) => tick !== null);
+    expect(entry).toBeDefined();
+    expect(parseSave(save)!.commitmentForecast).toEqual(forecast);
+
+    expect(
+      parseSave({ ...save, commitmentForecast: forecast.slice(1) }),
+    ).toBeNull();
+    const [id] = Object.keys(entry.dispatchTargets);
+    const corrupt = (change: (tick: typeof entry) => void) => {
+      const copy = JSON.parse(JSON.stringify(save));
+      change(copy.commitmentForecast.find((tick: unknown) => tick !== null));
+      return parseSave(copy);
+    };
+    expect(corrupt((tick) => (tick.dispatchTargets[id] = -1))).toBeNull();
+    expect(corrupt((tick) => (tick.dispatchTargets[id] = null))).toBeNull();
+    expect(corrupt((tick) => (tick.dispatchTargets["x"] = 0))).toBeNull();
+    expect(
+      corrupt((tick) => (tick.runningCostToNextDispatch[id] = "1")),
+    ).toBeNull();
+    // Infinity (no dispatch ahead) has no JSON form and travels as null
+    expect(
+      corrupt((tick) => (tick.runningCostToNextDispatch[id] = null)),
+    ).not.toBeNull();
   });
 
   it("forgets the save it just cleared", () => {
