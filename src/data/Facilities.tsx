@@ -19,6 +19,7 @@ import {
   getViableLocationsRemaining,
 } from "./FacilitySites";
 import { resolveStoryAtDate } from "./WorldEvents";
+import { applyDefaultResilience } from "../helpers/Hazards";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -679,6 +680,9 @@ export function GENERATORS(
       g.costPerStart *= difficulty.expensesOM * inflation;
     }
     g.yearsToBuild *= difficulty.buildTime;
+    // Priced on the scaled cost so the option's share is exact; cold-climate gas is winterized by
+    // default. The build dialog can then toggle it with withResilienceOption.
+    Object.assign(g, applyDefaultResilience(g, state));
     // The custom game screen asks what can be built in a year before any game has loaded the
     // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no
     // fuel prices behind it is genuinely unknown rather than zero

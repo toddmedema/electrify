@@ -20,7 +20,10 @@ import {
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
-import { validBuildFacility } from "../helpers/BuildValidation";
+import {
+  validBuildFacility,
+  validRetrofitFacility,
+} from "../helpers/BuildValidation";
 import {
   pendingScenarioChoice,
   validScenarioResponse,
@@ -146,6 +149,26 @@ import {
   weatherFireRiskModifier,
 } from "../helpers/Wildfire";
 import { getWildfireProfile } from "../data/WildfireProfiles";
+import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
+import {
+  activeWeatherHazardsFor,
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  hailOccurs,
+  hazardEventKey,
+  isWeatherHazardEligible,
+  oneTimeCostMinute,
+  oneTimeWorldEventCost,
+  representativeMinTempC,
+  resolveColdImpact,
+  RETROFIT_DOWNTIME_MINUTES,
+  retrofitCost,
+  retrofittedResilience,
+  sampleHailImpacts,
+  trackerOutputMultiplier,
+  upgradeInProgress,
+  isUpgradingAt,
+} from "../helpers/Hazards";
 import {
   getHydroConditions,
   HYDRO_DEADPOOL_FRACTION,
@@ -228,6 +251,8 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
+  ResilienceUpgradeType,
+  RetrofitFacilityAction,
   TradingPolicyType,
   TransmissionLineOperatingType,
   VictoryType,
@@ -297,13 +322,6 @@ const BLOCKING_CARDS = new Set([
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
-// Edge-detects the blackout toast, so a sustained blackout announces itself once rather than
-// four times an hour of game time
-let previouslyInBlackout = false;
-// What the blackout currently underway has cost, so the event log can say how bad it was once
-// it's over. Reset on each edge into one; meaningless while the lights are on
-let blackoutStartMinute = 0;
-let blackoutUnservedWh = 0;
 // Last month's fuel prices, to compare this month's against. Undefined before the first
 // rollover of a run, and after resuming a save - the first month back reports no move rather
 // than inventing one against prices from whenever the game was last open
@@ -795,6 +813,352 @@ function updateWildfireHazards(state: GameType): void {
   });
 }
 
+/** Keeps the hazard dedupe and occurrence records bounded, like the authored-story path. */
+function trimWorldEventRecords(state: GameType) {
+  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.checkedKeys.splice(
+      0,
+      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+}
+
+// Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
+const NEGLIGIBLE_RESISTANT_HAIL_SHARE = 0.05;
+
+function formatDays(days: number): string {
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+/**
+ * Hail and extreme-cold checks at monthly rollover, after the authored story and wildfire, before
+ * the month's forecast is built. Each check is keyed by (hazard, location, absolute month) and
+ * every draw is addressed, so saving, forecasting or reordering the fleet cannot reroll it and a
+ * resumed month cannot announce twice. Hail persists one occurrence per damaged solar facility,
+ * lasting until its repair ends and charging its repair cost once; cold persists one occurrence
+ * for the month that derates under-rated gas plants and, when regional, raises gas prices.
+ * Returns the fuels whose price this changed, for the month's fuel-price log.
+ */
+function updateWeatherHazards(state: GameType): Set<FuelNameType> {
+  const priceFuels = new Set<FuelNameType>();
+  const locationId = state.location.id;
+  const monthsElapsed = state.date.monthsElapsed;
+  const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
+  if (isWeatherHazardEligible(state, "HAIL")) {
+    const key = hazardEventKey("HAIL", locationId, monthsElapsed);
+    if (!state.worldEvents.checkedKeys.includes(key)) {
+      state.worldEvents.checkedKeys.push(key);
+      if (hailOccurs(state, key, state.date.monthNumber - 1)) {
+        recordHailStorm(state, key, startsMinute);
+      }
+    }
+  }
+  if (isWeatherHazardEligible(state, "EXTREME_COLD")) {
+    const key = hazardEventKey("EXTREME_COLD", locationId, monthsElapsed);
+    if (!state.worldEvents.checkedKeys.includes(key)) {
+      state.worldEvents.checkedKeys.push(key);
+      if (recordColdSnap(state, key, startsMinute)) {
+        priceFuels.add("Natural Gas");
+      }
+    }
+  }
+  trimWorldEventRecords(state);
+  return priceFuels;
+}
+
+function recordHailStorm(state: GameType, key: string, startsMinute: number) {
+  const impacts = sampleHailImpacts({ game: state, key });
+  // A storm that misses every array is not news to the company.
+  if (!impacts.length) return;
+  const chargeMinute = oneTimeCostMinute(startsMinute);
+  const occurrences: ActiveWorldEventType[] = impacts.map((impact) => ({
+    key: `${key}:f${impact.facilityId}`,
+    definitionId: HAIL_DEFINITION_ID,
+    startsMinute,
+    endsMinute: startsMinute + impact.repairMinutes,
+    forecastable: false,
+    title: "Hail damage",
+    message: `Hail damaged ${Math.round(impact.damagedFraction * 100)}% of ${impact.facilityName}.`,
+    concept: "severeWeather",
+    importance: "CRITICAL",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    attributes: {
+      hazard: "HAIL",
+      eventKey: key,
+      facilityId: impact.facilityId,
+      facilityName: impact.facilityName,
+      damagedFraction: impact.damagedFraction,
+      repairDays: impact.repairDays,
+      repairCost: impact.repairCost,
+      hailResistant: impact.hailResistant,
+      oneTimeCost: impact.repairCost,
+      oneTimeCostMinute: chargeMinute,
+    },
+    effects: {
+      facilityOutputMultipliersById: {
+        [String(impact.facilityId)]: 1 - impact.damagedFraction,
+      },
+    },
+  }));
+  state.worldEvents.active.push(...occurrences);
+  state.worldEvents.occurrences.push(...occurrences);
+  const solarW = state.facilities
+    .filter((f) => f.fuel === "Sun" && f.yearsToBuildLeft <= 0)
+    .reduce((total, f) => total + f.peakW, 0);
+  const damagedW = impacts.reduce((total, impact) => {
+    const facility = state.facilities.find(
+      ({ id }) => id === impact.facilityId,
+    );
+    return total + (facility?.peakW || 0) * impact.damagedFraction;
+  }, 0);
+  const share = solarW > 0 ? damagedW / solarW : 0;
+  const repairCost = impacts.reduce((total, i) => total + i.repairCost, 0);
+  const repairDays = Math.max(...impacts.map((i) => i.repairDays));
+  const negligible =
+    impacts.every((i) => i.hailResistant) &&
+    share < NEGLIGIBLE_RESISTANT_HAIL_SHARE;
+  const percent = Math.max(1, Math.round(share * 100));
+  const terms = `Repairs cost ${formatMoneyConcise(repairCost)} and take about ${formatDays(repairDays)}.`;
+  const message = negligible
+    ? `Hail-resistant panels held damage to ${percent}% of your solar fleet. ${terms}`
+    : `Hail damaged ${percent}% of your solar fleet. ${terms}`;
+  logGameEvent(state, "WORLD_EVENT", message, {
+    importance: negligible ? "NOTABLE" : "CRITICAL",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    title: negligible ? "Minor hail damage" : "Hail damage",
+    concept: "severeWeather",
+    storyPhaseKey: key,
+    turningPointPriority: negligible ? undefined : 110,
+    reportedKey: key,
+    pause: !negligible,
+  });
+}
+
+/** Persists and announces this month's cold snap; returns whether gas prices spiked. */
+function recordColdSnap(
+  state: GameType,
+  key: string,
+  startsMinute: number,
+): boolean {
+  const minTempC = representativeMinTempC(
+    state.date,
+    state.seed,
+    storyEffectsAt(state.date, state).temperatureOffsetC || 0,
+  );
+  const impact = resolveColdImpact({ game: state, key, minTempC });
+  if (!impact) return false;
+  // An authored gas shock this month already prices in some of the strain, so the cold snap only
+  // lifts the combined multiple to the same cap a deep freeze alone could reach.
+  const storyGasMultiplier =
+    storyEffectsAt(state.date, state).fuelPriceMultipliers?.["Natural Gas"] ??
+    1;
+  const gasPriceMultiplier = impact.regional
+    ? Math.max(
+        1,
+        Math.min(
+          impact.gasPriceMultiplier,
+          COLD_MAX_GAS_PRICE_MULTIPLIER / Math.max(1, storyGasMultiplier),
+        ),
+      )
+    : 1;
+  const raisesGasPrice = gasPriceMultiplier > 1;
+  const affectedIds = impact.derates.map((d) => d.facilityId);
+  const affectedNames = impact.derates.map((d) => d.facilityName);
+  const effects: WorldEventEffectsType = {};
+  if (raisesGasPrice) {
+    effects.fuelPriceMultipliers = { "Natural Gas": gasPriceMultiplier };
+  }
+  if (impact.derates.length) {
+    effects.facilityOutputMultipliersById = Object.fromEntries(
+      impact.derates.map((d) => [String(d.facilityId), d.availableFraction]),
+    );
+  }
+  // The temperature stays in the attributes: the log text cannot follow the player's unit setting.
+  const parts: string[] = [];
+  if (raisesGasPrice) {
+    parts.push(
+      `Gas prices are ${gasPriceMultiplier.toFixed(1)}× normal this month as regional supply strains`,
+    );
+  } else if (impact.regional) {
+    parts.push("Regional gas supply is strained");
+  }
+  if (impact.derates.length) {
+    const lowest = Math.min(...impact.derates.map((d) => d.availableFraction));
+    const percent = Math.round(lowest * 100);
+    parts.push(
+      affectedNames.length === 1
+        ? `${affectedNames[0]} is limited to ${percent}% output`
+        : `${affectedNames.join(", ")} are limited to as little as ${percent}% output`,
+    );
+  }
+  const protectedNames = impact.protectedFacilityIds
+    .map((id) => state.facilities.find((f) => f.id === id)?.name)
+    .filter((name): name is string => !!name);
+  const protectedNote = protectedNames.length
+    ? ` Cold-weather packages kept ${protectedNames.join(", ")} running.`
+    : "";
+  // The log title already says "Extreme cold", so the message starts with what it means.
+  const message = `${parts.join("; ")}.${protectedNote}`;
+  const burnsGas = state.facilities.some(
+    (f) => f.fuel === "Natural Gas" && f.yearsToBuildLeft <= 0,
+  );
+  const critical = impact.derates.length > 0 || (impact.regional && burnsGas);
+  const occurrence: ActiveWorldEventType = {
+    key,
+    definitionId: COLD_DEFINITION_ID,
+    startsMinute,
+    endsMinute: startsMinute + MINUTES_PER_MONTH,
+    forecastable: false,
+    title: "Extreme cold",
+    message,
+    concept: "severeWeather",
+    importance: critical ? "CRITICAL" : "NOTABLE",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    attributes: {
+      hazard: "EXTREME_COLD",
+      eventKey: key,
+      minTempC,
+      regional: impact.regional,
+      gasPriceMultiplier,
+      affectedFacilityIds: affectedIds,
+      affectedFacilityNames: affectedNames,
+      protectedFacilityIds: impact.protectedFacilityIds,
+    },
+    effects,
+  };
+  state.worldEvents.active.push(occurrence);
+  state.worldEvents.occurrences.push(occurrence);
+  logGameEvent(state, "WORLD_EVENT", message, {
+    importance: occurrence.importance,
+    actionTarget: occurrence.actionTarget,
+    title: occurrence.title,
+    concept: "severeWeather",
+    storyPhaseKey: key,
+    turningPointPriority: critical ? 105 : undefined,
+    reportedKey: key,
+    pause: critical,
+  });
+  return raisesGasPrice;
+}
+
+/**
+ * Logs each facility whose hail repairs finished in the tick that just ran and that no other
+ * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
+ * frames coincide on a month's rollover tick.
+ */
+/**
+ * Installs every retrofit whose month offline has ended. Runs once per real tick, right after the
+ * clock advances and before a new month's weather hazards are drawn, so a plant finishing at the
+ * rollover meets that month's weather with its upgrade. Forecasts need no copy of this: whether a
+ * plant is offline is a pure function of the minute (isUpgradingAt).
+ */
+function completeRetrofits(state: GameType) {
+  state.facilities.forEach((facility) => {
+    const upgrade = upgradeInProgress(facility);
+    if (!upgrade || state.date.minute < upgrade.completesMinute) return;
+    facility.resilience = retrofittedResilience(
+      facility,
+      state,
+      upgrade.upgrade,
+    );
+    delete (facility as GeneratorOperatingType).upgradeInProgress;
+    const message = `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
+    logGameEvent(state, "CONSTRUCTION", message, {
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    });
+    setTimeout(() => {
+      getStore().dispatch(snackbarOpen(message));
+    }, 0);
+  });
+}
+
+function logHailRepairsCompleted(state: GameType) {
+  const minute = state.date.minute;
+  const logged = new Set<number>();
+  state.worldEvents.active.forEach((event) => {
+    if (
+      event.definitionId !== HAIL_DEFINITION_ID ||
+      !(minute - TICK_MINUTES < event.endsMinute && event.endsMinute <= minute)
+    ) {
+      return;
+    }
+    const facility = state.facilities.find(
+      ({ id }) => id === event.attributes.facilityId,
+    );
+    // Sold while under repair, or a later facility that reused the ID.
+    if (!facility || event.startsMinute < (facility.minuteCreated || 0)) {
+      return;
+    }
+    if (
+      logged.has(facility.id) ||
+      activeWeatherHazardsFor(state, facility, minute).length
+    ) {
+      return;
+    }
+    logged.add(facility.id);
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      `${facility.name} is back to full output.`,
+      {
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        title: "Hail repairs complete",
+        // Restored output is good news, so it takes the green supply icon, not the amber storm.
+        concept: "supply",
+        storyPhaseKey: event.key,
+        reportedKey: `hail-repair:${event.key}`,
+      },
+    );
+  });
+}
+
+/**
+ * Ends a sold or cancelled facility's weather-hazard outages at once. IDs are reused (max + 1),
+ * so a lingering multiplier would otherwise limit whichever facility is built next under that ID.
+ * A repair cost already incurred still falls due; only the facility's output effect is removed.
+ */
+function endWeatherHazardsForFacility(state: GameType, id: number) {
+  const key = String(id);
+  const minute = state.date.minute;
+  let edited = false;
+  state.worldEvents.active = state.worldEvents.active.map((event) => {
+    if (
+      (event.definitionId !== HAIL_DEFINITION_ID &&
+        event.definitionId !== COLD_DEFINITION_ID) ||
+      event.effects.facilityOutputMultipliersById?.[key] === undefined
+    ) {
+      return event;
+    }
+    edited = true;
+    const multipliers = { ...event.effects.facilityOutputMultipliersById };
+    delete multipliers[key];
+    const effects = { ...event.effects };
+    if (Object.keys(multipliers).length) {
+      effects.facilityOutputMultipliersById = multipliers;
+    } else {
+      delete effects.facilityOutputMultipliersById;
+    }
+    return {
+      ...event,
+      effects,
+      endsMinute:
+        event.definitionId === HAIL_DEFINITION_ID
+          ? Math.min(event.endsMinute, minute)
+          : event.endsMinute,
+    };
+  });
+  // The effects cache keys active events by key, not by their effects, and a cold snap keeps its
+  // key and window here. Selling is rare, so dropping the whole cache is the cheap correct fix.
+  if (edited) storyEffectsCache.clear();
+}
+
 /**
  * Scheduled effects for any simulated date. Persisted live occurrences win over a newly resolved
  * copy, which is what preserves facility IDs and other onset-time attributes after they are drawn.
@@ -883,10 +1247,20 @@ function storyEffectsAt(date: DateType, state: GameType) {
   // copies, so an object-keyed WeakMap missed almost every lookup. These are the stable inputs
   // that can change a month's resolved effects; using them lets live play and both forecast
   // passes share one result without changing the authored story decision.
+  // Persisted occurrences can start or end mid-month (a hail repair), so which of them cover
+  // this minute is part of the key; the rest of the key only resolves to the month.
+  const inWindowKey = state.worldEvents.active
+    .filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    )
+    .map((event) => event.key)
+    .join("|");
   const cacheKey = [
     scheduledStoryCacheKey(date, state),
     state.storyEffectsDisabled ? 1 : 0,
     activeKey,
+    inWindowKey,
     state.worldEvents.occurrences.length,
     lastOccurrence?.key || "",
   ].join("|");
@@ -1110,6 +1484,7 @@ export const gameSlice = createSlice({
           "customScenario",
           "location",
           "storyEffectsDisabled",
+          "weatherHazardsDisabled",
           "meaningfulDecisionGateWaived",
         ].some((key) =>
           Object.prototype.hasOwnProperty.call(action.payload, key),
@@ -1136,8 +1511,7 @@ export const gameSlice = createSlice({
       delete state.policies;
       delete state.policyPause;
       const a = action.payload;
-      previouslyInBlackout = false;
-      blackoutUnservedWh = 0;
+      delete state.blackout;
       previousFuelPrices = undefined;
       state.eventLog = [] as GameEventType[];
       state.reportedEventKeys = [];
@@ -1400,6 +1774,22 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "reprioritizeFacility", action.payload);
       }
     },
+    retrofitFacility: (
+      state,
+      action: PayloadAction<RetrofitFacilityAction>,
+    ) => {
+      if (
+        !state.replayPlayback &&
+        applyRetrofitFacility(state, action.payload)
+      ) {
+        recordReplayAction(state, "retrofitFacility", action.payload);
+      }
+    },
+    cancelRetrofit: (state, action: PayloadAction<number>) => {
+      if (!state.replayPlayback && applyCancelRetrofit(state, action.payload)) {
+        recordReplayAction(state, "cancelRetrofit", action.payload);
+      }
+    },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       if (
         state.tutorialIntertieStress?.active &&
@@ -1481,10 +1871,6 @@ export const gameSlice = createSlice({
         copyCommitmentMetadata(tick, restored.timeline[i]),
       );
       // The tick loop's remaining module-level locals have to line up with restored state.
-      const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
-      previouslyInBlackout = now ? now.supplyW < now.demandW : false;
-      blackoutStartMinute = restored.date.minute;
-      blackoutUnservedWh = 0;
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
@@ -1680,6 +2066,8 @@ export const {
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
+  retrofitFacility,
+  cancelRetrofit,
   setTradingPolicy,
   setSpeed,
   markEventsRead,
@@ -1783,6 +2171,7 @@ function applySellFacility(state: GameType, id: number): boolean {
       : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
   );
   const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.financed ? "financed" : "cash"}`;
+  endWeatherHazardsForFacility(state, id);
   // in one loop, refund cash from selling + remove from list
   state.facilities = state.facilities.filter(
     (g: GeneratorOperatingType | StorageOperatingType) => {
@@ -2037,6 +2426,137 @@ function applyUpgradeTransmissionLine(
   return true;
 }
 
+/** The retrofit's name as it reads mid-sentence, e.g. "a cold-weather package". */
+function retrofitLabel(upgrade: ResilienceUpgradeType): string {
+  return upgrade === "hailResistant"
+    ? "hail-resistant panels"
+    : "a cold-weather package";
+}
+
+/**
+ * Records a retrofit payment (positive) or refund (negative) as a zero-length occurrence. Like an
+ * authored scenario choice, it is booked immediately into this tick, and the occurrence lets a
+ * re-forecast from the current tick re-add it to the new frame exactly once.
+ */
+function recordRetrofitTransaction(
+  state: GameType,
+  facilityId: number,
+  upgrade: ResilienceUpgradeType,
+  cost: number,
+) {
+  const refund = cost < 0;
+  const key = `retrofit${refund ? "-refund" : ""}:${facilityId}:${upgrade}:${state.date.minute}`;
+  state.worldEvents.occurrences.push({
+    key,
+    definitionId: key,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: {
+      retrofit: true,
+      facilityId,
+      upgrade,
+      cost,
+    },
+    effects: {},
+  });
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+}
+
+/**
+ * Starts installing a weather-resilience upgrade on a standing facility, for live play and
+ * replay. The price is recomputed here from current state rather than trusted from the dialog and
+ * paid up front. The plant is offline for RETROFIT_DOWNTIME_MINUTES, after which the upgrade takes
+ * effect; see completeRetrofits.
+ */
+function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
+  if (!validRetrofitFacility(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload.facilityId);
+  if (!facility || facility.yearsToBuildLeft > 0) return false;
+  const cost = retrofitCost(facility, state, payload.upgrade);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (cost === undefined || !Number.isFinite(cost) || cost < 0 || !now)
+    return false;
+  if (now.cash < cost) return false;
+  now.cash -= cost;
+  now.netWorth -= cost;
+  now.expensesOM += cost;
+  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
+  (facility as GeneratorOperatingType).upgradeInProgress = {
+    upgrade: payload.upgrade,
+    cost,
+    startsMinute: state.date.minute,
+    completesMinute: state.date.minute + RETROFIT_DOWNTIME_MINUTES,
+  };
+  recordRetrofitTransaction(state, facility.id, payload.upgrade, cost);
+  const label = retrofitLabel(payload.upgrade);
+  logGameEvent(
+    state,
+    "BUILD",
+    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost)}. Offline for a month.`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  // Levers are lowercase kebab-case; saves reject anything else.
+  const lever =
+    payload.upgrade === "hailResistant"
+      ? "hail-resistant"
+      : "cold-weather-package";
+  recordMeaningfulDecision(state, {
+    lever: `resilience:${facility.id}:${lever}`,
+    label: `Add ${label} to ${facility.name}`,
+    kind: "asset",
+    before: "standard",
+    after: lever,
+  });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+/**
+ * Cancels a retrofit that is still being installed: the plant returns to service at once, as it
+ * was, and the whole price is refunded. Lets the player try an upgrade without committing to it.
+ */
+function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
+  if (!Number.isSafeInteger(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload);
+  const upgrade = facility && upgradeInProgress(facility);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    !facility ||
+    !upgrade ||
+    !now ||
+    !isUpgradingAt(facility, state.date.minute) ||
+    !Number.isFinite(upgrade.cost) ||
+    upgrade.cost < 0
+  )
+    return false;
+  const refund = upgrade.cost;
+  now.cash += refund;
+  now.netWorth += refund;
+  now.expensesOM -= refund;
+  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
+  delete (facility as GeneratorOperatingType).upgradeInProgress;
+  recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
+  logGameEvent(
+    state,
+    "BUILD",
+    `Cancelled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund)}.`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
@@ -2168,6 +2688,12 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     case "chooseScenarioResponse":
       applyScenarioResponse(state, payload);
+      break;
+    case "retrofitFacility":
+      applyRetrofitFacility(state, payload);
+      break;
+    case "cancelRetrofit":
+      applyCancelRetrofit(state, payload);
       break;
     case "schedulePolicy":
     case "cancelPolicy":
@@ -2336,6 +2862,7 @@ export function tickState(state: GameType) {
     state.date.minute + TICK_MINUTES,
     state.startingYear,
   );
+  completeRetrofits(state);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const prev = getTimeFromTimeline(
     state.date.minute - TICK_MINUTES,
@@ -2343,6 +2870,7 @@ export function tickState(state: GameType) {
   );
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
+    logHailRepairsCompleted(state);
 
     const exercise = state.tutorialIntertieStress;
     if (exercise?.active) {
@@ -2356,29 +2884,31 @@ export function tickState(state: GameType) {
     }
     // The pulsing top bar only tells a player who is looking at it, and by default they're
     // looking at Finances or Forecasts. Fire on the edges only, never per tick.
+    // Edge-detected against the slice, so a sustained blackout announces itself once rather than
+    // four times an hour of game time, and a resumed save picks up the one it was taken during
     const inBlackout = now.supplyW < now.demandW;
+    const wasInBlackout = state.blackout !== undefined;
     if (inBlackout) {
+      if (!state.blackout) {
+        state.blackout = { startMinute: state.date.minute, unservedWh: 0 };
+        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
+      }
       // What the lights being out is actually costing, in the same units the score is docked in.
       // Accumulated per tick rather than worked out at the end, since the gap moves the whole
       // time the blackout lasts
-      blackoutUnservedWh +=
+      state.blackout.unservedWh +=
         ((now.demandW - now.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    } else if (state.blackout) {
+      // The toast that says this vanishes in four seconds and the pulsing bar stops the moment
+      // it's over, so without this a player who was looking elsewhere never learns what it cost
+      logGameEvent(
+        state,
+        "BLACKOUT_OVER",
+        `Blackout ended after ${blackoutLength(state.date.minute - state.blackout.startMinute)}. The grid could not supply ${formatWattHours(state.blackout.unservedWh)} of electricity demand.`,
+      );
+      delete state.blackout;
     }
-    if (inBlackout !== previouslyInBlackout) {
-      previouslyInBlackout = inBlackout;
-      if (inBlackout) {
-        blackoutStartMinute = state.date.minute;
-        blackoutUnservedWh = 0;
-        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
-      } else {
-        // The toast that says this vanishes in four seconds and the pulsing bar stops the moment
-        // it's over, so without this a player who was looking elsewhere never learns what it cost
-        logGameEvent(
-          state,
-          "BLACKOUT_OVER",
-          `Blackout ended after ${blackoutLength(state.date.minute - blackoutStartMinute)}. The grid could not supply ${formatWattHours(blackoutUnservedWh)} of electricity demand.`,
-        );
-      }
+    if (inBlackout !== wasInBlackout) {
       const message = inBlackout
         ? "Blackout! Demand is outrunning your supply."
         : "Blackout over - supply is meeting demand again.";
@@ -2424,6 +2954,7 @@ export function tickState(state: GameType) {
       // The recurring regional hazard resolves on its own path, after the authored story, so a
       // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
       updateWildfireHazards(state);
+      updateWeatherHazards(state).forEach((fuel) => storyPriceFuels.add(fuel));
       const activatedPrograms = advancePolicies(
         state,
         state.date.monthsElapsed,
@@ -3141,8 +3672,10 @@ function updateSupplyFacilitiesFinances(
     const fuelOutputMultiplier = generatorFuel
       ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
       : 1;
-    const facilityOutputMultiplier =
-      tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1;
+    // A retrofit holds the plant offline until it completes.
+    const facilityOutputMultiplier = isUpgradingAt(g, now.minute)
+      ? 0
+      : (tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1);
     const availablePeakW =
       g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
     let dispatchPeakW = availablePeakW;
@@ -3235,7 +3768,15 @@ function updateSupplyFacilitiesFinances(
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
-            g.currentW = availablePeakW * outputFactor * solarOutputFactor;
+            // Trackers raise morning and evening output; the array still clips at nameplate.
+            g.currentW =
+              availablePeakW *
+              outputFactor *
+              Math.min(
+                1,
+                solarOutputFactor *
+                  trackerOutputMultiplier(g, tickDate.minuteOfDay),
+              );
             break;
           case "Wind":
             g.currentW = availablePeakW * outputFactor * windOutputFactor;
@@ -3542,17 +4083,33 @@ function updateSupplyFacilitiesFinances(
     exportedW > 0
       ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
       : 0;
+  // Immediate choice and retrofit transactions belong to the frame of the tick they were made
+  // in. At a month's last tick the clock clamps prev and now to the same final frame, whose cash
+  // already carries them, so that pass still reports them in the frame's revenue and expenses but
+  // leaves them out of its cash delta. A current-tick re-forecast passes a copied frame and
+  // re-adds each exactly once.
+  const rebookingFrame = prev === now;
+  const bookedThisFrame = (event: ActiveWorldEventType) =>
+    event.startsMinute === now.minute;
   const choiceGrant = state.worldEvents.occurrences
     .filter(
       (event) =>
-        event.attributes.scenarioChoice === true &&
-        event.startsMinute === now.minute,
+        event.attributes.scenarioChoice === true && bookedThisFrame(event),
     )
     .reduce(
       (total, event) => total + Number(event.attributes.upfrontGrant || 0),
       0,
     );
-  const revenue = customerRevenue + revenueExports + choiceGrant;
+  const immediateCosts = state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        (event.attributes.scenarioChoice === true ||
+          event.attributes.retrofit === true) &&
+        bookedThisFrame(event),
+    )
+    .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
+  const revenue =
+    customerRevenue + revenueExports + (rebookingFrame ? 0 : choiceGrant);
 
   // Facilities expenses
   let kgco2e = 0;
@@ -3560,13 +4117,13 @@ function updateSupplyFacilitiesFinances(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
-  expensesOM += state.worldEvents.occurrences
-    .filter(
-      (event) =>
-        event.attributes.scenarioChoice === true &&
-        event.startsMinute === now.minute,
-    )
-    .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
+  if (!rebookingFrame) expensesOM += immediateCosts;
+  // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
+  // frames and a forecast's first frame share prev and now minutes, so they never charge one.
+  const hazardOneTimeCosts = state.worldEvents.active.filter(
+    (event) => typeof event.attributes.oneTimeCost === "number",
+  );
+  expensesOM += oneTimeWorldEventCost(hazardOneTimeCosts, prev, now);
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;
@@ -3661,7 +4218,15 @@ function updateSupplyFacilitiesFinances(
         g.lifetimeWh += generatedWh;
         g.lifetimePotentialWh += (g.peakW / ticksPerHour) * GAME_TO_REAL_YEARS;
         g.lifetimeRevenue += deliveredW * revenuePerSuppliedW;
-        g.lifetimeExpenses += facilityExpenses;
+        g.lifetimeExpenses +=
+          facilityExpenses +
+          oneTimeWorldEventCost(
+            hazardOneTimeCosts.filter(
+              (event) => event.attributes.facilityId === g.id,
+            ),
+            prev,
+            now,
+          );
         if (started) {
           g.lifetimeStarts = (g.lifetimeStarts || 0) + GAME_TO_REAL_YEARS;
         }
@@ -3748,10 +4313,10 @@ function updateSupplyFacilitiesFinances(
     now.minute,
     transmission.lines,
   );
-  now.revenue = revenue;
+  now.revenue = revenue + (rebookingFrame ? choiceGrant : 0);
   now.revenueExports = revenueExports;
   now.expensesImports = expensesImports;
-  now.expensesOM = expensesOM;
+  now.expensesOM = expensesOM + (rebookingFrame ? immediateCosts : 0);
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
   now.expensesInterest = expensesInterest;
@@ -4076,10 +4641,12 @@ function buildFacilityHelper(
     }
     // Site availability belongs to the current fleet quote, not the facility bought from it. A
     // saved operating asset must not retain a permanently stale "remaining" count.
+    // Nor does the resilience option's share of the price: it is only for the build dialog.
     const {
       viableLocationsRemaining: _viableLocationsRemaining,
+      resilienceExtraBuildCost: _resilienceExtraBuildCost,
       ...facilitySnapshot
-    } = g;
+    } = g as FacilityShoppingType & { resilienceExtraBuildCost?: number };
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,

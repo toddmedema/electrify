@@ -37,6 +37,7 @@ import {
   FacilityOperatingType,
   GameType,
   GeneratorOperatingType,
+  RetrofitFacilityAction,
   WorldEventEffectsType,
   EvidenceRequestType,
 } from "../../Types";
@@ -54,6 +55,17 @@ import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
+import {
+  COLD_DEFINITION_ID,
+  facilityHazardStatus,
+  FacilityHazardStatusType,
+  HAIL_DEFINITION_ID,
+  isUpgradingAt,
+  upgradeDaysLeft,
+  upgradeInProgress,
+  upgradeProgress,
+} from "../../helpers/Hazards";
+import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -67,6 +79,7 @@ interface FacilityListItemProps {
   game: GameType;
   selected: boolean;
   storyOutputMultiplier: number;
+  hazardStatus?: FacilityHazardStatusType;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   // A replay is a recording of somebody else's decisions; letting the viewer make their own
   // would desync the run from the actions still queued up against it
@@ -75,6 +88,65 @@ interface FacilityListItemProps {
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
   onReprioritize: DispatchProps["onReprioritize"];
+  onRetrofit?: DispatchProps["onRetrofit"];
+  onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
+}
+
+/**
+ * A weather outage leads the row's status line, in amber, so a damaged plant reads as damaged
+ * before its reduced output does. The long and short forms swap on row width like the reservoir
+ * reading.
+ */
+function hazardStatusText(status: FacilityHazardStatusType): {
+  long: string;
+  short: string;
+  spoken: string;
+} {
+  const available = Math.round(status.availableFraction * 100);
+  const days = status.daysLeft;
+  const longParts = [
+    status.label,
+    `${available}% available`,
+    days !== undefined ? `${dayCount(days)} to repair` : "",
+  ].filter(Boolean);
+  return {
+    long: longParts.join(" · "),
+    short: [
+      status.hazard === "HAIL" ? "Hail" : "Cold",
+      `${available}%`,
+      days !== undefined ? `${days}d` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    spoken: longParts.join(", "),
+  };
+}
+
+function HazardStatusLead(props: {
+  status: FacilityHazardStatusType;
+}): React.JSX.Element {
+  const { long, short } = hazardStatusText(props.status);
+  // The row's disclosure carries the spoken form in its label, so these are visual only; the
+  // title spells out the abbreviated form for a pointer
+  return (
+    <>
+      <span className="facilityHazardStatus" aria-hidden="true" title={long}>
+        <span className="facilityHazardLong">{long}</span>
+        <span className="facilityHazardShort">{short}</span>
+      </span>
+      <span className="facilityHazardSeparator" aria-hidden="true">
+        {" · "}
+      </span>
+    </>
+  );
+}
+
+// Weather hazards report themselves through the row's own status lead, so the generic story
+// limit chip leaves them out rather than stating the same derate twice
+function isWeatherHazardEvent(definitionId: string): boolean {
+  return (
+    definitionId === HAIL_DEFINITION_ID || definitionId === COLD_DEFINITION_ID
+  );
 }
 
 function storyOutputMultiplierForFacility(
@@ -106,12 +178,19 @@ const getDraggableStyle = (
 // The one-glance answer to "what is this thing doing right now", so the fleet can be read down
 // the left edge without parsing any of the numbers next to it.
 type FacilityActivityType =
-  "BUILDING" | "PAUSED" | "IDLE" | "RUNNING" | "CHARGING" | "DISCHARGING";
+  | "BUILDING"
+  | "UPGRADING"
+  | "PAUSED"
+  | "IDLE"
+  | "RUNNING"
+  | "CHARGING"
+  | "DISCHARGING";
 
 function activityIcon(activity: FacilityActivityType, color: string) {
   const style = { color };
   switch (activity) {
     case "BUILDING":
+    case "UPGRADING":
       return <ConceptIcon concept="construction" style={style} />;
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
@@ -130,6 +209,7 @@ function activityIcon(activity: FacilityActivityType, color: string) {
 // reported and a screen reader can't see a lightning bolt
 const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   BUILDING: "under construction",
+  UPGRADING: "offline for an upgrade",
   PAUSED: "paused",
   IDLE: "idle",
   RUNNING: "running",
@@ -149,9 +229,11 @@ function FacilityActions(props: {
   listLength: number;
   readOnly: boolean;
   spotInList: number;
+  upgrading: boolean;
   onPause: DispatchProps["onPause"];
   onReprioritize: DispatchProps["onReprioritize"];
   onTogglePause: DispatchProps["onTogglePause"];
+  onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
   onOpenSell: () => void;
 }) {
   const {
@@ -163,12 +245,25 @@ function FacilityActions(props: {
     onTogglePause,
     readOnly,
     spotInList,
+    upgrading,
+    onCancelRetrofit,
   } = props;
   if (readOnly) return null;
   const underConstruction = facility.yearsToBuildLeft > 0;
   return (
     <div className="facilityActions">
-      {!underConstruction && (
+      {upgrading && onCancelRetrofit && (
+        // Refunds in full and returns the plant to service at once, so it needs no confirmation
+        <Button
+          className="facilityCancelConstruction"
+          startIcon={<CancelIcon />}
+          aria-label={"Cancel upgrade of " + facility.name}
+          onClick={() => onCancelRetrofit(facility.id)}
+        >
+          <span className="facilityActionLabel">Cancel upgrade</span>
+        </Button>
+      )}
+      {!underConstruction && !upgrading && (
         <Button
           startIcon={
             <ConceptIcon concept={facility.paused ? "play" : "pause"} />
@@ -240,6 +335,8 @@ const MemoizedFacilityActions = React.memo(
       previous.facility.name === next.facility.name &&
       previous.facility.paused === next.facility.paused &&
       previousUnderConstruction === nextUnderConstruction &&
+      previous.upgrading === next.upgrading &&
+      previous.onCancelRetrofit === next.onCancelRetrofit &&
       previous.listLength === next.listLength &&
       previous.readOnly === next.readOnly &&
       previous.spotInList === next.spotInList &&
@@ -268,10 +365,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     spotInList,
     storyOutputMultiplier,
+    hazardStatus,
     arriving: arrivalRequested,
     onArrivalShown,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const installing = underConstruction
+    ? undefined
+    : upgradeInProgress(facility);
+  const upgrading = !!installing && isUpgradingAt(facility, game.date.minute);
+  // Building and upgrading both hold the plant out of service behind a progress bar
+  const offlineForWork = underConstruction || upgrading;
   const isStorage = facility.peakWh > 0;
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
@@ -303,6 +407,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
     activity = "BUILDING";
+  } else if (upgrading) {
+    activity = "UPGRADING";
   } else if (facility.paused) {
     activity = "PAUSED";
   } else if (isStorage) {
@@ -334,16 +440,18 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
   // storage power and the reservoir's absolute size are both in the opened details.
-  const builtFraction = underConstruction
-    ? Math.max(
-        0,
-        Math.min(
-          1,
-          (facility.yearsToBuild - facility.yearsToBuildLeft) /
-            facility.yearsToBuild,
-        ),
-      )
-    : 1;
+  const builtFraction = upgrading
+    ? upgradeProgress(installing!, game.date.minute)
+    : underConstruction
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            (facility.yearsToBuild - facility.yearsToBuildLeft) /
+              facility.yearsToBuild,
+          ),
+        )
+      : 1;
   let reading = "";
   let detail: React.ReactNode = null;
   if (underConstruction) {
@@ -351,6 +459,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     const percentBuilt = Math.round(builtFraction * 100);
     reading = `Building ${percentBuilt}%`;
     detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+  } else if (upgrading) {
+    const daysLeft = upgradeDaysLeft(installing!, game.date.minute);
+    reading = `Upgrading ${Math.round(builtFraction * 100)}%`;
+    detail = (
+      <>
+        <span className="facilityStatusLong">
+          {resilienceName(installing!.upgrade)}, {dayCount(daysLeft)} left
+        </span>
+        <span className="facilityStatusShort">{daysLeft}d left</span>
+      </>
+    );
   } else if (facility.peakWh) {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
@@ -377,7 +496,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
   // Output communicates normal operation; keep explicit labels for other states.
   const status =
-    underConstruction || activity === "RUNNING"
+    offlineForWork || activity === "RUNNING"
       ? reading
       : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
@@ -407,7 +526,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
-            {!underConstruction && (
+            {!offlineForWork && (
               <FlowBar fraction={outputFraction} color={accentColor} />
             )}
             {!readOnly && (
@@ -424,7 +543,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` + (isStorage ? `, ${status}` : "")
+                `Inspect ${facility.name}` +
+                (hazardStatus && !underConstruction
+                  ? `, ${hazardStatusText(hazardStatus).spoken}`
+                  : "") +
+                (isStorage ? `, ${status}` : "")
               }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
@@ -434,7 +557,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               <ListItem
                 className="facility"
                 sx={
-                  underConstruction
+                  offlineForWork
                     ? {
                         // The progress bar stays at full strength so the build is legible
                         "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
@@ -502,6 +625,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }
                     secondary={
                       <>
+                        {hazardStatus && !underConstruction && (
+                          <HazardStatusLead status={hazardStatus} />
+                        )}
                         <span className="facilityStatus">{status}</span>
                         {detail && (
                           <span className="facilityStatusDetail">
@@ -518,7 +644,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }
                   />
                   {/* The percentage is already in the text; this only makes it glanceable */}
-                  {underConstruction && (
+                  {offlineForWork && (
                     <span
                       className="constructionProgress"
                       aria-hidden
@@ -599,9 +725,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               listLength={props.listLength}
               readOnly={readOnly}
               spotInList={spotInList}
+              upgrading={upgrading}
               onPause={onPause}
               onReprioritize={onReprioritize}
               onTogglePause={onTogglePause}
+              onCancelRetrofit={props.onCancelRetrofit}
               onOpenSell={toggleDialog}
             />
           )}
@@ -612,6 +740,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               seed={game.seed}
               location={game.location}
               game={game}
+              readOnly={readOnly}
+              onRetrofit={props.onRetrofit}
             />
           )}
         </div>
@@ -670,6 +800,8 @@ export interface DispatchProps {
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
+  onRetrofit?: (payload: RetrofitFacilityAction) => void;
+  onCancelRetrofit?: (id: FacilityOperatingType["id"]) => void;
   onFacilityDragStart: (speed: GameType["speed"]) => void;
   onFacilityDragEnd: (
     sourceIndex: number,
@@ -787,7 +919,8 @@ export default class Facilities extends React.Component<Props> {
       game.worldEvents.active.filter(
         (event) =>
           game.date.minute >= event.startsMinute &&
-          game.date.minute < event.endsMinute,
+          game.date.minute < event.endsMinute &&
+          !isWeatherHazardEvent(event.definitionId),
       ),
     );
 
@@ -841,12 +974,15 @@ export default class Facilities extends React.Component<Props> {
                             onTogglePause={onTogglePause}
                             onPause={onPause}
                             onReprioritize={onReprioritize}
+                            onRetrofit={this.props.onRetrofit}
+                            onCancelRetrofit={this.props.onCancelRetrofit}
                             onSelect={onSelect}
                             selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplierForFacility(
                               g,
                               storyEffects,
                             )}
+                            hazardStatus={facilityHazardStatus(game, g)}
                             spotInList={i}
                             listLength={facilitiesCount}
                             readOnly={readOnly}

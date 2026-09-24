@@ -1,6 +1,14 @@
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
-import { Typography } from "@mui/material";
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Typography,
+} from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   facilityAgeYears,
@@ -15,6 +23,25 @@ import {
   formatWatts,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
+import {
+  facilityHazardStatus,
+  facilityResilienceSummary,
+  FacilityResilienceSummaryType,
+  retrofittedResilience,
+  upgradeInProgress,
+  upgradeProgress,
+} from "../../helpers/Hazards";
+import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
+import { useUnits } from "./UnitsContext";
+import {
+  coldPackageEffect,
+  dayCount,
+  formatDesignTemperature,
+  resilienceActionLabel,
+  resilienceName,
+} from "./WeatherResilienceText";
+import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
 import {
   DateType,
   FacilityOperatingType,
@@ -22,6 +49,7 @@ import {
   GameType,
   GeneratorOperatingType,
   LocationType,
+  RetrofitFacilityAction,
   StorageOperatingType,
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
@@ -45,8 +73,11 @@ export interface Props {
   date: DateType;
   seed: number;
   location: LocationType;
-  /** Needed only by a hydro plant, whose water outlook is a forecast of the whole game */
+  /** Needed by a hydro plant's water outlook and by the weather resilience section */
   game?: GameType;
+  // A replay can inspect a facility's hardening but not buy any
+  readOnly?: boolean;
+  onRetrofit?: (payload: RetrofitFacilityAction) => void;
 }
 
 interface StatProps {
@@ -116,6 +147,182 @@ export function fuelPriceTrend(
   return prices;
 }
 
+/**
+ * How the facility is hardened against the weather hazard its technology faces and - outside a
+ * replay - an offer to add the upgrade to the standing plant.
+ */
+function WeatherResilienceSection(props: {
+  facility: FacilityOperatingType;
+  game: GameType;
+  summary: FacilityResilienceSummaryType;
+  readOnly?: boolean;
+  onRetrofit?: Props["onRetrofit"];
+}): React.JSX.Element {
+  const { facility, game, summary, onRetrofit } = props;
+  const units = useUnits();
+  const [confirming, setConfirming] = React.useState(false);
+  // Paying removes the offer button, so focus moves to the section heading instead of the page
+  const [focusHeading, setFocusHeading] = React.useState(0);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const shortfallId = React.useId();
+  React.useEffect(() => {
+    if (focusHeading > 0) {
+      headingRef.current?.focus();
+    }
+  }, [focusHeading]);
+  const hail = summary.upgrade === "hailResistant";
+  const cost = summary.retrofitCost;
+  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
+  const shortfallText = `${formatMoneyConcise(shortfall)} more cash needed`;
+  const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;
+  const designMinTempC =
+    facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
+  const detail = hail
+    ? summary.detail
+    : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
+  const actionLabel = resilienceActionLabel(summary.upgrade);
+  const retrofitted = canOffer
+    ? retrofittedResilience(facility, game, summary.upgrade)
+    : undefined;
+  const hazard = facilityHazardStatus(game, facility);
+  const installing = upgradeInProgress(facility);
+  const activeOutage =
+    hazard && (hazard.hazard === "HAIL") === hail
+      ? hail
+        ? "Doesn't speed up current repairs."
+        : "Doesn't end this month's cold outage."
+      : undefined;
+  return (
+    <section className="facilityDetailSection" aria-label="Weather resilience">
+      <Typography
+        component="h3"
+        className="facilityDetailHeading"
+        ref={headingRef}
+        tabIndex={-1}
+      >
+        Weather resilience
+      </Typography>
+      <dl className="facilityStats">
+        <Stat
+          label={hail ? "Hail protection" : "Cold protection"}
+          value={
+            <>
+              {summary.label}
+              <span className="facilityStatNote">{detail}</span>
+            </>
+          }
+        />
+        {facility.resilience?.solarTrackers && (
+          <Stat
+            label="Mounting"
+            value={
+              <>
+                Solar trackers
+                <span className="facilityStatNote">
+                  More morning and evening power.
+                </span>
+              </>
+            }
+          />
+        )}
+        {installing && (
+          <Stat
+            label="Upgrade"
+            value={
+              <>
+                Installing {resilienceName(installing.upgrade)}
+                <span className="facilityStatNote">
+                  {`Offline until done · ${Math.round(upgradeProgress(installing, game.date.minute) * 100)}% installed`}
+                </span>
+              </>
+            }
+          />
+        )}
+      </dl>
+      {canOffer && (
+        <div className="facilityRetrofit">
+          <Button
+            variant="outlined"
+            color="primary"
+            disabled={shortfall > 0}
+            aria-describedby={shortfall > 0 ? shortfallId : undefined}
+            onClick={() => setConfirming(true)}
+          >
+            {actionLabel} · {formatMoneyConcise(cost)}
+          </Button>
+          {shortfall > 0 && (
+            <Typography
+              id={shortfallId}
+              variant="caption"
+              color="textSecondary"
+            >
+              {shortfallText}
+            </Typography>
+          )}
+        </div>
+      )}
+      {canOffer && confirming && (
+        <Dialog
+          open
+          onClose={() => setConfirming(false)}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          <DialogTitle>
+            {actionLabel} to {facility.name}?
+          </DialogTitle>
+          <DialogContent className="facilityRetrofitDialog">
+            <DialogContentText>
+              {hail
+                ? "Less damage from future hail."
+                : coldPackageEffect(
+                    retrofitted?.designMinTempC ?? designMinTempC,
+                    designMinTempC,
+                    units,
+                  )}
+            </DialogContentText>
+            <DialogContentText>
+              {facility.name} goes offline for a month while it&apos;s
+              installed. Adding it now costs{" "}
+              {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
+              building it in. Cancel before it&apos;s done for a full refund.
+            </DialogContentText>
+            {activeOutage && (
+              <DialogContentText>{activeOutage}</DialogContentText>
+            )}
+            {shortfall > 0 && (
+              <DialogContentText className="facilityRetrofitShortfall">
+                {shortfallText}.
+              </DialogContentText>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirming(false)} color="primary">
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              variant="contained"
+              autoFocus
+              disabled={shortfall > 0}
+              onClick={() => {
+                onRetrofit?.({
+                  facilityId: facility.id,
+                  upgrade: summary.upgrade,
+                });
+                setConfirming(false);
+                setFocusHeading((count) => count + 1);
+              }}
+            >
+              Pay {formatMoneyConcise(cost)}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </section>
+  );
+}
+
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
@@ -132,6 +339,19 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
   const equivalentCycles = facilityEquivalentCycles(facility);
+  const resilience = props.game
+    ? facilityResilienceSummary(props.game, facility)
+    : undefined;
+  const hazard =
+    props.game && !underConstruction
+      ? facilityHazardStatus(props.game, facility)
+      : undefined;
+  // Age wear and an active weather outage both cap output, and the simulation multiplies them
+  const maxOutputFactor = outputFactor * (hazard?.availableFraction ?? 1);
+  const maxOutputCauses = [
+    outputFactor < 1 ? "age" : "",
+    hazard ? (hazard.hazard === "HAIL" ? "hail" : "cold") : "",
+  ].filter(Boolean);
 
   // Price history only changes at a month boundary. Selected-facility lifetime totals still
   // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
@@ -228,14 +448,29 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               )}
             />
           )}
-          {!isStorage && outputFactor < 1 && (
+          {hazard && (
+            <Stat
+              label={hazard.label}
+              value={
+                <span className="facilityStatWarning">
+                  {percent(hazard.availableFraction)} available
+                  <span className="facilityStatNote">
+                    {hazard.daysLeft !== undefined
+                      ? `${dayCount(hazard.daysLeft)} to repair`
+                      : "Until month end"}
+                  </span>
+                </span>
+              }
+            />
+          )}
+          {!isStorage && maxOutputFactor < 1 && (
             <Stat
               label="Current maximum output"
               value={
                 <>
-                  {formatWatts(facility.peakW * outputFactor)}
+                  {formatWatts(facility.peakW * maxOutputFactor)}
                   <span className="facilityStatNote">
-                    Limited to {percent(outputFactor)}
+                    {`Limited to ${percent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
                   </span>
                 </>
               }
@@ -330,6 +565,15 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           )}
         </dl>
       </section>
+      {resilience && props.game && (
+        <WeatherResilienceSection
+          facility={facility}
+          game={props.game}
+          summary={resilience}
+          readOnly={props.readOnly}
+          onRetrofit={props.onRetrofit}
+        />
+      )}
     </div>
   );
 }

@@ -236,6 +236,7 @@ export type ConceptNameType =
   | "rate"
   | "fuel"
   | "weather"
+  | "severeWeather"
   | "danger"
   | "goal";
 
@@ -321,6 +322,8 @@ export type ReplayActionNameType =
   | "buildTransmissionLine"
   | "upgradeTransmissionLine"
   | "setTradingPolicy"
+  | "retrofitFacility"
+  | "cancelRetrofit"
   | "delta";
 
 export interface ReplayActionType {
@@ -536,6 +539,8 @@ export interface GeneratorOperatingType
   // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
   paused: boolean;
+  // A retrofit being installed, which holds the plant offline until it completes.
+  upgradeInProgress?: FacilityUpgradeInProgressType;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
   // its stable minimum while starting and stopping, but cannot remain there indefinitely.
   committed?: boolean;
@@ -641,6 +646,11 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   reservoirCapacityWh?: number;
   hydroWhPerMm?: number;
   hydroMeanMonthlyInflowWh?: number;
+  // Weather hardening chosen at purchase or added later by retrofit. See src/helpers/Hazards.tsx.
+  resilience?: FacilityResilienceType;
+  // The part of buildCost that pays for the resilience option, kept on the quote so the build
+  // dialog can add and remove the option exactly. Dropped once the quote becomes a facility.
+  resilienceExtraBuildCost?: number;
 }
 
 interface SharedShoppingType {
@@ -958,6 +968,55 @@ export interface WildfireProfileType {
   preparednessDurationMonths: number;
 }
 
+export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
+export type ResilienceUpgradeType =
+  "hailResistant" | "coldWeatherPackage" | "solarTrackers";
+
+/** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
+export interface FacilityResilienceType {
+  hailResistant?: boolean; // "Sun" only
+  // "Sun" only, and only at build: single-axis trackers that follow the sun and stow in hail
+  solarTrackers?: boolean;
+  // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
+  // the stow angle the trackers of that year could reach.
+  trackerHailDamageFactor?: number; // (0, 1]
+  coldWeatherPackage?: boolean; // "Natural Gas" only
+  // "Natural Gas" only: the coldest representative-day minimum the plant runs through without a
+  // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
+  designMinTempC?: number; // [-60, 0]
+}
+
+/**
+ * Location exposure to hail and extreme cold. Simplified game balance rounded from published
+ * climatologies, not a site-specific risk assessment; see src/data/Hazards.tsx for sources.
+ */
+export interface WeatherHazardProfileType {
+  /** Expected hailstorms per year damaging enough to break utility PV modules at a site. */
+  damagingHailPerYear: number;
+  /** Whether plants are winterized by default here, and cold must be deeper to strain gas supply. */
+  coldClimate: boolean;
+  /** Representative-day minimum below which regional gas supply is strained; defaults by climate. */
+  regionalColdThresholdC?: number;
+  source: string;
+}
+
+/** The replayed payload for adding a resilience upgrade to a standing facility. */
+export interface RetrofitFacilityAction {
+  facilityId: number;
+  upgrade: ResilienceUpgradeType;
+}
+
+/**
+ * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
+ * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
+ */
+export interface FacilityUpgradeInProgressType {
+  upgrade: ResilienceUpgradeType;
+  cost: number; // What the player paid, and what a cancellation refunds
+  startsMinute: number;
+  completesMinute: number;
+}
+
 export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
@@ -1105,6 +1164,10 @@ export interface GameType {
   // original row was the 101st one and fell off the visible history.
   reportedEventKeys: string[];
   eventLogReadThroughId: number;
+  // The blackout underway as of the last tick, so the event log can say how bad it was once it's
+  // over. Undefined while the lights are on. Kept in the slice so a save taken mid-blackout
+  // reports the same length and shortfall as the run that was never interrupted.
+  blackout?: { startMinute: number; unservedWh: number };
   // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
   worldEvents: WorldEventStateType;
@@ -1114,6 +1177,9 @@ export interface GameType {
   // Headless balance harness only: run the identical strategy with the recurring regional wildfire
   // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
   wildfireHazardDisabled?: boolean;
+  // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
+  // switched off. Undefined means enabled (the browser default).
+  weatherHazardsDisabled?: boolean;
   commissionedHydroSiteIds: string[];
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled

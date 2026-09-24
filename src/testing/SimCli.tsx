@@ -64,6 +64,7 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
     sellFacilityId: envNumber("SIM_SELL_ID"),
     sellAtMonth: envNumber("SIM_SELL_MONTH"),
     storyEffectsEnabled: process.env.SIM_WITHOUT_STORIES !== "1",
+    weatherHazardsEnabled: process.env.SIM_WITHOUT_HAZARDS !== "1",
   };
 }
 

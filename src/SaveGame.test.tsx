@@ -157,6 +157,12 @@ describe("SaveGame", () => {
         { ...event, attributes: { ids: [null] } },
         { ...event, effects: { demandMultiplier: "bad" } },
         { ...event, effects: { facilityOutputMultipliersById: { "1": null } } },
+        // Negative booked amounts would turn a charge into income.
+        { ...event, attributes: { cost: -10 } },
+        { ...event, attributes: { oneTimeCost: -1e9, oneTimeCostMinute: 15 } },
+        { ...event, attributes: { repairCost: -1 } },
+        { ...event, attributes: { upfrontGrant: -5 } },
+        { ...event, attributes: { cost: "10" } },
       ]) {
         raw.game.worldEvents[field] = [malformed];
         expect(parseSave(raw)).toBeNull();
@@ -464,6 +470,75 @@ describe("SaveGame", () => {
         game: { ...save.game, facilities: [facility] },
       }),
     ).toBeNull();
+  });
+
+  it("validates weather resilience on facilities", () => {
+    const save = serializeSave(game);
+    const withFacility = (patch: Record<string, unknown>) =>
+      parseSave(
+        JSON.parse(
+          JSON.stringify({
+            ...save,
+            game: {
+              ...save.game,
+              facilities: [{ ...save.game.facilities[0], ...patch }],
+            },
+          }),
+        ),
+      );
+    const gas = {
+      fuel: "Natural Gas",
+      resilience: { coldWeatherPackage: true, designMinTempC: -30 },
+    };
+    expect(withFacility(gas)).not.toBeNull();
+    expect(
+      withFacility({ fuel: "Sun", resilience: { hailResistant: true } }),
+    ).not.toBeNull();
+    [
+      { ...gas, resilience: { coldWeatherPackage: "yes" } },
+      { ...gas, resilience: { designMinTempC: 5 } },
+      { ...gas, resilience: { hailResistant: true } },
+      { ...gas, resilience: "hardened" },
+      { fuel: "Sun", resilience: { coldWeatherPackage: true } },
+      { fuel: "Uranium", resilience: { hailResistant: false } },
+      { fuel: "Sun", resilience: { trackerHailDamageFactor: 0 } },
+      { ...gas, resilience: { solarTrackers: true } },
+    ].forEach((patch) => expect(withFacility(patch)).toBeNull());
+    expect(
+      withFacility({
+        fuel: "Sun",
+        resilience: { solarTrackers: true, trackerHailDamageFactor: 0.25 },
+      }),
+    ).not.toBeNull();
+  });
+
+  it("validates a retrofit being installed", () => {
+    const save = serializeSave(game);
+    const withUpgrade = (upgradeInProgress: unknown) =>
+      parseSave(
+        JSON.parse(
+          JSON.stringify({
+            ...save,
+            game: {
+              ...save.game,
+              facilities: [{ ...save.game.facilities[0], upgradeInProgress }],
+            },
+          }),
+        ),
+      );
+    const upgrade = {
+      upgrade: "coldWeatherPackage",
+      cost: 1e6,
+      startsMinute: 100,
+      completesMinute: 200,
+    };
+    expect(withUpgrade(upgrade)).not.toBeNull();
+    [
+      { ...upgrade, upgrade: "gold-plating" },
+      { ...upgrade, cost: -1 },
+      { ...upgrade, completesMinute: 50 },
+      "soon",
+    ].forEach((bad) => expect(withUpgrade(bad)).toBeNull());
   });
 
   it("ignores corrupt JSON", () => {

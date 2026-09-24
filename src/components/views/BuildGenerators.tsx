@@ -5,11 +5,13 @@ import {
   Button,
   Card,
   CardHeader,
+  Checkbox,
   Chip,
   Collapse,
   Dialog,
   DialogActions,
   DialogContent,
+  FormControlLabel,
   List,
   Stack,
   Table,
@@ -50,10 +52,24 @@ import {
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
 import {
+  resilienceBuildOptions,
+  ResilienceBuildOptionType,
+  ResilienceSelectionType,
+  withResilienceOptions,
+} from "../../helpers/Hazards";
+import {
+  STANDARD_GAS_DESIGN_MIN_TEMP_C,
+  TRACKER_ANNUAL_ENERGY_MULTIPLIER,
+} from "../../data/Hazards";
+import {
+  coldPackageEffect,
+  formatDesignTemperature,
+} from "../base/WeatherResilienceText";
+import {
   expectedMonthlyOutputShape,
   ExpectedOutputShape,
 } from "../../helpers/ExpectedOutput";
-import { MANUAL_ENTRY, ManualEntryTitleType } from "../../data/Manual";
+import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
@@ -195,7 +211,13 @@ interface GeneratorBuildItemProps {
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
-  onBuild: (financed: boolean) => void;
+  // Optional build upgrades, and the quote with a selection of them. Both come from the hazard
+  // model so the dialog's price is exactly the one the purchase will charge.
+  resilienceOptions?: ResilienceBuildOptionType[];
+  withResilience?: (
+    selection: ResilienceSelectionType,
+  ) => GeneratorShoppingType;
+  onBuild: (financed: boolean, selection?: ResilienceSelectionType) => void;
 }
 
 export function GeneratorBuildItem(
@@ -213,15 +235,22 @@ export function GeneratorBuildItem(
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [financingExpanded, setFinancingExpanded] = React.useState(false);
+  const resilienceOptions = props.resilienceOptions ?? [];
+  const hasOptions = resilienceOptions.length > 0 && !!props.withResilience;
+  const defaultSelection = (): ResilienceSelectionType =>
+    Object.fromEntries(
+      resilienceOptions.map((option) => [option.upgrade, option.selected]),
+    );
+  const [resilienceSelection, setResilienceSelection] =
+    React.useState<ResilienceSelectionType>(defaultSelection);
   const financingTermsId = React.useId();
   const purchaseSubmitted = React.useRef(false);
-  const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
-  const loanAmount = props.generator.buildCost - downpayment;
-  const monthlyPayment = getMonthlyPayment(
-    loanAmount,
-    props.interestRate,
-    LOAN_MONTHS,
-  );
+  // A default hardening option is only a default: the card stays buyable whenever the plant
+  // without it is affordable, and the dialog lets the player clear it
+  const cheapestQuote =
+    hasOptions && props.withResilience ? props.withResilience({}) : generator;
+  const downpayment = DOWNPAYMENT_PERCENT * cheapestQuote.buildCost;
+  const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const { buildable, secondaryText } = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
@@ -281,6 +310,7 @@ export function GeneratorBuildItem(
     if (!open) {
       purchaseSubmitted.current = false;
       setFinancingExpanded(false);
+      setResilienceSelection(defaultSelection());
     }
     setOpen(!open);
     e.stopPropagation();
@@ -296,9 +326,70 @@ export function GeneratorBuildItem(
       return;
     }
     purchaseSubmitted.current = true;
-    props.onBuild(financed);
+    props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
     toggleOpen(e);
   };
+
+  // The dialog prices the quote with the player's hardening choice; the card keeps the default
+  const quote =
+    hasOptions && props.withResilience
+      ? props.withResilience(resilienceSelection)
+      : generator;
+  const quoteDownpayment = DOWNPAYMENT_PERCENT * quote.buildCost;
+  const quoteMonthlyPayment = getMonthlyPayment(
+    quote.buildCost - quoteDownpayment,
+    props.interestRate,
+    LOAN_MONTHS,
+  );
+  const quoteCanBuild = buildable && quoteDownpayment <= cash;
+  const resilienceOptionId = React.useId();
+  // Each line under an option says what it buys; a warning line says what it costs the player
+  const optionDetails = (
+    option: ResilienceBuildOptionType,
+  ): { text: string; warning?: boolean }[] => {
+    switch (option.upgrade) {
+      case "solarTrackers":
+        return [
+          {
+            text: "Follows the sun for more morning and evening power, about 20% more a year.",
+          },
+          { text: "Stows steeply in hail. Can't be added after building." },
+        ];
+      case "hailResistant":
+        return [{ text: "Less hail damage." }];
+      default: {
+        if (!props.withResilience) return [];
+        const standardMinTempC =
+          props.withResilience({}).resilience?.designMinTempC ??
+          STANDARD_GAS_DESIGN_MIN_TEMP_C;
+        const lines: { text: string; warning?: boolean }[] = [
+          {
+            text: coldPackageEffect(
+              props.withResilience({ [option.upgrade]: true }).resilience
+                ?.designMinTempC ?? standardMinTempC,
+              standardMinTempC,
+              units,
+            ),
+          },
+        ];
+        if (option.defaultSelected) {
+          lines.push({
+            text: `Recommended here: winters often drop below ${formatDesignTemperature(standardMinTempC, units)}.`,
+          });
+        }
+        return lines;
+      }
+    }
+  };
+  const anySelected = resilienceOptions.some(
+    (option) => resilienceSelection[option.upgrade],
+  );
+  const affordabilityWarning =
+    anySelected && !quoteCanBuild && canBuild
+      ? resilienceOptions.length > 1
+        ? "Uncheck options to afford the downpayment."
+        : "Uncheck to afford the downpayment."
+      : undefined;
 
   const compareAction = props.onCompare && canBuild && (
     <Button
@@ -403,6 +494,11 @@ export function GeneratorBuildItem(
         <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
+          note={
+            includedOptions.length
+              ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
+              : undefined
+          }
         />
         <BuildMetric
           label="Build time"
@@ -588,7 +684,7 @@ export function GeneratorBuildItem(
         </TableContainer>
       </Collapse>
 
-      <Dialog open={open} onClose={toggleOpen}>
+      <Dialog open={open} onClose={toggleOpen} fullWidth maxWidth="sm">
         <ClosableDialogTitle onClose={toggleOpen}>
           Build {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
           {generator.name}?
@@ -601,23 +697,70 @@ export function GeneratorBuildItem(
               Uses the whole site. Only cancelling before completion frees it.
             </Typography>
           )}
+          {hasOptions &&
+            resilienceOptions.map((option, index) => {
+              const describedBy = `${resilienceOptionId}-${option.upgrade}`;
+              const lines = optionDetails(option);
+              if (
+                affordabilityWarning &&
+                index === resilienceOptions.length - 1
+              )
+                lines.push({ text: affordabilityWarning, warning: true });
+              return (
+                <Box className="resilienceBuildOption" key={option.upgrade}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={!!resilienceSelection[option.upgrade]}
+                        onChange={(event) =>
+                          setResilienceSelection((selection) => ({
+                            ...selection,
+                            [option.upgrade]: event.target.checked,
+                          }))
+                        }
+                        slotProps={{
+                          input: { "aria-describedby": describedBy },
+                        }}
+                      />
+                    }
+                    label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
+                  />
+                  <Box id={describedBy}>
+                    {lines.map((line) => (
+                      <Typography
+                        key={line.text}
+                        variant="body2"
+                        color={line.warning ? undefined : "textSecondary"}
+                        className={
+                          line.warning
+                            ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
+                            : "resilienceBuildOptionDetail"
+                        }
+                      >
+                        {line.text}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })}
           <DecisionImpactPreview
             facts={[
               {
                 concept: "money",
                 label: "Cash purchase",
-                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - generator.buildCost)}`,
+                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - quote.buildCost)}`,
               },
               {
                 concept: "finances",
                 label: "Loan option",
-                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo`,
                 detail: "Payments start now.",
               },
               {
                 concept: "money",
                 label: "Estimated upkeep",
-                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(generator) / 12)}/mo`,
+                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
                 detail: "Plus fuel and loan payments.",
               },
               {
@@ -629,7 +772,13 @@ export function GeneratorBuildItem(
               {
                 concept: "supply",
                 label: "Typical output",
-                value: `+${formatWatts(typicalOutputW)}`,
+                // The selected quote's trackers add their morning and evening energy
+                value: `+${formatWatts(
+                  typicalOutputW *
+                    (quote.resilience?.solarTrackers
+                      ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
+                      : 1),
+                )}`,
                 detail: waterShape
                   ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
                   : `${formatWatts(generator.peakW)} max; weather may limit it.`,
@@ -679,7 +828,7 @@ export function GeneratorBuildItem(
                   <TableRow>
                     <TableCell>Downpayment</TableCell>
                     <TableCell align="right">
-                      {formatMoneyConcise(downpayment)}
+                      {formatMoneyConcise(quoteDownpayment)}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -697,7 +846,7 @@ export function GeneratorBuildItem(
                   <TableRow>
                     <TableCell>Monthly payments</TableCell>
                     <TableCell align="right">
-                      {formatMoneyConcise(monthlyPayment)}/mo
+                      {formatMoneyConcise(quoteMonthlyPayment)}/mo
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -714,7 +863,7 @@ export function GeneratorBuildItem(
         <DialogActions>
           <Button
             color="primary"
-            disabled={!canBuild || cash < generator.buildCost}
+            disabled={!quoteCanBuild || cash < quote.buildCost}
             variant="contained"
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(false, e)
@@ -726,7 +875,7 @@ export function GeneratorBuildItem(
           <Button
             color="primary"
             variant="outlined"
-            disabled={!canBuild}
+            disabled={!quoteCanBuild}
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(true, e)
             }
@@ -1051,8 +1200,17 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 compared={compared}
                 compareDisabled={comparedNames.length >= 3}
                 onCompare={() => toggleCompare(g.name)}
-                onBuild={(financed: boolean) => {
-                  props.onBuildGenerator(g, financed);
+                resilienceOptions={resilienceBuildOptions(g, game)}
+                withResilience={(selection) =>
+                  withResilienceOptions(g, game, selection)
+                }
+                onBuild={(financed, selection) => {
+                  props.onBuildGenerator(
+                    selection === undefined
+                      ? g
+                      : withResilienceOptions(g, game, selection),
+                    financed,
+                  );
                   onBack();
                 }}
               />

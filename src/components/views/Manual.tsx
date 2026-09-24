@@ -22,7 +22,7 @@ import {
   ManualEntryType,
   ManualGroupType,
   manualEntryText,
-} from "../../data/Manual";
+} from "../base/ManualEntries";
 
 export interface StateProps {
   // Set when the player arrived via a deep link from a term shown elsewhere in the game

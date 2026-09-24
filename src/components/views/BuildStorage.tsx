@@ -29,7 +29,7 @@ import {
 } from "../../helpers/Format";
 import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ManualLink from "../base/ManualLink";
 import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";

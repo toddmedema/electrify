@@ -44,7 +44,7 @@ import {
   setStorageKeyValue,
 } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ManualLink from "../base/ManualLink";
 import {
   DerivedHistoryKeysType,

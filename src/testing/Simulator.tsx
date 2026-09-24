@@ -37,6 +37,7 @@ import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
 import { summarizeWildfireImpact } from "../helpers/Wildfire";
+import { summarizeWeatherHazardImpact } from "../helpers/Hazards";
 import {
   ActiveWorldEventType,
   DifficultyType,
@@ -52,6 +53,7 @@ import {
 } from "../Types";
 import {
   checkMonth,
+  checkWeatherHazards,
   checkTick,
   InvariantCollector,
   ViolationType,
@@ -119,6 +121,8 @@ export interface SimOptionsType {
   // Recurring regional wildfire hazard, on by default. Off runs the identical strategy without it,
   // isolating its effect for balance comparison.
   wildfireHazardEnabled?: boolean;
+  // Hail and extreme-cold hazards, on by default. Off runs the identical strategy without them.
+  weatherHazardsEnabled?: boolean;
   scheduledActions?: ScheduledSimActionType[];
 }
 
@@ -136,6 +140,7 @@ export interface ResolvedSimOptionsType {
   sellAtMonth: number;
   storyEffectsEnabled: boolean;
   wildfireHazardEnabled: boolean;
+  weatherHazardsEnabled: boolean;
   scheduledActions: ScheduledSimActionType[];
 }
 
@@ -176,6 +181,8 @@ export interface SimResultType {
   // Aggregate impact of the recurring regional wildfire hazard over the run (zeroed when it never
   // fired or was disabled), for many-seed balance comparison.
   wildfireImpact: import("../helpers/Wildfire").WildfireImpactSummaryType;
+  // Aggregate hail and extreme-cold impact over the run (zeroed when disabled or never fired).
+  weatherHazardImpact: import("../helpers/Hazards").WeatherHazardImpactSummaryType;
 }
 
 const DEFAULT_SEED = 12345;
@@ -241,6 +248,9 @@ function setUpGame(
   }
   if (!options.wildfireHazardEnabled) {
     state = gameReducer(state, delta({ wildfireHazardDisabled: true }));
+  }
+  if (!options.weatherHazardsEnabled) {
+    state = gameReducer(state, delta({ weatherHazardsDisabled: true }));
   }
   if (options.initialBuild) {
     const build =
@@ -389,6 +399,7 @@ function resolveOptions(
     sellAtMonth: options.sellAtMonth || 0,
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
     wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
+    weatherHazardsEnabled: options.weatherHazardsEnabled !== false,
     scheduledActions: options.scheduledActions || [],
   };
 }
@@ -630,6 +641,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
 
     previousMonthCount = state.monthlyHistory.length;
     checkMonth(collector, state.monthlyHistory[0], formatWhen(state));
+    checkWeatherHazards(collector, state, formatWhen(state));
 
     if (now.cash < 0) {
       bankruptAtMonth = state.date.monthsElapsed;
@@ -738,6 +750,9 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       [...state.monthlyHistory].reverse(),
       state.worldEvents.occurrences,
       state.startingYear,
+    ),
+    weatherHazardImpact: summarizeWeatherHazardImpact(
+      state.worldEvents.occurrences,
     ),
   };
 }

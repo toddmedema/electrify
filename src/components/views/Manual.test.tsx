@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
 import Manual, { clearManualMemory } from "./Manual";
 
@@ -52,6 +52,34 @@ describe("Manual", () => {
     renderManual();
     await search("LCOE");
     expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toBeInTheDocument();
+  });
+
+  it("links weather damage from operating costs and finds it by hazard", () => {
+    renderManual(MANUAL_ENTRY.OPERATING_COSTS);
+    expect(
+      within(
+        screen.getByRole("navigation", {
+          name: "Related to Operating costs",
+        }),
+      ).getByRole("button", { name: MANUAL_ENTRY.WEATHER_DAMAGE }),
+    ).toBeInTheDocument();
+    search("hail");
+    expect(
+      screen.getByRole("button", {
+        name: MANUAL_ENTRY.WEATHER_DAMAGE,
+        expanded: true,
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/only offered where winters get cold enough to matter/),
+    ).toBeVisible();
+  });
+
+  it("names the severe weather symbol in the symbol guide", () => {
+    renderManual(MANUAL_ENTRY.SYMBOLS);
+    expect(
+      within(screen.getByTestId("concept-legend")).getByText("Severe weather"),
+    ).toBeInTheDocument();
   });
 
   it.each([

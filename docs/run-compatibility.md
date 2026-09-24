@@ -21,7 +21,10 @@ are sorted by path. An input that is only a Git LFS pointer is rejected.
 This deliberately broad set can invalidate invitations after harmless helper or
 type edits. That costs availability rather than falsely promising equal
 conditions. It avoids maintaining a fragile duplicate list of individual
-simulation formulas. Ordinary scenario sharing remains available when a challenge
+simulation formulas. Because inputs are selected by directory, keep content that
+only the interface reads, such as manual entries or map artwork, under
+`src/components` rather than `src/data`, so editing it does not invalidate
+challenges. Ordinary scenario sharing remains available when a challenge
 is incompatible. No historical simulation runtime or migration is provided.
 
 When changing simulation behavior outside these directories, add the source to

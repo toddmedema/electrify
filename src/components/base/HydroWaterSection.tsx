@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { MONTH_NAMES, MONTHS, TICKS_PER_YEAR } from "../../Constants";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "./ManualEntries";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursOfPeak } from "../../helpers/Format";
 import {
