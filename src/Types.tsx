@@ -1105,6 +1105,10 @@ export interface GameType {
   // original row was the 101st one and fell off the visible history.
   reportedEventKeys: string[];
   eventLogReadThroughId: number;
+  // The blackout underway as of the last tick, so the event log can say how bad it was once it's
+  // over. Undefined while the lights are on. Kept in the slice so a save taken mid-blackout
+  // reports the same length and shortfall as the run that was never interrupted.
+  blackout?: { startMinute: number; unservedWh: number };
   // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
   worldEvents: WorldEventStateType;
