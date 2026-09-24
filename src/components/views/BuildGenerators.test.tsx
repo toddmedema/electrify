@@ -11,6 +11,8 @@ import {
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
+import { SCENARIOS } from "../../data/Scenarios";
+import { formatMoneyConcise } from "../../helpers/Format";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
@@ -512,4 +514,88 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
+});
+
+describe("weather hardening in the purchase dialog", () => {
+  // Carbon Fee moved to Pittsburgh: a cold climate that also sees some hail
+  function coldGame() {
+    const scenario = SCENARIOS.find((candidate) => candidate.id === 100)!;
+    const game = createGame({
+      scenario: { ...scenario, locationId: "PIT" },
+      scenarioId: 100,
+    });
+    game.timeline[0].cash = 1e12;
+    return game;
+  }
+
+  function showBuildList(onBuild = jest.fn()) {
+    render(
+      <BuildGenerators
+        game={coldGame()}
+        onBack={jest.fn()}
+        onBuildGenerator={onBuild}
+      />,
+    );
+    return onBuild;
+  }
+
+  it("prices the default cold-weather package and builds without it when cleared", () => {
+    const onBuild = showBuildList();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const option = within(dialog).getByRole("checkbox", {
+      name: /^Cold-weather package \+\$/,
+    });
+    expect(option).toBeChecked();
+    expect(option).toHaveAccessibleDescription(
+      "Runs down to \u221230°C instead of \u22128°C.",
+    );
+    const impact = within(dialog).getByRole("region", {
+      name: "Expected impact",
+    });
+    const withPackage = impact.textContent;
+    fireEvent.click(option);
+    expect(impact.textContent).not.toEqual(withPackage);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
+    const [quote, financed] = onBuild.mock.calls[0];
+    expect(financed).toBe(false);
+    expect(quote.fuel).toBe("Natural Gas");
+    expect(quote.resilience).toEqual({
+      coldWeatherPackage: false,
+      designMinTempC: -8,
+    });
+    expect(quote.resilienceExtraBuildCost).toBeUndefined();
+  });
+
+  it("offers hail-resistant solar as an opt-in that follows the quoted price", () => {
+    const onBuild = showBuildList();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Solar" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const option = within(dialog).getByRole("checkbox", {
+      name: /^Hail-resistant design \+\$/,
+    });
+    expect(option).not.toBeChecked();
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
+    const [quote] = onBuild.mock.calls[0];
+    expect(quote.resilience).toEqual({ hailResistant: true });
+    expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
+    expect(option).toHaveAccessibleName(
+      `Hail-resistant design +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
+    );
+  });
+
+  it("offers no hardening for technologies without a modelled hazard", () => {
+    showBuildList();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Wind" }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("checkbox"),
+    ).toBeNull();
+  });
 });

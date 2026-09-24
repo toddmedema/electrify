@@ -13,6 +13,13 @@ import {
   TickPresentFutureType,
 } from "../Types";
 import { effectiveMarket } from "../data/IntertieAccess";
+import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../data/Hazards";
+import {
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  isWeatherHazardEligible,
+} from "../helpers/Hazards";
+import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import {
   allocateIntertieFlows,
   neighborImportSupplyW,
@@ -652,6 +659,107 @@ export function checkMonth(
       `demandWh = ${month.demandWh}`,
     );
   }
+}
+
+/**
+ * Checks the weather hazards that started this month, right after the rollover that drew them:
+ * every derate is a real reduction, deductibles never exceed the insured repair, hail only hits
+ * operating solar and cold only derates gas plants rated warmer than the month's minimum. Also
+ * checks every generator's insurance premium.
+ */
+export function checkWeatherHazards(
+  collector: InvariantCollector,
+  state: GameType,
+  when: string,
+) {
+  const monthStart = state.date.monthsElapsed * MINUTES_PER_MONTH;
+  state.worldEvents.active.forEach((event) => {
+    const hail = event.definitionId === HAIL_DEFINITION_ID;
+    const cold = event.definitionId === COLD_DEFINITION_ID;
+    if ((!hail && !cold) || event.startsMinute !== monthStart) return;
+    if (!isWeatherHazardEligible(state, hail ? "HAIL" : "EXTREME_COLD")) {
+      collector.add(
+        "weather hazards only occur where eligible",
+        when,
+        `${event.key} in scenario ${state.scenarioId}`,
+      );
+    }
+    Object.entries(event.effects.facilityOutputMultipliersById || {}).forEach(
+      ([id, multiplier]) => {
+        if (!isFinite_(multiplier) || multiplier <= 0 || multiplier > 1) {
+          collector.add(
+            "weather hazard derates stay within (0, 1]",
+            when,
+            `${event.key} facility ${id} multiplier ${multiplier}`,
+          );
+        }
+        const facility = state.facilities.find((f) => String(f.id) === id);
+        if (
+          hail &&
+          (facility?.fuel !== "Sun" || facility.yearsToBuildLeft > 0)
+        ) {
+          collector.add(
+            "hail only damages operating solar",
+            when,
+            `${event.key} hit ${facility?.fuel ?? "missing"} facility ${id}`,
+          );
+        }
+        if (cold) {
+          const designMinTempC =
+            facility?.resilience?.designMinTempC ??
+            STANDARD_GAS_DESIGN_MIN_TEMP_C;
+          if (
+            facility?.fuel !== "Natural Gas" ||
+            !(Number(event.attributes.minTempC) < designMinTempC)
+          ) {
+            collector.add(
+              "cold only derates gas plants colder than their rating",
+              when,
+              `${event.key} derated ${facility?.fuel ?? "missing"} facility ${id} rated ${designMinTempC} at ${event.attributes.minTempC}`,
+            );
+          }
+        }
+      },
+    );
+    const gasMultiplier = event.effects.fuelPriceMultipliers?.["Natural Gas"];
+    if (
+      gasMultiplier !== undefined &&
+      (!isFinite_(gasMultiplier) || gasMultiplier < 1)
+    ) {
+      collector.add(
+        "cold gas price multipliers are finite and at least 1",
+        when,
+        `${event.key} ${gasMultiplier}`,
+      );
+    }
+    if (hail) {
+      const deductible = event.attributes.oneTimeCost;
+      const repairCost = event.attributes.repairCost;
+      if (
+        !isFinite_(deductible) ||
+        !isFinite_(repairCost) ||
+        deductible < 0 ||
+        deductible > repairCost * (1 + RELATIVE_TOLERANCE)
+      ) {
+        collector.add(
+          "hail deductible is within the repair cost",
+          when,
+          `${event.key} deductible ${deductible} repair ${repairCost}`,
+        );
+      }
+    }
+  });
+  state.facilities.forEach((facility) => {
+    const premium = (facility as { annualInsuranceCost?: unknown })
+      .annualInsuranceCost;
+    if (premium !== undefined && (!isFinite_(premium) || premium < 0)) {
+      collector.add(
+        "weather insurance premiums are finite and non-negative",
+        when,
+        `${facility.name} (${facility.id}) premium ${premium}`,
+      );
+    }
+  });
 }
 
 /**

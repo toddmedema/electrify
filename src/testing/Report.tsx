@@ -202,6 +202,16 @@ export function formatReport(
   if (result.builds.length) {
     lines.push(`  Built            ${result.builds.length} facilities`);
   }
+  const hazards = result.weatherHazardImpact;
+  if (!result.options.weatherHazardsEnabled) {
+    lines.push("  Weather hazards  disabled");
+  } else if (hazards && (hazards.hailEvents || hazards.coldEvents)) {
+    lines.push(
+      `  Weather hazards  ${hazards.hailEvents} hailstorms (${hazards.hailFacilityHits} facility hits, ` +
+        `${formatMoneyConcise(hazards.hailDeductibles)} deductibles); ${hazards.coldEvents} cold snaps ` +
+        `(${hazards.coldRegionalEvents} regional, ${hazards.coldDerates} plant-month derates)`,
+    );
+  }
 
   lines.push("");
   lines.push("FINAL FLEET");

@@ -210,4 +210,30 @@ describe("EventLog", () => {
 
     expect(screen.getByText("No project events yet.")).toBeVisible();
   });
+
+  it("groups weather hazards with world events", async () => {
+    const user = userEvent.setup();
+    render(
+      <EventLog
+        events={[
+          {
+            id: 1,
+            kind: "BUILD",
+            label: "Jan 2024",
+            message: "Built a solar farm.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Filter event history, All events" }),
+    );
+    await user.click(screen.getByRole("menuitemradio", { name: "World" }));
+
+    expect(screen.getByText("No world or weather events yet.")).toBeVisible();
+    expect(screen.queryByText("Built a solar farm.")).toBeNull();
+  });
 });

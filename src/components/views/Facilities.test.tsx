@@ -23,6 +23,8 @@ import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
+import { HAIL_DEFINITION_ID, retrofitCost } from "../../helpers/Hazards";
+import { formatMoneyConcise } from "../../helpers/Format";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -54,6 +56,7 @@ interface Handlers {
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
   onSell: jest.Mock;
+  onRetrofit: jest.Mock;
 }
 
 function renderFacilities(
@@ -65,6 +68,7 @@ function renderFacilities(
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
+    onRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
   function ControlledFacilities() {
@@ -82,6 +86,7 @@ function renderFacilities(
         onTogglePause={() => undefined}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
+        onRetrofit={handlers.onRetrofit}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
         onSelect={(id) => {
@@ -376,6 +381,97 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
     </Provider>,
   );
 }
+
+describe("weather hazards in the fleet", () => {
+  // Game minutes per real day: a representative game month stands for a real month.
+  const DAY = MINUTES_PER_MONTH / (365 / 12);
+
+  // Carbon Fee plus a standing solar farm, eligible for hail because it is not a tutorial
+  function gameWithSolar(): GameType {
+    const state = createGame({ scenarioId: 100 });
+    const template = state.facilities[0];
+    state.facilities.push({
+      ...cloneDeep(template),
+      id: 3,
+      name: "Solar",
+      fuel: "Sun",
+      resilience: { hailResistant: false },
+    } as FacilityOperatingType);
+    return state;
+  }
+
+  function hailOn(state: GameType, availableFraction: number, days: number) {
+    state.worldEvents.active.push({
+      key: `hail:${state.location.id}:0:f3`,
+      definitionId: HAIL_DEFINITION_ID,
+      startsMinute: state.date.minute,
+      endsMinute: state.date.minute + Math.floor(days * DAY),
+      attributes: { hazard: "HAIL", facilityId: 3 },
+      effects: { facilityOutputMultipliersById: { "3": availableFraction } },
+    });
+  }
+
+  it("leads a hail-damaged row with the outage instead of a generic limit chip", () => {
+    const state = gameWithSolar();
+    hailOn(state, 0.72, 9);
+    renderFacilities(state, null);
+
+    expect(
+      screen.getByText("Hail damage · 72% available · 9 days left"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Hail · 72% · 9d")).toBeInTheDocument();
+    expect(screen.queryByText("72% limit")).toBeNull();
+    const solarRow = rows().find((row) =>
+      row.getAttribute("aria-label")?.startsWith("Inspect Solar"),
+    );
+    expect(solarRow).toHaveAttribute(
+      "aria-label",
+      "Inspect Solar, Hail damage · 72% available · 9 days left",
+    );
+  });
+
+  it("offers hail protection from the details and confirms before paying", async () => {
+    const state = gameWithSolar();
+    const cost = retrofitCost(state.facilities[2], state, "hailResistant")!;
+    const { onRetrofit, onSelect } = renderFacilities(state, 3);
+
+    const details = screen.getByRole("region", { name: "Weather resilience" });
+    expect(details).toHaveTextContent("Standard panels");
+    expect(details).toHaveTextContent("Weather insurance");
+    await user.click(
+      within(details).getByRole("button", {
+        name: `Add hail protection · ${formatMoneyConcise(cost)}`,
+      }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Add hail protection to Solar?",
+    });
+    expect(dialog).toHaveTextContent(
+      `Costs ${formatMoneyConcise(cost)} cash now.`,
+    );
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: `Pay ${formatMoneyConcise(cost)}`,
+      }),
+    );
+    expect(onRetrofit).toHaveBeenCalledWith({
+      facilityId: 3,
+      upgrade: "hailResistant",
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("shows a replay's hardening without offering to buy any", () => {
+    const state = {
+      ...gameWithSolar(),
+      replayPlayback: { actions: [], index: 0 },
+    } as GameType;
+    renderFacilities(state, 3);
+    const details = screen.getByRole("region", { name: "Weather resilience" });
+    expect(details).toHaveTextContent("Standard panels");
+    expect(within(details).queryByRole("button")).toBeNull();
+  });
+});
 
 describe("the interties view", () => {
   it("explains and offers California connection projects", async () => {

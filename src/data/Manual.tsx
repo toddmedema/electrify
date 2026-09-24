@@ -103,6 +103,7 @@ export const MANUAL_ENTRY = {
   SCORE: "Score",
   SYMBOLS: "Symbol Guide",
   TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
+  WEATHER_DAMAGE: "Weather Damage & Insurance",
 } as const;
 
 export type ManualEntryTitleType =
@@ -880,7 +881,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Money",
     keywords:
       "O&M fixed base variable operations maintenance non-fuel start annual upkeep",
-    related: [MANUAL_ENTRY.CAPACITY_FACTOR, MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    related: [
+      MANUAL_ENTRY.CAPACITY_FACTOR,
+      MANUAL_ENTRY.TOTAL_COST_OF_ENERGY,
+      MANUAL_ENTRY.WEATHER_DAMAGE,
+    ],
     entry: (
       <div>
         <p>
@@ -907,6 +912,44 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Actual costs depend on operation. Oil plants pay fixed and variable
           O&amp;M; pausing halves the fixed charge and stops the variable
           charge.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.WEATHER_DAMAGE,
+    group: "Gameplay",
+    keywords:
+      "hail storm freeze cold snap winterization deductible premium resilience retrofit hardening",
+    related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
+    entry: (
+      <div>
+        <p>
+          Hail and extreme cold strike at random. How often depends on the
+          location. Tutorials have neither.
+        </p>
+        <ul>
+          <li>
+            <strong>Hail:</strong> Breaks part of a solar farm. The broken share
+            produces nothing until repairs finish, usually within weeks.
+            Insurance pays for repairs; you pay a deductible of up to 2% of the
+            farm&apos;s value.
+          </li>
+          <li>
+            <strong>Extreme cold:</strong> Gas plants colder than their rating
+            lose output for the month. A deep regional freeze also raises gas
+            prices.
+          </li>
+          <li>
+            <strong>Weather insurance:</strong> Solar farms pay a yearly premium
+            that rises with local hail risk. It is charged with upkeep.
+          </li>
+        </ul>
+        <p>
+          When building, add a hail-resistant design to solar or a cold-weather
+          package to gas. The package is on by default in cold climates. Either
+          can be added later from the facility&apos;s details, at a higher
+          price.
         </p>
       </div>
     ),

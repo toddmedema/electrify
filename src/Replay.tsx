@@ -1,6 +1,9 @@
 import { MAX_INTERTIE_UPGRADES } from "./Constants";
 import { validScenarioResponse } from "./helpers/ScenarioChoices";
-import { validBuildFacility } from "./helpers/BuildValidation";
+import {
+  validBuildFacility,
+  validRetrofitFacility,
+} from "./helpers/BuildValidation";
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
@@ -70,6 +73,7 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "buildTransmissionLine",
   "upgradeTransmissionLine",
   "setTradingPolicy",
+  "retrofitFacility",
   "delta",
 ];
 
@@ -227,6 +231,11 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     if (action.type === "beginIntertieStress" && action.payload !== null)
       return null;
     if (action.type === "buildFacility" && !validBuildFacility(action.payload))
+      return null;
+    if (
+      action.type === "retrofitFacility" &&
+      !validRetrofitFacility(action.payload)
+    )
       return null;
     actions.push({
       minute: action.minute,

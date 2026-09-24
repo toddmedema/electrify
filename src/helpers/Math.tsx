@@ -50,6 +50,8 @@ export const RANDOM_STREAM = {
   // randomAt only -- recurring regional wildfire hazards. Kept off the authored worldEvents stream
   // so adding or reordering a hazard draw can never shift an authored story's seeded outcome.
   wildfireHazards: 10,
+  // randomAt only -- hail and extreme-cold hazards, separate for the same reason as wildfires.
+  weatherHazards: 11,
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript

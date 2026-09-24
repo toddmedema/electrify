@@ -6,6 +6,7 @@ import {
   setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
+  retrofitFacility,
   buildTransmissionLine,
   upgradeTransmissionLine,
   setTradingPolicy,
@@ -63,6 +64,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onReprioritize: (spotInList: number, delta: number) => {
       dispatch(reprioritizeFacility({ spotInList, delta }));
+    },
+    onRetrofit: (payload) => {
+      dispatch(retrofitFacility(payload));
     },
     onFacilityDragStart: (speed) => {
       dispatch(setFacilityDragActive(true));

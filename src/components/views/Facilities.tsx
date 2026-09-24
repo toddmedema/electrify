@@ -37,6 +37,7 @@ import {
   FacilityOperatingType,
   GameType,
   GeneratorOperatingType,
+  RetrofitFacilityAction,
   WorldEventEffectsType,
   EvidenceRequestType,
 } from "../../Types";
@@ -54,6 +55,12 @@ import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
+import {
+  COLD_DEFINITION_ID,
+  facilityHazardStatus,
+  FacilityHazardStatusType,
+  HAIL_DEFINITION_ID,
+} from "../../helpers/Hazards";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -67,6 +74,7 @@ interface FacilityListItemProps {
   game: GameType;
   selected: boolean;
   storyOutputMultiplier: number;
+  hazardStatus?: FacilityHazardStatusType;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   // A replay is a recording of somebody else's decisions; letting the viewer make their own
   // would desync the run from the actions still queued up against it
@@ -75,6 +83,55 @@ interface FacilityListItemProps {
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
   onReprioritize: DispatchProps["onReprioritize"];
+  onRetrofit?: DispatchProps["onRetrofit"];
+}
+
+/**
+ * A weather outage leads the row's status line, in amber, so a damaged plant reads as damaged
+ * before its reduced output does. The long and short forms swap on row width like the reservoir
+ * reading.
+ */
+function hazardStatusText(status: FacilityHazardStatusType): {
+  long: string;
+  short: string;
+} {
+  const available = Math.round(status.availableFraction * 100);
+  const days = status.daysLeft;
+  const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
+  return {
+    long: join([
+      status.label,
+      `${available}% available`,
+      days !== undefined ? `${days} ${days === 1 ? "day" : "days"} left` : "",
+    ]),
+    short: join([
+      status.hazard === "HAIL" ? "Hail" : "Cold",
+      `${available}%`,
+      days !== undefined ? `${days}d` : "",
+    ]),
+  };
+}
+
+function HazardStatusLead(props: {
+  status: FacilityHazardStatusType;
+}): React.JSX.Element {
+  const { long, short } = hazardStatusText(props.status);
+  // The row's disclosure carries the spoken form in its label, so these are visual only
+  return (
+    <span className="facilityHazardStatus" aria-hidden="true">
+      <span className="facilityHazardLong">{long}</span>
+      <span className="facilityHazardShort">{short}</span>
+      <span className="facilityStatusSeparator">{" · "}</span>
+    </span>
+  );
+}
+
+// Weather hazards report themselves through the row's own status lead, so the generic story
+// limit chip leaves them out rather than stating the same derate twice
+function isWeatherHazardEvent(definitionId: string): boolean {
+  return (
+    definitionId === HAIL_DEFINITION_ID || definitionId === COLD_DEFINITION_ID
+  );
 }
 
 function storyOutputMultiplierForFacility(
@@ -268,6 +325,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     spotInList,
     storyOutputMultiplier,
+    hazardStatus,
     arriving: arrivalRequested,
     onArrivalShown,
   } = props;
@@ -424,7 +482,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               type="button"
               className="facilityDisclosure"
               aria-label={
-                `Inspect ${facility.name}` + (isStorage ? `, ${status}` : "")
+                `Inspect ${facility.name}` +
+                (hazardStatus && !underConstruction
+                  ? `, ${hazardStatusText(hazardStatus).long}`
+                  : "") +
+                (isStorage ? `, ${status}` : "")
               }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
@@ -502,6 +564,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     }
                     secondary={
                       <>
+                        {hazardStatus && !underConstruction && (
+                          <HazardStatusLead status={hazardStatus} />
+                        )}
                         <span className="facilityStatus">{status}</span>
                         {detail && (
                           <span className="facilityStatusDetail">
@@ -612,6 +677,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               seed={game.seed}
               location={game.location}
               game={game}
+              readOnly={readOnly}
+              onRetrofit={props.onRetrofit}
             />
           )}
         </div>
@@ -670,6 +737,7 @@ export interface DispatchProps {
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
+  onRetrofit?: (payload: RetrofitFacilityAction) => void;
   onFacilityDragStart: (speed: GameType["speed"]) => void;
   onFacilityDragEnd: (
     sourceIndex: number,
@@ -787,7 +855,8 @@ export default class Facilities extends React.Component<Props> {
       game.worldEvents.active.filter(
         (event) =>
           game.date.minute >= event.startsMinute &&
-          game.date.minute < event.endsMinute,
+          game.date.minute < event.endsMinute &&
+          !isWeatherHazardEvent(event.definitionId),
       ),
     );
 
@@ -841,12 +910,14 @@ export default class Facilities extends React.Component<Props> {
                             onTogglePause={onTogglePause}
                             onPause={onPause}
                             onReprioritize={onReprioritize}
+                            onRetrofit={this.props.onRetrofit}
                             onSelect={onSelect}
                             selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplierForFacility(
                               g,
                               storyEffects,
                             )}
+                            hazardStatus={facilityHazardStatus(game, g)}
                             spotInList={i}
                             listLength={facilitiesCount}
                             readOnly={readOnly}

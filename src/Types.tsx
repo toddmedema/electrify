@@ -321,6 +321,7 @@ export type ReplayActionNameType =
   | "buildTransmissionLine"
   | "upgradeTransmissionLine"
   | "setTradingPolicy"
+  | "retrofitFacility"
   | "delta";
 
 export interface ReplayActionType {
@@ -548,6 +549,10 @@ export interface GeneratorOperatingType
   hydroLastSpillWh?: number;
   hydroLastMandatedReleaseWh?: number;
   hydroLastBypassWh?: number;
+  // Weather-hazard insurance loading, refreshed at each monthly rollover and charged as non-fuel
+  // O&M. The catalogue O&M already includes average insurance; this is the location-specific
+  // extra for exposure to hail. Absent for technologies with no insured weather vulnerability.
+  annualInsuranceCost?: number;
 }
 
 export interface StorageOperatingType
@@ -641,6 +646,11 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   reservoirCapacityWh?: number;
   hydroWhPerMm?: number;
   hydroMeanMonthlyInflowWh?: number;
+  // Weather hardening chosen at purchase or added later by retrofit. See src/helpers/Hazards.tsx.
+  resilience?: FacilityResilienceType;
+  // The part of buildCost that pays for the resilience option, kept on the quote so the build
+  // dialog can add and remove the option exactly. Dropped once the quote becomes a facility.
+  resilienceExtraBuildCost?: number;
 }
 
 interface SharedShoppingType {
@@ -958,6 +968,38 @@ export interface WildfireProfileType {
   preparednessDurationMonths: number;
 }
 
+export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
+export type ResilienceUpgradeType = "hailResistant" | "coldWeatherPackage";
+
+/** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
+export interface FacilityResilienceType {
+  hailResistant?: boolean; // "Sun" only
+  coldWeatherPackage?: boolean; // "Natural Gas" only
+  // "Natural Gas" only: the coldest representative-day minimum the plant runs through without a
+  // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
+  designMinTempC?: number; // [-60, 0]
+}
+
+/**
+ * Location exposure to hail and extreme cold. Simplified game balance rounded from published
+ * climatologies, not a site-specific risk assessment; see src/data/Hazards.tsx for sources.
+ */
+export interface WeatherHazardProfileType {
+  /** Expected hailstorms per year damaging enough to break utility PV modules at a site. */
+  damagingHailPerYear: number;
+  /** Whether plants are winterized by default here, and cold must be deeper to strain gas supply. */
+  coldClimate: boolean;
+  /** Representative-day minimum below which regional gas supply is strained; defaults by climate. */
+  regionalColdThresholdC?: number;
+  source: string;
+}
+
+/** The replayed payload for adding a resilience upgrade to a standing facility. */
+export interface RetrofitFacilityAction {
+  facilityId: number;
+  upgrade: ResilienceUpgradeType;
+}
+
 export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
@@ -1114,6 +1156,9 @@ export interface GameType {
   // Headless balance harness only: run the identical strategy with the recurring regional wildfire
   // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
   wildfireHazardDisabled?: boolean;
+  // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
+  // switched off. Undefined means enabled (the browser default).
+  weatherHazardsDisabled?: boolean;
   commissionedHydroSiteIds: string[];
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled

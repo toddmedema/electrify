@@ -435,6 +435,41 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
+  it("validates weather resilience and insurance on facilities", () => {
+    const save = serializeSave(game);
+    const withFacility = (patch: Record<string, unknown>) =>
+      parseSave(
+        JSON.parse(
+          JSON.stringify({
+            ...save,
+            game: {
+              ...save.game,
+              facilities: [{ ...save.game.facilities[0], ...patch }],
+            },
+          }),
+        ),
+      );
+    const gas = {
+      fuel: "Natural Gas",
+      resilience: { coldWeatherPackage: true, designMinTempC: -30 },
+      annualInsuranceCost: 1000,
+    };
+    expect(withFacility(gas)).not.toBeNull();
+    expect(
+      withFacility({ fuel: "Sun", resilience: { hailResistant: true } }),
+    ).not.toBeNull();
+    [
+      { ...gas, annualInsuranceCost: -1 },
+      { ...gas, annualInsuranceCost: "cheap" },
+      { ...gas, resilience: { coldWeatherPackage: "yes" } },
+      { ...gas, resilience: { designMinTempC: 5 } },
+      { ...gas, resilience: { hailResistant: true } },
+      { ...gas, resilience: "hardened" },
+      { fuel: "Sun", resilience: { coldWeatherPackage: true } },
+      { fuel: "Uranium", resilience: { hailResistant: false } },
+    ].forEach((patch) => expect(withFacility(patch)).toBeNull());
+  });
+
   it("ignores corrupt JSON", () => {
     window.localStorage.setItem(SAVE_KEY, "{not json");
     expect(readSave()).toBeNull();

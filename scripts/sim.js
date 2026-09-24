@@ -32,6 +32,7 @@ const BOOLEAN_FLAGS = {
   "--matrix": "SIM_MATRIX",
   "--benchmark-stories": "SIM_STORY_BENCHMARK",
   "--without-stories": "SIM_WITHOUT_STORIES",
+  "--without-hazards": "SIM_WITHOUT_HAZARDS",
 };
 
 const USAGE = `
@@ -65,6 +66,7 @@ Runs the game's simulation headlessly and reports what happened.
   --matrix               Run the deterministic story balance matrix
   --benchmark-stories    Compare a 20-year forecast with stories enabled/disabled
   --without-stories      Disable authored story effects for a control run
+  --without-hazards      Disable hail and extreme-cold weather hazards for a control run
   --full                 Print every month rather than a sample
   --list                 List the scenarios and exit
 `;

@@ -20,7 +20,10 @@ import {
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
-import { validBuildFacility } from "../helpers/BuildValidation";
+import {
+  validBuildFacility,
+  validRetrofitFacility,
+} from "../helpers/BuildValidation";
 import {
   pendingScenarioChoice,
   validScenarioResponse,
@@ -147,6 +150,22 @@ import {
 } from "../helpers/Wildfire";
 import { getWildfireProfile } from "../data/WildfireProfiles";
 import {
+  annualInsuranceCost,
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  hailOccurs,
+  hazardEventKey,
+  isWeatherHazardEligible,
+  oneTimeCostMinute,
+  oneTimeWorldEventCost,
+  refreshInsurancePremiums,
+  representativeMinTempC,
+  resolveColdImpact,
+  retrofitCost,
+  retrofittedResilience,
+  sampleHailImpacts,
+} from "../helpers/Hazards";
+import {
   getHydroConditions,
   HYDRO_DEADPOOL_FRACTION,
   mandatedReleaseFraction,
@@ -228,6 +247,7 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
+  RetrofitFacilityAction,
   TradingPolicyType,
   TransmissionLineOperatingType,
   VictoryType,
@@ -790,6 +810,251 @@ function updateWildfireHazards(state: GameType): void {
   });
 }
 
+/** Keeps the hazard dedupe and occurrence records bounded, like the authored-story path. */
+function trimWorldEventRecords(state: GameType) {
+  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.checkedKeys.splice(
+      0,
+      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+}
+
+// Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
+const NEGLIGIBLE_RESISTANT_HAIL_SHARE = 0.05;
+
+function formatDays(days: number): string {
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+/**
+ * Hail and extreme-cold checks at monthly rollover, after the authored story and wildfire, before
+ * the month's forecast is built. Each check is keyed by (hazard, location, absolute month) and
+ * every draw is addressed, so saving, forecasting or reordering the fleet cannot reroll it and a
+ * resumed month cannot announce twice. Hail persists one occurrence per damaged solar facility,
+ * lasting until its repair ends and charging its deductible once; cold persists one occurrence
+ * for the month that derates under-rated gas plants and, when regional, raises gas prices.
+ * Returns the fuels whose price this changed, for the month's fuel-price log.
+ */
+function updateWeatherHazards(state: GameType): Set<FuelNameType> {
+  const priceFuels = new Set<FuelNameType>();
+  const locationId = state.location.id;
+  const monthsElapsed = state.date.monthsElapsed;
+  const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
+  if (isWeatherHazardEligible(state, "HAIL")) {
+    const key = hazardEventKey("HAIL", locationId, monthsElapsed);
+    if (!state.worldEvents.checkedKeys.includes(key)) {
+      state.worldEvents.checkedKeys.push(key);
+      if (hailOccurs(state, key, state.date.monthNumber - 1)) {
+        recordHailStorm(state, key, startsMinute);
+      }
+    }
+  }
+  if (isWeatherHazardEligible(state, "EXTREME_COLD")) {
+    const key = hazardEventKey("EXTREME_COLD", locationId, monthsElapsed);
+    if (!state.worldEvents.checkedKeys.includes(key)) {
+      state.worldEvents.checkedKeys.push(key);
+      if (recordColdSnap(state, key, startsMinute)) {
+        priceFuels.add("Natural Gas");
+      }
+    }
+  }
+  trimWorldEventRecords(state);
+  return priceFuels;
+}
+
+function recordHailStorm(state: GameType, key: string, startsMinute: number) {
+  const impacts = sampleHailImpacts({ game: state, key });
+  // A storm that misses every array is not news to the company.
+  if (!impacts.length) return;
+  const chargeMinute = oneTimeCostMinute(startsMinute);
+  const occurrences: ActiveWorldEventType[] = impacts.map((impact) => ({
+    key: `${key}:f${impact.facilityId}`,
+    definitionId: HAIL_DEFINITION_ID,
+    startsMinute,
+    endsMinute: startsMinute + impact.repairMinutes,
+    forecastable: false,
+    title: "Hail damage",
+    message: `Hail damaged ${Math.round(impact.damagedFraction * 100)}% of ${impact.facilityName}.`,
+    concept: "weather",
+    importance: "CRITICAL",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    attributes: {
+      hazard: "HAIL",
+      eventKey: key,
+      facilityId: impact.facilityId,
+      facilityName: impact.facilityName,
+      damagedFraction: impact.damagedFraction,
+      repairDays: impact.repairDays,
+      repairCost: impact.repairCost,
+      hailResistant: impact.hailResistant,
+      oneTimeCost: impact.deductible,
+      oneTimeCostMinute: chargeMinute,
+    },
+    effects: {
+      facilityOutputMultipliersById: {
+        [String(impact.facilityId)]: 1 - impact.damagedFraction,
+      },
+    },
+  }));
+  state.worldEvents.active.push(...occurrences);
+  state.worldEvents.occurrences.push(...occurrences);
+  const solarW = state.facilities
+    .filter((f) => f.fuel === "Sun" && f.yearsToBuildLeft <= 0)
+    .reduce((total, f) => total + f.peakW, 0);
+  const damagedW = impacts.reduce((total, impact) => {
+    const facility = state.facilities.find(
+      ({ id }) => id === impact.facilityId,
+    );
+    return total + (facility?.peakW || 0) * impact.damagedFraction;
+  }, 0);
+  const share = solarW > 0 ? damagedW / solarW : 0;
+  const deductible = impacts.reduce((total, i) => total + i.deductible, 0);
+  const repairDays = Math.max(...impacts.map((i) => i.repairDays));
+  const negligible =
+    impacts.every((i) => i.hailResistant) &&
+    share < NEGLIGIBLE_RESISTANT_HAIL_SHARE;
+  const percent = Math.max(1, Math.round(share * 100));
+  const message = negligible
+    ? `Hail struck your hail-resistant panels, damaging only ${percent}% of your solar fleet; ${formatMoneyConcise(deductible)} deductible, repairs expected in ${formatDays(repairDays)}.`
+    : `Severe hail damaged ${percent}% of your solar fleet; ${formatMoneyConcise(deductible)} deductible, repairs expected in ${formatDays(repairDays)}.`;
+  logGameEvent(state, "WORLD_EVENT", message, {
+    importance: negligible ? "NOTABLE" : "CRITICAL",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    title: negligible ? "Hail shrugged off" : "Hailstorm damage",
+    concept: "weather",
+    storyPhaseKey: key,
+    turningPointPriority: negligible ? undefined : 110,
+    reportedKey: key,
+    pause: !negligible,
+  });
+}
+
+/** Persists and announces this month's cold snap; returns whether gas prices spiked. */
+function recordColdSnap(
+  state: GameType,
+  key: string,
+  startsMinute: number,
+): boolean {
+  const minTempC = representativeMinTempC(
+    state.date,
+    state.seed,
+    storyEffectsAt(state.date, state).temperatureOffsetC || 0,
+  );
+  const impact = resolveColdImpact({ game: state, key, minTempC });
+  if (!impact) return false;
+  const affectedIds = impact.derates.map((d) => d.facilityId);
+  const affectedNames = impact.derates.map((d) => d.facilityName);
+  const effects: WorldEventEffectsType = {};
+  if (impact.regional) {
+    effects.fuelPriceMultipliers = { "Natural Gas": impact.gasPriceMultiplier };
+  }
+  if (impact.derates.length) {
+    effects.facilityOutputMultipliersById = Object.fromEntries(
+      impact.derates.map((d) => [String(d.facilityId), d.availableFraction]),
+    );
+  }
+  const temperature = `${Math.round(minTempC)} °C`;
+  const parts: string[] = [];
+  if (impact.regional) {
+    parts.push(
+      `regional gas supply is strained and prices are up ${impact.gasPriceMultiplier.toFixed(1)}× this month`,
+    );
+  }
+  if (impact.derates.length) {
+    const lowest = Math.min(...impact.derates.map((d) => d.availableFraction));
+    parts.push(
+      `${affectedNames.join(", ")} ${affectedNames.length === 1 ? "is" : "are"} limited to as little as ${Math.round(lowest * 100)}% output`,
+    );
+  }
+  const protectedNames = impact.protectedFacilityIds
+    .map((id) => state.facilities.find((f) => f.id === id)?.name)
+    .filter((name): name is string => !!name);
+  const protectedNote = protectedNames.length
+    ? ` Cold-weather packages kept ${protectedNames.join(", ")} running.`
+    : "";
+  const message = `Extreme cold (${temperature}): ${parts.join("; ")}.${protectedNote}`;
+  const burnsGas = state.facilities.some(
+    (f) => f.fuel === "Natural Gas" && f.yearsToBuildLeft <= 0,
+  );
+  const critical = impact.derates.length > 0 || (impact.regional && burnsGas);
+  const occurrence: ActiveWorldEventType = {
+    key,
+    definitionId: COLD_DEFINITION_ID,
+    startsMinute,
+    endsMinute: startsMinute + MINUTES_PER_MONTH,
+    forecastable: false,
+    title: "Extreme cold",
+    message,
+    concept: "weather",
+    importance: critical ? "CRITICAL" : "NOTABLE",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+    attributes: {
+      hazard: "EXTREME_COLD",
+      eventKey: key,
+      minTempC,
+      regional: impact.regional,
+      gasPriceMultiplier: impact.gasPriceMultiplier,
+      affectedFacilityIds: affectedIds,
+      affectedFacilityNames: affectedNames,
+      protectedFacilityIds: impact.protectedFacilityIds,
+    },
+    effects,
+  };
+  state.worldEvents.active.push(occurrence);
+  state.worldEvents.occurrences.push(occurrence);
+  logGameEvent(state, "WORLD_EVENT", message, {
+    importance: occurrence.importance,
+    actionTarget: occurrence.actionTarget,
+    title: occurrence.title,
+    concept: "weather",
+    storyPhaseKey: key,
+    turningPointPriority: critical ? 105 : undefined,
+    reportedKey: key,
+    pause: critical,
+  });
+  return impact.regional;
+}
+
+/**
+ * Logs each hail repair that finished in the tick that just ran. Driven from the clock rather
+ * than the timeline, whose prev and now frames coincide on a month's rollover tick.
+ */
+function logHailRepairsCompleted(state: GameType) {
+  const minute = state.date.minute;
+  state.worldEvents.active.forEach((event) => {
+    if (
+      event.definitionId !== HAIL_DEFINITION_ID ||
+      !(minute - TICK_MINUTES < event.endsMinute && event.endsMinute <= minute)
+    ) {
+      return;
+    }
+    const facility = state.facilities.find(
+      ({ id }) => id === event.attributes.facilityId,
+    );
+    if (!facility) return; // Sold or cancelled while under repair.
+    logGameEvent(
+      state,
+      "WORLD_EVENT",
+      `Repairs complete: ${facility.name} is back to full output.`,
+      {
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        title: "Hail repairs complete",
+        concept: "weather",
+        storyPhaseKey: event.key,
+        reportedKey: `hail-repair:${event.key}`,
+      },
+    );
+  });
+}
+
 /**
  * Scheduled effects for any simulated date. Persisted live occurrences win over a newly resolved
  * copy, which is what preserves facility IDs and other onset-time attributes after they are drawn.
@@ -878,10 +1143,20 @@ function storyEffectsAt(date: DateType, state: GameType) {
   // copies, so an object-keyed WeakMap missed almost every lookup. These are the stable inputs
   // that can change a month's resolved effects; using them lets live play and both forecast
   // passes share one result without changing the authored story decision.
+  // Persisted occurrences can start or end mid-month (a hail repair), so which of them cover
+  // this minute is part of the key; the rest of the key only resolves to the month.
+  const inWindowKey = state.worldEvents.active
+    .filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    )
+    .map((event) => event.key)
+    .join("|");
   const cacheKey = [
     scheduledStoryCacheKey(date, state),
     state.storyEffectsDisabled ? 1 : 0,
     activeKey,
+    inWindowKey,
     state.worldEvents.occurrences.length,
     lastOccurrence?.key || "",
   ].join("|");
@@ -1074,6 +1349,7 @@ export const gameSlice = createSlice({
           "customScenario",
           "location",
           "storyEffectsDisabled",
+          "weatherHazardsDisabled",
           "meaningfulDecisionGateWaived",
         ].some((key) =>
           Object.prototype.hasOwnProperty.call(action.payload, key),
@@ -1364,6 +1640,17 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "reprioritizeFacility", action.payload);
       }
     },
+    retrofitFacility: (
+      state,
+      action: PayloadAction<RetrofitFacilityAction>,
+    ) => {
+      if (
+        !state.replayPlayback &&
+        applyRetrofitFacility(state, action.payload)
+      ) {
+        recordReplayAction(state, "retrofitFacility", action.payload);
+      }
+    },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       if (
         state.tutorialIntertieStress?.active &&
@@ -1634,6 +1921,7 @@ export const {
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
+  retrofitFacility,
   setTradingPolicy,
   setSpeed,
   markEventsRead,
@@ -1991,6 +2279,76 @@ function applyUpgradeTransmissionLine(
   return true;
 }
 
+/**
+ * Adds a weather-resilience upgrade to a standing facility, for live play and replay. The price is
+ * recomputed here from current state rather than trusted from the dialog. Like an authored
+ * scenario choice, the cost is booked immediately into this tick and recorded as a zero-length
+ * occurrence, so a re-forecast from the current tick re-adds it to the new frame exactly once.
+ */
+function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
+  if (!validRetrofitFacility(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload.facilityId);
+  if (!facility || facility.yearsToBuildLeft > 0) return false;
+  const cost = retrofitCost(facility, state, payload.upgrade);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (cost === undefined || !Number.isFinite(cost) || cost < 0 || !now)
+    return false;
+  if (now.cash < cost) return false;
+  now.cash -= cost;
+  now.netWorth -= cost;
+  now.expensesOM += cost;
+  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
+  facility.resilience = retrofittedResilience(facility, state, payload.upgrade);
+  if (facility.fuel !== undefined) {
+    const premium = annualInsuranceCost(facility, state);
+    const generator = facility as GeneratorOperatingType;
+    if (premium > 0) generator.annualInsuranceCost = premium;
+    else delete generator.annualInsuranceCost;
+  }
+  const label =
+    payload.upgrade === "hailResistant"
+      ? "hail protection"
+      : "a cold-weather package";
+  const key = `retrofit:${facility.id}:${payload.upgrade}`;
+  state.worldEvents.occurrences.push({
+    key,
+    definitionId: key,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: {
+      retrofit: true,
+      facilityId: facility.id,
+      upgrade: payload.upgrade,
+      cost,
+    },
+    effects: {},
+  });
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+  logGameEvent(
+    state,
+    "BUILD",
+    `Added ${label} to ${facility.name} for ${formatMoneyConcise(cost)}`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  recordMeaningfulDecision(state, {
+    lever: `resilience:${facility.id}:${payload.upgrade}`,
+    label: `Add ${label} to ${facility.name}`,
+    kind: "asset",
+    before: "standard",
+    after: payload.upgrade,
+  });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
@@ -2122,6 +2480,9 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     case "chooseScenarioResponse":
       applyScenarioResponse(state, payload);
+      break;
+    case "retrofitFacility":
+      applyRetrofitFacility(state, payload);
       break;
     case "schedulePolicy":
     case "cancelPolicy":
@@ -2297,6 +2658,7 @@ export function tickState(state: GameType) {
   );
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
+    logHailRepairsCompleted(state);
 
     const exercise = state.tutorialIntertieStress;
     if (exercise?.active) {
@@ -2378,6 +2740,10 @@ export function tickState(state: GameType) {
       // The recurring regional hazard resolves on its own path, after the authored story, so a
       // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
       updateWildfireHazards(state);
+      updateWeatherHazards(state).forEach((fuel) => storyPriceFuels.add(fuel));
+      // Premiums follow each facility's replacement value and hardening; refreshed before the
+      // month's forecast so it prices the same upkeep the real ticks will charge.
+      refreshInsurancePremiums(state);
       const activatedPrograms = advancePolicies(
         state,
         state.date.monthsElapsed,
@@ -3517,10 +3883,17 @@ function updateSupplyFacilitiesFinances(
   expensesOM += state.worldEvents.occurrences
     .filter(
       (event) =>
-        event.attributes.scenarioChoice === true &&
+        (event.attributes.scenarioChoice === true ||
+          event.attributes.retrofit === true) &&
         event.startsMinute === now.minute,
     )
     .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
+  // Hazard deductibles fall due one tick after onset, in the window (prev, now]. The pre-roll
+  // frames and a forecast's first frame share prev and now minutes, so they never charge one.
+  const hazardOneTimeCosts = state.worldEvents.active.filter(
+    (event) => typeof event.attributes.oneTimeCost === "number",
+  );
+  expensesOM += oneTimeWorldEventCost(hazardOneTimeCosts, prev, now);
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;
@@ -3563,6 +3936,10 @@ function updateSupplyFacilitiesFinances(
         (operatingFuel &&
           tickStoryEffects.operatingCostMultipliersByFuel?.[operatingFuel]) ||
         1;
+      // The location's weather insurance loading is fixed upkeep, due whether or not it runs.
+      facilityOM +=
+        ((g as Partial<GeneratorOperatingType>).annualInsuranceCost || 0) /
+        ticksPerYear;
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       if (g.fuel && FUELS[g.fuel]) {
@@ -3615,7 +3992,15 @@ function updateSupplyFacilitiesFinances(
         g.lifetimeWh += generatedWh;
         g.lifetimePotentialWh += (g.peakW / ticksPerHour) * GAME_TO_REAL_YEARS;
         g.lifetimeRevenue += deliveredW * revenuePerSuppliedW;
-        g.lifetimeExpenses += facilityExpenses;
+        g.lifetimeExpenses +=
+          facilityExpenses +
+          oneTimeWorldEventCost(
+            hazardOneTimeCosts.filter(
+              (event) => event.attributes.facilityId === g.id,
+            ),
+            prev,
+            now,
+          );
         if (started) {
           g.lifetimeStarts = (g.lifetimeStarts || 0) + GAME_TO_REAL_YEARS;
         }
@@ -4030,10 +4415,12 @@ function buildFacilityHelper(
     }
     // Site availability belongs to the current fleet quote, not the facility bought from it. A
     // saved operating asset must not retain a permanently stale "remaining" count.
+    // Nor does the resilience option's share of the price: it is only for the build dialog.
     const {
       viableLocationsRemaining: _viableLocationsRemaining,
+      resilienceExtraBuildCost: _resilienceExtraBuildCost,
       ...facilitySnapshot
-    } = g;
+    } = g as FacilityShoppingType & { resilienceExtraBuildCost?: number };
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,
@@ -4093,6 +4480,13 @@ function buildFacilityHelper(
       facility.hydroLastSpillWh = 0;
       facility.hydroLastMandatedReleaseWh = 0;
       facility.hydroLastBypassWh = 0;
+    }
+    if (facility.fuel !== undefined) {
+      // Priced from the start so the first month's forecast carries it; each rollover refreshes it.
+      const premium = annualInsuranceCost(facility, state);
+      if (premium > 0) {
+        (facility as GeneratorOperatingType).annualInsuranceCost = premium;
+      }
     }
     if (g.peakWh) {
       facility.currentWh = 0;

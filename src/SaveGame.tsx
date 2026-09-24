@@ -21,6 +21,7 @@ import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
+import { DESIGN_MIN_TEMP_BOUNDS_C } from "./data/Hazards";
 import {
   getStorageJson,
   removeStorageKey,
@@ -259,6 +260,34 @@ function validTransmissionLine(
   );
 }
 
+/**
+ * A facility's weather hardening: known flags only, each on the technology it applies to, and a
+ * bounded gas design temperature, so an edited save cannot harden a plant it does not describe.
+ */
+function validFacilityResilience(facility: Record<string, unknown>): boolean {
+  const resilience = facility.resilience;
+  if (resilience === undefined) return true;
+  if (typeof resilience !== "object" || resilience === null) return false;
+  const allowed =
+    facility.fuel === "Sun"
+      ? ["hailResistant"]
+      : facility.fuel === "Natural Gas"
+        ? ["coldWeatherPackage", "designMinTempC"]
+        : [];
+  return Object.entries(resilience).every(([key, value]) => {
+    if (!allowed.includes(key)) return false;
+    if (key === "designMinTempC") {
+      return (
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        value >= DESIGN_MIN_TEMP_BOUNDS_C.min &&
+        value <= DESIGN_MIN_TEMP_BOUNDS_C.max
+      );
+    }
+    return typeof value === "boolean";
+  });
+}
+
 function validEmissions(raw: unknown): boolean {
   if (!raw || typeof raw !== "object") return false;
   const record = raw as {
@@ -404,6 +433,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
+        current.annualInsuranceCost,
       ].some(
         (value) =>
           value !== undefined &&
@@ -423,7 +453,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
-        optionalBooleansInvalid
+        optionalBooleansInvalid ||
+        !validFacilityResilience(current)
       );
     }) ||
     !Array.isArray(game.timeline) ||
