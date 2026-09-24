@@ -12,6 +12,7 @@ interface ShortcutType {
 export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
+  { keys: ["4"], description: "Ultra speed (desktop-sized screens)" },
   { keys: ["Q"], description: "Facilities tab" },
   { keys: ["W", "E"], description: "Insights tab" },
   { keys: ["R"], description: "Events tab" },

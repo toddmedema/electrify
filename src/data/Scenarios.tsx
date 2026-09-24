@@ -279,7 +279,7 @@ export const SCENARIOS = [
         hideUi: EARLY_MISSION_HIDDEN,
         target: '#speedChangeButtons [aria-label="fast speed"]',
         advanceOn: (s: AppStateType) => s.game.speed === "FAST",
-        action: "Tap 20× to start construction time",
+        action: "Tap 12× to start construction time",
         content: (
           <TutorialPrompt text="Construction only moves while time runs." />
         ),

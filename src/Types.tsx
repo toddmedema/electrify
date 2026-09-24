@@ -22,7 +22,7 @@ export type MonthType =
   | "Nov"
   | "Dec";
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
-export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
+export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST" | "ULTRA";
 
 /** How an intertie may trade with neighbouring electricity markets. */
 export type TradingPolicyType =

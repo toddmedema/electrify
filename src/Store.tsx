@@ -19,7 +19,7 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       // Timeline/history dominate the state by several orders of magnitude and are replaced only
-      // by reducer-owned simulation code. Walking every tick of both after every 1x/20x action
+      // by reducer-owned simulation code. Walking every tick of both after every 1x/12x action
       // made development builds spend more time validating forecasts than running them.
       immutableCheck: {
         ignoredPaths: ["game.timeline", "game.monthlyHistory"],

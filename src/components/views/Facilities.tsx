@@ -713,7 +713,7 @@ export default class Facilities extends React.Component<Props> {
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
-      nextProps.game.speed !== "FAST" ||
+      (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.game.facilities.map((facility) => facility.id).join("|") !==
         this.props.game.facilities.map((facility) => facility.id).join("|")
