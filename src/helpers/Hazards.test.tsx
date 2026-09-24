@@ -27,14 +27,17 @@ import {
   oneTimeWorldEventCost,
   replacementValue,
   representativeMinTempC,
-  resilienceBuildOption,
+  resilienceBuildOptions,
   resolveColdImpact,
   retrofitCost,
   retrofittedResilience,
   sampleHailImpacts,
   summarizeWeatherHazardImpact,
-  withResilienceOption,
+  withResilienceOptions,
   realDaysToGameMinutes,
+  trackerOutputMultiplier,
+  isUpgradingAt,
+  upgradeProgress,
 } from "./Hazards";
 
 const DENVER: LocationType = {
@@ -102,6 +105,12 @@ function gameAt(
     worldEvents: { active: [], occurrences: [], checkedKeys: [] },
     ...overrides,
   } as unknown as GameType;
+}
+
+function optionFor(q: GeneratorShoppingType, game: GameType, upgrade: string) {
+  return resilienceBuildOptions(q, game).find(
+    (option) => option.upgrade === upgrade,
+  );
 }
 
 function quote(fuel: string, buildCost = 50_000_000): GeneratorShoppingType {
@@ -353,12 +362,31 @@ describe("replacementValue", () => {
 });
 
 describe("retrofitCost", () => {
-  it("prices retrofits from replacement value", () => {
+  it("prices retrofits at half as much again as building them in", () => {
     const game = gameAt(DENVER);
-    expect(retrofitCost(facility(1, "Sun"), game, "hailResistant")).toBe(8e6);
+    // 1.5 x the 3% and 2% build shares of a $100M replacement value
+    expect(retrofitCost(facility(1, "Sun"), game, "hailResistant")).toBe(4.5e6);
     expect(
       retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
-    ).toBe(4e6);
+    ).toBe(3e6);
+  });
+
+  it("is not offered while a retrofit is being installed, or for trackers", () => {
+    const game = gameAt(DENVER);
+    const installing = facility(1, "Natural Gas", {
+      upgradeInProgress: {
+        upgrade: "coldWeatherPackage",
+        cost: 3e6,
+        startsMinute: 0,
+        completesMinute: MINUTES_PER_MONTH,
+      },
+    } as Partial<FacilityOperatingType>);
+    expect(
+      retrofitCost(installing, game, "coldWeatherPackage"),
+    ).toBeUndefined();
+    expect(retrofitCost(facility(1, "Sun"), game, "solarTrackers")).toBe(
+      undefined,
+    );
   });
 
   it("is not offered for the wrong technology, twice, or without the hazard", () => {
@@ -416,19 +444,61 @@ describe("retrofittedResilience", () => {
 });
 
 describe("resilience build options", () => {
-  it("offers hail-resistant solar, off by default", () => {
+  it("offers trackers and hail-resistant solar, both off by default", () => {
     const game = gameAt(DENVER);
-    const option = resilienceBuildOption(quote("Sun"), game)!;
-    expect(option).toMatchObject({
-      upgrade: "hailResistant",
+    const options = resilienceBuildOptions(quote("Sun"), game);
+    expect(options.map((option) => option.upgrade)).toEqual([
+      "solarTrackers",
+      "hailResistant",
+    ]);
+    expect(options[0]).toMatchObject({
       defaultSelected: false,
       selected: false,
+      extraBuildCost: 3.5e6,
     });
-    expect(option.extraBuildCost).toBe(1.5e6);
+    expect(options[1]).toMatchObject({
+      defaultSelected: false,
+      selected: false,
+      extraBuildCost: 1.5e6,
+    });
     expect(applyDefaultResilience(quote("Sun"), game)).toMatchObject({
       buildCost: 50_000_000,
-      resilience: { hailResistant: false },
+      resilience: { solarTrackers: false, hailResistant: false },
     });
+  });
+
+  it("prices both solar options together and records the tracker hail stow", () => {
+    const both = withResilienceOptions(quote("Sun"), gameAt(DENVER), {
+      solarTrackers: true,
+      hailResistant: true,
+    });
+    expect(both.buildCost).toBe(55_000_000);
+    expect(both.resilienceExtraBuildCost).toBe(5e6);
+    // 2020 predates Hail Pro-75's steeper stow
+    expect(both.resilience).toEqual({
+      solarTrackers: true,
+      hailResistant: true,
+      trackerHailDamageFactor: 0.5,
+    });
+    const later = gameAt(DENVER, [], { date: getDateFromMinute(0, 2025) });
+    expect(
+      withResilienceOptions(quote("Sun"), later, { solarTrackers: true })
+        .resilience?.trackerHailDamageFactor,
+    ).toBe(0.25);
+    expect(withResilienceOptions(both, gameAt(DENVER), {}).buildCost).toBe(
+      50_000_000,
+    );
+  });
+
+  it("offers trackers only once they exist, even without hail", () => {
+    const early = gameAt(DENVER, [], { date: getDateFromMinute(0, 2010) });
+    expect(optionFor(quote("Sun"), early, "solarTrackers")).toBeUndefined();
+    const noHazards = gameAt(DENVER, [], { weatherHazardsDisabled: true });
+    expect(
+      resilienceBuildOptions(quote("Sun"), noHazards).map(
+        (option) => option.upgrade,
+      ),
+    ).toEqual(["solarTrackers"]);
   });
 
   it("winterizes gas by default only in cold climates", () => {
@@ -447,8 +517,8 @@ describe("resilience build options", () => {
       gameAt(NASHVILLE),
     );
     expect(
-      resilienceBuildOption(quote("Natural Gas"), gameAt(NASHVILLE)),
-    ).toMatchObject({ upgrade: "coldWeatherPackage", defaultSelected: false });
+      optionFor(quote("Natural Gas"), gameAt(NASHVILLE), "coldWeatherPackage"),
+    ).toMatchObject({ defaultSelected: false });
     expect(mild.resilience).toEqual({
       coldWeatherPackage: false,
       designMinTempC: -8,
@@ -460,17 +530,17 @@ describe("resilience build options", () => {
   it("toggles the option exactly and idempotently", () => {
     const game = gameAt(NASHVILLE);
     const base = quote("Natural Gas", 123_456_789.123);
-    const on = withResilienceOption(base, game, true);
-    expect(withResilienceOption(on, game, true)).toEqual(on);
-    const off = withResilienceOption(on, game, false);
+    const select = { coldWeatherPackage: true };
+    const on = withResilienceOptions(base, game, select);
+    expect(withResilienceOptions(on, game, select)).toEqual(on);
+    const off = withResilienceOptions(on, game, {});
     expect(off.buildCost).toBe(123_456_789.123);
     expect(Number.isInteger(on.resilienceExtraBuildCost)).toBe(true);
-    expect(withResilienceOption(off, game, false)).toEqual(off);
-    expect(resilienceBuildOption(on, game)!.selected).toBe(true);
-    expect(resilienceBuildOption(on, game)!.extraBuildCost).toBeCloseTo(
-      on.resilienceExtraBuildCost!,
-      6,
-    );
+    expect(withResilienceOptions(off, game, {})).toEqual(off);
+    expect(optionFor(on, game, "coldWeatherPackage")!.selected).toBe(true);
+    expect(
+      optionFor(on, game, "coldWeatherPackage")!.extraBuildCost,
+    ).toBeCloseTo(on.resilienceExtraBuildCost!, 6);
   });
 
   it("offers no cold-weather package where cold never reaches the standard rating", () => {
@@ -483,14 +553,14 @@ describe("resilience build options", () => {
     ];
     warmPlaces.forEach((location) => {
       const game = gameAt(location);
-      expect(resilienceBuildOption(quote("Natural Gas"), game)).toBeUndefined();
+      expect(resilienceBuildOptions(quote("Natural Gas"), game)).toEqual([]);
       const gas = facility(1, "Natural Gas", {
         resilience: { coldWeatherPackage: false, designMinTempC: -8 },
       });
       expect(retrofitCost(gas, game, "coldWeatherPackage")).toBeUndefined();
       expect(facilityResilienceSummary(game, gas)).toBeUndefined();
       // Solar is unaffected.
-      expect(resilienceBuildOption(quote("Sun"), game)).toBeDefined();
+      expect(optionFor(quote("Sun"), game, "hailResistant")).toBeDefined();
     });
     // Still offered where cold is plausible, including an unrecorded high-latitude city.
     [
@@ -500,7 +570,9 @@ describe("resilience build options", () => {
     ]
       .map((location) => gameAt(location))
       .forEach((game) => {
-        expect(resilienceBuildOption(quote("Natural Gas"), game)).toBeDefined();
+        expect(
+          optionFor(quote("Natural Gas"), game, "coldWeatherPackage"),
+        ).toBeDefined();
         expect(
           retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
         ).toBeGreaterThan(0);
@@ -508,19 +580,19 @@ describe("resilience build options", () => {
   });
 
   it("offers nothing for other technologies or where the hazard is off", () => {
-    expect(
-      resilienceBuildOption(quote("Wind"), gameAt(DENVER)),
-    ).toBeUndefined();
+    expect(resilienceBuildOptions(quote("Wind"), gameAt(DENVER))).toEqual([]);
     const tutorial = gameAt(DENVER, [], { scenarioId: 1 });
-    expect(resilienceBuildOption(quote("Sun"), tutorial)).toBeUndefined();
+    expect(resilienceBuildOptions(quote("Sun"), tutorial)).toEqual([]);
     expect(applyDefaultResilience(quote("Sun"), tutorial).resilience).toBe(
       undefined,
     );
     // Gas still records its standard rating so a later retrofit has a baseline.
     const texas = gameAt(DALLAS, [], { scenarioId: 107 });
-    expect(resilienceBuildOption(quote("Natural Gas"), texas)).toBeUndefined();
+    expect(resilienceBuildOptions(quote("Natural Gas"), texas)).toEqual([]);
     expect(
-      withResilienceOption(quote("Natural Gas"), texas, true),
+      withResilienceOptions(quote("Natural Gas"), texas, {
+        coldWeatherPackage: true,
+      }),
     ).toMatchObject({
       buildCost: 50_000_000,
       resilience: { coldWeatherPackage: false, designMinTempC: -8 },
@@ -620,7 +692,7 @@ describe("facilityResilienceSummary", () => {
       upgrade: "hailResistant",
       label: "Standard panels",
       installed: false,
-      retrofitCost: 8e6,
+      retrofitCost: 4.5e6,
       replacementValue: 1e8,
     });
     const hardened = facility(2, "Sun", {
@@ -712,5 +784,78 @@ it("profiles every authored location", () => {
     expect(
       getWeatherHazardProfile(location as LocationType).source,
     ).toBeTruthy();
+  });
+});
+
+describe("solar trackers", () => {
+  const tracked = facility(1, "Sun", {
+    resilience: { solarTrackers: true, trackerHailDamageFactor: 0.5 },
+  });
+
+  it("gain nothing at noon and most in the morning and evening", () => {
+    expect(trackerOutputMultiplier(facility(1, "Sun"), 7 * 60)).toBe(1);
+    expect(trackerOutputMultiplier(tracked, 12 * 60)).toBeCloseTo(1, 12);
+    const morning = trackerOutputMultiplier(tracked, 8 * 60);
+    expect(morning).toBeGreaterThan(1.3);
+    expect(trackerOutputMultiplier(tracked, 16 * 60)).toBeCloseTo(morning, 12);
+    expect(trackerOutputMultiplier(tracked, 7 * 60)).toBeGreaterThan(morning);
+  });
+
+  it("add about a fifth to a clear day's energy", () => {
+    let fixed = 0;
+    let withTrackers = 0;
+    for (let minute = 6 * 60; minute < 18 * 60; minute += 5) {
+      const sun = Math.max(0, Math.cos(((minute / 60 - 12) / 12) * Math.PI));
+      fixed += sun;
+      withTrackers += sun * trackerOutputMultiplier(tracked, minute);
+    }
+    expect(withTrackers / fixed).toBeCloseTo(1.2, 2);
+  });
+
+  it("cut hail damage by the stow factor fixed at build", () => {
+    const plain = facility(2, "Sun");
+    const stowed = facility(3, "Sun", {
+      resilience: { solarTrackers: true, trackerHailDamageFactor: 0.25 },
+    });
+    const game = gameAt(DENVER, [plain, stowed]);
+    const key = keyHitting(game, [2, 3]);
+    const impacts = sampleHailImpacts({ game, key });
+    const plainDamage = impacts.find((i) => i.facilityId === 2)!;
+    const stowedDamage = impacts.find((i) => i.facilityId === 3)!;
+    // Each facility draws its own damage, so compare against its own untracked damage
+    const untracked = sampleHailImpacts({
+      game: gameAt(DENVER, [plain, facility(3, "Sun")]),
+      key,
+    }).find((i) => i.facilityId === 3)!;
+    expect(stowedDamage.damagedFraction).toBeCloseTo(
+      untracked.damagedFraction * 0.25,
+      12,
+    );
+    expect(plainDamage.damagedFraction).toBeGreaterThan(0);
+  });
+});
+
+describe("upgrade in progress", () => {
+  const upgrade = {
+    upgrade: "coldWeatherPackage" as const,
+    cost: 3e6,
+    startsMinute: 100,
+    completesMinute: 100 + MINUTES_PER_MONTH,
+  };
+  const gas = facility(1, "Natural Gas", {
+    upgradeInProgress: upgrade,
+  } as Partial<FacilityOperatingType>);
+
+  it("holds the plant offline until it completes", () => {
+    expect(isUpgradingAt(gas, 100)).toBe(true);
+    expect(isUpgradingAt(gas, upgrade.completesMinute - 1)).toBe(true);
+    expect(isUpgradingAt(gas, upgrade.completesMinute)).toBe(false);
+    expect(isUpgradingAt(facility(2, "Natural Gas"), 100)).toBe(false);
+  });
+
+  it("reports progress through the month", () => {
+    expect(upgradeProgress(upgrade, 100)).toBe(0);
+    expect(upgradeProgress(upgrade, 100 + MINUTES_PER_MONTH / 2)).toBe(0.5);
+    expect(upgradeProgress(upgrade, upgrade.completesMinute + 50)).toBe(1);
   });
 });

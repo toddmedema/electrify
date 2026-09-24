@@ -216,9 +216,21 @@ export function checkTick(
     });
   }
 
+  // Cancelling a retrofit refunds its price as negative O&M in the tick it happens, and nothing
+  // else may take a tick's expenses below zero.
+  const retrofitRefunds = state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.retrofit === true &&
+        event.startsMinute === now.minute &&
+        Number(event.attributes.cost) < 0,
+    )
+    .reduce((total, event) => total - Number(event.attributes.cost), 0);
   NON_NEGATIVE_TICK_FIELDS.forEach((field) => {
     const value = now[field];
-    if (isFinite_(value) && value < 0) {
+    const floor =
+      field === "expensesOM" ? -retrofitRefunds - CASH_ROUNDING_TOLERANCE : 0;
+    if (isFinite_(value) && value < floor) {
       collector.add("tick value is non-negative", when, `${field} = ${value}`);
     }
   });

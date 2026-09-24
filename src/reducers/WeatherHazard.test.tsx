@@ -1,5 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import gameReducer, {
+  cancelRetrofit,
   delta,
   resume,
   retrofitFacility,
@@ -335,9 +336,15 @@ describe("retrofits", () => {
     );
     const at = getTimeFromTimeline(next.date.minute, next.timeline)!;
     expect(cashBefore - at.cash).toBe(cost);
-    expect(
-      next.facilities.find((f) => f.id === solar.id)!.resilience?.hailResistant,
-    ).toBe(true);
+    // Installed over the next month, not at once
+    const installing = next.facilities.find((f) => f.id === solar.id)!;
+    expect(installing.resilience?.hailResistant).toBe(false);
+    expect(installing.upgradeInProgress).toEqual({
+      upgrade: "hailResistant",
+      cost,
+      startsMinute: next.date.minute,
+      completesMinute: next.date.minute + MINUTES_PER_MONTH,
+    });
     expect(next.replayLog?.at(-1)?.type).toBe("retrofitFacility");
     // A repeat is not offered and changes nothing.
     // Immer freezes an unchanged base, so each probe works on its own copy.
@@ -375,6 +382,94 @@ describe("retrofits", () => {
       getTimeFromTimeline(control.date.minute, control.timeline)!.expensesOM,
       6,
     );
+  });
+
+  it("holds the plant offline for a month, then installs the upgrade", () => {
+    const state = game(DENVER, HAIL.seed);
+    tickToMonth(state, 1);
+    const [solar, other] = state.facilities.filter((f) => f.fuel === "Sun");
+    const next = dispatch(
+      state,
+      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+    );
+    const completes = next.date.minute + MINUTES_PER_MONTH;
+    let otherPeakW = 0;
+    while (next.date.minute < completes - TICK_MINUTES) {
+      tickState(next);
+      expect(next.facilities.find((f) => f.id === solar.id)!.currentW).toBe(0);
+      otherPeakW = Math.max(
+        otherPeakW,
+        next.facilities.find((f) => f.id === other.id)!.currentW,
+      );
+    }
+    // The comparison array kept generating through the same daylight
+    expect(otherPeakW).toBeGreaterThan(0);
+    tickToMinute(next, completes + 12 * 60);
+    const done = next.facilities.find((f) => f.id === solar.id)!;
+    expect(done.upgradeInProgress).toBeUndefined();
+    expect(done.resilience?.hailResistant).toBe(true);
+    expect(
+      next.eventLog.some((e) => e.message.startsWith("Upgrade complete:")),
+    ).toBe(true);
+    // Back in service: it generates again once the sun is up
+    let peakW = 0;
+    tickToMinute(next, completes + MINUTES_PER_MONTH / 2);
+    for (let i = 0; i < 24 * 4; i++) {
+      tickState(next);
+      peakW = Math.max(
+        peakW,
+        next.facilities.find((f) => f.id === solar.id)!.currentW,
+      );
+    }
+    expect(peakW).toBeGreaterThan(0);
+  });
+
+  it("cancels for a full refund and returns the plant to service at once", () => {
+    const state = game(DENVER, HAIL.seed);
+    tickToMonth(state, 1);
+    tickToMinute(state, state.date.minute + 12 * 60);
+    // Denver winterizes gas by default; start from one bought without the package
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
+    const control = cloneDeep(state);
+    const cost = retrofitCost(gas, state, "coldWeatherPackage")!;
+    expect(cost).toBeGreaterThan(0);
+    const started = dispatch(
+      state,
+      retrofitFacility({ facilityId: gas.id, upgrade: "coldWeatherPackage" }),
+    );
+    tickState(started);
+    tickState(control);
+    expect(
+      started.facilities.find((f) => f.id === gas.id)!.upgradeInProgress,
+    ).toBeDefined();
+    const cancelled = dispatch(started, cancelRetrofit(gas.id));
+    const plant = cancelled.facilities.find((f) => f.id === gas.id)!;
+    expect(plant.upgradeInProgress).toBeUndefined();
+    expect(plant.resilience?.coldWeatherPackage).toBeFalsy();
+    expect(cancelled.replayLog?.at(-1)?.type).toBe("cancelRetrofit");
+    expect(
+      cancelled.eventLog.some((e) => e.message.startsWith("Cancelled")),
+    ).toBe(true);
+    // Cash ends where it would have been had the player never started it, give or take the
+    // one tick of lost output
+    const cashNow = (s: GameType) =>
+      getTimeFromTimeline(s.date.minute, s.timeline)!.cash;
+    expect(Math.abs(cashNow(cancelled) - cashNow(control))).toBeLessThan(
+      cost * 0.05,
+    );
+    // A second cancel, or one for a plant that isn't upgrading, changes nothing
+    const again = dispatch(cloneDeep(cancelled), cancelRetrofit(gas.id));
+    expect(again.replayLog).toEqual(cancelled.replayLog);
+    expect(cashNow(again)).toBe(cashNow(cancelled));
+    // The refunded plant runs like one that was never upgraded
+    for (let i = 0; i < 8; i++) {
+      tickState(cancelled);
+      tickState(control);
+    }
+    expect(
+      cancelled.facilities.find((f) => f.id === gas.id)!.currentW,
+    ).toBeCloseTo(control.facilities.find((f) => f.id === gas.id)!.currentW, 0);
   });
 
   it("saves and resumes after a retrofit exactly like an uninterrupted run", () => {
@@ -430,15 +525,29 @@ describe("retrofits", () => {
     let played = createGame({ scenarioId: 105, scenario, seed: 4242 });
     tickToMonth(played, 2);
     const solar = played.facilities.find((f) => f.fuel === "Sun")!;
+    // Try it, cancel for a refund, then commit to it
+    played = dispatch(
+      played,
+      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+    );
+    tickToMinute(played, played.date.minute + 4 * 60);
+    played = dispatch(played, cancelRetrofit(solar.id));
+    tickToMinute(played, played.date.minute + 60);
     played = dispatch(
       played,
       retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
     );
     tickToMonth(played, 5);
+    expect(
+      played.facilities.find((f) => f.id === solar.id)!.resilience
+        ?.hailResistant,
+    ).toBe(true);
     const replay = decodeReplay(
       JSON.parse(JSON.stringify(encodeReplay(serializeReplay(played)!))),
     )!;
-    expect(replay.actions.map((a) => a.type)).toContain("retrofitFacility");
+    expect(replay.actions.map((a) => a.type)).toEqual(
+      expect.arrayContaining(["retrofitFacility", "cancelRetrofit"]),
+    );
     const watched = createGameFromReplay(replay);
     tickToMonth(watched, 5);
     expect(watched.facilities).toEqual(played.facilities);
@@ -624,9 +733,9 @@ describe("month-end transactions", () => {
       retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
     );
     expect(
-      retrofitted.facilities.find((f) => f.id === solar.id)!.resilience
-        ?.hailResistant,
-    ).toBe(true);
+      retrofitted.facilities.find((f) => f.id === solar.id)!.upgradeInProgress
+        ?.upgrade,
+    ).toBe("hailResistant");
     // The rollover tick clamps prev and now to the month's final frame.
     tickState(retrofitted);
     tickState(control);

@@ -930,7 +930,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package",
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package solar trackers downtime",
     related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
     entry: (
       <div>
@@ -954,9 +954,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           When building, you can add hail-resistant panels to solar (less
           damage) or a cold-weather package to gas (rated to{" "}
           <ColdPackageRating />, colder in cold climates). Either can be added
-          later from the facility&apos;s details, at a higher price. The
-          cold-weather package is only offered where winters get cold enough to
-          matter.
+          later from the facility&apos;s details for 50% more, and the plant
+          goes offline for a month while it&apos;s installed. You can cancel
+          before then for a full refund. The cold-weather package is only
+          offered where winters get cold enough to matter.
+        </p>
+        <p>
+          Solar trackers, available from 2014, turn panels to follow the sun for
+          more morning and evening power, about 20% more a year, and stow
+          steeply to cut hail damage. They can only be added when building.
         </p>
       </div>
     ),

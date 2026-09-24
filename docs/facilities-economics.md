@@ -297,9 +297,21 @@ All values are rounded game balance, not a site-specific risk assessment.
   where the one-winter-in-twelve low reaches the standard -8 °C rating (or, without a weather
   record, outside the lowland tropics and subtropics); elsewhere it could never help. A cold snap's gas-price multiple is capped so that,
   combined with any authored gas shock that month, prices reach at most 3× normal.
-- **Hardening prices.** Hail-resistant panels add 3% to a solar build (8% as a retrofit), after
-  DOE FEMP's solar hail-resilience guidance; a cold-weather package adds 2% to a gas build (4% as
-  a retrofit).
+- **Hardening prices.** Hail-resistant panels add 3% to a solar build, after DOE FEMP's solar
+  hail-resilience guidance; a cold-weather package adds 2% to a gas build.
+- **Retrofits.** Either can be added to a standing plant for 1.5× its build share, charged on the
+  plant's replacement value (4.5% and 3%). The plant is offline for one game month while the work
+  is done, and the player can cancel before then for a full refund and immediate return to service.
+- **Solar trackers.** A build-only option for solar, modelled on Nextpower (formerly Nextracker),
+  the largest single-axis tracker supplier. It is available from 2014, when the self-powered NX
+  Horizon tracker began shipping, and priced at 7% of the build: Nextpower's FY2025 revenue was
+  about $0.09 per watt delivered ($2.96B for 34 GW, Form 10-K), against roughly $1.25/W for
+  utility PV (LBNL Utility-Scale Solar). Tracking adds about 20% of annual energy over fixed tilt
+  (LBNL, NREL PVWatts), almost all of it in the morning and evening. The game scales output by
+  `1 + 0.6 sin²(hour angle)`, which is unchanged at noon and averages +20% over a clear day, still
+  clipped at nameplate. Trackers stow steeply ahead of hail: arrays bought before 2024 take half
+  the damage, and those bought from 2024 take a quarter, after NX Horizon Hail Pro-75's 75° stow
+  and VDE Americas' stow-angle findings. The share multiplies with hail-resistant panels.
 
 ## Primary references
 

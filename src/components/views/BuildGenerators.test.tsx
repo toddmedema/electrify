@@ -14,8 +14,8 @@ import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
-  resilienceBuildOption,
-  withResilienceOption,
+  resilienceBuildOptions,
+  withResilienceOptions,
 } from "../../helpers/Hazards";
 import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
@@ -607,7 +607,10 @@ describe("weather hardening in the purchase dialog", () => {
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
     const [quote] = onBuild.mock.calls[0];
-    expect(quote.resilience).toEqual({ hailResistant: true });
+    expect(quote.resilience).toEqual({
+      hailResistant: true,
+      solarTrackers: false,
+    });
     expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
     expect(option).toHaveAccessibleName(
       `Hail-resistant panels +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
@@ -626,12 +629,34 @@ describe("weather hardening in the purchase dialog", () => {
     expect(option).toHaveAccessibleDescription("Less hail damage.");
   });
 
+  it("offers solar trackers at build, pitched on morning and evening output", () => {
+    const onBuild = showBuildList();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Solar" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const option = within(dialog).getByRole("checkbox", {
+      name: /^Solar trackers \+\$/,
+    });
+    expect(option).not.toBeChecked();
+    expect(option).toHaveAccessibleDescription(
+      /more morning and evening power.*Stows steeply in hail\. Can't be added after building\./,
+    );
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay cash" }));
+    const [quote] = onBuild.mock.calls[0];
+    expect(quote.resilience).toMatchObject({
+      solarTrackers: true,
+      hailResistant: false,
+    });
+    expect(quote.resilience.trackerHailDamageFactor).toBeGreaterThan(0);
+  });
+
   function gasItem(cash: number, onBuild = jest.fn()) {
     const game = coldGame();
     const quote = GENERATORS(game, 419000000, [], []).find(
       (candidate) => candidate.name === "Natural Gas",
     )!;
-    const option = resilienceBuildOption(quote, game)!;
     render(
       <GeneratorBuildItem
         cash={cash}
@@ -640,16 +665,18 @@ describe("weather hardening in the purchase dialog", () => {
         generator={quote}
         location={game.location}
         seed={game.seed}
-        resilienceOption={option}
-        withResilience={(selected) =>
-          withResilienceOption(quote, game, selected)
+        resilienceOptions={resilienceBuildOptions(quote, game)}
+        withResilience={(selection) =>
+          withResilienceOptions(quote, game, selection)
         }
         onBuild={onBuild}
       />,
     );
     return {
-      packaged: withResilienceOption(quote, game, true),
-      plain: withResilienceOption(quote, game, false),
+      packaged: withResilienceOptions(quote, game, {
+        coldWeatherPackage: true,
+      }),
+      plain: withResilienceOptions(quote, game, {}),
       onBuild,
     };
   }
@@ -660,7 +687,7 @@ describe("weather hardening in the purchase dialog", () => {
       (candidate) => candidate.name === "Natural Gas",
     )!;
     const plainDownpayment =
-      DOWNPAYMENT_PERCENT * withResilienceOption(quote, game, false).buildCost;
+      DOWNPAYMENT_PERCENT * withResilienceOptions(quote, game, {}).buildCost;
     const packagedDownpayment = DOWNPAYMENT_PERCENT * quote.buildCost;
     const cash = (plainDownpayment + packagedDownpayment) / 2;
     const { onBuild } = gasItem(cash);
@@ -687,7 +714,9 @@ describe("weather hardening in the purchase dialog", () => {
     ).toBeDisabled();
     fireEvent.click(option);
     fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
-    expect(onBuild).toHaveBeenCalledWith(true, false);
+    expect(onBuild).toHaveBeenCalledWith(true, {
+      coldWeatherPackage: false,
+    });
   });
 
   it("prices cash, downpayment and loan from the selected quote", () => {
@@ -726,7 +755,9 @@ describe("weather hardening in the purchase dialog", () => {
       `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} now`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
-    expect(onBuild).toHaveBeenCalledWith(true, false);
+    expect(onBuild).toHaveBeenCalledWith(true, {
+      coldWeatherPackage: false,
+    });
   });
 
   it("offers no hardening for technologies without a modelled hazard", () => {

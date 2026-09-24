@@ -65,6 +65,24 @@ describe("validBuildFacility weather resilience", () => {
       expect(valid(generator({ resilience: { designMinTempC } }))).toBe(false);
     });
     expect(valid(generator({ resilience: { extra: true } }))).toBe(false);
+    [0, 1.5, Number.NaN].forEach((trackerHailDamageFactor) => {
+      expect(
+        valid(
+          generator({
+            fuel: "Sun",
+            resilience: { solarTrackers: true, trackerHailDamageFactor },
+          }),
+        ),
+      ).toBe(false);
+    });
+    expect(
+      valid(
+        generator({
+          fuel: "Sun",
+          resilience: { solarTrackers: true, trackerHailDamageFactor: 0.5 },
+        }),
+      ),
+    ).toBe(true);
     expect(valid(generator({ resilienceExtraBuildCost: -1 }))).toBe(false);
     expect(valid(generator({ resilienceExtraBuildCost: 2_000_000 }))).toBe(
       false,

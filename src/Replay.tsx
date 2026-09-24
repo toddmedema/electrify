@@ -74,6 +74,7 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "upgradeTransmissionLine",
   "setTradingPolicy",
   "retrofitFacility",
+  "cancelRetrofit",
   "delta",
 ];
 
@@ -235,6 +236,11 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     if (
       action.type === "retrofitFacility" &&
       !validRetrofitFacility(action.payload)
+    )
+      return null;
+    if (
+      action.type === "cancelRetrofit" &&
+      !(Number.isSafeInteger(action.payload) && (action.payload as number) >= 0)
     )
       return null;
     actions.push({

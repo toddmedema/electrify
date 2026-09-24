@@ -323,6 +323,7 @@ export type ReplayActionNameType =
   | "upgradeTransmissionLine"
   | "setTradingPolicy"
   | "retrofitFacility"
+  | "cancelRetrofit"
   | "delta";
 
 export interface ReplayActionType {
@@ -538,6 +539,8 @@ export interface GeneratorOperatingType
   // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
   paused: boolean;
+  // A retrofit being installed, which holds the plant offline until it completes.
+  upgradeInProgress?: FacilityUpgradeInProgressType;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
   // its stable minimum while starting and stopping, but cannot remain there indefinitely.
   committed?: boolean;
@@ -966,11 +969,17 @@ export interface WildfireProfileType {
 }
 
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
-export type ResilienceUpgradeType = "hailResistant" | "coldWeatherPackage";
+export type ResilienceUpgradeType =
+  "hailResistant" | "coldWeatherPackage" | "solarTrackers";
 
 /** Weather hardening on one facility. Each field only applies to the fuel noted beside it. */
 export interface FacilityResilienceType {
   hailResistant?: boolean; // "Sun" only
+  // "Sun" only, and only at build: single-axis trackers that follow the sun and stow in hail
+  solarTrackers?: boolean;
+  // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
+  // the stow angle the trackers of that year could reach.
+  trackerHailDamageFactor?: number; // (0, 1]
   coldWeatherPackage?: boolean; // "Natural Gas" only
   // "Natural Gas" only: the coldest representative-day minimum the plant runs through without a
   // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
@@ -995,6 +1004,17 @@ export interface WeatherHazardProfileType {
 export interface RetrofitFacilityAction {
   facilityId: number;
   upgrade: ResilienceUpgradeType;
+}
+
+/**
+ * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
+ * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
+ */
+export interface FacilityUpgradeInProgressType {
+  upgrade: ResilienceUpgradeType;
+  cost: number; // What the player paid, and what a cancellation refunds
+  startsMinute: number;
+  completesMinute: number;
 }
 
 export interface WorldEventEffectsType {

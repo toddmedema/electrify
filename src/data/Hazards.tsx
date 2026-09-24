@@ -42,13 +42,42 @@ export const HAIL_MAX_DAMAGED_FRACTION = 0.6;
 export const HAIL_RESISTANT_DAMAGE_FACTOR = 0.3;
 /** Extra build cost for hail-resistant design. Source: DOE FEMP solar hail resilience guide. */
 export const HAIL_RESISTANT_BUILD_SHARE = 0.03;
-/** Retrofitting a standing array (module swaps, stow controls) costs more than building it in. */
-export const HAIL_RESISTANT_RETROFIT_SHARE = 0.08;
 
 /** Extra build cost for a cold-weather package (heat tracing, enclosures, instrument heat). */
 export const COLD_PACKAGE_BUILD_SHARE = 0.02;
-/** Retrofitting winterization onto a standing plant. */
-export const COLD_PACKAGE_RETROFIT_SHARE = 0.04;
+
+/**
+ * An upgrade added to a standing plant costs this multiple of building it in (crews remobilize
+ * and work around finished equipment), charged on the plant's replacement value, and holds the
+ * plant offline for a month while it is installed.
+ */
+export const RETROFIT_COST_MULTIPLIER = 1.5;
+export const HAIL_RESISTANT_RETROFIT_SHARE =
+  HAIL_RESISTANT_BUILD_SHARE * RETROFIT_COST_MULTIPLIER;
+export const COLD_PACKAGE_RETROFIT_SHARE =
+  COLD_PACKAGE_BUILD_SHARE * RETROFIT_COST_MULTIPLIER;
+
+/**
+ * Single-axis solar trackers, priced and dated from Nextpower (formerly Nextracker), the largest
+ * tracker supplier. Build only: a fixed-tilt array's racking and piles cannot be converted.
+ * - Available from 2014, when Nextracker's self-powered NX Horizon tracker began shipping.
+ * - Price: Nextpower's FY2025 revenue was about $0.09 per watt delivered ($2.96B for 34 GW,
+ *   Form 10-K), about 7% of a utility PV plant's installed cost (LBNL Utility-Scale Solar 2024).
+ * - Output: turning east to west adds about 20% of annual energy over fixed tilt (LBNL and NREL
+ *   PVWatts), almost all of it in the morning and evening; a fixed array already faces the noon
+ *   sun. TRACKER_SHOULDER_GAIN spreads that over the day as 1 + gain * sin^2(hour angle), whose
+ *   irradiance-weighted mean is 1 + gain / 3.
+ * - Hail: trackers stow steeply ahead of a storm. Standard stow reaches about 60 degrees; NX
+ *   Horizon Hail Pro-75 (2024) reaches 75, where VDE Americas found far fewer broken modules.
+ */
+export const TRACKER_FIRST_YEAR = 2014;
+export const TRACKER_BUILD_SHARE = 0.07;
+export const TRACKER_SHOULDER_GAIN = 0.6;
+/** A tracked array's typical energy relative to a fixed one, before nameplate clipping. */
+export const TRACKER_ANNUAL_ENERGY_MULTIPLIER = 1 + TRACKER_SHOULDER_GAIN / 3;
+export const TRACKER_HAIL_DAMAGE_FACTOR = 0.5;
+export const TRACKER_HAIL_PRO_YEAR = 2024;
+export const TRACKER_HAIL_PRO_DAMAGE_FACTOR = 0.25;
 /** A packaged plant is rated this far below the regional threshold, and at least to -25 C. */
 export const COLD_PACKAGE_MARGIN_C = 5;
 export const COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C = -25;

@@ -29,6 +29,8 @@ import {
   facilityResilienceSummary,
   FacilityResilienceSummaryType,
   retrofittedResilience,
+  upgradeInProgress,
+  upgradeProgress,
 } from "../../helpers/Hazards";
 import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 import { useUnits } from "./UnitsContext";
@@ -37,7 +39,9 @@ import {
   dayCount,
   formatDesignTemperature,
   resilienceActionLabel,
+  resilienceName,
 } from "./WeatherResilienceText";
+import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
 import {
   DateType,
   FacilityOperatingType,
@@ -182,6 +186,7 @@ function WeatherResilienceSection(props: {
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
   const hazard = facilityHazardStatus(game, facility);
+  const installing = upgradeInProgress(facility);
   const activeOutage =
     hazard && (hazard.hazard === "HAIL") === hail
       ? hail
@@ -208,6 +213,32 @@ function WeatherResilienceSection(props: {
             </>
           }
         />
+        {facility.resilience?.solarTrackers && (
+          <Stat
+            label="Mounting"
+            value={
+              <>
+                Solar trackers
+                <span className="facilityStatNote">
+                  More morning and evening power.
+                </span>
+              </>
+            }
+          />
+        )}
+        {installing && (
+          <Stat
+            label="Upgrade"
+            value={
+              <>
+                Installing {resilienceName(installing.upgrade)}
+                <span className="facilityStatNote">
+                  {`Offline until done · ${Math.round(upgradeProgress(installing, game.date.minute) * 100)}% installed`}
+                </span>
+              </>
+            }
+          />
+        )}
       </dl>
       {canOffer && (
         <div className="facilityRetrofit">
@@ -249,6 +280,12 @@ function WeatherResilienceSection(props: {
                     designMinTempC,
                     units,
                   )}
+            </DialogContentText>
+            <DialogContentText>
+              {facility.name} goes offline for a month while it&apos;s
+              installed. Adding it now costs{" "}
+              {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
+              building it in. Cancel before it&apos;s done for a full refund.
             </DialogContentText>
             {activeOutage && (
               <DialogContentText>{activeOutage}</DialogContentText>

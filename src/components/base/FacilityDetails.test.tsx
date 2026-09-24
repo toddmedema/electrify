@@ -173,6 +173,10 @@ describe("weather resilience details", () => {
       name: "Add hail-resistant panels to Solar?",
     });
     expect(dialog).toHaveTextContent("Less damage from future hail.");
+    // The plant's downtime, the premium over building it in and the way out
+    expect(dialog).toHaveTextContent(
+      "Solar goes offline for a month while it's installed. Adding it now costs 50% more than building it in. Cancel before it's done for a full refund.",
+    );
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
       within(dialog).getByRole("button", {
@@ -234,6 +238,39 @@ describe("weather resilience details", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Doesn't speed up current repairs.",
     );
+  });
+
+  it("reports a retrofit being installed and offers no second one", () => {
+    const game = coldGame();
+    const gas = game.facilities[0];
+    (gas as { upgradeInProgress?: object }).upgradeInProgress = {
+      upgrade: "coldWeatherPackage",
+      cost: 1e6,
+      startsMinute: game.date.minute - MINUTES_PER_MONTH / 4,
+      completesMinute: game.date.minute + (MINUTES_PER_MONTH * 3) / 4,
+    };
+    showDetails(game, gas);
+    expect(section()).toHaveTextContent(
+      "Installing cold-weather packageOffline until done · 25% installed",
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Add cold-weather package/ }),
+    ).toBeNull();
+  });
+
+  it("names trackers on a tracked solar farm", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.resilience = {
+      hailResistant: false,
+      solarTrackers: true,
+      trackerHailDamageFactor: 0.5,
+    };
+    showDetails(game, solar);
+    expect(section()).toHaveTextContent(
+      "Solar trackersMore morning and evening power.",
+    );
+    expect(section()).toHaveTextContent("Trackers stow ahead of hail.");
   });
 
   it("offers no retrofit while a plant is under construction", () => {

@@ -17,12 +17,63 @@ function nonNegative(value: unknown): value is number {
 const RESILIENCE_UPGRADES: readonly ResilienceUpgradeType[] = [
   "hailResistant",
   "coldWeatherPackage",
+  "solarTrackers",
 ];
 
+const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
+  Sun: ["hailResistant", "solarTrackers", "trackerHailDamageFactor"],
+  "Natural Gas": ["coldWeatherPackage", "designMinTempC"],
+};
+
 /**
- * A quote's weather hardening: booleans and a bounded design temperature, each only on the
- * technology it applies to, so a crafted replay cannot harden the wrong plant.
+ * Weather hardening on a quote or a saved facility: known flags only, each on the technology it
+ * applies to, with a bounded gas design temperature and tracker hail share, so a crafted replay
+ * or edited save cannot harden a plant it does not describe.
  */
+export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
+  if (raw === undefined) return true;
+  if (!raw || typeof raw !== "object") return false;
+  const allowed = RESILIENCE_FIELDS_BY_FUEL[String(fuel)] ?? [];
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => {
+      if (!allowed.includes(key)) return false;
+      if (value === undefined) return true;
+      if (key === "designMinTempC") {
+        return (
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          value >= DESIGN_MIN_TEMP_BOUNDS_C.min &&
+          value <= DESIGN_MIN_TEMP_BOUNDS_C.max
+        );
+      }
+      if (key === "trackerHailDamageFactor") {
+        return (
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          value > 0 &&
+          value <= 1
+        );
+      }
+      return typeof value === "boolean";
+    },
+  );
+}
+
+/** A saved retrofit in progress: a known upgrade, a non-negative price and an ordered window. */
+export function validUpgradeInProgress(raw: unknown): boolean {
+  if (raw === undefined) return true;
+  if (!raw || typeof raw !== "object") return false;
+  const upgrade = raw as Record<string, unknown>;
+  return (
+    RESILIENCE_UPGRADES.includes(upgrade.upgrade as ResilienceUpgradeType) &&
+    nonNegative(upgrade.cost) &&
+    nonNegative(upgrade.startsMinute) &&
+    nonNegative(upgrade.completesMinute) &&
+    (upgrade.completesMinute as number) >= (upgrade.startsMinute as number)
+  );
+}
+
+/** A quote's weather hardening and the share of its price the options account for. */
 function validResilience(facility: Record<string, unknown>): boolean {
   if (
     facility.resilienceExtraBuildCost !== undefined &&
@@ -30,33 +81,7 @@ function validResilience(facility: Record<string, unknown>): boolean {
       facility.resilienceExtraBuildCost > (facility.buildCost as number))
   )
     return false;
-  if (facility.resilience === undefined) return true;
-  if (!facility.resilience || typeof facility.resilience !== "object")
-    return false;
-  const resilience = facility.resilience as Record<string, unknown>;
-  const allowed =
-    facility.fuel === "Sun"
-      ? ["hailResistant"]
-      : facility.fuel === "Natural Gas"
-        ? ["coldWeatherPackage", "designMinTempC"]
-        : [];
-  const keys = Object.keys(resilience);
-  if (keys.some((key) => !allowed.includes(key))) return false;
-  if (
-    ["hailResistant", "coldWeatherPackage"].some(
-      (key) =>
-        resilience[key] !== undefined && typeof resilience[key] !== "boolean",
-    )
-  )
-    return false;
-  const designMinTempC = resilience.designMinTempC;
-  return (
-    designMinTempC === undefined ||
-    (typeof designMinTempC === "number" &&
-      Number.isFinite(designMinTempC) &&
-      designMinTempC >= DESIGN_MIN_TEMP_BOUNDS_C.min &&
-      designMinTempC <= DESIGN_MIN_TEMP_BOUNDS_C.max)
-  );
+  return validResilienceRecord(facility.fuel, facility.resilience);
 }
 
 /** Retrofit requests also arrive through untrusted replay documents. */

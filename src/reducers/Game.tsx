@@ -161,9 +161,13 @@ import {
   oneTimeWorldEventCost,
   representativeMinTempC,
   resolveColdImpact,
+  RETROFIT_DOWNTIME_MINUTES,
   retrofitCost,
   retrofittedResilience,
   sampleHailImpacts,
+  trackerOutputMultiplier,
+  upgradeInProgress,
+  isUpgradingAt,
 } from "../helpers/Hazards";
 import {
   getHydroConditions,
@@ -247,6 +251,7 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
+  ResilienceUpgradeType,
   RetrofitFacilityAction,
   TradingPolicyType,
   TransmissionLineOperatingType,
@@ -1049,6 +1054,32 @@ function recordColdSnap(
  * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
  * frames coincide on a month's rollover tick.
  */
+/**
+ * Installs every retrofit whose month offline has ended. Runs once per real tick, right after the
+ * clock advances and before a new month's weather hazards are drawn, so a plant finishing at the
+ * rollover meets that month's weather with its upgrade. Forecasts need no copy of this: whether a
+ * plant is offline is a pure function of the minute (isUpgradingAt).
+ */
+function completeRetrofits(state: GameType) {
+  state.facilities.forEach((facility) => {
+    const upgrade = upgradeInProgress(facility);
+    if (!upgrade || state.date.minute < upgrade.completesMinute) return;
+    facility.resilience = retrofittedResilience(
+      facility,
+      state,
+      upgrade.upgrade,
+    );
+    delete (facility as GeneratorOperatingType).upgradeInProgress;
+    const message = `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
+    logGameEvent(state, "CONSTRUCTION", message, {
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    });
+    setTimeout(() => {
+      getStore().dispatch(snackbarOpen(message));
+    }, 0);
+  });
+}
+
 function logHailRepairsCompleted(state: GameType) {
   const minute = state.date.minute;
   const logged = new Set<number>();
@@ -1726,6 +1757,11 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "retrofitFacility", action.payload);
       }
     },
+    cancelRetrofit: (state, action: PayloadAction<number>) => {
+      if (!state.replayPlayback && applyCancelRetrofit(state, action.payload)) {
+        recordReplayAction(state, "cancelRetrofit", action.payload);
+      }
+    },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       if (
         state.tutorialIntertieStress?.active &&
@@ -2007,6 +2043,7 @@ export const {
   togglePauseFacility,
   reprioritizeFacility,
   retrofitFacility,
+  cancelRetrofit,
   setTradingPolicy,
   setSpeed,
   markEventsRead,
@@ -2365,11 +2402,52 @@ function applyUpgradeTransmissionLine(
   return true;
 }
 
+/** The retrofit's name as it reads mid-sentence, e.g. "a cold-weather package". */
+function retrofitLabel(upgrade: ResilienceUpgradeType): string {
+  return upgrade === "hailResistant"
+    ? "hail-resistant panels"
+    : "a cold-weather package";
+}
+
 /**
- * Adds a weather-resilience upgrade to a standing facility, for live play and replay. The price is
- * recomputed here from current state rather than trusted from the dialog. Like an authored
- * scenario choice, the cost is booked immediately into this tick and recorded as a zero-length
- * occurrence, so a re-forecast from the current tick re-adds it to the new frame exactly once.
+ * Records a retrofit payment (positive) or refund (negative) as a zero-length occurrence. Like an
+ * authored scenario choice, it is booked immediately into this tick, and the occurrence lets a
+ * re-forecast from the current tick re-add it to the new frame exactly once.
+ */
+function recordRetrofitTransaction(
+  state: GameType,
+  facilityId: number,
+  upgrade: ResilienceUpgradeType,
+  cost: number,
+) {
+  const refund = cost < 0;
+  const key = `retrofit${refund ? "-refund" : ""}:${facilityId}:${upgrade}:${state.date.minute}`;
+  state.worldEvents.occurrences.push({
+    key,
+    definitionId: key,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: {
+      retrofit: true,
+      facilityId,
+      upgrade,
+      cost,
+    },
+    effects: {},
+  });
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+}
+
+/**
+ * Starts installing a weather-resilience upgrade on a standing facility, for live play and
+ * replay. The price is recomputed here from current state rather than trusted from the dialog and
+ * paid up front. The plant is offline for RETROFIT_DOWNTIME_MINUTES, after which the upgrade takes
+ * effect; see completeRetrofits.
  */
 function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   if (!validRetrofitFacility(payload)) return false;
@@ -2384,35 +2462,18 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   now.netWorth -= cost;
   now.expensesOM += cost;
   facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
-  facility.resilience = retrofittedResilience(facility, state, payload.upgrade);
-  const label =
-    payload.upgrade === "hailResistant"
-      ? "hail-resistant panels"
-      : "a cold-weather package";
-  const key = `retrofit:${facility.id}:${payload.upgrade}`;
-  state.worldEvents.occurrences.push({
-    key,
-    definitionId: key,
+  (facility as GeneratorOperatingType).upgradeInProgress = {
+    upgrade: payload.upgrade,
+    cost,
     startsMinute: state.date.minute,
-    endsMinute: state.date.minute,
-    attributes: {
-      retrofit: true,
-      facilityId: facility.id,
-      upgrade: payload.upgrade,
-      cost,
-    },
-    effects: {},
-  });
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+    completesMinute: state.date.minute + RETROFIT_DOWNTIME_MINUTES,
+  };
+  recordRetrofitTransaction(state, facility.id, payload.upgrade, cost);
+  const label = retrofitLabel(payload.upgrade);
   logGameEvent(
     state,
     "BUILD",
-    `Added ${label} to ${facility.name} for ${formatMoneyConcise(cost)}.`,
+    `Installing ${label} on ${facility.name} for ${formatMoneyConcise(cost)}. Offline for a month.`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -2430,6 +2491,44 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
     before: "standard",
     after: lever,
   });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+/**
+ * Cancels a retrofit that is still being installed: the plant returns to service at once, as it
+ * was, and the whole price is refunded. Lets the player try an upgrade without committing to it.
+ */
+function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
+  if (!Number.isSafeInteger(payload)) return false;
+  const facility = state.facilities.find(({ id }) => id === payload);
+  const upgrade = facility && upgradeInProgress(facility);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    !facility ||
+    !upgrade ||
+    !now ||
+    !isUpgradingAt(facility, state.date.minute) ||
+    !Number.isFinite(upgrade.cost) ||
+    upgrade.cost < 0
+  )
+    return false;
+  const refund = upgrade.cost;
+  now.cash += refund;
+  now.netWorth += refund;
+  now.expensesOM -= refund;
+  facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
+  delete (facility as GeneratorOperatingType).upgradeInProgress;
+  recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
+  logGameEvent(
+    state,
+    "BUILD",
+    `Cancelled ${retrofitLabel(upgrade.upgrade)} on ${facility.name}; refunded ${formatMoneyConcise(refund)}.`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -2568,6 +2667,9 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     case "retrofitFacility":
       applyRetrofitFacility(state, payload);
+      break;
+    case "cancelRetrofit":
+      applyCancelRetrofit(state, payload);
       break;
     case "schedulePolicy":
     case "cancelPolicy":
@@ -2736,6 +2838,7 @@ export function tickState(state: GameType) {
     state.date.minute + TICK_MINUTES,
     state.startingYear,
   );
+  completeRetrofits(state);
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const prev = getTimeFromTimeline(
     state.date.minute - TICK_MINUTES,
@@ -3543,8 +3646,10 @@ function updateSupplyFacilitiesFinances(
     const fuelOutputMultiplier = generatorFuel
       ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
       : 1;
-    const facilityOutputMultiplier =
-      tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1;
+    // A retrofit holds the plant offline until it completes.
+    const facilityOutputMultiplier = isUpgradingAt(g, now.minute)
+      ? 0
+      : (tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1);
     const availablePeakW =
       g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
     let dispatchPeakW = availablePeakW;
@@ -3637,7 +3742,15 @@ function updateSupplyFacilitiesFinances(
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
-            g.currentW = availablePeakW * outputFactor * solarOutputFactor;
+            // Trackers raise morning and evening output; the array still clips at nameplate.
+            g.currentW =
+              availablePeakW *
+              outputFactor *
+              Math.min(
+                1,
+                solarOutputFactor *
+                  trackerOutputMultiplier(g, tickDate.minuteOfDay),
+              );
             break;
           case "Wind":
             g.currentW = availablePeakW * outputFactor * windOutputFactor;

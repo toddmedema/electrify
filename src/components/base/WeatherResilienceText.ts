@@ -14,6 +14,18 @@ export function formatDesignTemperature(
   return formatTemperature(celsius, units).replace(/^-/, "−");
 }
 
+/** The upgrade's name mid-sentence, e.g. "cold-weather package". */
+export function resilienceName(upgrade: ResilienceUpgradeType): string {
+  switch (upgrade) {
+    case "hailResistant":
+      return "hail-resistant panels";
+    case "solarTrackers":
+      return "solar trackers";
+    default:
+      return "cold-weather package";
+  }
+}
+
 /** The upgrade's name as an action, e.g. "Add hail-resistant panels". */
 export function resilienceActionLabel(upgrade: ResilienceUpgradeType): string {
   return upgrade === "hailResistant"

@@ -61,6 +61,7 @@ interface Handlers {
   onReprioritize: jest.Mock;
   onSell: jest.Mock;
   onRetrofit: jest.Mock;
+  onCancelRetrofit: jest.Mock;
 }
 
 function renderFacilities(
@@ -73,6 +74,7 @@ function renderFacilities(
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
     onRetrofit: jest.fn(),
+    onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
   function ControlledFacilities() {
@@ -91,6 +93,7 @@ function renderFacilities(
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
+        onCancelRetrofit={handlers.onCancelRetrofit}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
         onSelect={(id) => {
@@ -414,6 +417,36 @@ describe("weather hazards in the fleet", () => {
       effects: { facilityOutputMultipliersById: { "3": availableFraction } },
     });
   }
+
+  it("shows an upgrading plant's progress and lets the player cancel it", async () => {
+    const state = gameWithSolar();
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    (gas as { upgradeInProgress?: object }).upgradeInProgress = {
+      upgrade: "coldWeatherPackage",
+      cost: 1e6,
+      startsMinute: state.date.minute - MINUTES_PER_MONTH / 2,
+      completesMinute: state.date.minute + MINUTES_PER_MONTH / 2,
+    };
+    const { onCancelRetrofit } = renderFacilities(state, gas.id);
+    const gasRow = rows().find((row) =>
+      row.getAttribute("aria-label")?.startsWith(`Inspect ${gas.name}`),
+    )!;
+    expect(gasRow).toHaveTextContent("Upgrading 50%");
+    expect(gasRow).toHaveTextContent("cold-weather package, 16 days left");
+    // The only plant out of service, so the only progress bar on the pane. The bar is
+    // aria-hidden (the percentage is in the text), so there is no role to query it by.
+    // eslint-disable-next-line testing-library/no-node-access
+    const fills = document.querySelectorAll(".constructionProgressFill");
+    expect(fills).toHaveLength(1);
+    expect(fills[0]).toHaveStyle({ width: "50%" });
+    expect(
+      screen.queryByRole("button", { name: `Pause ${gas.name}` }),
+    ).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: `Cancel upgrade of ${gas.name}` }),
+    );
+    expect(onCancelRetrofit).toHaveBeenCalledWith(gas.id);
+  });
 
   it("leads a hail-damaged row with the outage instead of a generic limit chip", () => {
     const state = gameWithSolar();

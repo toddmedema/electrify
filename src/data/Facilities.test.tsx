@@ -389,7 +389,10 @@ describe("weather resilience defaults", () => {
     const solar = quotes(dallas).filter((g) => g.fuel === "Sun");
     expect(solar.length).toBeGreaterThan(0);
     solar.forEach((g) => {
-      expect(g.resilience).toEqual({ hailResistant: false });
+      expect(g.resilience).toEqual({
+        hailResistant: false,
+        solarTrackers: false,
+      });
       expect(g.resilienceExtraBuildCost).toBeUndefined();
     });
   });
