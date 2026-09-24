@@ -1,0 +1,17 @@
+{
+  "tolerance": 0.25,
+  "recordedWith": {
+    "node": "v24.14.0",
+    "platform": "darwin-arm64",
+    "runs": 3,
+    "date": "2026-09-24"
+  },
+  "measured": {
+    "immerOverheadRatio": 8.742,
+    "typicalRolloverRatio": 74.965
+  },
+  "ceilings": {
+    "immerOverheadRatio": 10.928,
+    "typicalRolloverRatio": 93.707
+  }
+}
