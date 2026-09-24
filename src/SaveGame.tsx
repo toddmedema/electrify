@@ -11,11 +11,13 @@ import {
   normalizedInputs,
 } from "./helpers/RunIdentity";
 import { validInvitation } from "./helpers/Challenge";
+import { validPolicies, validDeferredResidential } from "./helpers/Policies";
 import {
-  emptyPolicies,
-  validPolicies,
-  validDeferredResidential,
-} from "./helpers/Policies";
+  restoreCommitmentMetadata,
+  SavedCommitmentMetadata,
+  serializeCommitmentMetadata,
+  validCommitmentMetadata,
+} from "./helpers/Commitment";
 import packageJson from "../package.json";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
@@ -73,6 +75,8 @@ export interface SaveGameType {
   savedAt: string; // ISO 8601
   appVersion: string; // For bug reports
   game: GameType;
+  // The unit-commitment forecast attached to game.timeline, which JSON would otherwise drop
+  commitmentForecast?: SavedCommitmentMetadata[];
 }
 
 // mapStateToProps runs on every dispatch, and re-parsing ~100KB of JSON each time to decide whether
@@ -294,6 +298,7 @@ export function serializeSave(game: GameType): SaveGameType {
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
+    commitmentForecast: serializeCommitmentMetadata(game.timeline),
   };
 }
 
@@ -612,9 +617,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
-    policies:
-      game.policies ??
-      emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
     transmission: transmissionEnabled
       ? (game.transmission ?? emptyTransmissionState())
       : undefined,
@@ -659,6 +661,21 @@ export function parseSave(raw: unknown): SaveGameType | null {
       ))
   )
     return null;
+  if (
+    save.commitmentForecast !== undefined &&
+    !validCommitmentMetadata(
+      save.commitmentForecast,
+      normalized.timeline.length,
+    )
+  )
+    return null;
+  // The ticks were rebuilt by the map above, so they are plain objects this save alone owns
+  if (save.commitmentForecast) {
+    restoreCommitmentMetadata(
+      normalized.timeline as GameType["timeline"],
+      save.commitmentForecast,
+    );
+  }
   return { ...save, game: normalized } as SaveGameType;
 }
 
