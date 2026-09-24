@@ -13,7 +13,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
-import { WORLD_LAND_PATH } from "../../data/WorldLand";
+import { WORLD_LAND_PATH } from "./WorldLand";
 import {
   clampViewport,
   clusterLocations,

@@ -69,7 +69,7 @@ import {
   expectedMonthlyOutputShape,
   ExpectedOutputShape,
 } from "../../helpers/ExpectedOutput";
-import { MANUAL_ENTRY, ManualEntryTitleType } from "../../data/Manual";
+import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";

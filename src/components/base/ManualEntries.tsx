@@ -1,9 +1,7 @@
 import * as React from "react";
-import KeyboardShortcuts, {
-  SHORTCUTS_SEARCH_TEXT,
-} from "../components/base/KeyboardShortcuts";
-import ConceptLegend from "../components/base/ConceptLegend";
-import { useUnits } from "../components/base/UnitsContext";
+import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
+import ConceptLegend from "./ConceptLegend";
+import { useUnits } from "./UnitsContext";
 import {
   formatLargeMassApprox,
   formatMass,
@@ -11,10 +9,10 @@ import {
   KG_PER_MEGATONNE,
   largeMassUnit,
   massUnitName,
-} from "../helpers/Units";
-import { formatDesignTemperature } from "../components/base/WeatherResilienceText";
-import { IMPORT_EMISSIONS_ASSUMPTIONS } from "./ImportEmissions";
-import { COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C } from "./Hazards";
+} from "../../helpers/Units";
+import { formatDesignTemperature } from "./WeatherResilienceText";
+import { IMPORT_EMISSIONS_ASSUMPTIONS } from "../../data/ImportEmissions";
+import { COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
 // through a component of their own rather than the array becoming a function of it. Their text
