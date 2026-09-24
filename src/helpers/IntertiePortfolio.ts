@@ -25,6 +25,7 @@ export function intertiePortfolioOutlook(
   corridorId: string,
   forecast: readonly TickPresentFutureType[],
   stepMinutes = 60,
+  capacityW?: number,
 ): IntertiePortfolioOutlook | undefined {
   const context = { ...intertieContextForGame(game), expectedLuck: true };
   const corridor = effectiveCorridor(corridorId, context);
@@ -32,7 +33,10 @@ export function intertiePortfolioOutlook(
   const existing = (game.transmission?.lines || []).filter(
     (line) => line.yearsToBuildLeft <= 0 && line.corridorId !== corridorId,
   );
-  const lines = [...existing, { corridorId, capacityW: corridor.capacityW }];
+  const lines = [
+    ...existing,
+    { corridorId, capacityW: capacityW ?? corridor.capacityW },
+  ];
   const ticks = forecast.filter(
     (t) =>
       t.minute >= game.date.minute &&

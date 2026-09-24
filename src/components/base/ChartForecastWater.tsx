@@ -12,7 +12,7 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
-import { formatWattHours, formatWattsInUnit } from "../../helpers/Format";
+import { formatWattHours } from "../../helpers/Format";
 import { waterDashArrays, chartPalette } from "../../Theme";
 
 export interface Props {
@@ -33,10 +33,9 @@ interface State {
 }
 
 const RESERVOIR_SCALE = "reservoir";
-const GIGAWATT = { suffix: "G", divisor: 1e9 };
 
 export function formatReservoirAxisValue(value: number): string {
-  return formatWattsInUnit(value, GIGAWATT).replace(/GW$/, "");
+  return formatWattHours(value);
 }
 
 function buildOptions(showXLabels: boolean) {
@@ -69,7 +68,7 @@ function buildOptions(showXLabels: boolean) {
       yAxis(scale, {
         scale: RESERVOIR_SCALE,
         side: 1,
-        label: "Reservoir (GWh)",
+        label: "Reservoir",
         stroke: chartPalette().reservoir,
         size: FORECAST_AXIS_RIGHT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((v) => formatReservoirAxisValue(v)),

@@ -110,9 +110,9 @@ import {
   allocateIntertieFlows,
   neighborImportSupplyW,
   clearTransmissionMarket,
-  corridorConstructionKgco2e,
   intertieContextForGame,
   intertieUpgradeQuote,
+  intertieBuildQuote,
   intertieImportLimitW,
   IntertieOffer,
   transmissionRatingW,
@@ -251,6 +251,7 @@ interface UpgradeTransmissionLineAction {
 interface BuildTransmissionLineAction {
   corridorId: string;
   financed: boolean;
+  tier?: number;
 }
 
 interface NewGameAction {
@@ -1061,6 +1062,7 @@ export const gameSlice = createSlice({
       const {
         policies: _policies,
         policyPause: _policyPause,
+        scenarioChoicePause: _scenarioChoicePause,
         ...payload
       } = action.payload;
       if (
@@ -1565,8 +1567,20 @@ export const gameSlice = createSlice({
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
-      if (!state.replayPlayback && applyScenarioResponse(state, action.payload))
+      if (
+        !state.replayPlayback &&
+        applyScenarioResponse(state, action.payload)
+      ) {
         recordReplayAction(state, "chooseScenarioResponse", action.payload);
+        if (
+          !pendingScenarioChoice(state) &&
+          state.scenarioChoicePause !== undefined
+        ) {
+          setForegroundSpeed(state, state.scenarioChoicePause);
+          delete state.scenarioChoicePause;
+          ensureTicking(state);
+        }
+      }
     });
     builder.addCase(schedulePolicy, (state, action) => {
       if (
@@ -1828,9 +1842,17 @@ function applyBuildTransmissionLine(
   payload: Partial<BuildTransmissionLineAction>,
 ): boolean {
   if (typeof payload.corridorId !== "string") return false;
-  const corridor = corridorsForGame(state).find(
+  const availableCorridor = corridorsForGame(state).find(
     ({ id }) => id === payload.corridorId,
   );
+  const corridor =
+    availableCorridor &&
+    intertieBuildQuote(
+      availableCorridor.id,
+      state.date.year,
+      payload.tier ?? 1,
+      accessContextForGame(state),
+    );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (!state.transmission) return false;
   if (
@@ -1870,7 +1892,7 @@ function applyBuildTransmissionLine(
     interestRate: financed ? state.interestRate : 0,
     // Nothing flows until the line is energised, which is years away
     currentFlowW: 0,
-    constructionKgco2eTotal: corridorConstructionKgco2e(corridor),
+    constructionKgco2eTotal: corridor.constructionKgco2eTotal,
   };
   state.transmission.lines.push(line);
   recordMeaningfulDecision(state, {
@@ -2256,10 +2278,12 @@ export function tickState(state: GameType) {
     state.speed = "PAUSED";
     return;
   }
+  const speedBeforeTick = foregroundSpeed(state);
   const stressWasActive = !!state.tutorialIntertieStress?.active;
   applyPendingReplayActions(state);
   if (pendingScenarioChoice(state)) {
-    state.speed = "PAUSED";
+    state.scenarioChoicePause ??= speedBeforeTick;
+    setForegroundSpeed(state, "PAUSED");
     return;
   }
   state.date = getDateFromMinute(
@@ -2640,7 +2664,10 @@ export function tickState(state: GameType) {
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
   applyPendingReplayActions(state);
-  if (pendingScenarioChoice(state)) state.speed = "PAUSED";
+  if (pendingScenarioChoice(state)) {
+    state.scenarioChoicePause ??= speedBeforeTick;
+    setForegroundSpeed(state, "PAUSED");
+  }
 }
 
 export {

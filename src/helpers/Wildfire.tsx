@@ -553,13 +553,13 @@ export function wildfirePreparednessChoice(
     scenarioId: game.scenarioId,
     atMonth: game.date.monthsElapsed,
     title: "Wildfire season preparedness",
-    message: `Fire risk is elevated in ${game.location.name} this season. Fund inspections, backup equipment and response crews to halve customer disconnections and generator output losses if a wildfire strikes. Restoration costs still apply either way.`,
+    message: `Prepare for elevated fire risk in ${game.location.name} or save cash; restoration costs apply either way.`,
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost,
-        description: `Spend {cost} on inspections, backup equipment and crews. If a wildfire starts within the next ${profile.preparednessDurationMonths} months, customer disconnections and generator output losses are halved. Restoration costs still apply.`,
+        description: `Spend {cost} to halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
         message: "Preparedness funded for the season.",
       },
       {
@@ -568,9 +568,9 @@ export function wildfirePreparednessChoice(
         label: "Keep cash",
         cost: () => 0,
         description:
-          "Keep your cash and accept the full customer disconnections and generator output losses if a wildfire strikes this season.",
+          "Save cash and accept full customer disconnections and generator output losses if a wildfire strikes this season.",
         message:
-          "Cash preserved. Full wildfire impact applies if one starts this season.",
+          "Cash is preserved, with the full impact of any wildfire that starts this season.",
       },
     ],
   };

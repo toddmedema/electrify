@@ -1062,6 +1062,8 @@ export interface GameType {
   challenge?: ChallengeInvitationV1;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
+  /** Presentation speed restored after the pending scenario decision. */
+  scenarioChoicePause?: SpeedType;
   seed: number;
   difficulty: DifficultyType;
   scenarioId: number;

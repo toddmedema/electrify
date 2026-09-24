@@ -298,44 +298,41 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"
-        sx={{
-          px: { xs: 2, sm: 3 },
-          pb: 2,
-          flexWrap: "wrap",
-          gap: 0.5,
-          "& > :not(:first-of-type)": { ml: 0 },
-        }}
+        disableSpacing
+        sx={{ px: { xs: 2, sm: 3 }, pb: 2 }}
       >
-        {canShare() && (
+        <div className="victoryUtilityActions">
+          {canShare() && (
+            <Button
+              color="primary"
+              startIcon={<ShareIcon />}
+              onClick={() => setPreview(true)}
+            >
+              {shared.challenge ? "Challenge a friend" : "Share result"}
+            </Button>
+          )}
+          {!failed && (
+            <Button color="primary" onClick={onClose}>
+              Review grid
+            </Button>
+          )}
+        </div>
+        <div className="victoryNextActions">
           <Button
             color="primary"
-            startIcon={<ShareIcon />}
-            onClick={() => setPreview(true)}
+            variant={failed ? "text" : "outlined"}
+            onClick={failed ? onQuit : () => props.onRetry(victory)}
           >
-            {shared.challenge ? "Challenge a friend" : "Share result"}
+            {failed ? "New game" : "Replay"}
           </Button>
-        )}
-        {!failed && (
-          <Button color="primary" onClick={onClose}>
-            Review grid
-          </Button>
-        )}
-        <Button
-          color="primary"
-          variant={failed ? "text" : "contained"}
-          onClick={onQuit}
-        >
-          New game
-        </Button>
-        {failed && (
           <Button
             color="primary"
             variant="contained"
-            onClick={() => props.onRetry(victory)}
+            onClick={failed ? () => props.onRetry(victory) : onQuit}
           >
-            Try again
+            {failed ? "Try again" : "New game"}
           </Button>
-        )}
+        </div>
       </DialogActions>
       <Dialog
         open={preview}

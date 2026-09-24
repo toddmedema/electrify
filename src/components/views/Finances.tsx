@@ -37,7 +37,6 @@ import {
   formatMoneyConcise,
   formatMoneyStable,
   formatWattHours,
-  formatWatts,
 } from "../../helpers/Format";
 import {
   getStorageBoolean,
@@ -122,13 +121,13 @@ export function buildChartKeys(units: UnitSystemType): {
     supplyWh: {
       label: "Electricity sold",
       higherIsBetter: true,
-      format: (n: number) => `${formatWatts(n, 0)}h`,
+      format: (n: number) => formatWattHours(n, 0),
       nesting: 1,
     },
     demandWh: {
       label: "Demand",
       higherIsBetter: true,
-      format: (n: number) => `${formatWatts(n, 0)}h`,
+      format: (n: number) => formatWattHours(n, 0),
     },
     customers: {
       label: "Customers",

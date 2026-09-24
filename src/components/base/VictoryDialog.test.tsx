@@ -177,7 +177,9 @@ describe("VictoryDialog", () => {
   it("keeps the ways out of a finished run", async () => {
     const onClose = jest.fn();
     const onQuit = jest.fn();
-    renderDialog({ onClose, onQuit });
+    const onRetry = jest.fn();
+    const victory = aVictory();
+    renderDialog({ victory, onClose, onQuit, onRetry });
 
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(screen.getByRole("button", { name: "New game" })).toHaveClass(
@@ -187,6 +189,10 @@ describe("VictoryDialog", () => {
     expect(onClose).toHaveBeenCalled();
     await userEvent.click(screen.getByText("New game"));
     expect(onQuit).toHaveBeenCalled();
+    const replay = screen.getByRole("button", { name: "Replay" });
+    expect(replay).toHaveClass("MuiButton-outlined");
+    await userEvent.click(replay);
+    expect(onRetry).toHaveBeenCalledWith(victory);
   });
 
   it("shows terminal scores without letting either run resume", async () => {

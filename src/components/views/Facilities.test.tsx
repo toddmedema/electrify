@@ -1,5 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { Provider } from "react-redux";
@@ -385,9 +391,13 @@ describe("the interties view", () => {
       screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
     ).not.toHaveLength(0);
     expect(screen.getAllByText("Total cost")).toHaveLength(2);
-    expect(
-      screen.getByText(/Pay \$10.8M now · finance \$43.2M/),
-    ).toBeInTheDocument();
+    const north = screen.getByTestId("transmission-project-california-north");
+    await user.click(
+      within(north).getByRole("button", { name: /^Show .* details$/ }),
+    );
+    expect(within(north).getByText("Down payment")).toBeInTheDocument();
+    expect(within(north).getByText("$10.8M")).toBeInTheDocument();
+    expect(within(north).getByText("$43.2M")).toBeInTheDocument();
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -479,6 +489,22 @@ describe("the interties view", () => {
     expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 
+  it("updates capacity and purchase quote when selecting a larger tier", async () => {
+    const onBuild = jest.fn();
+    renderProjects(createGame({ scenarioId: 111 }), onBuild);
+    const north = screen.getByTestId("transmission-project-california-north");
+    const slider = screen.getByRole("slider");
+    fireEvent.change(slider, { target: { value: 3 } });
+    expect(slider).toHaveAttribute("aria-valuenow", "3");
+    expect(north).toHaveTextContent(formatWatts(5e6 * 1.5 ** 2));
+    await user.click(
+      within(north).getByRole("button", { name: /Review purchase/ }),
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
+    await user.click(screen.getByRole("button", { name: "Pay cash" }));
+    expect(onBuild).toHaveBeenCalledWith("california-north", false, 3);
+  });
+
   it("reviews and cancels before committing a financed intertie", async () => {
     const onBuild = jest.fn();
     renderProjects(createGame({ scenarioId: 112 }), onBuild);
@@ -493,7 +519,7 @@ describe("the interties view", () => {
     await user.click(review);
     await user.click(screen.getByRole("button", { name: "Take loan" }));
     expect(onBuild).toHaveBeenCalledTimes(1);
-    expect(onBuild).toHaveBeenCalledWith("california-north", true);
+    expect(onBuild).toHaveBeenCalledWith("california-north", true, 1);
   });
 });
 

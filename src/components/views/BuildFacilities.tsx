@@ -9,10 +9,9 @@ import {
   upgradeTransmissionLine,
 } from "../../reducers/Game";
 import { snackbarOpen } from "../../reducers/UI";
-import {
-  corridorsForLocation,
-  TRANSMISSION_CORRIDORS,
-} from "../../data/AdjacentMarkets";
+import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { accessContextForGame } from "../../data/IntertieAccess";
+import { intertieBuildQuote } from "../../helpers/Transmission";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable } from "../../helpers/Format";
 import ConceptIcon from "../base/ConceptIcon";
@@ -128,10 +127,13 @@ export default function BuildFacilities(): React.JSX.Element {
               onUpgrade={(corridorId, financed) =>
                 dispatch(upgradeTransmissionLine({ corridorId, financed }))
               }
-              onBuild={(corridorId, financed) => {
-                dispatch(buildTransmissionLine({ corridorId, financed }));
-                const corridor = TRANSMISSION_CORRIDORS.find(
-                  ({ id }) => id === corridorId,
+              onBuild={(corridorId, financed, tier) => {
+                dispatch(buildTransmissionLine({ corridorId, financed, tier }));
+                const corridor = intertieBuildQuote(
+                  corridorId,
+                  game.date.year,
+                  tier,
+                  accessContextForGame(game),
                 );
                 if (corridor)
                   dispatch(

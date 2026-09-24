@@ -15,7 +15,7 @@ test("choice descriptions include actual funding and difficulty-specific costs",
     (choice) => choice.scenarioId === 106,
   )!;
   expect(scenarioChoiceDescription(dataCenter.options[0], "Manager")).toBe(
-    "Receive $15M in exchange for the full 100 MW coming online in January 2026.",
+    "Receive $15M to connect all 100 MW in January 2026.",
   );
   const pricedOption = {
     id: "protection",

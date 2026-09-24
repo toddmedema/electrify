@@ -33,8 +33,20 @@ test("California players can build and understand an intertie", async ({
   ).toBeVisible();
   await expect(projects.getByLabel("Trading rule")).toHaveCount(0);
   await expect(projects.getByText("Total cost").first()).toBeVisible();
+  const northernProject = projects.getByTestId(
+    "transmission-project-california-north",
+  );
+  await northernProject
+    .getByRole("button", { name: "Show Pacific Northwest details" })
+    .click();
   await expect(
-    projects.getByText("Pay $10.8M now · finance $43.2M").first(),
+    northernProject.getByText("Down payment", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    northernProject.getByText("$10.8M", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    northernProject.getByText("$43.2M", { exact: true }),
   ).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
     const firstBuild = projects
@@ -229,7 +241,7 @@ for (const theme of ["light", "dark"] as const) {
       );
       // The metric grid carries the decision; the archetype and outlook wait behind details
       await expect(
-        card.getByText("Your access", { exact: true }),
+        card.getByText("Connection bandwidth", { exact: true }),
       ).toBeVisible();
       await expect(card.getByText("Emissions", { exact: true })).toBeVisible();
       await expect(

@@ -1,3 +1,4 @@
+import { MAX_INTERTIE_UPGRADES } from "./Constants";
 import { validScenarioResponse } from "./helpers/ScenarioChoices";
 import { validBuildFacility } from "./helpers/BuildValidation";
 import { validPolicyChange } from "./helpers/Policies";
@@ -200,6 +201,17 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
           "string")
     )
       return null;
+    if (action.type === "buildTransmissionLine") {
+      const tier = (action.payload as { tier?: unknown }).tier;
+      if (
+        tier !== undefined &&
+        (typeof tier !== "number" ||
+          !Number.isInteger(tier) ||
+          tier < 1 ||
+          tier > MAX_INTERTIE_UPGRADES + 1)
+      )
+        return null;
+    }
     if (
       action.type === "setTradingPolicy" &&
       !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(

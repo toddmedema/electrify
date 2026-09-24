@@ -221,8 +221,8 @@ test("an unanswered choice blocks ticks and speed changes and survives save/load
 
 // Preparation is an advance resource package, independent of later damage/restoration.
 test.each(["Intern", "Employee", "Manager", "VP", "CEO"] as const)(
-  "wildfire preparation keeps the same municipal budget on %s",
-  (difficulty) => expect(wildfirePreparationCost(difficulty)).toBe(200000),
+  "wildfire preparation commits a meaningful $2M budget on %s",
+  (difficulty) => expect(wildfirePreparationCost(difficulty)).toBe(2000000),
 );
 
 test("restoration scales with authored damage severity independently of advance preparation", () => {

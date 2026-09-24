@@ -146,6 +146,8 @@ function validLineInvestment(
     annualOperatingCost: corridor.annualOperatingCost,
   };
   let buildCost = corridor.buildCost;
+  let yearsToBuild = corridor.yearsToBuild;
+  let constructionKgco2e = corridorConstructionKgco2e(corridor);
   const steps = Math.round(
     Math.log(line.capacityW! / corridor.capacityW) /
       Math.log(INTERTIE_UPGRADE_STEP),
@@ -159,6 +161,8 @@ function validLineInvestment(
       annualOperatingCost: quote.annualOperatingCost,
     };
     buildCost += quote.buildCost;
+    yearsToBuild += quote.yearsToBuild;
+    constructionKgco2e += quote.constructionKgco2eTotal;
   }
   if (
     !approximatelyEqual(line.annualOperatingCost, expected.annualOperatingCost)
@@ -201,7 +205,8 @@ function validLineInvestment(
     approximatelyEqual(line.buildCost, buildCost) &&
     line.loanAmountLeft! <=
       buildCost * (1 - DOWNPAYMENT_PERCENT) + Math.max(1, buildCost) * 1e-9 &&
-    validConstruction(line, corridorConstructionKgco2e(corridor))
+    line.yearsToBuildLeft! <= yearsToBuild &&
+    validConstruction(line, constructionKgco2e)
   );
 }
 
@@ -235,7 +240,6 @@ function validTransmissionLine(
     ) &&
     validUpgradedCapacity(line.capacityW!, corridor.capacityW) &&
     validLineInvestment(line, corridor, year, context) &&
-    line.yearsToBuildLeft! <= corridor.yearsToBuild &&
     Number.isInteger(line.minuteCreated) &&
     line.interestRate! <= 1 &&
     line.loanMonthlyPayment! <= corridor.buildCost &&
@@ -607,6 +611,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const normalized = {
     ...game,
     policyPause: undefined,
+    scenarioChoicePause: undefined,
     policies:
       game.policies ??
       emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
