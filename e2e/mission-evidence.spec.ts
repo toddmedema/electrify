@@ -22,6 +22,33 @@ async function openBuildGenerators(page: Page) {
   await page.locator(".button-buildGenerator").click();
   await expect(page.locator(".buildOption").first()).toBeVisible();
 }
+// Autosave writes a new game's first save once the game goes live, which a loaded machine can
+// reach after the first frame of the game screen. Poll the same pagehide flush the fixtures use
+// until that save exists, rather than editing a save that may not have been written yet.
+async function waitForSave(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        window.dispatchEvent(new Event("pagehide"));
+        return localStorage.getItem("savedGame") !== null;
+      }),
+    )
+    .toBe(true);
+}
+
+// Brings the end of the fleet list into view. On a phone the whole Facilities body scrolls, so
+// that takes the supply chart off screen and a later request has to bring it back. A tall desktop
+// pane pins the chart above a list that scrolls on its own, so the chart must stay put there.
+// Asserted either way: a request to bring back a chart that never left would prove nothing.
+async function scrollChartAway(page: Page, chartPinned: boolean) {
+  await page
+    .locator(".unifiedFacilitiesList:visible [data-rfd-draggable-id]")
+    .last()
+    .scrollIntoViewIfNeeded();
+  const chart = expect(page.locator("#chartSupplyDemand"));
+  await (chartPinned ? chart.toBeInViewport() : chart.not.toBeInViewport());
+}
+
 async function range(page: Page) {
   return page
     .locator(".insights:visible .accessibleChart [role=img]")
@@ -46,6 +73,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await waitForSave(page);
     // Keep this layout/focus fixture solvent so a valid long-term cash warning does not
     // replace the upcoming-event label under test.
     await page.evaluate(() => {
@@ -234,6 +262,7 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
+  await waitForSave(page);
   // A saved-game fixture isolates the presentation warning from economic outcomes.
   await page.evaluate(() => {
     window.dispatchEvent(new Event("pagehide"));
@@ -321,9 +350,11 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   test.skip(
     !new Set(["desktop-chromium", "mobile-390px"]).has(info.project.name),
   );
+  const chartPinned = info.project.name === "desktop-chromium";
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
+  await waitForSave(page);
   await page.evaluate(() => {
     window.dispatchEvent(new Event("pagehide"));
     const save = JSON.parse(localStorage.getItem("savedGame")!);
@@ -345,12 +376,12 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Shortfall expected later today/,
   );
-  await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
+  await scrollChartAway(page, chartPinned);
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator("#chartSupplyDemand")).toBeVisible();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   // Scroll the chart away so the second request has to bring it back
-  await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
+  await scrollChartAway(page, chartPinned);
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
