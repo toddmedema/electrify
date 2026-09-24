@@ -3,14 +3,15 @@ import { join } from "path";
 import { LocationType, WeatherHazardProfileType } from "../Types";
 import { LOCATIONS } from "../Constants";
 import { SCENARIOS } from "./Scenarios";
+import { COLD_CLIMATE_BY_LOCATION } from "./ColdClimate";
 import {
+  authoredHailLocationIds,
   coldPackageDesignMinTempC,
   getWeatherHazardProfile,
   NORTHERN_HAIL_MONTHLY_WEIGHTS,
   regionalColdThresholdC,
   validateWeatherHazardProfile,
   WEATHER_HAZARD_AUTHORED_FREEZE_SCENARIOS,
-  WEATHER_HAZARD_PROFILES,
   WEATHER_HAZARD_TUTORIAL_SCENARIOS,
 } from "./Hazards";
 
@@ -32,8 +33,14 @@ describe("weather hazard profile data", () => {
       ...Object.keys(LOCATIONS),
       ...Object.keys(weatherIndex.cities),
     ]);
+    expect(authoredHailLocationIds().filter((id) => !known.has(id))).toEqual(
+      [],
+    );
+    // Every city the picker offers has its own cold climate record.
     expect(
-      Object.keys(WEATHER_HAZARD_PROFILES).filter((id) => !known.has(id)),
+      Object.keys(weatherIndex.cities).filter(
+        (id) => !COLD_CLIMATE_BY_LOCATION[id],
+      ),
     ).toEqual([]);
   });
 
@@ -80,12 +87,31 @@ describe("weather hazard profile data", () => {
   });
 
   it("resolves regional thresholds and cold-weather package ratings", () => {
-    expect(regionalColdThresholdC(profile("Dallas"))).toBe(-8);
+    // Mild: regional strain needs cold well below a standard plant's -8 °C rating.
+    expect(regionalColdThresholdC(profile("Dallas"))).toBe(-15);
+    expect(profile("Dallas").coldClimate).toBe(false);
     expect(regionalColdThresholdC(profile("PIT"))).toBe(-25);
-    expect(regionalColdThresholdC(profile("Fairbanks"))).toBe(-40);
+    // The far north strains only in cold rare even for it.
+    expect(regionalColdThresholdC(profile("Fairbanks"))).toBe(-42);
     expect(coldPackageDesignMinTempC(profile("Dallas"))).toBe(-25);
     expect(coldPackageDesignMinTempC(profile("PIT"))).toBe(-30);
-    expect(coldPackageDesignMinTempC(profile("Minneapolis"))).toBe(-35);
+    expect(coldPackageDesignMinTempC(profile("Minneapolis"))).toBe(-34);
+  });
+
+  it.each(["Halifax", "Yerevan", "Tashkent", "Tbilisi", "Tehran"])(
+    "builds for local winters at %s, which routinely drops below -8 °C",
+    (id) => {
+      expect(profile(id).coldClimate).toBe(true);
+      expect(regionalColdThresholdC(profile(id))).toBeLessThanOrEqual(-25);
+    },
+  );
+
+  it("keeps mild-climate thresholds at least 7 °C below the standard rating", () => {
+    const tooWarm = Object.keys(COLD_CLIMATE_BY_LOCATION).filter((id) => {
+      const p = profile(id);
+      return regionalColdThresholdC(p) > (p.coldClimate ? -25 : -15);
+    });
+    expect(tooWarm).toEqual([]);
   });
 
   it("rejects malformed profiles", () => {

@@ -1908,11 +1908,15 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 }
 
-// Optional weather hardening in the build dialog: one checkbox, its price in the label, and one
-// line of what it buys, set under the label text rather than the box
+// Optional weather hardening in the build dialog: one checkbox, its price in the label, and a
+// line or two of what it buys, set under the label text rather than the box. The impact
+// summary's first fact rule is the one neutral divider below it.
 .resilienceBuildOption {
-  padding: 4px 16px 12px;
-  border-bottom: 1px solid var(--border-selected);
+  padding: 4px 16px 0;
+
+  & + .decisionImpact {
+    padding-top: 12px;
+  }
 
   .MuiFormControlLabel-root {
     min-height: 40px;

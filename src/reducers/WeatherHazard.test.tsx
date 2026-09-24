@@ -137,8 +137,10 @@ describe("hail damage", () => {
     const logs = state.eventLog.filter((e) => e.storyPhaseKey === key);
     expect(logs).toHaveLength(1);
     expect(logs[0].importance).toBe("CRITICAL");
+    expect(logs[0].title).toBe("Hail damage");
+    expect(logs[0].concept).toBe("severeWeather");
     expect(logs[0].message).toMatch(
-      /^Severe hail damaged \d+% of your solar fleet/,
+      /^Hail damaged \d+% of your solar fleet\. \$[\d.]+[KMB]? deductible; repairs take about \d+ days?\.$/,
     );
     expect(state.speed).toBe("PAUSED");
     // Continuing the month does not announce or record the storm again.
@@ -228,6 +230,42 @@ describe("hail damage", () => {
     expect(repaired(state)[0].message).toContain("back to full output");
     tickToMinute(state, hit.endsMinute + MINUTES_PER_MONTH);
     expect(repaired(state)).toHaveLength(1);
+  });
+
+  it("reports overlapping storms together and completes repairs only after the last", () => {
+    const { state, hits } = atHailOnset();
+    const hit = hits[0];
+    const id = hit.attributes.facilityId as number;
+    // A second storm's damage on the same array, still under repair after the first ends.
+    const second: ActiveWorldEventType = {
+      ...cloneDeep(hit),
+      key: `${hit.key}:second`,
+      endsMinute: hit.endsMinute + MINUTES_PER_MONTH / 4,
+      attributes: { ...hit.attributes, oneTimeCost: 0 },
+      effects: { facilityOutputMultipliersById: { [String(id)]: 0.5 } },
+    };
+    state.worldEvents.active.push(second);
+    const facility = () => state.facilities.find((f) => f.id === id)!;
+    const status = facilityHazardStatus(state, facility())!;
+    expect(status.availableFraction).toBeCloseTo(
+      (1 - Number(hit.attributes.damagedFraction)) * 0.5,
+      12,
+    );
+    expect(status.endsMinute).toBe(second.endsMinute);
+    const completions = () =>
+      state.eventLog.filter(
+        (e) =>
+          e.message ===
+          `Repairs complete: ${facility().name} is back to full output.`,
+      );
+    tickToMinute(state, hit.endsMinute);
+    expect(completions()).toHaveLength(0);
+    expect(facilityHazardStatus(state, facility())?.availableFraction).toBe(
+      0.5,
+    );
+    tickToMinute(state, second.endsMinute);
+    expect(completions()).toHaveLength(1);
+    expect(facilityHazardStatus(state, facility())).toBeUndefined();
   });
 
   it("lets a damaged facility be sold mid-repair", () => {
@@ -429,21 +467,138 @@ describe("extreme cold", () => {
     expect(multipliers[String(standard.id)]).toBeLessThan(1);
     expect(multipliers[String(standard.id)]).toBeGreaterThan(0);
     // Still warmer than the packaged plant's rating, so it rides the cold out.
-    expect(minTempC).toBeGreaterThanOrEqual(-35);
+    expect(minTempC).toBeGreaterThanOrEqual(-34);
     expect(multipliers[String(packaged.id)]).toBeUndefined();
     expect(snap.attributes.protectedFacilityIds).toContain(packaged.id);
     // Regional gas strain only below the location's threshold.
-    expect(!!snap.effects.fuelPriceMultipliers).toBe(minTempC < -30);
+    expect(!!snap.effects.fuelPriceMultipliers).toBe(minTempC < -29);
     const logs = state.eventLog.filter((e) => e.storyPhaseKey === key);
     expect(logs).toHaveLength(1);
     expect(logs[0].importance).toBe("CRITICAL");
+    expect(logs[0].title).toBe("Extreme cold");
+    expect(logs[0].concept).toBe("severeWeather");
     expect(logs[0].message).toContain(standard.name);
+    // The log cannot follow the player's unit setting, so it names no temperature.
+    expect(logs[0].message).not.toMatch(/°|\d+ ?C\b/);
     // Over at the next rollover, and not drawn twice.
     tickToMonth(state, month! + 1);
     expect(state.worldEvents.active.some((e) => e.key === key)).toBe(false);
     expect(
       state.worldEvents.occurrences.filter((e) => e.key === key),
     ).toHaveLength(1);
+  });
+});
+
+describe("extreme cold gas prices", () => {
+  const DALLAS = scenarioAt("Dallas", [
+    { fuel: "Natural Gas", peakW: 600000000, initialAgeYears: 5 },
+    { fuel: "Oil", peakW: 400000000, initialAgeYears: 5 },
+  ]);
+
+  /** A Dallas run whose next month carries an injected story freeze and gas shock. */
+  function withStory(gasMultiplier: number | undefined) {
+    const state = game(DALLAS, 5);
+    const month = 1;
+    state.worldEvents.active.push({
+      // Story effects are cached by occurrence key, so each variant needs its own.
+      key: `test-freeze-${gasMultiplier ?? 1}`,
+      definitionId: "test-freeze",
+      startsMinute: month * MINUTES_PER_MONTH,
+      endsMinute: (month + 1) * MINUTES_PER_MONTH,
+      attributes: {},
+      effects: {
+        temperatureOffsetC: -40,
+        ...(gasMultiplier
+          ? { fuelPriceMultipliers: { "Natural Gas": gasMultiplier } }
+          : {}),
+      },
+    });
+    tickToMonth(state, month);
+    const snap = state.worldEvents.active.find(
+      (e) => e.key === hazardEventKey("EXTREME_COLD", "Dallas", month),
+    )!;
+    return { state, snap };
+  }
+
+  it("spikes gas in a rare mild-climate freeze and says so plainly", () => {
+    const { state, snap } = withStory(undefined);
+    expect(snap.attributes.regional).toBe(true);
+    const multiplier = snap.effects.fuelPriceMultipliers?.["Natural Gas"]!;
+    expect(multiplier).toBe(3);
+    const log = state.eventLog.find((e) => e.storyPhaseKey === snap.key)!;
+    expect(log.message).toContain(
+      "gas prices are 3.0× normal this month as regional supply strains",
+    );
+  });
+
+  it("caps the combined story and cold gas multiple", () => {
+    const { state, snap } = withStory(2.5);
+    const cold = snap.effects.fuelPriceMultipliers?.["Natural Gas"]!;
+    expect(cold).toBeCloseTo(3 / 2.5, 12);
+    expect(snap.attributes.gasPriceMultiplier).toBeCloseTo(3 / 2.5, 12);
+    // A story shock already at the cap leaves nothing for the cold to add.
+    const capped = withStory(3.5).snap;
+    expect(capped.attributes.regional).toBe(true);
+    expect(capped.effects.fuelPriceMultipliers).toBeUndefined();
+    const log = state.eventLog.find((e) => e.storyPhaseKey === snap.key)!;
+    expect(log.message).toContain("1.2× normal");
+  });
+});
+
+describe("month-end transactions", () => {
+  it("charges a retrofit on a month's last tick exactly once", () => {
+    const state = game(DENVER, HAIL.seed);
+    tickToMinute(state, 2 * MINUTES_PER_MONTH - TICK_MINUTES);
+    expect(state.date.monthsElapsed).toBe(1);
+    const control = cloneDeep(state);
+    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
+    const cost = retrofitCost(solar, state, "hailResistant")!;
+    const retrofitted = dispatch(
+      state,
+      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+    );
+    expect(
+      retrofitted.facilities.find((f) => f.id === solar.id)!.resilience
+        ?.hailResistant,
+    ).toBe(true);
+    // The rollover tick clamps prev and now to the month's final frame.
+    tickState(retrofitted);
+    tickState(control);
+    expect(retrofitted.date.monthsElapsed).toBe(2);
+    const cashGap = control.timeline[0].cash - retrofitted.timeline[0].cash;
+    // Only one tick of a lower premium separates the runs besides the cost.
+    expect(Math.abs(cashGap - cost)).toBeLessThan(cost * 0.001);
+  });
+});
+
+describe("selling a facility under a weather outage", () => {
+  it("ends its outage so a facility reusing the ID starts clean", () => {
+    const { state, hits } = atHailOnset();
+    const id = hits[0].attributes.facilityId as number;
+    const sold = dispatch(state, sellFacility(id));
+    const covering = sold.worldEvents.active.filter(
+      (e) =>
+        e.effects.facilityOutputMultipliersById?.[String(id)] !== undefined,
+    );
+    expect(covering).toEqual([]);
+    const ended = sold.worldEvents.active.find((e) => e.key === hits[0].key)!;
+    expect(ended.endsMinute).toBeLessThanOrEqual(sold.date.minute);
+    // The incurred deductible is still due; the historical record is untouched.
+    expect(ended.attributes.oneTimeCost).toBe(hits[0].attributes.oneTimeCost);
+    expect(
+      sold.worldEvents.occurrences.find((e) => e.key === hits[0].key),
+    ).toEqual(hits[0]);
+    // A new facility with the same ID is not limited and gets no repair log.
+    const reused = {
+      ...state.facilities.find((f) => f.id === id)!,
+      minuteCreated: sold.date.minute,
+    };
+    sold.facilities.push(reused);
+    expect(facilityHazardStatus(sold, reused)).toBeUndefined();
+    tickToMinute(sold, hits[0].endsMinute + TICK_MINUTES);
+    expect(sold.eventLog.some((e) => e.storyPhaseKey === hits[0].key)).toBe(
+      false,
+    );
   });
 });
 

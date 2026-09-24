@@ -1,4 +1,5 @@
 import { LocationType, WeatherHazardProfileType } from "../Types";
+import { COLD_CLIMATE_BY_LOCATION } from "./ColdClimate";
 
 /**
  * Location exposure to damaging hail and extreme cold, plus the balance constants that turn an
@@ -23,11 +24,14 @@ const FALLBACK = "Latitude-band fallback, rounded game balance";
 export const STANDARD_GAS_DESIGN_MIN_TEMP_C = -8;
 
 /**
- * The regional threshold where gas supply is strained (wellhead freeze-offs, pipeline pressure),
- * by climate. Northern systems are built for deeper cold, as ERCOT's in February 2021 was not.
+ * The warmest threshold where regional gas supply is strained (wellhead freeze-offs, pipeline
+ * pressure), by climate; a place's own rare cold lowers it further, so a shock needs cold well
+ * below the local norm. Northern systems are built for deeper cold, as ERCOT's in February 2021
+ * was not. Mild regions still sit well below a standard plant's rating, so a plant can trip in a
+ * cold snap without the whole region's gas supply failing.
  * Source: FERC-NERC February 2021 Cold Weather Outages report (2021).
  */
-export const DEFAULT_REGIONAL_COLD_THRESHOLD_C = { cold: -25, mild: -8 };
+export const DEFAULT_REGIONAL_COLD_THRESHOLD_C = { cold: -25, mild: -15 };
 
 /** Hailstorm-to-site hit share: a storm swath misses some panels even within a small region. */
 export const HAIL_EXPOSURE_HIT_SHARE = 0.7;
@@ -103,155 +107,180 @@ export const WEATHER_HAZARD_AUTHORED_FREEZE_SCENARIOS: ReadonlySet<number> =
  */
 export const WEATHER_HAZARD_OPT_OUT_SCENARIOS: ReadonlySet<number> = new Set();
 
-type ProfileRow = [
-  damagingHailPerYear: number,
-  coldClimate: boolean,
-  source: string,
-  regionalColdThresholdC?: number,
-];
+type ProfileRow = [damagingHailPerYear: number, source: string];
 
-// Grouped by hail band, highest first. Cold thresholds are overridden only where the default
-// for the climate would be clearly wrong: the far north runs through much deeper cold routinely.
+// Grouped by hail band, highest first. Cold exposure comes from each city's own weather record
+// (data/ColdClimate), not from these rows.
 const PROFILE_ROWS: Record<string, ProfileRow> = {
   // Hail alley and the Argentine lee of the Andes, the world's most active hail regions.
-  Denver: [0.08, true, SPC],
-  Dallas: [0.08, false, SPC],
-  KansasCity: [0.08, true, SPC],
-  Cordoba: [0.08, false, SATELLITE],
-  Mendoza: [0.08, false, SATELLITE],
-  Calgary: [0.07, true, SPC, -30],
-  Johannesburg: [0.06, false, SATELLITE],
+  Denver: [0.08, SPC],
+  Dallas: [0.08, SPC],
+  KansasCity: [0.08, SPC],
+  Cordoba: [0.08, SATELLITE],
+  Mendoza: [0.08, SATELLITE],
+  Calgary: [0.07, SPC],
+  Johannesburg: [0.06, SATELLITE],
   // The wider Plains, Midwest and South, plus the Po valley, Bavaria and the Pampas.
-  Austin: [0.05, false, SPC],
-  SanAntonio: [0.05, false, SPC],
-  StLouis: [0.05, true, SPC],
-  Minneapolis: [0.05, true, SPC, -30],
-  Winnipeg: [0.04, true, SPC, -35],
-  Milwaukee: [0.04, true, SPC],
-  Chicago: [0.04, true, SPC],
-  Indianapolis: [0.04, true, SPC],
-  Nashville: [0.04, false, SPC],
-  Memphis: [0.04, false, SPC],
-  Monterrey: [0.04, false, SATELLITE],
-  Milan: [0.05, false, ESSL],
-  Munich: [0.04, true, ESSL],
-  BuenosAires: [0.04, false, SATELLITE],
-  PortoAlegre: [0.04, false, SATELLITE],
+  Austin: [0.05, SPC],
+  SanAntonio: [0.05, SPC],
+  StLouis: [0.05, SPC],
+  Minneapolis: [0.05, SPC],
+  Winnipeg: [0.04, SPC],
+  Milwaukee: [0.04, SPC],
+  Chicago: [0.04, SPC],
+  Indianapolis: [0.04, SPC],
+  Nashville: [0.04, SPC],
+  Memphis: [0.04, SPC],
+  Monterrey: [0.04, SATELLITE],
+  Milan: [0.05, ESSL],
+  Munich: [0.04, ESSL],
+  BuenosAires: [0.04, SATELLITE],
+  PortoAlegre: [0.04, SATELLITE],
   // Moderate: eastern North America, central Europe, the Caucasus, Central and East Asia.
-  PIT: [0.03, true, SPC],
-  Houston: [0.03, false, SPC],
-  Atlanta: [0.03, false, SPC],
-  Columbus: [0.03, true, SPC],
-  Detroit: [0.03, true, SPC],
-  Cleveland: [0.03, true, SPC],
-  Toronto: [0.02, true, SPC],
-  Albuquerque: [0.03, true, SPC],
-  SaltLakeCity: [0.02, true, SPC],
-  Vienna: [0.03, true, ESSL],
-  Zurich: [0.03, true, ESSL],
-  Geneva: [0.03, true, ESSL],
-  Lyon: [0.03, false, ESSL],
-  Frankfurt: [0.02, true, ESSL],
-  Prague: [0.02, true, ESSL],
-  Krakow: [0.02, true, ESSL],
-  Budapest: [0.03, true, ESSL],
-  Belgrade: [0.03, true, ESSL],
-  Bucharest: [0.03, true, ESSL],
-  Sofia: [0.03, true, ESSL],
-  Zagreb: [0.03, true, ESSL],
-  Tbilisi: [0.03, false, SATELLITE],
-  Almaty: [0.03, true, SATELLITE],
-  Beijing: [0.02, true, SATELLITE],
-  Kolkata: [0.02, false, SATELLITE],
-  Durban: [0.02, false, SATELLITE],
-  Harare: [0.02, false, SATELLITE],
+  PIT: [0.03, SPC],
+  Houston: [0.03, SPC],
+  Atlanta: [0.03, SPC],
+  Columbus: [0.03, SPC],
+  Detroit: [0.03, SPC],
+  Cleveland: [0.03, SPC],
+  Toronto: [0.02, SPC],
+  Albuquerque: [0.03, SPC],
+  SaltLakeCity: [0.02, SPC],
+  Vienna: [0.03, ESSL],
+  Zurich: [0.03, ESSL],
+  Geneva: [0.03, ESSL],
+  Lyon: [0.03, ESSL],
+  Frankfurt: [0.02, ESSL],
+  Prague: [0.02, ESSL],
+  Krakow: [0.02, ESSL],
+  Budapest: [0.03, ESSL],
+  Belgrade: [0.03, ESSL],
+  Bucharest: [0.03, ESSL],
+  Sofia: [0.03, ESSL],
+  Zagreb: [0.03, ESSL],
+  Tbilisi: [0.03, SATELLITE],
+  Almaty: [0.03, SATELLITE],
+  Beijing: [0.02, SATELLITE],
+  Kolkata: [0.02, SATELLITE],
+  Durban: [0.02, SATELLITE],
+  Harare: [0.02, SATELLITE],
   // Occasional: the Northeast corridor, the desert Southwest, Paris and Iberia.
-  NewYork: [0.015, true, SPC],
-  Philadelphia: [0.015, true, SPC],
-  Baltimore: [0.015, true, SPC],
-  Manassas: [0.015, true, SPC],
-  Boston: [0.01, true, SPC],
-  Phoenix: [0.01, false, SPC],
-  Tucson: [0.01, false, SPC],
-  Paris: [0.015, false, ESSL],
-  Madrid: [0.01, false, ESSL],
-  Barcelona: [0.01, false, ESSL],
+  NewYork: [0.015, SPC],
+  Philadelphia: [0.015, SPC],
+  Baltimore: [0.015, SPC],
+  Manassas: [0.015, SPC],
+  Boston: [0.01, SPC],
+  Phoenix: [0.01, SPC],
+  Tucson: [0.01, SPC],
+  Paris: [0.015, ESSL],
+  Madrid: [0.01, ESSL],
+  Barcelona: [0.01, ESSL],
   // Rare: marine and Mediterranean climates, and the Gulf.
-  SF: [0.003, false, SPC],
-  LA: [0.003, false, SPC],
-  SanDiego: [0.003, false, SPC],
-  Seattle: [0.003, false, SPC],
-  Portland: [0.003, false, SPC],
-  Vancouver: [0.003, false, SPC],
-  Miami: [0.005, false, SPC],
-  London: [0.004, false, ESSL],
-  Dublin: [0.002, false, ESSL],
-  Edinburgh: [0.002, false, ESSL],
-  Oslo: [0.004, true, ESSL],
-  Bergen: [0.002, false, ESSL],
-  Santiago: [0.004, false, SATELLITE],
-  Dubai: [0.002, false, SATELLITE],
-  Doha: [0.002, false, SATELLITE],
+  SF: [0.003, SPC],
+  LA: [0.003, SPC],
+  SanDiego: [0.003, SPC],
+  Seattle: [0.003, SPC],
+  Portland: [0.003, SPC],
+  Vancouver: [0.003, SPC],
+  Miami: [0.005, SPC],
+  London: [0.004, ESSL],
+  Dublin: [0.002, ESSL],
+  Edinburgh: [0.002, ESSL],
+  Oslo: [0.004, ESSL],
+  Bergen: [0.002, ESSL],
+  Santiago: [0.004, SATELLITE],
+  Dubai: [0.002, SATELLITE],
+  Doha: [0.002, SATELLITE],
   // Negligible hail: the subarctic, subantarctic and tropical islands.
-  Reykjavik: [0.001, true, ESSL],
-  HNL: [0.001, false, SPC],
-  SJU: [0.001, false, SPC],
-  Tromso: [0.001, true, ESSL],
-  Murmansk: [0.001, true, ESSL, -35],
-  Anchorage: [0.001, true, SPC],
-  Ushuaia: [0.001, true, SATELLITE],
-  // Cold-climate cities outside the hail bands above, listed for their cold thresholds.
-  Fairbanks: [0.001, true, SPC, -40],
-  Yellowknife: [0.001, true, SPC, -40],
-  Iqaluit: [0.001, true, SPC, -40],
-  Astana: [0.02, true, SATELLITE, -35],
-  Montreal: [0.01, true, SPC],
-  Buffalo: [0.01, true, SPC],
-  Moscow: [0.01, true, ESSL],
-  StPetersburg: [0.005, true, ESSL],
-  Helsinki: [0.005, true, ESSL],
-  Stockholm: [0.005, true, ESSL],
-  Warsaw: [0.02, true, ESSL],
-  Kyiv: [0.02, true, ESSL],
-  Minsk: [0.015, true, ESSL],
+  Reykjavik: [0.001, ESSL],
+  HNL: [0.001, SPC],
+  SJU: [0.001, SPC],
+  Tromso: [0.001, ESSL],
+  Murmansk: [0.001, ESSL],
+  Anchorage: [0.001, SPC],
+  Ushuaia: [0.001, SATELLITE],
+  // Cold-climate cities outside the hail bands above.
+  Fairbanks: [0.001, SPC],
+  Yellowknife: [0.001, SPC],
+  Iqaluit: [0.001, SPC],
+  Astana: [0.02, SATELLITE],
+  Montreal: [0.01, SPC],
+  Buffalo: [0.01, SPC],
+  Moscow: [0.01, ESSL],
+  StPetersburg: [0.005, ESSL],
+  Helsinki: [0.005, ESSL],
+  Stockholm: [0.005, ESSL],
+  Warsaw: [0.02, ESSL],
+  Kyiv: [0.02, ESSL],
+  Minsk: [0.015, ESSL],
 };
 
-/** Authored profiles by location id. Unknown or custom locations use the latitude fallback. */
-export const WEATHER_HAZARD_PROFILES: Readonly<
-  Record<string, WeatherHazardProfileType>
-> = Object.fromEntries(
-  Object.entries(PROFILE_ROWS).map(
-    ([id, [damagingHailPerYear, coldClimate, source, threshold]]) => [
-      id,
-      {
-        damagingHailPerYear,
-        coldClimate,
-        source,
-        ...(threshold === undefined
-          ? {}
-          : { regionalColdThresholdC: threshold }),
-      },
-    ],
-  ),
-);
-
 /**
- * A coarse profile for a location with no authored entry: hail is rarest near the poles and in
- * the deep tropics, and plants are winterized at high latitude or at altitude outside the tropics.
+ * Whether a place builds its gas plants for its own winters and where its regional gas supply
+ * strains. A place is a cold climate when a standard plant's rating is breached in about one
+ * winter in four; regional strain needs the colder of the climate's default threshold and the
+ * place's one-winter-in-twelve low. Cities without a weather record fall back to latitude and
+ * altitude: plants are winterized at high latitude or at altitude outside the tropics.
  */
-function fallbackProfile(location: LocationType): WeatherHazardProfileType {
-  const absLat = Math.abs(location.lat);
-  const damagingHailPerYear = absLat >= 60 ? 0.002 : absLat < 15 ? 0.005 : 0.01;
-  const coldClimate =
-    absLat >= 45 || ((location.elevation ?? 0) >= 1500 && absLat >= 30);
-  return { damagingHailPerYear, coldClimate, source: FALLBACK };
+function coldExposure(
+  location: LocationType,
+): Pick<WeatherHazardProfileType, "coldClimate" | "regionalColdThresholdC"> {
+  const climate = COLD_CLIMATE_BY_LOCATION[location.id];
+  if (!climate) {
+    const absLat = Math.abs(location.lat);
+    const coldClimate =
+      absLat >= 45 || ((location.elevation ?? 0) >= 1500 && absLat >= 30);
+    return {
+      coldClimate,
+      regionalColdThresholdC: coldClimate
+        ? DEFAULT_REGIONAL_COLD_THRESHOLD_C.cold
+        : DEFAULT_REGIONAL_COLD_THRESHOLD_C.mild,
+    };
+  }
+  const [routineLowC, rareLowC] = climate;
+  const coldClimate = routineLowC <= STANDARD_GAS_DESIGN_MIN_TEMP_C;
+  const base = coldClimate
+    ? DEFAULT_REGIONAL_COLD_THRESHOLD_C.cold
+    : DEFAULT_REGIONAL_COLD_THRESHOLD_C.mild;
+  return {
+    coldClimate,
+    regionalColdThresholdC: Math.max(
+      DESIGN_MIN_TEMP_BOUNDS_C.min,
+      Math.min(base, rareLowC),
+    ),
+  };
 }
 
-/** The hazard profile for a location: its authored entry, or the latitude fallback. */
+/** Authored hail rates by location id. Unknown or custom locations use the latitude fallback. */
+const HAIL_RATES: Readonly<Record<string, { rate: number; source: string }>> =
+  Object.fromEntries(
+    Object.entries(PROFILE_ROWS).map(([id, [rate, source]]) => [
+      id,
+      { rate, source },
+    ]),
+  );
+
+/** The latitude-band hail fallback: rarest near the poles and in the deep tropics. */
+function fallbackHailPerYear(location: LocationType): number {
+  const absLat = Math.abs(location.lat);
+  return absLat >= 60 ? 0.002 : absLat < 15 ? 0.005 : 0.01;
+}
+
+/** The hazard profile for a location: its authored hail rate and its own cold climate. */
 export function getWeatherHazardProfile(
   location: LocationType,
 ): WeatherHazardProfileType {
-  return WEATHER_HAZARD_PROFILES[location.id] ?? fallbackProfile(location);
+  const hail = HAIL_RATES[location.id];
+  return {
+    damagingHailPerYear: hail?.rate ?? fallbackHailPerYear(location),
+    ...coldExposure(location),
+    source: hail?.source ?? FALLBACK,
+  };
+}
+
+/** Every authored hail location's profile, for validation and tests. */
+export function authoredHailLocationIds(): string[] {
+  return Object.keys(PROFILE_ROWS);
 }
 
 /** The representative-day minimum below which regional gas supply is strained. */
@@ -313,7 +342,10 @@ export function validateWeatherHazardProfile(
   }
 }
 
-// Validate the shipped profiles at module load so a regression in this data file cannot ship.
-Object.entries(WEATHER_HAZARD_PROFILES).forEach(([id, profile]) =>
-  validateWeatherHazardProfile(profile, id),
+// Validate the shipped data at module load so a regression in these data files cannot ship.
+Object.keys({ ...PROFILE_ROWS, ...COLD_CLIMATE_BY_LOCATION }).forEach((id) =>
+  validateWeatherHazardProfile(
+    getWeatherHazardProfile({ id, name: id, lat: 0, long: 0 }),
+    id,
+  ),
 );

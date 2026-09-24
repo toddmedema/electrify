@@ -236,6 +236,7 @@ export type ConceptNameType =
   | "rate"
   | "fuel"
   | "weather"
+  | "severeWeather"
   | "danger"
   | "goal";
 

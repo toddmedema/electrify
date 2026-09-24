@@ -286,13 +286,18 @@ All values are rounded game balance, not a site-specific risk assessment.
   by local exposure, and 40% of that for hail-resistant arrays. Insurers pay repairs above a
   deductible of 2% of replacement value. Gas carries no loading: cold costs output, not assets.
 - **Extreme cold.** Each month's representative-day minimum is compared with each gas plant's
-  design minimum (-8 °C standard) and with the region's gas-supply threshold (-8 °C in mild
-  climates, -25 °C in cold ones, deeper in the far north), following the FERC-NERC report on the
-  February 2021 cold-weather outages. A cold-weather package rates a plant 5 °C below the regional
-  threshold, and at least to -25 °C.
-- **Hardening prices.** Hail-resistant design adds 3% to a solar build (8% as a retrofit), after
+  design minimum (-8 °C standard) and with the region's gas-supply threshold, following the
+  FERC-NERC report on the February 2021 cold-weather outages. Cold is judged against each city's
+  own weather record (`src/data/ColdClimate.tsx`, derived from 1980-2024 representative days): a
+  place is a cold climate when the standard rating is breached in about one winter in four, and
+  its gas quotes include a cold-weather package by default. Regional supply strains below the
+  colder of -15 °C (mild climates) or -25 °C (cold climates) and the place's one-winter-in-twelve
+  low, so a regional gas shock stays rare everywhere. A package rates a plant 5 °C below the
+  regional threshold, and at least to -25 °C. A cold snap's gas-price multiple is capped so that,
+  combined with any authored gas shock that month, prices reach at most 3× normal.
+- **Hardening prices.** Hail-resistant panels add 3% to a solar build (8% as a retrofit), after
   DOE FEMP's solar hail-resilience guidance; a cold-weather package adds 2% to a gas build (4% as
-  a retrofit). Cold-climate gas quotes include the package by default.
+  a retrofit).
 
 ## Primary references
 

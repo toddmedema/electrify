@@ -25,14 +25,21 @@ import {
 import { facilityColor } from "../../Theme";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
+  annualInsuranceCost,
   facilityHazardStatus,
   facilityResilienceSummary,
   FacilityResilienceSummaryType,
   retrofittedResilience,
 } from "../../helpers/Hazards";
 import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
-import { formatTemperature } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import {
+  coldPackageEffect,
+  dayCount,
+  formatDesignTemperature,
+  insuranceChange,
+  resilienceActionLabel,
+} from "./WeatherResilienceText";
 import {
   DateType,
   FacilityOperatingType,
@@ -138,14 +145,6 @@ export function fuelPriceTrend(
   return prices;
 }
 
-// The unicode minus reads as a sign rather than a hyphen next to a temperature
-function formatDesignTemperature(
-  celsius: number,
-  units: ReturnType<typeof useUnits>,
-) {
-  return formatTemperature(celsius, units).replace(/^-/, "\u2212");
-}
-
 /**
  * How the facility is hardened against the weather hazard its technology faces, what that costs
  * in insurance, and - outside a replay - an offer to add the upgrade to the standing plant.
@@ -160,24 +159,49 @@ function WeatherResilienceSection(props: {
   const { facility, game, summary, onRetrofit } = props;
   const units = useUnits();
   const [confirming, setConfirming] = React.useState(false);
+  // Paying removes the offer button, so focus moves to the section heading instead of the page
+  const [focusHeading, setFocusHeading] = React.useState(0);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const shortfallId = React.useId();
+  React.useEffect(() => {
+    if (focusHeading > 0) {
+      headingRef.current?.focus();
+    }
+  }, [focusHeading]);
   const hail = summary.upgrade === "hailResistant";
   const cost = summary.retrofitCost;
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
+  const shortfallText = `${formatMoneyConcise(shortfall)} more cash needed`;
   const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;
   const designMinTempC =
     facility.resilience?.designMinTempC ?? STANDARD_GAS_DESIGN_MIN_TEMP_C;
   const detail = hail
     ? summary.detail
     : `Rated to ${formatDesignTemperature(designMinTempC, units)}`;
-  const actionLabel = hail ? "Add hail protection" : "Add cold-weather package";
-  const retrofitDesignMinTempC = hail
-    ? undefined
-    : retrofittedResilience(facility, game, "coldWeatherPackage")
-        .designMinTempC;
+  const actionLabel = resilienceActionLabel(summary.upgrade);
+  const retrofitted = canOffer
+    ? retrofittedResilience(facility, game, summary.upgrade)
+    : undefined;
+  const insuranceAfter =
+    hail && retrofitted && summary.annualInsuranceCost !== undefined
+      ? annualInsuranceCost({ ...facility, resilience: retrofitted }, game)
+      : undefined;
+  const hazard = facilityHazardStatus(game, facility);
+  const activeOutage =
+    hazard && (hazard.hazard === "HAIL") === hail
+      ? hail
+        ? "Current damage is still repaired on schedule."
+        : "This month's cold outage continues."
+      : undefined;
   return (
     <section className="facilityDetailSection" aria-label="Weather resilience">
-      <Typography component="h3" className="facilityDetailHeading">
+      <Typography
+        component="h3"
+        className="facilityDetailHeading"
+        ref={headingRef}
+        tabIndex={-1}
+      >
         Weather resilience
       </Typography>
       <dl className="facilityStats">
@@ -208,13 +232,18 @@ function WeatherResilienceSection(props: {
             variant="outlined"
             color="primary"
             disabled={shortfall > 0}
+            aria-describedby={shortfall > 0 ? shortfallId : undefined}
             onClick={() => setConfirming(true)}
           >
             {actionLabel} · {formatMoneyConcise(cost)}
           </Button>
           {shortfall > 0 && (
-            <Typography variant="caption" color="textSecondary">
-              Needs {formatMoneyConcise(shortfall)} more cash.
+            <Typography
+              id={shortfallId}
+              variant="caption"
+              color="textSecondary"
+            >
+              {shortfallText}
             </Typography>
           )}
         </div>
@@ -231,12 +260,29 @@ function WeatherResilienceSection(props: {
           <DialogContent>
             <DialogContentText>
               {hail
-                ? "Future hail breaks less of the array, and weather insurance falls."
-                : `Keeps the plant running down to ${formatDesignTemperature(retrofitDesignMinTempC ?? designMinTempC, units)} instead of ${formatDesignTemperature(designMinTempC, units)}.`}
+                ? "Future hail breaks less of the array."
+                : coldPackageEffect(
+                    retrofitted?.designMinTempC ?? designMinTempC,
+                    designMinTempC,
+                    units,
+                  )}
             </DialogContentText>
-            <DialogContentText>
-              Costs {formatMoneyConcise(cost)} cash now.
-            </DialogContentText>
+            {insuranceAfter !== undefined && (
+              <DialogContentText>
+                {insuranceChange(
+                  summary.annualInsuranceCost ?? 0,
+                  insuranceAfter,
+                )}
+              </DialogContentText>
+            )}
+            {activeOutage && (
+              <DialogContentText>{activeOutage}</DialogContentText>
+            )}
+            {shortfall > 0 && (
+              <DialogContentText className="facilityRetrofitShortfall">
+                {shortfallText}.
+              </DialogContentText>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setConfirming(false)} color="primary">
@@ -253,6 +299,7 @@ function WeatherResilienceSection(props: {
                   upgrade: summary.upgrade,
                 });
                 setConfirming(false);
+                setFocusHeading((count) => count + 1);
               }}
             >
               Pay {formatMoneyConcise(cost)}
@@ -391,8 +438,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                   {percent(hazard.availableFraction)} available
                   <span className="facilityStatNote">
                     {hazard.daysLeft !== undefined
-                      ? `Repaired in ${hazard.daysLeft} ${hazard.daysLeft === 1 ? "day" : "days"}`
-                      : "Through this month"}
+                      ? `${dayCount(hazard.daysLeft)} to repair`
+                      : "Until month end"}
                   </span>
                 </span>
               }

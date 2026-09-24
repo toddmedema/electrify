@@ -25,6 +25,7 @@ import {
   hailMonthlyProbability,
   hazardDraw,
   hazardEventKey,
+  hazardInsuranceComparison,
   isWeatherHazardEligible,
   oneTimeWorldEventCost,
   refreshInsurancePremiums,
@@ -293,6 +294,14 @@ describe("resolveColdImpact", () => {
     expect(resolveColdImpact({ game, key, minTempC: -5 })).toBeUndefined();
   });
 
+  it("trips a mild-climate plant without a regional gas shock", () => {
+    const game = gameAt(DALLAS, [facility(1, "Natural Gas")]);
+    const impact = resolveColdImpact({ game, key, minTempC: -10 })!;
+    expect(impact.regional).toBe(false);
+    expect(impact.gasPriceMultiplier).toBe(1);
+    expect(impact.derates).toHaveLength(1);
+  });
+
   it("derates standard plants and spikes gas below the regional threshold", () => {
     const game = gameAt(DALLAS, [
       facility(2, "Natural Gas", {
@@ -302,13 +311,14 @@ describe("resolveColdImpact", () => {
       facility(3, "Sun"),
       facility(4, "Natural Gas", { yearsToBuildLeft: 2 }),
     ]);
-    const impact = resolveColdImpact({ game, key, minTempC: -15 })!;
+    // Dallas strains regionally below -15 °C, well under a standard plant's -8 °C rating.
+    const impact = resolveColdImpact({ game, key, minTempC: -20 })!;
     expect(impact.regional).toBe(true);
-    expect(impact.gasPriceMultiplier).toBeCloseTo(1.5 + 0.1 * 7, 12);
+    expect(impact.gasPriceMultiplier).toBeCloseTo(1.5 + 0.1 * 5, 12);
     expect(impact.derates.map((d) => d.facilityId)).toEqual([1]);
     const derate = 1 - impact.derates[0].availableFraction;
-    expect(derate).toBeGreaterThanOrEqual((0.2 + 0.04 * 7) * 0.85 - 1e-12);
-    expect(derate).toBeLessThanOrEqual((0.2 + 0.04 * 7) * 1.15 + 1e-12);
+    expect(derate).toBeGreaterThanOrEqual((0.2 + 0.04 * 12) * 0.85 - 1e-12);
+    expect(derate).toBeLessThanOrEqual((0.2 + 0.04 * 12) * 1.15 + 1e-12);
     expect(impact.protectedFacilityIds).toEqual([2]);
   });
 
@@ -399,6 +409,48 @@ describe("retrofitCost", () => {
         facility(1, "Natural Gas"),
         gameAt(DENVER, [], { scenarioId: 107 }),
         "coldWeatherPackage",
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("retrofitCost under construction", () => {
+  it("is not offered until the facility is operating", () => {
+    const game = gameAt(DENVER);
+    const building = facility(1, "Sun", { yearsToBuildLeft: 0.5 });
+    expect(retrofitCost(building, game, "hailResistant")).toBeUndefined();
+    expect(
+      facilityResilienceSummary(game, building)!.retrofitCost,
+    ).toBeUndefined();
+  });
+});
+
+describe("hazardInsuranceComparison", () => {
+  it("prices a solar quote's insurance with and without hail protection", () => {
+    const game = gameAt(DENVER);
+    const comparison = hazardInsuranceComparison(quote("Sun"), game)!;
+    expect(comparison.standard).toBeCloseTo(5e7 * 0.002 * (0.08 / 0.05), 6);
+    expect(comparison.hardened).toBeCloseTo(
+      5e7 * 1.03 * 0.002 * (0.08 / 0.05) * 0.4,
+      6,
+    );
+    // The same answer whichever way the quote's option is currently set.
+    expect(
+      hazardInsuranceComparison(
+        withResilienceOption(quote("Sun"), game, true),
+        game,
+      ),
+    ).toEqual(comparison);
+  });
+
+  it("is undefined without a hail option", () => {
+    expect(
+      hazardInsuranceComparison(quote("Natural Gas"), gameAt(DENVER)),
+    ).toBeUndefined();
+    expect(
+      hazardInsuranceComparison(
+        quote("Sun"),
+        gameAt(DENVER, [], { scenarioId: 1 }),
       ),
     ).toBeUndefined();
   });
@@ -527,7 +579,7 @@ function realDays(days: number): number {
 }
 
 describe("facilityHazardStatus", () => {
-  it("reports the worst active weather outage with days left", () => {
+  it("combines overlapping outages and runs to the last repair", () => {
     const sun = facility(1, "Sun");
     const game = gameAt(DENVER, [sun]);
     game.date = getDateFromMinute(1440, 2020);
@@ -539,14 +591,38 @@ describe("facilityHazardStatus", () => {
         definitionId: COLD_DEFINITION_ID,
       },
     );
-    expect(facilityHazardStatus(game, sun)).toEqual({
+    const status = facilityHazardStatus(game, sun)!;
+    expect(status).toMatchObject({
       hazard: "HAIL",
       label: "Hail damage",
-      availableFraction: 0.7,
-      daysLeft: 4,
-      endsMinute: 1440 + realDays(4),
+      daysLeft: 10,
+      endsMinute: 1440 + realDays(10),
     });
+    expect(status.availableFraction).toBeCloseTo(0.8 * 0.7, 12);
     expect(facilityHazardStatus(game, facility(2, "Sun"))).toBeUndefined();
+  });
+
+  it("labels a cold-only outage as extreme cold", () => {
+    const gas = facility(1, "Natural Gas");
+    const game = gameAt(DALLAS, [gas]);
+    game.worldEvents.active.push({
+      ...hailOccurrence(1, 0, MINUTES_PER_MONTH, 0.6),
+      definitionId: COLD_DEFINITION_ID,
+    });
+    expect(facilityHazardStatus(game, gas)).toEqual({
+      hazard: "EXTREME_COLD",
+      label: "Extreme cold",
+      availableFraction: 0.6,
+      endsMinute: MINUTES_PER_MONTH,
+    });
+  });
+
+  it("ignores an outage that began before the facility was bought", () => {
+    const game = gameAt(DENVER);
+    game.date = getDateFromMinute(1440, 2020);
+    game.worldEvents.active.push(hailOccurrence(1, 0, 1440 * 10, 0.8));
+    const reused = facility(1, "Sun", { minuteCreated: 1000 });
+    expect(facilityHazardStatus(game, reused)).toBeUndefined();
   });
 
   it("ignores outages outside their window", () => {
@@ -579,7 +655,7 @@ describe("facilityResilienceSummary", () => {
     expect(facilityResilienceSummary(gameAt(REYKJAVIK), gas)).toMatchObject({
       label: "Cold-weather package",
       installed: true,
-      detail: "Rated to -30 °C",
+      detail: "Keeps running through deeper cold.",
       retrofitCost: undefined,
       annualInsuranceCost: undefined,
     });

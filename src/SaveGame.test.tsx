@@ -158,6 +158,12 @@ describe("SaveGame", () => {
         { ...event, attributes: { ids: [null] } },
         { ...event, effects: { demandMultiplier: "bad" } },
         { ...event, effects: { facilityOutputMultipliersById: { "1": null } } },
+        // Negative booked amounts would turn a charge into income.
+        { ...event, attributes: { cost: -10 } },
+        { ...event, attributes: { oneTimeCost: -1e9, oneTimeCostMinute: 15 } },
+        { ...event, attributes: { repairCost: -1 } },
+        { ...event, attributes: { upfrontGrant: -5 } },
+        { ...event, attributes: { cost: "10" } },
       ]) {
         raw.game.worldEvents[field] = [malformed];
         expect(parseSave(raw)).toBeNull();

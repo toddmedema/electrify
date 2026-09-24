@@ -13,6 +13,12 @@ import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
+import {
+  hazardInsuranceComparison,
+  resilienceBuildOption,
+  withResilienceOption,
+} from "../../helpers/Hazards";
+import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
@@ -576,7 +582,7 @@ describe("weather hardening in the purchase dialog", () => {
     );
     const dialog = screen.getByRole("dialog");
     const option = within(dialog).getByRole("checkbox", {
-      name: /^Hail-resistant design \+\$/,
+      name: /^Hail-resistant panels \+\$/,
     });
     expect(option).not.toBeChecked();
     fireEvent.click(option);
@@ -585,8 +591,129 @@ describe("weather hardening in the purchase dialog", () => {
     expect(quote.resilience).toEqual({ hailResistant: true });
     expect(quote.resilienceExtraBuildCost).toBeGreaterThan(0);
     expect(option).toHaveAccessibleName(
-      `Hail-resistant design +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
+      `Hail-resistant panels +${formatMoneyConcise(quote.resilienceExtraBuildCost)}`,
     );
+  });
+
+  it("shows hail-resistant panels' effect on weather insurance and upkeep", () => {
+    showBuildList();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Solar" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const option = within(dialog).getByRole("checkbox", {
+      name: /^Hail-resistant panels \+\$/,
+    });
+    expect(option).toHaveAccessibleDescription(
+      /^Cuts hail damage and weather insurance\. Weather insurance \$[\d.]+[kMB]? → \$[\d.]+[kMB]?\/yr$/,
+    );
+    const impact = within(dialog).getByRole("region", {
+      name: "Expected impact",
+    });
+    expect(impact).toHaveTextContent(
+      "Includes weather insurance. Plus fuel and loan payments.",
+    );
+  });
+
+  function gasItem(cash: number, onBuild = jest.fn()) {
+    const game = coldGame();
+    const quote = GENERATORS(game, 419000000, [], []).find(
+      (candidate) => candidate.name === "Natural Gas",
+    )!;
+    const option = resilienceBuildOption(quote, game)!;
+    render(
+      <GeneratorBuildItem
+        cash={cash}
+        date={game.date}
+        interestRate={game.interestRate}
+        generator={quote}
+        location={game.location}
+        seed={game.seed}
+        resilienceOption={option}
+        withResilience={(selected) =>
+          withResilienceOption(quote, game, selected)
+        }
+        insurance={hazardInsuranceComparison(quote, game)}
+        onBuild={onBuild}
+      />,
+    );
+    return {
+      packaged: withResilienceOption(quote, game, true),
+      plain: withResilienceOption(quote, game, false),
+      onBuild,
+    };
+  }
+
+  it("keeps the card buyable when only the default package is unaffordable", () => {
+    const game = coldGame();
+    const quote = GENERATORS(game, 419000000, [], []).find(
+      (candidate) => candidate.name === "Natural Gas",
+    )!;
+    const plainDownpayment =
+      DOWNPAYMENT_PERCENT * withResilienceOption(quote, game, false).buildCost;
+    const packagedDownpayment = DOWNPAYMENT_PERCENT * quote.buildCost;
+    const cash = (plainDownpayment + packagedDownpayment) / 2;
+    const { onBuild } = gasItem(cash);
+
+    expect(screen.getByText("Incl. cold-weather package")).toBeVisible();
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Natural Gas",
+    });
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    const dialog = screen.getByRole("dialog");
+    const option = within(dialog).getByRole("checkbox", {
+      name: /^Cold-weather package/,
+    });
+    expect(option).toBeChecked();
+    expect(option).toHaveAccessibleDescription(
+      /Clear it to afford this build\.$/,
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Take loan" }),
+    ).toBeDisabled();
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
+    expect(onBuild).toHaveBeenCalledWith(true, false);
+  });
+
+  it("prices cash, downpayment and loan from the selected quote", () => {
+    const cash = 1e12;
+    const { packaged, plain, onBuild } = gasItem(cash);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Show financing terms" }),
+    );
+    const downpayment = () =>
+      within(
+        within(dialog).getByRole("row", { name: /^Downpayment/ }),
+      ).getAllByRole("cell")[1];
+    const impact = within(dialog).getByRole("region", {
+      name: "Expected impact",
+    });
+    expect(downpayment()).toHaveTextContent(
+      formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost),
+    );
+    expect(impact).toHaveTextContent(
+      `→ ${formatMoneyConcise(cash - packaged.buildCost)}`,
+    );
+    fireEvent.click(
+      within(dialog).getByRole("checkbox", { name: /^Cold-weather package/ }),
+    );
+    expect(downpayment()).toHaveTextContent(
+      formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost),
+    );
+    expect(impact).toHaveTextContent(
+      `→ ${formatMoneyConcise(cash - plain.buildCost)}`,
+    );
+    expect(impact).toHaveTextContent(
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost)} now`,
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take loan" }));
+    expect(onBuild).toHaveBeenCalledWith(true, false);
   });
 
   it("offers no hardening for technologies without a modelled hazard", () => {

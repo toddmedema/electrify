@@ -23,7 +23,11 @@ import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
-import { HAIL_DEFINITION_ID, retrofitCost } from "../../helpers/Hazards";
+import {
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  retrofitCost,
+} from "../../helpers/Hazards";
 import { formatMoneyConcise } from "../../helpers/Format";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
@@ -416,21 +420,53 @@ describe("weather hazards in the fleet", () => {
     hailOn(state, 0.72, 9);
     renderFacilities(state, null);
 
-    expect(
-      screen.getByText("Hail damage · 72% available · 9 days left"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Hail · 72% · 9d")).toBeInTheDocument();
+    const lead = screen.getByTitle(
+      "Hail damage · 72% available · 9 days to repair",
+    );
+    expect(lead).toHaveTextContent(
+      "Hail damage · 72% available · 9 days to repair",
+    );
+    expect(screen.getByText("Hail · 72% output · 9d")).toBeInTheDocument();
     expect(screen.queryByText("72% limit")).toBeNull();
     const solarRow = rows().find((row) =>
       row.getAttribute("aria-label")?.startsWith("Inspect Solar"),
     );
     expect(solarRow).toHaveAttribute(
       "aria-label",
-      "Inspect Solar, Hail damage · 72% available · 9 days left",
+      "Inspect Solar, Hail damage, 72% available, 9 days to repair",
     );
   });
 
-  it("offers hail protection from the details and confirms before paying", async () => {
+  it("leads a cold-derated gas row with the month-long outage and no limit chip", () => {
+    const state = gameWithSolar();
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    state.worldEvents.active.push({
+      key: `cold:${state.location.id}:0`,
+      definitionId: COLD_DEFINITION_ID,
+      startsMinute: state.date.minute,
+      endsMinute: state.date.minute + MINUTES_PER_MONTH,
+      attributes: { hazard: "EXTREME_COLD" },
+      effects: {
+        facilityOutputMultipliersById: { [String(gas.id)]: 0.55 },
+      },
+    });
+    renderFacilities(state, null);
+
+    expect(screen.getByTitle("Extreme cold · 55% available")).toHaveTextContent(
+      "Extreme cold · 55% available",
+    );
+    expect(screen.getByText("Cold · 55% output")).toBeInTheDocument();
+    expect(screen.queryByText("55% limit")).toBeNull();
+    const gasRow = rows().find((row) =>
+      row.getAttribute("aria-label")?.startsWith(`Inspect ${gas.name}`),
+    );
+    expect(gasRow).toHaveAttribute(
+      "aria-label",
+      `Inspect ${gas.name}, Extreme cold, 55% available`,
+    );
+  });
+
+  it("offers hail-resistant panels from the details and confirms before paying", async () => {
     const state = gameWithSolar();
     const cost = retrofitCost(state.facilities[2], state, "hailResistant")!;
     const { onRetrofit, onSelect } = renderFacilities(state, 3);
@@ -440,15 +476,14 @@ describe("weather hazards in the fleet", () => {
     expect(details).toHaveTextContent("Weather insurance");
     await user.click(
       within(details).getByRole("button", {
-        name: `Add hail protection · ${formatMoneyConcise(cost)}`,
+        name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
       }),
     );
     const dialog = screen.getByRole("dialog", {
-      name: "Add hail protection to Solar?",
+      name: "Add hail-resistant panels to Solar?",
     });
-    expect(dialog).toHaveTextContent(
-      `Costs ${formatMoneyConcise(cost)} cash now.`,
-    );
+    expect(dialog).toHaveTextContent(/Weather insurance \$.+ → \$.+\/yr/);
+    expect(dialog).not.toHaveTextContent("cash now");
     await user.click(
       within(dialog).getByRole("button", {
         name: `Pay ${formatMoneyConcise(cost)}`,

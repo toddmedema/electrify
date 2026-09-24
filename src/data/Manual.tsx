@@ -12,7 +12,9 @@ import {
   largeMassUnit,
   massUnitName,
 } from "../helpers/Units";
+import { formatDesignTemperature } from "../components/base/WeatherResilienceText";
 import { IMPORT_EMISSIONS_ASSUMPTIONS } from "./ImportEmissions";
+import { COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C } from "./Hazards";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
 // through a component of their own rather than the array becoming a function of it. Their text
@@ -64,6 +66,14 @@ function ExampleCarbonFee(): React.JSX.Element {
 
 function EmissionsPerPoint(): React.JSX.Element {
   return <>{formatLargeMassApprox(KG_PER_MEGATONNE, useUnits())}</>;
+}
+
+function ColdPackageRating(): React.JSX.Element {
+  return (
+    <>
+      {formatDesignTemperature(COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C, useUnits())}
+    </>
+  );
 }
 
 // Groups the entries into sections, so the list doesn't open on "Blackouts" and "BTU" purely
@@ -920,7 +930,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization deductible premium resilience retrofit hardening",
+      "hail storm freeze cold snap winterization deductible premium resilience retrofit hardening hail-resistant panels cold-weather package insurance",
     related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
     entry: (
       <div>
@@ -937,8 +947,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             <strong>Extreme cold:</strong> Gas plants colder than their rating
-            lose output for the month. A deep regional freeze also raises gas
-            prices.
+            lose output for the month; a cold-weather package halves the loss. A
+            deep regional freeze also raises gas prices.
           </li>
           <li>
             <strong>Weather insurance:</strong> Solar farms pay a yearly premium
@@ -946,10 +956,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
         </ul>
         <p>
-          When building, add a hail-resistant design to solar or a cold-weather
-          package to gas. The package is on by default in cold climates. Either
-          can be added later from the facility&apos;s details, at a higher
-          price.
+          When building, you can add hail-resistant panels to solar (less
+          damage, lower insurance) or a cold-weather package to gas (rated to{" "}
+          <ColdPackageRating />, colder in cold climates). Either can be added
+          later from the facility&apos;s details, at a higher price.
         </p>
       </div>
     ),

@@ -61,6 +61,7 @@ import {
   FacilityHazardStatusType,
   HAIL_DEFINITION_ID,
 } from "../../helpers/Hazards";
+import { dayCount } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
@@ -94,21 +95,25 @@ interface FacilityListItemProps {
 function hazardStatusText(status: FacilityHazardStatusType): {
   long: string;
   short: string;
+  spoken: string;
 } {
   const available = Math.round(status.availableFraction * 100);
   const days = status.daysLeft;
-  const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
+  const longParts = [
+    status.label,
+    `${available}% available`,
+    days !== undefined ? `${dayCount(days)} to repair` : "",
+  ].filter(Boolean);
   return {
-    long: join([
-      status.label,
-      `${available}% available`,
-      days !== undefined ? `${days} ${days === 1 ? "day" : "days"} left` : "",
-    ]),
-    short: join([
+    long: longParts.join(" · "),
+    short: [
       status.hazard === "HAIL" ? "Hail" : "Cold",
-      `${available}%`,
+      `${available}% output`,
       days !== undefined ? `${days}d` : "",
-    ]),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    spoken: longParts.join(", "),
   };
 }
 
@@ -116,9 +121,10 @@ function HazardStatusLead(props: {
   status: FacilityHazardStatusType;
 }): React.JSX.Element {
   const { long, short } = hazardStatusText(props.status);
-  // The row's disclosure carries the spoken form in its label, so these are visual only
+  // The row's disclosure carries the spoken form in its label, so these are visual only; the
+  // title spells out the abbreviated form for a pointer
   return (
-    <span className="facilityHazardStatus" aria-hidden="true">
+    <span className="facilityHazardStatus" aria-hidden="true" title={long}>
       <span className="facilityHazardLong">{long}</span>
       <span className="facilityHazardShort">{short}</span>
       <span className="facilityStatusSeparator">{" · "}</span>
@@ -484,7 +490,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               aria-label={
                 `Inspect ${facility.name}` +
                 (hazardStatus && !underConstruction
-                  ? `, ${hazardStatusText(hazardStatus).long}`
+                  ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
                 (isStorage ? `, ${status}` : "")
               }

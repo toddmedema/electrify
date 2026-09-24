@@ -149,7 +149,9 @@ import {
   weatherFireRiskModifier,
 } from "../helpers/Wildfire";
 import { getWildfireProfile } from "../data/WildfireProfiles";
+import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
+  activeWeatherHazardsFor,
   annualInsuranceCost,
   COLD_DEFINITION_ID,
   HAIL_DEFINITION_ID,
@@ -882,7 +884,7 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
     forecastable: false,
     title: "Hail damage",
     message: `Hail damaged ${Math.round(impact.damagedFraction * 100)}% of ${impact.facilityName}.`,
-    concept: "weather",
+    concept: "severeWeather",
     importance: "CRITICAL",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
     attributes: {
@@ -921,14 +923,15 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
     impacts.every((i) => i.hailResistant) &&
     share < NEGLIGIBLE_RESISTANT_HAIL_SHARE;
   const percent = Math.max(1, Math.round(share * 100));
+  const terms = `${formatMoneyConcise(deductible)} deductible; repairs take about ${formatDays(repairDays)}.`;
   const message = negligible
-    ? `Hail struck your hail-resistant panels, damaging only ${percent}% of your solar fleet; ${formatMoneyConcise(deductible)} deductible, repairs expected in ${formatDays(repairDays)}.`
-    : `Severe hail damaged ${percent}% of your solar fleet; ${formatMoneyConcise(deductible)} deductible, repairs expected in ${formatDays(repairDays)}.`;
+    ? `Hail hit your hail-resistant panels but damaged only ${percent}% of your solar fleet. ${terms}`
+    : `Hail damaged ${percent}% of your solar fleet. ${terms}`;
   logGameEvent(state, "WORLD_EVENT", message, {
     importance: negligible ? "NOTABLE" : "CRITICAL",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
-    title: negligible ? "Hail shrugged off" : "Hailstorm damage",
-    concept: "weather",
+    title: negligible ? "Minor hail damage" : "Hail damage",
+    concept: "severeWeather",
     storyPhaseKey: key,
     turningPointPriority: negligible ? undefined : 110,
     reportedKey: key,
@@ -949,23 +952,40 @@ function recordColdSnap(
   );
   const impact = resolveColdImpact({ game: state, key, minTempC });
   if (!impact) return false;
+  // An authored gas shock this month already prices in some of the strain, so the cold snap only
+  // lifts the combined multiple to the same cap a deep freeze alone could reach.
+  const storyGasMultiplier =
+    storyEffectsAt(state.date, state).fuelPriceMultipliers?.["Natural Gas"] ??
+    1;
+  const gasPriceMultiplier = impact.regional
+    ? Math.max(
+        1,
+        Math.min(
+          impact.gasPriceMultiplier,
+          COLD_MAX_GAS_PRICE_MULTIPLIER / Math.max(1, storyGasMultiplier),
+        ),
+      )
+    : 1;
+  const raisesGasPrice = gasPriceMultiplier > 1;
   const affectedIds = impact.derates.map((d) => d.facilityId);
   const affectedNames = impact.derates.map((d) => d.facilityName);
   const effects: WorldEventEffectsType = {};
-  if (impact.regional) {
-    effects.fuelPriceMultipliers = { "Natural Gas": impact.gasPriceMultiplier };
+  if (raisesGasPrice) {
+    effects.fuelPriceMultipliers = { "Natural Gas": gasPriceMultiplier };
   }
   if (impact.derates.length) {
     effects.facilityOutputMultipliersById = Object.fromEntries(
       impact.derates.map((d) => [String(d.facilityId), d.availableFraction]),
     );
   }
-  const temperature = `${Math.round(minTempC)} °C`;
+  // The temperature stays in the attributes: the log text cannot follow the player's unit setting.
   const parts: string[] = [];
-  if (impact.regional) {
+  if (raisesGasPrice) {
     parts.push(
-      `regional gas supply is strained and prices are up ${impact.gasPriceMultiplier.toFixed(1)}× this month`,
+      `gas prices are ${gasPriceMultiplier.toFixed(1)}× normal this month as regional supply strains`,
     );
+  } else if (impact.regional) {
+    parts.push("regional gas supply is strained");
   }
   if (impact.derates.length) {
     const lowest = Math.min(...impact.derates.map((d) => d.availableFraction));
@@ -979,7 +999,8 @@ function recordColdSnap(
   const protectedNote = protectedNames.length
     ? ` Cold-weather packages kept ${protectedNames.join(", ")} running.`
     : "";
-  const message = `Extreme cold (${temperature}): ${parts.join("; ")}.${protectedNote}`;
+  const summary = parts.join("; ");
+  const message = `Extreme cold: ${summary}.${protectedNote}`;
   const burnsGas = state.facilities.some(
     (f) => f.fuel === "Natural Gas" && f.yearsToBuildLeft <= 0,
   );
@@ -992,7 +1013,7 @@ function recordColdSnap(
     forecastable: false,
     title: "Extreme cold",
     message,
-    concept: "weather",
+    concept: "severeWeather",
     importance: critical ? "CRITICAL" : "NOTABLE",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
     attributes: {
@@ -1000,7 +1021,7 @@ function recordColdSnap(
       eventKey: key,
       minTempC,
       regional: impact.regional,
-      gasPriceMultiplier: impact.gasPriceMultiplier,
+      gasPriceMultiplier,
       affectedFacilityIds: affectedIds,
       affectedFacilityNames: affectedNames,
       protectedFacilityIds: impact.protectedFacilityIds,
@@ -1013,21 +1034,23 @@ function recordColdSnap(
     importance: occurrence.importance,
     actionTarget: occurrence.actionTarget,
     title: occurrence.title,
-    concept: "weather",
+    concept: "severeWeather",
     storyPhaseKey: key,
     turningPointPriority: critical ? 105 : undefined,
     reportedKey: key,
     pause: critical,
   });
-  return impact.regional;
+  return raisesGasPrice;
 }
 
 /**
- * Logs each hail repair that finished in the tick that just ran. Driven from the clock rather
- * than the timeline, whose prev and now frames coincide on a month's rollover tick.
+ * Logs each facility whose hail repairs finished in the tick that just ran and that no other
+ * weather hazard still limits. Driven from the clock rather than the timeline, whose prev and now
+ * frames coincide on a month's rollover tick.
  */
 function logHailRepairsCompleted(state: GameType) {
   const minute = state.date.minute;
+  const logged = new Set<number>();
   state.worldEvents.active.forEach((event) => {
     if (
       event.definitionId !== HAIL_DEFINITION_ID ||
@@ -1038,7 +1061,17 @@ function logHailRepairsCompleted(state: GameType) {
     const facility = state.facilities.find(
       ({ id }) => id === event.attributes.facilityId,
     );
-    if (!facility) return; // Sold or cancelled while under repair.
+    // Sold while under repair, or a later facility that reused the ID.
+    if (!facility || event.startsMinute < (facility.minuteCreated || 0)) {
+      return;
+    }
+    if (
+      logged.has(facility.id) ||
+      activeWeatherHazardsFor(state, facility, minute).length
+    ) {
+      return;
+    }
+    logged.add(facility.id);
     logGameEvent(
       state,
       "WORLD_EVENT",
@@ -1047,11 +1080,46 @@ function logHailRepairsCompleted(state: GameType) {
         importance: "NOTABLE",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
         title: "Hail repairs complete",
-        concept: "weather",
+        concept: "severeWeather",
         storyPhaseKey: event.key,
         reportedKey: `hail-repair:${event.key}`,
       },
     );
+  });
+}
+
+/**
+ * Ends a sold or cancelled facility's weather-hazard outages at once. IDs are reused (max + 1),
+ * so a lingering multiplier would otherwise limit whichever facility is built next under that ID.
+ * A deductible already incurred still falls due; only the facility's output effect is removed.
+ */
+function endWeatherHazardsForFacility(state: GameType, id: number) {
+  const key = String(id);
+  const minute = state.date.minute;
+  state.worldEvents.active = state.worldEvents.active.map((event) => {
+    if (
+      (event.definitionId !== HAIL_DEFINITION_ID &&
+        event.definitionId !== COLD_DEFINITION_ID) ||
+      event.effects.facilityOutputMultipliersById?.[key] === undefined
+    ) {
+      return event;
+    }
+    const multipliers = { ...event.effects.facilityOutputMultipliersById };
+    delete multipliers[key];
+    const effects = { ...event.effects };
+    if (Object.keys(multipliers).length) {
+      effects.facilityOutputMultipliersById = multipliers;
+    } else {
+      delete effects.facilityOutputMultipliersById;
+    }
+    return {
+      ...event,
+      effects,
+      endsMinute:
+        event.definitionId === HAIL_DEFINITION_ID
+          ? Math.min(event.endsMinute, minute)
+          : event.endsMinute,
+    };
   });
 }
 
@@ -2025,6 +2093,7 @@ function applySellFacility(state: GameType, id: number): boolean {
       : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
   );
   const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.financed ? "financed" : "cash"}`;
+  endWeatherHazardsForFacility(state, id);
   // in one loop, refund cash from selling + remove from list
   state.facilities = state.facilities.filter(
     (g: GeneratorOperatingType | StorageOperatingType) => {
@@ -2307,7 +2376,7 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   }
   const label =
     payload.upgrade === "hailResistant"
-      ? "hail protection"
+      ? "hail-resistant panels"
       : "a cold-weather package";
   const key = `retrofit:${facility.id}:${payload.upgrade}`;
   state.worldEvents.occurrences.push({
@@ -2332,7 +2401,7 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   logGameEvent(
     state,
     "BUILD",
-    `Added ${label} to ${facility.name} for ${formatMoneyConcise(cost)}`,
+    `Added ${label} to ${facility.name} for ${formatMoneyConcise(cost)}.`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -3862,11 +3931,16 @@ function updateSupplyFacilitiesFinances(
     exportedW > 0
       ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
       : 0;
+  // Immediate choice and retrofit transactions belong to the frame of the tick they were made
+  // in. At a month's last tick the clock clamps prev and now to the same final frame, as do the
+  // pre-roll frames, so those passes must not book them again; a current-tick re-forecast passes
+  // a copied frame and re-adds each exactly once.
+  const bookedThisFrame = (event: ActiveWorldEventType) =>
+    prev !== now && event.startsMinute === now.minute;
   const choiceGrant = state.worldEvents.occurrences
     .filter(
       (event) =>
-        event.attributes.scenarioChoice === true &&
-        event.startsMinute === now.minute,
+        event.attributes.scenarioChoice === true && bookedThisFrame(event),
     )
     .reduce(
       (total, event) => total + Number(event.attributes.upfrontGrant || 0),
@@ -3885,7 +3959,7 @@ function updateSupplyFacilitiesFinances(
       (event) =>
         (event.attributes.scenarioChoice === true ||
           event.attributes.retrofit === true) &&
-        event.startsMinute === now.minute,
+        bookedThisFrame(event),
     )
     .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
   // Hazard deductibles fall due one tick after onset, in the window (prev, now]. The pre-roll

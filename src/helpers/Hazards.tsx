@@ -227,6 +227,29 @@ export function annualInsuranceCost(
   );
 }
 
+/**
+ * A build quote's annual weather insurance without and with its hail upgrade, priced as if built
+ * today, or undefined when the quote has no hail option in this game.
+ */
+export function hazardInsuranceComparison(
+  quote: GeneratorShoppingType,
+  game: GameType,
+): { standard: number; hardened: number } | undefined {
+  const option = resilienceBuildOption(quote, game);
+  if (!option || option.upgrade !== "hailResistant") {
+    return undefined;
+  }
+  const premium = (selected: boolean) =>
+    annualInsuranceCost(
+      {
+        ...withResilienceOption(quote, game, selected),
+        minuteCreated: game.date.minute,
+      } as GeneratorOperatingType,
+      game,
+    );
+  return { standard: premium(false), hardened: premium(true) };
+}
+
 /** Refreshes every generator's premium in place, at each monthly rollover. */
 export function refreshInsurancePremiums(game: GameType): void {
   game.facilities.forEach((facility) => {
@@ -397,7 +420,8 @@ function hazardForUpgrade(upgrade: ResilienceUpgradeType): WeatherHazardType {
 
 /**
  * What adding an upgrade to a standing facility costs, or undefined when it is not offered: the
- * wrong technology, already installed, or a game where that hazard never occurs.
+ * wrong technology, already installed, still under construction, or a game where that hazard
+ * never occurs. The reducer and the facility details pane share this one rule.
  */
 export function retrofitCost(
   facility: FacilityOperatingType,
@@ -405,6 +429,7 @@ export function retrofitCost(
   upgrade: ResilienceUpgradeType,
 ): number | undefined {
   if (
+    !isOperational(facility) ||
     upgradeForFuel(facility.fuel) !== upgrade ||
     facility.resilience?.[upgrade] ||
     !isWeatherHazardEligible(game, hazardForUpgrade(upgrade))
@@ -443,7 +468,6 @@ export function retrofittedResilience(
 export interface ResilienceBuildOptionType {
   upgrade: ResilienceUpgradeType;
   label: string;
-  description: string;
   extraBuildCost: number;
   defaultSelected: boolean;
   selected: boolean;
@@ -467,9 +491,7 @@ export function resilienceBuildOption(
   if (upgrade === "hailResistant") {
     return {
       upgrade,
-      label: "Hail-resistant design",
-      description:
-        "Thicker module glass and trackers that stow in storms, cutting hail damage and weather insurance.",
+      label: "Hail-resistant panels",
       extraBuildCost: Math.round(
         baseBuildCost(quote) * HAIL_RESISTANT_BUILD_SHARE,
       ),
@@ -481,7 +503,6 @@ export function resilienceBuildOption(
   return {
     upgrade,
     label: "Cold-weather package",
-    description: `Heat tracing and enclosures that keep the plant running down to ${coldPackageDesignMinTempC(profile)} °C instead of ${STANDARD_GAS_DESIGN_MIN_TEMP_C} °C.`,
     extraBuildCost: Math.round(baseBuildCost(quote) * COLD_PACKAGE_BUILD_SHARE),
     defaultSelected: profile.coldClimate,
     selected,
@@ -541,52 +562,83 @@ export function applyDefaultResilience(
 /** A facility's current weather outage, for its fleet row. */
 export interface FacilityHazardStatusType {
   hazard: WeatherHazardType;
-  label: "Hail damage" | "Cold-weather outage";
-  availableFraction: number;
+  label: "Hail damage" | "Extreme cold";
+  availableFraction: number; // Product of every active weather multiplier on the facility
   daysLeft?: number; // Hail repairs only; a cold snap lasts the month
   endsMinute: number;
 }
 
-/** The facility's worst active weather-hazard outage right now, if any. */
+/**
+ * The weather-hazard occurrences limiting a facility at a minute. An occurrence that began before
+ * the facility was bought belonged to an earlier facility with the same ID, so it never applies.
+ */
+export function activeWeatherHazardsFor(
+  game: GameType,
+  facility: FacilityOperatingType,
+  minute: number,
+): ActiveWorldEventType[] {
+  return (game.worldEvents?.active ?? []).filter((event) => {
+    if (
+      event.definitionId !== HAIL_DEFINITION_ID &&
+      event.definitionId !== COLD_DEFINITION_ID
+    ) {
+      return false;
+    }
+    if (minute < event.startsMinute || minute >= event.endsMinute) {
+      return false;
+    }
+    if (event.startsMinute < (facility.minuteCreated || 0)) {
+      return false;
+    }
+    const multiplier =
+      event.effects.facilityOutputMultipliersById?.[String(facility.id)];
+    return multiplier !== undefined && multiplier < 1;
+  });
+}
+
+/**
+ * The facility's combined active weather outage right now, if any. Overlapping storms multiply,
+ * as the simulation applies them, and a hail outage lasts until its last repair finishes.
+ */
 export function facilityHazardStatus(
   game: GameType,
   facility: FacilityOperatingType,
 ): FacilityHazardStatusType | undefined {
   const minute = game.date.minute;
-  let worst: FacilityHazardStatusType | undefined;
-  (game.worldEvents?.active ?? []).forEach((event) => {
-    if (
-      event.definitionId !== HAIL_DEFINITION_ID &&
-      event.definitionId !== COLD_DEFINITION_ID
-    ) {
-      return;
-    }
-    if (minute < event.startsMinute || minute >= event.endsMinute) {
-      return;
-    }
-    const availableFraction =
-      event.effects.facilityOutputMultipliersById?.[String(facility.id)];
-    if (availableFraction === undefined || availableFraction >= 1) {
-      return;
-    }
-    if (worst && worst.availableFraction <= availableFraction) {
-      return;
-    }
-    const hail = event.definitionId === HAIL_DEFINITION_ID;
-    worst = {
-      hazard: hail ? "HAIL" : "EXTREME_COLD",
-      label: hail ? "Hail damage" : "Cold-weather outage",
+  const events = activeWeatherHazardsFor(game, facility, minute);
+  if (!events.length) {
+    return undefined;
+  }
+  const availableFraction = events.reduce(
+    (product, event) =>
+      product *
+      (event.effects.facilityOutputMultipliersById?.[String(facility.id)] ?? 1),
+    1,
+  );
+  const hailEvents = events.filter(
+    (event) => event.definitionId === HAIL_DEFINITION_ID,
+  );
+  const endsMinute = Math.max(
+    ...(hailEvents.length ? hailEvents : events).map((e) => e.endsMinute),
+  );
+  if (hailEvents.length) {
+    return {
+      hazard: "HAIL",
+      label: "Hail damage",
       availableFraction,
-      daysLeft: hail
-        ? Math.max(
-            1,
-            Math.ceil((event.endsMinute - minute) / GAME_MINUTES_PER_REAL_DAY),
-          )
-        : undefined,
-      endsMinute: event.endsMinute,
+      daysLeft: Math.max(
+        1,
+        Math.ceil((endsMinute - minute) / GAME_MINUTES_PER_REAL_DAY),
+      ),
+      endsMinute,
     };
-  });
-  return worst;
+  }
+  return {
+    hazard: "EXTREME_COLD",
+    label: "Extreme cold",
+    availableFraction,
+    endsMinute,
+  };
 }
 
 /** What the facility details pane shows about a facility's weather hardening. */
@@ -617,10 +669,13 @@ export function facilityResilienceSummary(
     label = installed ? "Hail-resistant panels" : "Standard panels";
     detail = installed
       ? "Hail breaks less of the array and insurance costs less."
-      : "Exposed to the full force of hail.";
+      : "Takes full hail damage.";
   } else {
     label = installed ? "Cold-weather package" : "Standard winterization";
-    detail = `Rated to ${designMinTempC(facility)} °C`;
+    // The pane formats the rating itself in the player's temperature unit.
+    detail = installed
+      ? "Keeps running through deeper cold."
+      : "Built for ordinary winters.";
   }
   return {
     upgrade,

@@ -16,6 +16,7 @@ import PriceChangeIcon from "@mui/icons-material/PriceChange";
 import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
+import ThunderstormIcon from "@mui/icons-material/Thunderstorm";
 import WarningIcon from "@mui/icons-material/Warning";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import * as React from "react";
@@ -46,6 +47,7 @@ export const CONCEPT_NAMES: ConceptNameType[] = [
   "rate",
   "fuel",
   "weather",
+  "severeWeather",
   "danger",
   "goal",
 ];
@@ -72,6 +74,7 @@ export const CONCEPT_LABELS: Record<ConceptNameType, string> = {
   rate: "Electricity rate",
   fuel: "Fuel",
   weather: "Weather",
+  severeWeather: "Severe weather",
   danger: "Danger",
   goal: "Goal",
 };
@@ -99,6 +102,7 @@ const CONCEPT_ICONS: Record<
   rate: PriceChangeIcon,
   fuel: LocalGasStationIcon,
   weather: WbSunnyIcon,
+  severeWeather: ThunderstormIcon,
   danger: WarningIcon,
   goal: EmojiEventsIcon,
 };
@@ -110,6 +114,7 @@ const CONCEPT_COLORS: Partial<
   supply: "success",
   blackout: "error",
   danger: "warning",
+  severeWeather: "warning",
 };
 
 const IMG_SIZES = { small: 20, medium: 24, large: 35 };
