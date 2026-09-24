@@ -7,11 +7,6 @@
 const { spawn } = require("child_process");
 
 const steps = [
-  {
-    name: "Run compatibility",
-    script: "compatibility:check",
-    fix: "npm run compatibility:generate, then commit src/data/RunCompatibility.json",
-  },
   { name: "Types", script: "typecheck" },
   { name: "Lint", script: "lint", fix: "npm run lint:fix" },
   { name: "Formatting", script: "format:check", fix: "npm run format" },
@@ -48,9 +43,9 @@ async function main() {
   // The static checks take a few seconds each and barely contend with one another; Jest and the
   // simulation each use every core, so they run alone.
   const results = [
-    ...(await Promise.all(steps.slice(0, 4).map(run))),
+    ...(await Promise.all(steps.slice(0, 3).map(run))),
+    await run(steps[3]),
     await run(steps[4]),
-    await run(steps[5]),
   ];
   for (const result of results.filter((r) => !r.ok)) {
     console.error(

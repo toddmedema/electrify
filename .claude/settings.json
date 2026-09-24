@@ -13,7 +13,6 @@
       "Bash(npm run test:ci:*)",
       "Bash(npm run sim:*)",
       "Bash(npm run build)",
-      "Bash(npm run compatibility:check)",
       "Bash(npm run compatibility:generate)",
       "Bash(npm run test:e2e:*)"
     ]
