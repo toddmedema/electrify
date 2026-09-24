@@ -107,7 +107,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           }}
         >
           <Button variant="text" color="primary" onClick={props.onManual}>
-            How to play
+            Manual
           </Button>
           <Button
             data-settings-trigger
