@@ -39,7 +39,7 @@ for (const theme of ["light", "dark"]) {
     const newBox = (await newGame.boundingBox())!;
     const replayBox = (await replay.boundingBox())!;
     expect(replayBox.y).toBe(newBox.y);
-    expect(replayBox.x).toBeGreaterThan(newBox.x + newBox.width);
+    expect(newBox.x).toBeGreaterThan(replayBox.x + replayBox.width);
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

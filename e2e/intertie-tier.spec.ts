@@ -23,7 +23,8 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const card = page.getByTestId("transmission-project-california-north");
-    const slider = card.getByRole("slider");
+    const slider = page.getByRole("slider");
+    await expect(slider).toHaveCount(1);
     await slider.focus();
     await slider.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "4");
@@ -37,7 +38,7 @@ for (const theme of ["light", "dark"] as const) {
       await card.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     if (process.env.REVIEW_SCREENSHOT_DIR && theme === "light") {
-      await card.scrollIntoViewIfNeeded();
+      await slider.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: path.join(
           process.env.REVIEW_SCREENSHOT_DIR,

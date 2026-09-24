@@ -217,9 +217,6 @@ function IntertieBuildItem(props: {
   readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
-  tier: number;
-  maxTier: number;
-  onTier: (tier: number) => void;
   spareCapacityW: number;
   constructionKgco2eTotal: number;
   renderPortfolio: () => React.ReactNode;
@@ -266,8 +263,6 @@ function IntertieBuildItem(props: {
         title={name}
       />
       <Typography className="buildOptionContext" variant="body2">
-        {corridor.name}
-        {" · "}
         <span className="nowrap">
           {corridor.routeType === "EXISTING"
             ? "Existing corridor"
@@ -282,30 +277,6 @@ function IntertieBuildItem(props: {
           </>
         )}
       </Typography>
-      <Box sx={{ px: 2, pt: 1 }}>
-        <Typography id={`tier-label-${corridor.id}`} variant="subtitle2">
-          Build capacity · Tier {props.tier}
-        </Typography>
-        {props.maxTier > 1 && (
-          <Box sx={{ px: 3, pb: 1 }}>
-            <Slider
-              aria-labelledby={`tier-label-${corridor.id}`}
-              getAriaValueText={(value) => `Tier ${value}`}
-              value={props.tier}
-              min={1}
-              max={props.maxTier}
-              step={1}
-              marks={Array.from({ length: props.maxTier }, (_, index) => ({
-                value: index + 1,
-                label: `Tier ${index + 1}`,
-              }))}
-              disabled={readOnly}
-              onChange={(_event, value) => props.onTier(value as number)}
-              sx={{ mt: 1 }}
-            />
-          </Box>
-        )}
-      </Box>
       {!readOnly && !buildable && (
         <Typography
           component="div"
@@ -341,10 +312,9 @@ function IntertieBuildItem(props: {
             value={`${formatMass(market.emissionsKgco2ePerMWh, units)}/MWh`}
           />
         )}
-        <ConstructionEmissionsMetric
-          kgco2eTotal={props.constructionKgco2eTotal}
-          yearsToBuild={corridor.yearsToBuild}
-          units={units}
+        <BuildMetric
+          label="Neighbor’s max spare capacity"
+          value={formatWatts(props.spareCapacityW)}
         />
       </Box>
       <Box className="buildOptionFooter">
@@ -380,10 +350,7 @@ function IntertieBuildItem(props: {
                 )}
               </dd>
             </div>
-            <div>
-              <dt>Neighbor’s max spare capacity</dt>
-              <dd>{formatWatts(props.spareCapacityW)}</dd>
-            </div>
+
             <div>
               <dt>Down payment</dt>
               <dd>{formatMoneyConcise(downpayment)}</dd>
@@ -393,6 +360,13 @@ function IntertieBuildItem(props: {
               <dd>{formatMoneyConcise(financed)}</dd>
             </div>
           </dl>
+        </Box>
+        <Box className="buildOptionDetailBody">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={props.constructionKgco2eTotal}
+            yearsToBuild={corridor.yearsToBuild}
+            units={units}
+          />
         </Box>
         {expanded && props.renderPortfolio()}
         {outlook && (
@@ -673,7 +647,7 @@ export default function TransmissionPanel({
 }: TransmissionPanelProps) {
   const units = useUnits();
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
-  const [tiers, setTiers] = React.useState<Record<string, number>>({});
+  const [tier, setTier] = React.useState(1);
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);
@@ -706,8 +680,23 @@ export default function TransmissionPanel({
     (corridor) =>
       !state.lines.some(({ corridorId }) => corridorId === corridor.id),
   );
-  const buildQuote = (corridorId: string, tier = tiers[corridorId] || 1) =>
-    intertieBuildQuote(corridorId, game.date.year, tier, intertieContext);
+  const buildQuote = (corridorId: string, selectedTier = tier) =>
+    intertieBuildQuote(
+      corridorId,
+      game.date.year,
+      selectedTier,
+      intertieContext,
+    );
+  const maxTier = Math.max(
+    1,
+    ...unbuiltCorridors.map(
+      ({ id }) =>
+        Array.from(
+          { length: MAX_INTERTIE_UPGRADES + 1 },
+          (_, index) => index + 1,
+        ).filter((candidate) => buildQuote(id, candidate)).length,
+    ),
+  );
   const review =
     reviewId && unbuiltCorridors.some(({ id }) => id === reviewId)
       ? buildQuote(reviewId)
@@ -716,7 +705,7 @@ export default function TransmissionPanel({
   const reviewDownpayment = (review?.buildCost || 0) * DOWNPAYMENT_PERCENT;
   const approve = (financed: boolean) => {
     if (!review) return;
-    onBuild(review.id, financed, tiers[review.id] || 1);
+    onBuild(review.id, financed, tier);
     setReviewId(null);
   };
 
@@ -974,25 +963,37 @@ export default function TransmissionPanel({
       )}
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
+          <Box
+            className="constructionControls"
+            sx={{ gridTemplateColumns: "max-content minmax(80px, 1fr)", pr: 3 }}
+          >
+            <Typography
+              id="intertie-tier-label"
+              className="constructionCapacity"
+              variant="body2"
+            >
+              Tier <strong>{tier}</strong>
+            </Typography>
+            <Slider
+              className="constructionCapacitySlider"
+              aria-labelledby="intertie-tier-label"
+              getAriaValueText={(value) => `Tier ${value}`}
+              value={tier}
+              min={1}
+              max={maxTier}
+              step={1}
+              disabled={readOnly || maxTier === 1}
+              onChange={(_event, value) => setTier(value as number)}
+            />
+          </Box>
           <div className="transmissionProjects">
             {unbuiltCorridors.map((baseCorridor) => {
-              const corridor = buildQuote(baseCorridor.id)!;
-              const maxTier = Array.from(
-                { length: MAX_INTERTIE_UPGRADES + 1 },
-                (_, index) => index + 1,
-              ).filter((tier) => buildQuote(corridor.id, tier)).length;
+              const corridor = buildQuote(baseCorridor.id);
+              if (!corridor) return null;
               return (
                 <IntertieBuildItem
                   key={corridor.id}
                   corridor={corridor}
-                  tier={tiers[corridor.id] || 1}
-                  maxTier={maxTier}
-                  onTier={(tier) =>
-                    setTiers((previous) => ({
-                      ...previous,
-                      [corridor.id]: tier,
-                    }))
-                  }
                   spareCapacityW={
                     effectiveMarket(corridor.id, intertieContext)
                       ?.availableSupplyW || 0
@@ -1019,18 +1020,6 @@ export default function TransmissionPanel({
                           Portfolio outlook
                         </Typography>
                         <dl className="transmissionMetrics">
-                          <div>
-                            <dt>Forecast period</dt>
-                            <dd>Next year</dd>
-                          </div>
-                          <div>
-                            <dt>Assumed assets</dt>
-                            <dd>Current fleet + selected tier</dd>
-                          </div>
-                          <div>
-                            <dt>Trading rule</dt>
-                            <dd>{POLICY_LABELS[state.tradingPolicy]}</dd>
-                          </div>
                           <div>
                             <dt>Shortfall covered</dt>
                             <dd>{percent(portfolio.shortfallCoverage)}</dd>
@@ -1089,7 +1078,7 @@ export default function TransmissionPanel({
             id="intertie-review-title"
             onClose={() => setReviewId(null)}
           >
-            Build {reviewMarket?.name} · Tier {tiers[review.id] || 1}?
+            Build {reviewMarket?.name} · Tier {tier}?
           </ClosableDialogTitle>
           <DialogContent className="noPadding">
             <Box sx={{ px: 2, pb: 1 }}>

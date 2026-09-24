@@ -320,17 +320,17 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         <div className="victoryNextActions">
           <Button
             color="primary"
-            variant={failed ? "text" : "contained"}
-            onClick={onQuit}
+            variant={failed ? "text" : "outlined"}
+            onClick={failed ? onQuit : () => props.onRetry(victory)}
           >
-            New game
+            {failed ? "New game" : "Replay"}
           </Button>
           <Button
             color="primary"
-            variant={failed ? "contained" : "outlined"}
-            onClick={() => props.onRetry(victory)}
+            variant="contained"
+            onClick={failed ? () => props.onRetry(victory) : onQuit}
           >
-            {failed ? "Try again" : "Replay"}
+            {failed ? "Try again" : "New game"}
           </Button>
         </div>
       </DialogActions>

@@ -493,7 +493,7 @@ describe("the interties view", () => {
     const onBuild = jest.fn();
     renderProjects(createGame({ scenarioId: 111 }), onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
-    const slider = within(north).getByRole("slider");
+    const slider = screen.getByRole("slider");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
     expect(north).toHaveTextContent(formatWatts(5e6 * 1.5 ** 2));
