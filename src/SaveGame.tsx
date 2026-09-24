@@ -555,6 +555,19 @@ export function parseSave(raw: unknown): SaveGameType | null {
       (exercise.completed && exercise.active))
   )
     return null;
+  const blackout = game.blackout;
+  if (
+    blackout !== undefined &&
+    (typeof blackout !== "object" ||
+      blackout === null ||
+      !Number.isInteger(blackout.startMinute) ||
+      blackout.startMinute < 0 ||
+      blackout.startMinute > game.date.minute ||
+      typeof blackout.unservedWh !== "number" ||
+      !Number.isFinite(blackout.unservedWh) ||
+      blackout.unservedWh < 0)
+  )
+    return null;
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   const transmissionEnabled = !!(

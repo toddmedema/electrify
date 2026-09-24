@@ -317,13 +317,6 @@ const BLOCKING_CARDS = new Set([
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
-// Edge-detects the blackout toast, so a sustained blackout announces itself once rather than
-// four times an hour of game time
-let previouslyInBlackout = false;
-// What the blackout currently underway has cost, so the event log can say how bad it was once
-// it's over. Reset on each edge into one; meaningless while the lights are on
-let blackoutStartMinute = 0;
-let blackoutUnservedWh = 0;
 // Last month's fuel prices, to compare this month's against. Undefined before the first
 // rollover of a run, and after resuming a save - the first month back reports no move rather
 // than inventing one against prices from whenever the game was last open
@@ -1482,8 +1475,7 @@ export const gameSlice = createSlice({
       delete state.policies;
       delete state.policyPause;
       const a = action.payload;
-      previouslyInBlackout = false;
-      blackoutUnservedWh = 0;
+      delete state.blackout;
       previousFuelPrices = undefined;
       state.eventLog = [] as GameEventType[];
       state.reportedEventKeys = [];
@@ -1843,10 +1835,6 @@ export const gameSlice = createSlice({
         copyCommitmentMetadata(tick, restored.timeline[i]),
       );
       // The tick loop's remaining module-level locals have to line up with restored state.
-      const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
-      previouslyInBlackout = now ? now.supplyW < now.demandW : false;
-      blackoutStartMinute = restored.date.minute;
-      blackoutUnservedWh = 0;
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
@@ -2860,29 +2848,31 @@ export function tickState(state: GameType) {
     }
     // The pulsing top bar only tells a player who is looking at it, and by default they're
     // looking at Finances or Forecasts. Fire on the edges only, never per tick.
+    // Edge-detected against the slice, so a sustained blackout announces itself once rather than
+    // four times an hour of game time, and a resumed save picks up the one it was taken during
     const inBlackout = now.supplyW < now.demandW;
+    const wasInBlackout = state.blackout !== undefined;
     if (inBlackout) {
+      if (!state.blackout) {
+        state.blackout = { startMinute: state.date.minute, unservedWh: 0 };
+        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
+      }
       // What the lights being out is actually costing, in the same units the score is docked in.
       // Accumulated per tick rather than worked out at the end, since the gap moves the whole
       // time the blackout lasts
-      blackoutUnservedWh +=
+      state.blackout.unservedWh +=
         ((now.demandW - now.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    } else if (state.blackout) {
+      // The toast that says this vanishes in four seconds and the pulsing bar stops the moment
+      // it's over, so without this a player who was looking elsewhere never learns what it cost
+      logGameEvent(
+        state,
+        "BLACKOUT_OVER",
+        `Blackout ended after ${blackoutLength(state.date.minute - state.blackout.startMinute)}. The grid could not supply ${formatWattHours(state.blackout.unservedWh)} of electricity demand.`,
+      );
+      delete state.blackout;
     }
-    if (inBlackout !== previouslyInBlackout) {
-      previouslyInBlackout = inBlackout;
-      if (inBlackout) {
-        blackoutStartMinute = state.date.minute;
-        blackoutUnservedWh = 0;
-        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
-      } else {
-        // The toast that says this vanishes in four seconds and the pulsing bar stops the moment
-        // it's over, so without this a player who was looking elsewhere never learns what it cost
-        logGameEvent(
-          state,
-          "BLACKOUT_OVER",
-          `Blackout ended after ${blackoutLength(state.date.minute - blackoutStartMinute)}. The grid could not supply ${formatWattHours(blackoutUnservedWh)} of electricity demand.`,
-        );
-      }
+    if (inBlackout !== wasInBlackout) {
       const message = inBlackout
         ? "Blackout! Demand is outrunning your supply."
         : "Blackout over - supply is meeting demand again.";
