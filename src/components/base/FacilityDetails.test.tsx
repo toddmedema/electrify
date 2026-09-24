@@ -2,6 +2,8 @@ import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../../testing/Simulator";
+import { SCENARIOS } from "../../data/Scenarios";
+import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
   COLD_DEFINITION_ID,
@@ -17,6 +19,21 @@ import { UnitsContext } from "./UnitsContext";
 // Carbon Fee: a non-tutorial game in San Francisco, starting with a gas plant
 function carbonFee(): GameType {
   return createGame({ scenarioId: 100 });
+}
+
+// Carbon Fee moved to Pittsburgh, where winters can get cold enough to offer the gas package.
+// The starting plant comes packaged there, so it is reset to a standard plant to retrofit.
+function coldGame(): GameType {
+  const scenario = SCENARIOS.find((candidate) => candidate.id === 100)!;
+  const game = createGame({
+    scenario: { ...scenario, locationId: "PIT" },
+    scenarioId: 100,
+  });
+  game.facilities[0].resilience = {
+    coldWeatherPackage: false,
+    designMinTempC: STANDARD_GAS_DESIGN_MIN_TEMP_C,
+  };
+  return game;
 }
 
 function withSolar(game: GameType, hailResistant = false) {
@@ -91,7 +108,7 @@ function section() {
 
 describe("weather resilience details", () => {
   it("rates standard gas and offers the cold-weather package", () => {
-    const game = carbonFee();
+    const game = coldGame();
     const gas = game.facilities[0];
     showDetails(game, gas);
     expect(section()).toHaveTextContent("Standard winterization");
@@ -157,8 +174,8 @@ describe("weather resilience details", () => {
     const dialog = screen.getByRole("dialog", {
       name: "Add hail-resistant panels to Solar?",
     });
-    expect(dialog).toHaveTextContent("Future hail breaks less of the array.");
-    expect(dialog).toHaveTextContent(/Weather insurance \$.+ → \$.+\/yr/);
+    expect(dialog).toHaveTextContent("Less damage from future hail.");
+    expect(dialog).toHaveTextContent(/Insurance \$.+ → \$.+\/yr\./);
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
       within(dialog).getByRole("button", {
@@ -176,7 +193,7 @@ describe("weather resilience details", () => {
   });
 
   it("closes on Cancel without buying anything", () => {
-    const game = carbonFee();
+    const game = coldGame();
     const { onRetrofit } = showDetails(game, game.facilities[0]);
     fireEvent.click(
       within(section()).getByRole("button", {
@@ -193,7 +210,7 @@ describe("weather resilience details", () => {
   });
 
   it("says a current outage continues after a retrofit", async () => {
-    const game = carbonFee();
+    const game = coldGame();
     const gas = game.facilities[0];
     outage(game, gas, false, 0.55);
     showDetails(game, gas);
@@ -203,11 +220,11 @@ describe("weather resilience details", () => {
       }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "This month's cold outage continues.",
+      "Doesn't end this month's cold outage.",
     );
   });
 
-  it("says current hail damage is still repaired on schedule", async () => {
+  it("says a retrofit does not speed up current hail repairs", async () => {
     const game = carbonFee();
     const solar = withSolar(game);
     outage(game, solar, true, 0.7);
@@ -218,7 +235,7 @@ describe("weather resilience details", () => {
       }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Current damage is still repaired on schedule.",
+      "Doesn't speed up current repairs.",
     );
   });
 
@@ -233,14 +250,14 @@ describe("weather resilience details", () => {
   });
 
   it("gives design temperatures in the player's units with a true minus", async () => {
-    const game = carbonFee();
+    const game = coldGame();
     const gas = game.facilities[0];
     render(
       <UnitsContext.Provider value="imperial">
         {details(game, gas, jest.fn())}
       </UnitsContext.Provider>,
     );
-    // -8°C is 17.6°F, rounded to 18°F; the package's -25°C is -13°F
+    // -8°C is 17.6°F, rounded to 18°F; Pittsburgh's package rating of -30°C is -22°F
     expect(section()).toHaveTextContent("Rated to 18°F");
     await userEvent.click(
       within(section()).getByRole("button", {
@@ -248,7 +265,7 @@ describe("weather resilience details", () => {
       }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Runs down to \u221213°F instead of 18°F.",
+      "Rated to \u221222°F instead of 18°F; halves losses below that.",
     );
   });
 
@@ -290,11 +307,54 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("Until month end");
   });
 
-  it("hides the purchase in a replay", () => {
+  it("caps current maximum output by an active hail outage", () => {
     const game = carbonFee();
+    const solar = withSolar(game);
+    solar.annualOutputDegradation = 0;
+    outage(game, solar, true, 0.6);
+    showDetails(game, solar);
+    const operation = screen.getByRole("region", { name: "Operation" });
+    expect(operation).toHaveTextContent("Current maximum output");
+    expect(operation).toHaveTextContent("Limited to 60% (hail)");
+  });
+
+  it("names cold as the cause of a cold-limited maximum output", () => {
+    const game = carbonFee();
+    const gas = game.facilities[0];
+    gas.annualOutputDegradation = 0;
+    outage(game, gas, false, 0.55);
+    showDetails(game, gas);
+    expect(screen.getByRole("region", { name: "Operation" })).toHaveTextContent(
+      "Limited to 55% (cold)",
+    );
+  });
+
+  it("combines age wear with hail damage in the maximum output", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    // Two per cent a year for about ten years leaves about 82%; 60% of that is about 49%
+    solar.annualOutputDegradation = 0.02;
+    solar.minuteOperational = game.date.minute - 10 * 12 * MINUTES_PER_MONTH;
+    outage(game, solar, true, 0.6);
+    showDetails(game, solar);
+    expect(screen.getByRole("region", { name: "Operation" })).toHaveTextContent(
+      /Limited to 4\d% \(age, hail\)/,
+    );
+  });
+
+  it("hides the purchase in a replay", () => {
+    const game = coldGame();
     showDetails(game, game.facilities[0], { readOnly: true });
     expect(section()).toHaveTextContent("Standard winterization");
     expect(within(section()).queryByRole("button")).toBeNull();
+  });
+
+  it("leaves gas out where winters never get cold enough to matter", () => {
+    const game = carbonFee();
+    showDetails(game, game.facilities[0]);
+    expect(
+      screen.queryByRole("region", { name: "Weather resilience" }),
+    ).toBeNull();
   });
 
   it("leaves the section out of tutorials, which have no weather hazards", () => {

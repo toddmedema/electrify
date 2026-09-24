@@ -22,18 +22,18 @@ export function resilienceActionLabel(upgrade: ResilienceUpgradeType): string {
     : "Add cold-weather package";
 }
 
-/** What a cold-weather package does to a plant's rating. */
+/** What a cold-weather package does to a plant's rating and its losses in deeper cold. */
 export function coldPackageEffect(
   packagedMinTempC: number,
   standardMinTempC: number,
   units: UnitSystemType,
 ): string {
-  return `Runs down to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}.`;
+  return `Rated to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}; halves losses below that.`;
 }
 
 /** The yearly premium before and after hail-resistant panels. */
 export function insuranceChange(before: number, after: number): string {
-  return `Weather insurance ${formatMoneyConcise(before)} → ${formatMoneyConcise(after)}/yr`;
+  return `Insurance ${formatMoneyConcise(before)} → ${formatMoneyConcise(after)}/yr.`;
 }
 
 /** "9 days" or "1 day". */

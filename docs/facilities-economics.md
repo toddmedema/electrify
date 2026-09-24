@@ -279,8 +279,10 @@ All values are rounded game balance, not a site-specific risk assessment.
   utility PV site, ranked from NOAA SPC's 1986-2015 severe-hail report climatology in North
   America, the ESSL European Severe Weather Database in Europe, and NASA passive-microwave hail
   climatologies (Cecil & Blankenship 2012; Bang & Cecil 2019) elsewhere. Unprofiled locations fall
-  back by latitude band. A storm hits each array with 70% probability and breaks at most 60% of
-  it; hail-resistant designs break 30% as much.
+  back by latitude band. The busiest hail regions are capped at 0.06 storms per year, so about
+  nine 20-year runs in ten see at most two damaging storms even there, and most low-risk places
+  see none. A storm hits each array with 70% probability and breaks at most 60% of it;
+  hail-resistant designs break 30% as much.
 - **Insurance.** Catalogue O&M already includes average insurance, so solar carries only a
   location-specific loading: 0.2% of replacement value per year at 0.05 storms per year, scaled
   by local exposure, and 40% of that for hail-resistant arrays. Insurers pay repairs above a
@@ -293,7 +295,9 @@ All values are rounded game balance, not a site-specific risk assessment.
   its gas quotes include a cold-weather package by default. Regional supply strains below the
   colder of -15 °C (mild climates) or -25 °C (cold climates) and the place's one-winter-in-twelve
   low, so a regional gas shock stays rare everywhere. A package rates a plant 5 °C below the
-  regional threshold, and at least to -25 °C. A cold snap's gas-price multiple is capped so that,
+  regional threshold, and at least to -25 °C. It is only offered, at build or as a retrofit,
+  where the one-winter-in-twelve low reaches the standard -8 °C rating (or, without a weather
+  record, outside the lowland tropics and subtropics); elsewhere it could never help. A cold snap's gas-price multiple is capped so that,
   combined with any authored gas shock that month, prices reach at most 3× normal.
 - **Hardening prices.** Hail-resistant panels add 3% to a solar build (8% as a retrofit), after
   DOE FEMP's solar hail-resilience guidance; a cold-weather package adds 2% to a gas build (4% as

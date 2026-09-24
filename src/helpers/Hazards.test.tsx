@@ -53,6 +53,13 @@ const DALLAS: LocationType = {
   lat: 32.78,
   long: -96.8,
 };
+// A mild climate whose rare winters still breach a standard plant's -8 °C rating.
+const NASHVILLE: LocationType = {
+  id: "Nashville",
+  name: "Nashville, TN",
+  lat: 36.16,
+  long: -86.78,
+};
 const REYKJAVIK: LocationType = {
   id: "Reykjavik",
   name: "Reykjavik",
@@ -189,7 +196,7 @@ describe("hailMonthlyProbability", () => {
   it("follows the northern convective season", () => {
     expect(hailMonthlyProbability(denver, DENVER, 0)).toBe(0);
     expect(hailMonthlyProbability(denver, DENVER, 5)).toBeCloseTo(
-      1 - Math.exp(-0.08 * 0.25),
+      1 - Math.exp(-0.06 * 0.25),
       12,
     );
   });
@@ -213,7 +220,7 @@ describe("hailMonthlyProbability", () => {
       { length: 12 },
       (_, m) => -Math.log(1 - hailMonthlyProbability(denver, DENVER, m)),
     ).reduce((a, b) => a + b, 0);
-    expect(lambda).toBeCloseTo(0.08, 9);
+    expect(lambda).toBeCloseTo(0.06, 9);
   });
 });
 
@@ -353,7 +360,7 @@ describe("replacement value and insurance", () => {
     const denver = gameAt(DENVER, [sun]);
     expect(replacementValue(sun, denver)).toBe(1e8);
     expect(annualInsuranceCost(sun, denver)).toBeCloseTo(
-      1e8 * 0.002 * (0.08 / 0.05),
+      1e8 * 0.002 * (0.06 / 0.05),
       6,
     );
     const resistant = facility(2, "Sun", {
@@ -429,9 +436,9 @@ describe("hazardInsuranceComparison", () => {
   it("prices a solar quote's insurance with and without hail protection", () => {
     const game = gameAt(DENVER);
     const comparison = hazardInsuranceComparison(quote("Sun"), game)!;
-    expect(comparison.standard).toBeCloseTo(5e7 * 0.002 * (0.08 / 0.05), 6);
+    expect(comparison.standard).toBeCloseTo(5e7 * 0.002 * (0.06 / 0.05), 6);
     expect(comparison.hardened).toBeCloseTo(
-      5e7 * 1.03 * 0.002 * (0.08 / 0.05) * 0.4,
+      5e7 * 1.03 * 0.002 * (0.06 / 0.05) * 0.4,
       6,
     );
     // The same answer whichever way the quote's option is currently set.
@@ -504,7 +511,13 @@ describe("resilience build options", () => {
     });
     expect(cold.buildCost).toBeCloseTo(51_000_000, 6);
     expect(cold.resilienceExtraBuildCost).toBeCloseTo(1_000_000, 6);
-    const mild = applyDefaultResilience(quote("Natural Gas"), gameAt(DALLAS));
+    const mild = applyDefaultResilience(
+      quote("Natural Gas"),
+      gameAt(NASHVILLE),
+    );
+    expect(
+      resilienceBuildOption(quote("Natural Gas"), gameAt(NASHVILLE)),
+    ).toMatchObject({ upgrade: "coldWeatherPackage", defaultSelected: false });
     expect(mild.resilience).toEqual({
       coldWeatherPackage: false,
       designMinTempC: -8,
@@ -514,7 +527,7 @@ describe("resilience build options", () => {
   });
 
   it("toggles the option exactly and idempotently", () => {
-    const game = gameAt(DALLAS);
+    const game = gameAt(NASHVILLE);
     const base = quote("Natural Gas", 123_456_789.123);
     const on = withResilienceOption(base, game, true);
     expect(withResilienceOption(on, game, true)).toEqual(on);
@@ -527,6 +540,40 @@ describe("resilience build options", () => {
       on.resilienceExtraBuildCost!,
       6,
     );
+  });
+
+  it("offers no cold-weather package where cold never reaches the standard rating", () => {
+    // Dallas's one-winter-in-twelve low is -3 °C; Miami and an unrecorded lowland tropical city
+    // never get near -8 °C either.
+    const warmPlaces: LocationType[] = [
+      DALLAS,
+      { id: "Miami", name: "Miami", lat: 25.76, long: -80.19 },
+      { id: "Nowhere", name: "Nowhere", lat: 12, long: 30 },
+    ];
+    warmPlaces.forEach((location) => {
+      const game = gameAt(location);
+      expect(resilienceBuildOption(quote("Natural Gas"), game)).toBeUndefined();
+      const gas = facility(1, "Natural Gas", {
+        resilience: { coldWeatherPackage: false, designMinTempC: -8 },
+      });
+      expect(retrofitCost(gas, game, "coldWeatherPackage")).toBeUndefined();
+      expect(facilityResilienceSummary(game, gas)).toBeUndefined();
+      // Solar is unaffected.
+      expect(resilienceBuildOption(quote("Sun"), game)).toBeDefined();
+    });
+    // Still offered where cold is plausible, including an unrecorded high-latitude city.
+    [
+      NASHVILLE,
+      REYKJAVIK,
+      { id: "Nowhere", name: "Nowhere", lat: 50, long: 30 },
+    ]
+      .map((location) => gameAt(location))
+      .forEach((game) => {
+        expect(resilienceBuildOption(quote("Natural Gas"), game)).toBeDefined();
+        expect(
+          retrofitCost(facility(1, "Natural Gas"), game, "coldWeatherPackage"),
+        ).toBeGreaterThan(0);
+      });
   });
 
   it("offers nothing for other technologies or where the hazard is off", () => {
@@ -646,6 +693,15 @@ describe("facilityResilienceSummary", () => {
       replacementValue: 1e8,
     });
     expect(summary.annualInsuranceCost).toBeGreaterThan(0);
+    const hardened = facility(2, "Sun", {
+      resilience: { hailResistant: true },
+    });
+    expect(facilityResilienceSummary(gameAt(DENVER), hardened)).toMatchObject({
+      label: "Hail-resistant panels",
+      installed: true,
+      detail: "Less hail damage, lower insurance.",
+      retrofitCost: undefined,
+    });
   });
 
   it("reports a gas plant's rating and hides where cold is authored", () => {
@@ -655,10 +711,13 @@ describe("facilityResilienceSummary", () => {
     expect(facilityResilienceSummary(gameAt(REYKJAVIK), gas)).toMatchObject({
       label: "Cold-weather package",
       installed: true,
-      detail: "Keeps running through deeper cold.",
       retrofitCost: undefined,
       annualInsuranceCost: undefined,
     });
+    // The pane shows the rating, so gas carries no detail text.
+    expect(
+      facilityResilienceSummary(gameAt(REYKJAVIK), gas)!.detail,
+    ).toBeUndefined();
     expect(
       facilityResilienceSummary(gameAt(DALLAS, [], { scenarioId: 103 }), gas),
     ).toBeUndefined();

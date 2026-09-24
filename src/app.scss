@@ -1937,6 +1937,17 @@ $pane_header_height: 48px;
   }
 }
 
+.resilienceBuildOption .resilienceBuildOptionWarning {
+  color: var(--warning-icon);
+}
+
+// The retrofit confirmation's statements read as separate short lines
+.facilityRetrofitDialog
+  .MuiDialogContentText-root
+  + .MuiDialogContentText-root {
+  margin-top: 8px;
+}
+
 .generatorComparison {
   padding: 8px 16px 10px;
   border-bottom: 1px solid var(--border-selected);
@@ -5027,14 +5038,19 @@ $sizemap: (
 }
 // A weather outage leads the status line in warning amber (text as well as colour carries it).
 // Deep amber on the card clears 7:1 in light mode and amber300 does the same in dark mode.
+// It gives way before the output reading does (shrink is weighted by width, so the factor is
+// large), and its title and the row's label keep the long form.
 .facilityDisclosure .facilityHazardStatus {
-  flex-shrink: 0;
+  flex-shrink: 1000;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--warning-icon);
   font-weight: 600;
-  white-space: pre;
 }
-.facilityDisclosure .facilityHazardStatus .facilityStatusSeparator {
-  font-weight: 400;
+.facilityDisclosure .facilityHazardSeparator {
+  flex-shrink: 0;
+  white-space: pre;
 }
 .facilityDisclosure .facilityHazardLong {
   display: none;

@@ -191,8 +191,8 @@ function WeatherResilienceSection(props: {
   const activeOutage =
     hazard && (hazard.hazard === "HAIL") === hail
       ? hail
-        ? "Current damage is still repaired on schedule."
-        : "This month's cold outage continues."
+        ? "Doesn't speed up current repairs."
+        : "Doesn't end this month's cold outage."
       : undefined;
   return (
     <section className="facilityDetailSection" aria-label="Weather resilience">
@@ -257,10 +257,10 @@ function WeatherResilienceSection(props: {
           <DialogTitle>
             {actionLabel} to {facility.name}?
           </DialogTitle>
-          <DialogContent>
+          <DialogContent className="facilityRetrofitDialog">
             <DialogContentText>
               {hail
-                ? "Future hail breaks less of the array."
+                ? "Less damage from future hail."
                 : coldPackageEffect(
                     retrofitted?.designMinTempC ?? designMinTempC,
                     designMinTempC,
@@ -334,6 +334,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     props.game && !underConstruction
       ? facilityHazardStatus(props.game, facility)
       : undefined;
+  // Age wear and an active weather outage both cap output, and the simulation multiplies them
+  const maxOutputFactor = outputFactor * (hazard?.availableFraction ?? 1);
+  const maxOutputCauses = [
+    outputFactor < 1 ? "age" : "",
+    hazard ? (hazard.hazard === "HAIL" ? "hail" : "cold") : "",
+  ].filter(Boolean);
 
   // Price history only changes at a month boundary. Selected-facility lifetime totals still
   // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
@@ -445,14 +451,14 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               }
             />
           )}
-          {!isStorage && outputFactor < 1 && (
+          {!isStorage && maxOutputFactor < 1 && (
             <Stat
               label="Current maximum output"
               value={
                 <>
-                  {formatWatts(facility.peakW * outputFactor)}
+                  {formatWatts(facility.peakW * maxOutputFactor)}
                   <span className="facilityStatNote">
-                    Limited to {percent(outputFactor)}
+                    {`Limited to ${percent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
                   </span>
                 </>
               }

@@ -272,7 +272,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SYMBOLS,
     group: "Gameplay",
     keywords:
-      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather danger goal",
+      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather severe storm hail cold danger goal",
     entry: (
       <div>
         <p>These symbols have the same meaning throughout the game.</p>
@@ -936,7 +936,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Hail and extreme cold strike at random. How often depends on the
-          location. Tutorials have neither.
+          location. Neither happens in tutorials.
         </p>
         <ul>
           <li>
@@ -959,7 +959,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           When building, you can add hail-resistant panels to solar (less
           damage, lower insurance) or a cold-weather package to gas (rated to{" "}
           <ColdPackageRating />, colder in cold climates). Either can be added
-          later from the facility&apos;s details, at a higher price.
+          later from the facility&apos;s details, at a higher price. The
+          cold-weather package is only offered where winters get cold enough to
+          matter.
         </p>
       </div>
     ),

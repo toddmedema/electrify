@@ -151,6 +151,20 @@ describe("hail damage", () => {
     expect(hailOccurrences(state)).toHaveLength(hits.length);
   });
 
+  it("logs light damage to hail-resistant panels as minor", () => {
+    const state = game(DENVER, HAIL.seed);
+    state.facilities
+      .filter((f) => f.fuel === "Sun")
+      .forEach((f) => (f.resilience = { hailResistant: true }));
+    tickToMonth(state, HAIL.month);
+    const key = hazardEventKey("HAIL", "Denver", HAIL.month);
+    const log = state.eventLog.find((e) => e.storyPhaseKey === key)!;
+    expect(log.title).toBe("Minor hail damage");
+    expect(log.message).toMatch(
+      /^Hail-resistant panels held damage to \d+% of your solar fleet\. \$[\d.]+[KMB]? deductible; repairs take about \d+ days?\.$/,
+    );
+  });
+
   it("is independent of fleet order", () => {
     const { hits } = atHailOnset();
     const reordered = game(DENVER, HAIL.seed);
@@ -227,7 +241,10 @@ describe("hail damage", () => {
     const repaired = (s: GameType) =>
       s.eventLog.filter((e) => e.storyPhaseKey === hit.key);
     expect(repaired(state)).toHaveLength(1);
-    expect(repaired(state)[0].message).toContain("back to full output");
+    expect(repaired(state)[0].message).toBe(
+      `${facility().name} is back to full output.`,
+    );
+    expect(repaired(state)[0].title).toBe("Hail repairs complete");
     tickToMinute(state, hit.endsMinute + MINUTES_PER_MONTH);
     expect(repaired(state)).toHaveLength(1);
   });
@@ -254,9 +271,7 @@ describe("hail damage", () => {
     expect(status.endsMinute).toBe(second.endsMinute);
     const completions = () =>
       state.eventLog.filter(
-        (e) =>
-          e.message ===
-          `Repairs complete: ${facility().name} is back to full output.`,
+        (e) => e.message === `${facility().name} is back to full output.`,
       );
     tickToMinute(state, hit.endsMinute);
     expect(completions()).toHaveLength(0);
@@ -386,6 +401,33 @@ describe("retrofits", () => {
     );
   });
 
+  it("saves and resumes after a retrofit exactly like an uninterrupted run", () => {
+    const state = game(DENVER, HAIL.seed);
+    tickToMonth(state, 1);
+    const solar = state.facilities.find((f) => f.fuel === "Sun")!;
+    const retrofitted = dispatch(
+      state,
+      retrofitFacility({ facilityId: solar.id, upgrade: "hailResistant" }),
+    );
+    expect(retrofitted.meaningfulDecisions.at(-1)).toMatchObject({
+      lever: `resilience:${solar.id}:hail-resistant`,
+      after: "hail-resistant",
+    });
+    const continued = cloneDeep(retrofitted);
+    const saved = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(retrofitted))),
+    );
+    expect(saved).not.toBeNull();
+    const restored = cloneDeep(gameReducer(undefined, resume(saved!.game)));
+    tickToMonth(continued, 3);
+    tickToMonth(restored, 3);
+    expect(restored.meaningfulDecisions).toEqual(continued.meaningfulDecisions);
+    expect(restored.monthlyHistory).toEqual(continued.monthlyHistory);
+    expect(JSON.parse(JSON.stringify(restored.facilities))).toEqual(
+      JSON.parse(JSON.stringify(continued.facilities)),
+    );
+  });
+
   it("refuses a retrofit the company cannot afford", () => {
     const state = game(DENVER, HAIL.seed);
     tickToMonth(state, 1);
@@ -489,6 +531,51 @@ describe("extreme cold", () => {
   });
 });
 
+describe("selling a plant during a cold snap", () => {
+  it("does not leave its derate cached for a plant that reuses the ID", () => {
+    const MINNEAPOLIS = scenarioAt("Minneapolis", [
+      { fuel: "Natural Gas", peakW: 600000000, initialAgeYears: 5 },
+      { fuel: "Oil", peakW: 400000000, initialAgeYears: 5 },
+    ]);
+    const state = game(MINNEAPOLIS, 11);
+    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
+    gas.resilience = { coldWeatherPackage: false, designMinTempC: -8 };
+    const month = [0, 1, 11, 12, 13, 23, 24, 25].find(
+      (m) =>
+        representativeMinTempC(
+          getDateFromMinute(m * MINUTES_PER_MONTH, state.startingYear),
+          state.seed,
+        ) < -9,
+    )!;
+    tickToMonth(state, month);
+    const snap = state.worldEvents.active.find(
+      (e) => e.key === hazardEventKey("EXTREME_COLD", "Minneapolis", month),
+    )!;
+    const multiplier =
+      snap.effects.facilityOutputMultipliersById![String(gas.id)];
+    expect(multiplier).toBeLessThan(0.9);
+    // Run a few ticks so the month's effects are cached with the derate.
+    for (let i = 0; i < 4; i++) tickState(state);
+    const sold = dispatch(state, sellFacility(gas.id));
+    // A new, unrated plant under the same ID, running alone against the city's load.
+    sold.facilities.forEach((f) => (f.paused = true));
+    sold.facilities.unshift({
+      ...cloneDeep(gas),
+      minuteCreated: sold.date.minute,
+      paused: false,
+    });
+    let peakW = 0;
+    for (let i = 0; i < 24; i++) {
+      tickState(sold);
+      peakW = Math.max(
+        peakW,
+        sold.facilities.find((f) => f.id === gas.id)!.currentW,
+      );
+    }
+    expect(peakW).toBeGreaterThan(gas.peakW * multiplier * 1.05);
+  });
+});
+
 describe("extreme cold gas prices", () => {
   const DALLAS = scenarioAt("Dallas", [
     { fuel: "Natural Gas", peakW: 600000000, initialAgeYears: 5 },
@@ -526,9 +613,12 @@ describe("extreme cold gas prices", () => {
     const multiplier = snap.effects.fuelPriceMultipliers?.["Natural Gas"]!;
     expect(multiplier).toBe(3);
     const log = state.eventLog.find((e) => e.storyPhaseKey === snap.key)!;
-    expect(log.message).toContain(
-      "gas prices are 3.0× normal this month as regional supply strains",
+    // The title already says "Extreme cold"; one plant is limited to a plain share.
+    expect(log.title).toBe("Extreme cold");
+    expect(log.message).toMatch(
+      /^Gas prices are 3\.0× normal this month as regional supply strains; .+ is limited to \d+% output\.$/,
     );
+    expect(log.message).not.toContain("as little as");
   });
 
   it("caps the combined story and cold gas multiple", () => {
@@ -568,6 +658,11 @@ describe("month-end transactions", () => {
     const cashGap = control.timeline[0].cash - retrofitted.timeline[0].cash;
     // Only one tick of a lower premium separates the runs besides the cost.
     expect(Math.abs(cashGap - cost)).toBeLessThan(cost * 0.001);
+    // The closed month's history reports it as an expense exactly once, too.
+    const expenseGap =
+      retrofitted.monthlyHistory[0].expensesOM -
+      control.monthlyHistory[0].expensesOM;
+    expect(Math.abs(expenseGap - cost)).toBeLessThan(cost * 0.001);
   });
 });
 
@@ -638,7 +733,25 @@ describe("eligibility", () => {
 
   it("switches everything off with the harness flag", () => {
     let state = game(DENVER, HAIL.seed);
+    const insured = state.facilities.filter(
+      (f) => (f as { annualInsuranceCost?: number }).annualInsuranceCost,
+    );
+    expect(insured.length).toBeGreaterThan(0);
+    const openingExpenses = getTimeFromTimeline(
+      MINUTES_PER_MONTH - TICK_MINUTES,
+      state.timeline,
+    )!.expensesOM;
     state = dispatch(state, delta({ weatherHazardsDisabled: true }));
+    // No premium from the opening month, in the facilities or the month's forecast.
+    state.facilities.forEach((f) =>
+      expect(
+        (f as { annualInsuranceCost?: number }).annualInsuranceCost,
+      ).toBeUndefined(),
+    );
+    expect(
+      getTimeFromTimeline(MINUTES_PER_MONTH - TICK_MINUTES, state.timeline)!
+        .expensesOM,
+    ).toBeLessThan(openingExpenses);
     tickToMonth(state, HAIL.month + 1);
     expect(anyHazard(state)).toBe(false);
     expect(hailOccurrences(state)).toHaveLength(0);

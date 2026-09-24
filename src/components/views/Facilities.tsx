@@ -108,7 +108,7 @@ function hazardStatusText(status: FacilityHazardStatusType): {
     long: longParts.join(" · "),
     short: [
       status.hazard === "HAIL" ? "Hail" : "Cold",
-      `${available}% output`,
+      `${available}%`,
       days !== undefined ? `${days}d` : "",
     ]
       .filter(Boolean)
@@ -124,11 +124,15 @@ function HazardStatusLead(props: {
   // The row's disclosure carries the spoken form in its label, so these are visual only; the
   // title spells out the abbreviated form for a pointer
   return (
-    <span className="facilityHazardStatus" aria-hidden="true" title={long}>
-      <span className="facilityHazardLong">{long}</span>
-      <span className="facilityHazardShort">{short}</span>
-      <span className="facilityStatusSeparator">{" · "}</span>
-    </span>
+    <>
+      <span className="facilityHazardStatus" aria-hidden="true" title={long}>
+        <span className="facilityHazardLong">{long}</span>
+        <span className="facilityHazardShort">{short}</span>
+      </span>
+      <span className="facilityHazardSeparator" aria-hidden="true">
+        {" · "}
+      </span>
+    </>
   );
 }
 

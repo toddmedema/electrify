@@ -925,7 +925,7 @@ function recordHailStorm(state: GameType, key: string, startsMinute: number) {
   const percent = Math.max(1, Math.round(share * 100));
   const terms = `${formatMoneyConcise(deductible)} deductible; repairs take about ${formatDays(repairDays)}.`;
   const message = negligible
-    ? `Hail hit your hail-resistant panels but damaged only ${percent}% of your solar fleet. ${terms}`
+    ? `Hail-resistant panels held damage to ${percent}% of your solar fleet. ${terms}`
     : `Hail damaged ${percent}% of your solar fleet. ${terms}`;
   logGameEvent(state, "WORLD_EVENT", message, {
     importance: negligible ? "NOTABLE" : "CRITICAL",
@@ -982,15 +982,18 @@ function recordColdSnap(
   const parts: string[] = [];
   if (raisesGasPrice) {
     parts.push(
-      `gas prices are ${gasPriceMultiplier.toFixed(1)}× normal this month as regional supply strains`,
+      `Gas prices are ${gasPriceMultiplier.toFixed(1)}× normal this month as regional supply strains`,
     );
   } else if (impact.regional) {
-    parts.push("regional gas supply is strained");
+    parts.push("Regional gas supply is strained");
   }
   if (impact.derates.length) {
     const lowest = Math.min(...impact.derates.map((d) => d.availableFraction));
+    const percent = Math.round(lowest * 100);
     parts.push(
-      `${affectedNames.join(", ")} ${affectedNames.length === 1 ? "is" : "are"} limited to as little as ${Math.round(lowest * 100)}% output`,
+      affectedNames.length === 1
+        ? `${affectedNames[0]} is limited to ${percent}% output`
+        : `${affectedNames.join(", ")} are limited to as little as ${percent}% output`,
     );
   }
   const protectedNames = impact.protectedFacilityIds
@@ -999,8 +1002,8 @@ function recordColdSnap(
   const protectedNote = protectedNames.length
     ? ` Cold-weather packages kept ${protectedNames.join(", ")} running.`
     : "";
-  const summary = parts.join("; ");
-  const message = `Extreme cold: ${summary}.${protectedNote}`;
+  // The log title already says "Extreme cold", so the message starts with what it means.
+  const message = `${parts.join("; ")}.${protectedNote}`;
   const burnsGas = state.facilities.some(
     (f) => f.fuel === "Natural Gas" && f.yearsToBuildLeft <= 0,
   );
@@ -1075,7 +1078,7 @@ function logHailRepairsCompleted(state: GameType) {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      `Repairs complete: ${facility.name} is back to full output.`,
+      `${facility.name} is back to full output.`,
       {
         importance: "NOTABLE",
         actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1096,6 +1099,7 @@ function logHailRepairsCompleted(state: GameType) {
 function endWeatherHazardsForFacility(state: GameType, id: number) {
   const key = String(id);
   const minute = state.date.minute;
+  let edited = false;
   state.worldEvents.active = state.worldEvents.active.map((event) => {
     if (
       (event.definitionId !== HAIL_DEFINITION_ID &&
@@ -1104,6 +1108,7 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
     ) {
       return event;
     }
+    edited = true;
     const multipliers = { ...event.effects.facilityOutputMultipliersById };
     delete multipliers[key];
     const effects = { ...event.effects };
@@ -1121,6 +1126,9 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
           : event.endsMinute,
     };
   });
+  // The effects cache keys active events by key, not by their effects, and a cold snap keeps its
+  // key and window here. Selling is rare, so dropping the whole cache is the cheap correct fix.
+  if (edited) storyEffectsCache.clear();
 }
 
 /**
@@ -1428,6 +1436,24 @@ export const gameSlice = createSlice({
       const recorded = recordedDelta(action.payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
+      // Switching hazards off (a harness baseline) removes the hail insurance loading priced when
+      // the fleet was built, so the opening month's forecast and ticks do not charge it.
+      if (
+        ["weatherHazardsDisabled", "storyEffectsDisabled"].some((key) =>
+          Object.prototype.hasOwnProperty.call(payload, key),
+        ) &&
+        state.facilities?.length
+      ) {
+        const premiums = () =>
+          state.facilities
+            .map((f) => (f as GeneratorOperatingType).annualInsuranceCost ?? 0)
+            .join(",");
+        const before = premiums();
+        refreshInsurancePremiums(state);
+        if (state.timeline.length && premiums() !== before) {
+          state.timeline = reforecastSupply(state, true);
+        }
+      }
       if (recorded && recorded.dollarsPerkWh !== rateBefore) {
         recordMeaningfulDecision(state, {
           lever: "rate",
@@ -2407,12 +2433,17 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     },
   );
+  // Levers are lowercase kebab-case; saves reject anything else.
+  const lever =
+    payload.upgrade === "hailResistant"
+      ? "hail-resistant"
+      : "cold-weather-package";
   recordMeaningfulDecision(state, {
-    lever: `resilience:${facility.id}:${payload.upgrade}`,
+    lever: `resilience:${facility.id}:${lever}`,
     label: `Add ${label} to ${facility.name}`,
     kind: "asset",
     before: "standard",
-    after: payload.upgrade,
+    after: lever,
   });
   state.timeline = reforecastSupply(state, true);
   return true;
@@ -3932,11 +3963,13 @@ function updateSupplyFacilitiesFinances(
       ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
       : 0;
   // Immediate choice and retrofit transactions belong to the frame of the tick they were made
-  // in. At a month's last tick the clock clamps prev and now to the same final frame, as do the
-  // pre-roll frames, so those passes must not book them again; a current-tick re-forecast passes
-  // a copied frame and re-adds each exactly once.
+  // in. At a month's last tick the clock clamps prev and now to the same final frame, whose cash
+  // already carries them, so that pass still reports them in the frame's revenue and expenses but
+  // leaves them out of its cash delta. A current-tick re-forecast passes a copied frame and
+  // re-adds each exactly once.
+  const rebookingFrame = prev === now;
   const bookedThisFrame = (event: ActiveWorldEventType) =>
-    prev !== now && event.startsMinute === now.minute;
+    event.startsMinute === now.minute;
   const choiceGrant = state.worldEvents.occurrences
     .filter(
       (event) =>
@@ -3946,15 +3979,7 @@ function updateSupplyFacilitiesFinances(
       (total, event) => total + Number(event.attributes.upfrontGrant || 0),
       0,
     );
-  const revenue = customerRevenue + revenueExports + choiceGrant;
-
-  // Facilities expenses
-  let kgco2e = 0;
-  // Some authored emergencies carry company-level response costs that do not belong to a single
-  // plant, such as field crews and rebuilding damaged distribution equipment.
-  let expensesOM =
-    (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
-  expensesOM += state.worldEvents.occurrences
+  const immediateCosts = state.worldEvents.occurrences
     .filter(
       (event) =>
         (event.attributes.scenarioChoice === true ||
@@ -3962,6 +3987,16 @@ function updateSupplyFacilitiesFinances(
         bookedThisFrame(event),
     )
     .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
+  const revenue =
+    customerRevenue + revenueExports + (rebookingFrame ? 0 : choiceGrant);
+
+  // Facilities expenses
+  let kgco2e = 0;
+  // Some authored emergencies carry company-level response costs that do not belong to a single
+  // plant, such as field crews and rebuilding damaged distribution equipment.
+  let expensesOM =
+    (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
+  if (!rebookingFrame) expensesOM += immediateCosts;
   // Hazard deductibles fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.
   const hazardOneTimeCosts = state.worldEvents.active.filter(
@@ -4161,10 +4196,10 @@ function updateSupplyFacilitiesFinances(
     now.minute,
     transmission.lines,
   );
-  now.revenue = revenue;
+  now.revenue = revenue + (rebookingFrame ? choiceGrant : 0);
   now.revenueExports = revenueExports;
   now.expensesImports = expensesImports;
-  now.expensesOM = expensesOM;
+  now.expensesOM = expensesOM + (rebookingFrame ? immediateCosts : 0);
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
   now.expensesInterest = expensesInterest;

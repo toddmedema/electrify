@@ -60,6 +60,7 @@ import {
 import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 import {
   coldPackageEffect,
+  formatDesignTemperature,
   insuranceChange,
 } from "../base/WeatherResilienceText";
 import {
@@ -348,26 +349,41 @@ export function GeneratorBuildItem(
       ? props.insurance.hardened
       : props.insurance.standard
     : 0;
-  const resilienceDetails: string[] = [];
+  // Each line under the option says what it buys; a warning line says what it costs the player
+  const resilienceDetails: { text: string; warning?: boolean }[] = [];
   if (props.resilienceOption?.upgrade === "hailResistant") {
-    resilienceDetails.push("Cuts hail damage and weather insurance.");
+    resilienceDetails.push({ text: "Less hail damage." });
     if (props.insurance && props.insurance.standard > 0) {
-      resilienceDetails.push(
-        insuranceChange(props.insurance.standard, props.insurance.hardened),
-      );
+      resilienceDetails.push({
+        text: insuranceChange(
+          props.insurance.standard,
+          props.insurance.hardened,
+        ),
+      });
     }
-  } else if (props.resilienceOption) {
-    resilienceDetails.push(
-      coldPackageEffect(
-        props.withResilience?.(true).resilience?.designMinTempC ??
-          STANDARD_GAS_DESIGN_MIN_TEMP_C,
-        STANDARD_GAS_DESIGN_MIN_TEMP_C,
+  } else if (props.resilienceOption && props.withResilience) {
+    const standardMinTempC =
+      props.withResilience(false).resilience?.designMinTempC ??
+      STANDARD_GAS_DESIGN_MIN_TEMP_C;
+    resilienceDetails.push({
+      text: coldPackageEffect(
+        props.withResilience(true).resilience?.designMinTempC ??
+          standardMinTempC,
+        standardMinTempC,
         units,
       ),
-    );
+    });
+    if (props.resilienceOption.defaultSelected) {
+      resilienceDetails.push({
+        text: `Recommended here: winters often drop below ${formatDesignTemperature(standardMinTempC, units)}.`,
+      });
+    }
   }
   if (resilienceSelected && !quoteCanBuild && canBuild) {
-    resilienceDetails.push("Clear it to afford this build.");
+    resilienceDetails.push({
+      text: "Uncheck to afford the downpayment.",
+      warning: true,
+    });
   }
 
   const compareAction = props.onCompare && canBuild && (
@@ -663,7 +679,7 @@ export function GeneratorBuildItem(
         </TableContainer>
       </Collapse>
 
-      <Dialog open={open} onClose={toggleOpen}>
+      <Dialog open={open} onClose={toggleOpen} fullWidth maxWidth="sm">
         <ClosableDialogTitle onClose={toggleOpen}>
           Build {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
           {generator.name}?
@@ -695,12 +711,16 @@ export function GeneratorBuildItem(
               <Box id={resilienceOptionId}>
                 {resilienceDetails.map((line) => (
                   <Typography
-                    key={line}
+                    key={line.text}
                     variant="body2"
-                    color="textSecondary"
-                    className="resilienceBuildOptionDetail"
+                    color={line.warning ? undefined : "textSecondary"}
+                    className={
+                      line.warning
+                        ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
+                        : "resilienceBuildOptionDetail"
+                    }
                   >
-                    {line}
+                    {line.text}
                   </Typography>
                 ))}
               </Box>
@@ -725,7 +745,7 @@ export function GeneratorBuildItem(
                 value: `${formatMoneyConcise((estimatedAnnualOperatingCost(quote) + quoteInsurance) / 12)}/mo`,
                 detail:
                   quoteInsurance > 0
-                    ? "Includes weather insurance. Plus fuel and loan payments."
+                    ? "Incl. insurance. Plus fuel and loan payments."
                     : "Plus fuel and loan payments.",
               },
               {

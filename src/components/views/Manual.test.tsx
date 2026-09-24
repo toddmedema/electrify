@@ -70,6 +70,16 @@ describe("Manual", () => {
         expanded: true,
       }),
     ).toBeVisible();
+    expect(
+      screen.getByText(/only offered where winters get cold enough to matter/),
+    ).toBeVisible();
+  });
+
+  it("names the severe weather symbol in the symbol guide", () => {
+    renderManual(MANUAL_ENTRY.SYMBOLS);
+    expect(
+      within(screen.getByTestId("concept-legend")).getByText("Severe weather"),
+    ).toBeInTheDocument();
   });
 
   it.each([

@@ -1,7 +1,13 @@
 import { SCENARIOS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import { ScenarioType } from "../Types";
 import { getSimLocation } from "./SimData";
-import { runSimulation, SimResultType } from "./Simulator";
+import { createGame, runSimulation, SimResultType } from "./Simulator";
+import {
+  hailOccurs,
+  hazardEventKey,
+  sampleHailImpacts,
+} from "../helpers/Hazards";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 
 jest.setTimeout(600000);
 
@@ -122,4 +128,58 @@ describe("weather hazard balance (real reducer, twenty years)", () => {
     // Premiums alone make the hazard run poorer.
     expect(on.finalCash).toBeLessThan(off.finalCash);
   });
+});
+
+describe("damaging hail across many seeds (pure occurrence draws)", () => {
+  const PROBE_SEEDS = 300;
+
+  /** Share of 20-year runs with each count of storms that damage the balance fleet. */
+  function stormCounts(locationId: string): number[] {
+    const scenario = customAt(locationId);
+    const template = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario,
+      seed: 1,
+    });
+    return Array.from({ length: PROBE_SEEDS }, (_, i) => {
+      const probe = { ...template, seed: i + 1 };
+      let storms = 0;
+      for (let month = 1; month <= MONTHS; month++) {
+        const date = getDateFromMinute(
+          month * MINUTES_PER_MONTH,
+          probe.startingYear,
+        );
+        const key = hazardEventKey("HAIL", locationId, month);
+        if (
+          hailOccurs(probe, key, date.monthNumber - 1) &&
+          sampleHailImpacts({ game: probe, key }).length
+        ) {
+          storms += 1;
+        }
+      }
+      return storms;
+    });
+  }
+
+  const share = (counts: number[], test: (n: number) => boolean) =>
+    counts.filter(test).length / counts.length;
+
+  it.each(["Denver", "Dallas", "KansasCity", "Cordoba", "Mendoza"])(
+    "usually sees zero to two damaging storms in hail alley (%s)",
+    (locationId) => {
+      const counts = stormCounts(locationId);
+      expect(share(counts, (n) => n <= 2)).toBeGreaterThanOrEqual(0.85);
+      // Still a real risk there: most runs see at least one.
+      expect(share(counts, (n) => n >= 1)).toBeGreaterThan(0.5);
+    },
+  );
+
+  it.each(["SF", "Seattle", "London", "Reykjavik"])(
+    "usually sees none in a low-risk place (%s)",
+    (locationId) => {
+      expect(share(stormCounts(locationId), (n) => n === 0)).toBeGreaterThan(
+        0.85,
+      );
+    },
+  );
 });

@@ -556,7 +556,7 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      "Runs down to \u221230°C instead of \u22128°C.",
+      "Rated to \u221230°C instead of \u22128°C; halves losses below that. Recommended here: winters often drop below \u22128°C.",
     );
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",
@@ -573,6 +573,26 @@ describe("weather hardening in the purchase dialog", () => {
       designMinTempC: -8,
     });
     expect(quote.resilienceExtraBuildCost).toBeUndefined();
+  });
+
+  it("offers no cold-weather package where winters never get cold enough", () => {
+    const game = createGame({ scenarioId: 100 });
+    game.timeline[0].cash = 1e12;
+    render(
+      <BuildGenerators
+        game={game}
+        onBack={jest.fn()}
+        onBuildGenerator={jest.fn()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("checkbox", {
+        name: /^Cold-weather package/,
+      }),
+    ).toBeNull();
   });
 
   it("offers hail-resistant solar as an opt-in that follows the quoted price", () => {
@@ -605,13 +625,13 @@ describe("weather hardening in the purchase dialog", () => {
       name: /^Hail-resistant panels \+\$/,
     });
     expect(option).toHaveAccessibleDescription(
-      /^Cuts hail damage and weather insurance\. Weather insurance \$[\d.]+[kMB]? → \$[\d.]+[kMB]?\/yr$/,
+      /^Less hail damage\. Insurance \$[\d.]+[kMB]? → \$[\d.]+[kMB]?\/yr\.$/,
     );
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",
     });
     expect(impact).toHaveTextContent(
-      "Includes weather insurance. Plus fuel and loan payments.",
+      "Incl. insurance. Plus fuel and loan payments.",
     );
   });
 
@@ -667,8 +687,11 @@ describe("weather hardening in the purchase dialog", () => {
     });
     expect(option).toBeChecked();
     expect(option).toHaveAccessibleDescription(
-      /Clear it to afford this build\.$/,
+      /Uncheck to afford the downpayment\.$/,
     );
+    expect(
+      within(dialog).getByText("Uncheck to afford the downpayment."),
+    ).toHaveClass("resilienceBuildOptionWarning");
     expect(
       within(dialog).getByRole("button", { name: "Take loan" }),
     ).toBeDisabled();

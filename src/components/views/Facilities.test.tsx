@@ -426,7 +426,7 @@ describe("weather hazards in the fleet", () => {
     expect(lead).toHaveTextContent(
       "Hail damage · 72% available · 9 days to repair",
     );
-    expect(screen.getByText("Hail · 72% output · 9d")).toBeInTheDocument();
+    expect(screen.getByText("Hail · 72% · 9d")).toBeInTheDocument();
     expect(screen.queryByText("72% limit")).toBeNull();
     const solarRow = rows().find((row) =>
       row.getAttribute("aria-label")?.startsWith("Inspect Solar"),
@@ -455,7 +455,7 @@ describe("weather hazards in the fleet", () => {
     expect(screen.getByTitle("Extreme cold · 55% available")).toHaveTextContent(
       "Extreme cold · 55% available",
     );
-    expect(screen.getByText("Cold · 55% output")).toBeInTheDocument();
+    expect(screen.getByText("Cold · 55%")).toBeInTheDocument();
     expect(screen.queryByText("55% limit")).toBeNull();
     const gasRow = rows().find((row) =>
       row.getAttribute("aria-label")?.startsWith(`Inspect ${gas.name}`),
@@ -482,7 +482,7 @@ describe("weather hazards in the fleet", () => {
     const dialog = screen.getByRole("dialog", {
       name: "Add hail-resistant panels to Solar?",
     });
-    expect(dialog).toHaveTextContent(/Weather insurance \$.+ → \$.+\/yr/);
+    expect(dialog).toHaveTextContent(/Insurance \$.+ → \$.+\/yr\./);
     expect(dialog).not.toHaveTextContent("cash now");
     await user.click(
       within(dialog).getByRole("button", {

@@ -8,8 +8,9 @@ import { COLD_CLIMATE_BY_LOCATION } from "./ColdClimate";
  * The hail rates are the expected number of storms per year with hail large enough to break
  * utility PV modules at a single site. They are rounded game balance read from published hail
  * climatologies, not a site-specific risk assessment: the ranking between places is the point,
- * and the absolute values are deliberately modest so a 20-year run sees a handful of storms at
- * most even in hail alley. Flooding is out of scope.
+ * and the absolute values are deliberately modest so a 20-year run usually sees zero to two
+ * damaging storms even in hail alley, and none at all in most low-risk places. Flooding is out of
+ * scope.
  */
 
 const SPC =
@@ -112,14 +113,16 @@ type ProfileRow = [damagingHailPerYear: number, source: string];
 // Grouped by hail band, highest first. Cold exposure comes from each city's own weather record
 // (data/ColdClimate), not from these rows.
 const PROFILE_ROWS: Record<string, ProfileRow> = {
-  // Hail alley and the Argentine lee of the Andes, the world's most active hail regions.
-  Denver: [0.08, SPC],
-  Dallas: [0.08, SPC],
-  KansasCity: [0.08, SPC],
-  Cordoba: [0.08, SATELLITE],
-  Mendoza: [0.08, SATELLITE],
-  Calgary: [0.07, SPC],
-  Johannesburg: [0.06, SATELLITE],
+  // Hail alley and the Argentine lee of the Andes, the world's most active hail regions. Capped at
+  // 0.06 so about nine 20-year runs in ten see at most two damaging storms even here (a probe
+  // over 1,000 seeds: 90-91% at 0.06, against 82-83% at the earlier 0.08).
+  Denver: [0.06, SPC],
+  Dallas: [0.06, SPC],
+  KansasCity: [0.06, SPC],
+  Cordoba: [0.06, SATELLITE],
+  Mendoza: [0.06, SATELLITE],
+  Calgary: [0.055, SPC],
+  Johannesburg: [0.05, SATELLITE],
   // The wider Plains, Midwest and South, plus the Po valley, Bavaria and the Pampas.
   Austin: [0.05, SPC],
   SanAntonio: [0.05, SPC],
@@ -249,6 +252,19 @@ function coldExposure(
       Math.min(base, rareLowC),
     ),
   };
+}
+
+/**
+ * Whether a standard gas plant's rating is ever plausibly breached here, so a cold-weather package
+ * could help: the place's one-winter-in-twelve low reaches the standard rating. Cities without a
+ * weather record count as exposed outside the lowland subtropics and tropics.
+ */
+export function coldPackageCanHelp(location: LocationType): boolean {
+  const climate = COLD_CLIMATE_BY_LOCATION[location.id];
+  if (climate) {
+    return climate[1] <= STANDARD_GAS_DESIGN_MIN_TEMP_C;
+  }
+  return Math.abs(location.lat) >= 30 || (location.elevation ?? 0) >= 1500;
 }
 
 /** Authored hail rates by location id. Unknown or custom locations use the latitude fallback. */

@@ -18,6 +18,7 @@ import {
   COLD_PACKAGE_BUILD_SHARE,
   COLD_PACKAGE_DERATE_FACTOR,
   COLD_PACKAGE_RETROFIT_SHARE,
+  coldPackageCanHelp,
   coldPackageDesignMinTempC,
   GAS_INSURANCE_VULNERABILITY,
   getWeatherHazardProfile,
@@ -419,6 +420,20 @@ function hazardForUpgrade(upgrade: ResilienceUpgradeType): WeatherHazardType {
 }
 
 /**
+ * Whether an upgrade is offered in this game at all: its hazard must be able to occur, and a
+ * cold-weather package is only sold where cold can plausibly breach a standard plant's rating.
+ */
+function upgradeOffered(
+  game: GameType,
+  upgrade: ResilienceUpgradeType,
+): boolean {
+  return (
+    isWeatherHazardEligible(game, hazardForUpgrade(upgrade)) &&
+    (upgrade !== "coldWeatherPackage" || coldPackageCanHelp(game.location))
+  );
+}
+
+/**
  * What adding an upgrade to a standing facility costs, or undefined when it is not offered: the
  * wrong technology, already installed, still under construction, or a game where that hazard
  * never occurs. The reducer and the facility details pane share this one rule.
@@ -432,7 +447,7 @@ export function retrofitCost(
     !isOperational(facility) ||
     upgradeForFuel(facility.fuel) !== upgrade ||
     facility.resilience?.[upgrade] ||
-    !isWeatherHazardEligible(game, hazardForUpgrade(upgrade))
+    !upgradeOffered(game, upgrade)
   ) {
     return undefined;
   }
@@ -484,7 +499,7 @@ export function resilienceBuildOption(
   game: GameType,
 ): ResilienceBuildOptionType | undefined {
   const upgrade = upgradeForFuel(quote.fuel);
-  if (!upgrade || !isWeatherHazardEligible(game, hazardForUpgrade(upgrade))) {
+  if (!upgrade || !upgradeOffered(game, upgrade)) {
     return undefined;
   }
   const selected = !!quote.resilience?.[upgrade];
@@ -646,7 +661,7 @@ export interface FacilityResilienceSummaryType {
   upgrade: ResilienceUpgradeType;
   label: string;
   installed: boolean;
-  detail: string;
+  detail?: string; // Hail only; gas shows its temperature rating instead
   retrofitCost?: number; // Absent once installed
   annualInsuranceCost?: number; // Absent when nothing is charged
   replacementValue: number;
@@ -658,24 +673,21 @@ export function facilityResilienceSummary(
   facility: FacilityOperatingType,
 ): FacilityResilienceSummaryType | undefined {
   const upgrade = upgradeForFuel(facility.fuel);
-  if (!upgrade || !isWeatherHazardEligible(game, hazardForUpgrade(upgrade))) {
+  if (!upgrade || !upgradeOffered(game, upgrade)) {
     return undefined;
   }
   const installed = !!facility.resilience?.[upgrade];
   const premium = annualInsuranceCost(facility, game);
   let label: string;
-  let detail: string;
+  let detail: string | undefined;
   if (upgrade === "hailResistant") {
     label = installed ? "Hail-resistant panels" : "Standard panels";
     detail = installed
-      ? "Hail breaks less of the array and insurance costs less."
+      ? "Less hail damage, lower insurance."
       : "Takes full hail damage.";
   } else {
+    // The pane shows the plant's rating instead, in the player's temperature unit.
     label = installed ? "Cold-weather package" : "Standard winterization";
-    // The pane formats the rating itself in the player's temperature unit.
-    detail = installed
-      ? "Keeps running through deeper cold."
-      : "Built for ordinary winters.";
   }
   return {
     upgrade,
