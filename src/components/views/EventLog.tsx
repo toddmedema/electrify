@@ -43,7 +43,7 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
 };
 
 type EventHistoryFilterType =
-  "ALL" | "SCENARIO" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
+  "ALL" | "WORLD" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
 
 const EVENT_HISTORY_FILTERS: {
   value: EventHistoryFilterType;
@@ -53,9 +53,10 @@ const EVENT_HISTORY_FILTERS: {
 }[] = [
   { value: "ALL", label: "All events" },
   {
-    value: "SCENARIO",
-    label: "Scenario",
-    emptyMessage: "No scenario events yet.",
+    // Scenario stories, wildfires and weather hazards all log as world events
+    value: "WORLD",
+    label: "World",
+    emptyMessage: "No world or weather events yet.",
     kinds: ["WORLD_EVENT"],
   },
   {

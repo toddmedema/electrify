@@ -1,8 +1,19 @@
 import cloneDeep from "lodash.clonedeep";
 import { getTimeFromTimeline, summarizeTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
-import { GameType, TickPresentFutureType } from "../Types";
-import { checkMonth, checkTick, InvariantCollector } from "./Invariants";
+import {
+  ActiveWorldEventType,
+  GameType,
+  TickPresentFutureType,
+} from "../Types";
+import {
+  checkMonth,
+  checkTick,
+  checkWeatherHazards,
+  InvariantCollector,
+} from "./Invariants";
+import { HAIL_DEFINITION_ID } from "../helpers/Hazards";
+import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { createGame } from "./Simulator";
 
 let fixture: GameType;
@@ -73,4 +84,62 @@ it("caps reported examples without losing the total violation count", () => {
   });
   expect(collector.getViolations()).toHaveLength(6);
   expect(collector.getViolations()[5].rule).toBe("broken energy");
+});
+
+describe("weather hazard checks", () => {
+  function withHail(patch: (event: ActiveWorldEventType) => void) {
+    const state = cloneDeep(fixture);
+    const solar = state.facilities[0];
+    solar.fuel = "Sun";
+    const startsMinute = state.date.monthsElapsed * MINUTES_PER_MONTH;
+    const event: ActiveWorldEventType = {
+      key: `hail:test:${state.date.monthsElapsed}:f${solar.id}`,
+      definitionId: HAIL_DEFINITION_ID,
+      startsMinute,
+      endsMinute: startsMinute + 600,
+      attributes: {
+        facilityId: solar.id,
+        oneTimeCost: 1000,
+        repairCost: 1000,
+      },
+      effects: { facilityOutputMultipliersById: { [String(solar.id)]: 0.8 } },
+    };
+    patch(event);
+    state.worldEvents.active.push(event);
+    const collector = new InvariantCollector();
+    checkWeatherHazards(collector, state, "test month");
+    return collector.getViolations().map(({ rule }) => rule);
+  }
+
+  it("accepts a well-formed hail occurrence", () => {
+    expect(withHail(() => {})).toEqual([]);
+  });
+
+  it.each([
+    [
+      "a charge that differs from the repair",
+      (e: ActiveWorldEventType) => {
+        e.attributes.oneTimeCost = 5000;
+      },
+      "hail charge equals the repair cost",
+    ],
+    [
+      "a derate outside (0, 1]",
+      (e: ActiveWorldEventType) => {
+        const byId = e.effects.facilityOutputMultipliersById!;
+        byId[Object.keys(byId)[0]] = 0;
+      },
+      "weather hazard derates stay within (0, 1]",
+    ],
+  ])("flags %s", (_label, patch, rule) => {
+    expect(withHail(patch)).toContain(rule);
+  });
+
+  it("flags hail on a non-solar facility", () => {
+    expect(
+      withHail((e) => {
+        e.effects.facilityOutputMultipliersById = { "999999": 0.5 };
+      }),
+    ).toContain("hail only damages operating solar");
+  });
 });

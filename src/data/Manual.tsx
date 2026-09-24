@@ -12,7 +12,9 @@ import {
   largeMassUnit,
   massUnitName,
 } from "../helpers/Units";
+import { formatDesignTemperature } from "../components/base/WeatherResilienceText";
 import { IMPORT_EMISSIONS_ASSUMPTIONS } from "./ImportEmissions";
+import { COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C } from "./Hazards";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
 // through a component of their own rather than the array becoming a function of it. Their text
@@ -66,6 +68,14 @@ function EmissionsPerPoint(): React.JSX.Element {
   return <>{formatLargeMassApprox(KG_PER_MEGATONNE, useUnits())}</>;
 }
 
+function ColdPackageRating(): React.JSX.Element {
+  return (
+    <>
+      {formatDesignTemperature(COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C, useUnits())}
+    </>
+  );
+}
+
 // Groups the entries into sections, so the list doesn't open on "Blackouts" and "BTU" purely
 // because the alphabet says so. Ordered the way they're shown.
 export const MANUAL_GROUPS = ["Gameplay", "Money", "Physics & Units"] as const;
@@ -103,6 +113,7 @@ export const MANUAL_ENTRY = {
   SCORE: "Score",
   SYMBOLS: "Symbol Guide",
   TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
+  WEATHER_DAMAGE: "Weather Damage",
 } as const;
 
 export type ManualEntryTitleType =
@@ -261,7 +272,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SYMBOLS,
     group: "Gameplay",
     keywords:
-      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather danger goal",
+      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather severe storm hail cold danger goal",
     entry: (
       <div>
         <p>These symbols have the same meaning throughout the game.</p>
@@ -880,7 +891,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Money",
     keywords:
       "O&M fixed base variable operations maintenance non-fuel start annual upkeep",
-    related: [MANUAL_ENTRY.CAPACITY_FACTOR, MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    related: [
+      MANUAL_ENTRY.CAPACITY_FACTOR,
+      MANUAL_ENTRY.TOTAL_COST_OF_ENERGY,
+      MANUAL_ENTRY.WEATHER_DAMAGE,
+    ],
     entry: (
       <div>
         <p>
@@ -907,6 +922,47 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Actual costs depend on operation. Oil plants pay fixed and variable
           O&amp;M; pausing halves the fixed charge and stops the variable
           charge.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.WEATHER_DAMAGE,
+    group: "Gameplay",
+    keywords:
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package solar trackers downtime",
+    related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
+    entry: (
+      <div>
+        <p>
+          Hail and extreme cold strike at random. How often depends on the
+          location. Neither happens in tutorials.
+        </p>
+        <ul>
+          <li>
+            <strong>Hail:</strong> Breaks part of a solar farm. The broken share
+            produces nothing until repairs finish, usually within weeks. You pay
+            the full repair cost.
+          </li>
+          <li>
+            <strong>Extreme cold:</strong> Gas plants colder than their rating
+            lose output for the month; a cold-weather package halves the loss. A
+            deep regional freeze also raises gas prices.
+          </li>
+        </ul>
+        <p>
+          When building, you can add hail-resistant panels to solar (less
+          damage) or a cold-weather package to gas (rated to{" "}
+          <ColdPackageRating />, colder in cold climates). Either can be added
+          later from the facility&apos;s details for 50% more, and the plant
+          goes offline for a month while it&apos;s installed. You can cancel
+          before then for a full refund. The cold-weather package is only
+          offered where winters get cold enough to matter.
+        </p>
+        <p>
+          Solar trackers, available from 2014, turn panels to follow the sun for
+          more morning and evening power, about 20% more a year, and stow
+          steeply to cut hail damage. They can only be added when building.
         </p>
       </div>
     ),

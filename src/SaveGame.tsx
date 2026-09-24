@@ -24,6 +24,10 @@ import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
+  validResilienceRecord,
+  validUpgradeInProgress,
+} from "./helpers/BuildValidation";
+import {
   getStorageJson,
   removeStorageKey,
   setStorageKeyValue,
@@ -428,7 +432,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
-        optionalBooleansInvalid
+        optionalBooleansInvalid ||
+        !validResilienceRecord(current.fuel, current.resilience) ||
+        !validUpgradeInProgress(current.upgradeInProgress)
       );
     }) ||
     !Array.isArray(game.timeline) ||

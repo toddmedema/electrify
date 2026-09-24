@@ -1913,6 +1913,46 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 }
 
+// Optional weather hardening in the build dialog: one checkbox, its price in the label, and a
+// line or two of what it buys, set under the label text rather than the box. The impact
+// summary's first fact rule is the one neutral divider below it.
+.resilienceBuildOption {
+  padding: 4px 16px 0;
+
+  & + .decisionImpact {
+    padding-top: 12px;
+  }
+
+  .MuiFormControlLabel-root {
+    min-height: 40px;
+    margin-right: 0;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+
+  .MuiFormControlLabel-label {
+    font-weight: 600;
+  }
+
+  .resilienceBuildOptionDetail {
+    // The checkbox's 42px hit area less MUI's -11px start margin
+    padding-left: 31px;
+  }
+}
+
+.resilienceBuildOption .resilienceBuildOptionWarning {
+  color: var(--warning-icon);
+}
+
+// The retrofit confirmation's statements read as separate short lines
+.facilityRetrofitDialog
+  .MuiDialogContentText-root
+  + .MuiDialogContentText-root {
+  margin-top: 8px;
+}
+
 .generatorComparison {
   padding: 8px 16px 10px;
   border-bottom: 1px solid var(--border-selected);
@@ -3457,6 +3497,12 @@ html[data-theme="dark"] .uplot {
     }
   }
 
+  // The value of an active weather outage, in the same amber as the row's status lead
+  .facilityStatWarning {
+    color: var(--warning-icon);
+    font-weight: 600;
+  }
+
   .facilityStatNote {
     display: block;
     color: var(--font-color-faded);
@@ -3467,6 +3513,23 @@ html[data-theme="dark"] .uplot {
 
   .facilityFuelTrend {
     grid-column: 1 / -1;
+  }
+
+  .facilityRetrofit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 12px;
+
+    .MuiButton-root {
+      min-height: 40px;
+      text-transform: none;
+
+      @media (pointer: coarse) {
+        min-height: 44px;
+      }
+    }
   }
 
   .facilityWaterOutlook {
@@ -5021,6 +5084,34 @@ $sizemap: (
 }
 .facilityDisclosure .facilityStatusShort {
   display: none;
+}
+// A weather outage leads the status line in warning amber (text as well as colour carries it).
+// Deep amber on the card clears 7:1 in light mode and amber300 does the same in dark mode.
+// It gives way before the output reading does (shrink is weighted by width, so the factor is
+// large), and its title and the row's label keep the long form.
+.facilityDisclosure .facilityHazardStatus {
+  flex-shrink: 1000;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--warning-icon);
+  font-weight: 600;
+}
+.facilityDisclosure .facilityHazardSeparator {
+  flex-shrink: 0;
+  white-space: pre;
+}
+.facilityDisclosure .facilityHazardLong {
+  display: none;
+}
+// Only a wide row has room for the spelled-out outage beside the output reading
+@container (min-width: 400px) {
+  .facilityDisclosure .facilityHazardLong {
+    display: inline;
+  }
+  .facilityDisclosure .facilityHazardShort {
+    display: none;
+  }
 }
 // Compact reservoir wording keeps the output and fullness together on phones.
 @container (max-width: 239px) {

@@ -353,6 +353,31 @@ describe("decodeReplay", () => {
     ).toBeNull();
   });
 
+  it("accepts a well-formed retrofit and rejects a malformed one", () => {
+    const withAction = (payload: unknown) => {
+      const doc = encodeReplay(aReplay());
+      doc.actions = JSON.stringify([
+        { minute: 0, type: "retrofitFacility", payload },
+      ]);
+      return decodeReplay(doc);
+    };
+    expect(
+      withAction({ facilityId: 3, upgrade: "hailResistant" })?.actions[0].type,
+    ).toBe("retrofitFacility");
+    expect(
+      withAction({ facilityId: 3, upgrade: "coldWeatherPackage" }),
+    ).not.toBeNull();
+    [
+      null,
+      3,
+      { facilityId: 3 },
+      { facilityId: -1, upgrade: "hailResistant" },
+      { facilityId: 1.5, upgrade: "hailResistant" },
+      { facilityId: "3", upgrade: "hailResistant" },
+      { facilityId: 3, upgrade: "floodWall" },
+    ].forEach((payload) => expect(withAction(payload)).toBeNull());
+  });
+
   it("ignores an action the reducer has no handler for", () => {
     const doc = encodeReplay(aReplay());
     doc.actions = JSON.stringify([

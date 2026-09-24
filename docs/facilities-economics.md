@@ -269,6 +269,50 @@ and imported amounts affect score, while carbon fees charge only local generatio
 upstream supply chains and land-use emissions are omitted; zero operating emissions is not zero
 lifecycle impact.
 
+## Weather hazards
+
+Hail can break solar modules and extreme cold can take gas plants offline (issue #73). Profiles
+and balance constants live in `src/data/Hazards.tsx`; the pure model is `src/helpers/Hazards.tsx`.
+All values are rounded game balance, not a site-specific risk assessment.
+
+- **Hail exposure.** Each location carries an expected number of damaging hailstorms per year at a
+  utility PV site, ranked from NOAA SPC's 1986-2015 severe-hail report climatology in North
+  America, the ESSL European Severe Weather Database in Europe, and NASA passive-microwave hail
+  climatologies (Cecil & Blankenship 2012; Bang & Cecil 2019) elsewhere. Unprofiled locations fall
+  back by latitude band. The busiest hail regions are capped at 0.06 storms per year, so about
+  nine 20-year runs in ten see at most two damaging storms even there, and most low-risk places
+  see none. A storm hits each array with 70% probability and breaks at most 60% of it;
+  hail-resistant designs break 30% as much.
+- **Repairs.** The company pays the full repair cost once: the damaged share of the array's
+  replacement value (its build cost carried forward by inflation).
+- **Extreme cold.** Each month's representative-day minimum is compared with each gas plant's
+  design minimum (-8 °C standard) and with the region's gas-supply threshold, following the
+  FERC-NERC report on the February 2021 cold-weather outages. Cold is judged against each city's
+  own weather record (`src/data/ColdClimate.tsx`, derived from 1980-2024 representative days): a
+  place is a cold climate when the standard rating is breached in about one winter in four, and
+  its gas quotes include a cold-weather package by default. Regional supply strains below the
+  colder of -15 °C (mild climates) or -25 °C (cold climates) and the place's one-winter-in-twelve
+  low, so a regional gas shock stays rare everywhere. A package rates a plant 5 °C below the
+  regional threshold, and at least to -25 °C. It is only offered, at build or as a retrofit,
+  where the one-winter-in-twelve low reaches the standard -8 °C rating (or, without a weather
+  record, outside the lowland tropics and subtropics); elsewhere it could never help. A cold snap's gas-price multiple is capped so that,
+  combined with any authored gas shock that month, prices reach at most 3× normal.
+- **Hardening prices.** Hail-resistant panels add 3% to a solar build, after DOE FEMP's solar
+  hail-resilience guidance; a cold-weather package adds 2% to a gas build.
+- **Retrofits.** Either can be added to a standing plant for 1.5× its build share, charged on the
+  plant's replacement value (4.5% and 3%). The plant is offline for one game month while the work
+  is done, and the player can cancel before then for a full refund and immediate return to service.
+- **Solar trackers.** A build-only option for solar, modelled on Nextpower (formerly Nextracker),
+  the largest single-axis tracker supplier. It is available from 2014, when the self-powered NX
+  Horizon tracker began shipping, and priced at 7% of the build: Nextpower's FY2025 revenue was
+  about $0.09 per watt delivered ($2.96B for 34 GW, Form 10-K), against roughly $1.25/W for
+  utility PV (LBNL Utility-Scale Solar). Tracking adds about 20% of annual energy over fixed tilt
+  (LBNL, NREL PVWatts), almost all of it in the morning and evening. The game scales output by
+  `1 + 0.6 sin²(hour angle)`, which is unchanged at noon and averages +20% over a clear day, still
+  clipped at nameplate. Trackers stow steeply ahead of hail: arrays bought before 2024 take half
+  the damage, and those bought from 2024 take a quarter, after NX Horizon Hail Pro-75's 75° stow
+  and VDE Americas' stow-angle findings. The share multiplies with hail-resistant panels.
+
 ## Primary references
 
 - [EIA, Capital Cost and Performance Characteristics for Utility-Scale Electric Power Generating Technologies, AEO2025](https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf)
