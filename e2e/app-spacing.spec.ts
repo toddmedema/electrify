@@ -18,7 +18,7 @@ test("phone surfaces share stable gutters and compact chrome", async ({
   test.skip(!isPhoneProject(testInfo.project.name));
 
   await page.goto("/");
-  await page.getByRole("button", { name: "How to play" }).click();
+  await page.getByRole("button", { name: "Manual" }).click();
   await page.waitForTimeout(400);
   const manualEntries = page.locator(".manual-entry");
   const firstManualEntry = await manualEntries.nth(1).boundingBox();

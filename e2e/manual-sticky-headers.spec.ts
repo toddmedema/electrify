@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 async function openManual(page: import("@playwright/test").Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "How to play" }).click();
+  await page.getByRole("button", { name: "Manual" }).click();
   await expect(page.getByRole("heading", { name: "Manual" })).toBeVisible();
 }
 
