@@ -46,7 +46,7 @@ import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
 import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import {
   policyWindowLabel,
   suggestedPolicyStartHour,

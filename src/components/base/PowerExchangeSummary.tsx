@@ -1,5 +1,5 @@
 import ManualLink from "./ManualLink";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "./ManualEntries";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";

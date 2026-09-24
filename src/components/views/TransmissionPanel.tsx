@@ -10,7 +10,7 @@ import {
   intertieForecastKey,
 } from "../../helpers/IntertiePortfolio";
 import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";

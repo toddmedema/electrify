@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import type { AppDispatch } from "../../Store";
 import { manualHelpOpen } from "../../reducers/UI";
-import type { ManualEntryTitleType } from "../../data/Manual";
+import type { ManualEntryTitleType } from "./ManualEntries";
 
 interface Props {
   entry: ManualEntryTitleType;
