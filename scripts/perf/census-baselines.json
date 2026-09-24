@@ -1,0 +1,60 @@
+{
+  "desktop-chromium": {
+    "ordinary": {
+      "commits": 60,
+      "dispatches": 30,
+      "mutationRecords": 77,
+      "addedNodes": 0,
+      "removedNodes": 0,
+      "attributeMutations": 55,
+      "textMutations": 22
+    },
+    "rollover": {
+      "commits": 11,
+      "dispatches": 6,
+      "mutationRecords": 26,
+      "addedNodes": 0,
+      "removedNodes": 0,
+      "attributeMutations": 16,
+      "textMutations": 10
+    },
+    "catalog": {
+      "commits": 11,
+      "dispatches": 1,
+      "mutationRecords": 45,
+      "addedNodes": 5,
+      "removedNodes": 11,
+      "attributeMutations": 29,
+      "textMutations": 0
+    }
+  },
+  "mobile-390px": {
+    "ordinary": {
+      "commits": 80,
+      "dispatches": 30,
+      "mutationRecords": 65,
+      "addedNodes": 0,
+      "removedNodes": 0,
+      "attributeMutations": 55,
+      "textMutations": 10
+    },
+    "rollover": {
+      "commits": 14,
+      "dispatches": 5,
+      "mutationRecords": 11,
+      "addedNodes": 0,
+      "removedNodes": 0,
+      "attributeMutations": 8,
+      "textMutations": 3
+    },
+    "catalog": {
+      "commits": 13,
+      "dispatches": 1,
+      "mutationRecords": 37,
+      "addedNodes": 6,
+      "removedNodes": 6,
+      "attributeMutations": 25,
+      "textMutations": 0
+    }
+  }
+}

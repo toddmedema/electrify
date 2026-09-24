@@ -18,6 +18,11 @@ files are large, so broad rewrites create expensive review diffs.
   only to `test:ci`.
 - Iterate on game economics with `npm run sim -- --scenario <id>`. See `src/testing/README.md`
   for simulation flags and traps.
+- Performance work starts from `docs/perf-plan.md`. `npm run perf:bench` reports tick and
+  rollover cost and gates same-process ratios; `npm run perf:bundle` gates gzip bytes after a
+  build; `src/testing/GoldenOutputs.test.tsx` pins every scenario's output. Rebaseline all of
+  them with `npm run perf:rebaseline`, last, and explain the move in the PR. Append `?perf=1`
+  to a dev URL for the frame-budget overlay.
 - Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and
   run with `npm run test:e2e -- <spec> --project=desktop-chromium` when the changed path warrants
   them. CI runs `build-options.spec.ts` and `tutorial-exit.spec.ts` on desktop and 390 px phone.
