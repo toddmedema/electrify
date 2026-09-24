@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MANUAL_ENTRY } from "../../data/Manual";
+import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
 import Manual, { clearManualMemory } from "./Manual";
 
