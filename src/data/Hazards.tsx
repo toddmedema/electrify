@@ -3,7 +3,7 @@ import { COLD_CLIMATE_BY_LOCATION } from "./ColdClimate";
 
 /**
  * Location exposure to damaging hail and extreme cold, plus the balance constants that turn an
- * occurrence into damage, derates, deductibles and premiums (issue #73).
+ * occurrence into damage, derates and repair costs (issue #73).
  *
  * The hail rates are the expected number of storms per year with hail large enough to break
  * utility PV modules at a single site. They are rounded game balance read from published hail
@@ -40,27 +40,12 @@ export const HAIL_EXPOSURE_HIT_SHARE = 0.7;
 export const HAIL_MAX_DAMAGED_FRACTION = 0.6;
 /** Hail-resistant arrays (thicker glass, tracker hail stow) break this share of a standard loss. */
 export const HAIL_RESISTANT_DAMAGE_FACTOR = 0.3;
-/** Deductible as a share of replacement value, capped at the repair cost itself. */
-export const HAIL_DEDUCTIBLE_SHARE = 0.02;
-/** Build-time premium for hail-resistant design. Source: DOE FEMP solar hail resilience guide. */
+/** Extra build cost for hail-resistant design. Source: DOE FEMP solar hail resilience guide. */
 export const HAIL_RESISTANT_BUILD_SHARE = 0.03;
 /** Retrofitting a standing array (module swaps, stow controls) costs more than building it in. */
 export const HAIL_RESISTANT_RETROFIT_SHARE = 0.08;
-/**
- * Annual hazard insurance loading on a solar array's replacement value at the reference hail rate.
- * Catalogue O&M already carries average insurance; this is the extra for local exposure.
- */
-export const SOLAR_HAIL_INSURANCE_RATE = 0.002;
-export const SOLAR_HAIL_INSURANCE_REFERENCE_PER_YEAR = 0.05;
-/**
- * Insured-loss vulnerability of hail-resistant arrays relative to standard ones. Anchored on NREL
- * TP-7A40-78588's finding that hail stow and thicker glass remove most hail loss.
- */
-export const HAIL_RESISTANT_INSURANCE_VULNERABILITY = 0.4;
-/** Gas plants carry no weather insurance loading in v1: cold costs lost output, not assets. */
-export const GAS_INSURANCE_VULNERABILITY = 0;
 
-/** Build-time premium for a cold-weather package (heat tracing, enclosures, instrument heat). */
+/** Extra build cost for a cold-weather package (heat tracing, enclosures, instrument heat). */
 export const COLD_PACKAGE_BUILD_SHARE = 0.02;
 /** Retrofitting winterization onto a standing plant. */
 export const COLD_PACKAGE_RETROFIT_SHARE = 0.04;

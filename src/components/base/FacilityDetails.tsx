@@ -25,7 +25,6 @@ import {
 import { facilityColor } from "../../Theme";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
-  annualInsuranceCost,
   facilityHazardStatus,
   facilityResilienceSummary,
   FacilityResilienceSummaryType,
@@ -37,7 +36,6 @@ import {
   coldPackageEffect,
   dayCount,
   formatDesignTemperature,
-  insuranceChange,
   resilienceActionLabel,
 } from "./WeatherResilienceText";
 import {
@@ -146,8 +144,8 @@ export function fuelPriceTrend(
 }
 
 /**
- * How the facility is hardened against the weather hazard its technology faces, what that costs
- * in insurance, and - outside a replay - an offer to add the upgrade to the standing plant.
+ * How the facility is hardened against the weather hazard its technology faces and - outside a
+ * replay - an offer to add the upgrade to the standing plant.
  */
 function WeatherResilienceSection(props: {
   facility: FacilityOperatingType;
@@ -183,10 +181,6 @@ function WeatherResilienceSection(props: {
   const retrofitted = canOffer
     ? retrofittedResilience(facility, game, summary.upgrade)
     : undefined;
-  const insuranceAfter =
-    hail && retrofitted && summary.annualInsuranceCost !== undefined
-      ? annualInsuranceCost({ ...facility, resilience: retrofitted }, game)
-      : undefined;
   const hazard = facilityHazardStatus(game, facility);
   const activeOutage =
     hazard && (hazard.hazard === "HAIL") === hail
@@ -214,17 +208,6 @@ function WeatherResilienceSection(props: {
             </>
           }
         />
-        {summary.annualInsuranceCost !== undefined && (
-          <Stat
-            label="Weather insurance"
-            value={
-              <>
-                {formatMoneyConcise(summary.annualInsuranceCost)}/yr
-                <span className="facilityStatNote">Charged with upkeep</span>
-              </>
-            }
-          />
-        )}
       </dl>
       {canOffer && (
         <div className="facilityRetrofit">
@@ -267,14 +250,6 @@ function WeatherResilienceSection(props: {
                     units,
                   )}
             </DialogContentText>
-            {insuranceAfter !== undefined && (
-              <DialogContentText>
-                {insuranceChange(
-                  summary.annualInsuranceCost ?? 0,
-                  insuranceAfter,
-                )}
-              </DialogContentText>
-            )}
             {activeOutage && (
               <DialogContentText>{activeOutage}</DialogContentText>
             )}

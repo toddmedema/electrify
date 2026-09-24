@@ -208,7 +208,7 @@ export function formatReport(
   } else if (hazards && (hazards.hailEvents || hazards.coldEvents)) {
     lines.push(
       `  Weather hazards  ${hazards.hailEvents} hailstorms (${hazards.hailFacilityHits} facility hits, ` +
-        `${formatMoneyConcise(hazards.hailDeductibles)} deductibles); ${hazards.coldEvents} cold snaps ` +
+        `${formatMoneyConcise(hazards.hailRepairCosts)} repairs); ${hazards.coldEvents} cold snaps ` +
         `(${hazards.coldRegionalEvents} regional, ${hazards.coldDerates} plant-month derates)`,
     );
   }

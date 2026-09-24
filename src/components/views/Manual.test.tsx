@@ -63,7 +63,7 @@ describe("Manual", () => {
         }),
       ).getByRole("button", { name: MANUAL_ENTRY.WEATHER_DAMAGE }),
     ).toBeInTheDocument();
-    search("deductible");
+    search("hail");
     expect(
       screen.getByRole("button", {
         name: MANUAL_ENTRY.WEATHER_DAMAGE,

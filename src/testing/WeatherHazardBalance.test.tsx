@@ -115,17 +115,22 @@ describe("weather hazard balance (real reducer, twenty years)", () => {
   });
 
   it("costs something where hail is common, against a hazards-off control", () => {
+    // The first hail-alley run that paid for repairs, rerun with hazards off.
+    const [locationId, seedIndex] = ["Denver", "Dallas"]
+      .flatMap((id) => SEEDS.map((_, i) => [id, i] as const))
+      .find(
+        ([id, i]) => results[id][i].weatherHazardImpact.hailRepairCosts > 0,
+      )!;
     const off = runSimulation({
-      scenario: customAt("Denver"),
+      scenario: customAt(locationId),
       scenarioId: CUSTOM_SCENARIO_ID,
-      seed: SEEDS[0],
+      seed: SEEDS[seedIndex],
       months: MONTHS,
       weatherHazardsEnabled: false,
     });
-    const on = results.Denver[0];
+    const on = results[locationId][seedIndex];
     expect(off.weatherHazardImpact.hailEvents).toBe(0);
     expect(off.weatherHazardImpact.coldEvents).toBe(0);
-    // Premiums alone make the hazard run poorer.
     expect(on.finalCash).toBeLessThan(off.finalCash);
   });
 });

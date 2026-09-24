@@ -34,9 +34,9 @@ One explicit storage decision can be replayed with, for example,
 Pass `--without-stories` to run the same playthrough as an authored-effects control, and
 `--without-hazards` to switch off hail and extreme cold (`weatherHazardsEnabled: false` in
 `runSimulation`). When hazards fire, the totals add a "Weather hazards" line: storms, facility
-hits, deductibles, cold snaps and derated plant-months. `WeatherHazardBalance.test.tsx` runs a
+hits, repair costs, cold snaps and derated plant-months. `WeatherHazardBalance.test.tsx` runs a
 solar-and-gas fleet for twenty years at Denver, Dallas, SF, PIT and Reykjavik and bounds the
-storm counts; `reducers/WeatherHazard.test.tsx` covers onset, deductibles, repair, retrofits,
+storm counts; `reducers/WeatherHazard.test.tsx` covers onset, repair costs, repair, retrofits,
 save/resume and replay.
 
 Story balance uses the checked-in seeds 1–20 across all six scored scenarios and five
@@ -100,7 +100,7 @@ code rather than a vibe.
 | Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                                                                                                                                                                      |
 | Trade               | Imports plus exports never exceed the built lines' weather-adjusted rating, a tick never imports and exports at once, imports and exports are paid for exactly when they flow, and imports never exceed independently allocated neighbor supply times archetype availability; multiple paths share each market's supply and export-demand budget |
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                                                                                                                                                                    |
-| Weather hazards     | Each month, new hail and cold derates stay within (0, 1], hail only hits operating solar and its deductible never exceeds the insured repair, cold only derates gas plants rated warmer than the month's minimum, gas price spikes are at least 1x, and insurance premiums are finite and non-negative                                           |
+| Weather hazards     | Each month, new hail and cold derates stay within (0, 1], hail only hits operating solar and charges exactly its repair cost, cold only derates gas plants rated warmer than the month's minimum, and gas price spikes are at least 1x                                                                                                           |
 
 `Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
 `SimulationEconomics*.test.tsx` cover difficulty, player strategies, price competition, and

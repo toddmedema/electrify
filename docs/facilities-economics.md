@@ -283,10 +283,8 @@ All values are rounded game balance, not a site-specific risk assessment.
   nine 20-year runs in ten see at most two damaging storms even there, and most low-risk places
   see none. A storm hits each array with 70% probability and breaks at most 60% of it;
   hail-resistant designs break 30% as much.
-- **Insurance.** Catalogue O&M already includes average insurance, so solar carries only a
-  location-specific loading: 0.2% of replacement value per year at 0.05 storms per year, scaled
-  by local exposure, and 40% of that for hail-resistant arrays. Insurers pay repairs above a
-  deductible of 2% of replacement value. Gas carries no loading: cold costs output, not assets.
+- **Repairs.** The company pays the full repair cost once: the damaged share of the array's
+  replacement value (its build cost carried forward by inflation).
 - **Extreme cold.** Each month's representative-day minimum is compared with each gas plant's
   design minimum (-8 °C standard) and with the region's gas-supply threshold, following the
   FERC-NERC report on the February 2021 cold-weather outages. Cold is judged against each city's

@@ -113,7 +113,7 @@ export const MANUAL_ENTRY = {
   SCORE: "Score",
   SYMBOLS: "Symbol Guide",
   TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
-  WEATHER_DAMAGE: "Weather Damage & Insurance",
+  WEATHER_DAMAGE: "Weather Damage",
 } as const;
 
 export type ManualEntryTitleType =
@@ -930,7 +930,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.WEATHER_DAMAGE,
     group: "Gameplay",
     keywords:
-      "hail storm freeze cold snap winterization deductible premium resilience retrofit hardening hail-resistant panels cold-weather package insurance",
+      "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package",
     related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
     entry: (
       <div>
@@ -941,23 +941,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <ul>
           <li>
             <strong>Hail:</strong> Breaks part of a solar farm. The broken share
-            produces nothing until repairs finish, usually within weeks.
-            Insurance pays for repairs; you pay a deductible of up to 2% of the
-            farm&apos;s value.
+            produces nothing until repairs finish, usually within weeks. You pay
+            the full repair cost.
           </li>
           <li>
             <strong>Extreme cold:</strong> Gas plants colder than their rating
             lose output for the month; a cold-weather package halves the loss. A
             deep regional freeze also raises gas prices.
           </li>
-          <li>
-            <strong>Weather insurance:</strong> Solar farms pay a yearly premium
-            that rises with local hail risk. It is charged with upkeep.
-          </li>
         </ul>
         <p>
           When building, you can add hail-resistant panels to solar (less
-          damage, lower insurance) or a cold-weather package to gas (rated to{" "}
+          damage) or a cold-weather package to gas (rated to{" "}
           <ColdPackageRating />, colder in cold climates). Either can be added
           later from the facility&apos;s details, at a higher price. The
           cold-weather package is only offered where winters get cold enough to

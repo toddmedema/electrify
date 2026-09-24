@@ -1,4 +1,3 @@
-import { formatMoneyConcise } from "../../helpers/Format";
 import { formatTemperature } from "../../helpers/Units";
 import { ResilienceUpgradeType, UnitSystemType } from "../../Types";
 
@@ -29,11 +28,6 @@ export function coldPackageEffect(
   units: UnitSystemType,
 ): string {
   return `Rated to ${formatDesignTemperature(packagedMinTempC, units)} instead of ${formatDesignTemperature(standardMinTempC, units)}; halves losses below that.`;
-}
-
-/** The yearly premium before and after hail-resistant panels. */
-export function insuranceChange(before: number, after: number): string {
-  return `Insurance ${formatMoneyConcise(before)} → ${formatMoneyConcise(after)}/yr.`;
 }
 
 /** "9 days" or "1 day". */

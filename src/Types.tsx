@@ -550,10 +550,6 @@ export interface GeneratorOperatingType
   hydroLastSpillWh?: number;
   hydroLastMandatedReleaseWh?: number;
   hydroLastBypassWh?: number;
-  // Weather-hazard insurance loading, refreshed at each monthly rollover and charged as non-fuel
-  // O&M. The catalogue O&M already includes average insurance; this is the location-specific
-  // extra for exposure to hail. Absent for technologies with no insured weather vulnerability.
-  annualInsuranceCost?: number;
 }
 
 export interface StorageOperatingType

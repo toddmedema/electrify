@@ -663,9 +663,8 @@ export function checkMonth(
 
 /**
  * Checks the weather hazards that started this month, right after the rollover that drew them:
- * every derate is a real reduction, deductibles never exceed the insured repair, hail only hits
- * operating solar and cold only derates gas plants rated warmer than the month's minimum. Also
- * checks every generator's insurance premium.
+ * every derate is a real reduction, each hail charge is its repair cost, hail only hits operating
+ * solar and cold only derates gas plants rated warmer than the month's minimum.
  */
 export function checkWeatherHazards(
   collector: InvariantCollector,
@@ -733,31 +732,20 @@ export function checkWeatherHazards(
       );
     }
     if (hail) {
-      const deductible = event.attributes.oneTimeCost;
+      const charge = event.attributes.oneTimeCost;
       const repairCost = event.attributes.repairCost;
       if (
-        !isFinite_(deductible) ||
+        !isFinite_(charge) ||
         !isFinite_(repairCost) ||
-        deductible < 0 ||
-        deductible > repairCost * (1 + RELATIVE_TOLERANCE)
+        repairCost < 0 ||
+        Math.abs(charge - repairCost) > repairCost * RELATIVE_TOLERANCE
       ) {
         collector.add(
-          "hail deductible is within the repair cost",
+          "hail charge equals the repair cost",
           when,
-          `${event.key} deductible ${deductible} repair ${repairCost}`,
+          `${event.key} charge ${charge} repair ${repairCost}`,
         );
       }
-    }
-  });
-  state.facilities.forEach((facility) => {
-    const premium = (facility as { annualInsuranceCost?: unknown })
-      .annualInsuranceCost;
-    if (premium !== undefined && (!isFinite_(premium) || premium < 0)) {
-      collector.add(
-        "weather insurance premiums are finite and non-negative",
-        when,
-        `${facility.name} (${facility.id}) premium ${premium}`,
-      );
     }
   });
 }

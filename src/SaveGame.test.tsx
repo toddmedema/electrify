@@ -441,7 +441,7 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  it("validates weather resilience and insurance on facilities", () => {
+  it("validates weather resilience on facilities", () => {
     const save = serializeSave(game);
     const withFacility = (patch: Record<string, unknown>) =>
       parseSave(
@@ -458,15 +458,12 @@ describe("SaveGame", () => {
     const gas = {
       fuel: "Natural Gas",
       resilience: { coldWeatherPackage: true, designMinTempC: -30 },
-      annualInsuranceCost: 1000,
     };
     expect(withFacility(gas)).not.toBeNull();
     expect(
       withFacility({ fuel: "Sun", resilience: { hailResistant: true } }),
     ).not.toBeNull();
     [
-      { ...gas, annualInsuranceCost: -1 },
-      { ...gas, annualInsuranceCost: "cheap" },
       { ...gas, resilience: { coldWeatherPackage: "yes" } },
       { ...gas, resilience: { designMinTempC: 5 } },
       { ...gas, resilience: { hailResistant: true } },

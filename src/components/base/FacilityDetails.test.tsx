@@ -113,8 +113,6 @@ describe("weather resilience details", () => {
     showDetails(game, gas);
     expect(section()).toHaveTextContent("Standard winterization");
     expect(section()).toHaveTextContent("Rated to −8°C");
-    // Cold costs gas plants output rather than assets, so there is no premium to show
-    expect(section()).not.toHaveTextContent("Weather insurance");
     const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
     expect(
       within(section()).getByRole("button", {
@@ -161,7 +159,7 @@ describe("weather resilience details", () => {
     expect(onRetrofit).not.toHaveBeenCalled();
   });
 
-  it("confirms a hail retrofit with the insurance change and moves focus after paying", () => {
+  it("confirms a hail retrofit and moves focus after paying", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     const cost = retrofitCost(solar, game, "hailResistant")!;
@@ -175,7 +173,6 @@ describe("weather resilience details", () => {
       name: "Add hail-resistant panels to Solar?",
     });
     expect(dialog).toHaveTextContent("Less damage from future hail.");
-    expect(dialog).toHaveTextContent(/Insurance \$.+ → \$.+\/yr\./);
     expect(dialog).not.toHaveTextContent("cash now");
     fireEvent.click(
       within(dialog).getByRole("button", {
@@ -274,8 +271,6 @@ describe("weather resilience details", () => {
     const solar = withSolar(game, true);
     showDetails(game, solar);
     expect(section()).toHaveTextContent("Hail-resistant panels");
-    expect(section()).toHaveTextContent(/Weather insurance.*\/yr/);
-    expect(section()).toHaveTextContent("Charged with upkeep");
     expect(within(section()).queryByRole("button")).toBeNull();
   });
 

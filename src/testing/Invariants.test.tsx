@@ -99,7 +99,7 @@ describe("weather hazard checks", () => {
       endsMinute: startsMinute + 600,
       attributes: {
         facilityId: solar.id,
-        oneTimeCost: 100,
+        oneTimeCost: 1000,
         repairCost: 1000,
       },
       effects: { facilityOutputMultipliersById: { [String(solar.id)]: 0.8 } },
@@ -117,11 +117,11 @@ describe("weather hazard checks", () => {
 
   it.each([
     [
-      "a deductible above the repair",
+      "a charge that differs from the repair",
       (e: ActiveWorldEventType) => {
         e.attributes.oneTimeCost = 5000;
       },
-      "hail deductible is within the repair cost",
+      "hail charge equals the repair cost",
     ],
     [
       "a derate outside (0, 1]",

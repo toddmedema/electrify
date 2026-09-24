@@ -8,7 +8,6 @@ import {
 import { LOCATIONS } from "../Constants";
 import {
   getWeatherHazardProfile,
-  HAIL_DEDUCTIBLE_SHARE,
   HAIL_MAX_DAMAGED_FRACTION,
   HAIL_RESISTANT_DAMAGE_FACTOR,
 } from "../data/Hazards";
@@ -16,7 +15,6 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { storyHash } from "../data/WorldEvents";
 import {
-  annualInsuranceCost,
   applyDefaultResilience,
   COLD_DEFINITION_ID,
   facilityHazardStatus,
@@ -25,10 +23,8 @@ import {
   hailMonthlyProbability,
   hazardDraw,
   hazardEventKey,
-  hazardInsuranceComparison,
   isWeatherHazardEligible,
   oneTimeWorldEventCost,
-  refreshInsurancePremiums,
   replacementValue,
   representativeMinTempC,
   resilienceBuildOption,
@@ -260,10 +256,6 @@ describe("sampleHailImpacts", () => {
         realDaysToGameMinutes(impact.repairDays),
       );
       expect(impact.repairCost).toBeCloseTo(impact.damagedFraction * 1e8, 3);
-      expect(impact.deductible).toBeLessThanOrEqual(impact.repairCost);
-      expect(impact.deductible).toBeLessThanOrEqual(
-        HAIL_DEDUCTIBLE_SHARE * 1e8,
-      );
     });
   });
 
@@ -354,39 +346,9 @@ describe("resolveColdImpact", () => {
   });
 });
 
-describe("replacement value and insurance", () => {
-  it("prices solar weather insurance from local hail exposure", () => {
-    const sun = facility(1, "Sun");
-    const denver = gameAt(DENVER, [sun]);
-    expect(replacementValue(sun, denver)).toBe(1e8);
-    expect(annualInsuranceCost(sun, denver)).toBeCloseTo(
-      1e8 * 0.002 * (0.06 / 0.05),
-      6,
-    );
-    const resistant = facility(2, "Sun", {
-      resilience: { hailResistant: true },
-    });
-    expect(annualInsuranceCost(resistant, denver)).toBeCloseTo(
-      annualInsuranceCost(sun, denver) * 0.4,
-      6,
-    );
-    expect(annualInsuranceCost(facility(3, "Natural Gas"), denver)).toBe(0);
-    expect(
-      annualInsuranceCost(sun, gameAt(DENVER, [], { scenarioId: 0 })),
-    ).toBe(0);
-  });
-
-  it("refreshes premiums in place and clears ones that no longer apply", () => {
-    const gas = facility(2, "Natural Gas", { annualInsuranceCost: 50 });
-    const game = gameAt(DENVER, [
-      facility(1, "Sun"),
-      gas,
-      facility(3, undefined),
-    ]);
-    refreshInsurancePremiums(game);
-    expect(game.facilities[0].annualInsuranceCost).toBeGreaterThan(0);
-    expect("annualInsuranceCost" in game.facilities[1]).toBe(false);
-    expect("annualInsuranceCost" in game.facilities[2]).toBe(false);
+describe("replacementValue", () => {
+  it("is the build cost without inflation data", () => {
+    expect(replacementValue(facility(1, "Sun"), gameAt(DENVER))).toBe(1e8);
   });
 });
 
@@ -428,37 +390,6 @@ describe("retrofitCost under construction", () => {
     expect(retrofitCost(building, game, "hailResistant")).toBeUndefined();
     expect(
       facilityResilienceSummary(game, building)!.retrofitCost,
-    ).toBeUndefined();
-  });
-});
-
-describe("hazardInsuranceComparison", () => {
-  it("prices a solar quote's insurance with and without hail protection", () => {
-    const game = gameAt(DENVER);
-    const comparison = hazardInsuranceComparison(quote("Sun"), game)!;
-    expect(comparison.standard).toBeCloseTo(5e7 * 0.002 * (0.06 / 0.05), 6);
-    expect(comparison.hardened).toBeCloseTo(
-      5e7 * 1.03 * 0.002 * (0.06 / 0.05) * 0.4,
-      6,
-    );
-    // The same answer whichever way the quote's option is currently set.
-    expect(
-      hazardInsuranceComparison(
-        withResilienceOption(quote("Sun"), game, true),
-        game,
-      ),
-    ).toEqual(comparison);
-  });
-
-  it("is undefined without a hail option", () => {
-    expect(
-      hazardInsuranceComparison(quote("Natural Gas"), gameAt(DENVER)),
-    ).toBeUndefined();
-    expect(
-      hazardInsuranceComparison(
-        quote("Sun"),
-        gameAt(DENVER, [], { scenarioId: 1 }),
-      ),
     ).toBeUndefined();
   });
 });
@@ -602,7 +533,7 @@ function hailOccurrence(
   startsMinute: number,
   endsMinute: number,
   multiplier: number,
-  deductible = 0,
+  oneTimeCost = 0,
 ): ActiveWorldEventType {
   return {
     key: `hail:Denver:0:f${id}`,
@@ -613,7 +544,7 @@ function hailOccurrence(
       hazard: "HAIL",
       eventKey: "hail:Denver:0",
       facilityId: id,
-      oneTimeCost: deductible,
+      oneTimeCost,
       oneTimeCostMinute: startsMinute + 15,
     },
     effects: { facilityOutputMultipliersById: { [id]: multiplier } },
@@ -682,7 +613,7 @@ describe("facilityHazardStatus", () => {
 });
 
 describe("facilityResilienceSummary", () => {
-  it("summarizes solar hardening, retrofit and insurance", () => {
+  it("summarizes solar hardening and retrofit", () => {
     const sun = facility(1, "Sun");
     const summary = facilityResilienceSummary(gameAt(DENVER), sun)!;
     expect(summary).toMatchObject({
@@ -692,14 +623,13 @@ describe("facilityResilienceSummary", () => {
       retrofitCost: 8e6,
       replacementValue: 1e8,
     });
-    expect(summary.annualInsuranceCost).toBeGreaterThan(0);
     const hardened = facility(2, "Sun", {
       resilience: { hailResistant: true },
     });
     expect(facilityResilienceSummary(gameAt(DENVER), hardened)).toMatchObject({
       label: "Hail-resistant panels",
       installed: true,
-      detail: "Less hail damage, lower insurance.",
+      detail: "Breaks less in a hailstorm.",
       retrofitCost: undefined,
     });
   });
@@ -712,7 +642,6 @@ describe("facilityResilienceSummary", () => {
       label: "Cold-weather package",
       installed: true,
       retrofitCost: undefined,
-      annualInsuranceCost: undefined,
     });
     // The pane shows the rating, so gas carries no detail text.
     expect(
@@ -745,7 +674,7 @@ describe("oneTimeWorldEventCost", () => {
 });
 
 describe("summarizeWeatherHazardImpact", () => {
-  it("counts storms, hits, deductibles and cold months", () => {
+  it("counts storms, hits, repair costs and cold months", () => {
     const summary = summarizeWeatherHazardImpact([
       hailOccurrence(1, 0, 100, 0.8, 100),
       hailOccurrence(2, 0, 100, 0.8, 50),
@@ -769,7 +698,7 @@ describe("summarizeWeatherHazardImpact", () => {
     expect(summary).toEqual({
       hailEvents: 1,
       hailFacilityHits: 2,
-      hailDeductibles: 150,
+      hailRepairCosts: 150,
       coldEvents: 1,
       coldRegionalEvents: 1,
       coldDerates: 2,

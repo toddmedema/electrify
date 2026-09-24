@@ -433,7 +433,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
-        current.annualInsuranceCost,
       ].some(
         (value) =>
           value !== undefined &&

@@ -4,7 +4,6 @@ import {
   FacilityOperatingType,
   FacilityResilienceType,
   GameType,
-  GeneratorOperatingType,
   GeneratorShoppingType,
   LocationType,
   ResilienceUpgradeType,
@@ -20,19 +19,14 @@ import {
   COLD_PACKAGE_RETROFIT_SHARE,
   coldPackageCanHelp,
   coldPackageDesignMinTempC,
-  GAS_INSURANCE_VULNERABILITY,
   getWeatherHazardProfile,
-  HAIL_DEDUCTIBLE_SHARE,
   HAIL_EXPOSURE_HIT_SHARE,
   HAIL_MAX_DAMAGED_FRACTION,
   HAIL_RESISTANT_BUILD_SHARE,
   HAIL_RESISTANT_DAMAGE_FACTOR,
-  HAIL_RESISTANT_INSURANCE_VULNERABILITY,
   HAIL_RESISTANT_RETROFIT_SHARE,
   NORTHERN_HAIL_MONTHLY_WEIGHTS,
   regionalColdThresholdC,
-  SOLAR_HAIL_INSURANCE_RATE,
-  SOLAR_HAIL_INSURANCE_REFERENCE_PER_YEAR,
   STANDARD_GAS_DESIGN_MIN_TEMP_C,
   WEATHER_HAZARD_AUTHORED_FREEZE_SCENARIOS,
   WEATHER_HAZARD_OPT_OUT_SCENARIOS,
@@ -175,12 +169,6 @@ function isOperational(facility: FacilityOperatingType): boolean {
   return facility.yearsToBuildLeft <= 0;
 }
 
-function isGenerator(
-  facility: FacilityOperatingType,
-): facility is GeneratorOperatingType {
-  return facility.fuel !== undefined;
-}
-
 /**
  * What a facility would cost to replace today: its purchase price carried forward by the game's
  * inflation since it was bought. The starting fleet's price is carried from the run start.
@@ -202,70 +190,6 @@ export function replacementValue(
   return then > 0 ? buildCost * (now / then) : buildCost;
 }
 
-/**
- * The location-specific weather insurance loading for one facility, per year. Only solar carries
- * one in v1: hail breaks modules, while cold costs a gas plant output rather than assets.
- */
-export function annualInsuranceCost(
-  facility: FacilityOperatingType,
-  game: GameType,
-): number {
-  if (facility.fuel === "Natural Gas") {
-    return replacementValue(facility, game) * GAS_INSURANCE_VULNERABILITY;
-  }
-  if (facility.fuel !== "Sun" || !isWeatherHazardEligible(game, "HAIL")) {
-    return 0;
-  }
-  const profile = getWeatherHazardProfile(game.location);
-  const vulnerability = facility.resilience?.hailResistant
-    ? HAIL_RESISTANT_INSURANCE_VULNERABILITY
-    : 1;
-  return (
-    replacementValue(facility, game) *
-    SOLAR_HAIL_INSURANCE_RATE *
-    (profile.damagingHailPerYear / SOLAR_HAIL_INSURANCE_REFERENCE_PER_YEAR) *
-    vulnerability
-  );
-}
-
-/**
- * A build quote's annual weather insurance without and with its hail upgrade, priced as if built
- * today, or undefined when the quote has no hail option in this game.
- */
-export function hazardInsuranceComparison(
-  quote: GeneratorShoppingType,
-  game: GameType,
-): { standard: number; hardened: number } | undefined {
-  const option = resilienceBuildOption(quote, game);
-  if (!option || option.upgrade !== "hailResistant") {
-    return undefined;
-  }
-  const premium = (selected: boolean) =>
-    annualInsuranceCost(
-      {
-        ...withResilienceOption(quote, game, selected),
-        minuteCreated: game.date.minute,
-      } as GeneratorOperatingType,
-      game,
-    );
-  return { standard: premium(false), hardened: premium(true) };
-}
-
-/** Refreshes every generator's premium in place, at each monthly rollover. */
-export function refreshInsurancePremiums(game: GameType): void {
-  game.facilities.forEach((facility) => {
-    if (!isGenerator(facility)) {
-      return;
-    }
-    const premium = annualInsuranceCost(facility, game);
-    if (premium > 0) {
-      facility.annualInsuranceCost = premium;
-    } else {
-      delete facility.annualInsuranceCost;
-    }
-  });
-}
-
 /** One solar facility's damage from a hailstorm. */
 export interface HailImpactType {
   facilityId: number;
@@ -273,8 +197,7 @@ export interface HailImpactType {
   damagedFraction: number; // Share of nameplate broken, (0, HAIL_MAX_DAMAGED_FRACTION]
   repairDays: number; // Whole days
   repairMinutes: number;
-  repairCost: number; // Insured cost of the repair
-  deductible: number; // What the company pays, charged once
+  repairCost: number; // What the company pays, charged once
   hailResistant: boolean;
 }
 
@@ -316,8 +239,7 @@ export function sampleHailImpacts(args: {
       const repairDays = Math.ceil(
         (5 + 80 * damagedFraction) * (0.8 + 0.4 * repairDraw),
       );
-      const value = replacementValue(facility, game);
-      const repairCost = damagedFraction * value;
+      const repairCost = damagedFraction * replacementValue(facility, game);
       return {
         facilityId: facility.id,
         facilityName: facility.name,
@@ -325,7 +247,6 @@ export function sampleHailImpacts(args: {
         repairDays,
         repairMinutes: realDaysToGameMinutes(repairDays),
         repairCost,
-        deductible: Math.min(repairCost, HAIL_DEDUCTIBLE_SHARE * value),
         hailResistant,
       };
     })
@@ -663,7 +584,6 @@ export interface FacilityResilienceSummaryType {
   installed: boolean;
   detail?: string; // Hail only; gas shows its temperature rating instead
   retrofitCost?: number; // Absent once installed
-  annualInsuranceCost?: number; // Absent when nothing is charged
   replacementValue: number;
 }
 
@@ -677,13 +597,12 @@ export function facilityResilienceSummary(
     return undefined;
   }
   const installed = !!facility.resilience?.[upgrade];
-  const premium = annualInsuranceCost(facility, game);
   let label: string;
   let detail: string | undefined;
   if (upgrade === "hailResistant") {
     label = installed ? "Hail-resistant panels" : "Standard panels";
     detail = installed
-      ? "Less hail damage, lower insurance."
+      ? "Breaks less in a hailstorm."
       : "Takes full hail damage.";
   } else {
     // The pane shows the plant's rating instead, in the player's temperature unit.
@@ -695,13 +614,12 @@ export function facilityResilienceSummary(
     installed,
     detail,
     retrofitCost: retrofitCost(facility, game, upgrade),
-    annualInsuranceCost: premium > 0 ? premium : undefined,
     replacementValue: replacementValue(facility, game),
   };
 }
 
 /**
- * One-time hazard costs (hail deductibles) falling due in the window (prev, now]. Each is charged
+ * One-time hazard costs (hail repairs) falling due in the window (prev, now]. Each is charged
  * at `oneTimeCostMinute`, one tick after onset, so the month-boundary pre-roll frames -- which run
  * with prev === now -- and a re-forecast from the current tick can never charge one twice.
  */
@@ -732,7 +650,7 @@ export function oneTimeCostMinute(startsMinute: number): number {
 export interface WeatherHazardImpactSummaryType {
   hailEvents: number; // Distinct storms
   hailFacilityHits: number;
-  hailDeductibles: number;
+  hailRepairCosts: number;
   coldEvents: number;
   coldRegionalEvents: number;
   coldDerates: number; // Plant-months derated
@@ -746,7 +664,7 @@ export function summarizeWeatherHazardImpact(
   const summary: WeatherHazardImpactSummaryType = {
     hailEvents: 0,
     hailFacilityHits: 0,
-    hailDeductibles: 0,
+    hailRepairCosts: 0,
     coldEvents: 0,
     coldRegionalEvents: 0,
     coldDerates: 0,
@@ -755,7 +673,7 @@ export function summarizeWeatherHazardImpact(
     if (event.definitionId === HAIL_DEFINITION_ID) {
       storms.add(String(event.attributes.eventKey ?? event.key));
       summary.hailFacilityHits += 1;
-      summary.hailDeductibles += Number(event.attributes.oneTimeCost) || 0;
+      summary.hailRepairCosts += Number(event.attributes.oneTimeCost) || 0;
     } else if (event.definitionId === COLD_DEFINITION_ID) {
       summary.coldEvents += 1;
       if (event.attributes.regional === true) {

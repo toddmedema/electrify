@@ -473,7 +473,6 @@ describe("weather hazards in the fleet", () => {
 
     const details = screen.getByRole("region", { name: "Weather resilience" });
     expect(details).toHaveTextContent("Standard panels");
-    expect(details).toHaveTextContent("Weather insurance");
     await user.click(
       within(details).getByRole("button", {
         name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
@@ -482,7 +481,6 @@ describe("weather hazards in the fleet", () => {
     const dialog = screen.getByRole("dialog", {
       name: "Add hail-resistant panels to Solar?",
     });
-    expect(dialog).toHaveTextContent(/Insurance \$.+ → \$.+\/yr\./);
     expect(dialog).not.toHaveTextContent("cash now");
     await user.click(
       within(dialog).getByRole("button", {

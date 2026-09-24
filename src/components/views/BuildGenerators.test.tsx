@@ -14,7 +14,6 @@ import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
-  hazardInsuranceComparison,
   resilienceBuildOption,
   withResilienceOption,
 } from "../../helpers/Hazards";
@@ -615,7 +614,7 @@ describe("weather hardening in the purchase dialog", () => {
     );
   });
 
-  it("shows hail-resistant panels' effect on weather insurance and upkeep", () => {
+  it("describes hail-resistant panels' effect", () => {
     showBuildList();
     fireEvent.click(
       screen.getByRole("button", { name: "Review purchase of Solar" }),
@@ -624,13 +623,7 @@ describe("weather hardening in the purchase dialog", () => {
     const option = within(dialog).getByRole("checkbox", {
       name: /^Hail-resistant panels \+\$/,
     });
-    expect(option).toHaveAccessibleDescription(
-      /^Less hail damage\. Insurance \$[\d.]+[kMB]? → \$[\d.]+[kMB]?\/yr\.$/,
-    );
-    const impact = within(dialog).getByRole("region", {
-      name: "Expected impact",
-    });
-    expect(impact).toHaveTextContent("Incl. insurance. Plus loan payments.");
+    expect(option).toHaveAccessibleDescription("Less hail damage.");
   });
 
   function gasItem(cash: number, onBuild = jest.fn()) {
@@ -651,7 +644,6 @@ describe("weather hardening in the purchase dialog", () => {
         withResilience={(selected) =>
           withResilienceOption(quote, game, selected)
         }
-        insurance={hazardInsuranceComparison(quote, game)}
         onBuild={onBuild}
       />,
     );

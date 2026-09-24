@@ -140,7 +140,7 @@ describe("hail damage", () => {
     expect(logs[0].title).toBe("Hail damage");
     expect(logs[0].concept).toBe("severeWeather");
     expect(logs[0].message).toMatch(
-      /^Hail damaged \d+% of your solar fleet\. \$[\d.]+[KMB]? deductible; repairs take about \d+ days?\.$/,
+      /^Hail damaged \d+% of your solar fleet\. Repairs cost \$[\d.]+[KMB]? and take about \d+ days?\.$/,
     );
     expect(state.speed).toBe("PAUSED");
     // Continuing the month does not announce or record the storm again.
@@ -161,7 +161,7 @@ describe("hail damage", () => {
     const log = state.eventLog.find((e) => e.storyPhaseKey === key)!;
     expect(log.title).toBe("Minor hail damage");
     expect(log.message).toMatch(
-      /^Hail-resistant panels held damage to \d+% of your solar fleet\. \$[\d.]+[KMB]? deductible; repairs take about \d+ days?\.$/,
+      /^Hail-resistant panels held damage to \d+% of your solar fleet\. Repairs cost \$[\d.]+[KMB]? and take about \d+ days?\.$/,
     );
   });
 
@@ -175,20 +175,20 @@ describe("hail damage", () => {
     ).toEqual(hits.map((e) => [e.key, e.attributes.oneTimeCost]));
   });
 
-  it("charges each deductible exactly once, even across a re-forecast", () => {
+  it("charges each repair cost exactly once, even across a re-forecast", () => {
     const { state, hits } = atHailOnset();
-    const deductible = hits.reduce(
+    const repairCost = hits.reduce(
       (total, e) => total + Number(e.attributes.oneTimeCost),
       0,
     );
-    expect(deductible).toBeGreaterThan(0);
-    // The control differs only in the deductible, zeroed before it falls due.
+    expect(repairCost).toBeGreaterThan(0);
+    // The control differs only in the repairCost, zeroed before it falls due.
     let control = cloneDeep(state);
     control.worldEvents.active.forEach((e) => {
       if (e.definitionId === HAIL_DEFINITION_ID) e.attributes.oneTimeCost = 0;
     });
     let charged = state;
-    // One tick in the deductible is booked; re-forecast the current tick twice from there.
+    // One tick in the repairCost is booked; re-forecast the current tick twice from there.
     tickState(charged);
     tickState(control);
     const chargeTick = getTimeFromTimeline(
@@ -200,7 +200,7 @@ describe("hail damage", () => {
       control.timeline,
     )!;
     expect(chargeTick.expensesOM - controlTick.expensesOM).toBeCloseTo(
-      deductible,
+      repairCost,
       0,
     );
     const oil = charged.facilities.find((f) => f.fuel === "Oil")!.id;
@@ -213,14 +213,14 @@ describe("hail damage", () => {
       getTimeFromTimeline(control.date.minute, control.timeline)!.cash -
       getTimeFromTimeline(charged.date.minute, charged.timeline)!.cash;
     // Whole-dollar cash rounding each tick is the only slack.
-    expect(Math.abs(cashGap - deductible)).toBeLessThan(200);
+    expect(Math.abs(cashGap - repairCost)).toBeLessThan(200);
     const lifetimeGap = hits.reduce((total, hit) => {
       const id = hit.attributes.facilityId;
       const a = charged.facilities.find((f) => f.id === id)!;
       const b = control.facilities.find((f) => f.id === id)!;
       return total + a.lifetimeExpenses - b.lifetimeExpenses;
     }, 0);
-    expect(lifetimeGap).toBeCloseTo(deductible, 0);
+    expect(lifetimeGap).toBeCloseTo(repairCost, 0);
   });
 
   it("caps damaged output until the repair ends, then restores it once", () => {
@@ -296,7 +296,7 @@ describe("hail damage", () => {
     expect(Number.isFinite(now.cash)).toBe(true);
   });
 
-  it("resumes a save mid-repair without repeating the storm or its deductible", () => {
+  it("resumes a save mid-repair without repeating the storm or its repair cost", () => {
     const { state } = atHailOnset();
     const continued = cloneDeep(state);
     const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
@@ -315,30 +315,6 @@ describe("hail damage", () => {
     expect(restored.eventLog.map((e) => e.message)).toEqual(
       continued.eventLog.map((e) => e.message),
     );
-  });
-
-  it("books insurance premiums as fixed upkeep, cut by hail-resistant panels", () => {
-    const state = game(DENVER, HAIL.seed);
-    const solar = state.facilities.filter((f) => f.fuel === "Sun");
-    solar.forEach((f) =>
-      expect(
-        (f as { annualInsuranceCost?: number }).annualInsuranceCost,
-      ).toBeGreaterThan(0),
-    );
-    const gas = state.facilities.find((f) => f.fuel === "Natural Gas")!;
-    expect(
-      (gas as { annualInsuranceCost?: number }).annualInsuranceCost,
-    ).toBeUndefined();
-    const before = (solar[0] as { annualInsuranceCost?: number })
-      .annualInsuranceCost!;
-    const retrofitted = dispatch(
-      state,
-      retrofitFacility({ facilityId: solar[0].id, upgrade: "hailResistant" }),
-    );
-    const after = retrofitted.facilities.find((f) => f.id === solar[0].id) as {
-      annualInsuranceCost?: number;
-    };
-    expect(after.annualInsuranceCost).toBeLessThan(before);
   });
 });
 
@@ -656,7 +632,7 @@ describe("month-end transactions", () => {
     tickState(control);
     expect(retrofitted.date.monthsElapsed).toBe(2);
     const cashGap = control.timeline[0].cash - retrofitted.timeline[0].cash;
-    // Only one tick of a lower premium separates the runs besides the cost.
+    // Whole-dollar cash rounding each tick is the only slack.
     expect(Math.abs(cashGap - cost)).toBeLessThan(cost * 0.001);
     // The closed month's history reports it as an expense exactly once, too.
     const expenseGap =
@@ -678,7 +654,7 @@ describe("selling a facility under a weather outage", () => {
     expect(covering).toEqual([]);
     const ended = sold.worldEvents.active.find((e) => e.key === hits[0].key)!;
     expect(ended.endsMinute).toBeLessThanOrEqual(sold.date.minute);
-    // The incurred deductible is still due; the historical record is untouched.
+    // The incurred repair cost is still due; the historical record is untouched.
     expect(ended.attributes.oneTimeCost).toBe(hits[0].attributes.oneTimeCost);
     expect(
       sold.worldEvents.occurrences.find((e) => e.key === hits[0].key),
@@ -732,33 +708,12 @@ describe("eligibility", () => {
   });
 
   it("switches everything off with the harness flag", () => {
-    let state = game(DENVER, HAIL.seed);
-    const insured = state.facilities.filter(
-      (f) => (f as { annualInsuranceCost?: number }).annualInsuranceCost,
+    const state = dispatch(
+      game(DENVER, HAIL.seed),
+      delta({ weatherHazardsDisabled: true }),
     );
-    expect(insured.length).toBeGreaterThan(0);
-    const openingExpenses = getTimeFromTimeline(
-      MINUTES_PER_MONTH - TICK_MINUTES,
-      state.timeline,
-    )!.expensesOM;
-    state = dispatch(state, delta({ weatherHazardsDisabled: true }));
-    // No premium from the opening month, in the facilities or the month's forecast.
-    state.facilities.forEach((f) =>
-      expect(
-        (f as { annualInsuranceCost?: number }).annualInsuranceCost,
-      ).toBeUndefined(),
-    );
-    expect(
-      getTimeFromTimeline(MINUTES_PER_MONTH - TICK_MINUTES, state.timeline)!
-        .expensesOM,
-    ).toBeLessThan(openingExpenses);
     tickToMonth(state, HAIL.month + 1);
     expect(anyHazard(state)).toBe(false);
     expect(hailOccurrences(state)).toHaveLength(0);
-    state.facilities.forEach((f) =>
-      expect(
-        (f as { annualInsuranceCost?: number }).annualInsuranceCost,
-      ).toBeUndefined(),
-    );
   });
 });

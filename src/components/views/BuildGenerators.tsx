@@ -52,7 +52,6 @@ import {
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
 import {
-  hazardInsuranceComparison,
   resilienceBuildOption,
   ResilienceBuildOptionType,
   withResilienceOption,
@@ -61,7 +60,6 @@ import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 import {
   coldPackageEffect,
   formatDesignTemperature,
-  insuranceChange,
 } from "../base/WeatherResilienceText";
 import {
   expectedMonthlyOutputShape,
@@ -213,8 +211,6 @@ interface GeneratorBuildItemProps {
   // hazard model so the dialog's price is exactly the one the purchase will charge.
   resilienceOption?: ResilienceBuildOptionType;
   withResilience?: (selected: boolean) => GeneratorShoppingType;
-  // A hail option's yearly weather insurance without and with it
-  insurance?: { standard: number; hardened: number };
   onBuild: (financed: boolean, resilienceSelected?: boolean) => void;
 }
 
@@ -344,23 +340,10 @@ export function GeneratorBuildItem(
   );
   const quoteCanBuild = buildable && quoteDownpayment <= cash;
   const resilienceOptionId = React.useId();
-  const quoteInsurance = props.insurance
-    ? resilienceSelected
-      ? props.insurance.hardened
-      : props.insurance.standard
-    : 0;
   // Each line under the option says what it buys; a warning line says what it costs the player
   const resilienceDetails: { text: string; warning?: boolean }[] = [];
   if (props.resilienceOption?.upgrade === "hailResistant") {
     resilienceDetails.push({ text: "Less hail damage." });
-    if (props.insurance && props.insurance.standard > 0) {
-      resilienceDetails.push({
-        text: insuranceChange(
-          props.insurance.standard,
-          props.insurance.hardened,
-        ),
-      });
-    }
   } else if (props.resilienceOption && props.withResilience) {
     const standardMinTempC =
       props.withResilience(false).resilience?.designMinTempC ??
@@ -742,10 +725,8 @@ export function GeneratorBuildItem(
               {
                 concept: "money",
                 label: "Estimated upkeep",
-                value: `${formatMoneyConcise((estimatedAnnualOperatingCost(quote) + quoteInsurance) / 12)}/mo`,
-                detail: `${quoteInsurance > 0 ? "Incl. insurance. " : ""}Plus ${
-                  quote.fuel === "Sun" ? "" : "fuel and "
-                }loan payments.`,
+                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
+                detail: "Plus fuel and loan payments.",
               },
               {
                 concept: "time",
@@ -1182,7 +1163,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 withResilience={(selected) =>
                   withResilienceOption(g, game, selected)
                 }
-                insurance={hazardInsuranceComparison(g, game)}
                 onBuild={(financed, resilienceSelected) => {
                   props.onBuildGenerator(
                     resilienceSelected === undefined
