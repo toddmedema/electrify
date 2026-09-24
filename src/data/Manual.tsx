@@ -185,8 +185,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          In Insights, choose customer programs and compare demand and cash
-          before applying. Changes start next month and stay until changed.
+          Customer programs are set in Insights. Changes start next month and
+          stay until changed.
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Choose Off,
@@ -201,21 +201,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           use from your chosen four-hour window into the next three hours. Total
           energy use stays the same. Participants pay 30% above the base rate
           during the window, 10% below during those later hours, and the base
-          rate otherwise. Higher bills can drive customers away.
+          rate otherwise.
         </p>
         <p>
           <strong>Peak curtailment contracts:</strong> Half of industrial and
           data-center demand participates. Participants cut use by 20% during a
           separate four-hour window, even with enough supply. That use is
           canceled, not delayed. Participants get 10% off electricity delivered
-          all day. This agreed reduction does not count as a blackout. Transport
-          is excluded from both offers.
-        </p>
-        <p>
-          Windows repeat daily in local time and can cross midnight. Shifting
-          use can create a later peak. Already-delayed energy returns at its
-          scheduled discount even after you change or stop the tariff. Estimates
-          hold weather, fuel prices, facilities and the base rate fixed.
+          all day.
         </p>
       </div>
     ),
@@ -239,14 +232,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Facilities:</strong> Build and manage your plants here.
-          Generators higher in the list run first when possible. Keep backup for
-          hours when wind and solar cannot meet demand.
+          Generators higher in the list run first when possible. Wind and solar
+          follow the weather, so supply can fall short on some hours.
         </p>
         <p>
-          <strong>Insights:</strong> Check finances, set your electricity rate
-          and compare forecasts. Pause at an hour when demand nearly exceeds
-          supply. Compare new generation, storage and imports by cost, readiness
-          and emissions.
+          <strong>Insights:</strong> Finances, your electricity rate and
+          forecasts are here.
         </p>
         <p>
           One simulated day represents a month. A four-hour battery still lasts
@@ -300,8 +291,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           A blackout happens when available supply falls below demand. Outages
-          hurt customer numbers, revenue, score and job security. There is no
-          separate damage bill.
+          hurt customer numbers, revenue, score and job security.
         </p>
       </div>
     ),
@@ -356,9 +346,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <ExampleCarbonFee />, coal can become more expensive to run than gas.
         </p>
         <p>
-          The fee appears as an operating expense. Scenarios set it; custom
-          games let you choose it. Imports add emissions to your score but pay
-          no separate local carbon fee: their cost is in the wholesale bill.
+          The fee appears as an operating expense. Imports add emissions to your
+          score but pay no separate local carbon fee: their cost is in the
+          wholesale bill.
         </p>
       </div>
     ),
@@ -495,7 +485,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Supply &amp; Demand:</strong> Shading marks predicted
-          blackouts. Check missing energy and the largest power shortage.
+          blackouts. It shows missing energy and the largest power shortage.
           Unserved energy is scaled to a month; shaded hours are not a real
           outage's duration.
         </p>
@@ -549,8 +539,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Plants higher in Facilities are asked to run first. This is the{" "}
-          <strong>dispatch order</strong>, or merit order. Put cheaper plants
-          first, while allowing for how quickly they respond.
+          <strong>dispatch order</strong>, or merit order: in real electricity
+          markets, the cheapest plants run first. In Electrify you choose the
+          order yourself.
         </p>
         <p>
           Plants lower down cover remaining demand. Minimum output and ramp rate
@@ -589,8 +580,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           and paying to restart.
         </p>
         <p>
-          Check response time as well as cost when choosing plants for short
-          peaks.
+          Response time determines which demand a plant can follow: fast plants
+          cover short peaks, slow ones suit steady hours.
         </p>
       </div>
     ),
@@ -603,10 +594,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Financing means borrowing part of a plant's cost. Check the down
-          payment, monthly payment and upkeep before buying. Payments start
-          during construction, before the plant earns money. Leave cash for fuel
-          and other bills.
+          Financing means borrowing part of a plant's cost: you pay the rest up
+          front and repay the loan in monthly payments. Payments start during
+          construction, before the plant earns money.
         </p>
         <p>
           The <strong>prime rate</strong> is a benchmark borrowing rate that
@@ -621,8 +611,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           <strong>Inflation</strong> means rising prices. It increases fuel,
           construction and operating costs in the game. Your electricity rate
-          does not rise automatically; adjust it when allowed to protect your
-          profit. Future economic conditions are estimates.
+          does not rise automatically; you set it in Insights. Future economic
+          conditions are estimates.
         </p>
       </div>
     ),
@@ -639,14 +629,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           tariffs and curtailment credits.
         </p>
         <p>
-          <strong>Investor-owned:</strong> Charge below the market rate to
-          attract customers, or above it to earn more per customer while some
-          leave. The market rate rises with inflation; switching takes months.
+          <strong>Investor-owned:</strong> A rate below the market rate attracts
+          customers; above it earns more per customer while some leave. The
+          market rate rises with inflation; switching takes months.
         </p>
         <p>
           <strong>Publicly owned:</strong> Set your rate in Insights. A lifetime
           average below the scenario's target earns points; above it loses
-          points. Keep bills affordable while paying for reliable supply.
+          points.
         </p>
       </div>
     ),
@@ -692,9 +682,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           redirecting exports. Unused import promises do not count.
         </p>
         <p>
-          A low-reserve warning means check backup for difficult hours. The
-          game's 10% threshold is a teaching guide, not a real reliability
-          standard or protection against every blackout.
+          A low-reserve warning flags hours when demand is close to available
+          supply. The game's 10% threshold is a teaching guide, not a real
+          reliability standard or protection against every blackout.
         </p>
       </div>
     ),
@@ -734,15 +724,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Imports come from the cheapest available neighbor first, and exports
           go to the best-paying one. Hot, sunny weather can also reduce line
-          capacity. Check construction time, loan payments and upkeep before
-          relying on imports. The purchase review compares the candidate with
-          your existing connections and operating fleet against next-year
-          demand: how much shortfall energy it covers, the worst remaining gap,
-          and the annual electricity bill. This comparison assumes the new line
-          is open; it does not bring construction forward or include unfinished
-          plants. Its regional-stress example is an illustration, not a
-          predicted event. Live line details identify whether your wire, the
-          neighbor, or your own demand and trading rule limits actual flow.
+          capacity. The purchase review compares the candidate with your
+          existing connections and operating fleet against next-year demand: how
+          much shortfall energy it covers, the worst remaining gap, and the
+          annual electricity bill. This comparison assumes the new line is open;
+          it does not bring construction forward or include unfinished plants.
+          Its regional-stress example is an illustration, not a predicted event.
+          Live line details identify whether your wire, the neighbor, or your
+          own demand and trading rule limits actual flow.
         </p>
         <p>
           Purchased electricity adds estimated emissions to your score. Each
@@ -779,9 +768,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           clock.
         </p>
         <p>
-          Storage can save money by charging with cheap surplus and replacing
-          expensive generation later, but account for losses and construction
-          cost.
+          Storage can be cheaper than running expensive generation, once its
+          losses and construction cost are counted.
         </p>
       </div>
     ),
@@ -804,9 +792,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           supply less than 90% of demand for three consecutive months.
         </p>
         <p>
-          The tables below score your term. Compare reliability, costs and
-          emissions separately too. Logged-in players submit scores and replays
-          to the leaderboard; a play button opens a replay.
+          The tables below score your term; reliability, costs and emissions are
+          shown separately. Logged-in players submit scores and replays to the
+          leaderboard; a play button opens a replay.
         </p>
         <p>
           Saves and replays require compatible game rules. Older runs need their
@@ -920,7 +908,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           The fuel quote is cost per MWh at current prices and plant efficiency.
-          Prices can change. Upkeep, carbon fees and loans are separate.
         </p>
       </div>
     ),
@@ -933,9 +920,23 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Accounting lifetime sets the years used to estimate costs and
-          depreciation (declining value in your accounts). Plants can run beyond
-          it, though aging may reduce output or increase upkeep.
+          The accounting lifetime is the number of years a plant's capital cost
+          is spread over in your accounts. Real utilities depreciate power
+          plants the same way: book value declines year by year over an expected
+          useful life, even while the plant keeps running. Depreciation is an
+          accounting allocation, not a cash payment.
+        </p>
+        <p>
+          In Electrify it sets the horizon for cost estimates: lifetime cost and
+          levelized cost of energy divide construction, upkeep and fuel by the
+          energy expected over those years. It also sets resale value: a plant's
+          book value declines evenly to zero over its accounting lifetime, so an
+          early sale returns more of the build cost. Any outstanding loan is
+          settled from the sale first.
+        </p>
+        <p>
+          Plants can run beyond their accounting lifetime; some technologies
+          lose a little output each year as they age.
         </p>
       </div>
     ),
