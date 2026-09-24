@@ -347,3 +347,53 @@ describe("biomass", () => {
     });
   });
 });
+
+describe("weather resilience defaults", () => {
+  const dallas: LocationType = {
+    id: "Dallas",
+    name: "Dallas, TX",
+    lat: 32.7767,
+    long: -96.797,
+    region: "North America",
+    country: "United States",
+  };
+  const quotes = (location: LocationType) =>
+    GENERATORS(stateAt(location, 2024), 100000000, [], []);
+
+  it("winterizes gas by default in cold climates only", () => {
+    const icelandGas = quotes(iceland).filter((g) => g.fuel === "Natural Gas");
+    const texasGas = quotes(dallas).filter((g) => g.fuel === "Natural Gas");
+    expect(icelandGas.length).toBeGreaterThan(0);
+    icelandGas.forEach((g) => {
+      expect(g.resilience).toEqual({
+        coldWeatherPackage: true,
+        designMinTempC: -30,
+      });
+      expect(g.resilienceExtraBuildCost).toBeGreaterThan(0);
+    });
+    texasGas.forEach((g) => {
+      expect(g.resilience).toEqual({
+        coldWeatherPackage: false,
+        designMinTempC: -8,
+      });
+      expect(g.resilienceExtraBuildCost).toBeUndefined();
+    });
+    // The package is a small, exact share of the otherwise identical scaled price.
+    const [iceGas] = icelandGas;
+    const extra = iceGas.resilienceExtraBuildCost as number;
+    const base = iceGas.buildCost - extra;
+    expect(extra).toBe(Math.round(base * 0.02));
+  });
+
+  it("offers solar hail resistance unselected by default", () => {
+    const solar = quotes(dallas).filter((g) => g.fuel === "Sun");
+    expect(solar.length).toBeGreaterThan(0);
+    solar.forEach((g) => {
+      expect(g.resilience).toEqual({
+        hailResistant: false,
+        solarTrackers: false,
+      });
+      expect(g.resilienceExtraBuildCost).toBeUndefined();
+    });
+  });
+});

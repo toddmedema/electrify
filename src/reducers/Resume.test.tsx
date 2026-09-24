@@ -175,3 +175,60 @@ describe("resuming a save mid-month", () => {
     expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
   });
 });
+
+/**
+ * How long a blackout lasted and how much demand it left unserved used to live outside Redux, and
+ * resume() reset them to "started just now, nothing missed yet". A save taken partway through a
+ * blackout then reported a shorter, cheaper one once the lights came back.
+ */
+describe("resuming a save mid-blackout", () => {
+  // Scenario 102 on this seed goes dark from minute 9465 to 9795; save halfway through
+  const BLACKOUT_OPTIONS = { scenarioId: 102, seed: 8675309 };
+  const SAVED_AT_MINUTE = 9600;
+
+  function runPast(state: GameType, minute: number) {
+    while (state.date.minute < minute) {
+      tickState(state);
+    }
+  }
+
+  function blackoutsOver(state: GameType) {
+    return state.eventLog.filter(({ kind }) => kind === "BLACKOUT_OVER");
+  }
+
+  it("reports the blackout the way the uninterrupted run does", () => {
+    const uninterrupted = createGame(BLACKOUT_OPTIONS);
+    runPast(uninterrupted, SAVED_AT_MINUTE);
+    expect(uninterrupted.blackout).toBeDefined();
+    const saved = serialized(uninterrupted);
+    expect(saved.blackout).toEqual(uninterrupted.blackout);
+
+    const restored = restore(saved);
+    runPast(uninterrupted, 10000);
+    runPast(restored, 10000);
+
+    expect(blackoutsOver(uninterrupted)).toHaveLength(1);
+    expect(restored.eventLog).toEqual(uninterrupted.eventLog);
+  });
+
+  it("rejects a save with an impossible blackout", () => {
+    const played = createGame(BLACKOUT_OPTIONS);
+    runPast(played, SAVED_AT_MINUTE);
+    const envelope = JSON.parse(JSON.stringify(serializeSave(played)));
+    for (const blackout of [
+      { startMinute: played.date.minute + 1, unservedWh: 0 },
+      { startMinute: -1, unservedWh: 0 },
+      { startMinute: 1.5, unservedWh: 0 },
+      { startMinute: 0, unservedWh: -1 },
+      { startMinute: 0, unservedWh: "1" },
+      { startMinute: 0, unservedWh: null },
+      null,
+      "dark",
+    ]) {
+      expect(
+        parseSave({ ...envelope, game: { ...envelope.game, blackout } }),
+      ).toBeNull();
+    }
+    expect(parseSave(envelope)!.game.blackout).toEqual(played.blackout);
+  });
+});

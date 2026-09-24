@@ -24,6 +24,10 @@ import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
+  validResilienceRecord,
+  validUpgradeInProgress,
+} from "./helpers/BuildValidation";
+import {
   getStorageJson,
   removeStorageKey,
   setStorageKeyValue,
@@ -428,7 +432,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
-        optionalBooleansInvalid
+        optionalBooleansInvalid ||
+        !validResilienceRecord(current.fuel, current.resilience) ||
+        !validUpgradeInProgress(current.upgradeInProgress)
       );
     }) ||
     !Array.isArray(game.timeline) ||
@@ -547,6 +553,19 @@ export function parseSave(raw: unknown): SaveGameType | null {
       exercise.suppliedTicks < 0 ||
       exercise.suppliedTicks > TICKS_PER_MONTH ||
       (exercise.completed && exercise.active))
+  )
+    return null;
+  const blackout = game.blackout;
+  if (
+    blackout !== undefined &&
+    (typeof blackout !== "object" ||
+      blackout === null ||
+      !Number.isInteger(blackout.startMinute) ||
+      blackout.startMinute < 0 ||
+      blackout.startMinute > game.date.minute ||
+      typeof blackout.unservedWh !== "number" ||
+      !Number.isFinite(blackout.unservedWh) ||
+      blackout.unservedWh < 0)
   )
     return null;
   const transmission = game.transmission;

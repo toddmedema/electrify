@@ -6,6 +6,13 @@ function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+const NON_NEGATIVE_ATTRIBUTES: readonly string[] = [
+  "cost",
+  "oneTimeCost",
+  "repairCost",
+  "upfrontGrant",
+];
+
 /** Validate persisted occurrences before simulation or story presentation dereferences them. */
 export function validWorldEvent(value: unknown): boolean {
   if (!record(value)) return false;
@@ -32,6 +39,16 @@ export function validWorldEvent(value: unknown): boolean {
           (attribute.every((entry) => typeof entry === "string") ||
             attribute.every(finite))),
     )
+  )
+    return false;
+  // Money amounts the tick books directly. The reducer only ever records them as non-negative,
+  // so a negative one in a save could only come from an edit that turns a charge into income.
+  const attributes = value.attributes;
+  if (
+    NON_NEGATIVE_ATTRIBUTES.some((key) => {
+      const amount = attributes[key];
+      return amount !== undefined && !(finite(amount) && amount >= 0);
+    })
   )
     return false;
   const scalarEffects = [

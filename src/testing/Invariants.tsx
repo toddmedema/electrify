@@ -13,6 +13,13 @@ import {
   TickPresentFutureType,
 } from "../Types";
 import { effectiveMarket } from "../data/IntertieAccess";
+import { STANDARD_GAS_DESIGN_MIN_TEMP_C } from "../data/Hazards";
+import {
+  COLD_DEFINITION_ID,
+  HAIL_DEFINITION_ID,
+  isWeatherHazardEligible,
+} from "../helpers/Hazards";
+import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import {
   allocateIntertieFlows,
   neighborImportSupplyW,
@@ -209,9 +216,21 @@ export function checkTick(
     });
   }
 
+  // Cancelling a retrofit refunds its price as negative O&M in the tick it happens, and nothing
+  // else may take a tick's expenses below zero.
+  const retrofitRefunds = state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.retrofit === true &&
+        event.startsMinute === now.minute &&
+        Number(event.attributes.cost) < 0,
+    )
+    .reduce((total, event) => total - Number(event.attributes.cost), 0);
   NON_NEGATIVE_TICK_FIELDS.forEach((field) => {
     const value = now[field];
-    if (isFinite_(value) && value < 0) {
+    const floor =
+      field === "expensesOM" ? -retrofitRefunds - CASH_ROUNDING_TOLERANCE : 0;
+    if (isFinite_(value) && value < floor) {
       collector.add("tick value is non-negative", when, `${field} = ${value}`);
     }
   });
@@ -652,6 +671,95 @@ export function checkMonth(
       `demandWh = ${month.demandWh}`,
     );
   }
+}
+
+/**
+ * Checks the weather hazards that started this month, right after the rollover that drew them:
+ * every derate is a real reduction, each hail charge is its repair cost, hail only hits operating
+ * solar and cold only derates gas plants rated warmer than the month's minimum.
+ */
+export function checkWeatherHazards(
+  collector: InvariantCollector,
+  state: GameType,
+  when: string,
+) {
+  const monthStart = state.date.monthsElapsed * MINUTES_PER_MONTH;
+  state.worldEvents.active.forEach((event) => {
+    const hail = event.definitionId === HAIL_DEFINITION_ID;
+    const cold = event.definitionId === COLD_DEFINITION_ID;
+    if ((!hail && !cold) || event.startsMinute !== monthStart) return;
+    if (!isWeatherHazardEligible(state, hail ? "HAIL" : "EXTREME_COLD")) {
+      collector.add(
+        "weather hazards only occur where eligible",
+        when,
+        `${event.key} in scenario ${state.scenarioId}`,
+      );
+    }
+    Object.entries(event.effects.facilityOutputMultipliersById || {}).forEach(
+      ([id, multiplier]) => {
+        if (!isFinite_(multiplier) || multiplier <= 0 || multiplier > 1) {
+          collector.add(
+            "weather hazard derates stay within (0, 1]",
+            when,
+            `${event.key} facility ${id} multiplier ${multiplier}`,
+          );
+        }
+        const facility = state.facilities.find((f) => String(f.id) === id);
+        if (
+          hail &&
+          (facility?.fuel !== "Sun" || facility.yearsToBuildLeft > 0)
+        ) {
+          collector.add(
+            "hail only damages operating solar",
+            when,
+            `${event.key} hit ${facility?.fuel ?? "missing"} facility ${id}`,
+          );
+        }
+        if (cold) {
+          const designMinTempC =
+            facility?.resilience?.designMinTempC ??
+            STANDARD_GAS_DESIGN_MIN_TEMP_C;
+          if (
+            facility?.fuel !== "Natural Gas" ||
+            !(Number(event.attributes.minTempC) < designMinTempC)
+          ) {
+            collector.add(
+              "cold only derates gas plants colder than their rating",
+              when,
+              `${event.key} derated ${facility?.fuel ?? "missing"} facility ${id} rated ${designMinTempC} at ${event.attributes.minTempC}`,
+            );
+          }
+        }
+      },
+    );
+    const gasMultiplier = event.effects.fuelPriceMultipliers?.["Natural Gas"];
+    if (
+      gasMultiplier !== undefined &&
+      (!isFinite_(gasMultiplier) || gasMultiplier < 1)
+    ) {
+      collector.add(
+        "cold gas price multipliers are finite and at least 1",
+        when,
+        `${event.key} ${gasMultiplier}`,
+      );
+    }
+    if (hail) {
+      const charge = event.attributes.oneTimeCost;
+      const repairCost = event.attributes.repairCost;
+      if (
+        !isFinite_(charge) ||
+        !isFinite_(repairCost) ||
+        repairCost < 0 ||
+        Math.abs(charge - repairCost) > repairCost * RELATIVE_TOLERANCE
+      ) {
+        collector.add(
+          "hail charge equals the repair cost",
+          when,
+          `${event.key} charge ${charge} repair ${repairCost}`,
+        );
+      }
+    }
+  });
 }
 
 /**

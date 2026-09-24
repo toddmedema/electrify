@@ -1,4 +1,9 @@
-import { FacilityShoppingType } from "../Types";
+import {
+  FacilityShoppingType,
+  ResilienceUpgradeType,
+  RetrofitFacilityAction,
+} from "../Types";
+import { DESIGN_MIN_TEMP_BOUNDS_C } from "../data/Hazards";
 
 const MAXIMUM_CONSTRUCTION_KGCO2E: Readonly<Record<string, number>> = {
   constructionKgco2ePerW: 20,
@@ -7,6 +12,89 @@ const MAXIMUM_CONSTRUCTION_KGCO2E: Readonly<Record<string, number>> = {
 
 function nonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+const RESILIENCE_UPGRADES: readonly ResilienceUpgradeType[] = [
+  "hailResistant",
+  "coldWeatherPackage",
+  "solarTrackers",
+];
+
+const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
+  Sun: ["hailResistant", "solarTrackers", "trackerHailDamageFactor"],
+  "Natural Gas": ["coldWeatherPackage", "designMinTempC"],
+};
+
+/**
+ * Weather hardening on a quote or a saved facility: known flags only, each on the technology it
+ * applies to, with a bounded gas design temperature and tracker hail share, so a crafted replay
+ * or edited save cannot harden a plant it does not describe.
+ */
+export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
+  if (raw === undefined) return true;
+  if (!raw || typeof raw !== "object") return false;
+  const allowed = RESILIENCE_FIELDS_BY_FUEL[String(fuel)] ?? [];
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => {
+      if (!allowed.includes(key)) return false;
+      if (value === undefined) return true;
+      if (key === "designMinTempC") {
+        return (
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          value >= DESIGN_MIN_TEMP_BOUNDS_C.min &&
+          value <= DESIGN_MIN_TEMP_BOUNDS_C.max
+        );
+      }
+      if (key === "trackerHailDamageFactor") {
+        return (
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          value > 0 &&
+          value <= 1
+        );
+      }
+      return typeof value === "boolean";
+    },
+  );
+}
+
+/** A saved retrofit in progress: a known upgrade, a non-negative price and an ordered window. */
+export function validUpgradeInProgress(raw: unknown): boolean {
+  if (raw === undefined) return true;
+  if (!raw || typeof raw !== "object") return false;
+  const upgrade = raw as Record<string, unknown>;
+  return (
+    RESILIENCE_UPGRADES.includes(upgrade.upgrade as ResilienceUpgradeType) &&
+    nonNegative(upgrade.cost) &&
+    nonNegative(upgrade.startsMinute) &&
+    nonNegative(upgrade.completesMinute) &&
+    (upgrade.completesMinute as number) >= (upgrade.startsMinute as number)
+  );
+}
+
+/** A quote's weather hardening and the share of its price the options account for. */
+function validResilience(facility: Record<string, unknown>): boolean {
+  if (
+    facility.resilienceExtraBuildCost !== undefined &&
+    (!nonNegative(facility.resilienceExtraBuildCost) ||
+      facility.resilienceExtraBuildCost > (facility.buildCost as number))
+  )
+    return false;
+  return validResilienceRecord(facility.fuel, facility.resilience);
+}
+
+/** Retrofit requests also arrive through untrusted replay documents. */
+export function validRetrofitFacility(
+  raw: unknown,
+): raw is RetrofitFacilityAction {
+  if (!raw || typeof raw !== "object") return false;
+  const payload = raw as Record<string, unknown>;
+  return (
+    Number.isSafeInteger(payload.facilityId) &&
+    (payload.facilityId as number) >= 0 &&
+    RESILIENCE_UPGRADES.includes(payload.upgrade as ResilienceUpgradeType)
+  );
 }
 
 /** Shopping quotes travel through untrusted replay documents as well as the build dialog. */
@@ -61,7 +149,8 @@ export function validBuildFacility(raw: unknown): raw is {
       (key) =>
         typeof facility[key] === "number" &&
         facility[key] > MAXIMUM_CONSTRUCTION_KGCO2E[key],
-    )
+    ) ||
+    !validResilience(facility)
   )
     return false;
   if (
