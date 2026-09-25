@@ -5925,6 +5925,14 @@ $sizemap: (
 .insights .insightsLevers {
   position: relative;
   padding-right: 64px;
+
+  // The customer programs button sits over the summary row; the slider below it runs under the
+  // button's column out to the pane's edge instead of stopping short of it
+  .budgetSlider {
+    box-sizing: border-box;
+    width: calc(100% + 52px);
+    margin-right: -52px;
+  }
 }
 .customerProgramsControl {
   position: absolute;
