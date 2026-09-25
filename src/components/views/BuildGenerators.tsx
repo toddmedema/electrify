@@ -53,6 +53,7 @@ import {
   GeneratorShoppingType,
   FuelNameType,
   LocationType,
+  TickPresentFutureType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
 import {
@@ -208,7 +209,6 @@ interface GeneratorBuildItemProps {
   location: LocationType;
   seed: number;
   secondaryMetric?: string;
-  forecastGapW?: number;
   advantages?: string[];
   /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
   outputShape?: ExpectedOutputShape;
@@ -947,6 +947,51 @@ function valueLabelFormat(x: number) {
   return formatWatts(getW(x));
 }
 
+interface BuildForecast {
+  timeline: TickPresentFutureType[];
+  windSpeeds: number[];
+  offshoreWindSpeeds: number[];
+  airborneWindSpeeds: number[];
+  solarIrradiances: number[];
+}
+
+// The three-year forecast is the one expensive part of a quote (tens of milliseconds), and it
+// reads nearly all of the game: the clock, fleet, customers, loans, weather position and story
+// state. So it is keyed on the game object itself rather than a hand-picked subset of it. Redux
+// hands back a new object whenever anything in the game changes and the same object otherwise,
+// which makes the key exact: the size slider, sort, compare and details reuse the forecast, and
+// so do remounts (StrictMode's double render, switching catalog tabs) while the game is unchanged.
+// Only the per-size GENERATORS quote and output shapes, both cheap, rerun on a slider move.
+// Weak, so a replaced game state is collected along with its forecast.
+const buildForecasts = new WeakMap<GameType, BuildForecast>();
+
+function getBuildForecast(
+  game: GameType,
+  now: TickPresentFutureType,
+): BuildForecast {
+  const cached = buildForecasts.get(game);
+  if (cached) {
+    return cached;
+  }
+  const timeline = generateNewTimeline(
+    game,
+    now.cash,
+    now.customers,
+    TICKS_PER_YEAR * 3,
+  );
+  const forecast: BuildForecast = {
+    timeline,
+    windSpeeds: timeline.map((w) => w.windKph),
+    offshoreWindSpeeds: timeline.flatMap((w) =>
+      w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
+    ),
+    airborneWindSpeeds: timeline.map((w) => w.windAirborneKph),
+    solarIrradiances: timeline.map((w) => w.solarIrradianceWM2),
+  };
+  buildForecasts.set(game, forecast);
+  return forecast;
+}
+
 export interface StateProps {
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   facilityDragActive?: boolean;
@@ -1007,18 +1052,13 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   }
 
   const cash = now.cash;
-  const forecastedTimeline = generateNewTimeline(
-    game,
-    cash,
-    now.customers,
-    TICKS_PER_YEAR * 3, // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
-  );
-  const windSpeeds = forecastedTimeline.map((w) => w.windKph);
-  const offshoreWindSpeeds = forecastedTimeline.flatMap((w) =>
-    w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
-  );
-  const airborneWindSpeeds = forecastedTimeline.map((w) => w.windAirborneKph);
-  const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
+  const {
+    timeline: forecastedTimeline,
+    windSpeeds,
+    offshoreWindSpeeds,
+    airborneWindSpeeds,
+    solarIrradiances,
+  } = getBuildForecast(game, now);
   const hydroAvailability = getHydroAvailability(
     game,
     exactSizes.Hydro ?? getW(sliderTick),
@@ -1068,10 +1108,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       }
       return a[sort] - b[sort];
     });
-  const forecastGapW = Math.max(
-    0,
-    ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
-  );
   const outputShapes = new Map(
     generators.map((generator) => [
       generator.name,
@@ -1190,7 +1226,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 generator={g}
                 cash={cash}
                 secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
-                forecastGapW={forecastGapW}
                 advantages={advantages.slice(0, 2)}
                 outputShape={outputShapes.get(g.name)}
                 outputCeiling={outputCeiling}

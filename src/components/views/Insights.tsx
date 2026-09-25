@@ -81,10 +81,15 @@ import {
 } from "../../LocalStorage";
 import {
   forecastViewportBounds,
-  projectionSignature,
   ProjectionView,
-  selectProjection,
 } from "../../helpers/Projection";
+import {
+  projectionReady,
+  readProjection,
+  requestProjection,
+  signature as projectionSignature,
+  subscribeProjection,
+} from "../base/DeferredProjection";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
 import {
   chartPalette,
@@ -338,6 +343,8 @@ interface State {
   shortRateOpen: boolean;
   activeEventKey?: string;
   viewport: ChartViewportRange;
+  // The game month the viewport was last advanced to
+  viewportMonth: number;
   viewportAnnouncement: string;
 }
 
@@ -671,6 +678,14 @@ export default class Insights extends React.Component<Props, State> {
 
   private paneRef = React.createRef<HTMLDivElement>();
   private paneObserver?: ResizeObserver;
+  // The projection the pane last drew, kept on screen while a stale one is recomputed
+  private shownProjection?: {
+    projection: ProjectionView;
+    scenarioId: number;
+    seed: number;
+    monthsElapsed: number;
+  };
+  private unsubscribeProjection?: () => void;
 
   private shortfallCache:
     | {
@@ -707,7 +722,39 @@ export default class Insights extends React.Component<Props, State> {
       viewport: props.savedViewport
         ? this.restoredViewport(props.savedViewport)
         : initialViewport(props.game),
+      viewportMonth: props.game.date.monthsElapsed,
       viewportAnnouncement: "",
+    };
+  }
+
+  // Slide the viewport in the same render as the month that moved it. Advancing it from
+  // componentDidUpdate rendered every chart a second time on each month boundary.
+  //
+  // While a lower-priority update is pending (a landed projection, a resize), React keeps
+  // derived state out of the queue's base state, so every synchronous render until then
+  // derives the same month again from the older state. That must stay idempotent: the result
+  // is the same range each time, and componentDidUpdate saves only a range that changed.
+  public static getDerivedStateFromProps(
+    props: Props,
+    state: State,
+  ): Partial<State> | null {
+    const month = props.game.date.monthsElapsed;
+    if (month === state.viewportMonth) return null;
+    const advanced = advanceViewport(
+      props.game,
+      state.viewport,
+      month - state.viewportMonth,
+    );
+    const viewport = rangesEqual(advanced, state.viewport)
+      ? state.viewport
+      : advanced;
+    return {
+      viewport,
+      viewportMonth: month,
+      viewportAnnouncement: viewportAnnouncement(
+        viewport,
+        props.game.startingYear,
+      ),
     };
   }
 
@@ -746,9 +793,16 @@ export default class Insights extends React.Component<Props, State> {
 
   public componentWillUnmount() {
     this.paneObserver?.disconnect();
+    this.unsubscribeProjection?.();
   }
 
   public componentDidMount() {
+    // forceUpdate because the new projection is not a prop or state change. A fleet drag holds
+    // renders back on purpose (see shouldComponentUpdate) and catches up on release anyway.
+    this.unsubscribeProjection = subscribeProjection(() => {
+      if (!this.props.facilityDragActive) this.forceUpdate();
+    });
+    this.requestStaleProjection();
     const pane = this.paneRef.current;
     if (pane && typeof ResizeObserver !== "undefined") {
       const measure = () => {
@@ -764,11 +818,16 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   public componentDidUpdate(previousProps: Props, previousState: State) {
-    if (this.state.viewport !== previousState.viewport) {
-      this.props.onViewportChange?.({
-        viewport: [...this.state.viewport],
-        month: this.props.game.date.monthsElapsed,
-      });
+    this.requestStaleProjection();
+    // Compare values, not identity: see getDerivedStateFromProps
+    const { viewport } = this.state;
+    const month = this.props.game.date.monthsElapsed;
+    const saved = this.props.savedViewport;
+    if (
+      !rangesEqual(viewport, previousState.viewport) &&
+      !(saved && saved.month === month && rangesEqual(saved.viewport, viewport))
+    ) {
+      this.props.onViewportChange?.({ viewport: [...viewport], month });
     }
     if (
       this.props.evidenceRunId !== previousProps.evidenceRunId ||
@@ -781,28 +840,6 @@ export default class Insights extends React.Component<Props, State> {
     this.resolveEvidence();
     if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
       this.scrollTutorialPowerExchangeIntoView();
-    }
-    if (
-      this.props.game.date.monthsElapsed !==
-      previousProps.game.date.monthsElapsed
-    ) {
-      const elapsedMonths =
-        this.props.game.date.monthsElapsed -
-        previousProps.game.date.monthsElapsed;
-      this.setState((state) => {
-        const viewport = advanceViewport(
-          this.props.game,
-          state.viewport,
-          elapsedMonths,
-        );
-        return {
-          viewport,
-          viewportAnnouncement: viewportAnnouncement(
-            viewport,
-            this.props.game.startingYear,
-          ),
-        };
-      });
     }
     if (
       this.props.focusLayer &&
@@ -1116,9 +1153,41 @@ export default class Insights extends React.Component<Props, State> {
   /**
    * The game's long-range forecast, shared with the top bar's runway warning through the
    * memoized helper: one simulation per set of inputs, read by both callers.
+   *
+   * When a month rollover or a decision has made it stale, the pane keeps drawing the one it
+   * already has, and componentDidUpdate asks for the new one after paint (see
+   * DeferredProjection). That keeps the twenty-year simulation out of the rollover frame. A
+   * projection from another run, or from more than a month back, is never shown in its place.
+   * With nothing to keep, such as on mount, the projection is computed now.
    */
   private getProjection(now: TickPresentFutureType): ProjectionView {
-    return selectProjection(this.props.game, now);
+    const { game } = this.props;
+    const shown = this.shownProjection;
+    const monthsBehind = shown && game.date.monthsElapsed - shown.monthsElapsed;
+    if (
+      shown &&
+      shown.scenarioId === game.scenarioId &&
+      shown.seed === game.seed &&
+      (monthsBehind === 0 || monthsBehind === 1) &&
+      !projectionReady(game)
+    ) {
+      return shown.projection;
+    }
+    const projection = readProjection(game, now);
+    this.shownProjection = {
+      projection,
+      scenarioId: game.scenarioId,
+      seed: game.seed,
+      monthsElapsed: game.date.monthsElapsed,
+    };
+    return projection;
+  }
+
+  private requestStaleProjection() {
+    const { game } = this.props;
+    if (projectionReady(game)) return;
+    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    if (now) requestProjection(game, now);
   }
 
   private available(layer: InsightLayerDefinition, projection: ProjectionView) {
@@ -1528,6 +1597,9 @@ export default class Insights extends React.Component<Props, State> {
     const clamped = clampChartViewport(bounds, next, minSpan);
     this.setState({
       viewport: clamped,
+      // Anchors the range to this month, so a render that derives from an older base state
+      // (see getDerivedStateFromProps) does not slide the player's own choice again
+      viewportMonth: this.props.game.date.monthsElapsed,
       viewportAnnouncement: announce
         ? viewportAnnouncement(clamped, this.props.game.startingYear)
         : this.state.viewportAnnouncement,

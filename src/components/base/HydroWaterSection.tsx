@@ -12,6 +12,7 @@ import {
 import { generateNewTimeline } from "../../reducers/Game";
 import { FacilityOperatingType, GameType } from "../../Types";
 import ManualLink from "./ManualLink";
+import { useAfterPaintValue } from "./AfterPaint";
 import Sparkline from "./Sparkline";
 
 const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
@@ -19,14 +20,11 @@ const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 /**
  * The year ahead only changes meaningfully when the month or the operating fleet does, so the
  * forecast is kept until one of those moves rather than re-simulated on every throttled render.
+ * A new one is computed after paint, so the month rollover's frame keeps last month's outlook.
  */
 function useReservoirOutlook(
   game: GameType,
 ): ReservoirOutlookPoint[] | undefined {
-  const cache = React.useRef<{
-    key: string;
-    outlook?: ReservoirOutlookPoint[];
-  }>();
   const key = [
     game.date.year,
     game.date.monthNumber,
@@ -35,20 +33,16 @@ function useReservoirOutlook(
       .map((f) => f.id)
       .join(","),
   ].join("|");
-  if (cache.current?.key !== key) {
+  return useAfterPaintValue(key, () => {
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
-    cache.current = {
-      key,
-      outlook: now
-        ? reservoirOutlook(
-            now,
-            generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
-            game.startingYear,
-          )
-        : undefined,
-    };
-  }
-  return cache.current.outlook;
+    return now
+      ? reservoirOutlook(
+          now,
+          generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
+          game.startingYear,
+        )
+      : undefined;
+  });
 }
 
 function Stat(props: { label: string; value: React.ReactNode }) {

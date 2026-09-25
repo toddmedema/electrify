@@ -1,5 +1,5 @@
 import { delta as uiDelta } from "../../reducers/UI";
-import { connect } from "react-redux";
+import { connectToStore } from "../base/ConnectToStore";
 import type { AppDispatch } from "../../Store";
 import { delta } from "../../reducers/Game";
 import { AppStateType, GameType } from "../../Types";
@@ -40,4 +40,4 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
   onDelta: (change: Partial<GameType>) => dispatch(delta(change)),
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(Insights);
+export default connectToStore(mapStateToProps, mapDispatchToProps)(Insights);

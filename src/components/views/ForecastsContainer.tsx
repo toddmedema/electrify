@@ -1,5 +1,5 @@
-import { connect } from "react-redux";
 import { AppStateType } from "../../Types";
+import { connectToStore } from "../base/ConnectToStore";
 import Forecasts, { StateProps } from "./Forecasts";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -9,6 +9,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const ForecastsContainer = connect(mapStateToProps)(Forecasts);
+const ForecastsContainer = connectToStore(mapStateToProps)(Forecasts);
 
 export default ForecastsContainer;
