@@ -1,9 +1,9 @@
 import * as React from "react";
-import { connect } from "react-redux";
 import { Toolbar, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { isPaneLayout } from "../../Globals";
 import { AppStateType, GameType } from "../../Types";
+import { connectToStore } from "./ConnectToStore";
 import GameAppBarContainer from "./GameAppBar";
 import NavigationContainer from "./NavigationContainer";
 
@@ -70,6 +70,6 @@ const mapStateToProps = (
   ...ownProps,
 });
 
-const GameCardContainer = connect(mapStateToProps)(GameCard);
+const GameCardContainer = connectToStore(mapStateToProps)(GameCard);
 
 export default GameCardContainer;

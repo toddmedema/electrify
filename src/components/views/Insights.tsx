@@ -338,6 +338,8 @@ interface State {
   shortRateOpen: boolean;
   activeEventKey?: string;
   viewport: ChartViewportRange;
+  // The game month the viewport was last advanced to
+  viewportMonth: number;
   viewportAnnouncement: string;
 }
 
@@ -707,7 +709,31 @@ export default class Insights extends React.Component<Props, State> {
       viewport: props.savedViewport
         ? this.restoredViewport(props.savedViewport)
         : initialViewport(props.game),
+      viewportMonth: props.game.date.monthsElapsed,
       viewportAnnouncement: "",
+    };
+  }
+
+  // Slide the viewport in the same render as the month that moved it. Advancing it from
+  // componentDidUpdate rendered every chart a second time on each month boundary.
+  public static getDerivedStateFromProps(
+    props: Props,
+    state: State,
+  ): Partial<State> | null {
+    const month = props.game.date.monthsElapsed;
+    if (month === state.viewportMonth) return null;
+    const viewport = advanceViewport(
+      props.game,
+      state.viewport,
+      month - state.viewportMonth,
+    );
+    return {
+      viewport,
+      viewportMonth: month,
+      viewportAnnouncement: viewportAnnouncement(
+        viewport,
+        props.game.startingYear,
+      ),
     };
   }
 
@@ -781,28 +807,6 @@ export default class Insights extends React.Component<Props, State> {
     this.resolveEvidence();
     if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
       this.scrollTutorialPowerExchangeIntoView();
-    }
-    if (
-      this.props.game.date.monthsElapsed !==
-      previousProps.game.date.monthsElapsed
-    ) {
-      const elapsedMonths =
-        this.props.game.date.monthsElapsed -
-        previousProps.game.date.monthsElapsed;
-      this.setState((state) => {
-        const viewport = advanceViewport(
-          this.props.game,
-          state.viewport,
-          elapsedMonths,
-        );
-        return {
-          viewport,
-          viewportAnnouncement: viewportAnnouncement(
-            viewport,
-            this.props.game.startingYear,
-          ),
-        };
-      });
     }
     if (
       this.props.focusLayer &&

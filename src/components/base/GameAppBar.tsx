@@ -1,6 +1,5 @@
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
-import { connect } from "react-redux";
 import {
   IconButton,
   Menu,
@@ -25,6 +24,7 @@ import {
   SpeedType,
   TickPresentFutureType,
 } from "../../Types";
+import { connectToStore } from "./ConnectToStore";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
@@ -432,7 +432,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const GameAppBarContainer = connect(
+const GameAppBarContainer = connectToStore(
   mapStateToProps,
   mapDispatchToProps,
 )(GameAppBar);

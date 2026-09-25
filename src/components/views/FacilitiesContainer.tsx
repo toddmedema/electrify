@@ -1,5 +1,5 @@
 import type { AppDispatch } from "../../Store";
-import { connect } from "react-redux";
+import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import {
   sellFacility,
@@ -125,7 +125,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const FacilitiesContainer = connect(
+const FacilitiesContainer = connectToStore(
   mapStateToProps,
   mapDispatchToProps,
 )(Facilities);
