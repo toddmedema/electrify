@@ -83,8 +83,13 @@ import {
   forecastViewportBounds,
   projectionSignature,
   ProjectionView,
-  selectProjection,
 } from "../../helpers/Projection";
+import {
+  projectionReady,
+  readProjection,
+  requestProjection,
+  subscribeProjection,
+} from "../base/DeferredProjection";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
 import {
   chartPalette,
@@ -673,6 +678,14 @@ export default class Insights extends React.Component<Props, State> {
 
   private paneRef = React.createRef<HTMLDivElement>();
   private paneObserver?: ResizeObserver;
+  // The projection the pane last drew, kept on screen while a stale one is recomputed
+  private shownProjection?: {
+    projection: ProjectionView;
+    scenarioId: number;
+    seed: number;
+    monthsElapsed: number;
+  };
+  private unsubscribeProjection?: () => void;
 
   private shortfallCache:
     | {
@@ -772,9 +785,16 @@ export default class Insights extends React.Component<Props, State> {
 
   public componentWillUnmount() {
     this.paneObserver?.disconnect();
+    this.unsubscribeProjection?.();
   }
 
   public componentDidMount() {
+    // forceUpdate because the new projection is not a prop or state change. A fleet drag holds
+    // renders back on purpose (see shouldComponentUpdate) and catches up on release anyway.
+    this.unsubscribeProjection = subscribeProjection(() => {
+      if (!this.props.facilityDragActive) this.forceUpdate();
+    });
+    this.requestStaleProjection();
     const pane = this.paneRef.current;
     if (pane && typeof ResizeObserver !== "undefined") {
       const measure = () => {
@@ -790,6 +810,7 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   public componentDidUpdate(previousProps: Props, previousState: State) {
+    this.requestStaleProjection();
     if (this.state.viewport !== previousState.viewport) {
       this.props.onViewportChange?.({
         viewport: [...this.state.viewport],
@@ -1120,9 +1141,41 @@ export default class Insights extends React.Component<Props, State> {
   /**
    * The game's long-range forecast, shared with the top bar's runway warning through the
    * memoized helper: one simulation per set of inputs, read by both callers.
+   *
+   * When a month rollover or a decision has made it stale, the pane keeps drawing the one it
+   * already has, and componentDidUpdate asks for the new one after paint (see
+   * DeferredProjection). That keeps the twenty-year simulation out of the rollover frame. A
+   * projection from another run, or from more than a month back, is never shown in its place.
+   * With nothing to keep, such as on mount, the projection is computed now.
    */
   private getProjection(now: TickPresentFutureType): ProjectionView {
-    return selectProjection(this.props.game, now);
+    const { game } = this.props;
+    const shown = this.shownProjection;
+    const monthsBehind = shown && game.date.monthsElapsed - shown.monthsElapsed;
+    if (
+      shown &&
+      shown.scenarioId === game.scenarioId &&
+      shown.seed === game.seed &&
+      (monthsBehind === 0 || monthsBehind === 1) &&
+      !projectionReady(game)
+    ) {
+      return shown.projection;
+    }
+    const projection = readProjection(game, now);
+    this.shownProjection = {
+      projection,
+      scenarioId: game.scenarioId,
+      seed: game.seed,
+      monthsElapsed: game.date.monthsElapsed,
+    };
+    return projection;
+  }
+
+  private requestStaleProjection() {
+    const { game } = this.props;
+    if (projectionReady(game)) return;
+    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    if (now) requestProjection(game, now);
   }
 
   private available(layer: InsightLayerDefinition, projection: ProjectionView) {

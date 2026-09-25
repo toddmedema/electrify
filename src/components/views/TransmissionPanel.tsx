@@ -90,6 +90,7 @@ import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import Sparkline from "../base/Sparkline";
+import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
 import { chartPalette } from "../../Theme";
@@ -119,23 +120,18 @@ const OUTLOOK_YEARS = 2;
 /**
  * A two-year hourly forecast, refreshed each month and whenever a portfolio, policy or story
  * decision changes its inputs. Excludes unfinished assets; the comparison assumes the candidate
- * is already open. Undefined while disabled or before the first tick exists.
+ * is already open. Undefined while disabled or before the first tick exists. A refresh is
+ * computed after paint, so the month rollover's frame keeps drawing last month's outlook.
  */
 function useIntertieForecast(
   game: GameType,
   enabled: boolean,
 ): TickPresentFutureType[] | undefined {
-  const cache = React.useRef<{
-    key: string;
-    timeline?: TickPresentFutureType[];
-  }>();
-  if (!enabled) return undefined;
-  const key = intertieForecastKey(game);
-  if (cache.current?.key !== key) {
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
-    cache.current = {
-      key,
-      timeline: now
+  return useAfterPaintValue(
+    enabled ? intertieForecastKey(game) : undefined,
+    () => {
+      const now = getTimeFromTimeline(game.date.minute, game.timeline);
+      return now
         ? generateNewTimeline(
             {
               ...game,
@@ -155,10 +151,9 @@ function useIntertieForecast(
               OUTLOOK_STEP_MINUTES,
             OUTLOOK_STEP_MINUTES,
           )
-        : undefined,
-    };
-  }
-  return cache.current.timeline;
+        : undefined;
+    },
+  );
 }
 
 /** Typical-year import room, drawn like the generator build cards' output lines */

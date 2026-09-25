@@ -54,12 +54,14 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
     selectedFacilityId: null,
     facilityDragActive: false,
   };
+  jest.useFakeTimers();
   const insights = new Insights(props);
   const internals = insights as unknown as {
     props: typeof props;
     getProjection: (now: TickPresentFutureType) => {
       timeline: TickPresentFutureType[];
     };
+    requestStaleProjection: () => void;
   };
   const before = internals.getProjection(game.timeline[0]);
   const change = {
@@ -73,7 +75,13 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
       true,
     );
     internals.props = nextProps;
-    return internals.getProjection(nextGame.timeline[0]);
+    // The decision's own render keeps the last projection, and the new one lands after paint
+    const stale = internals.getProjection(nextGame.timeline[0]);
+    internals.requestStaleProjection();
+    jest.runAllTimers();
+    const fresh = internals.getProjection(nextGame.timeline[0]);
+    expect(fresh).not.toBe(stale);
+    return fresh;
   };
   const scheduledGame = gameReducer(game, schedulePolicy(change));
   const scheduled = project(scheduledGame);
@@ -106,6 +114,7 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
       insights.state,
     ),
   ).toBe(false);
+  jest.useRealTimers();
 });
 
 jest.mock("../base/ChartFinances", () => ({
