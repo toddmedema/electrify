@@ -6,6 +6,7 @@ import gameReducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
+import * as preview from "../../helpers/PolicyPreview";
 import { previewPolicy } from "../../helpers/PolicyPreview";
 import CustomerPrograms from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
@@ -147,12 +148,18 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     jest.advanceTimersByTime(250);
   });
   const failure = { preventDefault: jest.fn() } as unknown as ErrorEvent;
+  const fallback = jest
+    .spyOn(preview, "previewPolicy")
+    .mockImplementation(() => {
+      throw new Error("no data");
+    });
   act(() => {
     workers[workers.length - 1].onerror!(failure);
   });
   expect(failure.preventDefault).toHaveBeenCalled();
   expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
   expect(apply).toBeDisabled();
+  fallback.mockRestore();
   fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
   act(() => {
     jest.advanceTimersByTime(250);
@@ -256,4 +263,44 @@ test("stopped funding describes retained upgrades without announcing another cha
     screen.queryByText(/Charges start|Funding stops/),
   ).not.toBeInTheDocument();
   view.unmount();
+});
+
+test("estimates on the page when the preview worker cannot load its data", () => {
+  jest.useFakeTimers();
+  const worker = {
+    onmessage: null as ((event: { data: unknown }) => void) | null,
+    onerror: null as ((event: ErrorEvent) => void) | null,
+    postMessage: jest.fn(),
+    terminate: jest.fn(),
+  };
+  const stub = jest
+    .spyOn(client, "createPolicyPreviewWorker")
+    .mockImplementation(() => worker as unknown as Worker);
+  const game = createGame({ scenarioId: 106 });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Rooftop solar rebates · Off" }),
+  );
+  fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
+  act(() => {
+    jest.advanceTimersByTime(250);
+  });
+  act(() => {
+    worker.onmessage!({ data: { error: "offline" } });
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Start next month" }),
+  ).toBeEnabled();
+  stub.mockRestore();
+  jest.useRealTimers();
 });
