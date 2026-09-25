@@ -528,7 +528,7 @@ export default function CustomerPrograms({
         gap: 1,
       }}
     >
-      <IconButton
+      <Button
         aria-label="Customer programs"
         title={
           pending
@@ -536,11 +536,12 @@ export default function CustomerPrograms({
             : `Customer programs: ${active} active${budget > 0 ? ` · up to ${formatMoneyConcise(budget)}/month in rebates` : ""}`
         }
         color="primary"
+        variant="contained"
         onClick={() => setOpen(true)}
         sx={{ minHeight: 44, minWidth: 44 }}
       >
         <GroupsIcon />
-      </IconButton>
+      </Button>
       {open && (
         <Decision onClose={() => setOpen(false)} onViewDemand={onViewDemand} />
       )}

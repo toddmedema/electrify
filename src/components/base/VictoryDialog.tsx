@@ -163,11 +163,15 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     : !endTitle || /^mission complete!?$/i.test(endTitle.trim())
       ? "Mission complete"
       : endTitle;
+  // Gains carry an explicit "+" so the line reads as pluses and minuses at a glance; losses
+  // already print their "-" and zero stays bare
   const breakdownSummary = Object.keys(breakdown)
-    .map(
-      (category) =>
-        `${formatScore(breakdown[category])} ${SCORE_LABELS[category] || category}`,
-    )
+    .map((category) => {
+      const points = breakdown[category];
+      return `${points > 0 ? "+" : ""}${formatScore(points)} ${
+        SCORE_LABELS[category] || category
+      }`;
+    })
     .join(" · ");
 
   const shared = challengeShareContent(victory);

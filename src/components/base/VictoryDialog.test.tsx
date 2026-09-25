@@ -70,8 +70,22 @@ describe("VictoryDialog", () => {
   it("shows the breakdown before any of the async data lands", () => {
     renderDialog();
     expect(screen.getByLabelText("Final score 812 points")).toBeInTheDocument();
-    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
-    expect(screen.getByText(/-18 blackouts/)).toBeInTheDocument();
+    // Gains carry an explicit "+", losses keep their "-", so the line reads as pluses and
+    // minuses at a glance
+    expect(
+      screen.getByText(
+        "+800 electricity supplied · +30 emissions · -18 blackouts",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves zero contributions unsigned", () => {
+    renderDialog({
+      victory: aVictory({ breakdown: { supply: 0, blackouts: -5 } }),
+    });
+    expect(
+      screen.getByText("0 electricity supplied · -5 blackouts"),
+    ).toBeInTheDocument();
   });
 
   it("summarizes mission results without replaying the run", () => {
