@@ -150,6 +150,11 @@ likely failure point. Otherwise drop it.
 - CDP `Performance.getMetrics` supplies the RecalcStyle and LayoutCount deltas.
 - Runs against the dev server (StrictMode double renders): deterministic, but not production
   numbers. Commit ms are reported, never gated.
+- Ordinary and month-boundary ticks commit once per dispatch. StrictMode double-renders but does
+  not add commits. A react-redux `connect()` container defers every store reader below it to an
+  extra commit (it notifies them from a layout effect), so game containers that map `state.game`
+  use `connectToStore` (`src/components/base/ConnectToStore.tsx`) or hooks. The build catalog's
+  extra commits come from MUI ripples, react-transition-group phases and Avatar image loads.
 - Gate: counts ≤ ceilings in `scripts/perf/census-baselines.json`. Kept out of the PR smoke job
   until it has been stable across several CI runs; run locally with
   `npm run test:e2e -- perf-census.spec.ts --project=desktop-chromium`.

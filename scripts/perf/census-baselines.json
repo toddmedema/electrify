@@ -1,7 +1,7 @@
 {
   "desktop-chromium": {
     "ordinary": {
-      "commits": 60,
+      "commits": 30,
       "dispatches": 30,
       "mutationRecords": 77,
       "addedNodes": 0,
@@ -10,7 +10,7 @@
       "textMutations": 22
     },
     "rollover": {
-      "commits": 11,
+      "commits": 6,
       "dispatches": 6,
       "mutationRecords": 26,
       "addedNodes": 0,
@@ -30,7 +30,7 @@
   },
   "mobile-390px": {
     "ordinary": {
-      "commits": 80,
+      "commits": 30,
       "dispatches": 30,
       "mutationRecords": 65,
       "addedNodes": 0,
@@ -39,7 +39,7 @@
       "textMutations": 10
     },
     "rollover": {
-      "commits": 14,
+      "commits": 5,
       "dispatches": 5,
       "mutationRecords": 11,
       "addedNodes": 0,

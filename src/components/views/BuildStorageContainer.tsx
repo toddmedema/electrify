@@ -1,5 +1,5 @@
 import type { AppDispatch } from "../../Store";
-import { connect } from "react-redux";
+import { connectToStore } from "../base/ConnectToStore";
 import { navigate } from "../../reducers/Card";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import { AppStateType, StorageShoppingType } from "../../Types";
@@ -22,7 +22,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const BuildStorageContainer = connect(
+const BuildStorageContainer = connectToStore(
   mapStateToProps,
   mapDispatchToProps,
 )(BuildStorage);

@@ -1,5 +1,5 @@
 import type { AppDispatch } from "../../Store";
-import { connect } from "react-redux";
+import { connectToStore } from "../base/ConnectToStore";
 import { delta } from "../../reducers/Game";
 import { AppStateType, GameType } from "../../Types";
 import Finances, { DispatchProps, StateProps } from "./Finances";
@@ -19,7 +19,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const FinancesContainer = connect(
+const FinancesContainer = connectToStore(
   mapStateToProps,
   mapDispatchToProps,
 )(Finances);
