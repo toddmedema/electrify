@@ -2700,26 +2700,30 @@ html[data-theme="dark"] .uplot {
     // each run as one unbroken segment on their own element, so the puff never pauses; their
     // easings are fitted so the path passes through the original small and then large circle.
     // The two puffs are half a cycle apart, so one or two are visible at a time.
+    $homeSmokeCycle: 3.2s * 1.4;
+
     .homeSmokePuff {
       fill: #0084f8;
       animation:
-        homeSmokeDrift 3.2s cubic-bezier(0.8, 0.4, 0.25, 0.3) infinite,
-        homeSmokeFade 3.2s linear infinite;
+        homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3)
+          infinite,
+        homeSmokeFade $homeSmokeCycle linear infinite;
     }
 
     .homeSmokeLift {
-      animation: homeSmokeLift 3.2s linear infinite;
+      animation: homeSmokeLift $homeSmokeCycle linear infinite;
     }
 
     .homeSmokePuff circle {
       transform-box: fill-box;
       transform-origin: center;
-      animation: homeSmokeGrow 3.2s cubic-bezier(0.15, 0.4, 0.25, 0.35) infinite;
+      animation: homeSmokeGrow $homeSmokeCycle
+        cubic-bezier(0.15, 0.4, 0.25, 0.35) infinite;
     }
 
     .homeSmokePuff:nth-child(2),
     .homeSmokePuff:nth-child(2) * {
-      animation-delay: -1.6s;
+      animation-delay: $homeSmokeCycle * -0.5;
     }
 
     @media (prefers-reduced-motion: reduce) {
