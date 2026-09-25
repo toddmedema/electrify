@@ -113,6 +113,55 @@ describe("connectToStore", () => {
     expect(renders).toEqual({});
   });
 
+  test("maps state with the own props and follows their changes", () => {
+    const store = testStore();
+    const mapState = jest.fn(
+      (state: AppStateType, { step }: { step: number }) => ({
+        tick: tickOf(state) * step,
+      }),
+    );
+    const Scaled = ({ tick, step }: { tick: number; step: number }) => (
+      <span data-testid="scaled">
+        {tick} by {step}
+      </span>
+    );
+    const ConnectedScaled = connectToStore(mapState)(Scaled);
+    const view = render(
+      <Provider store={store}>
+        <ConnectedScaled step={2} />
+      </Provider>,
+    );
+    act(() => {
+      store.dispatch(slice.actions.tick());
+    });
+    expect(screen.getByTestId("scaled")).toHaveTextContent("2 by 2");
+
+    view.rerender(
+      <Provider store={store}>
+        <ConnectedScaled step={3} />
+      </Provider>,
+    );
+    expect(screen.getByTestId("scaled")).toHaveTextContent("3 by 3");
+    expect(mapState).toHaveBeenLastCalledWith(store.getState(), { step: 3 });
+  });
+
+  test("injects no dispatch prop when mapDispatchToProps is omitted", () => {
+    const seen: Record<string, unknown>[] = [];
+    const Probe = (props: { tick: number }) => {
+      seen.push(props);
+      return null;
+    };
+    const ConnectedProbe = connectToStore((state) => ({
+      tick: tickOf(state),
+    }))(Probe);
+    render(
+      <Provider store={testStore()}>
+        <ConnectedProbe />
+      </Provider>,
+    );
+    expect(seen.at(-1)).toEqual({ tick: 0 });
+  });
+
   test("passes own props through and maps dispatch once", () => {
     const store = testStore();
     const mapDispatch = jest.fn((dispatch) => ({

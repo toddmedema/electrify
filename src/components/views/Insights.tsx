@@ -81,13 +81,13 @@ import {
 } from "../../LocalStorage";
 import {
   forecastViewportBounds,
-  projectionSignature,
   ProjectionView,
 } from "../../helpers/Projection";
 import {
   projectionReady,
   readProjection,
   requestProjection,
+  signature as projectionSignature,
   subscribeProjection,
 } from "../base/DeferredProjection";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
@@ -729,17 +729,25 @@ export default class Insights extends React.Component<Props, State> {
 
   // Slide the viewport in the same render as the month that moved it. Advancing it from
   // componentDidUpdate rendered every chart a second time on each month boundary.
+  //
+  // While a lower-priority update is pending (a landed projection, a resize), React keeps
+  // derived state out of the queue's base state, so every synchronous render until then
+  // derives the same month again from the older state. That must stay idempotent: the result
+  // is the same range each time, and componentDidUpdate saves only a range that changed.
   public static getDerivedStateFromProps(
     props: Props,
     state: State,
   ): Partial<State> | null {
     const month = props.game.date.monthsElapsed;
     if (month === state.viewportMonth) return null;
-    const viewport = advanceViewport(
+    const advanced = advanceViewport(
       props.game,
       state.viewport,
       month - state.viewportMonth,
     );
+    const viewport = rangesEqual(advanced, state.viewport)
+      ? state.viewport
+      : advanced;
     return {
       viewport,
       viewportMonth: month,
@@ -811,11 +819,15 @@ export default class Insights extends React.Component<Props, State> {
 
   public componentDidUpdate(previousProps: Props, previousState: State) {
     this.requestStaleProjection();
-    if (this.state.viewport !== previousState.viewport) {
-      this.props.onViewportChange?.({
-        viewport: [...this.state.viewport],
-        month: this.props.game.date.monthsElapsed,
-      });
+    // Compare values, not identity: see getDerivedStateFromProps
+    const { viewport } = this.state;
+    const month = this.props.game.date.monthsElapsed;
+    const saved = this.props.savedViewport;
+    if (
+      !rangesEqual(viewport, previousState.viewport) &&
+      !(saved && saved.month === month && rangesEqual(saved.viewport, viewport))
+    ) {
+      this.props.onViewportChange?.({ viewport: [...viewport], month });
     }
     if (
       this.props.evidenceRunId !== previousProps.evidenceRunId ||
@@ -1585,6 +1597,9 @@ export default class Insights extends React.Component<Props, State> {
     const clamped = clampChartViewport(bounds, next, minSpan);
     this.setState({
       viewport: clamped,
+      // Anchors the range to this month, so a render that derives from an older base state
+      // (see getDerivedStateFromProps) does not slide the player's own choice again
+      viewportMonth: this.props.game.date.monthsElapsed,
       viewportAnnouncement: announce
         ? viewportAnnouncement(clamped, this.props.game.startingYear)
         : this.state.viewportAnnouncement,

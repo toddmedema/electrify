@@ -15,7 +15,9 @@ import type { AppStateType } from "../../Types";
  * the store directly, so one dispatch updates every reader in one commit.
  *
  * Behaves like `connect` otherwise: the component re-renders only when its own props or a
- * shallowly compared field of `mapStateToProps` changes, and `mapDispatchToProps` runs once.
+ * shallowly compared field of `mapStateToProps` changes, `mapStateToProps` receives the own
+ * props, and `mapDispatchToProps` runs once. One difference: without `mapDispatchToProps`,
+ * `connect` injects a `dispatch` prop and this does not; map what the component needs instead.
  */
 export function connectToStore<
   StateProps extends object,

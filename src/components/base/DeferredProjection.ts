@@ -35,7 +35,7 @@ const listeners = new Set<() => void>();
 // Every reader asks about the same game object in the same render pass, and the signature
 // stringifies the location, world events and policies, so it is worked out once per game
 const signatures = new WeakMap<GameType, string>();
-function signature(game: GameType): string {
+export function signature(game: GameType): string {
   let key = signatures.get(game);
   if (key === undefined) {
     key = projectionSignature(game);
