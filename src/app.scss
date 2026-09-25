@@ -2696,31 +2696,49 @@ html[data-theme="dark"] .uplot {
       overflow: visible;
     }
 
-    // Stands in for the two smoke circles removed from logo-home.svg. Each puff leaves the
-    // smokestack, passes through the small and then the large circle, and fades; the two are
-    // half a cycle apart, so one or two are visible at a time.
+    // Stands in for the two smoke circles removed from logo-home.svg. Drift, rise, and growth
+    // each run as one unbroken segment on their own element, so the puff never pauses; their
+    // easings are fitted so the path passes through the original small and then large circle.
+    // The two puffs are half a cycle apart, so one or two are visible at a time.
     .homeSmokePuff {
       fill: #0084f8;
+      animation:
+        homeSmokeDrift 3.2s cubic-bezier(0.8, 0.4, 0.25, 0.3) infinite,
+        homeSmokeFade 3.2s linear infinite;
+    }
+
+    .homeSmokeLift {
+      animation: homeSmokeLift 3.2s linear infinite;
+    }
+
+    .homeSmokePuff circle {
       transform-box: fill-box;
       transform-origin: center;
-      animation: homeSmokeRise 3.2s ease-out infinite;
+      animation: homeSmokeGrow 3.2s cubic-bezier(0.15, 0.4, 0.25, 0.35) infinite;
+    }
 
-      &:nth-child(2) {
-        animation-delay: -1.6s;
-      }
+    .homeSmokePuff:nth-child(2),
+    .homeSmokePuff:nth-child(2) * {
+      animation-delay: -1.6s;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .homeEnergyPulse {
+      .homeEnergyPulse,
+      .homeSmokePuff,
+      .homeSmokePuff * {
         animation: none;
       }
 
       // Hold the puffs where the logo's original smoke circles sit.
-      .homeSmokePuff {
-        animation: none;
+      .homeSmokePuff:nth-child(2) {
+        transform: translateX(-4.3px);
 
-        &:nth-child(2) {
-          transform: translate(-4.3px, 3.6px) scale(0.7);
+        .homeSmokeLift {
+          transform: translateY(3.6px);
+        }
+
+        circle {
+          transform: scale(0.7);
         }
       }
     }
@@ -4616,24 +4634,43 @@ $sizemap: (
 }
 
 // KEYFRAMES
-@keyframes homeSmokeRise {
+@keyframes homeSmokeDrift {
+  from {
+    transform: translateX(-6px);
+  }
+  to {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes homeSmokeLift {
+  from {
+    transform: translateY(7px);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes homeSmokeGrow {
+  from {
+    transform: scale(0.2);
+  }
+  to {
+    transform: scale(1.35);
+  }
+}
+
+@keyframes homeSmokeFade {
   0% {
     opacity: 0;
-    transform: translate(-6px, 7px) scale(0.2);
   }
-  15% {
-    opacity: 1;
-  }
-  40% {
-    transform: translate(-4.3px, 3.6px) scale(0.7);
-  }
+  15%,
   65% {
     opacity: 1;
-    transform: translate(0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(4px, -4px) scale(1.35);
   }
 }
 

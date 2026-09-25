@@ -72,8 +72,16 @@ const MainMenu = (props: Props): React.JSX.Element => {
               pathLength="100"
             />
             <g className="homeSmoke">
-              <circle className="homeSmokePuff" cx="222" cy="8.1" r="4.4" />
-              <circle className="homeSmokePuff" cx="222" cy="8.1" r="4.4" />
+              <g className="homeSmokePuff">
+                <g className="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
+                </g>
+              </g>
+              <g className="homeSmokePuff">
+                <g className="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
+                </g>
+              </g>
             </g>
           </svg>
         </div>
