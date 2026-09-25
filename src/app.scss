@@ -2700,7 +2700,7 @@ html[data-theme="dark"] .uplot {
     // each run as one unbroken segment on their own element, so the puff never pauses; their
     // easings are fitted so the path passes through the original small and then large circle.
     // The two puffs are half a cycle apart, so one or two are visible at a time.
-    $homeSmokeCycle: 3.2s * 1.4;
+    $homeSmokeCycle: 5.6s;
 
     .homeSmokePuff {
       fill: #0084f8;
