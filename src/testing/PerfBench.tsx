@@ -5,7 +5,7 @@
  *
  * It times the real reducer tick two ways, on the plain object the headless simulator mutates and
  * inside Immer's produce the way the browser's `tick` case reducer pays for it, then times the
- * month-keyed UI forecasts the screens rebuild in the rollover frame. Results go to the file named
+ * forecasts the mounted screens rebuild when a month rolls over or the catalog opens. Results go to the file named
  * by PERF_RESULT_FILE; bench.js owns the gating so ceilings stay out of the TS pipeline.
  */
 import * as fs from "fs";
@@ -14,10 +14,10 @@ import * as fs from "fs";
 import { createNextState, freeze } from "@reduxjs/toolkit";
 import cloneDeep from "lodash.clonedeep";
 import { TICK_MINUTES, TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
-import { projectMonths } from "../components/views/Finances";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { reservoirOutlook } from "../helpers/HydroOutlook";
+import { selectProjection } from "../helpers/Projection";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import gameReducer, {
   buildFacility,
@@ -224,29 +224,32 @@ function runOnce(months: number): RunType {
   };
 }
 
-/** Each forecast exactly as its screen calls it on the frame the month rolls over. */
+/**
+ * Each forecast a mounted screen runs, called exactly as that screen calls it. The first three are
+ * keyed on the month and now run after paint rather than in the rollover frame (see
+ * components/base/AfterPaint and DeferredProjection); the build quote runs when the catalog opens,
+ * memoized per game state. Each is still a long task wherever it lands.
+ */
 function uiForecasts(game: GameType): { name: string; run: () => unknown }[] {
   const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-  const forecastsPane = (years: number) => () => {
-    const projectionStepMinutes = years >= 10 ? 60 : TICK_MINUTES;
-    const tickScale = projectionStepMinutes / TICK_MINUTES;
-    return generateNewTimeline(
-      game,
-      now.cash,
-      now.customers,
-      (TICKS_PER_YEAR * years) / tickScale,
-      projectionStepMinutes,
-    );
-  };
   const buildTimeline = () =>
     generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR * 3);
   // The build screen opens on the size of the newest non-storage facility
   const buildPeakW =
     [...game.facilities].filter((f) => !f.peakWh).sort((a, b) => b.id - a.id)[0]
       ?.peakW || 500000000;
+  // TransmissionPanel's two-year hourly outlook, with unfinished assets left out
+  const intertieStepMinutes = 60;
   return [
-    { name: "Forecasts, 1 year", run: forecastsPane(1) },
-    { name: "Forecasts, 5 years", run: forecastsPane(5) },
+    {
+      // selectProjection caches on the history array's identity, so a fresh array times a rebuild
+      name: "Shared projection, 20 years",
+      run: () =>
+        selectProjection(
+          { ...game, monthlyHistory: [...game.monthlyHistory] },
+          now,
+        ),
+    },
     {
       name: "Hydro outlook (1 year)",
       run: () =>
@@ -257,21 +260,25 @@ function uiForecasts(game: GameType): { name: string; run: () => unknown }[] {
         ),
     },
     {
-      // The default "this year" range projects the rest of the calendar year
-      name: `Finances, this year (${12 - game.date.monthNumber} mo)`,
+      name: "Intertie outlook (2 years, hourly)",
       run: () =>
-        projectMonths(
-          game,
+        generateNewTimeline(
+          {
+            ...game,
+            facilities: game.facilities.filter((f) => f.yearsToBuildLeft <= 0),
+            transmission: {
+              tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
+              lines: (game.transmission?.lines || [])
+                .filter((l) => l.yearsToBuildLeft <= 0)
+                .map((l) => ({ ...l, upgrade: undefined })),
+            },
+          },
           now.cash,
           now.customers,
-          12 - game.date.monthNumber,
+          (TICKS_PER_YEAR * 2 * TICK_MINUTES) / intertieStepMinutes,
+          intertieStepMinutes,
         ),
     },
-    {
-      name: "Finances, next 1 year",
-      run: () => projectMonths(game, now.cash, now.customers, 12),
-    },
-    { name: "BuildGenerators 3y timeline", run: buildTimeline },
     {
       name: "BuildGenerators 3y quote (+GENERATORS)",
       run: () => {
@@ -430,7 +437,7 @@ it("perf bench", () => {
   if (forecasts.length) {
     write("");
     write(
-      `  UI forecasts at the month ${WORKLOAD.forecastMonth} rollover        ms    × median rollover  × worst`,
+      `  UI forecasts at month ${WORKLOAD.forecastMonth}                     ms    × median rollover  × worst`,
     );
     forecasts.forEach((forecast) =>
       row(

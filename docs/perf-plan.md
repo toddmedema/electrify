@@ -9,10 +9,11 @@ This revision corrects the first draft against the code. The changes that matter
 - The headless sim calls `tickState` on a plain object (`src/testing/Simulator.tsx`); the browser
   runs it inside RTK's Immer draft. Headless-only numbers miss proxy and finalize cost, so every
   tick bench measures both paths.
-- The biggest known rollover cost is in the UI, not the reducer. `Forecasts.tsx` recomputes a 1–N
-  year `generateNewTimeline` (at least 1,152 ticks) in `render` on every month change;
-  `HydroWaterSection` (one year) and the Finances projection cache are also keyed on the month. The
-  reducer's own rollover forecast is 96 ticks.
+- The biggest known rollover cost is in the UI, not the reducer. The twenty-year hourly projection
+  that Insights and the top bar's cash-runway warning share (`selectProjection`, 5,760 steps) was
+  rebuilt in `render` on every month change. `HydroWaterSection` (one year) and the intertie outlook
+  (two years, hourly) are also keyed on the month. The reducer's own rollover forecast is 96 ticks.
+  The `Forecasts` and `Finances` panes the first draft named are no longer mounted.
 - Weather is already memoized: `getWeather` reads a cached row array and extrapolates each day once.
   "Load weather up front" is not a lever.
 - `TICK_MS` lives in `src/Constants.tsx` and the tick loop in `src/reducers/Game.tsx`, both inside
@@ -33,12 +34,15 @@ From `npm run perf:bench` on the M5 (Node 24.14, median of three warmed runs):
 | Month rollover, median |       8.4 ms |        37 ms |
 | Month rollover, worst  |            — |        97 ms |
 
-| Screen forecast, computed synchronously in render                |   Cost |
-| ---------------------------------------------------------------- | -----: |
-| Forecasts at 5 years (on every month change)                     | 306 ms |
-| BuildGenerators three-year quote (each render, e.g. slider move) | 210 ms |
-| Finances projection, next year (month-keyed)                     | 100 ms |
-| Hydro outlook, one year (month-keyed)                            |  61 ms |
+Screen forecasts, from the bench's UI section at month 60, re-measured when G3 thread 1 retargeted
+it at the screens actually mounted (the reducer rollover median was 11 ms in that run):
+
+| Screen forecast                                                         |   Cost |
+| ----------------------------------------------------------------------- | -----: |
+| Shared projection, twenty years (Insights, runway warning; month-keyed) | 145 ms |
+| BuildGenerators three-year quote (catalog open)                         |  63 ms |
+| Hydro outlook, one year (month-keyed)                                   |  20 ms |
+| Intertie outlook, two years hourly (month-keyed)                        |  10 ms |
 
 From `e2e/perf-census.spec.ts` against the dev server, 30 FAST steps of one presentation frame each:
 desktop makes 60 React commits for 30 dispatches, and mobile-390px makes 80. Every tick batch
@@ -62,9 +66,9 @@ And the month-keyed screen forecasts cost several times the reducer's rollover.
 - **G3: No visible hiccup at month and year boundaries.** The rollover frame does two kinds of work.
   In the reducer: summarize the month, reprice credit, resolve world events and wildfire hazards,
   advance policies, regenerate the 96-tick timeline (deep-cloned fleet), and run four pre-roll
-  finance passes. In the UI, same frame: month-keyed forecasts on the visible screen (Forecasts:
-  `years × 1,152` ticks; Hydro: 1,152; Finances projection), plus a larger commit (new timeline
-  array, new history row). Every fix keeps `monthlyHistory` identical (B2).
+  finance passes. In the UI: month-keyed forecasts on the visible screen (the shared twenty-year
+  projection: 5,760 hourly steps; hydro: 1,152 ticks; intertie: 2,304 hourly steps), plus a larger
+  commit (new timeline array, new history row). Every fix keeps `monthlyHistory` identical (B2).
 
 ## Journeys
 
@@ -73,7 +77,7 @@ And the month-keyed screen forecasts cost several times the reducer's rollover.
 3. **Core loop:** time advancing while the player watches (most of play). Per presentation update:
    `tickState` under Immer, then React and uPlot work. G3 lives here.
 4. **Building:** open the catalog, read quotes, confirm, return. `BuildGenerators` calls
-   `generateNewTimeline` for three years in `render` (an existing TODO asks to memoize it).
+   `generateNewTimeline` for three years, memoized per game state.
 5. **Save resume:** load a save, resume.
 
 ## Benchmarks
@@ -127,10 +131,11 @@ likely failure point. Otherwise drop it.
   ordinary tick, the median and worst month rollover, and the worst January. The gate is the typical
   rollover ratio (median rollover ÷ median ordinary tick). The worst-rollover ratio is only
   reported: it is a single maximum that a GC pause can double, and it ranged 116–355 across runs.
-- **UI forecasts at rollover (in `perf:bench`):** time the month-keyed forecasts the screens run in
-  the same frame, each called exactly as the screen does. Forecasts at 1 and 5 years, the Hydro
-  outlook, the Finances projection, and the BuildGenerators three-year quote. These are reported in
-  ms and as multiples of the reducer rollover. They are the attribution for G3's first fix.
+- **UI forecasts (in `perf:bench`):** time the forecasts the mounted screens rebuild, each called
+  exactly as the screen does: the shared twenty-year projection, the hydro outlook, and the intertie
+  outlook (month-keyed, now computed after paint), plus the BuildGenerators three-year quote (catalog
+  open). These are reported in ms and as multiples of the reducer rollover. Each is still one long
+  task wherever it runs, so they remain the attribution for the rest of G3.
 - **Browser:** at FAST under Playwright's clock, record the longest rAF gap spanning each month
   boundary. Local only at first.
 - **Manual:** play through a boundary on a real phone with the dev overlay.
@@ -181,16 +186,15 @@ order is G3 first, then G2, then G1.
 
 **G3: kill the rollover hiccup.** Attribute with B7. The likely order:
 
-1. **Take UI forecasts off the rollover frame.** Compute month-keyed screen forecasts after the
-   commit (idle callback or a post-paint timeout), and show the previous month's forecast until the
-   new one arrives. Memoize the BuildGenerators quote per month and fleet. This is UI-only, outside
-   the hash, needs no manifest regeneration, and is the biggest expected win.
+1. **Take UI forecasts off the rollover frame (done, see Sequence).** Month-keyed screen forecasts
+   now run after paint while the previous month's stay on screen.
 2. **Shrink reducer rollover work:** the deep clone, per-tick object churn, and the four pre-roll
    passes. These are hashed inputs, so batch them into one release and prove B2 holds.
 3. **Shrink the rollover commit:** stable references and memoized chart props, measured with the
    B3/B4 month-boundary numbers.
-4. **Escalation only if phones still hitch:** move screen forecasts to a worker. They are pure
-   functions of state, so this is safer than moving the reducer's own rollover.
+4. **Move the shared projection to a worker.** No longer an escalation: after step 1 it is still a
+   single long task of about 85 ms in the frame after the rollover, which drops that frame. Screen
+   forecasts are pure functions of state, so this is safer than moving the reducer's own rollover.
 
 **G2: 120 Hz.**
 
@@ -248,8 +252,13 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
 - **Foundation PR (this one).** B2 golden snapshots and `perf:rebaseline`, the `perf:bench` harness
   (B1, headless B7 and UI forecasts, with ratio ceilings), B5 bundle size in CI, the B3/B4 census
   module, spec, and ceilings, the B6 overlay, and this plan.
-- **Next: G3 thread 1.** Defer month-keyed UI forecasts off the rollover frame (UI-only, no
-  manifest).
+- **Done: G3 thread 1** (UI-only, no manifest). Month-keyed forecasts are computed after paint
+  (`components/base/AfterPaint`), with the previous value kept on screen. Insights and the runway
+  warning share one deferred twenty-year projection (`DeferredProjection`). Ticks commit once per
+  dispatch (`connectToStore`). The BuildGenerators quote is memoized per game state. The rollover
+  task drops from about 110–120 ms to under 50 ms in the dev census. The projection still runs as
+  an 85 ms task one frame later.
+- **Next: move the shared projection to a worker** (G3 step 4), the remaining rollover hitch.
 - **Then:** one manifest-regenerating release that bundles the Immer tax, the reducer-side rollover
   savings, the G2 rAF presentation loop, and the `TICK_MS.FAST` decision.
 - **Timeboxed spike:** Valgrind feasibility, kept only if it passes its criteria.
