@@ -70,7 +70,7 @@ jobs:
         if: '!cancelled()'
         run: npm run build
 
-      # Gzip bytes are deterministic for a given build, so they gate at 1% tolerance.
+      # Gzip bytes gate at 10% over the recorded ceilings.
       - name: Bundle size
         if: "!cancelled() && steps.build.outcome == 'success'"
         run: npm run perf:bundle

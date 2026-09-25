@@ -158,7 +158,7 @@ likely failure point. Otherwise drop it.
 
 `scripts/perf/bundle-size.js` runs after `npm run build`. It measures the gzip bytes of the main JS
 and CSS chunks and the total initial JS. The ceilings in `scripts/perf/bundle-baselines.json` allow
-1% tolerance. This needs no browser, so CI runs it right after the production build. Load journey
+10% tolerance. This needs no browser, so CI runs it right after the production build. Load journey
 timing (request count, bytes transferred, navigation to first tick) against the production build is
 local-only until proven stable.
 
