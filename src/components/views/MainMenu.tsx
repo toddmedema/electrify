@@ -59,7 +59,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
     <div id="menuCard">
       <div id="logo">
         <div className="homeLogo">
-          <img src="images/logo.svg" alt="Electrify" />
+          <img src="images/logo-home.svg" alt="Electrify" />
           <svg
             className="homeEnergyTrace"
             viewBox="0 0 300 70"
@@ -71,6 +71,18 @@ const MainMenu = (props: Props): React.JSX.Element => {
               d="M57.7873 5.39465C57.7873 5.39465 85.2179 11.978 107.162 11.978C129.107 11.978 150.32 8.22915 150.32 8.22915"
               pathLength="100"
             />
+            <g className="homeSmoke">
+              <g className="homeSmokePuff">
+                <g className="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
+                </g>
+              </g>
+              <g className="homeSmokePuff">
+                <g className="homeSmokeLift">
+                  <circle cx="222" cy="8.1" r="4.4" />
+                </g>
+              </g>
+            </g>
           </svg>
         </div>
       </div>
