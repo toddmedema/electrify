@@ -11,16 +11,135 @@ import {
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
 import * as ExpectedOutput from "../../helpers/ExpectedOutput";
+import * as GameReducer from "../../reducers/Game";
+import * as Facilities from "../../data/Facilities";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { SCENARIOS } from "../../data/Scenarios";
 import { formatMoneyConcise } from "../../helpers/Format";
 import {
   resilienceBuildOptions,
   withResilienceOptions,
 } from "../../helpers/Hazards";
-import { DOWNPAYMENT_PERCENT } from "../../Constants";
+import { DOWNPAYMENT_PERCENT, TICKS_PER_YEAR } from "../../Constants";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
+
+describe("the three-year build forecast", () => {
+  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
+  let timeline: jest.SpyInstance;
+  beforeEach(() => {
+    timeline = jest.spyOn(GameReducer, "generateNewTimeline");
+  });
+  afterEach(() => {
+    timeline.mockRestore();
+  });
+
+  // What a player reads off the screen: all of its text and every typical-year sparkline
+  function quotes(container: HTMLElement) {
+    return {
+      text: container.textContent,
+      charts: within(container)
+        .getAllByRole("img", { name: /^(Typical year|Available on demand)/ })
+        .map((chart) => chart.getAttribute("aria-label")),
+    };
+  }
+
+  it("is computed once per game state across slider, compare, details and remounts", () => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const view = render(
+      <React.StrictMode>
+        <BuildGenerators game={game} {...callbacks} />
+      </React.StrictMode>,
+    );
+    // StrictMode renders twice; the second render reuses the first one's forecast
+    expect(timeline).toHaveBeenCalledTimes(1);
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    expect(timeline).toHaveBeenCalledWith(
+      game,
+      now.cash,
+      now.customers,
+      TICKS_PER_YEAR * 3,
+    );
+
+    const generators = jest.spyOn(Facilities, "GENERATORS");
+    const slider = screen.getByRole("slider");
+    const before = slider.getAttribute("aria-valuenow");
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: /^Compare / })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /details$/ })[0]);
+    view.rerender(
+      <React.StrictMode>
+        <BuildGenerators game={game} {...callbacks} focusFuel="Wind" />
+      </React.StrictMode>,
+    );
+    view.unmount();
+    render(<BuildGenerators game={game} {...callbacks} />);
+    expect(timeline).toHaveBeenCalledTimes(1);
+    // The cheap per-size quote still reruns, against the very same forecast arrays
+    expect(generators.mock.calls.length).toBeGreaterThan(1);
+    const [first, ...rest] = generators.mock.calls;
+    rest.forEach((call) => {
+      expect(call[2]).toBe(first[2]);
+      expect(call[3]).toBe(first[3]);
+      expect(call[4]).toBe(first[4]);
+      expect(call[5]).toBe(first[5]);
+    });
+    generators.mockRestore();
+  });
+
+  it("is recomputed when the game state changes", () => {
+    const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+    const view = render(<BuildGenerators game={game} {...callbacks} />);
+    expect(timeline).toHaveBeenCalledTimes(1);
+    // A new state object, even with equal contents, is a new forecast
+    view.rerender(<BuildGenerators game={{ ...game }} {...callbacks} />);
+    expect(timeline).toHaveBeenCalledTimes(2);
+    // And a changed input reaches it: here the cash the forecast starts from
+    const richer = {
+      ...game,
+      timeline: game.timeline.map((tick) =>
+        tick.minute === game.date.minute
+          ? Object.assign({}, tick, { cash: 1e12 })
+          : tick,
+      ),
+    };
+    view.rerender(<BuildGenerators game={richer} {...callbacks} />);
+    expect(timeline).toHaveBeenCalledTimes(3);
+    expect(timeline.mock.calls[2][1]).toBe(1e12);
+  });
+
+  it("quotes exactly what a freshly computed forecast quotes", () => {
+    const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+    // Reused: the forecast from the first render serves each slider position
+    const { container: reused } = render(
+      <BuildGenerators game={game} {...callbacks} />,
+    );
+    const reusedSlider = within(reused).getByRole("slider");
+    fireEvent.keyDown(reusedSlider, { key: "ArrowRight" });
+    fireEvent.keyDown(reusedSlider, { key: "ArrowRight" });
+    expect(timeline).toHaveBeenCalledTimes(1);
+    const reusedQuotes = quotes(reused);
+    const reusedForecast = timeline.mock.results[0].value;
+    // Fresh: an equal but distinct game state forces the forecast to be computed again
+    const { container: fresh } = render(
+      <BuildGenerators game={{ ...game }} {...callbacks} />,
+    );
+    const freshSlider = within(fresh).getByRole("slider");
+    fireEvent.keyDown(freshSlider, { key: "ArrowRight" });
+    fireEvent.keyDown(freshSlider, { key: "ArrowRight" });
+    expect(timeline).toHaveBeenCalledTimes(2);
+
+    expect(timeline.mock.results[1].value).toEqual(reusedForecast);
+    expect(reusedSlider.getAttribute("aria-valuenow")).toBe(
+      freshSlider.getAttribute("aria-valuenow"),
+    );
+    expect(reusedQuotes.charts.length).toBeGreaterThan(0);
+    expect(quotes(fresh)).toEqual(reusedQuotes);
+  });
+});
 
 it("shows natural-gas base, per-start, and daily-start estimated O&M", async () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
