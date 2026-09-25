@@ -204,7 +204,6 @@ interface GeneratorBuildItemProps {
   location: LocationType;
   seed: number;
   secondaryMetric?: string;
-  forecastGapW?: number;
   advantages?: string[];
   /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
   outputShape?: ExpectedOutputShape;
@@ -971,7 +970,6 @@ interface BuildForecast {
   offshoreWindSpeeds: number[];
   airborneWindSpeeds: number[];
   solarIrradiances: number[];
-  forecastGapW: number;
 }
 
 // The three-year forecast is the one expensive part of a quote (tens of milliseconds), and it
@@ -1006,10 +1004,6 @@ function getBuildForecast(
     ),
     airborneWindSpeeds: timeline.map((w) => w.windAirborneKph),
     solarIrradiances: timeline.map((w) => w.solarIrradianceWM2),
-    forecastGapW: Math.max(
-      0,
-      ...timeline.map((tick) => tick.demandW - tick.supplyW),
-    ),
   };
   buildForecasts.set(game, forecast);
   return forecast;
@@ -1078,7 +1072,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     offshoreWindSpeeds,
     airborneWindSpeeds,
     solarIrradiances,
-    forecastGapW,
   } = getBuildForecast(game, now);
   const hydroAvailability = getHydroAvailability(
     game,
@@ -1236,7 +1229,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 generator={g}
                 cash={cash}
                 secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
-                forecastGapW={forecastGapW}
                 advantages={advantages.slice(0, 2)}
                 outputShape={outputShapes.get(g.name)}
                 outputCeiling={outputCeiling}

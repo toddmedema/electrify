@@ -331,7 +331,6 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
       generator={generator}
       location={game.location}
       seed={game.seed}
-      forecastGapW={generator.peakW}
       advantages={["Fastest online", "Lowest lifetime cost"]}
       onBuild={jest.fn()}
     />,
