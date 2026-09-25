@@ -971,11 +971,13 @@ export default function TransmissionPanel({
               id="intertie-tier-label"
               className="constructionCapacity"
               variant="body2"
+              color="primary"
             >
               Tier <strong>{tier}</strong>
             </Typography>
             <Slider
               className="constructionCapacitySlider"
+              sx={{ ml: 2 }}
               aria-labelledby="intertie-tier-label"
               getAriaValueText={(value) => `Tier ${value}`}
               value={tier}

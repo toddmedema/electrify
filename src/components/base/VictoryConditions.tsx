@@ -21,8 +21,29 @@ export interface Props {
   difficulty?: DifficultyType;
   meaningfulDecisions?: MeaningfulDecisionType[];
   meaningfulDecisionGateWaived?: boolean;
-  /** Only the point rules; in play the requirements are already listed with live progress. */
-  scoringOnly?: boolean;
+}
+
+/** The point rule behind each score category, keyed like `computeScoreBreakdown`. */
+export function scoreRules(
+  ownership: ScenarioType["ownership"],
+  dollarsPerkWh: number,
+  perEmissions: string,
+): { [category: string]: string } {
+  return ownership === "Investor"
+    ? {
+        netWorth: "Earn 40 points per $1 billion of net worth at the end.",
+        customers: "Earn 2 points per 100,000 customers at the end.",
+        supply: "Earn 1 point per terawatt-hour (TWh) of electricity supplied.",
+        emissions: `Lose 2 points per ${perEmissions} of greenhouse gas emissions.`,
+        blackouts: "Lose 8 points per TWh of customer demand not served.",
+      }
+    : {
+        rate: `Earn 80 points for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose 80 points for each $0.01/kWh it is above.`,
+        supply:
+          "Earn 10 points per terawatt-hour (TWh) of electricity supplied.",
+        emissions: `Lose 5 points per ${perEmissions} of greenhouse gas emissions.`,
+        blackouts: "Lose 10 points per TWh of customer demand not served.",
+      };
 }
 
 /**
@@ -44,49 +65,47 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   const requirement = props.difficulty
     ? meaningfulDecisionRequirement(props.difficulty)
     : null;
-  const decisionProgress =
-    requirement && !props.scoringOnly ? (
-      <div data-testid="meaningful-decision-progress">
-        {props.meaningfulDecisionGateWaived ? (
+  const decisionProgress = requirement ? (
+    <div data-testid="meaningful-decision-progress">
+      {props.meaningfulDecisionGateWaived ? (
+        <p>
+          This game began before decision tracking was added, so its original
+          victory rules still apply.
+        </p>
+      ) : (
+        <>
           <p>
-            This game began before decision tracking was added, so its original
-            victory rules still apply.
+            Required: make {requirement.count} meaningful decision
+            {requirement.count === 1 ? "" : "s"} that change the grid or its
+            economics
+            {requirement.categories > 1
+              ? ` across at least ${requirement.categories} decision types`
+              : ""}
+            . Progress: {decisions.length} of {requirement.count}
+            {requirement.categories > 1
+              ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
+              : ""}
+            .
           </p>
-        ) : (
-          <>
-            <p>
-              Required: make {requirement.count} meaningful decision
-              {requirement.count === 1 ? "" : "s"} that change the grid or its
-              economics
-              {requirement.categories > 1
-                ? ` across at least ${requirement.categories} decision types`
-                : ""}
-              . Progress: {decisions.length} of {requirement.count}
-              {requirement.categories > 1
-                ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
-                : ""}
-              .
-            </p>
-            <p>
-              Decision counts are learning goals for this game, not a real
-              utility standard. Meeting a score target does not waive required
-              objectives.
-            </p>
-            {decisions.length > 0 && (
-              <ul data-testid="meaningful-decision-history">
-                {decisions.map((decision) => (
-                  <li key={decision.key}>
-                    {decision.label} —{" "}
-                    {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
-    ) : null;
-  const requiredObjectives = props.scoringOnly ? null : (
+          <p>
+            Decision counts are learning goals for this game, not a real utility
+            standard. Meeting a score target does not waive required objectives.
+          </p>
+          {decisions.length > 0 && (
+            <ul data-testid="meaningful-decision-history">
+              {decisions.map((decision) => (
+                <li key={decision.key}>
+                  {decision.label} —{" "}
+                  {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
+  const requiredObjectives = (
     <>
       <p>
         Regular scenarios end early if cash is negative at a month-end check, or
@@ -114,34 +133,14 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
       )}
     </>
   );
-  if (ownership === "Investor") {
-    return (
-      <div>
-        {decisionProgress}
-        {requiredObjectives}
-        <p>Earn 40 points per $1 billion of net worth at the end.</p>
-        <p>Earn 2 points per 100,000 customers at the end.</p>
-        <p>Earn 1 point per terawatt-hour (TWh) of electricity supplied.</p>
-        <p>Lose 2 points per {perEmissions} of greenhouse gas emissions.</p>
-        <p>Lose 8 points per TWh of customer demand not served.</p>
-      </div>
-    );
-  }
+  const rules = scoreRules(ownership, dollarsPerkWh, perEmissions);
   return (
     <div>
       {decisionProgress}
       {requiredObjectives}
-      <p>
-        Earn 80 points for each $0.01/kWh your lifetime average rate is below
-        the ${dollarsPerkWh}/kWh target.
-      </p>
-      <p>
-        Lose 80 points for each $0.01/kWh your lifetime average rate is above
-        the target.
-      </p>
-      <p>Earn 10 points per terawatt-hour (TWh) of electricity supplied.</p>
-      <p>Lose 5 points per {perEmissions} of greenhouse gas emissions.</p>
-      <p>Lose 10 points per TWh of customer demand not served.</p>
+      {Object.entries(rules).map(([category, rule]) => (
+        <p key={category}>{rule}</p>
+      ))}
     </div>
   );
 }

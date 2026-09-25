@@ -23,6 +23,7 @@ import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { getMonthlyPayment } from "../../helpers/Financials";
 import {
+  floorToTwoSignificantDigits,
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
@@ -49,6 +50,7 @@ interface StorageBuildItemProps {
   interestRate: number;
   location?: LocationType;
   storage: StorageShoppingType;
+  onUseMaxSize: (peakWh: number) => void;
   onBuild: (financed: boolean) => void;
 }
 
@@ -57,8 +59,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const units = useUnits();
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [financingExpanded, setFinancingExpanded] = React.useState(false);
-  const financingTermsId = React.useId();
   const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
@@ -68,12 +68,14 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     LOAN_MONTHS,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
+  const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
   const { buildable, secondaryText } = getBuildAvailability({
     name: storage.name,
     description: storage.description,
     available: storage.available,
     sizeBuildable,
-    maxSizeLabel: formatWattHours(storage.maxPeakWh),
+    maxSizeLabel: formatWattHours(maxSizeWh),
+    onUseMaxSize: () => props.onUseMaxSize(maxSizeWh),
     location: props.location,
     viableLocationsRemaining: storage.viableLocationsRemaining,
   });
@@ -95,7 +97,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const toggleOpen = (e: React.SyntheticEvent) => {
     if (!open) {
       purchaseSubmitted.current = false;
-      setFinancingExpanded(false);
     }
     setOpen(!open);
     e.stopPropagation();
@@ -264,7 +265,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               {
                 concept: "finances",
                 label: "Loan option",
-                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
                 detail: "Payments start now.",
               },
               {
@@ -308,59 +309,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 : []),
             ]}
           />
-          <Button
-            color="primary"
-            size="small"
-            fullWidth
-            aria-expanded={financingExpanded}
-            aria-controls={financingTermsId}
-            endIcon={
-              financingExpanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
-            }
-            onClick={() => setFinancingExpanded((value) => !value)}
-          >
-            {financingExpanded
-              ? "Hide financing terms"
-              : "Show financing terms"}
-          </Button>
-          <Collapse in={financingExpanded} timeout="auto" unmountOnExit>
-            <TableContainer id={financingTermsId}>
-              <Table size="small" aria-label="Financing terms">
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Downpayment</TableCell>
-                    <TableCell align="right">
-                      {formatMoneyConcise(downpayment)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      Interest rate
-                      <ManualLink
-                        entry={MANUAL_ENTRY.INTEREST_RATES}
-                        label="interest rate"
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      {(props.interestRate * 100).toFixed(2)}%
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Monthly payments</TableCell>
-                    <TableCell align="right">
-                      {formatMoneyConcise(monthlyPayment)}/mo
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Loan duration</TableCell>
-                    <TableCell align="right">
-                      Construction + {LOAN_MONTHS / 12} years
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Collapse>
         </DialogContent>
         <DialogActions>
           <Button
@@ -437,6 +385,9 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
+  const [exactSizes, setExactSizes] = React.useState<Record<string, number>>(
+    {},
+  );
   const [sort, setSort] = React.useState<StorageSortKey>("buildCost");
 
   if (!now) {
@@ -444,9 +395,15 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   }
 
   const cash = now.cash;
-  const storage = STORAGE(game, getW(sliderTick)).sort(
-    (a, b) => a[sort] - b[sort],
-  );
+  const storage = STORAGE(game, getW(sliderTick))
+    .map((candidate) =>
+      exactSizes[candidate.name] !== undefined
+        ? STORAGE(game, exactSizes[candidate.name]).find(
+            (resized) => resized.name === candidate.name,
+          ) || candidate
+        : candidate,
+    )
+    .sort((a, b) => a[sort] - b[sort]);
 
   return (
     <div
@@ -465,7 +422,10 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         sort={sort}
         sortOptions={sortOptions}
         onClose={onBack}
-        onSliderChange={setSliderTick}
+        onSliderChange={(value) => {
+          setSliderTick(value);
+          setExactSizes({});
+        }}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
       <List dense className="scrollable cardList">
@@ -474,6 +434,9 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             storage={g}
             key={i}
             cash={cash}
+            onUseMaxSize={(peakWh) =>
+              setExactSizes((sizes) => ({ ...sizes, [g.name]: peakWh }))
+            }
             interestRate={game.interestRate}
             location={game.location}
             onBuild={(financed: boolean) => {

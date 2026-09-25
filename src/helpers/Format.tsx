@@ -1,11 +1,27 @@
 import numbro from "numbro";
 
-/** Format power using its actual magnitude, without promoting sub-GW values to GW. */
-export function formatWatts(i: number, mantissa = 1): string {
+/**
+ * Format power using its actual magnitude, without promoting sub-GW values to GW. Unless a
+ * mantissa is requested, values of 10 or more in their unit are whole numbers ("541MW") and
+ * smaller ones keep one decimal ("9.8GW").
+ */
+export function formatWatts(i: number, mantissa?: number): string {
   return formatWattsInUnit(i, getWattUnit(i), mantissa);
 }
 
-export function formatWattHours(i: number, mantissa = 1): string {
+/**
+ * Rounds down to two significant digits, so a maximum shown as "1.2GW" is a size that can really
+ * be built rather than a rounded-up value just past the limit.
+ */
+export function floorToTwoSignificantDigits(i: number): number {
+  if (!(i > 0) || !Number.isFinite(i)) {
+    return 0;
+  }
+  const step = Math.pow(10, Math.floor(Math.log10(i)) - 1);
+  return Math.floor(i / step + 1e-9) * step;
+}
+
+export function formatWattHours(i: number, mantissa?: number): string {
   return formatWatts(i, mantissa) + "h";
 }
 
@@ -99,13 +115,14 @@ export function getWattUnit(i: number): WattUnitType {
 export function formatWattsInUnit(
   i: number,
   unit: WattUnitType,
-  mantissa = 1,
+  mantissa?: number,
 ): string {
+  const scaled = i / unit.divisor;
   return (
-    numbro(i / unit.divisor).format({
+    numbro(scaled).format({
       thousandSeparated: true,
       trimMantissa: true,
-      mantissa,
+      mantissa: mantissa ?? (Math.abs(scaled) >= 9.95 ? 0 : 1),
     }) +
     unit.suffix +
     "W"

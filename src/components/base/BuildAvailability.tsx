@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TableCell, TableRow } from "@mui/material";
+import { Button, TableCell, TableRow } from "@mui/material";
 import { getViableLocationCount } from "../../data/FacilitySites";
 import { getHydroAvailability } from "../../data/HydroSites";
 import { LocationType } from "../../Types";
@@ -55,6 +55,8 @@ export function getBuildAvailability(options: {
   available: boolean;
   sizeBuildable: boolean;
   maxSizeLabel: React.ReactNode;
+  /** Offers a text button that resizes the project to the largest available size. */
+  onUseMaxSize?: () => void;
   location?: LocationType;
   viableLocationsRemaining?: number;
 }): BuildAvailability {
@@ -109,6 +111,20 @@ export function getBuildAvailability(options: {
           This project size is not available with technology in this year.
           <br />
           Maximum available size: <strong>{options.maxSizeLabel}</strong>
+          {options.onUseMaxSize && (
+            <>
+              {" "}
+              <Button
+                size="small"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  options.onUseMaxSize?.();
+                }}
+              >
+                Use max size
+              </Button>
+            </>
+          )}
         </div>
       ),
     };
