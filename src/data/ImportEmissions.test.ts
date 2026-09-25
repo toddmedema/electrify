@@ -25,6 +25,14 @@ it("retains sourced neighboring differences without calling hydro zero-carbon", 
   );
 });
 
+it("does not give Himalayan hydro imports the world-average fallback", () => {
+  const himalaya = importEmissionsAssumption(
+    "geo-delhi-himalayan-hydro-market",
+  );
+  expect(himalaya.emissionsKgco2ePerMWh).toBeLessThan(50);
+  expect(himalaya.emissionsBasis).toMatch(/proxy/);
+});
+
 it("compares fuel energy with a consistent combustion CO2 boundary", () => {
   expect(FUELS.Coal.kgCO2ePerBtu * 1000000).toBeCloseTo(93.24);
   expect(FUELS["Natural Gas"].kgCO2ePerBtu * 1000000).toBeCloseTo(52.91);
