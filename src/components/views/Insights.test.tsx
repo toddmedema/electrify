@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import {
+  act,
   isInaccessible,
   render as renderUI,
   screen,
@@ -8,6 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import cloneDeep from "lodash.clonedeep";
 import * as React from "react";
+import { flushSync } from "react-dom";
 import { Provider } from "react-redux";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import * as GameModule from "../../reducers/Game";
@@ -45,6 +47,11 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+
+// Restore real timers even when a test that fakes them fails partway
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
   const game = createGame({ scenarioId: 106, seed: 4 });
@@ -114,7 +121,6 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
       insights.state,
     ),
   ).toBe(false);
-  jest.useRealTimers();
 });
 
 jest.mock("../base/ChartFinances", () => ({
@@ -828,6 +834,64 @@ describe("Insights layers", () => {
     expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
       "data-domain",
       zoomed!,
+    );
+  });
+
+  it("saves a month's viewport once while a lower-priority update is pending", async () => {
+    // React keeps derived state out of the update queue's base state while the component has
+    // pending work, so every synchronous render until that work lands derives the month's
+    // viewport again. Saving it back into props must not turn that into a render loop.
+    const game = createGame({ scenarioId: 100 });
+    const nextMonth = {
+      ...game,
+      date: {
+        ...game.date,
+        minute: game.date.minute + MINUTES_PER_MONTH,
+        monthsElapsed: game.date.monthsElapsed + 1,
+      },
+    };
+    const insights = React.createRef<Insights>();
+    const saves: { viewport: [number, number]; month: number }[] = [];
+    let setGame: (game: GameType) => void = () => undefined;
+    function Host() {
+      const [current, setCurrent] = React.useState(game);
+      const [saved, setSaved] = React.useState<(typeof saves)[number]>();
+      setGame = setCurrent;
+      return (
+        <Insights
+          ref={insights}
+          game={current}
+          savedViewport={saved}
+          selectedFacilityId={null}
+          facilityDragActive={false}
+          onDelta={() => undefined}
+          onViewportChange={(next) => {
+            saves.push(next);
+            setSaved(next);
+          }}
+        />
+      );
+    }
+    render(<Host />);
+    // Unpinned, so the month moves the viewport and it is saved once
+    await user.click(labelledButton("Zoom in"));
+    const zoomed = saves.at(-1)!;
+    saves.length = 0;
+
+    act(() => {
+      React.startTransition(() => insights.current!.forceUpdate());
+      flushSync(() => setGame(nextMonth));
+    });
+
+    expect(saves).toEqual([
+      {
+        viewport: zoomed.viewport.map((minute) => minute + MINUTES_PER_MONTH),
+        month: nextMonth.date.monthsElapsed,
+      },
+    ]);
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify(saves[0].viewport),
     );
   });
 

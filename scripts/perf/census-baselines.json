@@ -10,8 +10,8 @@
       "textMutations": 22
     },
     "rollover": {
-      "commits": 7,
-      "dispatches": 6,
+      "commits": 6,
+      "dispatches": 5,
       "mutationRecords": 26,
       "addedNodes": 0,
       "removedNodes": 0,
