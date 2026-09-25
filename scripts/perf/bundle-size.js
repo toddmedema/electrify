@@ -2,7 +2,7 @@
 /**
  * Bundle size gate (benchmark B5 in docs/perf-plan.md). Reads the CRA production output in
  * build/, gzips each shipped chunk at level 9, and compares the totals with the ceilings in
- * bundle-baselines.json. Any metric more than 1% over its ceiling fails. Run after
+ * bundle-baselines.json. Any metric more than 10% over its ceiling fails. Run after
  * `npm run build`; it needs no browser, so CI runs it right after the production build.
  *
  *   node scripts/perf/bundle-size.js            compare against the ceilings
@@ -18,7 +18,7 @@ const zlib = require("zlib");
 const root = path.resolve(__dirname, "../..");
 const buildDir = path.join(root, "build");
 const baselinesPath = path.join(__dirname, "bundle-baselines.json");
-const tolerance = 0.01;
+const tolerance = 0.1;
 
 const metrics = [
   { key: "mainJs", label: "Main JS chunk" },

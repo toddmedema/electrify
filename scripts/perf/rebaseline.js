@@ -3,7 +3,7 @@
  * Rewrites every performance ratchet in one visible diff: the golden output snapshot (B2), the
  * tick bench ratio ceilings (B1/B7) and, when a production build exists, the bundle size ceilings
  * (B5). The browser census (B3/B4) needs a dev server, so it is rebaselined separately with
- * PERF_UPDATE=1. See docs/perf-plan.md. Run it last, alongside compatibility:generate.
+ * PERF_UPDATE=1. See docs/perf-plan.md. Run it last.
  */
 const { spawnSync } = require("child_process");
 const fs = require("fs");
