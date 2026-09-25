@@ -91,7 +91,7 @@ store the hashes as a Jest snapshot. Numbers are rounded to 10 significant digit
 libm or V8 last-bit drift doesn't flake the gate while any real behavior change still does.
 Rebaseline with `npm run perf:rebaseline` (Jest `-u` on that suite); CI's `--ci` mode never writes
 snapshots, so a changed hash fails. The snapshot diff shows which scenarios moved, which also helps
-review balance work. Regenerate last, alongside `compatibility:generate`; never hand-edit.
+review balance work. Regenerate last; never hand-edit.
 
 ### B1: Tick cost bench (headline lab metric)
 
@@ -232,8 +232,8 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
 - **Tests before optimizations.** B2 plus the invariant suite run on every PR. A perf PR that
   changes behavior fails loudly.
 - **Manifest.** Perf work that touches `src/data`, `src/helpers`, `src/reducers`,
-  `src/Constants.tsx`, or `src/Types.tsx` regenerates `RunCompatibility.json` last. That invalidates
-  live challenge links, so batch such changes.
+  `src/Constants.tsx`, or `src/Types.tsx` changes the generated (git-ignored) `RunCompatibility.json`
+  hash. That invalidates live challenge links, so batch such changes.
 - **Determinism.** Seeded paths use only the `src/helpers/Math.tsx` seed helpers.
 - **No flaky ms gates.** CI gates only counts, bytes, hashes, and same-process ratios.
 - Visual regression is out of scope.
