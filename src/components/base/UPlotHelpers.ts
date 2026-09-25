@@ -457,6 +457,29 @@ export function verticalLinePlugin(
   };
 }
 
+/**
+ * Redraws the x axis line over the series. uPlot paints axes before series, so a filled series
+ * (the history wash) covers the half of the line that sits inside the plot.
+ */
+export function baselinePlugin(stroke: string): uPlot.Plugin {
+  return {
+    hooks: {
+      draw: (u: uPlot) => {
+        const width = Math.max(1, Math.round(uPlot.pxRatio));
+        const y = u.bbox.top + u.bbox.height + width / 2;
+        u.ctx.save();
+        u.ctx.strokeStyle = stroke;
+        u.ctx.lineWidth = width;
+        u.ctx.beginPath();
+        u.ctx.moveTo(u.bbox.left, y);
+        u.ctx.lineTo(u.bbox.left + u.bbox.width, y);
+        u.ctx.stroke();
+        u.ctx.restore();
+      },
+    },
+  };
+}
+
 /** Scenario-event onset markers shared by the stacked Insight charts. */
 export function eventMarkersPlugin(
   getMarkers: () => ChartEventMarker[],
