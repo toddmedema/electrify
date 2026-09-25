@@ -193,7 +193,7 @@ order is G3 first, then G2, then G1.
 3. **Shrink the rollover commit:** stable references and memoized chart props, measured with the
    B3/B4 month-boundary numbers.
 4. **Move the shared projection to a worker.** No longer an escalation: after step 1 it is still a
-   single long task of about 85 ms in the frame after the rollover, which drops that frame. Screen
+   single long task of about 85 ms (dev build, `longtask` observer) in the frame after the rollover, which drops that frame. Screen
    forecasts are pure functions of state, so this is safer than moving the reducer's own rollover.
 
 **G2: 120 Hz.**
@@ -255,9 +255,11 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
 - **Done: G3 thread 1** (UI-only, no manifest). Month-keyed forecasts are computed after paint
   (`components/base/AfterPaint`), with the previous value kept on screen. Insights and the runway
   warning share one deferred twenty-year projection (`DeferredProjection`). Ticks commit once per
-  dispatch (`connectToStore`). The BuildGenerators quote is memoized per game state. The rollover
-  task drops from about 110–120 ms to under 50 ms in the dev census. The projection still runs as
-  an 85 ms task one frame later.
+  dispatch (`connectToStore`). The BuildGenerators quote is memoized per game state. Measured
+  with a `longtask` PerformanceObserver during the census run (dev build), the rollover frame's
+  longest task drops from about 110–120 ms to under 50 ms; the projection still runs as an 85 ms
+  task one frame later. The census's `maxStepMs` includes both, because the fake clock runs the
+  deferred work inside the same step.
 - **Next: move the shared projection to a worker** (G3 step 4), the remaining rollover hitch.
 - **Then:** one manifest-regenerating release that bundles the Immer tax, the reducer-side rollover
   savings, the G2 rAF presentation loop, and the `TICK_MS.FAST` decision.
