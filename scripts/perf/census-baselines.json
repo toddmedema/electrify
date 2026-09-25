@@ -10,7 +10,7 @@
       "textMutations": 22
     },
     "rollover": {
-      "commits": 11,
+      "commits": 12,
       "dispatches": 6,
       "mutationRecords": 26,
       "addedNodes": 0,
@@ -39,7 +39,7 @@
       "textMutations": 10
     },
     "rollover": {
-      "commits": 14,
+      "commits": 15,
       "dispatches": 5,
       "mutationRecords": 11,
       "addedNodes": 0,
