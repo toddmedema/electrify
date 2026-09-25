@@ -222,6 +222,8 @@ describe("the shipped weather files", () => {
     "Barcelona",
     "CapeTown",
     "Chennai",
+    "Chittagong",
+    "Colombo",
     "Durban",
     "Seville",
     "Lisbon",

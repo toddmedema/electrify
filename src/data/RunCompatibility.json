@@ -1,6 +1,6 @@
 {
   "rulesRevision": 1,
-  "compatibilityId": "rules-1-399d312290be08dc9037b5af5e54a18eaf33f8495de18b7ba77567f08372d699",
+  "compatibilityId": "rules-1-c9933d8a36944cfe80a29b2dc383d2e0c05bef90326254c4104cf7aad9f07836",
   "dataIntegrity": {
     "/data/EconomyRaw.csv": "sha256-k/hCW/VGPtEOOUIkyEhvZuqTcSyJ03ojGTsD9p+SQt4=",
     "/data/FuelPricesRaw.csv": "sha256-rRMPMbjt+Z5nzNmbJlUlXZYQPO/IMXOONXng61jxiSc=",
@@ -56,8 +56,10 @@
     "/data/weather/Charlotte.bin": "sha256-ZSdZ7yqK6AKWFsIBD3ukTPrO9gOEJgjGxr68zGWYRto=",
     "/data/weather/Chennai.bin": "sha256-nSHmgRIzDT/Jip3QkLKJ6dEHVeE+EHuXxXDrSvqUfuo=",
     "/data/weather/Chicago.bin": "sha256-bij4Rr6IWfJdfBMUrb/XfpuY/Qwie1WB6+/HFrBP8zM=",
+    "/data/weather/Chittagong.bin": "sha256-Tm4l0yELxpLBsmEZuNTOzWLhzZafNQUKQTLMzDuMqeA=",
     "/data/weather/Cleveland.bin": "sha256-jb7SlQzhWtp1zTsxp+64MSrpbhQdguSE3jBQUul5jxg=",
     "/data/weather/Cologne.bin": "sha256-4nBLf2puQ+K87qi3QivnzIhhja35AmRRROgVm+4Y3nw=",
+    "/data/weather/Colombo.bin": "sha256-O2hauabGHVSd3uOrWkQGVm0QkDB3r2XAHwx1yrVTxPs=",
     "/data/weather/Columbus.bin": "sha256-kGe9ddaPe8Xq/fqO7cP19/Ieps5LTHSme/KPfel7RFA=",
     "/data/weather/Copenhagen.bin": "sha256-5Y5sdW6b2VzyhlhMNTSF5+xLUw8L6Q+Iwbs9xpRwCvU=",
     "/data/weather/Cordoba.bin": "sha256-GctD01NCnFPznCPBKUfBRL+mjjDAQ5cMxJ4hawJ//qY=",
@@ -68,6 +70,7 @@
     "/data/weather/Delhi.bin": "sha256-DAiYws7900ySDyuasGKlGDmerlisv+nFFu70jYcdxtU=",
     "/data/weather/Denver.bin": "sha256-9cyfosvG0tYKWM8pcFfoynpeOFNcKhnSO2m0mFoPQ+I=",
     "/data/weather/Detroit.bin": "sha256-RsGErS3zJvFK0J8eMu+MyYVwVPEOwhYP3NmE5mHM+Ds=",
+    "/data/weather/Dhaka.bin": "sha256-RKL3UIGP2QA/h1TWLy7nILzrU08eZO0a9skZp+Jblyk=",
     "/data/weather/Doha.bin": "sha256-HF5vsnOCJGhhMGujgvA9e7g1TPxb/tw+80LcXNeZzRk=",
     "/data/weather/Dubai.bin": "sha256-YiFLEu4wUgx9d6A3WNzdXdJmcOOwHcBZy5iZEtltlDM=",
     "/data/weather/Dublin.bin": "sha256-1daSxWeq2XL1jbi+GhKAQhGa6mmG6xC6oLp6oX5BvxI=",
@@ -106,6 +109,7 @@
     "/data/weather/Kano.bin": "sha256-yFCCk3qOw/EBQ4zBx2LVx12Lg+f7Zu/0NTNYgTUCzeM=",
     "/data/weather/KansasCity.bin": "sha256-81uG/OJTvyidUcCl8sXwVqc5Qgasiwgm3ycqKq73Xe0=",
     "/data/weather/Karachi.bin": "sha256-9JZbP6enm5MAziwEsLEuzKfNVbeq9JJbUo8Lt9oFZsA=",
+    "/data/weather/Kathmandu.bin": "sha256-SbKVYVm4xdLRV09sSEGaFQ0js0lJthoL5ewHO2zRHZk=",
     "/data/weather/Khartoum.bin": "sha256-wkziTMGZoepTNaNF5+xO+7DfGkAa0+7sewNB6Z7lW8Q=",
     "/data/weather/Kigali.bin": "sha256-tdgYe3PyClHDJISgNcf8OW6qqSqRej3UogVlucp/3d4=",
     "/data/weather/Kingston.bin": "sha256-+nHuEdKPLXh4SjqHYRvaBCmXO5N2tL6MGg1gBwjUEcE=",
@@ -226,6 +230,6 @@
     "/data/weather/Yerevan.bin": "sha256-V2kMSds9kEM8h4EanhXxLBPiYsOKlBrDUL4ICpBf3JQ=",
     "/data/weather/Zagreb.bin": "sha256-RcWhQyDMTtyTk3Ezumy6FYJd9qpM63iojyp45IylyKY=",
     "/data/weather/Zurich.bin": "sha256-rnEoc2y/aYpVtsBlm2rCku+RyXYX2QPsQbdhubn52s4=",
-    "/data/weather/index.json": "sha256-s7/09uYZ1yS2e18eaLhE4IHC4Y2cD52HRnOk4ZryGoY="
+    "/data/weather/index.json": "sha256-Nb300jaqGDEX0ZjARZ86IFrQDX+bEZqM7euhrdR3cU0="
   }
 }
