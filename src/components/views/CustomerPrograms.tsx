@@ -41,7 +41,10 @@ import {
 } from "../../helpers/Format";
 import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
-import { PolicyPreviewResult } from "../../helpers/PolicyPreview";
+import {
+  PolicyPreviewResult,
+  previewPolicy,
+} from "../../helpers/PolicyPreview";
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
@@ -114,31 +117,43 @@ function Decision({
     const timer = window.setTimeout(() => {
       try {
         worker = createPolicyPreviewWorker();
-        worker.onmessage = (event) => {
-          if (!cancelled) setPreview({ key, snapshot: game, ...event.data });
+        const change = {
+          id: selected,
+          tier,
+          month: effective,
+          ...(isOperatingPolicy(selected) ? { startHour } : {}),
         };
-        worker.onerror = (event: ErrorEvent) => {
-          // An unhandled worker error is re-raised on the window. The preview already shows its
-          // own failure, so the page must not also report it as an uncaught runtime error.
-          event.preventDefault();
-          if (!cancelled)
+        // The worker reloads its data over the network, which fails offline. The page already
+        // has that data loaded, so fall back to estimating here.
+        const estimateHere = () => {
+          if (cancelled) return;
+          try {
+            setPreview({
+              key,
+              snapshot: game,
+              result: previewPolicy(game, change, month),
+            });
+          } catch (_error) {
             setPreview({
               key,
               snapshot: game,
               error:
                 "Could not estimate this change. Reopen the program to retry.",
             });
+          }
         };
-        worker.postMessage({
-          game,
-          change: {
-            id: selected,
-            tier,
-            month: effective,
-            ...(isOperatingPolicy(selected) ? { startHour } : {}),
-          },
-          month,
-        });
+        worker.onmessage = (event) => {
+          if (event.data?.error) estimateHere();
+          else if (!cancelled)
+            setPreview({ key, snapshot: game, ...event.data });
+        };
+        worker.onerror = (event: ErrorEvent) => {
+          // An unhandled worker error is re-raised on the window. The preview falls back to
+          // the page itself, so it must not also be reported as an uncaught runtime error.
+          event.preventDefault();
+          estimateHere();
+        };
+        worker.postMessage({ game, change, month });
       } catch (_error) {
         setPreview({
           key,
