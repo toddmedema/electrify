@@ -401,9 +401,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
               alt={`${scenario.name} icon`}
             />
             <div className="scenarioDossierCopy">
-              <Typography variant="overline" component="div">
-                {location.name} · {scenario.startingYear}-{endYear}
-              </Typography>
               <Typography
                 id="scenario-title"
                 variant="h6"
@@ -411,6 +408,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 sx={{ fontWeight: 800, lineHeight: 1.2 }}
               >
                 {scenario.name}
+              </Typography>
+              <Typography variant="overline" component="div">
+                {location.name} · {scenario.startingYear}-{endYear}
               </Typography>
               <Typography variant="body1" color="textSecondary">
                 {briefing.fantasy}

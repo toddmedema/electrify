@@ -44,6 +44,13 @@ const QUEBEC: ImportEmissionsAssumption = {
   emissionsSource:
     "https://www.cer-rec.gc.ca/en/data-analysis/energy-markets/province-territory-energy-profiles/quebec.html",
 };
+const HIMALAYAN_HYDRO: ImportEmissionsAssumption = {
+  label: "Nepal and Bhutan",
+  emissionsKgco2ePerMWh: 10,
+  emissionsBasis:
+    "Rounded hydro-dominated grid proxy for Nepal and Bhutan; not an hourly or historical mix",
+  emissionsSource: "https://ember-energy.org/countries-and-regions/nepal/",
+};
 
 const MARKET_ASSUMPTIONS: Readonly<Record<string, ImportEmissionsAssumption>> =
   {
@@ -56,6 +63,7 @@ const MARKET_ASSUMPTIONS: Readonly<Record<string, ImportEmissionsAssumption>> =
     "geo-london-continental-core": EUROPE,
     "geo-dublin-continental-core": EUROPE,
     "geo-paris-continental-core": EUROPE,
+    "geo-delhi-himalayan-hydro-market": HIMALAYAN_HYDRO,
   };
 
 /**
@@ -64,7 +72,7 @@ const MARKET_ASSUMPTIONS: Readonly<Record<string, ImportEmissionsAssumption>> =
  * rather than repeated on each card.
  */
 export const IMPORT_EMISSIONS_ASSUMPTIONS: readonly ImportEmissionsAssumption[] =
-  [WASHINGTON, CALIFORNIA, QUEBEC, EUROPE, WORLD];
+  [WASHINGTON, CALIFORNIA, QUEBEC, HIMALAYAN_HYDRO, EUROPE, WORLD];
 
 export function importEmissionsAssumption(
   marketId: string,

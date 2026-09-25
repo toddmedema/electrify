@@ -289,8 +289,13 @@ interface NewGameAction {
 
 let previousTickMs = 0;
 let accumulatedTickMs = 0;
-const MAX_PRESENTATION_FPS = 60;
-const MIN_PRESENTATION_INTERVAL_MS = 1000 / MAX_PRESENTATION_FPS;
+// Only for environments without requestAnimationFrame; a browser presents at its display rate.
+const MIN_PRESENTATION_INTERVAL_MS = 1000 / 60;
+// A frame whose accumulated time is within this fraction of a step of a whole number of steps
+// runs that whole number. Display timestamps jitter by a fraction of a millisecond, and without
+// the snap a step that divides the frame evenly would still run 0, 2, 1, 1, 0, 2... ticks a frame.
+// The remainder carries (briefly negative), so the long-run rate stays exact.
+const TICK_SNAP = 0.25;
 // Only for restoring speed after a blocking dialog (bankrupt/fired/win) closes -- NOT used to
 // decide whether the tick loop needs restarting, since state.speed can change without going
 // through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
@@ -299,6 +304,9 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
+// The construction catalogs show the speed control, so the player may change speed while one is
+// open. Every other blocking card keeps the clock frozen until it closes.
+let blockingCardAllowsSpeed = false;
 let speedBeforeManualHelp: SpeedType | undefined;
 // While hidden, pause owners read and update this foreground speed; the real clock stays
 // paused even if a dialog or card opens or closes before the page returns.
@@ -1364,11 +1372,42 @@ function ensureTicking(state: GameType) {
     tickLoopRunning = true;
     previousTickMs = performance.now();
     accumulatedTickMs = 0;
-    setTimeout(
-      () => getStore().dispatch(gameSlice.actions.tick()),
-      Math.max(TICK_MS[state.speed], MIN_PRESENTATION_INTERVAL_MS),
-    );
+    scheduleTick(state.speed);
   }
+}
+
+function dispatchTick() {
+  getStore().dispatch(gameSlice.actions.tick());
+}
+
+// Presents on display frames, so a step that divides the frame evenly lands the same number of
+// ticks on every frame at 60 or 120 Hz. Frames that are not yet owed a tick skip the dispatch
+// entirely, which keeps SLOW from committing an empty update to React on every frame.
+function scheduleTick(speed: SpeedType) {
+  if (typeof requestAnimationFrame !== "function") {
+    setTimeout(
+      dispatchTick,
+      Math.max(TICK_MS[speed], MIN_PRESENTATION_INTERVAL_MS),
+    );
+    return;
+  }
+  const onFrame = () => {
+    const game = getStore().getState().game;
+    const stepMs = TICK_MS[game.speed];
+    const owedMs =
+      accumulatedTickMs + Math.max(0, performance.now() - previousTickMs);
+    // A stopped or paused clock still dispatches once, so the reducer can end the loop
+    if (
+      !game.inGame ||
+      game.speed === "PAUSED" ||
+      owedMs + stepMs * TICK_SNAP >= stepMs
+    ) {
+      dispatchTick();
+    } else {
+      requestAnimationFrame(onFrame);
+    }
+  };
+  requestAnimationFrame(onFrame);
 }
 
 // Backgrounding is an outer pause: UI transitions still update the speed to restore,
@@ -1390,8 +1429,13 @@ function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  setForegroundSpeed(state, speedBeforeBlockingCard);
+  // Only put the old speed back if the clock is still paused; a speed picked while the card was
+  // open is the player's newer choice
+  if (foregroundSpeed(state) === "PAUSED") {
+    setForegroundSpeed(state, speedBeforeBlockingCard);
+  }
   speedBeforeBlockingCard = undefined;
+  blockingCardAllowsSpeed = false;
   ensureTicking(state);
 }
 
@@ -1408,14 +1452,17 @@ export const gameSlice = createSlice({
 
       // Accumulate wall time before doing any simulation work. The old loop reset its timestamp
       // inside every iteration, losing both reducer time and the fractional remainder. That made
-      // the clock run slower precisely when a frame was expensive. FAST also dispatched at
-      // 100Hz; batching its 10ms simulation steps behind a 60Hz presentation ceiling preserves
-      // every deterministic tick while giving React at most one update per display frame.
+      // the clock run slower precisely when a frame was expensive. Batching every step owed
+      // since the last frame preserves each deterministic tick while giving React at most one
+      // update per display frame.
       const nowMs = performance.now();
       accumulatedTickMs += Math.max(0, nowMs - previousTickMs);
       previousTickMs = nowMs;
       const simulationStepMs = TICK_MS[state.speed];
-      while (accumulatedTickMs >= simulationStepMs) {
+      while (
+        accumulatedTickMs + simulationStepMs * TICK_SNAP >=
+        simulationStepMs
+      ) {
         tickState(state);
         accumulatedTickMs -= simulationStepMs;
         if (!state.inGame || (state.speed as SpeedType) === "PAUSED") {
@@ -1424,10 +1471,7 @@ export const gameSlice = createSlice({
         }
       }
 
-      setTimeout(
-        () => getStore().dispatch(gameSlice.actions.tick()),
-        Math.max(simulationStepMs, MIN_PRESENTATION_INTERVAL_MS),
-      );
+      scheduleTick(state.speed);
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
       // Assigned onto the draft rather than spread into a new object, which is equivalent for a
@@ -1768,7 +1812,7 @@ export const gameSlice = createSlice({
       // instructions frozen until the player actually closes the card. A backgrounded page
       // freezes the same way: pageVisible is the caller that resumes it.
       if (
-        (speedBeforeBlockingCard !== undefined ||
+        ((speedBeforeBlockingCard !== undefined && !blockingCardAllowsSpeed) ||
           speedBeforeManualHelp !== undefined ||
           speedBeforeHidden !== undefined) &&
         action.payload !== "PAUSED"
@@ -1918,6 +1962,7 @@ export const gameSlice = createSlice({
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
+        blockingCardAllowsSpeed = name.startsWith("BUILD_");
         speedBeforeBlockingCard =
           state.policyPause?.speed ?? foregroundSpeed(state);
         delete state.policyPause;

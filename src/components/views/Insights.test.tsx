@@ -791,9 +791,7 @@ describe("Insights layers", () => {
     const note = screen.getByRole("note", {
       name: /^Forecast shortfall for 2020–31:/,
     });
-    expect(note).toHaveTextContent(
-      /^Forecast shortfall, 2020–31: ~.+ unmet · peak ~/,
-    );
+    expect(note).toHaveTextContent(/^Shortfall, 2020–31:\s*~.+ unmet · peak ~/);
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));

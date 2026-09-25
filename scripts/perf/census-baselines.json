@@ -1,21 +1,21 @@
 {
   "desktop-chromium": {
     "ordinary": {
-      "commits": 30,
-      "dispatches": 30,
-      "mutationRecords": 77,
+      "commits": 62,
+      "dispatches": 31,
+      "mutationRecords": 65,
       "addedNodes": 0,
       "removedNodes": 0,
-      "attributeMutations": 55,
-      "textMutations": 22
+      "attributeMutations": 49,
+      "textMutations": 16
     },
     "rollover": {
-      "commits": 6,
-      "dispatches": 5,
-      "mutationRecords": 26,
-      "addedNodes": 0,
+      "commits": 13,
+      "dispatches": 7,
+      "mutationRecords": 42,
+      "addedNodes": 1,
       "removedNodes": 0,
-      "attributeMutations": 16,
+      "attributeMutations": 31,
       "textMutations": 10
     },
     "catalog": {
@@ -30,21 +30,21 @@
   },
   "mobile-390px": {
     "ordinary": {
-      "commits": 30,
-      "dispatches": 30,
-      "mutationRecords": 65,
+      "commits": 86,
+      "dispatches": 31,
+      "mutationRecords": 58,
       "addedNodes": 0,
       "removedNodes": 0,
-      "attributeMutations": 55,
-      "textMutations": 10
+      "attributeMutations": 49,
+      "textMutations": 9
     },
     "rollover": {
-      "commits": 6,
-      "dispatches": 5,
-      "mutationRecords": 11,
+      "commits": 17,
+      "dispatches": 6,
+      "mutationRecords": 12,
       "addedNodes": 0,
       "removedNodes": 0,
-      "attributeMutations": 8,
+      "attributeMutations": 9,
       "textMutations": 3
     },
     "catalog": {

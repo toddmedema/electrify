@@ -1769,33 +1769,6 @@ export default class Insights extends React.Component<Props, State> {
             domain={projection.domain.x}
             syncKey={SYNC_KEY}
           />
-          {id === "emissions" &&
-            ((game.monthlyHistory[0]?.importedKgco2e || 0) > 0 ||
-              (game.monthlyHistory[0]?.constructionKgco2e || 0) > 0) && (
-              <Typography variant="caption" color="textSecondary" component="p">
-                Last month:{" "}
-                {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local
-                {(game.monthlyHistory[0]?.importedKgco2e || 0) > 0 && (
-                  <>
-                    {" + "}
-                    {finance.format(
-                      game.monthlyHistory[0]?.importedKgco2e || 0,
-                    )}{" "}
-                    imported
-                  </>
-                )}
-                {(game.monthlyHistory[0]?.constructionKgco2e || 0) > 0 && (
-                  <>
-                    {" + "}
-                    {finance.format(
-                      game.monthlyHistory[0]?.constructionKgco2e || 0,
-                    )}{" "}
-                    building
-                  </>
-                )}{" "}
-                ({largeMassUnit(this.context as UnitSystemType)} CO2e)
-              </Typography>
-            )}
         </>
       );
     } else {
@@ -1850,11 +1823,9 @@ export default class Insights extends React.Component<Props, State> {
                 >
                   <WarningAmberIcon fontSize="small" aria-hidden="true" />
                   <span>
-                    <strong>
-                      Forecast shortfall, {projection.shortfall.label}:
-                    </strong>{" "}
-                    ~{formatWattHours(projection.shortfall.wh)} unmet · peak ~
-                    {formatWatts(projection.shortfall.peakW)}
+                    <strong>Shortfall, {projection.shortfall.label}:</strong>
+                    <br />~{formatWattHours(projection.shortfall.wh)} unmet ·
+                    peak ~{formatWatts(projection.shortfall.peakW)}
                   </span>
                 </Typography>
               )}

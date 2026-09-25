@@ -253,10 +253,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         >
           {breakdownSummary}
         </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          Points reflect the scenario's priorities. Compare reliability, cost,
-          and emissions separately when deciding what worked.
-        </Typography>
         {comparison && (
           <Typography role="status" sx={{ mt: 2 }}>
             {comparison}{" "}

@@ -31,7 +31,11 @@ import {
   estimatedAnnualVariableOperatingCost,
   getMonthlyPayment,
 } from "../../helpers/Financials";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  floorToTwoSignificantDigits,
+  formatMoneyConcise,
+  formatWatts,
+} from "../../helpers/Format";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
@@ -197,6 +201,7 @@ function GeneratorDetailRow(props: {
 interface GeneratorBuildItemProps {
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onUseSiteMaximum?: (peakW: number) => void;
+  onUseMaxSize?: (peakW: number) => void;
   cash: number;
   date: DateType;
   interestRate: number;
@@ -234,7 +239,6 @@ export function GeneratorBuildItem(
   );
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [financingExpanded, setFinancingExpanded] = React.useState(false);
   const resilienceOptions = props.resilienceOptions ?? [];
   const hasOptions = resilienceOptions.length > 0 && !!props.withResilience;
   const defaultSelection = (): ResilienceSelectionType =>
@@ -243,7 +247,6 @@ export function GeneratorBuildItem(
     );
   const [resilienceSelection, setResilienceSelection] =
     React.useState<ResilienceSelectionType>(defaultSelection);
-  const financingTermsId = React.useId();
   const purchaseSubmitted = React.useRef(false);
   // A default hardening option is only a default: the card stays buyable whenever the plant
   // without it is affordable, and the dialog lets the player clear it
@@ -252,13 +255,15 @@ export function GeneratorBuildItem(
   const downpayment = DOWNPAYMENT_PERCENT * cheapestQuote.buildCost;
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
+  const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
   const { buildable, secondaryText } = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
     name: generator.name,
     description: generator.description,
     available: generator.available,
     sizeBuildable,
-    maxSizeLabel: formatWatts(generator.maxPeakW),
+    maxSizeLabel: formatWatts(maxSizeW),
+    onUseMaxSize: () => props.onUseMaxSize?.(maxSizeW),
     location: props.location,
     viableLocationsRemaining: generator.viableLocationsRemaining,
   });
@@ -309,7 +314,6 @@ export function GeneratorBuildItem(
   const toggleOpen = (e: React.SyntheticEvent) => {
     if (!open) {
       purchaseSubmitted.current = false;
-      setFinancingExpanded(false);
       setResilienceSelection(defaultSelection());
     }
     setOpen(!open);
@@ -417,6 +421,37 @@ export function GeneratorBuildItem(
       Use site maximum
     </Button>
   );
+
+  // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
+  if (props.hydroAvailability?.remaining.length === 0) {
+    return (
+      <Card className="build-list-item buildOption">
+        <CardHeader
+          avatar={
+            <Avatar
+              alt={generator.name}
+              src={`/images/${generator.name.toLowerCase()}.svg`}
+            />
+          }
+          action={
+            <Button
+              className="buy-button"
+              size="small"
+              variant="outlined"
+              color="primary"
+              disabled
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+              aria-label={`Review purchase of ${generator.name}`}
+            >
+              Review
+            </Button>
+          }
+          title={generator.name}
+          subheader="No remaining buildable locations"
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -754,20 +789,21 @@ export function GeneratorBuildItem(
               {
                 concept: "finances",
                 label: "Loan option",
-                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo`,
+                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
                 detail: "Payments start now.",
               },
               {
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
-                detail: "Plus fuel and loan payments.",
+                detail: fuelPrices[generator.fuel]
+                  ? "Plus fuel and loan payments."
+                  : "Plus loan payments.",
               },
               {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail: "No output until built.",
               },
               {
                 concept: "supply",
@@ -806,59 +842,6 @@ export function GeneratorBuildItem(
               },
             ]}
           />
-          <Button
-            color="primary"
-            size="small"
-            fullWidth
-            aria-expanded={financingExpanded}
-            aria-controls={financingTermsId}
-            endIcon={
-              financingExpanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
-            }
-            onClick={() => setFinancingExpanded((value) => !value)}
-          >
-            {financingExpanded
-              ? "Hide financing terms"
-              : "Show financing terms"}
-          </Button>
-          <Collapse in={financingExpanded} timeout="auto" unmountOnExit>
-            <TableContainer id={financingTermsId}>
-              <Table size="small" aria-label="Financing terms">
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Downpayment</TableCell>
-                    <TableCell align="right">
-                      {formatMoneyConcise(quoteDownpayment)}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      Interest rate
-                      <ManualLink
-                        entry={MANUAL_ENTRY.INTEREST_RATES}
-                        label="interest rate"
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      {(props.interestRate * 100).toFixed(2)}%
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Monthly payments</TableCell>
-                    <TableCell align="right">
-                      {formatMoneyConcise(quoteMonthlyPayment)}/mo
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Loan duration</TableCell>
-                    <TableCell align="right">
-                      Construction + {LOAN_MONTHS / 12} years
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Collapse>
         </DialogContent>
         <DialogActions>
           <Button
@@ -1056,7 +1039,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
-  const [exactHydroW, setExactHydroW] = React.useState<number>();
+  // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
+  const [exactSizes, setExactSizes] = React.useState<Record<string, number>>(
+    {},
+  );
   const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
   const [comparedNames, setComparedNames] = React.useState<string[]>([]);
   const [primerVisible, dismissPrimer] = useHydroPrimer();
@@ -1075,7 +1061,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   } = getBuildForecast(game, now);
   const hydroAvailability = getHydroAvailability(
     game,
-    exactHydroW ?? getW(sliderTick),
+    exactSizes.Hydro ?? getW(sliderTick),
   );
   const generators = GENERATORS(
     game,
@@ -1086,15 +1072,15 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     airborneWindSpeeds,
   )
     .map((generator) =>
-      generator.name === "Hydro" && exactHydroW !== undefined
+      exactSizes[generator.name] !== undefined
         ? GENERATORS(
             game,
-            exactHydroW,
+            exactSizes[generator.name],
             windSpeeds,
             solarIrradiances,
             offshoreWindSpeeds,
             airborneWindSpeeds,
-          ).find((candidate) => candidate.name === "Hydro") || generator
+          ).find((candidate) => candidate.name === generator.name) || generator
         : generator,
     )
     .filter(
@@ -1104,6 +1090,14 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     )
     .sort((a, b) => {
+      // Hydro with no sites left always sinks to the bottom
+      const spentA =
+        a.name === "Hydro" && hydroAvailability.remaining.length === 0;
+      const spentB =
+        b.name === "Hydro" && hydroAvailability.remaining.length === 0;
+      if (spentA !== spentB) {
+        return spentA ? 1 : -1;
+      }
       if (props.focusFuel && a.fuel !== b.fuel) {
         if (a.fuel === props.focusFuel) {
           return -1;
@@ -1191,7 +1185,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         onClose={onBack}
         onSliderChange={(value) => {
           setSliderTick(value);
-          setExactHydroW(undefined);
+          setExactSizes({});
         }}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />
@@ -1220,8 +1214,11 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 }
                 onUseSiteMaximum={(peakW) => {
                   setSliderTick(getTickFromW(peakW));
-                  setExactHydroW(peakW);
+                  setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
                 }}
+                onUseMaxSize={(peakW) =>
+                  setExactSizes((sizes) => ({ ...sizes, [g.name]: peakW }))
+                }
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

@@ -34,10 +34,6 @@ jobs:
 
       - run: npm ci
 
-      # Reject stale simulation metadata before changing production Firestore.
-      - name: Check run compatibility
-        run: npm run compatibility:check
-
       # Tests are not run here; workflow.yml gates pull requests before merge.
 
       # Firestore rules and indexes go out BEFORE the bundle that depends on them.

@@ -66,7 +66,7 @@ it("submits a storage purchase only once on a double-click", () => {
   expect(onBuildStorage).toHaveBeenCalledTimes(1);
 });
 
-it("deduplicates storage purchase impact and discloses financing terms", async () => {
+it("deduplicates storage purchase impact and shows loan terms inline", async () => {
   render(
     <BuildStorage
       game={game()}
@@ -81,7 +81,9 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
-  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent(
+    /Loan option.*now \+.*\/mo \(\d+\.\d+% for 30 years\)/,
+  );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).not.toHaveTextContent("Loan:");
@@ -91,25 +93,8 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     screen.queryByRole("table", { name: "Financing terms" }),
   ).not.toBeInTheDocument();
 
-  const toggle = screen.getByRole("button", { name: "Show financing terms" });
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  fireEvent.click(toggle);
-
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  const terms = screen.getByRole("table", { name: "Financing terms" });
-  expect(terms).toHaveTextContent("Downpayment");
-  expect(terms).toHaveTextContent("Interest rate");
-  expect(terms).toHaveTextContent("Monthly payments");
-  expect(terms).toHaveTextContent("Loan duration");
-
   fireEvent.click(
     within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(
-    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
-  );
-  expect(
-    screen.getByRole("button", { name: "Show financing terms" }),
-  ).toHaveAttribute("aria-expanded", "false");
 });

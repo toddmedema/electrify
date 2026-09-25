@@ -18,7 +18,9 @@ import {
   summarizeHistory,
 } from "../../helpers/DateTime";
 import { computeScoreBreakdown, totalScore } from "../../helpers/Scoring";
-import VictoryConditions from "./VictoryConditions";
+import { scoreRules } from "./VictoryConditions";
+import { useUnits } from "./UnitsContext";
+import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore, SCORE_LABELS } from "./VictoryDialog";
 import { getMissionStatus } from "../../helpers/MissionStatus";
@@ -46,6 +48,7 @@ function statusLabel(status: MissionRequirement["status"]): string {
 /** An in-game reminder of the mission and its score through completed months. */
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
+  const units = useUnits();
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) {
     return <Dialog open={false} />;
@@ -58,6 +61,11 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
       ? deriveExpandedSummary(summarizeHistory(history))
       : null;
   const breakdown = summary ? computeScoreBreakdown(scenario, summary) : null;
+  const rules = scoreRules(
+    scenario.ownership,
+    scenario.dollarsPerkWh,
+    formatLargeMassApprox(KG_PER_MEGATONNE, units),
+  );
   const facts = [
     {
       label: "Timeframe",
@@ -108,19 +116,6 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
           >
             Scenario details
           </Typography>
-          <DialogTitle
-            id="scenario-details-title"
-            sx={{
-              "&&": { p: 0 },
-              mt: 0.5,
-              fontSize: { xs: 24, sm: 28 },
-              fontWeight: 700,
-              lineHeight: 1.2,
-              overflowWrap: "anywhere",
-            }}
-          >
-            {scenario.name}
-          </DialogTitle>
         </Box>
         <IconButton
           aria-label="Close scenario details"
@@ -135,6 +130,19 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
         </IconButton>
       </Box>
       <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
+        <DialogTitle
+          id="scenario-details-title"
+          sx={{
+            "&&": { p: 0 },
+            mb: 2,
+            fontSize: { xs: 24, sm: 28 },
+            fontWeight: 700,
+            lineHeight: 1.2,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {scenario.name}
+        </DialogTitle>
         <Box
           component="dl"
           sx={{
@@ -190,8 +198,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             </Typography>
             {scenario.id === 3 && <CustomerGrowthChallenge />}
             <Typography variant="body2">
-              {mission.monthsRemaining} simulation months remaining.{" "}
-              {mission.finalNote}
+              {mission.monthsRemaining} months remaining. {mission.finalNote}
             </Typography>
             <Box component="dl" className="missionRequirements">
               {mission.requirements.map((requirement) => (
@@ -214,30 +221,6 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                   </Typography>
                 </React.Fragment>
               ))}
-            </Box>
-            <Box
-              sx={{
-                typography: "body2",
-                "& p": {
-                  my: 0,
-                  py: 1.5,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                },
-                "& p:last-child": { borderBottom: 0, pb: 0 },
-              }}
-            >
-              <VictoryConditions
-                ownership={scenario.ownership}
-                dollarsPerkWh={scenario.dollarsPerkWh}
-                startingCustomers={scenario.startingCustomers}
-                minimumCustomerRetention={scenario.minimumCustomerRetention}
-                reliabilityObjective={scenario.reliabilityObjective}
-                difficulty={game.difficulty}
-                meaningfulDecisions={game.meaningfulDecisions}
-                meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
-                scoringOnly
-              />
             </Box>
           </Box>
           <Box
@@ -275,9 +258,6 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                     points
                   </Box>
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Through last month
-                </Typography>
                 <Box component="dl" sx={{ m: 0, mt: 2 }}>
                   {Object.entries(breakdown).map(([category, score]) => (
                     <Box
@@ -293,13 +273,27 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                         typography: "body2",
                       }}
                     >
-                      <Box
-                        component="dt"
-                        sx={{
-                          "&::first-letter": { textTransform: "uppercase" },
-                        }}
-                      >
-                        {SCORE_LABELS[category] || category}
+                      <Box>
+                        <Box
+                          component="dt"
+                          sx={{
+                            "&::first-letter": { textTransform: "uppercase" },
+                          }}
+                        >
+                          {SCORE_LABELS[category] || category}
+                        </Box>
+                        {rules[category] && (
+                          <Box
+                            component="dd"
+                            sx={{
+                              m: 0,
+                              color: "text.secondary",
+                              typography: "caption",
+                            }}
+                          >
+                            {rules[category]}
+                          </Box>
+                        )}
                       </Box>
                       <Box
                         component="dd"

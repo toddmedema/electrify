@@ -42,4 +42,18 @@ describe("MainMenu", () => {
       { gap: "12px" },
     );
   });
+
+  it("links to Discord first in the footer", () => {
+    render(<MainMenu {...props()} />);
+
+    const discord = screen.getByRole("link", {
+      name: "Join the Electrify Discord",
+    });
+    expect(discord).toHaveAttribute("href", "https://discord.gg/Chrjk36DC");
+    expect(
+      screen.getAllByRole("link", {
+        name: /Discord|feedback|About|Privacy/,
+      })[0],
+    ).toBe(discord);
+  });
 });

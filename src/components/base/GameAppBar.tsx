@@ -15,7 +15,7 @@ import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import { isBigScreen, openWindow } from "../../Globals";
+import { isBigScreen, isDesktopScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import {
@@ -68,6 +68,7 @@ export interface Props extends StateProps, DispatchProps {}
 interface SpeedOptionsProps {
   speed: SpeedType;
   onSpeedChange: (speed: SpeedType) => void;
+  desktop: boolean;
 }
 
 /**
@@ -77,6 +78,9 @@ interface SpeedOptionsProps {
  * they are picking rather than inferring it from the number of chevrons on an icon.
  */
 const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
+// Only where there's room for a fifth control and, typically, a display fast enough to show it:
+// at 24x a phone spends most of each frame simulating rather than drawing.
+const DESKTOP_SPEEDS: SpeedType[] = [...RUNNING_SPEEDS, "ULTRA"];
 
 function speedMultiplier(speed: SpeedType): string {
   return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
@@ -149,13 +153,15 @@ const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
   SLOW: "slow speed",
   NORMAL: "normal speed",
   FAST: "fast speed",
+  ULTRA: "ultra speed",
 };
 
 // Pulled out of the component so it can be memoised on the handful of things it actually
 // depends on, rather than rebuilt on every tick along with the cash readout beside it
-function buildSpeedOptions({
+export function buildSpeedOptions({
   speed,
   onSpeedChange,
+  desktop,
 }: SpeedOptionsProps): React.JSX.Element {
   // Keep every speed one tap away at every viewport width. The selected treatment says where
   // the clock is now without turning the current speed into a misleading disabled control.
@@ -177,7 +183,7 @@ function buildSpeedOptions({
       <ToggleButton value="PAUSED" aria-label={SPEED_ARIA_LABELS.PAUSED}>
         <PauseIcon fontSize="small" />
       </ToggleButton>
-      {RUNNING_SPEEDS.map((s: SpeedType) => (
+      {(desktop ? DESKTOP_SPEEDS : RUNNING_SPEEDS).map((s: SpeedType) => (
         <ToggleButton key={s} value={s} aria-label={SPEED_ARIA_LABELS[s]}>
           {speedMultiplier(s)}
         </ToggleButton>
@@ -233,15 +239,25 @@ export function GameAppBar(props: Props) {
    * built once per actual change and handed back as the same elements. React then skips them
    * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
+  const desktop = isDesktopScreen();
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
         speed,
         onSpeedChange,
+        desktop,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [speed, onSpeedChange],
+    [speed, onSpeedChange, desktop],
   );
+  // A window narrowed below desktop width loses the ULTRA button, so it can't stay the selected
+  // speed. Re-checked whenever the speed changes too: a card that paused the clock can restore
+  // ULTRA after the window has already shrunk.
+  React.useEffect(() => {
+    if (speed === "ULTRA" && !desktop) {
+      onSpeedChange("FAST");
+    }
+  }, [speed, desktop, onSpeedChange]);
 
   const menu = React.useMemo(
     () => (

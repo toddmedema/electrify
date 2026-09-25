@@ -8,11 +8,11 @@ files are large, so broad rewrites create expensive review diffs.
 
 - Use Node 24 and install exactly the lockfile with `npm ci`.
 - Run `npm run check` before handing work off (about a minute). It runs the same gates as CI:
-  run compatibility, types (including `e2e/`), lint, formatting, the covered Jest suite, and every
-  scenario through the headless simulation. It reports every failing step at once, prints only
+  types (including `e2e/`), lint, formatting, the covered Jest suite, and every scenario through
+  the headless simulation. It reports every failing step at once, prints only
   failing output, and ends with a one-line-per-step summary and fix commands.
-- `npm run fix` applies every mechanical fix: regenerates the run compatibility manifest, then
-  runs `lint:fix` and `format`. Review its diff; it does not fix types or tests.
+- `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
+  does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
   interactive watch mode and never exits in a non-interactive shell. Coverage thresholds apply
   only to `test:ci`.
@@ -29,14 +29,12 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Run compatibility manifest
 
-`src/data/RunCompatibility.json` is a generated hash of every simulation input: everything under
-`src/data`, `src/helpers`, and `src/reducers` except tests, plus `src/Constants.tsx`,
-`src/Types.tsx`, `package-lock.json`, and `public/data`. Any edit to those files makes
-`compatibility:check`, and therefore `check` and `build`, fail until you run
-`npm run compatibility:generate` and commit the result. Regenerate it last, after all other edits
-and after any merge or rebase; never hand-merge it. Git keeps one side of a conflicted manifest
-whole (see `.gitattributes`), so resolve the other files and regenerate. See
-`docs/run-compatibility.md` for why the hash is intentionally broad.
+`src/data/RunCompatibility.json` is a generated, git-ignored hash of every simulation input:
+everything under `src/data`, `src/helpers`, and `src/reducers` except tests, plus
+`src/Constants.tsx`, `src/Types.tsx`, `package-lock.json`, and `public/data`. The npm pre-hooks of
+`start`, `build`, `test*`, `sim`, and `typecheck` regenerate it automatically, so never commit or
+merge it. Run `npm run compatibility:generate` by hand only if your editor complains that the file
+is missing. See `docs/run-compatibility.md` for why the hash is intentionally broad.
 
 ## Claude Code
 

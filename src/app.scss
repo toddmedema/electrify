@@ -25,20 +25,20 @@
      a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
      Nothing that dark can sit under the row's label, which is why the hatch is confined to a
      band below the text rather than painted across the whole fill. */
-  --flow-hatch: rgba(21, 101, 192, 0.8);
+  --flow-hatch: rgba(0, 132, 248, 0.8);
   --border-strong: #bdbdbd; /* grey400 */
   --border-tile: #e0e0e0; /* grey300 */
   --font-color-primary: #000000;
   --font-color-faded: #666666;
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-contrast: #f5f5f5;
-  --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
+  --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
   --spark-baseline: #90a4ae; /* blueGray300 */
   --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
-  --interactive-tint: rgba(21, 101, 192, 0.5);
+  --interactive-tint: rgba(0, 132, 248, 0.5);
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
@@ -84,12 +84,12 @@
   --font-color-faded: #9aa9ba;
   --font-color-disabled: #627083;
   --interactive-contrast: #0a0a0a;
-  --interactive-blue: #6ab8f7;
+  --interactive-blue: #0084f8; /* the logo blue - 5.1:1 on --bg-primary */
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
   --spark-marker-fill: #111820;
-  --interactive-tint: rgba(106, 184, 247, 0.42);
+  --interactive-tint: rgba(0, 132, 248, 0.42);
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 34%, white);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
@@ -105,7 +105,7 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
-  --cursor-line: rgba(106, 184, 247, 0.55);
+  --cursor-line: rgba(0, 132, 248, 0.55);
   --chart-surface: #0f161f;
   --chart-edge: rgba(148, 163, 184, 0.16);
   --chart-shadow: rgba(0, 0, 0, 0.28);
@@ -546,29 +546,8 @@ $topbar_height: 56px;
 
 .constructionCash {
   flex: 0 0 auto;
-  margin-left: auto;
   font-size: 0.875rem;
   white-space: nowrap;
-}
-
-// The build screen has no game bar, so the paused clock it opened with gets the same blue as
-// the selected speed toggle, and the word says it too: color is never the only signal
-.pausedChip {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: $space-1;
-  padding: 1px $space-2;
-  color: var(--interactive-blue);
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1.4;
-  white-space: nowrap;
-
-  > span {
-    display: flex;
-    align-items: center;
-  }
 }
 
 .constructionTitleBar #close-button {
@@ -2689,12 +2668,61 @@ html[data-theme="dark"] .uplot {
       stroke-dasharray: 16 100;
       stroke-dashoffset: 16;
       opacity: 0;
-      animation: homeEnergySweep calc(10s / 1.4) ease-in-out infinite;
+      animation: homeEnergySweep calc(10s / 1.4) ease-in-out 1.5s infinite;
+    }
+
+    .homeEnergyTrace {
+      overflow: visible;
+    }
+
+    // Stands in for the two smoke circles removed from logo-home.svg. Drift, rise, and growth
+    // each run as one unbroken segment on their own element, so the puff never pauses; their
+    // easings are fitted so the path passes through the original small and then large circle.
+    // The two puffs are half a cycle apart, so one or two are visible at a time.
+    $homeSmokeCycle: 5.6s;
+
+    .homeSmokePuff {
+      fill: #0084f8;
+      animation:
+        homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3)
+          infinite,
+        homeSmokeFade $homeSmokeCycle linear infinite;
+    }
+
+    .homeSmokeLift {
+      animation: homeSmokeLift $homeSmokeCycle linear infinite;
+    }
+
+    .homeSmokePuff circle {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: homeSmokeGrow $homeSmokeCycle
+        cubic-bezier(0.15, 0.4, 0.25, 0.35) infinite;
+    }
+
+    .homeSmokePuff:nth-child(2),
+    .homeSmokePuff:nth-child(2) * {
+      animation-delay: $homeSmokeCycle * -0.5;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .homeEnergyPulse {
+      .homeEnergyPulse,
+      .homeSmokePuff,
+      .homeSmokePuff * {
         animation: none;
+      }
+
+      // Hold the puffs where the logo's original smoke circles sit.
+      .homeSmokePuff:nth-child(2) {
+        transform: translateX(-4.3px);
+
+        .homeSmokeLift {
+          transform: translateY(3.6px);
+        }
+
+        circle {
+          transform: scale(0.7);
+        }
       }
     }
 
@@ -4589,6 +4617,46 @@ $sizemap: (
 }
 
 // KEYFRAMES
+@keyframes homeSmokeDrift {
+  from {
+    transform: translateX(-6px);
+  }
+  to {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes homeSmokeLift {
+  from {
+    transform: translateY(7px);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes homeSmokeGrow {
+  from {
+    transform: scale(0.2);
+  }
+  to {
+    transform: scale(1.35);
+  }
+}
+
+@keyframes homeSmokeFade {
+  0% {
+    opacity: 0;
+  }
+  15%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes homeEnergySweep {
   0% {
     stroke-dashoffset: 16;
@@ -5836,6 +5904,14 @@ $sizemap: (
 .insights .insightsLevers {
   position: relative;
   padding-right: 64px;
+
+  // The customer programs button sits over the summary row; the slider below it runs under the
+  // button's column out to the pane's edge instead of stopping short of it
+  .budgetSlider {
+    box-sizing: border-box;
+    width: calc(100% + 52px);
+    margin-right: -52px;
+  }
 }
 .customerProgramsControl {
   position: absolute;

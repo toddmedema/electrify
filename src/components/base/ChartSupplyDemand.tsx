@@ -12,6 +12,7 @@ import {
   tickLabelFill,
   verticalLinePlugin,
   xAxis,
+  baselinePlugin,
   yAxis,
 } from "./UPlotHelpers";
 import {
@@ -134,6 +135,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     ],
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      baselinePlugin(chartPalette().axis),
       verticalLinePlugin(
         () => getState().currentMinute,
         chartPalette().axis,

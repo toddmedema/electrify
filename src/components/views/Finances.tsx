@@ -551,7 +551,7 @@ export default class Finances extends React.Component<Props, State> {
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
     if (
       nextState !== this.state ||
-      nextProps.game.speed !== "FAST" ||
+      (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
       // Selecting a facility in the fleet list is the same kind of direct request the
       // dropdowns below are, and gets the same exemption
       nextProps.selectedFacilityId !== this.props.selectedFacilityId

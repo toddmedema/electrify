@@ -4,6 +4,7 @@ import {
   formatMoneyStable,
   formatWattHoursAxis,
   formatWattHoursOfPeak,
+  floorToTwoSignificantDigits,
   formatWatts,
   formatWattsAxis,
   formatSignedWattsOfPeak,
@@ -31,6 +32,24 @@ describe("formatWatts", () => {
     expect(formatWatts(1001, 0)).toEqual("1kW");
     expect(formatWatts(1521, 3)).toEqual("1.521kW");
     expect(formatWatts(1521, 4)).toEqual("1.521kW");
+  });
+});
+
+describe("formatWatts rounding", () => {
+  it("rounds to whole numbers from 10 up and keeps a decimal below", () => {
+    expect(formatWatts(540.5e6)).toEqual("541MW");
+    expect(formatWatts(54.1e6)).toEqual("54MW");
+    expect(formatWatts(9.8e9)).toEqual("9.8GW");
+    expect(formatWatts(9.84e6)).toEqual("9.8MW");
+  });
+});
+
+describe("floorToTwoSignificantDigits", () => {
+  it("never rounds up past the value", () => {
+    expect(floorToTwoSignificantDigits(1.29e9)).toEqual(1.2e9);
+    expect(floorToTwoSignificantDigits(1.2e9)).toEqual(1.2e9);
+    expect(floorToTwoSignificantDigits(987e6)).toEqual(980e6);
+    expect(floorToTwoSignificantDigits(0)).toEqual(0);
   });
 });
 

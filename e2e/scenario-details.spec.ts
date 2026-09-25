@@ -73,7 +73,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await menu.click();
     await page.getByRole("menuitem", { name: "Scenario details" }).click();
-    await expect(dialog.getByText("Through last month")).toBeAttached();
+    await expect(dialog.getByText(/points per/).first()).toBeAttached();
     const content = dialog.locator(".MuiDialogContent-root");
     expect(
       await content.evaluate((el) => el.scrollWidth - el.clientWidth),

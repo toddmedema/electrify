@@ -192,7 +192,9 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
-  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent(
+    /Loan option.*now \+.*\/mo \(\d+\.\d+% for 30 years\)/,
+  );
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).toHaveTextContent("Typical output");
@@ -205,45 +207,10 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
   expect(screen.queryByText("Time to build")).not.toBeInTheDocument();
 
-  const showFinancing = screen.getByRole("button", {
-    name: "Show financing terms",
-  });
-  expect(showFinancing).toHaveAttribute("aria-expanded", "false");
-  fireEvent.click(showFinancing);
-
-  const financingTerms = screen.getByRole("table", {
-    name: "Financing terms",
-  });
-  expect(
-    screen.getByRole("row", { name: /Downpayment \$[\d.]+[kMB]?/ }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", { name: /Interest rate.*\d+\.\d+%/ }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", { name: /Monthly payments \$[\d.]+[kMB]?\/mo/ }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Loan duration Construction \+ \d+ years/,
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Hide financing terms" }),
-  ).toHaveAttribute("aria-expanded", "true");
-  expect(financingTerms).not.toHaveTextContent("Cash cost");
-  expect(financingTerms).not.toHaveTextContent("Time to build");
-
   fireEvent.click(
     within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(
-    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
-  );
-  expect(
-    screen.getByRole("button", { name: "Show financing terms" }),
-  ).toHaveAttribute("aria-expanded", "false");
 }, 15000);
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
@@ -618,10 +585,14 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
       onBuildGenerator={onBuild}
     />,
   );
-  expect(screen.getByText(/0 sites left · 0 fit/)).toBeInTheDocument();
+  expect(screen.queryByText(/sites left/)).not.toBeInTheDocument();
   expect(
-    screen.getByText(/All Hydro sites are used or reserved/),
+    screen.getByText("No remaining buildable locations"),
   ).toBeInTheDocument();
+  const reviews = screen.getAllByRole("button", { name: /Review purchase of/ });
+  expect(reviews[reviews.length - 1]).toHaveAccessibleName(
+    "Review purchase of Hydro",
+  );
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
@@ -633,7 +604,9 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
       onBuildGenerator={onBuild}
     />,
   );
-  expect(screen.getByText(/Hydro site data unavailable/)).toBeInTheDocument();
+  expect(
+    screen.getByText("No remaining buildable locations"),
+  ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
@@ -844,27 +817,17 @@ describe("weather hardening in the purchase dialog", () => {
       screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
     );
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Show financing terms" }),
-    );
-    const downpayment = () =>
-      within(
-        within(dialog).getByRole("row", { name: /^Downpayment/ }),
-      ).getAllByRole("cell")[1];
     const impact = within(dialog).getByRole("region", {
       name: "Expected impact",
     });
-    expect(downpayment()).toHaveTextContent(
-      formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost),
+    expect(impact).toHaveTextContent(
+      `${formatMoneyConcise(DOWNPAYMENT_PERCENT * packaged.buildCost)} now`,
     );
     expect(impact).toHaveTextContent(
       `→ ${formatMoneyConcise(cash - packaged.buildCost)}`,
     );
     fireEvent.click(
       within(dialog).getByRole("checkbox", { name: /^Cold-weather package/ }),
-    );
-    expect(downpayment()).toHaveTextContent(
-      formatMoneyConcise(DOWNPAYMENT_PERCENT * plain.buildCost),
     );
     expect(impact).toHaveTextContent(
       `→ ${formatMoneyConcise(cash - plain.buildCost)}`,
