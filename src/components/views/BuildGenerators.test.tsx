@@ -467,10 +467,14 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
       onBuildGenerator={onBuild}
     />,
   );
-  expect(screen.getByText(/0 sites left · 0 fit/)).toBeInTheDocument();
+  expect(screen.queryByText(/sites left/)).not.toBeInTheDocument();
   expect(
-    screen.getByText(/All Hydro sites are used or reserved/),
+    screen.getByText("No remaining buildable locations"),
   ).toBeInTheDocument();
+  const reviews = screen.getAllByRole("button", { name: /Review purchase of/ });
+  expect(reviews[reviews.length - 1]).toHaveAccessibleName(
+    "Review purchase of Hydro",
+  );
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();
@@ -482,7 +486,9 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
       onBuildGenerator={onBuild}
     />,
   );
-  expect(screen.getByText(/Hydro site data unavailable/)).toBeInTheDocument();
+  expect(
+    screen.getByText("No remaining buildable locations"),
+  ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   ).toBeDisabled();

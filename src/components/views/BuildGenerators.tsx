@@ -422,6 +422,37 @@ export function GeneratorBuildItem(
     </Button>
   );
 
+  // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
+  if (props.hydroAvailability?.remaining.length === 0) {
+    return (
+      <Card className="build-list-item buildOption">
+        <CardHeader
+          avatar={
+            <Avatar
+              alt={generator.name}
+              src={`/images/${generator.name.toLowerCase()}.svg`}
+            />
+          }
+          action={
+            <Button
+              className="buy-button"
+              size="small"
+              variant="outlined"
+              color="primary"
+              disabled
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+              aria-label={`Review purchase of ${generator.name}`}
+            >
+              Review
+            </Button>
+          }
+          title={generator.name}
+          subheader="No remaining buildable locations"
+        />
+      </Card>
+    );
+  }
+
   return (
     <Card
       className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
@@ -765,13 +796,14 @@ export function GeneratorBuildItem(
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
-                detail: "Plus fuel and loan payments.",
+                detail: fuelPrices[generator.fuel]
+                  ? "Plus fuel and loan payments."
+                  : "Plus loan payments.",
               },
               {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail: "No output until built.",
               },
               {
                 concept: "supply",
@@ -1018,6 +1050,14 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
     )
     .sort((a, b) => {
+      // Hydro with no sites left always sinks to the bottom
+      const spentA =
+        a.name === "Hydro" && hydroAvailability.remaining.length === 0;
+      const spentB =
+        b.name === "Hydro" && hydroAvailability.remaining.length === 0;
+      if (spentA !== spentB) {
+        return spentA ? 1 : -1;
+      }
       if (props.focusFuel && a.fuel !== b.fuel) {
         if (a.fuel === props.focusFuel) {
           return -1;

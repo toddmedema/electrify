@@ -49,10 +49,10 @@ for (const theme of ["light", "dark"]) {
     await page.locator(".button-buildFacility").click();
     await visibility("hidden");
     await visibility("visible");
-    await expect(page.locator(".pausedChip")).toHaveText("Paused");
+    await expect(pause).toHaveAttribute("aria-pressed", "true");
     for (const name of ["Storage", "Interties", "Generators"]) {
       await page.getByRole("tab", { name, exact: true }).click();
-      await expect(page.locator(".pausedChip")).toHaveText("Paused");
+      await expect(pause).toHaveAttribute("aria-pressed", "true");
     }
     await expect(page.locator("main.base_main")).toHaveCount(1);
     expect(

@@ -114,10 +114,26 @@ describe("construction catalogs pausing the game", () => {
     expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("PAUSED");
   });
 
-  it("stays paused if a global speed shortcut fires while the catalog is open", () => {
+  it("keeps a speed chosen while the catalog is open when it closes", () => {
     const paused = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
+    const chosen = gameReducer(paused, setSpeed("FAST"));
+    expect(chosen.speed).toBe("FAST");
+    expect(gameReducer(chosen, navigate("FACILITIES")).speed).toBe("FAST");
+  });
+
+  it("restores the previous speed if the catalog is closed still paused", () => {
+    const paused = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
+    const repaused = gameReducer(
+      gameReducer(paused, setSpeed("FAST")),
+      setSpeed("PAUSED"),
+    );
+    expect(gameReducer(repaused, navigate("FACILITIES")).speed).toBe("NORMAL");
+  });
+
+  it("still freezes other blocking cards against speed shortcuts", () => {
+    const paused = gameReducer(running("NORMAL"), navigate("MANUAL"));
     expect(gameReducer(paused, setSpeed("FAST")).speed).toBe("PAUSED");
-    expect(gameReducer(paused, navigate("FACILITIES")).speed).toBe("NORMAL");
+    gameReducer(paused, navigate("FACILITIES"));
   });
 
   it("keeps a deliberate pause over the Interties tab", () => {
