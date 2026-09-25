@@ -158,7 +158,7 @@ const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
 
 // Pulled out of the component so it can be memoised on the handful of things it actually
 // depends on, rather than rebuilt on every tick along with the cash readout beside it
-function buildSpeedOptions({
+export function buildSpeedOptions({
   speed,
   onSpeedChange,
   desktop,

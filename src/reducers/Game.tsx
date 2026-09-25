@@ -304,6 +304,9 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
+// The construction catalogs show the speed control, so the player may change speed while one is
+// open. Every other blocking card keeps the clock frozen until it closes.
+let blockingCardAllowsSpeed = false;
 let speedBeforeManualHelp: SpeedType | undefined;
 // While hidden, pause owners read and update this foreground speed; the real clock stays
 // paused even if a dialog or card opens or closes before the page returns.
@@ -1426,8 +1429,13 @@ function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  setForegroundSpeed(state, speedBeforeBlockingCard);
+  // Only put the old speed back if the clock is still paused; a speed picked while the card was
+  // open is the player's newer choice
+  if (foregroundSpeed(state) === "PAUSED") {
+    setForegroundSpeed(state, speedBeforeBlockingCard);
+  }
   speedBeforeBlockingCard = undefined;
+  blockingCardAllowsSpeed = false;
   ensureTicking(state);
 }
 
@@ -1804,7 +1812,7 @@ export const gameSlice = createSlice({
       // instructions frozen until the player actually closes the card. A backgrounded page
       // freezes the same way: pageVisible is the caller that resumes it.
       if (
-        (speedBeforeBlockingCard !== undefined ||
+        ((speedBeforeBlockingCard !== undefined && !blockingCardAllowsSpeed) ||
           speedBeforeManualHelp !== undefined ||
           speedBeforeHidden !== undefined) &&
         action.payload !== "PAUSED"
@@ -1954,6 +1962,7 @@ export const gameSlice = createSlice({
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
+        blockingCardAllowsSpeed = name.startsWith("BUILD_");
         speedBeforeBlockingCard =
           state.policyPause?.speed ?? foregroundSpeed(state);
         delete state.policyPause;

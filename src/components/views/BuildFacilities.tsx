@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import {
   buildTransmissionLine,
+  setSpeed,
   setTradingPolicy,
   upgradeTransmissionLine,
 } from "../../reducers/Game";
@@ -14,7 +15,9 @@ import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable } from "../../helpers/Format";
+import { isDesktopScreen } from "../../Globals";
 import ConceptIcon from "../base/ConceptIcon";
+import { buildSpeedOptions } from "../base/GameAppBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
@@ -47,28 +50,6 @@ export default function BuildFacilities(): React.JSX.Element {
     <div id="topbar" className="flexContainer screenCatalog buildFacilities">
       <header className="constructionHeader">
         <Toolbar className="constructionTitleBar">
-          <Typography variant="h6" className="constructionTitle">
-            <span className="iconLabel">
-              <ConceptIcon concept="build" fontSize="small" />
-              Build
-            </span>
-            {/* The build screen carries no game bar, so the paused clock it opened with needs
-                saying. Replays hide it: their speed is the player's own, not a stopped game */}
-            {game.inGame && !game.replayPlayback && game.speed === "PAUSED" && (
-              <span className="pausedChip">
-                <span aria-hidden="true">
-                  <ConceptIcon concept="pause" fontSize="small" />
-                </span>
-                Paused
-              </span>
-            )}
-            <span
-              className="weak constructionCash"
-              aria-label={`Available cash ${formatMoneyStable(cash)}`}
-            >
-              {formatMoneyStable(cash)} cash
-            </span>
-          </Typography>
           <IconButton
             id="close-button"
             color="primary"
@@ -78,6 +59,29 @@ export default function BuildFacilities(): React.JSX.Element {
           >
             <CloseIcon />
           </IconButton>
+          <Typography variant="h6" className="constructionTitle">
+            <span className="iconLabel">
+              <ConceptIcon concept="build" fontSize="small" />
+              Build
+            </span>
+            <span
+              className="weak constructionCash"
+              aria-label={`Available cash ${formatMoneyStable(cash)}`}
+            >
+              {formatMoneyStable(cash)} cash
+            </span>
+          </Typography>
+          {/* The build screen carries no game bar, so the speed control lives here. The clock
+              opened paused; picking another speed is kept when the screen closes */}
+          {game.inGame && (
+            <div id="speedChangeButtons">
+              {buildSpeedOptions({
+                speed: game.speed,
+                onSpeedChange: (speed) => dispatch(setSpeed(speed)),
+                desktop: isDesktopScreen(),
+              })}
+            </div>
+          )}
         </Toolbar>
         {!introductoryChoices && (
           <Tabs
