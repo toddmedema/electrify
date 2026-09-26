@@ -872,7 +872,11 @@ export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
    * dry season arrives before its first wet one, has to be able to say so.
    */
   initialReservoirFraction?: number;
-  /** Optional player-facing name for an authored aggregate or gameplay proxy. */
+  /**
+   * Optional player-facing name for an authored aggregate or gameplay proxy. It replaces the
+   * facility's name, which the fleet also uses to find its icon, so a label on anything but a
+   * Uranium plant needs matching artwork under `public/images/`.
+   */
   label?: string;
 };
 

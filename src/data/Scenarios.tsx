@@ -1515,12 +1515,10 @@ export const SCENARIOS = [
     // cannot place the plant, and inventing one from the map is what that table forbids.
     facilities: [
       { fuel: "Coal", peakW: 385000000, initialAgeYears: 37 },
-      {
-        fuel: "Oil",
-        peakW: 24000000,
-        initialAgeYears: 11,
-        label: "Diesel Peakers",
-      },
+      // The diesel peakers are the standard Oil facility - fast-start internal combustion
+      // engines, so they keep the catalog's icon, fuel price and economics rather than a
+      // one-off label that would need its own artwork.
+      { fuel: "Oil", peakW: 24000000, initialAgeYears: 11 },
       { fuel: "Uranium", peakW: 18600000, initialAgeYears: 34 },
       { fuel: "Wind", peakW: 20000000, initialAgeYears: 4 },
       { fuel: "Sun", peakW: 15000000, initialAgeYears: 3 },
@@ -1621,12 +1619,9 @@ export const SCENARIOS = [
         initialAgeYears: 38,
         initialReservoirFraction: 1,
       },
-      {
-        fuel: "Oil",
-        peakW: 16000000,
-        initialAgeYears: 15,
-        label: "Emergency Diesel",
-      },
+      // The emergency diesel is the standard Oil facility, so it keeps the catalog's icon and
+      // economics rather than a one-off label that would need its own artwork.
+      { fuel: "Oil", peakW: 16000000, initialAgeYears: 15 },
       { fuel: "Sun", peakW: 6000000, initialAgeYears: 1 },
     ],
     endTitle: "The rains returned",
