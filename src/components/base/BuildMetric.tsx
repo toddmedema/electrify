@@ -28,7 +28,7 @@ export default function BuildMetric(props: {
   );
 }
 
-/** Construction emissions and schedule, shared by project cards and facility details. */
+/** Construction emissions and schedule for the intertie project card. */
 export function ConstructionEmissionsMetric(props: {
   kgco2eTotal: number;
   yearsToBuild: number;
