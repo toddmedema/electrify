@@ -40,7 +40,11 @@ import {
   siteCountLabel,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
-import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
+import BuildMetric from "../base/BuildMetric";
+import {
+  formatLargeMassValueConcise,
+  largeMassUnit,
+} from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
@@ -201,15 +205,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         >
           {storage.description}
         </Typography>
-        <Box className="buildOptionMetrics">
-          <ConstructionEmissionsMetric
-            kgco2eTotal={
-              (storage.constructionKgco2ePerWh || 0) * storage.peakWh
-            }
-            yearsToBuild={storage.yearsToBuild}
-            units={units}
-          />
-        </Box>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>
@@ -245,6 +240,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
               </TableRow>
               <ViableLocationsRow sites={sites} />
+              <TableRow>
+                <TableCell>Construction emissions</TableCell>
+                <TableCell align="right">
+                  {`${formatLargeMassValueConcise(
+                    (storage.constructionKgco2ePerWh || 0) * storage.peakWh,
+                    units,
+                  )} ${largeMassUnit(units)}`}
+                </TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </TableContainer>

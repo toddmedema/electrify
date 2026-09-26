@@ -22,7 +22,7 @@ for (const theme of ["light", "dark"] as const) {
       const cards = page.locator(".buildOption");
       const first = cards.first();
       await expect(first).toBeVisible();
-      await expect(first).not.toContainText("Construction emits");
+      await expect(first).not.toContainText("Construction emissions");
       await expect(page.locator("main.base_main")).toHaveCount(1);
       for (const card of await cards.all()) {
         expect(
@@ -101,7 +101,7 @@ for (const theme of ["light", "dark"] as const) {
             els.map((el) => el.getBoundingClientRect().width),
           );
         expect(sortedCells).toHaveLength(4);
-        await expect(first).not.toContainText("Construction emits");
+        await expect(first).not.toContainText("Construction emissions");
         expect(sortedCells.every((width) => width >= 128)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -140,13 +140,13 @@ for (const theme of ["light", "dark"] as const) {
       await expect(detailCard.locator(".buildOptionDescription")).toBeVisible();
       await expect(detailCard.getByRole("table")).toBeVisible();
       await expect(
-        detailCard.getByText("Construction emits", { exact: true }),
+        detailCard.getByText("Construction emissions", { exact: true }),
       ).toBeVisible();
       await detailCard
-        .getByText("Construction emits", { exact: true })
+        .getByText("Construction emissions", { exact: true })
         .scrollIntoViewIfNeeded();
       await expect(
-        detailCard.getByText("Construction emits", { exact: true }),
+        detailCard.getByText("Construction emissions", { exact: true }),
       ).toBeInViewport();
       await page.screenshot({
         path: testInfo.outputPath(`${kind}-details-${theme}.png`),

@@ -75,7 +75,11 @@ import {
   ExpectedOutputShape,
 } from "../../helpers/ExpectedOutput";
 import { MANUAL_ENTRY, ManualEntryTitleType } from "../base/ManualEntries";
-import { formatMass } from "../../helpers/Units";
+import {
+  formatLargeMassValueConcise,
+  formatMass,
+  largeMassUnit,
+} from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
@@ -87,7 +91,7 @@ import {
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
 import { getScenario } from "../../data/Scenarios";
-import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
+import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
 
@@ -287,6 +291,8 @@ export function GeneratorBuildItem(
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
+  const constructionKgco2eTotal =
+    (generator.constructionKgco2ePerW || 0) * generator.peakW;
   const outputShape =
     props.outputShape || expectedMonthlyOutputShape(generator, []);
   const waterShape =
@@ -592,15 +598,6 @@ export function GeneratorBuildItem(
             </Stack>
           </Box>
         )}
-        <Box className="buildOptionMetrics">
-          <ConstructionEmissionsMetric
-            kgco2eTotal={
-              (generator.constructionKgco2ePerW || 0) * generator.peakW
-            }
-            yearsToBuild={generator.yearsToBuild}
-            units={units}
-          />
-        </Box>
         <TableContainer>
           <Table
             size="small"
@@ -712,6 +709,14 @@ export function GeneratorBuildItem(
               <GeneratorDetailRow
                 label="Direct emissions"
                 value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+                entry={MANUAL_ENTRY.EMISSIONS}
+              />
+              <GeneratorDetailRow
+                label="Construction emissions"
+                value={`${formatLargeMassValueConcise(
+                  constructionKgco2eTotal,
+                  units,
+                )} ${largeMassUnit(units)}`}
                 entry={MANUAL_ENTRY.EMISSIONS}
               />
             </TableBody>
