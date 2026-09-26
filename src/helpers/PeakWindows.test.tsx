@@ -27,15 +27,17 @@ test.each(Array.from({ length: 24 }, (_, hour) => hour))(
     const game = cloneDeep(baseline);
     game.policies = emptyPolicies();
     game.policies.programs.timeOfUse = {
-      tier: "Large",
+      tier: "On",
       adoption: 0.5,
       spending: 0,
+      spent: 0,
       startHour,
     };
     game.policies.programs.curtailment = {
-      tier: "Large",
+      tier: "On",
       adoption: 0.5,
       spending: 0,
+      spent: 0,
       startHour,
     };
     let queue: DeferredResidentialLoad[] = [];
@@ -79,15 +81,17 @@ test("independent windows bill recovered energy at a discount even during a new 
   const game = cloneDeep(baseline);
   game.policies = emptyPolicies();
   game.policies.programs.timeOfUse = {
-    tier: "Large",
+    tier: "On",
     adoption: 0.5,
     spending: 0,
+    spent: 0,
     startHour: 0,
   };
   game.policies.programs.curtailment = {
-    tier: "Large",
+    tier: "On",
     adoption: 0.5,
     spending: 0,
+    spent: 0,
     startHour: 8,
   };
   const tick = cloneDeep(baseline.timeline[0]);
@@ -116,13 +120,13 @@ test("window edits preview, cancel, save and replay across a month boundary", ()
   let game = cloneDeep(baseline);
   const change = {
     id: "timeOfUse",
-    tier: "Large",
+    tier: "On",
     month: 1,
     startHour: 22,
   } as const;
   game = cloneDeep(gameReducer(game, schedulePolicy(change)));
   expect(game.policies!.programs.timeOfUse.pending).toEqual({
-    tier: "Large",
+    tier: "On",
     month: 1,
     startHour: 22,
   });
@@ -166,7 +170,7 @@ test.each([-1, 24, 1.5, NaN, "22", null])(
     expect(
       validPolicyChange({
         id: "timeOfUse",
-        tier: "Large",
+        tier: "On",
         month: 1,
         startHour,
       }),
@@ -178,7 +182,7 @@ test.each([-1, 24, 1.5, NaN, "22", null])(
     replay.actions.push({
       type: "schedulePolicy",
       minute: 0,
-      payload: { id: "timeOfUse", tier: "Large", month: 1, startHour },
+      payload: { id: "timeOfUse", tier: "On", month: 1, startHour },
     } as (typeof replay.actions)[number]);
     expect(decodeReplay(replay)).toBeNull();
   },

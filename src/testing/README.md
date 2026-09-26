@@ -115,12 +115,15 @@ each decision omitted only repeats that gate, without proving the omitted action
 economy. `ScenarioChoiceBalance.test.tsx` waives the gate when checking physical economic outcomes.
 
 Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
-`initialPrograms: { efficiency: "Small", solar: "Large" }` and schedules each through the real
-reducer for month two. The matrix compares Off, Small, Large, solar-only, and combined funding
-in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant.
-Program costs are authored game assumptions, scaled by initial customer market and demand
-scale, then inflated from the starting year. Adoption is allocated once at the month boundary;
-its actual cost is spread across that month's ticks. Installed upgrades persist within the run.
+`initialPrograms: { efficiency: "On", solar: "On" }` and schedules each through the real
+reducer for month two; `scheduledActions` can start a program later. The matrix compares Off,
+efficiency-only, solar-only, combined, and a late efficiency start through a full 24-month
+build-out in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant
+and zero spending after completion. Program costs are authored game assumptions (a total per
+initial market customer, spread evenly over the build-out), scaled by initial customer market
+and demand scale, then inflated from the starting year. Adoption is allocated once at the month
+boundary; its actual cost is spread across that month's ticks. Installed upgrades persist within
+the run.
 These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
 
 `createGame` is exported for tests that want a realistic mid-game state without running a whole

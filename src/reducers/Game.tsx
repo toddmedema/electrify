@@ -38,6 +38,8 @@ import {
   policyAvailable,
   validPolicyChange,
   samePolicyChoice,
+  isOperatingPolicy,
+  buildoutComplete,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
 import { policyChoiceLabel } from "../helpers/PolicyWindow";
@@ -2633,6 +2635,13 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
+  // A finished build-out has nothing left to fund, pause or resume.
+  if (
+    !cancel &&
+    !isOperatingPolicy(payload.id) &&
+    buildoutComplete(existing?.adoption ?? 0)
+  )
+    return false;
   const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
   if (cancel) {
     if (

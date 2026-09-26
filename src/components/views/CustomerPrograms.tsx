@@ -9,6 +9,7 @@ import {
   DialogTitle,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   Radio,
   RadioGroup,
   Skeleton,
@@ -25,12 +26,18 @@ import {
   openPolicyDecision,
   schedulePolicy,
 } from "../../reducers/GameActions";
-import { GameType, PolicyId, PolicyTier } from "../../Types";
+import { GameType, PolicyId, PolicyProgramType, PolicyTier } from "../../Types";
 import { POLICIES, POLICY_IDS, POLICY_TIERS } from "../../data/Policies";
 import {
+  BuildoutPolicyId,
+  buildoutComplete,
+  buildoutCompletionMonth,
+  buildoutMonths,
+  buildoutMonthsDone,
   emptyPolicies,
   policyAvailable,
   policyBudget,
+  policyTotalCost,
   isOperatingPolicy,
 } from "../../helpers/Policies";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -58,13 +65,142 @@ import {
 // it appears keeps the dialog from changing height when an estimate arrives.
 const NOTE_SLOT = { minHeight: "2lh" };
 
-const programLabel = (id: PolicyId, tier: PolicyTier) =>
-  isOperatingPolicy(id) && tier !== "Off" ? "On" : tier;
-
 const labelMonth = (game: GameType, month: number) => {
   const d = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
   return `${d.month} ${d.year}`;
 };
+
+const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
+  efficiency: "Efficiency",
+  solar: "Rooftop solar",
+};
+
+/** Build-out programs read as projects; operating offers are simply on or off. */
+function programStatus(
+  game: GameType,
+  id: PolicyId,
+  program: PolicyProgramType,
+): string {
+  if (isOperatingPolicy(id)) return program.tier;
+  const buildout = id as BuildoutPolicyId;
+  if (buildoutComplete(program.adoption))
+    return program.completedMonth === undefined
+      ? "Completed"
+      : `Completed ${labelMonth(game, program.completedMonth)}`;
+  if (program.tier === "On")
+    return `In progress · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
+  if (program.adoption > 0)
+    return `Paused · ${Math.round(program.adoption * 100)}% installed`;
+  return "Not started";
+}
+
+function pendingLabel(
+  game: GameType,
+  id: PolicyId,
+  program: PolicyProgramType,
+): string {
+  const pending = program.pending!;
+  const when = labelMonth(game, pending.month);
+  if (isOperatingPolicy(id))
+    return pending.tier === "Off"
+      ? `Off starts ${when}`
+      : `On starts ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
+  if (pending.tier === "Off") return `Pauses ${when}`;
+  return program.adoption > 0 ? `Resumes ${when}` : `Starts ${when}`;
+}
+
+function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
+  return id === "solar"
+    ? `Up to ${formatWatts(POLICIES.solar.cap * game.customerMarketSize * game.startingDemandScale)} of daytime rooftop generation`
+    : `Home and business use ${Math.round(POLICIES.efficiency.cap * 100)}% lower all day`;
+}
+
+/** Project facts and progress for a finite rebate build-out. */
+function BuildoutSummary({
+  game,
+  id,
+  program,
+  effective,
+  end,
+}: {
+  game: GameType;
+  id: BuildoutPolicyId;
+  program: PolicyProgramType;
+  effective: number;
+  end: number;
+}) {
+  const months = buildoutMonths(id);
+  const complete = buildoutComplete(program.adoption);
+  const done = buildoutMonthsDone(id, program.adoption);
+  const total = complete
+    ? program.spent
+    : program.spent +
+      policyTotalCost(game, id, effective) * (1 - program.adoption);
+  const finish = buildoutCompletionMonth(id, program.adoption, effective);
+  const facts: [string, string][] = complete
+    ? [
+        ["Installed", buildoutImpact(game, id)],
+        ["Total cost", formatMoneyConcise(program.spent)],
+      ]
+    : [
+        ["Duration", `${months} months of installations`],
+        ["Total cost", `About ${formatMoneyConcise(total)}`],
+        [
+          "While active",
+          `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/month`,
+        ],
+        ["At completion", buildoutImpact(game, id)],
+        [
+          program.tier === "On" ? "Finishes" : "If started now",
+          finish < end
+            ? `${program.tier === "On" ? "" : "Finishes "}${labelMonth(game, finish)}`
+            : "After this run ends",
+        ],
+      ];
+  return (
+    <Box className="customerProgramProject" sx={{ display: "grid", gap: 1.5 }}>
+      {program.adoption > 0 && (
+        <Box sx={{ display: "grid", gap: 1 }}>
+          <LinearProgress
+            variant="determinate"
+            value={Math.round(program.adoption * 100)}
+            aria-label={`${POLICIES[id].name} build-out progress`}
+            color={complete ? "success" : "primary"}
+            sx={{ height: 8, borderRadius: 1 }}
+          />
+          <Typography variant="body2">
+            {complete
+              ? `Completed ${program.completedMonth === undefined ? "" : `${labelMonth(game, program.completedMonth)} `}· no further cost`
+              : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent of about ${formatMoneyConcise(total)}`}
+          </Typography>
+        </Box>
+      )}
+      <Box
+        component="dl"
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "max-content 1fr",
+          columnGap: 2,
+          rowGap: 0.5,
+          m: 0,
+          "& dt": { color: "text.secondary" },
+          "& dd": { m: 0 },
+        }}
+      >
+        {facts.map(([term, value]) => (
+          <React.Fragment key={term}>
+            <Typography component="dt" variant="body2">
+              {term}
+            </Typography>
+            <Typography component="dd" variant="body2">
+              {value}
+            </Typography>
+          </React.Fragment>
+        ))}
+      </Box>
+    </Box>
+  );
+}
 
 function Decision({
   onClose,
@@ -108,10 +244,27 @@ function Decision({
   const effective = game.date.monthsElapsed + 1;
   const end =
     getScenario(game.scenarioId, game.customScenario)?.durationMonths ?? 0;
-  const month = later ? Math.min(effective + 11, end - 1) : effective;
+  const selectedProgram = selected
+    ? (game.policies?.programs ?? emptyPolicies().programs)[selected]
+    : undefined;
+  const buildout =
+    selected && !isOperatingPolicy(selected)
+      ? (selected as BuildoutPolicyId)
+      : undefined;
+  // Both plans install from next month, so they share the unpaused completion month.
+  const completion = buildout
+    ? buildoutCompletionMonth(buildout, selectedProgram!.adoption, effective)
+    : effective;
+  const laterMonth = Math.max(effective, Math.min(completion, end - 1));
+  const month = later ? laterMonth : effective;
   const key = `${selected}/${tier}/${startHour}/${month}/${game.date.minute}`;
   React.useEffect(() => {
-    if (!selected || effective >= end) return;
+    if (
+      !selected ||
+      effective >= end ||
+      (buildout && buildoutComplete(selectedProgram!.adoption))
+    )
+      return;
     let worker: Worker | undefined;
     let cancelled = false;
     const timer = window.setTimeout(() => {
@@ -167,10 +320,23 @@ function Decision({
       window.clearTimeout(timer);
       worker?.terminate();
     };
-  }, [game, selected, tier, startHour, month, effective, end, key]);
+  }, [
+    game,
+    selected,
+    tier,
+    startHour,
+    month,
+    effective,
+    end,
+    key,
+    buildout,
+    selectedProgram,
+  ]);
   const programs = game.policies?.programs ?? emptyPolicies().programs;
-  const current = selected ? programs[selected] : undefined;
+  const current = selectedProgram;
   const operating = selected ? isOperatingPolicy(selected) : false;
+  const complete = !!buildout && buildoutComplete(current!.adoption);
+  const planned = current?.pending?.tier ?? current?.tier ?? "Off";
   const settled = preview?.key === key && preview.snapshot === game;
   const result = settled ? preview.result : undefined;
   const error = settled ? preview.error : undefined;
@@ -179,6 +345,69 @@ function Decision({
     (!operating ||
       tier === "Off" ||
       startHour === (current?.pending?.startHour ?? current?.startHour ?? 17));
+  const finished = (id: PolicyId) =>
+    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
+  const open = (id: PolicyId) => {
+    const program = programs[id];
+    setSelected(id);
+    // Build-outs offer one decision: the opposite of the plan, or undoing a scheduled change.
+    setTier(
+      isOperatingPolicy(id)
+        ? (program.pending?.tier ?? program.tier)
+        : program.pending
+          ? program.tier
+          : program.tier === "On"
+            ? "Off"
+            : "On",
+    );
+    setStartHour(
+      program.pending?.startHour ??
+        program.startHour ??
+        (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
+    );
+    setLater(false);
+  };
+  const choice = (id: PolicyId) => {
+    const status = programStatus(game, id, programs[id]);
+    return (
+      <Box
+        key={id}
+        className="customerProgramChoice"
+        data-completed={finished(id) || undefined}
+      >
+        <Button
+          className="customerProgramChoiceButton"
+          aria-label={`${POLICIES[id].name} · ${status}`}
+          aria-describedby={`program-description-${id}`}
+          fullWidth
+          sx={{ minHeight: 44, textAlign: "left" }}
+          onClick={() => open(id)}
+        >
+          <span>
+            <strong>
+              {POLICIES[id].name} · {status}
+            </strong>
+            <Typography
+              id={`program-description-${id}`}
+              component="span"
+              variant="body2"
+              color="textSecondary"
+            >
+              {finished(id)
+                ? buildoutImpact(game, id as BuildoutPolicyId)
+                : POLICIES[id].description}
+            </Typography>
+          </span>
+          <span aria-hidden>›</span>
+        </Button>
+        {programs[id].pending && (
+          <Typography variant="body2">
+            {pendingLabel(game, id, programs[id])}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
   return (
@@ -214,64 +443,25 @@ function Decision({
       >
         {!selected ? (
           <Box sx={{ display: "grid", gap: 2 }}>
-            {POLICY_IDS.map((id) => (
-              <Box key={id} className="customerProgramChoice">
-                <Button
-                  className="customerProgramChoiceButton"
-                  aria-label={`${POLICIES[id].name} · ${programLabel(id, programs[id].tier)}`}
-                  aria-describedby={`program-description-${id}`}
-                  fullWidth
-                  sx={{ minHeight: 44, textAlign: "left" }}
-                  onClick={() => {
-                    setSelected(id);
-                    setTier(programs[id].pending?.tier ?? programs[id].tier);
-                    setStartHour(
-                      programs[id].pending?.startHour ??
-                        programs[id].startHour ??
-                        (programs[id].tier !== "Off"
-                          ? 17
-                          : suggestedPolicyStartHour(game)),
-                    );
-                    setLater(false);
-                  }}
-                >
-                  <span>
-                    <strong>
-                      {POLICIES[id].name} ·{" "}
-                      {programLabel(id, programs[id].tier)}
-                    </strong>
-                    <Typography
-                      id={`program-description-${id}`}
-                      component="span"
-                      variant="body2"
-                      color="textSecondary"
-                    >
-                      {POLICIES[id].description}
-                    </Typography>
-                  </span>
-                  <span aria-hidden>›</span>
-                </Button>
-                {programs[id].pending && (
-                  <Typography variant="body2">
-                    {programLabel(id, programs[id].pending!.tier)} starts{" "}
-                    {labelMonth(game, programs[id].pending!.month)}
-                    {isOperatingPolicy(id) &&
-                      programs[id].pending!.tier !== "Off" && (
-                        <>
-                          {" "}
-                          ·{" "}
-                          {policyWindowLabel(
-                            programs[id].pending!.startHour ??
-                              programs[id].startHour ??
-                              17,
-                          )}
-                        </>
-                      )}
-                  </Typography>
-                )}
-              </Box>
-            ))}
+            {POLICY_IDS.filter((id) => !finished(id)).map(choice)}
             <Typography variant="body2">Changes start next month.</Typography>
+            {POLICY_IDS.some(finished) && (
+              <Box
+                component="section"
+                aria-labelledby="completed-programs"
+                sx={{ display: "grid", gap: 1 }}
+              >
+                <Typography
+                  id="completed-programs"
+                  component="h3"
+                  variant="subtitle2"
+                  color="textSecondary"
+                >
+                  Completed
+                </Typography>
+                {POLICY_IDS.filter(finished).map(choice)}
+              </Box>
+            )}
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
@@ -280,41 +470,32 @@ function Decision({
                 ? POLICIES[selected].description
                 : POLICIES[selected].mechanism}
             </Typography>
-            {!operating && (
-              <Typography variant="body2">
-                {current!.adoption >= 1
-                  ? "Fully adopted"
-                  : current!.adoption > 0
-                    ? current!.tier === "Off"
-                      ? "Installed upgrades retained"
-                      : "Building up"
-                    : "No funded upgrades yet"}{" "}
-                · {Math.round(current!.adoption * 100)}% installed
-              </Typography>
+            {buildout ? (
+              <BuildoutSummary
+                game={game}
+                id={buildout}
+                program={current!}
+                effective={effective}
+                end={end}
+              />
+            ) : (
+              <RadioGroup
+                row
+                aria-label="Program status"
+                value={tier}
+                onChange={(e) => setTier(e.target.value as PolicyTier)}
+              >
+                {POLICY_TIERS.map((choice) => (
+                  <FormControlLabel
+                    key={choice}
+                    value={choice}
+                    control={<Radio />}
+                    sx={{ minHeight: 44, m: 0, flex: 1 }}
+                    label={choice}
+                  />
+                ))}
+              </RadioGroup>
             )}
-            <RadioGroup
-              row={operating || !phone}
-              aria-label={operating ? "Program status" : "Monthly funding"}
-              value={operating && tier !== "Off" ? "Large" : tier}
-              onChange={(e) => setTier(e.target.value as PolicyTier)}
-            >
-              {(operating
-                ? (["Off", "Large"] as PolicyTier[])
-                : POLICY_TIERS
-              ).map((choice) => (
-                <FormControlLabel
-                  key={choice}
-                  value={choice}
-                  control={<Radio />}
-                  sx={{ minHeight: 44, m: 0, flex: 1 }}
-                  label={
-                    operating
-                      ? programLabel(selected, choice)
-                      : `${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`
-                  }
-                />
-              ))}
-            </RadioGroup>
             {operating && tier !== "Off" && (
               <TextField
                 select
@@ -339,12 +520,7 @@ function Decision({
                 ))}
               </TextField>
             )}
-            {!operating && (
-              <Typography variant="body2">
-                Larger funding installs faster but costs more per upgrade.
-              </Typography>
-            )}
-            {effective >= end ? (
+            {complete ? null : effective >= end ? (
               <Alert severity="info">
                 This run ends before another program change could take effect.
               </Alert>
@@ -353,13 +529,13 @@ function Decision({
                 <Typography component="h3" variant="subtitle1">
                   Estimated utility demand · {labelMonth(game, month)}
                 </Typography>
-                {!operating && end - 1 > effective && (
+                {buildout && laterMonth > effective && (
                   <Button onClick={() => setLater(!later)}>
                     {later
                       ? "First effective month"
-                      : end > effective + 11
-                        ? "After 12 months"
-                        : `By ${labelMonth(game, end - 1)}`}
+                      : completion < end
+                        ? `At completion (${labelMonth(game, laterMonth)})`
+                        : `By ${labelMonth(game, laterMonth)}`}
                   </Button>
                 )}
                 {error ? (
@@ -444,7 +620,7 @@ function Decision({
                 )}
               </>
             )}
-            {current!.pending && (
+            {operating && current!.pending && (
               <Button
                 onClick={() => {
                   dispatch(
@@ -473,33 +649,47 @@ function Decision({
         <Button onClick={() => (selected ? setSelected(undefined) : onClose())}>
           {selected ? "Back" : "Close"}
         </Button>
-        {selected && (
+        {selected && !complete && (
           <Button
             variant="contained"
             disabled={
-              unchanged || !result || effective >= end || !!game.replayPlayback
+              // Undoing a scheduled change needs no estimate.
+              (!(buildout && current!.pending) && (unchanged || !result)) ||
+              effective >= end ||
+              !!game.replayPlayback
             }
             onClick={() => {
-              dispatch(
-                schedulePolicy({
-                  id: selected,
-                  tier,
-                  month: effective,
-                  ...(operating ? { startHour } : {}),
-                }),
-              );
+              if (buildout && current!.pending)
+                dispatch(cancelPolicy({ id: selected, ...current!.pending }));
+              else
+                dispatch(
+                  schedulePolicy({
+                    id: selected,
+                    tier,
+                    month: effective,
+                    ...(operating ? { startHour } : {}),
+                  }),
+                );
               setSelected(undefined);
             }}
           >
             {operating
               ? tier === "Off"
                 ? "Turn off next month"
-                : (current?.pending?.tier ?? current?.tier) !== "Off"
+                : planned !== "Off"
                   ? "Update next month"
                   : "Turn on next month"
-              : tier === "Off"
-                ? "Stop next month"
-                : "Start next month"}
+              : current!.pending
+                ? current!.pending.tier === "Off"
+                  ? "Cancel scheduled pause"
+                  : current!.adoption > 0
+                    ? "Cancel scheduled resume"
+                    : "Cancel scheduled start"
+                : tier === "Off"
+                  ? "Pause new installations next month"
+                  : current!.adoption > 0
+                    ? "Resume build-out next month"
+                    : "Start build-out next month"}
           </Button>
         )}
       </DialogActions>
@@ -516,21 +706,24 @@ export default function CustomerPrograms({
 }) {
   const [open, setOpen] = React.useState(false);
   if (!policyAvailable(game) || game.replayPlayback) return null;
-  const programs = game.policies?.programs;
-  const active = POLICY_IDS.filter(
-    (id) => programs?.[id].tier && programs[id].tier !== "Off",
-  ).length;
-  const pending = POLICY_IDS.some((id) => programs?.[id].pending);
-  const budget = POLICY_IDS.reduce(
-    (sum, id) =>
-      sum +
-      policyBudget(
-        game,
-        id,
-        programs?.[id].tier ?? "Off",
-        game.date.monthsElapsed,
-      ),
+  const programs = game.policies?.programs ?? emptyPolicies().programs;
+  // A finished build-out costs nothing more, so it is neither active nor in the rebate total.
+  const building = (["efficiency", "solar"] as BuildoutPolicyId[]).filter(
+    (id) =>
+      programs[id].tier === "On" && !buildoutComplete(programs[id].adoption),
+  );
+  const active =
+    POLICY_IDS.filter(
+      (id) => isOperatingPolicy(id) && programs[id].tier !== "Off",
+    ).length + building.length;
+  const pending = POLICY_IDS.some((id) => programs[id].pending);
+  const budget = building.reduce(
+    (sum, id) => sum + policyBudget(game, id, "On", game.date.monthsElapsed),
     0,
+  );
+  const progress = building.map(
+    (id) =>
+      ` · ${BUILDOUT_SHORT_NAME[id]} build-out · month ${buildoutMonthsDone(id, programs[id].adoption)} of ${buildoutMonths(id)}`,
   );
   return (
     <Box
@@ -548,7 +741,7 @@ export default function CustomerPrograms({
         title={
           pending
             ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
-            : `Customer programs: ${active} active${budget > 0 ? ` · up to ${formatMoneyConcise(budget)}/month in rebates` : ""}`
+            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}`
         }
         color="primary"
         variant="contained"

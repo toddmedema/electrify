@@ -22,24 +22,22 @@ for (const theme of ["light", "dark"]) {
     });
     await entry.click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByRole("button", { name: "Rooftop solar rebates · Off" })
-      .click();
+    const solar = dialog.getByRole("button", {
+      name: "Rooftop solar rebates · Not started",
+    });
+    await solar.click();
     await expect(dialog).toContainText(
       "does not directly cover an evening peak",
     );
-    const apply = dialog.getByRole("button", { name: "Start next month" });
-    await expect(
-      dialog.getByRole("button", { name: "Stop next month" }),
-    ).toBeDisabled();
-    await dialog.getByRole("radio", { name: /^Off/ }).focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(dialog.getByRole("radio", { name: /^Small/ })).toBeChecked();
+    await expect(dialog).toContainText("24 months of installations");
+    await expect(dialog.getByRole("radio")).toHaveCount(0);
+    const apply = dialog.getByRole("button", {
+      name: "Start build-out next month",
+    });
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
     await expect(dialog.getByText(/^Change in utility cash/)).toBeVisible();
-    await expect(dialog).not.toContainText("Charges start");
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -53,32 +51,26 @@ for (const theme of ["light", "dark"]) {
     await page.screenshot({
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
-    await dialog.getByRole("button", { name: "After 12 months" }).click();
+    await dialog
+      .getByRole("button", { name: "At completion (Jan 2022)" })
+      .click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
-    await expect(dialog).toContainText("Estimated utility demand · Jan 2021");
+    await expect(dialog).toContainText("Estimated utility demand · Jan 2022");
     await dialog.getByRole("button", { name: "First effective month" }).click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();
-    await expect(dialog).toContainText("Small starts Feb 2020");
-    await dialog
-      .getByRole("button", { name: "Rooftop solar rebates · Off" })
-      .click();
-    await dialog.getByRole("radio", { name: /^Off/ }).check();
+    await expect(dialog).toContainText("Starts Feb 2020");
+    await solar.click();
     await expect(
-      dialog.getByRole("button", { name: "Stop next month" }),
-    ).toBeVisible();
-    await expect(dialog).not.toContainText("Funding stops");
-    await expect(dialog).not.toContainText("Charges start");
-    await dialog.getByRole("radio", { name: /^Large/ }).check();
+      dialog.getByRole("button", { name: "Cancel scheduled start" }),
+    ).toBeEnabled({ timeout: 30000 });
     await dialog.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(dialog).toContainText("Small starts Feb 2020");
+    await expect(dialog).toContainText("Starts Feb 2020");
+    await solar.click();
     await dialog
-      .getByRole("button", { name: "Rooftop solar rebates · Off" })
+      .getByRole("button", { name: "Cancel scheduled start" })
       .click();
-    await dialog
-      .getByRole("button", { name: "Cancel scheduled change" })
-      .click();
-    await expect(dialog).not.toContainText("Small starts");
+    await expect(dialog).not.toContainText("Starts Feb 2020");
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(entry).toBeFocused();

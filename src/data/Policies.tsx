@@ -6,12 +6,14 @@ export const POLICY_IDS: PolicyId[] = [
   "timeOfUse",
   "curtailment",
 ];
-export const POLICY_TIERS: PolicyTier[] = ["Off", "Small", "Large"];
+export const POLICY_TIERS: PolicyTier[] = ["Off", "On"];
 // Explicit launch availability: modern, longer scenarios and custom games. Historical
 // scenarios and introductory tutorials deliberately have no program entry.
 export const POLICY_SCENARIOS = [
   100, 101, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 999,
 ];
+// Both rebate programs are one-time projects: they install a fixed pool of upgrades, then stop.
+const BUILDOUT_MONTHS = 24;
 export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
@@ -38,27 +40,21 @@ export const POLICIES = {
   efficiency: {
     name: "Efficiency rebates",
     description: "Help homes and businesses use less electricity.",
-    mechanism:
-      "Gradually cuts home and business electricity use throughout the day.",
+    mechanism: `A one-time project that funds upgrades over ${BUILDOUT_MONTHS} months. Savings grow as upgrades are installed; at completion, home and business electricity use is 20% lower throughout the day, with no further cost.`,
     tradeoff:
       "Upgrades cost money and reduce sales, but can lower generation costs and improve reliability.",
     cap: 0.2,
-    costPerCustomer: 30,
+    costPerCustomer: 30, // Total per initial market customer over the whole build-out.
+    buildoutMonths: BUILDOUT_MONTHS,
   },
   solar: {
     name: "Rooftop solar rebates",
     description: "Help customers make electricity during daylight.",
-    mechanism:
-      "Grows gradually. Helps in daylight; does not directly cover an evening peak.",
+    mechanism: `A one-time project that funds rooftop panels over ${BUILDOUT_MONTHS} months. Output grows as panels are installed and continues with no further cost after completion. Helps in daylight; does not directly cover an evening peak.`,
     tradeoff:
       "Rebates cost money and reduce sales. Surplus is discarded, with no export payments or utility generation credits.",
     cap: 300, // Watts per initial market customer, scaled with scenario demand, at full adoption.
-    costPerCustomer: 60,
+    costPerCustomer: 60, // Total per initial market customer over the whole build-out.
+    buildoutMonths: BUILDOUT_MONTHS,
   },
-} as const;
-// Large buys more absolute adoption, at a higher cost per extra installation.
-export const POLICY_FUNDING = {
-  Off: { adoption: 0, cost: 0 },
-  Small: { adoption: 0.02, cost: 0.02 },
-  Large: { adoption: 0.05, cost: 0.07 },
 } as const;

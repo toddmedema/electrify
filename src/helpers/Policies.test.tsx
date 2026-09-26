@@ -2,8 +2,11 @@ import cloneDeep from "lodash.clonedeep";
 import {
   advancePolicies,
   applyPolicyDemand,
+  buildoutCompletionMonth,
+  buildoutMonthsDone,
   emptyPolicies,
   policyBudget,
+  policyTotalCost,
 } from "./Policies";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import gameReducer, {
@@ -32,7 +35,7 @@ function month(game: GameType) {
   const target = game.date.monthsElapsed + 1;
   while (game.date.monthsElapsed < target) tickState(game);
 }
-const change = { id: "efficiency", tier: "Small", month: 1 } as const;
+const change = { id: "efficiency", tier: "On", month: 1 } as const;
 
 test("only the dialog that owns a pause restores its previous speed", () => {
   jest.useFakeTimers();
@@ -53,7 +56,7 @@ test("only the dialog that owns a pause restores its previous speed", () => {
 test("forecast resolution cannot multiply monthly spending or mutate live adoption", () => {
   const game = createGame({
     scenarioId: 106,
-    initialPrograms: { efficiency: "Large", solar: "Small" },
+    initialPrograms: { efficiency: "On", solar: "On" },
   });
   const snapshot = cloneDeep(game.policies);
   const now = game.timeline[0];
@@ -80,7 +83,7 @@ test("schedule, replace, cancel and reject stale/no-op edits without recording t
   let game = createGame({ scenarioId: 106, seed: 4 });
   game = gameReducer(game, schedulePolicy(change));
   expect(game.policies!.programs.efficiency.pending).toEqual({
-    tier: "Small",
+    tier: "On",
     month: 1,
   });
   const log = game.replayLog!.length;
@@ -88,12 +91,15 @@ test("schedule, replace, cancel and reject stale/no-op edits without recording t
   expect(
     gameReducer(game, schedulePolicy({ ...change, month: 2 })).replayLog,
   ).toHaveLength(log);
-  game = gameReducer(game, schedulePolicy({ ...change, tier: "Large" }));
+  // Scheduling the current tier replaces the pending start with no change.
+  game = gameReducer(game, schedulePolicy({ ...change, tier: "Off" }));
+  expect(game.policies!.programs.efficiency.pending).toBeUndefined();
+  game = gameReducer(game, schedulePolicy(change));
   expect(
-    gameReducer(game, cancelPolicy(change)).policies!.programs.efficiency
-      .pending!.tier,
-  ).toBe("Large");
-  game = gameReducer(game, cancelPolicy({ ...change, tier: "Large" }));
+    gameReducer(game, cancelPolicy({ ...change, tier: "Off" })).policies!
+      .programs.efficiency.pending!.tier,
+  ).toBe("On");
+  game = gameReducer(game, cancelPolicy(change));
   expect(game.policies!.programs.efficiency.pending).toBeUndefined();
   expect(game.policies!.programs.efficiency.spending).toBe(0);
   const tutorial = createGame({ scenarioId: 0 });
@@ -112,18 +118,61 @@ test("adoption and actual spending are bounded, idempotent, and stop at saturati
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies();
   const program = game.policies.programs.efficiency;
-  program.tier = "Large";
+  program.tier = "On";
   program.adoption = 0.99;
   advancePolicies(game, 1);
   expect(program.adoption).toBe(1);
+  expect(program.completedMonth).toBe(1);
+  // The final partial month pays for 0.01 of the pool at the 1/24-per-month rate.
   expect(program.spending).toBeCloseTo(
-    policyBudget(game, "efficiency", "Large", 1) * 0.2,
+    policyBudget(game, "efficiency", "On", 1) * 0.01 * 24,
   );
+  expect(program.spent).toBe(program.spending);
   const saved = cloneDeep(game.policies);
   advancePolicies(game, 1);
   expect(game.policies).toEqual(saved);
   advancePolicies(game, 2);
   expect(program.spending).toBe(0);
+  expect(program.completedMonth).toBe(1);
+});
+
+test("a build-out finishes after exactly 24 funded months, then costs nothing and cannot be rescheduled", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  game.policies = emptyPolicies();
+  const program = game.policies.programs.solar;
+  expect(buildoutCompletionMonth("solar", 0, 1)).toBe(24);
+  program.tier = "On";
+  let total = 0;
+  const completed: (number | undefined)[] = [];
+  for (let m = 1; m <= 24; m++) {
+    advancePolicies(game, m);
+    expect(buildoutMonthsDone("solar", program.adoption)).toBe(m);
+    expect(program.spending).toBeCloseTo(policyBudget(game, "solar", "On", m));
+    total += program.spending;
+    completed.push(program.completedMonth);
+  }
+  expect(completed.slice(0, 23).every((m) => m === undefined)).toBe(true);
+  expect(program.adoption).toBe(1);
+  expect(program.completedMonth).toBe(24);
+  expect(program.spent).toBeCloseTo(total);
+  // Inflation moves the monthly price, so the sum stays near the start-month total.
+  expect(total / policyTotalCost(game, "solar", 1)).toBeGreaterThan(0.95);
+  expect(total / policyTotalCost(game, "solar", 24)).toBeLessThan(1.05);
+  advancePolicies(game, 25);
+  expect(program.spending).toBe(0);
+  expect(program.spent).toBeCloseTo(total);
+  // Pausing a finished project has no effect, so the reducer refuses to record it.
+  const fresh = createGame({ scenarioId: 106, seed: 4 });
+  fresh.policies = emptyPolicies(fresh.date.monthsElapsed);
+  Object.assign(fresh.policies.programs.solar, cloneDeep(program));
+  const log = fresh.replayLog!.length;
+  expect(
+    gameReducer(fresh, schedulePolicy({ id: "solar", tier: "Off", month: 1 }))
+      .replayLog,
+  ).toHaveLength(log);
+  expect(gameReducer(fresh, schedulePolicy(change)).replayLog).toHaveLength(
+    log + 1,
+  );
 });
 
 test("solar affects only eligible daylight load after efficiency; neutral demand is exact", () => {
@@ -165,7 +214,7 @@ test("preview is isolated, matches the real forecast and monthly costs reach cas
     preview.changed,
   );
   month(game);
-  expect(game.policies!.programs.efficiency.adoption).toBe(0.02);
+  expect(game.policies!.programs.efficiency.adoption).toBeCloseTo(1 / 24);
   const expected = game.policies!.programs.efficiency.spending;
   expect(
     summarizeTimeline(game.timeline, game.startingYear).expensesPolicy,
@@ -197,7 +246,7 @@ test("Off preserves installed upgrades through save/load and actions replay dete
   );
   month(game);
   const stock = game.policies!.programs.efficiency.adoption;
-  expect(stock).toBe(0.02);
+  expect(stock).toBeCloseTo(1 / 24);
   expect(game.policies!.programs.efficiency.spending).toBe(0);
   const restored = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),

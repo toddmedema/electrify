@@ -1093,7 +1093,7 @@ export interface WorldEventStateType {
 }
 
 export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
-export type PolicyTier = "Off" | "Small" | "Large";
+export type PolicyTier = "Off" | "On";
 export interface DeferredResidentialLoad {
   energyWh: number; // Unscaled representative-day energy.
   recoveryStartMinute: number; // Absolute simulation minute, including across month boundaries.
@@ -1102,8 +1102,10 @@ export interface DeferredResidentialLoad {
 export interface PolicyProgramType {
   tier: PolicyTier;
   startHour?: number; // Four-hour local-clock window; absent means 17 for earlier callers.
-  adoption: number; // Installed potential for rebates; current enrolled share for operating offers.
+  adoption: number; // Build-out progress (0-1) for rebates; current enrolled share for operating offers.
   spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
+  spent: number; // Cumulative rebate spending over the run.
+  completedMonth?: number; // Last month a finished build-out installed upgrades.
   pending?: { tier: PolicyTier; month: number; startHour?: number };
 }
 export interface PoliciesType {

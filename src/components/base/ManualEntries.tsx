@@ -190,20 +190,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates funding adoption demand time-of-use tariff curtailment contracts peak enrollment",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
       <div>
+        <p>Customer programs are set in Insights. Changes start next month.</p>
         <p>
-          Customer programs are set in Insights. Changes start next month and
-          stay until changed.
-        </p>
-        <p>
-          <strong>Efficiency and rooftop solar rebates:</strong> Choose Off,
-          Small or Large. You pay for new upgrades up to a monthly budget;
-          spending stops at full adoption. Off stops new upgrades, but installed
-          ones stay. Efficiency cuts home and business use. Rooftop solar cuts
-          their daylight demand; surplus is discarded without payment. Both
-          reduce electricity sales.
+          <strong>Efficiency and rooftop solar rebates:</strong> Each is a
+          one-time build-out project. Once started, it installs upgrades over 24
+          months at a steady monthly cost, then finishes and costs nothing more.
+          Installed upgrades keep working for the rest of the run. You can pause
+          new installations and resume later; the project picks up where it left
+          off. Efficiency cuts home and business use by up to 20% at completion.
+          Rooftop solar cuts their daylight demand; surplus is discarded without
+          payment. Both reduce electricity sales.
         </p>
         <p>
           <strong>Time-of-use tariff:</strong> Half of homes move 20% of their

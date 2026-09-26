@@ -12,7 +12,6 @@ import {
   POLICY_IDS,
   POLICY_TIERS,
   POLICY_SCENARIOS,
-  POLICY_FUNDING,
 } from "../data/Policies";
 import { getInflationIndex } from "../data/Economy";
 import { EQUATOR_RADIANCE, TICK_MINUTES } from "../Constants";
@@ -22,10 +21,10 @@ export function emptyPolicies(month = 0): PoliciesType {
   return {
     month,
     programs: {
-      efficiency: { tier: "Off", adoption: 0, spending: 0 },
-      solar: { tier: "Off", adoption: 0, spending: 0 },
-      timeOfUse: { tier: "Off", adoption: 0, spending: 0 },
-      curtailment: { tier: "Off", adoption: 0, spending: 0 },
+      efficiency: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
+      solar: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
+      timeOfUse: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
+      curtailment: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
     },
   };
 }
@@ -69,6 +68,12 @@ export function validPolicies(
         s.adoption <= 1 &&
         Number.isFinite(s.spending) &&
         s.spending >= 0 &&
+        Number.isFinite(s.spent) &&
+        s.spent >= s.spending &&
+        (s.completedMonth === undefined ||
+          (Number.isInteger(s.completedMonth) &&
+            s.completedMonth <= p.month &&
+            s.adoption === 1)) &&
         (!s.pending ||
           (validPolicyChange({ id, ...s.pending }) &&
             s.pending.month === currentMonth + 1))
@@ -76,18 +81,33 @@ export function validPolicies(
     })
   );
 }
+export type BuildoutPolicyId = "efficiency" | "solar";
+export const buildoutMonths = (id: BuildoutPolicyId) =>
+  POLICIES[id].buildoutMonths;
+/** Monthly spending while a build-out program is installing. Operating offers cost nothing
+ * directly; their bill credits reduce revenue instead. */
 export function policyBudget(
   game: GameType,
   id: PolicyId,
   tier: PolicyTier,
   month: number,
 ): number {
-  if (tier === "Off") return 0;
+  if (tier === "Off" || isOperatingPolicy(id)) return 0;
+  return (
+    policyTotalCost(game, id as BuildoutPolicyId, month) /
+    buildoutMonths(id as BuildoutPolicyId)
+  );
+}
+/** Whole build-out cost in the given month's dollars. */
+export function policyTotalCost(
+  game: GameType,
+  id: BuildoutPolicyId,
+  month: number,
+): number {
   return (
     game.customerMarketSize *
     game.startingDemandScale *
     POLICIES[id].costPerCustomer *
-    POLICY_FUNDING[tier].cost *
     getInflationIndex(
       getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear),
       game.startingYear,
@@ -95,6 +115,26 @@ export function policyBudget(
     )
   );
 }
+// Monthly increments are 1/24, which do not sum exactly to 1 in floating point.
+const COMPLETE = 1 - 1e-9;
+export const buildoutComplete = (adoption: number) => adoption >= COMPLETE;
+/** Whole months of installation left, counting a partial final month as one. */
+export const buildoutMonthsRemaining = (
+  id: BuildoutPolicyId,
+  adoption: number,
+) =>
+  buildoutComplete(adoption)
+    ? 0
+    : Math.ceil((1 - adoption) * buildoutMonths(id) - 1e-6);
+/** Months of installation completed so far, e.g. 8 of 24. */
+export const buildoutMonthsDone = (id: BuildoutPolicyId, adoption: number) =>
+  buildoutMonths(id) - buildoutMonthsRemaining(id, adoption);
+/** The last month that installs upgrades if the program runs from `startMonth` without pausing. */
+export const buildoutCompletionMonth = (
+  id: BuildoutPolicyId,
+  adoption: number,
+  startMonth: number,
+) => startMonth + buildoutMonthsRemaining(id, adoption) - 1;
 /** Activation, then funded installations, then their spending. Idempotent per month.
  * Forecast callers own a private copy. Installed measures never retire during this run. */
 export function advancePolicies(game: GameType, month: number): PolicyId[] {
@@ -118,16 +158,21 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
         s.spending = 0;
         return;
       }
-      const increment = Math.min(
-        1 - s.adoption,
-        POLICY_FUNDING[s.tier].adoption,
-      );
+      const rate =
+        s.tier === "On" ? 1 / buildoutMonths(id as BuildoutPolicyId) : 0;
+      const increment = buildoutComplete(s.adoption)
+        ? 0
+        : Math.min(1 - s.adoption, rate);
+      // A final partial month pays only for the installations it funds.
       s.spending =
         increment > 0
-          ? (policyBudget(game, id, s.tier, m) * increment) /
-            POLICY_FUNDING[s.tier].adoption
+          ? (policyBudget(game, id, s.tier, m) * increment) / rate
           : 0;
-      s.adoption = Math.min(1, s.adoption + increment);
+      s.spent += s.spending;
+      if (increment > 0 && buildoutComplete(s.adoption + increment)) {
+        s.adoption = 1;
+        s.completedMonth = m;
+      } else s.adoption += increment;
     });
     p.month = m;
   }
@@ -135,8 +180,7 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
 }
 export const isOperatingPolicy = (id: PolicyId) =>
   id === "timeOfUse" || id === "curtailment";
-export const participation = (tier: PolicyTier) =>
-  tier === "Large" ? 0.5 : tier === "Small" ? 0.25 : 0;
+export const participation = (tier: PolicyTier) => (tier === "On" ? 0.5 : 0);
 
 const validStartHour = (hour: unknown) =>
   hour === undefined ||

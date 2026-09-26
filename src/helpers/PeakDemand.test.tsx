@@ -52,10 +52,10 @@ test.each([105, 106, 111])(
       seed: 4,
       months: 12,
       initialPrograms: {
-        timeOfUse: "Large",
-        curtailment: "Large",
-        efficiency: "Small",
-        solar: "Small",
+        timeOfUse: "On",
+        curtailment: "On",
+        efficiency: "On",
+        solar: "On",
       },
     });
     expect(result.violations).toEqual([]);
@@ -64,8 +64,8 @@ test.each([105, 106, 111])(
 function offers() {
   const game = cloneDeep(baseline);
   game.policies = emptyPolicies();
-  game.policies.programs.timeOfUse.tier = "Large";
-  game.policies.programs.curtailment.tier = "Small";
+  game.policies.programs.timeOfUse.tier = "On";
+  game.policies.programs.curtailment.tier = "On";
   return game;
 }
 function demand(minute: number) {
@@ -96,13 +96,13 @@ test.each([0, 6 * 60, 17 * 60 - 1, 17 * 60, 21 * 60 - 1, 21 * 60, 1440])(
     applyPeakDemand(game, tick, [], 1);
     expect(tick.demandByType.Residential).toBe(peak ? 90 : 100);
     expect(tick.demandByType.Commercial).toBe(100);
-    expect(tick.demandByType.Industrial).toBe(peak ? 95 : 100);
-    expect(tick.demandByType["Data centers"]).toBe(peak ? 95 : 100);
+    expect(tick.demandByType.Industrial).toBe(peak ? 90 : 100);
+    expect(tick.demandByType["Data centers"]).toBe(peak ? 90 : 100);
     expect(tick.demandByType.Transportation).toBe(100);
     // Explicit enrolled/un-enrolled bills: contracts and TOU never share a sector.
     const bill = peak
-      ? 50 + 40 * 1.3 + 100 + 2 * (75 + 20 * 0.9) + 100
-      : 50 + 50 * (late ? 0.9 : 1) + 100 + 2 * (75 + 25 * 0.9) + 100;
+      ? 50 + 40 * 1.3 + 100 + 2 * (50 + 40 * 0.9) + 100
+      : 50 + 50 * (late ? 0.9 : 1) + 100 + 2 * (50 + 50 * 0.9) + 100;
     const watts = Object.values(tick.demandByType).reduce((a, b) => a + b, 0);
     expect(customerBillingRate(game, tick) * watts).toBeCloseTo(
       bill * game.dollarsPerkWh,
@@ -143,7 +143,7 @@ test("Off removes all operating participation next month without changing instal
   game.policies!.programs.efficiency.adoption = 0.3;
   advancePolicies(game, 1);
   expect(game.policies!.programs.timeOfUse.adoption).toBe(0.5);
-  expect(game.policies!.programs.curtailment.adoption).toBe(0.25);
+  expect(game.policies!.programs.curtailment.adoption).toBe(0.5);
   for (const id of ["timeOfUse", "curtailment"] as const) {
     game.policies!.programs[id].pending = { tier: "Off", month: 2 };
   }
@@ -153,6 +153,7 @@ test("Off removes all operating participation next month without changing instal
       tier: "Off",
       adoption: 0,
       spending: 0,
+      spent: 0,
     });
   }
   const tick = demand(18 * 60);
@@ -163,7 +164,7 @@ test("Off removes all operating participation next month without changing instal
 });
 
 test("scheduled preview uses real demand/billing; even partial and zero supply bill only delivered energy", () => {
-  const change = { id: "timeOfUse", tier: "Large", month: 1 } as const;
+  const change = { id: "timeOfUse", tier: "On", month: 1 } as const;
   const preview = previewPolicy(baseline, change, 1);
   let game = cloneDeep(gameReducer(baseline, schedulePolicy(change)));
   const now = game.timeline[0];
@@ -181,7 +182,7 @@ test("scheduled preview uses real demand/billing; even partial and zero supply b
   game = cloneDeep(
     gameReducer(
       game,
-      schedulePolicy({ id: "curtailment", tier: "Large", month: 1 }),
+      schedulePolicy({ id: "curtailment", tier: "On", month: 1 }),
     ),
   );
   month(game);
@@ -215,7 +216,7 @@ test("changing the base rate updates live bills immediately while recorded histo
   let game = createGame({
     scenarioId: 106,
     seed: 4,
-    initialPrograms: { timeOfUse: "Large", curtailment: "Small" },
+    initialPrograms: { timeOfUse: "On", curtailment: "On" },
   });
   month(game);
   const history = cloneDeep(game.monthlyHistory);
@@ -238,7 +239,7 @@ test("constant curtailment credits drive the same effective-price memory used fo
   const game = createGame({
     scenarioId: 106,
     seed: 4,
-    initialPrograms: { curtailment: "Large" },
+    initialPrograms: { curtailment: "On" },
   });
   month(game);
   const scenario = getScenario(game.scenarioId)!;
@@ -275,7 +276,7 @@ test("constant curtailment credits drive the same effective-price memory used fo
 test("both offer actions cancel, save, resume and replay deterministically through stopping", () => {
   let game = cloneDeep(baseline);
   for (const id of ["timeOfUse", "curtailment"] as const) {
-    const change = { id, tier: "Small", month: 1 } as const;
+    const change = { id, tier: "On", month: 1 } as const;
     game = cloneDeep(gameReducer(game, schedulePolicy(change)));
     expect(
       gameReducer(game, cancelPolicy(change)).policies!.programs[id].pending,
@@ -358,8 +359,8 @@ test.each([false, true])(
           before.Residential * 0.95 +
           tick.shiftedResidentialW! * 0.9 +
           before.Commercial +
-          before.Industrial * 0.975 +
-          before["Data centers"] * 0.975 +
+          before.Industrial * 0.95 +
+          before["Data centers"] * 0.95 +
           before.Transportation;
         const total = Object.values(tick.demandByType).reduce(
           (a, b) => a + b,
@@ -373,7 +374,7 @@ test.each([false, true])(
     /* eslint-enable jest/no-conditional-expect */
     expect(queued).toEqual([]);
     expect(residentialAfter).toBeCloseTo(residentialBefore, 8);
-    expect(industrialBefore - industrialAfter).toBeCloseTo(20);
+    expect(industrialBefore - industrialAfter).toBeCloseTo(40);
   },
 );
 
@@ -383,7 +384,7 @@ test.each([18 * 60, 22 * 60])(
     let game = createGame({
       scenarioId: 106,
       seed: 4,
-      initialPrograms: { timeOfUse: "Large" },
+      initialPrograms: { timeOfUse: "On" },
     });
     month(game);
     while (game.date.minute < 1440 + minute) tickState(game);
