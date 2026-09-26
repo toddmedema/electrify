@@ -1,9 +1,9 @@
 import numbro from "numbro";
 
 /**
- * Format power using its actual magnitude, without promoting sub-GW values to GW. Unless a
- * mantissa is requested, values of 10 or more in their unit are whole numbers ("541MW") and
- * smaller ones keep one decimal ("9.8GW").
+ * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
+ * more in their unit are always whole numbers ("541MW"); smaller ones keep one decimal ("9.8GW")
+ * or the requested mantissa ("1.521kW").
  */
 export function formatWatts(i: number, mantissa?: number): string {
   return formatWattsInUnit(i, getWattUnit(i), mantissa);
@@ -118,11 +118,15 @@ export function formatWattsInUnit(
   mantissa?: number,
 ): string {
   const scaled = i / unit.divisor;
+  const requested = mantissa ?? 1;
+  // Every power and energy reading of 10 or more is a whole number, whatever precision a caller
+  // asks for; the rounding check uses that precision so 9.96 at one decimal becomes "10", not "10.0"
+  const whole = Math.abs(Number(scaled.toFixed(requested))) >= 10;
   return (
     numbro(scaled).format({
       thousandSeparated: true,
       trimMantissa: true,
-      mantissa: mantissa ?? (Math.abs(scaled) >= 9.95 ? 0 : 1),
+      mantissa: whole ? 0 : requested,
     }) +
     unit.suffix +
     "W"

@@ -28,7 +28,7 @@ for (const theme of ["light", "dark"] as const) {
     await slider.focus();
     await slider.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "4");
-    await expect(card).toContainText("16.9MW");
+    await expect(card).toContainText("17MW");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
@@ -54,7 +54,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Tier 4");
-    await expect(dialog).toContainText("16.9MW access");
+    await expect(dialog).toContainText("17MW access");
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(
       page

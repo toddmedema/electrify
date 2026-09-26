@@ -33,6 +33,14 @@ describe("formatWatts", () => {
     expect(formatWatts(1521, 3)).toEqual("1.521kW");
     expect(formatWatts(1521, 4)).toEqual("1.521kW");
   });
+
+  it("rounds to whole numbers from 10 up even when more precision is requested", () => {
+    expect(formatWatts(337.5e6, 3)).toEqual("338MW");
+    expect(formatWatts(16.875e6, 6)).toEqual("17MW");
+    expect(formatWattHours(12.4e6, 2)).toEqual("12MWh");
+    expect(formatWatts(9.9996e6, 3)).toEqual("10MW");
+    expect(formatWatts(7.5e6, 3)).toEqual("7.5MW");
+  });
 });
 
 describe("formatWatts rounding", () => {
