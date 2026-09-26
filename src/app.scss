@@ -5485,32 +5485,56 @@ $sizemap: (
 .insights .insightsRateMetricValue {
   font-size: 0.9375rem;
 }
-.customerProgramChoice {
-  border-bottom: 1px solid var(--border-subtle);
-}
-.customerProgramChoiceButton.MuiButton-root {
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  color: var(--font-color-primary);
-}
-.customerProgramChoiceButton > span:first-child {
+.customerProgramList {
   display: grid;
-  gap: 4px;
+  gap: 16px;
 }
-/* Finished projects need no decision, so they recede behind the programs still in play. */
-.customerProgramChoice[data-completed] .customerProgramChoiceButton strong {
-  font-weight: 500;
+.customerProgramSection {
+  display: grid;
+  gap: 8px;
 }
-.customerProgramChoice[data-completed] .customerProgramChoiceButton strong,
-.customerProgramChoice[data-completed] .customerProgramStatus,
-.customerProgramChoice[data-completed] .customerProgramDescription {
+.customerProgramSection > h3 {
+  font-weight: 700;
+}
+/* The shared mission card carries list margins; inside the dialog the section grid spaces rows. */
+.build-list-item.missionItem.customerProgramItem {
+  margin: 0;
+}
+.customerProgramItem .MuiCardHeader-avatar {
+  align-self: start;
+}
+.customerProgramIcon.MuiAvatar-root {
+  width: 40px;
+  height: 40px;
+  background: var(--bg-raised);
   color: var(--font-color-faded);
 }
-.customerProgramChoiceButton > span:last-child {
-  font-size: 24px;
-  color: var(--interactive-blue);
+.customerProgramItem[data-active] .customerProgramIcon.MuiAvatar-root {
+  color: var(--font-color-primary);
+}
+.customerProgramTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 12px;
+  row-gap: 0;
+}
+.customerProgramStatus {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--font-color-faded);
+}
+.customerProgramItem[data-active] .customerProgramStatus {
+  color: var(--font-color-primary);
+}
+/* Finished projects need no decision, so they recede behind the programs still in play. */
+.customerProgramItem[data-completed] {
+  border-style: dashed;
+}
+.customerProgramItem[data-completed] .MuiCardHeader-title {
+  font-weight: 500;
+  color: var(--font-color-faded);
 }
 .base_main .eventLogItem {
   border-style: solid;

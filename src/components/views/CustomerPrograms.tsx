@@ -1,8 +1,12 @@
 import * as React from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
+  Card,
+  CardActionArea,
+  CardHeader,
   Dialog,
   DialogActions,
   DialogContent,
@@ -19,6 +23,11 @@ import {
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CloseIcon from "@mui/icons-material/Close";
+import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
+import SolarPowerIcon from "@mui/icons-material/SolarPower";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import FactoryIcon from "@mui/icons-material/Factory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import {
   cancelPolicy,
@@ -70,6 +79,14 @@ const labelMonth = (game: GameType, month: number) => {
   const d = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
   return `${d.month} ${d.year}`;
 };
+
+const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
+  efficiency: EnergySavingsLeafIcon,
+  solar: SolarPowerIcon,
+  timeOfUse: ScheduleIcon,
+  curtailment: FactoryIcon,
+};
+const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
 const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
   efficiency: "Efficiency",
@@ -403,48 +420,65 @@ function Decision({
     );
     setLater(false);
   };
+  // Rows share the scenario pick list's card, so both catalogs scan the same way.
   const choice = (id: PolicyId) => {
     const status = choiceStatus(game, id, programs[id]);
+    const Icon = PROGRAM_ICONS[id];
+    const done = finished(id);
     return (
-      <Box
+      <Card
         key={id}
-        className="customerProgramChoice"
-        data-completed={finished(id) || undefined}
+        className="build-list-item missionItem customerProgramItem"
+        data-completed={done || undefined}
+        data-active={
+          !done && (programs[id].tier === "On" || !!programs[id].pending)
+            ? true
+            : undefined
+        }
       >
-        <Button
-          className="customerProgramChoiceButton"
+        <CardActionArea
           aria-label={`${POLICIES[id].name} · ${status}`}
-          aria-describedby={`program-description-${id}`}
-          fullWidth
-          sx={{ minHeight: 44, textAlign: "left" }}
+          aria-describedby={done ? undefined : `program-description-${id}`}
           onClick={() => open(id)}
         >
-          <span>
-            <strong>{POLICIES[id].name}</strong>
-            <Typography
-              className="customerProgramStatus"
-              component="span"
-              variant="body2"
-            >
-              {status}
-            </Typography>
-            <Typography
-              id={`program-description-${id}`}
-              className="customerProgramDescription"
-              component="span"
-              variant="body2"
-              color="textSecondary"
-            >
-              {finished(id)
-                ? buildoutImpact(game, id as BuildoutPolicyId)
-                : POLICIES[id].description}
-            </Typography>
-          </span>
-          <span aria-hidden>›</span>
-        </Button>
-      </Box>
+          <CardHeader
+            avatar={
+              <Avatar className="customerProgramIcon">
+                <Icon aria-hidden />
+              </Avatar>
+            }
+            title={
+              <span className="customerProgramTitle">
+                <span>{POLICIES[id].name}</span>
+                <span className="customerProgramStatus">{status}</span>
+              </span>
+            }
+            subheader={
+              done ? undefined : (
+                <span id={`program-description-${id}`}>
+                  {POLICIES[id].description}
+                </span>
+              )
+            }
+            action={<ArrowRightIcon color="primary" aria-hidden />}
+          />
+        </CardActionArea>
+      </Card>
     );
   };
+  const section = (title: string, ids: PolicyId[]) =>
+    ids.length > 0 && (
+      <Box
+        component="section"
+        aria-label={title}
+        className="customerProgramSection"
+      >
+        <Typography component="h3" variant="subtitle2">
+          {title}
+        </Typography>
+        {ids.map(choice)}
+      </Box>
+    );
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
   return (
@@ -479,26 +513,16 @@ function Decision({
         }}
       >
         {!selected ? (
-          <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography variant="body2">Changes start next month.</Typography>
-            {POLICY_IDS.filter((id) => !finished(id)).map(choice)}
-            {POLICY_IDS.some(finished) && (
-              <Box
-                component="section"
-                aria-labelledby="completed-programs"
-                sx={{ display: "grid", gap: 1 }}
-              >
-                <Typography
-                  id="completed-programs"
-                  component="h3"
-                  variant="subtitle2"
-                  color="textSecondary"
-                >
-                  Completed
-                </Typography>
-                {POLICY_IDS.filter(finished).map(choice)}
-              </Box>
+          <Box className="customerProgramList">
+            {section(
+              "Rebate projects",
+              BUILDOUT_IDS.filter((id) => !finished(id)),
             )}
+            {section(
+              "Rates and contracts",
+              POLICY_IDS.filter(isOperatingPolicy),
+            )}
+            {section("Completed", POLICY_IDS.filter(finished))}
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
@@ -687,6 +711,11 @@ function Decision({
       <DialogActions
         sx={{ p: 2, flexWrap: "wrap", gap: 1, "& button": { minHeight: 44 } }}
       >
+        {!selected && (
+          <Typography variant="body2" color="textSecondary" sx={{ mr: "auto" }}>
+            Changes start next month.
+          </Typography>
+        )}
         <Button onClick={() => (selected ? setSelected(undefined) : onClose())}>
           {selected ? "Back" : "Close"}
         </Button>
@@ -749,7 +778,7 @@ export default function CustomerPrograms({
   if (!policyAvailable(game) || game.replayPlayback) return null;
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   // A finished build-out costs nothing more, so it is neither active nor in the rebate total.
-  const building = (["efficiency", "solar"] as BuildoutPolicyId[]).filter(
+  const building = BUILDOUT_IDS.filter(
     (id) =>
       programs[id].tier === "On" && !buildoutComplete(programs[id].adoption),
   );
