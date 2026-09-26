@@ -12,21 +12,50 @@ const root = path.resolve(__dirname, "..");
 const publicDir = path.join(root, "public");
 const imagesDir = path.join(publicDir, "images");
 const output = path.join(publicDir, "icons.json");
+const IMAGE = /\.(svg|png|jpe?g|gif|webp|avif|ico)$/i;
 
 function filesUnder(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const relative = path.join(directory, entry.name);
-    return entry.isDirectory() ? filesUnder(relative) : [relative];
-  });
+  return fs
+    .readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => !entry.name.startsWith("."))
+    .flatMap((entry) => {
+      const absolute = path.join(directory, entry.name);
+      return entry.isDirectory() ? filesUnder(absolute) : [absolute];
+    });
 }
 
-const urls = filesUnder(imagesDir)
-  .map((file) => "/" + path.relative(publicDir, file).split(path.sep).join("/"))
-  .sort();
-
-const serialized = `${JSON.stringify(urls, null, 2)}\n`;
-// Skip an identical rewrite so parallel scripts never read a half-written file or churn mtimes.
-const current = fs.existsSync(output) ? fs.readFileSync(output, "utf8") : "";
-if (current !== serialized) {
-  fs.writeFileSync(output, serialized);
+/**
+ * Site-relative URLs for every image, encoded the way a browser encodes an `<img src>` so each
+ * entry is the same cache key the page later requests (`natural gas.svg` -> `natural%20gas.svg`).
+ * `%`, `#` and `?` are escaped first so they name the file rather than truncating the path.
+ * Dotfiles such as macOS `.DS_Store` differ between machines and are not artwork, so skip them.
+ */
+function iconUrls() {
+  return filesUnder(imagesDir)
+    .filter((file) => IMAGE.test(file))
+    .map((file) => {
+      const raw =
+        "/" + path.relative(publicDir, file).split(path.sep).join("/");
+      const escaped = raw
+        .replace(/%/g, "%25")
+        .replace(/#/g, "%23")
+        .replace(/\?/g, "%3F");
+      return new URL(escaped, "https://electrify.invalid").pathname;
+    })
+    .sort();
 }
+
+function writeManifest() {
+  const serialized = `${JSON.stringify(iconUrls(), null, 2)}\n`;
+  // Skip an identical rewrite so parallel scripts never read a half-written file or churn mtimes.
+  const current = fs.existsSync(output) ? fs.readFileSync(output, "utf8") : "";
+  if (current !== serialized) {
+    fs.writeFileSync(output, serialized);
+  }
+}
+
+if (require.main === module) {
+  writeManifest();
+}
+
+module.exports = { iconUrls, imagesDir, output };
