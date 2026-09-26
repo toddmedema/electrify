@@ -4915,9 +4915,10 @@ $sizemap: (
   gap: 0 4px;
   padding: 0 8px;
 }
-// A term's manual entry, opened beside it (base/ManualHelpPopover). At most half the screen
-// tall so the decision underneath stays in view; the body scrolls, the title and close stay put
-.manual-popover.MuiPopover-paper {
+// A term's manual entry, pinned beside it (base/ManualHelpPopover) or previewed on mouse hover
+// (base/ManualLink). At most half the screen tall so the decision underneath stays in view;
+// the body scrolls, the title and close stay put
+.manual-popover.MuiPaper-root {
   display: flex;
   flex-direction: column;
   width: min(420px, calc(100vw - 16px));

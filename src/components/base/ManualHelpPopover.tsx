@@ -16,6 +16,62 @@ MANUAL_ENTRIES.forEach((entry: ManualEntryType) => {
   ENTRIES_BY_TITLE[entry.title] = entry;
 });
 
+export function manualEntryByTitle(title: string): ManualEntryType | undefined {
+  return ENTRIES_BY_TITLE[title];
+}
+
+interface ContentProps {
+  entry: ManualEntryType;
+  onClose: () => void;
+  onRelated: (title: string) => void;
+  scrollRef?: React.Ref<HTMLDivElement>;
+}
+
+// One entry's title, close button and scrolling body. Shared by the popover a tap pins open and
+// the preview a mouse opens on hover (see ManualLink)
+export function ManualHelpContent(props: ContentProps): React.JSX.Element {
+  const { entry, onClose, onRelated } = props;
+  return (
+    <>
+      <div className="manual-popover-header">
+        <Typography variant="subtitle1" component="h2">
+          {entry.title}
+        </Typography>
+        <IconButton
+          onClick={onClose}
+          aria-label="close"
+          color="primary"
+          size="small"
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </div>
+      <div className="manual-popover-body" ref={props.scrollRef}>
+        {entry.entry}
+        {!!entry.related?.length && (
+          <nav
+            aria-label={`Related to ${entry.title}`}
+            className="manual-related"
+          >
+            <Typography variant="body2" color="textSecondary">
+              Related entries
+            </Typography>
+            {entry.related.map((title) => (
+              <Button
+                key={title}
+                className="manual-related-link"
+                onClick={() => onRelated(title)}
+              >
+                {title}
+              </Button>
+            ))}
+          </nav>
+        )}
+      </div>
+    </>
+  );
+}
+
 interface Props {
   // The entry to show, or undefined when closed
   entry?: string;
@@ -80,43 +136,12 @@ export default function ManualHelpPopover(
       }}
     >
       {entry && (
-        <>
-          <div className="manual-popover-header">
-            <Typography variant="subtitle1" component="h2">
-              {entry.title}
-            </Typography>
-            <IconButton
-              onClick={onClose}
-              aria-label="close"
-              color="primary"
-              size="small"
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </div>
-          <div className="manual-popover-body" ref={scrollRef}>
-            {entry.entry}
-            {!!entry.related?.length && (
-              <nav
-                aria-label={`Related to ${entry.title}`}
-                className="manual-related"
-              >
-                <Typography variant="body2" color="textSecondary">
-                  Related entries
-                </Typography>
-                {entry.related.map((title) => (
-                  <Button
-                    key={title}
-                    className="manual-related-link"
-                    onClick={() => onRelated(title)}
-                  >
-                    {title}
-                  </Button>
-                ))}
-              </nav>
-            )}
-          </div>
-        </>
+        <ManualHelpContent
+          entry={entry}
+          onClose={onClose}
+          onRelated={onRelated}
+          scrollRef={scrollRef}
+        />
       )}
     </Popover>
   );
