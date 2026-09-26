@@ -120,7 +120,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     await expect(
       line.getByRole("button", {
-        name: "Upgrade Northern intertie to 338MW",
+        name: "Upgrade Northern intertie to 337.5MW",
       }),
     ).toBeVisible();
     expect(
