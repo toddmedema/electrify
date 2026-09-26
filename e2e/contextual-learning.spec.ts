@@ -59,30 +59,22 @@ for (const theme of ["light", "dark"] as const) {
     await help.click();
     const manual = page.getByRole("dialog", { name: "Manual help" });
     await expect(manual).toBeVisible();
-    const topic = manual
-      .getByRole("heading", {
+    // Just the entry, beside the term, rather than the whole manual over the decision
+    await expect(
+      manual.getByRole("heading", {
         name: "Interest Rates & Inflation",
         exact: true,
-      })
-      .getByRole("button", {
-        name: "Interest Rates & Inflation",
-        exact: true,
-      });
-    await expect(topic).toHaveAttribute("aria-expanded", "true");
-    await expect(topic).toBeFocused();
+      }),
+    ).toBeVisible();
     await expect(manual).toContainText("prime rate");
-    await manual
-      .getByRole("textbox", { name: "Search the manual" })
-      .fill("round-trip");
-    const related = manual
-      .getByRole("heading", { name: "Power and Energy", exact: true })
-      .getByRole("button", { name: "Power and Energy", exact: true });
-    await manual
-      .getByRole("navigation", { name: "Related to Round-trip Efficiency" })
-      .getByRole("button", { name: "Power and Energy", exact: true })
-      .click();
-    await expect(related).toHaveAttribute("aria-expanded", "true");
-    await expect(related).toBeFocused();
+    await expect(
+      manual.getByRole("textbox", { name: "Search the manual" }),
+    ).toHaveCount(0);
+    const viewport = page.viewportSize()!;
+    const box = (await manual.boundingBox())!;
+    expect(box.height).toBeLessThanOrEqual(viewport.height / 2 + 1);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
     expect(
       await manual.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -98,9 +90,15 @@ for (const theme of ["light", "dark"] as const) {
         path: path.join(shots, `manual-${testInfo.project.name}-${theme}.png`),
       });
     }
-    await manual.getByRole("button", { name: "back", exact: true }).click();
+    await manual.getByRole("button", { name: "close", exact: true }).click();
     await expect(manual).not.toBeVisible();
     await expect(help).toBeFocused();
+    // Tapping anywhere outside puts it away too, without acting on what was tapped
+    await help.click();
+    await expect(manual).toBeVisible();
+    await page.mouse.click(4, viewport.height - 4);
+    await expect(manual).not.toBeVisible();
+    await expect(purchase).toContainText("Loan option");
     // A second lookup must close to the same draft without creating a history loop.
     await help.click();
     await expect(manual).toBeVisible();
@@ -183,7 +181,7 @@ test("reading help preserves the current tutorial objective", async ({
   await expect(
     page.getByRole("button", { name: "Next", exact: true }),
   ).not.toBeVisible();
-  await manual.getByRole("button", { name: "back", exact: true }).click();
+  await manual.getByRole("button", { name: "close", exact: true }).click();
   await expect(manual).not.toBeVisible();
   await expect(objective).toHaveText(before, { useInnerText: true });
   await expect(help).toBeFocused();

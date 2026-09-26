@@ -5,9 +5,14 @@ import {
   FORECAST_AXIS_LEFT,
   FORECAST_AXIS_RIGHT,
   forecastMonthAxis,
+  verticalLinePlugin,
   yAxis,
 } from "./UPlotHelpers";
-import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
+import {
+  formatMinuteAsTooltipHeader,
+  getDateFromMinute,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
 import { chartPalette, fuelColors, withAlpha } from "../../Theme";
@@ -32,6 +37,73 @@ export interface Props {
    * which part of the stack is theirs.
    */
   highlightFuel?: FuelNameType;
+  /** Where recorded history ends and the forecast begins, marked with a line */
+  currentMinute?: number;
+}
+
+// Past this span an hourly stack is thousands of slivers too thin to read, so it is drawn as
+// monthly averages instead
+const MONTHLY_ABOVE_MINUTES = 12 * MINUTES_PER_MONTH;
+
+/**
+ * Time-weighted monthly averages of a timeline, one point per game month.
+ *
+ * The sampled forecast is uneven -- it keeps extra points wherever output swings -- so each
+ * point counts for the time until the next one rather than once. Recorded history already
+ * holds one average per month and passes through unchanged. Each month's point sits at its
+ * first sample, so the current month starts at now rather than before it.
+ */
+export function monthlyAverages(
+  timeline: TickPresentFutureType[],
+  fuels: FuelNameType[],
+): TickPresentFutureType[] {
+  const months: TickPresentFutureType[] = [];
+  let bucket = -1;
+  let weight = 0;
+  let demandSum = 0;
+  let fuelSums: number[] = [];
+  let first: TickPresentFutureType | undefined;
+  const flush = () => {
+    if (!first) {
+      return;
+    }
+    const supplyByFuel: TickPresentFutureType["supplyByFuel"] = {};
+    fuels.forEach((f, i) => {
+      supplyByFuel[f] = fuelSums[i] / weight;
+    });
+    months.push({
+      ...first,
+      demandW: demandSum / weight,
+      supplyByFuel,
+    } as TickPresentFutureType);
+  };
+  timeline.forEach((t, i) => {
+    const month = Math.floor(t.minute / MINUTES_PER_MONTH);
+    if (month !== bucket) {
+      flush();
+      bucket = month;
+      weight = 0;
+      demandSum = 0;
+      fuelSums = fuels.map(() => 0);
+      first = t;
+    }
+    const next = timeline[i + 1];
+    // The last point, and a repeat of the same minute, still count for something, or a month
+    // made only of them would divide by zero
+    const w = Math.max(
+      next
+        ? Math.min(next.minute, (month + 1) * MINUTES_PER_MONTH) - t.minute
+        : 0,
+      1e-6,
+    );
+    weight += w;
+    demandSum += t.demandW * w;
+    fuels.forEach((f, j) => {
+      fuelSums[j] += (t.supplyByFuel[f] || 0) * w;
+    });
+  });
+  flush();
+  return months;
 }
 
 /**
@@ -69,6 +141,8 @@ interface State {
   maxY: number;
   startingYear: number;
   multiyear: boolean;
+  monthly: boolean;
+  currentMinute: number | null;
 }
 
 // Faded far enough that the highlighted band is unmistakably the subject, but not so far
@@ -126,14 +200,29 @@ function buildOptions(
     // Each fuel's fill runs down to the band below it rather than to the axis, which is what
     // makes the series read as a stack; the bottom fuel keeps its own fill to zero
     bands: fuels.slice(1).map((_f, i) => ({ series: [i + 2, i + 1] })),
+    plugins: [
+      // Solid and full strength: with a stack this busy, a faint line gets lost among the bands
+      verticalLinePlugin(
+        () => getState().currentMinute,
+        chartPalette().axis,
+        1,
+        2 * scale,
+      ),
+    ],
   });
 }
 
 function tooltip(idx: number, state: State): string {
-  const header = formatMinuteAsTooltipHeader(
-    state.minutes[idx],
-    state.startingYear,
-  );
+  let header: string;
+  if (state.monthly) {
+    const date = getDateFromMinute(state.minutes[idx], state.startingYear);
+    header = `${date.month} ${date.year} average`;
+  } else {
+    header = formatMinuteAsTooltipHeader(
+      state.minutes[idx],
+      state.startingYear,
+    );
+  }
   return [
     header,
     ...state.fuels
@@ -162,7 +251,10 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       showXLabels,
       syncKey,
       highlightFuel,
+      currentMinute,
     } = this.props;
+    const monthly = domain.x[1] - domain.x[0] > MONTHLY_ABOVE_MINUTES;
+    const points = monthly ? monthlyAverages(timeline, fuels) : timeline;
 
     // Every band needs a value at every x or the stack tears, so backfill the whole series.
     // The sampled forecast repeats its first minute, and a stack lines its bands up by x, so a
@@ -170,7 +262,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
     const minutes: number[] = [];
     const demand: number[] = [];
     const byFuel: number[][] = fuels.map(() => []);
-    timeline.forEach((t) => {
+    points.forEach((t) => {
       if (minutes.length && minutes[minutes.length - 1] === t.minute) {
         return;
       }
@@ -205,6 +297,14 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       maxY,
       startingYear,
       multiyear,
+      monthly,
+      // A line on the chart's edge says nothing, and just thickens the frame
+      currentMinute:
+        currentMinute === undefined ||
+        currentMinute <= domain.x[0] ||
+        currentMinute >= domain.x[1]
+          ? null
+          : currentMinute,
     };
 
     return (

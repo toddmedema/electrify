@@ -40,7 +40,7 @@ import FacilitiesContainer from "./views/FacilitiesContainer";
 import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
-import Manual from "./views/Manual";
+import ManualHelpPopover from "./base/ManualHelpPopover";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
@@ -52,7 +52,7 @@ import {
   togglePauseFacility,
 } from "../reducers/Game";
 import { selectTutorialHiddenUi } from "../reducers/Tutorial";
-import { snackbarOpen, manualHelpClose } from "../reducers/UI";
+import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
 
@@ -634,18 +634,11 @@ export default class Compositor extends React.Component<Props, {}> {
               onExit={() => this.props.onTutorialEnd(tutorialSteps)}
             />
           )}
-        <Dialog
-          fullScreen
-          open={!!ui.manualHelpEntry}
+        <ManualHelpPopover
+          entry={ui.manualHelpEntry}
           onClose={() => store.dispatch(manualHelpClose())}
-          data-manual-help="true"
-          slotProps={{ paper: { "aria-label": "Manual help" } }}
-        >
-          <Manual
-            focusEntry={ui.manualHelpEntry}
-            onBack={() => store.dispatch(manualHelpClose())}
-          />
-        </Dialog>
+          onRelated={(title: string) => store.dispatch(manualHelpOpen(title))}
+        />
         <Dialog
           open={ui.dialog.open}
           // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A

@@ -433,6 +433,7 @@ export function verticalLinePlugin(
   getX: () => number | null,
   stroke: string,
   opacity = 1,
+  width = 1,
 ): uPlot.Plugin {
   return {
     hooks: {
@@ -445,7 +446,9 @@ export function verticalLinePlugin(
         clipToPlot(u);
         u.ctx.globalAlpha = opacity;
         u.ctx.strokeStyle = stroke;
-        u.ctx.lineWidth = 1;
+        u.ctx.lineWidth = width;
+        // Solid whatever the last dashed series left on the context
+        u.ctx.setLineDash([]);
         u.ctx.beginPath();
         const x = Math.round(u.valToPos(at, "x", true)) + 0.5;
         u.ctx.moveTo(x, u.bbox.top);

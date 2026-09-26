@@ -30,6 +30,14 @@ export function PolicyDemandChartPlaceholder() {
   );
 }
 
+/** The y range for the two demand curves: their own min and max, with a little headroom. */
+export function demandRange(min: number, max: number): [number, number] {
+  const span = max - min;
+  // A flat day (or no data) has no span to pad by, so pad by its size instead
+  const pad = span > 0 ? span * 0.1 : Math.abs(max) * 0.1 || 1;
+  return [Math.max(0, min - pad), max + pad];
+}
+
 export default function PolicyDemandChart({
   current,
   changed,
@@ -55,7 +63,9 @@ export default function PolicyDemandChart({
         legend: { show: false },
         scales: {
           x: { time: false, range: [0, 24] },
-          y: { range: (_u, _min, max) => [0, max * 1.1] },
+          // Fitted to the data rather than anchored at zero: a program moves the day's demand
+          // by a few percent, which a zero-based axis flattens into two overlapping lines
+          y: { range: (_u, min, max) => demandRange(min, max) },
         },
         axes: [
           {

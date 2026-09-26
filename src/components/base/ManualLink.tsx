@@ -4,6 +4,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import type { AppDispatch } from "../../Store";
 import { manualHelpOpen } from "../../reducers/UI";
 import type { ManualEntryTitleType } from "./ManualEntries";
+import { setManualHelpAnchor } from "./ManualHelpPopover";
 
 interface Props {
   entry: ManualEntryTitleType;
@@ -26,6 +27,7 @@ export default function ManualLink(props: Props): React.JSX.Element {
         // These sit inside rows that expand when clicked, and looking a term up shouldn't
         // also toggle the row underneath it
         event.stopPropagation();
+        setManualHelpAnchor(event.currentTarget);
         dispatch(manualHelpOpen(props.entry));
       }}
     >
