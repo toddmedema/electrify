@@ -145,3 +145,18 @@ export function arrayMove<T>(
   }
   arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
 }
+
+/** Exponential interpolation between two real-cost observations, held flat outside them. */
+export function costBetween(
+  year: number,
+  fromYear: number,
+  fromCost: number,
+  toYear: number,
+  toCost: number,
+): number {
+  const boundedYear = Math.max(fromYear, Math.min(toYear, year));
+  return (
+    fromCost *
+    Math.pow(toCost / fromCost, (boundedYear - fromYear) / (toYear - fromYear))
+  );
+}

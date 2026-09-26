@@ -81,9 +81,9 @@ for (const theme of ["light", "dark"]) {
         ),
       });
       await apply.click();
-      await expect(dialog).toContainText("On starts Feb 2020");
+      await expect(dialog).toContainText("turns on Feb 2020");
       await dialog
-        .getByRole("button", { name: `${offer} · Off`, exact: true })
+        .getByRole("button", { name: new RegExp(`^${offer} · Off · turns on`) })
         .click();
       await expect(window).toHaveValue(
         offer === "Time-of-use tariff" ? "22" : "9",
@@ -97,12 +97,12 @@ for (const theme of ["light", "dark"]) {
       await update.click();
       await expect(dialog).toContainText("12:00–16:00");
       await dialog
-        .getByRole("button", { name: `${offer} · Off`, exact: true })
+        .getByRole("button", { name: new RegExp(`^${offer} · Off · turns on`) })
         .click();
       await dialog
         .getByRole("button", { name: "Cancel scheduled change" })
         .click();
-      await expect(dialog).not.toContainText("On starts");
+      await expect(dialog).not.toContainText("turns on");
     }
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

@@ -22,9 +22,14 @@ test("paused insights refresh customer programs and keep chart zoom after a pale
     .getByRole("button", { name: "Customer programs", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: /Efficiency.*Off/i }).click();
-  await dialog.getByRole("radio", { name: /^Large/ }).check();
-  await dialog.getByRole("button", { name: "Start next month" }).click();
+  await dialog
+    .getByRole("button", { name: /Efficiency.*Not started/i })
+    .click();
+  const start = dialog.getByRole("button", {
+    name: "Start build-out next month",
+  });
+  await expect(start).toBeEnabled({ timeout: 30000 });
+  await start.click();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(chart).not.toHaveAttribute("aria-label", before!);

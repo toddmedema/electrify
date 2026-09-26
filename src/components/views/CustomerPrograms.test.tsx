@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import gameReducer from "../../reducers/Game";
@@ -12,8 +12,18 @@ import CustomerPrograms from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
 import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
-import { emptyPolicies } from "../../helpers/Policies";
+import { emptyPolicies, policyBudget } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
+
+/** The value beside a build-out fact's label, if the fact is shown. */
+const fact = (label: string) => {
+  const index = screen
+    .queryAllByRole("term")
+    .findIndex((term) => term.textContent === label);
+  return index < 0
+    ? undefined
+    : screen.getAllByRole("definition")[index].textContent;
+};
 
 jest.mock("../../helpers/PolicyPreviewClient", () => ({
   createPolicyPreviewWorker: jest.fn(),
@@ -63,7 +73,7 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   });
   const result = previewPolicy(
     game,
-    { id: "timeOfUse", tier: "Large", month: 1, startHour: 22 },
+    { id: "timeOfUse", tier: "On", month: 1, startHour: 22 },
     1,
   );
   act(() => old.onmessage!({ data: { result } }));
@@ -73,7 +83,7 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   const worker = workers[workers.length - 1];
   expect(worker.postMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      change: { id: "timeOfUse", tier: "Large", month: 1, startHour: 22 },
+      change: { id: "timeOfUse", tier: "On", month: 1, startHour: 22 },
     }),
   );
   act(() => worker.onmessage!({ data: { result } }));
@@ -82,7 +92,9 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
     store.getState().game.policies!.programs.timeOfUse.pending!.startHour,
   ).toBe(22);
   fireEvent.click(
-    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+    screen.getByRole("button", {
+      name: /^Time-of-use tariff · Off · turns on /,
+    }),
   );
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(
@@ -114,11 +126,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
       return worker as unknown as Worker;
     });
   const game = createGame({ scenarioId: 106 });
-  const result = previewPolicy(
-    game,
-    { id: "solar", tier: "Small", month: 1 },
-    1,
-  );
+  const result = previewPolicy(game, { id: "solar", tier: "On", month: 1 }, 1);
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -130,19 +138,22 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Rooftop solar rebates · Off" }),
+    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
   act(() => {
     jest.advanceTimersByTime(250);
   });
   const old = workers[workers.length - 1];
-  fireEvent.click(screen.getByRole("radio", { name: /^Large/ }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "At completion (Jan 2024)" }),
+  );
   expect(old.terminate).toHaveBeenCalled();
   act(() => {
     old.onmessage!({ data: { result } });
   });
-  const apply = screen.getByRole("button", { name: "Start next month" });
+  const apply = screen.getByRole("button", {
+    name: "Start build-out next month",
+  });
   expect(apply).toBeDisabled();
   act(() => {
     jest.advanceTimersByTime(250);
@@ -160,7 +171,9 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
   expect(apply).toBeDisabled();
   fallback.mockRestore();
-  fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "First effective month" }),
+  );
   act(() => {
     jest.advanceTimersByTime(250);
   });
@@ -190,7 +203,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       .mockReturnValue(worker as unknown as Worker);
     const game = createGame({ scenarioId: 106 });
     const result = {
-      ...previewPolicy(game, { id, tier: "Large", month: 1 }, 12),
+      ...previewPolicy(game, { id, tier: "On", month: 1 }, 48),
       current: [47000000, 40000000],
       changed: [47000000, 30000000],
     };
@@ -205,17 +218,20 @@ test.each<PolicyId>(["solar", "efficiency"])(
     );
     fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
     fireEvent.click(
-      screen.getByRole("button", { name: `${POLICIES[id].name} · Off` }),
+      screen.getByRole("button", {
+        name: `${POLICIES[id].name} · Not started`,
+      }),
     );
-    fireEvent.click(screen.getByRole("radio", { name: /^Large/ }));
-    fireEvent.click(screen.getByRole("button", { name: "After 12 months" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "At completion (Jan 2024)" }),
+    );
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
 
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
     expect(screen.getByText(/^Change in utility cash/)).toBeVisible();
     expect(screen.getByText(/^Change in utility cash/)).toHaveTextContent(
-      `Jan 2021: ${formatMoneyConcise(result.cashChange)}`,
+      `Jan 2024: ${formatMoneyConcise(result.cashChange)}`,
     );
     const hint = screen.getByText(/^Little change in peak demand/);
     expect(hint).toBeVisible();
@@ -231,10 +247,10 @@ test.each<PolicyId>(["solar", "efficiency"])(
   },
 );
 
-test("stopped funding describes retained upgrades without announcing another change", () => {
+test("a paused build-out keeps its progress and offers to resume", () => {
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies();
-  game.policies.programs.efficiency.adoption = 0.05;
+  game.policies.programs.efficiency.adoption = 8 / 48;
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -246,21 +262,103 @@ test("stopped funding describes retained upgrades without announcing another cha
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Efficiency rebates · Off" }),
+    screen.getByRole("button", {
+      name: "Efficiency rebates · Paused · month 8 of 48",
+    }),
   );
-  expect(screen.getByText(/Installed upgrades retained/)).toHaveTextContent(
-    "5%",
-  );
-  expect(screen.queryByText(/Building up/)).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Stop next month" }),
-  ).toBeDisabled();
-  fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
+    screen.getByRole("progressbar", {
+      name: "Efficiency rebates build-out progress",
+    }),
+  ).toHaveAttribute("aria-valuenow", "17");
   expect(
-    screen.getByRole("button", { name: "Start next month" }),
+    screen.getByText(/^Paused after month 8 of 48 · \$[\d.]+[KMB]? spent$/),
   ).toBeVisible();
+  expect(fact("Remaining")).toBe("40 months");
+  expect(fact("If resumed now")).toBe("May 2023");
+  expect(fact("Finishes")).toBeUndefined();
   expect(
-    screen.queryByText(/Charges start|Funding stops/),
+    screen.getByRole("button", { name: "Resume build-out next month" }),
+  ).toBeDisabled();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Larger funding|Monthly funding/),
+  ).not.toBeInTheDocument();
+  view.unmount();
+});
+
+test("in-progress and completed build-outs read as projects in the list and toolbar", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.policies = emptyPolicies(game.date.monthsElapsed);
+  Object.assign(game.policies.programs.solar, {
+    tier: "On",
+    adoption: 8 / 48,
+    spent: 1000000,
+  });
+  Object.assign(game.policies.programs.efficiency, {
+    tier: "On",
+    adoption: 1,
+    spent: 2000000,
+    completedMonth: 24,
+  });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  const entry = screen.getByRole("button", { name: "Customer programs" });
+  // The finished project is neither active nor part of the monthly rebate total.
+  expect(entry.title).toBe(
+    `Customer programs: 1 active · Rooftop solar build-out · month 8 of 48 · ${formatMoneyConcise(
+      policyBudget(game, "solar", "On", 0),
+    )}/month in rebates`,
+  );
+  fireEvent.click(entry);
+  const completed = screen.getByRole("region", { name: "Completed" });
+  expect(
+    within(completed).getByRole("button", {
+      name: "Efficiency rebates · Completed Jan 2022",
+    }),
+  ).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Rooftop solar rebates · In progress · month 8 of 48",
+    }),
+  );
+  expect(screen.getByText("Month 8 of 48 · $1M spent")).toBeVisible();
+  expect(
+    screen.getByRole("progressbar", {
+      name: "Rooftop solar rebates build-out progress",
+    }),
+  ).toHaveAttribute("aria-valuetext", "Month 8 of 48 · $1M spent");
+  expect(fact("Remaining")).toBe("40 months");
+  expect(fact("Finishes")).toBe("May 2023");
+  // The preview of a pause compares against the finish the project had planned.
+  expect(
+    screen.getByRole("button", { name: "At planned completion (May 2023)" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Pause new installations next month" }),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Efficiency rebates · Completed Jan 2022",
+    }),
+  );
+  expect(screen.getByText("Completed Jan 2022")).toBeVisible();
+  expect(screen.getByText("Result")).toBeVisible();
+  expect(screen.getByText(/one-time project is finished/)).toBeVisible();
+  expect(
+    screen.queryByText(POLICIES.efficiency.mechanism),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/next month$/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/Estimated utility demand/),
   ).not.toBeInTheDocument();
   view.unmount();
 });
@@ -288,9 +386,8 @@ test("estimates on the page when the preview worker cannot load its data", () =>
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Rooftop solar rebates · Off" }),
+    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
   act(() => {
     jest.advanceTimersByTime(250);
   });
@@ -299,8 +396,84 @@ test("estimates on the page when the preview worker cannot load its data", () =>
   });
   expect(screen.queryByRole("alert")).toBeNull();
   expect(
-    screen.getByRole("button", { name: "Start next month" }),
+    screen.getByRole("button", { name: "Start build-out next month" }),
   ).toBeEnabled();
   stub.mockRestore();
   jest.useRealTimers();
+});
+
+test.each([
+  ["Off", "Pauses Feb 2020", "Cancel scheduled pause", undefined],
+  ["On", "Resumes Feb 2020", "Cancel scheduled resume", "May 2023"],
+] as const)(
+  "a scheduled %s shows its status and can be cancelled without an estimate",
+  (pending, status, action, finish) => {
+    jest.useFakeTimers();
+    const stub = jest.spyOn(client, "createPolicyPreviewWorker");
+    const game = createGame({ scenarioId: 106 });
+    game.policies = emptyPolicies(game.date.monthsElapsed);
+    Object.assign(game.policies.programs.solar, {
+      tier: pending === "Off" ? "On" : "Off",
+      adoption: 8 / 48,
+      spent: 1000000,
+      pending: { tier: pending, month: game.date.monthsElapsed + 1 },
+    });
+    const store = configureStore({
+      reducer: { game: gameReducer, ui: uiReducer },
+      preloadedState: { game },
+    });
+    const view = render(
+      <Provider store={store}>
+        <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      </Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+    // The list names the scheduled change in the program's status line.
+    const entry = screen.getByRole("button", {
+      name: `Rooftop solar rebates · ${pending === "Off" ? "In progress" : "Paused"} · month 8 of 48 · ${status[0].toLowerCase()}${status.slice(1)}`,
+    });
+    fireEvent.click(entry);
+    expect(screen.getByText(status)).toBeVisible();
+    expect(
+      screen.queryByText(/Estimated utility demand/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /completion/ }),
+    ).not.toBeInTheDocument();
+    // A scheduled pause has no finish to promise; a scheduled resume does.
+    expect(fact("Finishes")).toBe(finish);
+    act(() => jest.advanceTimersByTime(250));
+    expect(stub).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    expect(
+      store.getState().game.policies!.programs.solar.pending,
+    ).toBeUndefined();
+    view.unmount();
+    stub.mockRestore();
+    jest.useRealTimers();
+  },
+);
+
+test("the completion preview is capped at the run's last month", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.date = { ...game.date, monthsElapsed: 180 };
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
+  );
+  expect(fact("If started now")).toBe("After this run ends");
+  fireEvent.click(screen.getByRole("button", { name: "By Dec 2035" }));
+  expect(
+    screen.getByText("Estimated utility demand · Dec 2035"),
+  ).toBeInTheDocument();
+  view.unmount();
 });

@@ -38,6 +38,8 @@ import {
   policyAvailable,
   validPolicyChange,
   samePolicyChoice,
+  isOperatingPolicy,
+  buildoutComplete,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
 import { policyChoiceLabel } from "../helpers/PolicyWindow";
@@ -2635,6 +2637,13 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
+  // A finished build-out has nothing left to fund, pause or resume.
+  if (
+    !cancel &&
+    !isOperatingPolicy(payload.id) &&
+    buildoutComplete(existing?.adoption ?? 0)
+  )
+    return false;
   const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
   if (cancel) {
     if (
@@ -3315,9 +3324,13 @@ function getDemandW(
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
   const minutesFrom5pmLogistics =
     1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
+  const temperatureDemandW = temperatureDemandWattsPerCustomer(
+    now.temperatureC,
+    game.location,
+  );
   const demandMultiple =
     430 +
-    temperatureDemandWattsPerCustomer(now.temperatureC, game.location) -
+    temperatureDemandW -
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
@@ -3334,7 +3347,14 @@ function getDemandW(
     game.location,
     game.loadAdditions,
   );
-  applyPolicyDemand(game, now);
+  // The 20 W floor is the temperature term's baseline, not heating or cooling.
+  applyPolicyDemand(
+    game,
+    now,
+    demandMultiple > 0
+      ? Math.min(1, Math.max(0, (temperatureDemandW - 20) / demandMultiple))
+      : 0,
+  );
   applyPeakDemand(
     game,
     now,
