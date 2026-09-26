@@ -34,6 +34,7 @@ import {
   buildoutCompletionMonth,
   buildoutMonths,
   buildoutMonthsDone,
+  buildoutMonthsRemaining,
   emptyPolicies,
   policyAvailable,
   policyBudget,
@@ -132,47 +133,65 @@ function BuildoutSummary({
   const months = buildoutMonths(id);
   const complete = buildoutComplete(program.adoption);
   const done = buildoutMonthsDone(id, program.adoption);
+  const remaining = buildoutMonthsRemaining(id, program.adoption);
   const total = complete
     ? program.spent
     : program.spent +
       policyTotalCost(game, id, effective) * (1 - program.adoption);
   const finish = buildoutCompletionMonth(id, program.adoption, effective);
+  // The finish row follows the plan: a scheduled pause has no finish month to promise.
+  const planned = program.pending?.tier ?? program.tier;
+  const finishLabel =
+    planned === "On"
+      ? "Finishes"
+      : program.tier === "On"
+        ? undefined
+        : program.adoption > 0
+          ? "If resumed now"
+          : "If started now";
   const facts: [string, string][] = complete
     ? [
-        ["Installed", buildoutImpact(game, id)],
+        ["Result", buildoutImpact(game, id)],
         ["Total cost", formatMoneyConcise(program.spent)],
       ]
     : [
-        ["Duration", `${months} months of installations`],
+        program.adoption > 0
+          ? [
+              "Remaining",
+              `${remaining} ${remaining === 1 ? "month" : "months"}`,
+            ]
+          : ["Duration", `${months} months of installations`],
         ["Total cost", `About ${formatMoneyConcise(total)}`],
         [
           "While active",
           `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/month`,
         ],
         ["At completion", buildoutImpact(game, id)],
-        [
-          program.tier === "On" ? "Finishes" : "If started now",
-          finish < end
-            ? `${program.tier === "On" ? "" : "Finishes "}${labelMonth(game, finish)}`
-            : "After this run ends",
-        ],
       ];
+  if (!complete && finishLabel)
+    facts.push([
+      finishLabel,
+      finish < end ? labelMonth(game, finish) : "After this run ends",
+    ]);
+  const progress = complete
+    ? `Completed ${program.completedMonth === undefined ? "" : `${labelMonth(game, program.completedMonth)} `}· no further cost`
+    : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent of about ${formatMoneyConcise(total)}`;
   return (
     <Box className="customerProgramProject" sx={{ display: "grid", gap: 1.5 }}>
+      {program.pending && (
+        <Typography>{pendingLabel(game, id, program)}</Typography>
+      )}
       {program.adoption > 0 && (
         <Box sx={{ display: "grid", gap: 1 }}>
           <LinearProgress
             variant="determinate"
             value={Math.round(program.adoption * 100)}
             aria-label={`${POLICIES[id].name} build-out progress`}
+            aria-valuetext={progress}
             color={complete ? "success" : "primary"}
             sx={{ height: 8, borderRadius: 1 }}
           />
-          <Typography variant="body2">
-            {complete
-              ? `Completed ${program.completedMonth === undefined ? "" : `${labelMonth(game, program.completedMonth)} `}· no further cost`
-              : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent of about ${formatMoneyConcise(total)}`}
-          </Typography>
+          <Typography variant="body2">{progress}</Typography>
         </Box>
       )}
       <Box
@@ -251,7 +270,8 @@ function Decision({
     selected && !isOperatingPolicy(selected)
       ? (selected as BuildoutPolicyId)
       : undefined;
-  // Both plans install from next month, so they share the unpaused completion month.
+  // The comparison month is the unpaused completion from next month: when a start or resume
+  // would finish, or when a pause cuts off what would otherwise have finished then.
   const completion = buildout
     ? buildoutCompletionMonth(buildout, selectedProgram!.adoption, effective)
     : effective;
@@ -262,7 +282,10 @@ function Decision({
     if (
       !selected ||
       effective >= end ||
-      (buildout && buildoutComplete(selectedProgram!.adoption))
+      // Undoing a scheduled build-out change needs no estimate.
+      (buildout &&
+        (buildoutComplete(selectedProgram!.adoption) ||
+          selectedProgram!.pending))
     )
       return;
     let worker: Worker | undefined;
@@ -336,6 +359,7 @@ function Decision({
   const current = selectedProgram;
   const operating = selected ? isOperatingPolicy(selected) : false;
   const complete = !!buildout && buildoutComplete(current!.adoption);
+  const cancelling = !!buildout && !!current!.pending;
   const planned = current?.pending?.tier ?? current?.tier ?? "Off";
   const settled = preview?.key === key && preview.snapshot === game;
   const result = settled ? preview.result : undefined;
@@ -384,9 +408,10 @@ function Decision({
           onClick={() => open(id)}
         >
           <span>
-            <strong>
-              {POLICIES[id].name} · {status}
-            </strong>
+            <strong>{POLICIES[id].name}</strong>
+            <Typography component="span" variant="body2">
+              {status}
+            </Typography>
             <Typography
               id={`program-description-${id}`}
               component="span"
@@ -443,8 +468,8 @@ function Decision({
       >
         {!selected ? (
           <Box sx={{ display: "grid", gap: 2 }}>
-            {POLICY_IDS.filter((id) => !finished(id)).map(choice)}
             <Typography variant="body2">Changes start next month.</Typography>
+            {POLICY_IDS.filter((id) => !finished(id)).map(choice)}
             {POLICY_IDS.some(finished) && (
               <Box
                 component="section"
@@ -520,7 +545,7 @@ function Decision({
                 ))}
               </TextField>
             )}
-            {complete ? null : effective >= end ? (
+            {complete || cancelling ? null : effective >= end ? (
               <Alert severity="info">
                 This run ends before another program change could take effect.
               </Alert>
@@ -533,9 +558,11 @@ function Decision({
                   <Button onClick={() => setLater(!later)}>
                     {later
                       ? "First effective month"
-                      : completion < end
-                        ? `At completion (${labelMonth(game, laterMonth)})`
-                        : `By ${labelMonth(game, laterMonth)}`}
+                      : completion >= end
+                        ? `By ${labelMonth(game, laterMonth)}`
+                        : tier === "Off"
+                          ? `At planned completion (${labelMonth(game, laterMonth)})`
+                          : `At completion (${labelMonth(game, laterMonth)})`}
                   </Button>
                 )}
                 {error ? (
@@ -654,13 +681,13 @@ function Decision({
             variant="contained"
             disabled={
               // Undoing a scheduled change needs no estimate.
-              (!(buildout && current!.pending) && (unchanged || !result)) ||
+              (!cancelling && (unchanged || !result)) ||
               effective >= end ||
               !!game.replayPlayback
             }
             onClick={() => {
-              if (buildout && current!.pending)
-                dispatch(cancelPolicy({ id: selected, ...current!.pending }));
+              if (cancelling)
+                dispatch(cancelPolicy({ id: selected, ...current!.pending! }));
               else
                 dispatch(
                   schedulePolicy({

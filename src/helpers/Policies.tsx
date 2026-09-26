@@ -71,7 +71,9 @@ export function validPolicies(
         Number.isFinite(s.spent) &&
         s.spent >= s.spending &&
         (s.completedMonth === undefined ||
-          (Number.isInteger(s.completedMonth) &&
+          (!isOperatingPolicy(id) &&
+            Number.isInteger(s.completedMonth) &&
+            s.completedMonth >= 1 &&
             s.completedMonth <= p.month &&
             s.adoption === 1)) &&
         (!s.pending ||

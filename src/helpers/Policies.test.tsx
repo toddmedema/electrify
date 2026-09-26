@@ -287,3 +287,66 @@ test("neutral saves round-trip; malformed stocks and policy actions are rejected
     }),
   ).toBeNull();
 });
+
+test("a paused and resumed build-out completes through the reducer and its completion survives a save", () => {
+  const solar = { id: "solar", tier: "On", month: 1 } as const;
+  let game = cloneDeep(
+    gameReducer(
+      createGame({ scenarioId: 106, seed: 4 }),
+      schedulePolicy(solar),
+    ),
+  );
+  const program = () => game.policies!.programs.solar;
+  const schedule = (tier: "On" | "Off") => {
+    game = cloneDeep(
+      gameReducer(
+        game,
+        schedulePolicy({
+          ...solar,
+          tier,
+          month: game.date.monthsElapsed + 1,
+        }),
+      ),
+    );
+  };
+  month(game);
+  month(game);
+  expect(buildoutMonthsDone("solar", program().adoption)).toBe(2);
+  schedule("Off");
+  month(game);
+  month(game);
+  expect(program().tier).toBe("Off");
+  expect(buildoutMonthsDone("solar", program().adoption)).toBe(2);
+  expect(program().spending).toBe(0);
+  schedule("On");
+  month(game);
+  expect(program().tier).toBe("On");
+  expect(buildoutMonthsDone("solar", program().adoption)).toBe(3);
+  // Two paused months push the finish from month 24 to month 26.
+  expect(
+    buildoutCompletionMonth(
+      "solar",
+      program().adoption,
+      game.date.monthsElapsed + 1,
+    ),
+  ).toBe(26);
+  while (game.date.monthsElapsed < 26) month(game);
+  expect(program().adoption).toBe(1);
+  expect(program().completedMonth).toBe(26);
+  const spent = program().spent;
+  month(game);
+  expect(program().spending).toBe(0);
+  expect(program().spent).toBe(spent);
+  const restored = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(game))),
+  )!.game;
+  expect(restored.policies).toEqual(game.policies);
+  // Only build-outs finish, and never before the first month of play.
+  const saved = () => cloneDeep(serializeSave(game));
+  const operating = saved();
+  operating.game.policies!.programs.timeOfUse.completedMonth = 3;
+  expect(parseSave(operating)).toBeNull();
+  const early = saved();
+  early.game.policies!.programs.solar.completedMonth = 0;
+  expect(parseSave(early)).toBeNull();
+});

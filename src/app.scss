@@ -5497,7 +5497,12 @@ $sizemap: (
 }
 .customerProgramChoiceButton > span:first-child {
   display: grid;
-  gap: 8px;
+  gap: 4px;
+}
+/* Finished projects need no decision, so they recede behind the programs still in play. */
+.customerProgramChoice[data-completed] .customerProgramChoiceButton strong {
+  font-weight: 500;
+  color: var(--font-color-faded);
 }
 .customerProgramChoiceButton > span:last-child {
   font-size: 24px;
