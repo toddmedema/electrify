@@ -128,7 +128,19 @@ preserving every established onshore reading.
 `src/data/RunCompatibility.json`. After launch, the service worker downloads the listed icons in
 the background for every user -- not just installed apps -- so all screens' artwork is available
 offline before a game starts. Add an image to `public/images/` and the next build picks it up
-automatically; no service-worker change is needed.
+automatically; no service-worker change is needed. Images the app never displays, such as the
+1024 px link-preview icon, are listed in `EXCLUDED` in `scripts/generate-icon-manifest.js` so
+players don't download them.
+
+### Manual figures
+
+Every player downloads the manual's figures, so they ship as WebP. The originals live in
+`design/manual/`, which is not deployed. To add or change a figure, put the original there,
+run `node scripts/compress-manual-images.js` (requires `cwebp`: `brew install webp`), and
+reference the `.webp` from `src/components/base/ManualEntries.tsx` with its real `width` and
+`height`. JPEG charts are re-encoded at WebP quality 88 (about 60-70% smaller, SSIM ≥ 0.993 and
+indistinguishable at 3x zoom); PNGs are re-encoded losslessly. Always encode from the originals
+so losses never compound. `src/ManualFigures.test.ts` checks the two stay in step.
 
 ### Release checklist
 

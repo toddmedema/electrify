@@ -297,4 +297,126 @@ describe("CACHE_ICONS", () => {
 
     expect(sw.fetch).toHaveBeenCalledTimes(1);
   });
+  function workerWithManifest(entries: unknown) {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) =>
+      url === "/icons.json" ? jsonResponse(entries) : response(),
+    );
+    return sw;
+  }
+
+  function fetchedUrls(sw: ReturnType<typeof worker>) {
+    return sw.fetch.mock.calls.map(([url]) => url);
+  }
+
+  it("fetches and caches percent-encoded names under the key the page requests", async () => {
+    const sw = workerWithManifest(["/images/natural%20gas.svg"]);
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    expect(sw.cacheMatch).toHaveBeenCalledWith("/images/natural%20gas.svg");
+    expect(sw.put).toHaveBeenCalledWith(
+      "/images/natural%20gas.svg",
+      expect.anything(),
+    );
+  });
+
+  it("downloads a duplicated manifest entry once", async () => {
+    const sw = workerWithManifest(["/images/solar.svg", "/images/solar.svg"]);
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    expect(fetchedUrls(sw)).toEqual(["/icons.json", "/images/solar.svg"]);
+  });
+
+  it("keeps downloading the rest when one icon fails", async () => {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) => {
+      if (url === "/icons.json") {
+        return jsonResponse(manifest);
+      }
+      if (url === "/images/transmission.svg") {
+        return response(false);
+      }
+      return response();
+    });
+
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_ICONS" })),
+    ).resolves.toEqual([undefined]);
+
+    expect(sw.put).not.toHaveBeenCalledWith(
+      "/images/transmission.svg",
+      expect.anything(),
+    );
+    expect(sw.put).toHaveBeenCalledWith("/images/solar.svg", expect.anything());
+  });
+
+  it("falls back to the cached manifest when the server returns an error", async () => {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) =>
+      url === "/icons.json" ? response(false) : response(),
+    );
+    sw.cacheMatch.mockImplementation(async (url) =>
+      url === "/icons.json" ? jsonResponse(manifest) : undefined,
+    );
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    // A failed manifest response must never replace the good cached copy.
+    expect(sw.put).not.toHaveBeenCalledWith("/icons.json", expect.anything());
+    expect(fetchedUrls(sw)).toEqual([
+      "/icons.json",
+      "/images/transmission.svg",
+      "/images/solar.svg",
+    ]);
+  });
+
+  it("ignores a manifest that is not JSON", async () => {
+    const sw = worker();
+    sw.fetch.mockResolvedValue({
+      ok: true,
+      clone() {
+        return this;
+      },
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    } as unknown as WorkerResponse);
+
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_ICONS" })),
+    ).resolves.toEqual([undefined]);
+    expect(fetchedUrls(sw)).toEqual(["/icons.json"]);
+  });
+
+  it("still downloads every icon when the cache refuses writes", async () => {
+    const sw = iconWorker();
+    sw.put.mockRejectedValue(new Error("QuotaExceededError"));
+
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_ICONS" })),
+    ).resolves.toEqual([undefined]);
+    expect(fetchedUrls(sw)).toEqual([
+      "/icons.json",
+      "/images/transmission.svg",
+      "/images/solar.svg",
+    ]);
+  });
+
+  it("shares downloads between overlapping requests", async () => {
+    const sw = iconWorker();
+
+    // The launch timer and a reconnect can both ask before either finishes.
+    await Promise.all([
+      ...sw.message({ type: "CACHE_ICONS" }),
+      ...sw.message({ type: "CACHE_ICONS" }),
+    ]);
+
+    expect(fetchedUrls(sw).sort()).toEqual([
+      "/icons.json",
+      "/images/solar.svg",
+      "/images/transmission.svg",
+    ]);
+  });
 });

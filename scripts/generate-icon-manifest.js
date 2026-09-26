@@ -13,6 +13,12 @@ const publicDir = path.join(root, "public");
 const imagesDir = path.join(publicDir, "images");
 const output = path.join(publicDir, "icons.json");
 const IMAGE = /\.(svg|png|jpe?g|gif|webp|avif|ico)$/i;
+// Images the app itself never displays, so caching them would only cost every player bandwidth.
+// Paths are relative to public/, as the site serves them.
+const EXCLUDED = new Set([
+  // Link-preview (og:image / twitter:image) artwork, fetched only by social-media crawlers.
+  "/images/icon/1024x1024.png",
+]);
 
 function filesUnder(directory) {
   return fs
@@ -28,14 +34,17 @@ function filesUnder(directory) {
  * Site-relative URLs for every image, encoded the way a browser encodes an `<img src>` so each
  * entry is the same cache key the page later requests (`natural gas.svg` -> `natural%20gas.svg`).
  * `%`, `#` and `?` are escaped first so they name the file rather than truncating the path.
- * Dotfiles such as macOS `.DS_Store` differ between machines and are not artwork, so skip them.
+ * Dotfiles such as macOS `.DS_Store` differ between machines and are not artwork, so skip them,
+ * along with the EXCLUDED images the app never displays.
  */
 function iconUrls() {
   return filesUnder(imagesDir)
     .filter((file) => IMAGE.test(file))
-    .map((file) => {
-      const raw =
-        "/" + path.relative(publicDir, file).split(path.sep).join("/");
+    .map(
+      (file) => "/" + path.relative(publicDir, file).split(path.sep).join("/"),
+    )
+    .filter((raw) => !EXCLUDED.has(raw))
+    .map((raw) => {
       const escaped = raw
         .replace(/%/g, "%25")
         .replace(/#/g, "%23")
@@ -58,4 +67,4 @@ if (require.main === module) {
   writeManifest();
 }
 
-module.exports = { iconUrls, imagesDir, output };
+module.exports = { EXCLUDED, iconUrls, imagesDir, output };
