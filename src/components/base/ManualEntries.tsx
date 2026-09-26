@@ -4,14 +4,13 @@ import ConceptLegend from "./ConceptLegend";
 import { useUnits } from "./UnitsContext";
 import {
   formatLargeMassApprox,
-  formatMass,
   formatPricePerLargeMass,
   KG_PER_MEGATONNE,
   largeMassUnit,
   massUnitName,
 } from "../../helpers/Units";
 import { formatDesignTemperature } from "./WeatherResilienceText";
-import { IMPORT_EMISSIONS_ASSUMPTIONS } from "../../data/ImportEmissions";
+import { INTERTIE_TREND_SOURCE_FAMILIES } from "../../data/IntertieTrendData";
 import { COLD_PACKAGE_MAX_DESIGN_MIN_TEMP_C } from "../../data/Hazards";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
@@ -22,27 +21,16 @@ function MassUnitName(): React.JSX.Element {
 }
 
 /**
- * Where each neighbour's emissions figure comes from. The build cards show the number; a
- * citation belongs somewhere it can be read properly rather than squeezed into a metric cell.
+ * The families of data behind every neighbour's emissions and price trend. Each build card names
+ * its own neighbour's basis and source; this is the overview a citation list is for.
  */
-function ImportEmissionsSources(): React.JSX.Element {
-  const units = useUnits();
+function IntertieTrendSources(): React.JSX.Element {
   return (
     <ul className="manual-sources">
-      {IMPORT_EMISSIONS_ASSUMPTIONS.map((assumption) => (
-        <li key={assumption.label}>
-          <strong>{assumption.label}</strong>:{" "}
-          {formatMass(assumption.emissionsKgco2ePerMWh, units)}/MWh CO2e ·{" "}
-          {assumption.emissionsBasis}.{" "}
-          {/* Five links reading "Source" are five identical names in a screen reader's link
-              list, so each one says which assumption it backs. */}
-          <a
-            href={assumption.emissionsSource}
-            aria-label={`Source for ${assumption.label} emissions`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Source
+      {INTERTIE_TREND_SOURCE_FAMILIES.map(({ label, href }) => (
+        <li key={label}>
+          <a href={href} target="_blank" rel="noreferrer">
+            {label}
           </a>
         </li>
       ))}
@@ -743,12 +731,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           own demand and trading rule limits actual flow.
         </p>
         <p>
-          Purchased electricity adds estimated emissions to your score. Each
-          intertie&rsquo;s build card shows the neighbor&rsquo;s fixed estimate;
-          these are the mixes those estimates stand for. They do not model a
-          full transmission network.
+          Neighbors change with the era. Each one follows a researched trend of
+          its grid&rsquo;s carbon intensity and wholesale price from about 1990,
+          with official stated-policy outlooks to 2050 and flat estimates
+          beyond. Purchased electricity adds that year&rsquo;s estimated
+          emissions to your score, and imports get dearer or cheaper as the
+          neighbor&rsquo;s market did, such as during the 2022 energy crisis. A
+          connection can only be built once its real path existed. These are
+          annual averages that do not model a full transmission network; a
+          neighbor&rsquo;s details name its own basis and source.
         </p>
-        <ImportEmissionsSources />
+        <IntertieTrendSources />
       </div>
     ),
   },

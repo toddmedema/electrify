@@ -4868,6 +4868,15 @@ $sizemap: (
   .buildOptionDescription {
     padding: 0 12px 8px;
   }
+  // The citation is a real control, so it keeps the shared tap height inside running text
+  .intertieEmissionsNote a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
   .buildOptionFooter {
     display: flex;
     align-items: center;

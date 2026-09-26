@@ -108,12 +108,14 @@ import {
   emptyTransmissionState,
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
+import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
   neighborImportSupplyW,
   clearTransmissionMarket,
   intertieContextForGame,
+  intertieYear,
   intertieUpgradeQuote,
   intertieBuildQuote,
   intertieImportLimitW,
@@ -3958,6 +3960,7 @@ function updateSupplyFacilitiesFinances(
     ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
   );
   const intertieContext = intertieContextForGame(state);
+  const tradingYear = intertieYear(now.minute, state.startingYear);
   let transmissionCapacity = 0;
   let marketImportLimitW = 0;
   let marketExportLimitW = 0;
@@ -3994,7 +3997,9 @@ function updateSupplyFacilitiesFinances(
       importLimitW,
       exportLimitW,
       pricePerMWh,
-      emissionsKgco2ePerMWh: market?.emissionsKgco2ePerMWh || 0,
+      emissionsKgco2ePerMWh: market
+        ? importEmissionsKgco2ePerMWh(market.id, tradingYear)
+        : 0,
     });
   }
   marketImportLimitW = allocateIntertieFlows(

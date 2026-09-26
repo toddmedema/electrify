@@ -29,6 +29,7 @@ const game = (id: number) => ({
   scenarioId: id,
   location: getScenarioLocation(scenario(id))!,
   customScenario: undefined,
+  date: { year: scenario(id).startingYear },
 });
 const context = (id: number): IntertieContext => ({
   ...accessContextForGame(game(id)),
@@ -50,6 +51,10 @@ describe("authored utility transmission access", () => {
       expect(row.capacityW).toBeGreaterThan(0);
       expect(row.availableSupplyW).toBeGreaterThan(0);
       expect(row.availableDemandW).toBeGreaterThan(0);
+      // An authored allocation on a path that did not exist yet would be unreachable
+      expect(
+        corridorsForGame(game(row.scenarioId)).map(({ id }) => id),
+      ).toContain(row.corridorId);
     }
     for (const authored of SCENARIOS) {
       const state = game(authored.id);

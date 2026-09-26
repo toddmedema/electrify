@@ -30,6 +30,7 @@ import {
   DialogContent,
   FormControl,
   InputLabel,
+  Link,
   MenuItem,
   Select,
   Slider,
@@ -47,7 +48,16 @@ import {
 import {
   adjacentMarketForCorridor,
   corridorById,
+  corridorsForLocation,
 } from "../../data/AdjacentMarkets";
+import {
+  importEmissionsAssumption,
+  importEmissionsKgco2ePerMWh,
+} from "../../data/ImportEmissions";
+import {
+  corridorAvailableFromYear,
+  corridorOpenInYear,
+} from "../../data/IntertieTrends";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   formatMoneyConcise,
@@ -187,6 +197,29 @@ function IntertieYear({ outlook }: { outlook: IntertieOutlook }) {
   );
 }
 
+/** Where a neighbour's carbon figure comes from, beside the details that describe it. */
+function ImportEmissionsNote({ marketId }: { marketId: string }) {
+  const assumption = importEmissionsAssumption(marketId);
+  return (
+    <Typography
+      className="buildOptionDescription intertieEmissionsNote"
+      variant="caption"
+      color="textSecondary"
+      component="p"
+    >
+      Emissions: {assumption.emissionsBasis}.{" "}
+      <Link
+        href={assumption.emissionsSource}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Source for this neighbor's emissions"
+      >
+        Source
+      </Link>
+    </Typography>
+  );
+}
+
 function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
   const periods = pricePeriodCaption(outlook);
   return (
@@ -214,6 +247,7 @@ function IntertieBuildItem(props: {
   onReview: () => void;
   spareCapacityW: number;
   constructionKgco2eTotal: number;
+  year: number;
   renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
@@ -304,7 +338,7 @@ function IntertieBuildItem(props: {
         {market && (
           <BuildMetric
             label="Emissions"
-            value={`${formatMass(market.emissionsKgco2ePerMWh, units)}/MWh`}
+            value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
           />
         )}
         <BuildMetric
@@ -335,6 +369,7 @@ function IntertieBuildItem(props: {
             {INTERTIE_ARCHETYPES[market.archetype].summary}
           </Typography>
         )}
+        {market && <ImportEmissionsNote marketId={market.id} />}
         <Box className="buildOptionDetailBody">
           <dl className="transmissionMetrics">
             <div>
@@ -704,7 +739,19 @@ export default function TransmissionPanel({
     setReviewId(null);
   };
 
-  if (!corridors.length) {
+  // Paths whose real counterpart had not been built yet in this year, soonest first.
+  const upcomingCorridors = corridorsForLocation(game.location)
+    .filter(
+      ({ id }) =>
+        !corridorOpenInYear(id, game.date.year) &&
+        corridorAvailableFromYear(id) > game.date.year,
+    )
+    .sort(
+      (a, b) =>
+        corridorAvailableFromYear(a.id) - corridorAvailableFromYear(b.id),
+    );
+
+  if (!corridors.length && !upcomingCorridors.length && !state.lines.length) {
     return null;
   }
 
@@ -941,8 +988,14 @@ export default function TransmissionPanel({
                     {market && (
                       <Typography variant="caption" color="textSecondary">
                         Purchased emissions:{" "}
-                        {formatMass(market.emissionsKgco2ePerMWh, units)}/MWh
-                        CO2e
+                        {formatMass(
+                          importEmissionsKgco2ePerMWh(
+                            market.id,
+                            game.date.year,
+                          ),
+                          units,
+                        )}
+                        /MWh CO2e
                       </Typography>
                     )}
                   </div>
@@ -954,7 +1007,11 @@ export default function TransmissionPanel({
       )}
 
       {projectsOnly && !unbuiltCorridors.length && (
-        <Typography>All available connections have been approved.</Typography>
+        <Typography sx={{ px: 1.5, pt: 1 }}>
+          {corridors.length
+            ? "All available connections have been approved."
+            : "No connections can be built yet."}
+        </Typography>
       )}
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
@@ -996,6 +1053,7 @@ export default function TransmissionPanel({
                       ?.availableSupplyW || 0
                   }
                   constructionKgco2eTotal={corridor.constructionKgco2eTotal}
+                  year={game.date.year}
                   cash={now?.cash}
                   interestRate={game.interestRate}
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
@@ -1059,6 +1117,22 @@ export default function TransmissionPanel({
             })}
           </div>
         </section>
+      )}
+      {projectsOnly && !!upcomingCorridors.length && (
+        <Typography
+          className="transmissionUpcoming"
+          variant="body2"
+          color="textSecondary"
+          sx={{ px: 1.5, py: 1 }}
+        >
+          Opens later:{" "}
+          {upcomingCorridors
+            .map(
+              ({ id, name }) =>
+                `${adjacentMarketForCorridor(id)?.name || name} in ${corridorAvailableFromYear(id)}`,
+            )
+            .join(", ")}
+        </Typography>
       )}
       {projectsOnly && (
         <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />

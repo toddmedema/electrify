@@ -632,10 +632,24 @@ describe("the interties view", () => {
   it("shows researched local market names outside California", async () => {
     const game = createGame({ scenarioId: 103 });
     game.location = { ...game.location, id: "Dublin", name: "Dublin" };
+    game.date = { ...game.date, year: 2024 };
     renderProjects(game);
 
     expect(screen.getByText("Great Britain")).toBeInTheDocument();
     expect(screen.getByText("Continental Europe")).toBeInTheDocument();
+  });
+
+  it("lists connections whose real path had not been built yet", () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "Dublin", name: "Dublin" };
+    game.date = { ...game.date, year: 2008 };
+    renderProjects(game);
+
+    expect(screen.getByText("Continental Europe")).toBeInTheDocument();
+    expect(screen.queryByText("Great Britain")).toBeNull();
+    expect(
+      screen.getByText("Opens later: Great Britain in 2012"),
+    ).toBeInTheDocument();
   });
 
   it("gives the guided northern approval a stable target and specific name", async () => {

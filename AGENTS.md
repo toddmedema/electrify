@@ -77,7 +77,8 @@ failures should be rare; agents without that hook should run `npm run format` be
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
-  `docs/facilities-economics.md` (facility cost sources), `docs/run-compatibility.md`
+  `docs/facilities-economics.md` (facility cost sources), `docs/intertie-trends.md` (neighbour
+  emissions, prices and intertie opening years), `docs/run-compatibility.md`
   (challenge compatibility), and `src/testing/SCENARIO_CHOICE_BALANCE.md` (scenario choice
   balance).
 - Several files are large: `app.scss`, `reducers/Game.tsx`, `views/Insights.tsx`,

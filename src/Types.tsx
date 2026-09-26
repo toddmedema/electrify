@@ -39,7 +39,7 @@ export interface AdjacentMarketDefinitionType {
   basePricePerMWh: number;
   availableSupplyW: number;
   availableDemandW: number;
-  emissionsKgco2ePerMWh: number;
+  /** Carbon intensity varies by year; see importEmissionsKgco2ePerMWh */
   emissionsBasis: string;
   emissionsSource: string;
 }

@@ -35,11 +35,13 @@ import {
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
 } from "../data/AdjacentMarkets";
+import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
 import { IntertieArchetypeIdType } from "../data/IntertieArchetypes";
 import {
   adjacentMarketPricePerMWh,
   intertieImportLimitW,
   intertieContextForGame,
+  intertieYear,
   transmissionRatingW,
 } from "../helpers/Transmission";
 
@@ -80,7 +82,10 @@ function lineOffers(state: GameType, now: TickPresentFutureType) {
           now,
         ),
         importLimitW: intertieImportLimitW(line, context, now.minute, now),
-        emissionsKgco2ePerMWh: market.emissionsKgco2ePerMWh,
+        emissionsKgco2ePerMWh: importEmissionsKgco2ePerMWh(
+          market.id,
+          intertieYear(now.minute, state.startingYear),
+        ),
       };
     });
 }
@@ -563,8 +568,10 @@ describe("transmission actions", () => {
     });
     tickState(state);
     const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-    const intensity =
-      adjacentMarketForCorridor("california-north")!.emissionsKgco2ePerMWh;
+    const intensity = importEmissionsKgco2ePerMWh(
+      adjacentMarketForCorridor("california-north")!.id,
+      intertieYear(now.minute, state.startingYear),
+    );
     expect(now.importedW).toBe(100000000);
     expect(now.localKgco2e).toBe(0);
     expect(now.importedKgco2e).toBeCloseTo(

@@ -34,8 +34,8 @@ export type TransmissionProfileTuple = readonly [
 export const TRANSMISSION_PROFILE_DATA = {
   "us-ca-wecc": [
     [
-      ["pacific-northwest","Pacific Northwest","Hydropower often makes imports affordable, but dry years can tighten supply.",48,1800000000,1400000000,"SEASONAL_HYDRO"],
-      ["desert-southwest","Desert Southwest","Midday solar can be cheap; hot evenings raise both demand and prices.",55,1500000000,1700000000,"SOLAR_HEAVY"]
+      ["pacific-northwest","Pacific Northwest","Hydropower often makes imports affordable, but dry years can tighten supply.",52,1800000000,1400000000,"SEASONAL_HYDRO"],
+      ["desert-southwest","Desert Southwest","Midday solar can be cheap; hot evenings raise both demand and prices.",51,1500000000,1700000000,"SOLAR_HEAVY"]
     ],
     [
       ["california-north","pacific-northwest","Northern intertie","EXISTING",500000000,180000000,3600000,1,30,0.012,0.04],
@@ -44,8 +44,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-pjm": [
     [
-      ["pjm-miso-upgrade-market","Midcontinent market","The midcontinent's wind fleet often sends cheap power east overnight, though calm, hot days leave less to spare.",45,2200000000,2100000000,"WIND_HEAVY"],
-      ["pjm-nyiso-new-market","New York market","A stronger northeastern path can trade city demand and upstate hydro, but congestion can make power expensive.",58,1300000000,1600000000,"PEAK_SHARING"]
+      ["pjm-miso-upgrade-market","Midcontinent market","The midcontinent's wind fleet often sends cheap power east overnight, though calm, hot days leave less to spare.",36,2200000000,2100000000,"WIND_HEAVY"],
+      ["pjm-nyiso-new-market","New York market","A stronger northeastern path can trade city demand and upstate hydro, but congestion can make power expensive.",44,1300000000,1600000000,"PEAK_SHARING"]
     ],
     [
       ["pjm-miso-upgrade","pjm-miso-upgrade-market","Midcontinent market intertie","EXISTING",600000000,240000000,4800000,2,31,0.012,0.04],
@@ -54,8 +54,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-nyiso": [
     [
-      ["ny-quebec-upgrade-market","Québec hydro market","Reservoir hydropower can answer quickly when New York needs energy.",42,2200000000,900000000,"RESERVOIR_HYDRO"],
-      ["ny-pjm-new-market","PJM market","A new controlled path links two large city-heavy markets, where peak prices often arrive together.",54,1800000000,2000000000,"PEAK_SHARING"]
+      ["ny-quebec-upgrade-market","Québec hydro market","Reservoir hydropower can answer quickly when New York needs energy.",40,2200000000,900000000,"RESERVOIR_HYDRO"],
+      ["ny-pjm-new-market","PJM market","A new controlled path links two large city-heavy markets, where peak prices often arrive together.",39,1800000000,2000000000,"PEAK_SHARING"]
     ],
     [
       ["ny-quebec-upgrade","ny-quebec-upgrade-market","Québec hydro market intertie","EXISTING",700000000,350000000,5600000,2,29,0.01,0.03],
@@ -64,8 +64,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-isone": [
     [
-      ["newengland-quebec-upgrade-market","Québec hydro market","Stored water can supply steady power during cold snaps and summer peaks.",43,2100000000,800000000,"RESERVOIR_HYDRO"],
-      ["newengland-newyork-new-market","New York market","A stronger westward link adds another path, though New York's heat waves and cold snaps usually match New England's.",57,1200000000,1500000000,"PEAK_SHARING"]
+      ["newengland-quebec-upgrade-market","Québec hydro market","Stored water can supply steady power during cold snaps and summer peaks.",40,2100000000,800000000,"RESERVOIR_HYDRO"],
+      ["newengland-newyork-new-market","New York market","A stronger westward link adds another path, though New York's heat waves and cold snaps usually match New England's.",44,1200000000,1500000000,"PEAK_SHARING"]
     ],
     [
       ["newengland-quebec-upgrade","newengland-quebec-upgrade-market","Québec hydro market intertie","EXISTING",700000000,315000000,5600000,2,28,0.01,0.03],
@@ -74,8 +74,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-miso-north": [
     [
-      ["miso-pjm-upgrade-market","PJM market","A new line across the busy eastern seam lets two huge markets help each other, though their heat waves usually coincide.",49,2200000000,2300000000,"PEAK_SHARING"],
-      ["miso-spp-new-market","Great Plains market","Plains wind can be abundant, while heat waves can make both regions compete for power.",41,2000000000,1500000000,"WIND_HEAVY"]
+      ["miso-pjm-upgrade-market","PJM market","A new line across the busy eastern seam lets two huge markets help each other, though their heat waves usually coincide.",39,2200000000,2300000000,"PEAK_SHARING"],
+      ["miso-spp-new-market","Great Plains market","Plains wind can be abundant, while heat waves can make both regions compete for power.",33,2000000000,1500000000,"WIND_HEAVY"]
     ],
     [
       ["miso-pjm-upgrade","miso-pjm-upgrade-market","PJM market intertie","EXISTING",700000000,260000000,5200000,2,31,0.012,0.04],
@@ -84,8 +84,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-miso-south": [
     [
-      ["miso-south-spp-upgrade-market","Southwest Power Pool","A western seam shares wind and gas power with the Gulf region.",44,1600000000,1500000000,"WIND_HEAVY"],
-      ["miso-south-southeast-new-market","Southeastern utilities","A new eastward route adds support during storms, though Southeastern heat waves usually match the Gulf's.",51,1500000000,1800000000,"PEAK_SHARING"]
+      ["miso-south-spp-upgrade-market","Southwest Power Pool","A western seam shares wind and gas power with the Gulf region.",33,1600000000,1500000000,"WIND_HEAVY"],
+      ["miso-south-southeast-new-market","Southeastern utilities","A new eastward route adds support during storms, though Southeastern heat waves usually match the Gulf's.",36,1500000000,1800000000,"PEAK_SHARING"]
     ],
     [
       ["miso-south-spp-upgrade","miso-south-spp-upgrade-market","Southwest Power Pool intertie","EXISTING",500000000,220000000,4400000,2,32,0.014,0.05],
@@ -94,8 +94,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-spp": [
     [
-      ["spp-miso-upgrade-market","Midcontinent market","A stronger eastern seam reaches a much larger region, though Midwest heat waves strain both sides together.",43,2100000000,1900000000,"PEAK_SHARING"],
-      ["spp-west-hvdc-new-market","Rocky Mountain grid","Converter stations let two grids trade; the western side leans on coal, gas, and hydro plants under a different weather pattern.",46,1400000000,1300000000,"FIRM_THERMAL"]
+      ["spp-miso-upgrade-market","Midcontinent market","A stronger eastern seam reaches a much larger region, though Midwest heat waves strain both sides together.",36,2100000000,1900000000,"PEAK_SHARING"],
+      ["spp-west-hvdc-new-market","Rocky Mountain grid","Converter stations let two grids trade; the western side leans on coal, gas, and hydro plants under a different weather pattern.",50,1400000000,1300000000,"FIRM_THERMAL"]
     ],
     [
       ["spp-miso-upgrade","spp-miso-upgrade-market","Midcontinent market intertie","EXISTING",700000000,245000000,4900000,2,32,0.013,0.04],
@@ -104,8 +104,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-tva": [
     [
-      ["tva-pjm-upgrade-market","PJM market","A northern connection can supply power during a Valley shortage or buy surplus local energy.",50,1800000000,1900000000,"LARGE_POOL"],
-      ["tva-midcontinent-new-market","Midcontinent market","A new Mississippi crossing opens a second path for trading and emergency help, though Midsouth heat waves hit both sides.",45,1700000000,1600000000,"PEAK_SHARING"]
+      ["tva-pjm-upgrade-market","PJM market","A northern connection can supply power during a Valley shortage or buy surplus local energy.",39,1800000000,1900000000,"LARGE_POOL"],
+      ["tva-midcontinent-new-market","Midcontinent market","A new Mississippi crossing opens a second path for trading and emergency help, though Midsouth heat waves hit both sides.",36,1700000000,1600000000,"PEAK_SHARING"]
     ],
     [
       ["tva-pjm-upgrade","tva-pjm-upgrade-market","PJM market intertie","EXISTING",500000000,210000000,4200000,2,31,0.013,0.04],
@@ -114,8 +114,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-carolinas": [
     [
-      ["carolinas-pjm-upgrade-market","PJM market","A stronger northern seam brings access to a large multi-state market.",51,1700000000,1800000000,"LARGE_POOL"],
-      ["carolinas-southeast-new-market","Southern utility pool","A second route reaches the Southeast's gas, nuclear, and solar fleet, though its summer peaks match the Carolinas'.",49,1500000000,1600000000,"PEAK_SHARING"]
+      ["carolinas-pjm-upgrade-market","PJM market","A stronger northern seam brings access to a large multi-state market.",39,1700000000,1800000000,"LARGE_POOL"],
+      ["carolinas-southeast-new-market","Southern utility pool","A second route reaches the Southeast's gas, nuclear, and solar fleet, though its summer peaks match the Carolinas'.",36,1500000000,1600000000,"PEAK_SHARING"]
     ],
     [
       ["carolinas-pjm-upgrade","carolinas-pjm-upgrade-market","PJM market intertie","EXISTING",500000000,225000000,4500000,2,31,0.013,0.04],
@@ -124,8 +124,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-southeast": [
     [
-      ["southeast-tva-upgrade-market","Tennessee Valley","An existing northern path can share nuclear, hydro, gas, and solar generation, though Valley heat waves usually match Georgia's.",48,1600000000,1600000000,"PEAK_SHARING"],
-      ["southeast-miso-new-market","Lower Mississippi market","A new westward line reaches Gulf Coast gas plants, adding choices when a storm strains one side.",47,1700000000,1700000000,"FIRM_THERMAL"]
+      ["southeast-tva-upgrade-market","Tennessee Valley","An existing northern path can share nuclear, hydro, gas, and solar generation, though Valley heat waves usually match Georgia's.",37,1600000000,1600000000,"PEAK_SHARING"],
+      ["southeast-miso-new-market","Lower Mississippi market","A new westward line reaches Gulf Coast gas plants, adding choices when a storm strains one side.",37,1700000000,1700000000,"FIRM_THERMAL"]
     ],
     [
       ["southeast-tva-upgrade","southeast-tva-upgrade-market","Tennessee Valley intertie","EXISTING",500000000,205000000,4100000,2,32,0.014,0.05],
@@ -134,8 +134,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-florida": [
     [
-      ["florida-southeast-upgrade-market","Southeastern grid","Florida's main outside support comes from the north, but Georgia and Alabama feel the same heat waves and cold snaps.",50,1800000000,1900000000,"PEAK_SHARING"],
-      ["florida-gulf-new-market","Gulf Coast market","A new controlled Gulf route reaches gas-fired plants when the northern path is crowded.",52,1500000000,1800000000,"FIRM_THERMAL"]
+      ["florida-southeast-upgrade-market","Southeastern grid","Florida's main outside support comes from the north, but Georgia and Alabama feel the same heat waves and cold snaps.",37,1800000000,1900000000,"PEAK_SHARING"],
+      ["florida-gulf-new-market","Gulf Coast market","A new controlled Gulf route reaches gas-fired plants when the northern path is crowded.",37,1500000000,1800000000,"FIRM_THERMAL"]
     ],
     [
       ["florida-southeast-upgrade","florida-southeast-upgrade-market","Southeastern grid intertie","EXISTING",600000000,260000000,5200000,2,32,0.015,0.06],
@@ -144,8 +144,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-ercot": [
     [
-      ["ercot-east-dc-upgrade-market","Eastern grid","DC converter stations let Texas trade while its AC grid keeps operating independently.",47,1600000000,1700000000,"LARGE_POOL"],
-      ["ercot-southern-spirit-new-market","Southeastern grid","A major new DC line can move much more power across the Texas seam, though Southern heat waves and cold snaps often match Texas.",51,2200000000,2200000000,"PEAK_SHARING"]
+      ["ercot-east-dc-upgrade-market","Eastern grid","DC converter stations let Texas trade while its AC grid keeps operating independently.",32,1600000000,1700000000,"LARGE_POOL"],
+      ["ercot-southern-spirit-new-market","Southeastern grid","A major new DC line can move much more power across the Texas seam, though Southern heat waves and cold snaps often match Texas.",37,2200000000,2200000000,"PEAK_SHARING"]
     ],
     [
       ["ercot-east-dc-upgrade","ercot-east-dc-upgrade-market","Eastern grid intertie","EXISTING",600000000,360000000,7200000,2,33,0.016,0.06],
@@ -154,8 +154,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-pnw-wecc": [
     [
-      ["pnw-california-upgrade-market","California market","California's midday solar surplus can flow north, while its hot evenings pull power south.",56,1700000000,2100000000,"SOLAR_HEAVY"],
-      ["pnw-bc-upgrade-market","British Columbia hydro","Northern reservoirs can trade across the border when water and demand differ.",44,1500000000,900000000,"RESERVOIR_HYDRO"]
+      ["pnw-california-upgrade-market","California market","California's midday solar surplus can flow north, while its hot evenings pull power south.",55,1700000000,2100000000,"SOLAR_HEAVY"],
+      ["pnw-bc-upgrade-market","British Columbia hydro","Northern reservoirs can trade across the border when water and demand differ.",54,1500000000,900000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["pnw-california-upgrade","pnw-california-upgrade-market","California market intertie","EXISTING",700000000,245000000,4900000,2,30,0.011,0.04],
@@ -164,8 +164,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-desert-wecc": [
     [
-      ["desert-california-upgrade-market","California market","Desert solar can flow west by day, but West-wide heat waves strain both markets at once.",55,1500000000,1900000000,"PEAK_SHARING"],
-      ["desert-rockies-new-market","Rocky Mountain grid","A new inland route reaches wind and flexible generation with a different weather pattern.",45,1500000000,1300000000,"WIND_HEAVY"]
+      ["desert-california-upgrade-market","California market","Desert solar can flow west by day, but West-wide heat waves strain both markets at once.",50,1500000000,1900000000,"PEAK_SHARING"],
+      ["desert-rockies-new-market","Rocky Mountain grid","A new inland route reaches wind and flexible generation with a different weather pattern.",49,1500000000,1300000000,"WIND_HEAVY"]
     ],
     [
       ["desert-california-upgrade","desert-california-upgrade-market","California market intertie","EXISTING",600000000,230000000,4600000,2,34,0.017,0.07],
@@ -174,8 +174,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "us-rockies-wecc": [
     [
-      ["rockies-desert-upgrade-market","Desert Southwest","This route trades mountain wind and hydro for desert solar and peak support.",48,1500000000,1500000000,"SOLAR_HEAVY"],
-      ["rockies-eastern-hvdc-new-market","Great Plains market","A new HVDC seam link lets the Western and Eastern grids exchange much more power safely.",42,1800000000,1500000000,"WIND_HEAVY"]
+      ["rockies-desert-upgrade-market","Desert Southwest","This route trades mountain wind and hydro for desert solar and peak support.",54,1500000000,1500000000,"SOLAR_HEAVY"],
+      ["rockies-eastern-hvdc-new-market","Great Plains market","A new HVDC seam link lets the Western and Eastern grids exchange much more power safely.",28,1800000000,1500000000,"WIND_HEAVY"]
     ],
     [
       ["rockies-desert-upgrade","rockies-desert-upgrade-market","Desert Southwest intertie","EXISTING",500000000,210000000,4200000,2,31,0.012,0.05],
@@ -184,8 +184,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-ontario": [
     [
-      ["ontario-quebec-upgrade-market","Québec hydro market","Flexible reservoir power complements Ontario's nuclear-heavy supply.",42,2000000000,1000000000,"RESERVOIR_HYDRO"],
-      ["ontario-us-upgrade-market","Great Lakes U.S. market","Several border paths link Ontario to New York and Midcontinent neighbors, whose heat waves usually match Ontario's.",50,1700000000,1900000000,"PEAK_SHARING"]
+      ["ontario-quebec-upgrade-market","Québec hydro market","Flexible reservoir power complements Ontario's nuclear-heavy supply.",44,2000000000,1000000000,"RESERVOIR_HYDRO"],
+      ["ontario-us-upgrade-market","Great Lakes U.S. market","Several border paths link Ontario to New York and Midcontinent neighbors, whose heat waves usually match Ontario's.",39,1700000000,1900000000,"PEAK_SHARING"]
     ],
     [
       ["ontario-quebec-upgrade","ontario-quebec-upgrade-market","Québec hydro market intertie","EXISTING",700000000,280000000,5600000,2,29,0.01,0.03],
@@ -194,8 +194,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-quebec": [
     [
-      ["quebec-ontario-upgrade-market","Ontario market","Ontario can sell steady nuclear power when Québec reservoirs are tight, but the same cold snaps strain both grids.",49,1700000000,1800000000,"PEAK_SHARING"],
-      ["quebec-northeast-upgrade-market","New York and New England","Controlled ties reach large northeastern markets that can send power back when Québec's winter peak is tight.",56,1500000000,2300000000,"LARGE_POOL"]
+      ["quebec-ontario-upgrade-market","Ontario market","Ontario can sell steady nuclear power when Québec reservoirs are tight, but the same cold snaps strain both grids.",21,1700000000,1800000000,"PEAK_SHARING"],
+      ["quebec-northeast-upgrade-market","New York and New England","Controlled ties reach large northeastern markets that can send power back when Québec's winter peak is tight.",43,1500000000,2300000000,"LARGE_POOL"]
     ],
     [
       ["quebec-ontario-upgrade","quebec-ontario-upgrade-market","Ontario market intertie","EXISTING",700000000,280000000,5600000,2,29,0.01,0.03],
@@ -204,8 +204,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-bc": [
     [
-      ["bc-pnw-upgrade-market","Pacific Northwest","Hydro systems on both sides of the border can trade when rainfall, snowmelt, and demand differ.",47,1700000000,1400000000,"SEASONAL_HYDRO"],
-      ["bc-alberta-upgrade-market","Alberta market","A mountain crossing trades flexible hydro for Alberta's wind and gas power.",50,1300000000,1400000000,"WIND_HEAVY"]
+      ["bc-pnw-upgrade-market","Pacific Northwest","Hydro systems on both sides of the border can trade when rainfall, snowmelt, and demand differ.",54,1700000000,1400000000,"SEASONAL_HYDRO"],
+      ["bc-alberta-upgrade-market","Alberta market","A mountain crossing trades flexible hydro for Alberta's wind and gas power.",70,1300000000,1400000000,"WIND_HEAVY"]
     ],
     [
       ["bc-pnw-upgrade","bc-pnw-upgrade-market","Pacific Northwest intertie","EXISTING",600000000,230000000,4600000,2,28,0.01,0.03],
@@ -214,8 +214,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-alberta": [
     [
-      ["alberta-bc-upgrade-market","British Columbia hydro","Reservoir power can balance Alberta's wind and demand swings.",45,1500000000,1000000000,"RESERVOIR_HYDRO"],
-      ["alberta-saskatchewan-new-market","Prairie eastern grid","A larger converter link reaches a coal- and gas-fired grid that runs independently from the West.",47,900000000,900000000,"FIRM_THERMAL"]
+      ["alberta-bc-upgrade-market","British Columbia hydro","Reservoir power can balance Alberta's wind and demand swings.",54,1500000000,1000000000,"RESERVOIR_HYDRO"],
+      ["alberta-saskatchewan-new-market","Prairie eastern grid","A larger converter link reaches a coal- and gas-fired grid that runs independently from the West.",50,900000000,900000000,"FIRM_THERMAL"]
     ],
     [
       ["alberta-bc-upgrade","alberta-bc-upgrade-market","British Columbia hydro intertie","EXISTING",500000000,220000000,4400000,2,29,0.01,0.03],
@@ -224,8 +224,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-manitoba": [
     [
-      ["manitoba-us-upgrade-market","U.S. Midcontinent","Large north-south lines trade Manitoba hydro for Midwest wind power.",46,1700000000,1800000000,"WIND_HEAVY"],
-      ["manitoba-saskatchewan-upgrade-market","Saskatchewan market","A prairie link reaches a coal- and gas-heavy neighbour with some hydro and wind.",48,900000000,900000000,"FIRM_THERMAL"]
+      ["manitoba-us-upgrade-market","U.S. Midcontinent","Large north-south lines trade Manitoba hydro for Midwest wind power.",31,1700000000,1800000000,"WIND_HEAVY"],
+      ["manitoba-saskatchewan-upgrade-market","Saskatchewan market","A prairie link reaches a coal- and gas-heavy neighbour with some hydro and wind.",50,900000000,900000000,"FIRM_THERMAL"]
     ],
     [
       ["manitoba-us-upgrade","manitoba-us-upgrade-market","U.S. Midcontinent intertie","EXISTING",700000000,280000000,5600000,2,29,0.01,0.03],
@@ -234,8 +234,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ca-maritimes": [
     [
-      ["novascotia-newbrunswick-upgrade-market","New Brunswick market","This is Nova Scotia's landward path to the wider Eastern grid, though Maritime cold snaps hit both provinces together.",51,900000000,1000000000,"PEAK_SHARING"],
-      ["novascotia-maritime-link-upgrade-market","Newfoundland hydro","A subsea cable brings Newfoundland and Labrador reservoir hydropower across the Cabot Strait.",44,1100000000,700000000,"RESERVOIR_HYDRO"]
+      ["novascotia-newbrunswick-upgrade-market","New Brunswick market","This is Nova Scotia's landward path to the wider Eastern grid, though Maritime cold snaps hit both provinces together.",39,900000000,1000000000,"PEAK_SHARING"],
+      ["novascotia-maritime-link-upgrade-market","Newfoundland hydro","A subsea cable brings Newfoundland and Labrador reservoir hydropower across the Cabot Strait.",36,1100000000,700000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["novascotia-newbrunswick-upgrade","novascotia-newbrunswick-upgrade-market","New Brunswick market intertie","EXISTING",350000000,160000000,3200000,2,27,0.009,0.03],
@@ -244,8 +244,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mx-sin-central-west": [
     [
-      ["mexico-central-occidental-upgrade-market","Western Mexico","A stronger central-west path reaches Bajío solar parks, plus hydro and geothermal, inside the national market.",53,1800000000,2000000000,"SOLAR_HEAVY"],
-      ["mexico-northeast-new-market","Northeast Mexico","A new long-distance line reaches industrial demand and gas generation in the northeast.",50,1900000000,2100000000,"FIRM_THERMAL"]
+      ["mexico-central-occidental-upgrade-market","Western Mexico","A stronger central-west path reaches Bajío solar parks, plus hydro and geothermal, inside the national market.",50,1800000000,2000000000,"SOLAR_HEAVY"],
+      ["mexico-northeast-new-market","Northeast Mexico","A new long-distance line reaches industrial demand and gas generation in the northeast.",45,1900000000,2100000000,"FIRM_THERMAL"]
     ],
     [
       ["mexico-central-occidental-upgrade","mexico-central-occidental-upgrade-market","Western Mexico intertie","EXISTING",700000000,245000000,4900000,2,31,0.013,0.05],
@@ -254,8 +254,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mx-sin-northeast": [
     [
-      ["monterrey-ercot-dc-upgrade-market","Texas market","Converters let Northeast Mexico and Texas trade, though the same heat waves and cold snaps often hit both sides.",48,1000000000,1100000000,"PEAK_SHARING"],
-      ["monterrey-central-mexico-upgrade-market","Central Mexico","A stronger inland backbone links industrial demand with the national generation mix.",53,1700000000,1900000000,"LARGE_POOL"]
+      ["monterrey-ercot-dc-upgrade-market","Texas market","Converters let Northeast Mexico and Texas trade, though the same heat waves and cold snaps often hit both sides.",65,1000000000,1100000000,"PEAK_SHARING"],
+      ["monterrey-central-mexico-upgrade-market","Central Mexico","A stronger inland backbone links industrial demand with the national generation mix.",50,1700000000,1900000000,"LARGE_POOL"]
     ],
     [
       ["monterrey-ercot-dc-upgrade","monterrey-ercot-dc-upgrade-market","Texas market intertie","EXISTING",300000000,195000000,3900000,2,34,0.016,0.06],
@@ -264,8 +264,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mx-baja-wecc": [
     [
-      ["tijuana-california-upgrade-market","Southern California","Two operating border paths reach California's midday solar surplus, though hot evenings are tight on both sides.",57,1500000000,1900000000,"SOLAR_HEAVY"],
-      ["baja-sin-hvdc-new-market","Mexican national grid","A new HVDC line would connect Baja to the SIN without forcing the two AC systems to synchronize.",52,1900000000,1800000000,"LARGE_POOL"]
+      ["tijuana-california-upgrade-market","Southern California","Two operating border paths reach California's midday solar surplus, though hot evenings are tight on both sides.",51,1500000000,1900000000,"SOLAR_HEAVY"],
+      ["baja-sin-hvdc-new-market","Mexican national grid","A new HVDC line would connect Baja to the SIN without forcing the two AC systems to synchronize.",50,1900000000,1800000000,"LARGE_POOL"]
     ],
     [
       ["tijuana-california-upgrade","tijuana-california-upgrade-market","Southern California intertie","EXISTING",600000000,210000000,4200000,2,32,0.014,0.06],
@@ -274,8 +274,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mx-sin-yucatan": [
     [
-      ["yucatan-sin-upgrade-market","Eastern Mexico","The peninsula's main connection carries power to and from the rest of Mexico.",52,1700000000,1800000000,"LARGE_POOL"],
-      ["yucatan-belize-upgrade-market","Belize grid","A small border line reaches Belize's river dams for emergency trade, but cannot power the whole peninsula.",59,120000000,140000000,"MONSOON_HYDRO"]
+      ["yucatan-sin-upgrade-market","Eastern Mexico","The peninsula's main connection carries power to and from the rest of Mexico.",50,1700000000,1800000000,"LARGE_POOL"],
+      ["yucatan-belize-upgrade-market","Belize grid","A small border line reaches Belize's river dams for emergency trade, but cannot power the whole peninsula.",111,120000000,140000000,"MONSOON_HYDRO"]
     ],
     [
       ["yucatan-sin-upgrade","yucatan-sin-upgrade-market","Eastern Mexico intertie","EXISTING",600000000,270000000,5400000,2,32,0.015,0.06],
@@ -284,8 +284,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-north": [
     [
-      ["siepac-north-neighbor-upgrade-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"MONSOON_HYDRO"],
-      ["guatemala-mexico-upgrade-market","Mexico market","A northern border line gives the regional market another source and buyer.",54,900000000,1000000000,"LARGE_POOL"]
+      ["siepac-north-neighbor-upgrade-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",86,650000000,700000000,"MONSOON_HYDRO"],
+      ["guatemala-mexico-upgrade-market","Mexico market","A northern border line gives the regional market another source and buyer.",50,900000000,1000000000,"LARGE_POOL"]
     ],
     [
       ["siepac-north-neighbor-upgrade","siepac-north-neighbor-upgrade-market","Neighboring SIEPAC market intertie","EXISTING",250000000,105000000,2100000,2,31,0.014,0.05],
@@ -294,8 +294,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-central": [
     [
-      ["siepac-central-north-upgrade-market","Northern SIEPAC market","Trade north toward Guatemala and El Salvador, whose coal, fuel-oil, and geothermal plants run in any season.",60,650000000,700000000,"FIRM_THERMAL"],
-      ["siepac-central-south-upgrade-market","Southern SIEPAC market","Trade south toward Costa Rica and Panama, where rainfall and generation can follow a different pattern.",57,750000000,750000000,"MONSOON_HYDRO"]
+      ["siepac-central-north-upgrade-market","Northern SIEPAC market","Trade north toward Guatemala and El Salvador, whose coal, fuel-oil, and geothermal plants run in any season.",86,650000000,700000000,"FIRM_THERMAL"],
+      ["siepac-central-south-upgrade-market","Southern SIEPAC market","Trade south toward Costa Rica and Panama, where rainfall and generation can follow a different pattern.",85,750000000,750000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-central-north-upgrade","siepac-central-north-upgrade-market","Northern SIEPAC market intertie","EXISTING",250000000,100000000,2000000,2,32,0.014,0.05],
@@ -304,8 +304,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-south": [
     [
-      ["siepac-south-north-upgrade-market","Northern SIEPAC market","The regional backbone reaches Costa Rica's rain-fed hydropower and four more national markets to the north.",59,800000000,800000000,"MONSOON_HYDRO"],
-      ["panama-colombia-hvdc-new-market","Colombia market","A planned HVDC line would join Central and South America's regional grids.",48,1000000000,900000000,"LARGE_POOL"]
+      ["siepac-south-north-upgrade-market","Northern SIEPAC market","The regional backbone reaches Costa Rica's rain-fed hydropower and four more national markets to the north.",82,800000000,800000000,"MONSOON_HYDRO"],
+      ["panama-colombia-hvdc-new-market","Colombia market","A planned HVDC line would join Central and South America's regional grids.",91,1000000000,900000000,"LARGE_POOL"]
     ],
     [
       ["siepac-south-north-upgrade","siepac-south-north-upgrade-market","Northern SIEPAC market intertie","EXISTING",300000000,120000000,2400000,2,31,0.014,0.05],
@@ -314,7 +314,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-san-salvador": [
     [
-      ["siepac-honduras-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"MONSOON_HYDRO"]
+      ["siepac-honduras-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",86,650000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-honduras-upgrade","siepac-honduras-market","Honduras intertie","EXISTING",250000000,105000000,2100000,2,31,0.014,0.05]
@@ -322,7 +322,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-costa-rica": [
     [
-      ["siepac-panama-market","Northern SIEPAC market","The regional backbone links Costa Rica to Panama's rain-fed hydropower and the wider SIEPAC market.",59,800000000,800000000,"MONSOON_HYDRO"]
+      ["siepac-panama-market","Northern SIEPAC market","The regional backbone links Costa Rica to Panama's rain-fed hydropower and the wider SIEPAC market.",91,800000000,800000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-panama-upgrade","siepac-panama-market","Panama intertie","EXISTING",300000000,120000000,2400000,2,31,0.014,0.05]
@@ -330,8 +330,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-london": [
     [
-      ["geo-london-continental-core","Continental Europe","Nuclear, wind, and gas compete across the Channel; prices change when cables or power stations are busy.",62,2400000000,2200000000,"LARGE_POOL"],
-      ["geo-london-norwegian-hydro","Norwegian hydropower","Reservoirs can send flexible low-carbon power, but dry years leave less to export.",49,1600000000,1200000000,"RESERVOIR_HYDRO"]
+      ["geo-london-continental-core","Continental Europe","Nuclear, wind, and gas compete across the Channel; prices change when cables or power stations are busy.",108,2400000000,2200000000,"LARGE_POOL"],
+      ["geo-london-norwegian-hydro","Norwegian hydropower","Reservoirs can send flexible low-carbon power, but dry years leave less to export.",79,1600000000,1200000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["gb-channel-upgrade","geo-london-continental-core","New Channel cable","EXISTING",750000000,240000000,4800000,1,30,0.012,0.03],
@@ -340,8 +340,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-dublin": [
     [
-      ["geo-dublin-great-britain-market","Great Britain","Windy hours can be cheap, while cold calm evenings can tighten supply.",64,1400000000,1600000000,"WIND_HEAVY"],
-      ["geo-dublin-continental-core","Continental Europe","A larger mix of nuclear, wind, hydro, and gas gives another source of power.",62,1500000000,1400000000,"LARGE_POOL"]
+      ["geo-dublin-great-britain-market","Great Britain","Windy hours can be cheap, while cold calm evenings can tighten supply.",120,1400000000,1600000000,"WIND_HEAVY"],
+      ["geo-dublin-continental-core","Continental Europe","A larger mix of nuclear, wind, hydro, and gas gives another source of power.",110,1500000000,1400000000,"LARGE_POOL"]
     ],
     [
       ["ireland-ewic-upgrade","geo-dublin-great-britain-market","New Irish Sea cable","EXISTING",350000000,190000000,3800000,1,27,0.01,0.02],
@@ -350,8 +350,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-paris": [
     [
-      ["geo-paris-continental-core","Core European market","Neighbouring grids share wind, solar, nuclear, hydro, and gas, but the same cold snaps and heat waves hit them all.",60,2800000000,2600000000,"PEAK_SHARING"],
-      ["geo-paris-iberian-market","Iberian renewables","Spanish and Portuguese solar can send cheap midday surplus north, but the Pyrenees limit the flow.",51,1700000000,1400000000,"SOLAR_HEAVY"]
+      ["geo-paris-continental-core","Core European market","Neighbouring grids share wind, solar, nuclear, hydro, and gas, but the same cold snaps and heat waves hit them all.",107,2800000000,2600000000,"PEAK_SHARING"],
+      ["geo-paris-iberian-market","Iberian renewables","Spanish and Portuguese solar can send cheap midday surplus north, but the Pyrenees limit the flow.",92,1700000000,1400000000,"SOLAR_HEAVY"]
     ],
     [
       ["france-core-upgrade","geo-paris-continental-core","Eastern border intertie","EXISTING",800000000,230000000,4600000,1,30,0.012,0.04],
@@ -360,8 +360,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-madrid": [
     [
-      ["geo-madrid-portuguese-market","Portugal","Atlantic wind and hydro often complement Spanish solar.",49,1500000000,1200000000,"WIND_HEAVY"],
-      ["geo-madrid-continental-core","France and Continental Europe","The Pyrenees gateway reaches the larger European market, but it is often congested.",62,1800000000,2000000000,"LARGE_POOL"]
+      ["geo-madrid-portuguese-market","Portugal","Atlantic wind and hydro often complement Spanish solar.",92,1500000000,1200000000,"WIND_HEAVY"],
+      ["geo-madrid-continental-core","France and Continental Europe","The Pyrenees gateway reaches the larger European market, but it is often congested.",110,1800000000,2000000000,"LARGE_POOL"]
     ],
     [
       ["spain-portugal-upgrade","geo-madrid-portuguese-market","Iberian border intertie","EXISTING",650000000,180000000,3600000,1,34,0.014,0.05],
@@ -370,7 +370,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-lisbon": [
     [
-      ["geo-lisbon-spanish-market","Spain","The combined Iberian market shares changing supplies of wind, solar, hydro, and gas.",52,2000000000,1900000000,"SOLAR_HEAVY"]
+      ["geo-lisbon-spanish-market","Spain","The combined Iberian market shares changing supplies of wind, solar, hydro, and gas.",92,2000000000,1900000000,"SOLAR_HEAVY"]
     ],
     [
       ["portugal-spain-upgrade","geo-lisbon-spanish-market","Northern Iberian intertie","EXISTING",700000000,190000000,3800000,1,32,0.013,0.05]
@@ -378,8 +378,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-rome": [
     [
-      ["geo-rome-alpine-market","Alpine neighbours","French, Swiss, Austrian, and Slovenian power crosses mountain passes, with strong winter demand.",61,2200000000,2100000000,"LARGE_POOL"],
-      ["geo-rome-adriatic-market","Adriatic and Balkan grids","Hydro, wind, and thermal power arrive by eastern land routes and undersea cables.",54,1600000000,1300000000,"SEASONAL_HYDRO"]
+      ["geo-rome-alpine-market","Alpine neighbours","French, Swiss, Austrian, and Slovenian power crosses mountain passes, with strong winter demand.",115,2200000000,2100000000,"LARGE_POOL"],
+      ["geo-rome-adriatic-market","Adriatic and Balkan grids","Hydro, wind, and thermal power arrive by eastern land routes and undersea cables.",123,1600000000,1300000000,"SEASONAL_HYDRO"]
     ],
     [
       ["italy-alpine-upgrade","geo-rome-alpine-market","Alpine border intertie","EXISTING",750000000,260000000,5200000,2,31,0.012,0.04],
@@ -388,8 +388,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-berlin": [
     [
-      ["geo-berlin-western-core","Western Europe","Dense borders share French nuclear, Benelux wind and gas, and Alpine hydro, but calm cold spells tighten them all together.",61,2800000000,2700000000,"PEAK_SHARING"],
-      ["geo-berlin-nordic-market","Nordic and Danish market","Wind and reservoir hydro can absorb or fill Germany’s changing renewable supply.",48,2000000000,1700000000,"RESERVOIR_HYDRO"]
+      ["geo-berlin-western-core","Western Europe","Dense borders share French nuclear, Benelux wind and gas, and Alpine hydro, but calm cold spells tighten them all together.",110,2800000000,2700000000,"PEAK_SHARING"],
+      ["geo-berlin-nordic-market","Nordic and Danish market","Wind and reservoir hydro can absorb or fill Germany’s changing renewable supply.",72,2000000000,1700000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["germany-west-upgrade","geo-berlin-western-core","Western grid intertie","EXISTING",800000000,210000000,4200000,1,30,0.012,0.04],
@@ -398,8 +398,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-vienna": [
     [
-      ["geo-vienna-north-core","Germany and Czechia","Large connected markets can trade wind, solar, coal, gas, and nuclear power.",59,1800000000,1800000000,"LARGE_POOL"],
-      ["geo-vienna-alpine-balkan","Alps and Balkans","Hydro-rich neighbours can respond quickly, especially after rain and snowmelt.",55,1500000000,1300000000,"SEASONAL_HYDRO"]
+      ["geo-vienna-north-core","Germany and Czechia","Large connected markets can trade wind, solar, coal, gas, and nuclear power.",105,1800000000,1800000000,"LARGE_POOL"],
+      ["geo-vienna-alpine-balkan","Alps and Balkans","Hydro-rich neighbours can respond quickly, especially after rain and snowmelt.",120,1500000000,1300000000,"SEASONAL_HYDRO"]
     ],
     [
       ["austria-north-upgrade","geo-vienna-north-core","Danube border intertie","EXISTING",500000000,155000000,3100000,1,31,0.012,0.04],
@@ -408,8 +408,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-zurich": [
     [
-      ["geo-zurich-northwest-core","France and Germany","Big neighbouring markets bring nuclear, wind, and thermal power.",61,1900000000,2000000000,"LARGE_POOL"],
-      ["geo-zurich-italian-market","Italy","Italy's gas-fired plants often need imports, so Alpine storage can earn money by exporting at busy hours.",66,1200000000,1800000000,"FIRM_THERMAL"]
+      ["geo-zurich-northwest-core","France and Germany","Big neighbouring markets bring nuclear, wind, and thermal power.",107,1900000000,2000000000,"LARGE_POOL"],
+      ["geo-zurich-italian-market","Italy","Italy's gas-fired plants often need imports, so Alpine storage can earn money by exporting at busy hours.",135,1200000000,1800000000,"FIRM_THERMAL"]
     ],
     [
       ["swiss-north-upgrade","geo-zurich-northwest-core","Northern border intertie","EXISTING",500000000,170000000,3400000,1,29,0.011,0.04],
@@ -418,8 +418,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-amsterdam": [
     [
-      ["geo-amsterdam-core-neighbours","Belgium and Germany","Short, strong borders connect to the heart of the European market, which shares the same wind and weather.",60,2200000000,2100000000,"PEAK_SHARING"],
-      ["geo-amsterdam-north-sea-market","North Sea neighbours","Long DC cables reach Norwegian hydro, Danish wind, and Great Britain.",52,1600000000,1500000000,"RESERVOIR_HYDRO"]
+      ["geo-amsterdam-core-neighbours","Belgium and Germany","Short, strong borders connect to the heart of the European market, which shares the same wind and weather.",104,2200000000,2100000000,"PEAK_SHARING"],
+      ["geo-amsterdam-north-sea-market","North Sea neighbours","Long DC cables reach Norwegian hydro, Danish wind, and Great Britain.",90,1600000000,1500000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["netherlands-core-upgrade","geo-amsterdam-core-neighbours","Core border intertie","EXISTING",650000000,170000000,3400000,1,30,0.012,0.04],
@@ -428,8 +428,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-brussels": [
     [
-      ["geo-brussels-france-market","France","A large nuclear fleet can export steadily, but French cold snaps tighten prices on both sides of the border.",60,2000000000,1900000000,"PEAK_SHARING"],
-      ["geo-brussels-north-sea-core","Netherlands, Germany, and Great Britain","Several nearby grids offer a mix of wind, gas, coal, and imports.",62,1800000000,1900000000,"WIND_HEAVY"]
+      ["geo-brussels-france-market","France","A large nuclear fleet can export steadily, but French cold snaps tighten prices on both sides of the border.",110,2000000000,1900000000,"PEAK_SHARING"],
+      ["geo-brussels-north-sea-core","Netherlands, Germany, and Great Britain","Several nearby grids offer a mix of wind, gas, coal, and imports.",109,1800000000,1900000000,"WIND_HEAVY"]
     ],
     [
       ["belgium-france-upgrade","geo-brussels-france-market","Southern border intertie","EXISTING",550000000,150000000,3000000,1,30,0.012,0.04],
@@ -438,8 +438,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-copenhagen": [
     [
-      ["geo-copenhagen-nordic-market","Nordic grid","Swedish and Norwegian hydro can balance Denmark’s changing wind output.",47,1900000000,1500000000,"RESERVOIR_HYDRO"],
-      ["geo-copenhagen-continental-market","Continental and North Sea grid","Germany, the Netherlands, and Great Britain offer a much larger market for windy and calm hours.",61,2000000000,2100000000,"LARGE_POOL"]
+      ["geo-copenhagen-nordic-market","Nordic grid","Swedish and Norwegian hydro can balance Denmark’s changing wind output.",58,1900000000,1500000000,"RESERVOIR_HYDRO"],
+      ["geo-copenhagen-continental-market","Continental and North Sea grid","Germany, the Netherlands, and Great Britain offer a much larger market for windy and calm hours.",108,2000000000,2100000000,"LARGE_POOL"]
     ],
     [
       ["denmark-nordic-upgrade","geo-copenhagen-nordic-market","Øresund and Skagerrak intertie","EXISTING",550000000,210000000,4200000,2,27,0.01,0.03],
@@ -448,8 +448,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-lista": [
     [
-      ["geo-lista-nordic-market","Sweden and Finland","A shared Nordic grid moves hydro, wind, and nuclear power, though the same winter cold raises demand everywhere.",47,1900000000,1700000000,"PEAK_SHARING"],
-      ["geo-lista-north-sea-continent","North Sea and Continental Europe","Subsea cables reach Denmark, the Netherlands, Germany, and Great Britain, where windy hours bring cheap power.",61,2000000000,2300000000,"WIND_HEAVY"]
+      ["geo-lista-nordic-market","Sweden and Finland","A shared Nordic grid moves hydro, wind, and nuclear power, though the same winter cold raises demand everywhere.",60,1900000000,1700000000,"PEAK_SHARING"],
+      ["geo-lista-north-sea-continent","North Sea and Continental Europe","Subsea cables reach Denmark, the Netherlands, Germany, and Great Britain, where windy hours bring cheap power.",105,2000000000,2300000000,"WIND_HEAVY"]
     ],
     [
       ["norway-nordic-upgrade","geo-lista-nordic-market","Nordic border intertie","EXISTING",550000000,180000000,3600000,1,26,0.01,0.03],
@@ -458,8 +458,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-stockholm": [
     [
-      ["geo-stockholm-nordic-market","Norway, Finland, and Denmark","The synchronous Nordic grid shares hydro, nuclear, and wind power.",47,2000000000,1700000000,"RESERVOIR_HYDRO"],
-      ["geo-stockholm-baltic-continent","Baltic and Continental Europe","DC cables reach Lithuania, Poland, and Germany.",57,1600000000,1600000000,"LARGE_POOL"]
+      ["geo-stockholm-nordic-market","Norway, Finland, and Denmark","The synchronous Nordic grid shares hydro, nuclear, and wind power.",72,2000000000,1700000000,"RESERVOIR_HYDRO"],
+      ["geo-stockholm-baltic-continent","Baltic and Continental Europe","DC cables reach Lithuania, Poland, and Germany.",103,1600000000,1600000000,"LARGE_POOL"]
     ],
     [
       ["sweden-nordic-upgrade","geo-stockholm-nordic-market","Nordic AC line","EXISTING",600000000,180000000,3600000,1,26,0.01,0.03],
@@ -468,8 +468,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-helsinki": [
     [
-      ["geo-helsinki-nordic-market","Sweden and Norway","Nordic hydro, wind, and nuclear power share one synchronous grid.",48,1700000000,1600000000,"RESERVOIR_HYDRO"],
-      ["geo-helsinki-baltic-market","Estonia and the Baltic states","Undersea DC cables reach Estonia's fuel-fired plants and onward to Continental Europe.",56,1100000000,1200000000,"FIRM_THERMAL"]
+      ["geo-helsinki-nordic-market","Sweden and Norway","Nordic hydro, wind, and nuclear power share one synchronous grid.",57,1700000000,1600000000,"RESERVOIR_HYDRO"],
+      ["geo-helsinki-baltic-market","Estonia and the Baltic states","Undersea DC cables reach Estonia's fuel-fired plants and onward to Continental Europe.",98,1100000000,1200000000,"FIRM_THERMAL"]
     ],
     [
       ["finland-nordic-upgrade","geo-helsinki-nordic-market","Northern border intertie","EXISTING",500000000,170000000,3400000,1,25,0.01,0.03],
@@ -478,8 +478,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-warsaw": [
     [
-      ["geo-warsaw-western-core","Germany and Czechia","German wind often floods across the border cheaply, while calm spells leave less to import.",59,2100000000,2000000000,"WIND_HEAVY"],
-      ["geo-warsaw-baltic-nordic","Baltic and Nordic market","Links through Lithuania and Sweden reach hydro, wind, and nuclear power.",54,1500000000,1400000000,"RESERVOIR_HYDRO"]
+      ["geo-warsaw-western-core","Germany and Czechia","German wind often floods across the border cheaply, while calm spells leave less to import.",106,2100000000,2000000000,"WIND_HEAVY"],
+      ["geo-warsaw-baltic-nordic","Baltic and Nordic market","Links through Lithuania and Sweden reach hydro, wind, and nuclear power.",81,1500000000,1400000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["poland-west-upgrade","geo-warsaw-western-core","Western border intertie","EXISTING",600000000,175000000,3500000,1,30,0.012,0.04],
@@ -488,8 +488,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-prague": [
     [
-      ["geo-prague-west-core","Germany and Austria","Dense neighbouring grids provide a broad mix of power.",59,1900000000,1900000000,"LARGE_POOL"],
-      ["geo-prague-east-core","Poland and Slovakia","Coal and nuclear plants in Poland and Slovakia supply steady power to industrial demand.",56,1500000000,1500000000,"FIRM_THERMAL"]
+      ["geo-prague-west-core","Germany and Austria","Dense neighbouring grids provide a broad mix of power.",106,1900000000,1900000000,"LARGE_POOL"],
+      ["geo-prague-east-core","Poland and Slovakia","Coal and nuclear plants in Poland and Slovakia supply steady power to industrial demand.",108,1500000000,1500000000,"FIRM_THERMAL"]
     ],
     [
       ["czech-west-upgrade","geo-prague-west-core","Western border intertie","EXISTING",500000000,145000000,2900000,1,30,0.012,0.04],
@@ -498,8 +498,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-budapest": [
     [
-      ["geo-budapest-northwest-core","Austria and Slovakia","Connections lead toward large Central European markets.",59,1700000000,1600000000,"LARGE_POOL"],
-      ["geo-budapest-southern-balkan","Romania, Croatia, and Serbia","Hydro, nuclear, wind, and thermal power trade across several southern borders, but summer heat waves strain the whole region together.",53,1500000000,1400000000,"PEAK_SHARING"]
+      ["geo-budapest-northwest-core","Austria and Slovakia","Connections lead toward large Central European markets.",114,1700000000,1600000000,"LARGE_POOL"],
+      ["geo-budapest-southern-balkan","Romania, Croatia, and Serbia","Hydro, nuclear, wind, and thermal power trade across several southern borders, but summer heat waves strain the whole region together.",121,1500000000,1400000000,"PEAK_SHARING"]
     ],
     [
       ["hungary-northwest-upgrade","geo-budapest-northwest-core","Northwest border intertie","EXISTING",500000000,155000000,3100000,1,32,0.013,0.04],
@@ -508,8 +508,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-bucharest": [
     [
-      ["geo-bucharest-central-market","Hungary and Serbia","Connected neighbours share nuclear, hydro, wind, coal, and gas power, but the same heat waves raise demand on every side.",55,1600000000,1500000000,"PEAK_SHARING"],
-      ["geo-bucharest-black-sea-market","Bulgaria and Ukraine","A Black Sea corridor reaches nuclear and coal plants that run steadily in most seasons.",51,1500000000,1400000000,"FIRM_THERMAL"]
+      ["geo-bucharest-central-market","Hungary and Serbia","Connected neighbours share nuclear, hydro, wind, coal, and gas power, but the same heat waves raise demand on every side.",122,1600000000,1500000000,"PEAK_SHARING"],
+      ["geo-bucharest-black-sea-market","Bulgaria and Ukraine","A Black Sea corridor reaches nuclear and coal plants that run steadily in most seasons.",102,1500000000,1400000000,"FIRM_THERMAL"]
     ],
     [
       ["romania-west-upgrade","geo-bucharest-central-market","Western border intertie","EXISTING",500000000,150000000,3000000,1,33,0.014,0.05],
@@ -518,8 +518,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-sofia": [
     [
-      ["geo-sofia-northwest-balkan","Romania and Serbia","Nuclear, hydro, and thermal power move around the Balkan grid.",52,1500000000,1400000000,"SEASONAL_HYDRO"],
-      ["geo-sofia-south-market","Greece and Türkiye","Greek and Turkish solar makes midday power cheap, while hot evenings bring strong price swings.",57,1600000000,1700000000,"SOLAR_HEAVY"]
+      ["geo-sofia-northwest-balkan","Romania and Serbia","Nuclear, hydro, and thermal power move around the Balkan grid.",121,1500000000,1400000000,"SEASONAL_HYDRO"],
+      ["geo-sofia-south-market","Greece and Türkiye","Greek and Turkish solar makes midday power cheap, while hot evenings bring strong price swings.",103,1600000000,1700000000,"SOLAR_HEAVY"]
     ],
     [
       ["bulgaria-north-upgrade","geo-sofia-northwest-balkan","Danube border intertie","EXISTING",500000000,155000000,3100000,1,34,0.014,0.05],
@@ -528,8 +528,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-belgrade": [
     [
-      ["geo-belgrade-northwest-market","Hungary and Croatia","Central European markets add wind, nuclear, hydro, and gas power.",56,1500000000,1500000000,"LARGE_POOL"],
-      ["geo-belgrade-east-balkan","Romania and Bulgaria","Hydro, nuclear, and thermal fleets can trade, but Balkan heat waves tighten all three grids at once.",52,1400000000,1300000000,"PEAK_SHARING"]
+      ["geo-belgrade-northwest-market","Hungary and Croatia","Central European markets add wind, nuclear, hydro, and gas power.",122,1500000000,1500000000,"LARGE_POOL"],
+      ["geo-belgrade-east-balkan","Romania and Bulgaria","Hydro, nuclear, and thermal fleets can trade, but Balkan heat waves tighten all three grids at once.",120,1400000000,1300000000,"PEAK_SHARING"]
     ],
     [
       ["serbia-north-upgrade","geo-belgrade-northwest-market","Northern border intertie","EXISTING",450000000,145000000,2900000,1,34,0.014,0.05],
@@ -538,8 +538,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-zagreb": [
     [
-      ["geo-zagreb-alpine-market","Slovenia and Hungary","Connections lead into the larger Central European market.",57,1500000000,1500000000,"LARGE_POOL"],
-      ["geo-zagreb-western-balkan","Serbia and Bosnia","Hydro and thermal systems can help each other when water or fuel conditions differ.",51,1300000000,1200000000,"SEASONAL_HYDRO"]
+      ["geo-zagreb-alpine-market","Slovenia and Hungary","Connections lead into the larger Central European market.",122,1500000000,1500000000,"LARGE_POOL"],
+      ["geo-zagreb-western-balkan","Serbia and Bosnia","Hydro and thermal systems can help each other when water or fuel conditions differ.",120,1300000000,1200000000,"SEASONAL_HYDRO"]
     ],
     [
       ["croatia-alpine-upgrade","geo-zagreb-alpine-market","Alpine gateway intertie","EXISTING",450000000,145000000,2900000,1,33,0.014,0.05],
@@ -548,8 +548,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-athens": [
     [
-      ["geo-athens-balkan-market","Bulgaria and Türkiye","Land links reach Balkan hydro, nuclear, gas, coal, wind, and solar.",56,1600000000,1600000000,"FIRM_THERMAL"],
-      ["geo-athens-italian-market","Italy","An undersea cable links two Mediterranean markets with different busy hours.",65,1200000000,1600000000,"LARGE_POOL"]
+      ["geo-athens-balkan-market","Bulgaria and Türkiye","Land links reach Balkan hydro, nuclear, gas, coal, wind, and solar.",97,1600000000,1600000000,"FIRM_THERMAL"],
+      ["geo-athens-italian-market","Italy","An undersea cable links two Mediterranean markets with different busy hours.",135,1200000000,1600000000,"LARGE_POOL"]
     ],
     [
       ["greece-balkan-upgrade","geo-athens-balkan-market","Northern border intertie","EXISTING",500000000,170000000,3400000,1,35,0.014,0.05],
@@ -558,7 +558,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kyiv": [
     [
-      ["geo-kyiv-continental-west","Continental Europe","Poland, Slovakia, Hungary, and Romania connect Ukraine to Europe's coordinated grid.",57,1700000000,1900000000,"LARGE_POOL"]
+      ["geo-kyiv-continental-west","Continental Europe","Poland, Slovakia, Hungary, and Romania connect Ukraine to Europe's coordinated grid.",115,1700000000,1900000000,"LARGE_POOL"]
     ],
     [
       ["ukraine-west-upgrade","geo-kyiv-continental-west","Western synchronous intertie","EXISTING",500000000,220000000,4400000,2,31,0.012,0.04]
@@ -566,7 +566,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-minsk": [
     [
-      ["geo-minsk-russian-market","Russia","The two power systems still operate at one frequency and exchange power, while the former Baltic routes are closed.",46,1600000000,1500000000,"LARGE_POOL"]
+      ["geo-minsk-russian-market","Russia","The two power systems still operate at one frequency and exchange power, while the former Baltic routes are closed.",19,1600000000,1500000000,"LARGE_POOL"]
     ],
     [
       ["belarus-russia-upgrade","geo-minsk-russian-market","Russia border intertie","EXISTING",450000000,160000000,3200000,1,29,0.011,0.04]
@@ -574,8 +574,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tallinn": [
     [
-      ["geo-tallinn-finnish-market","Finland","Two undersea DC links reach the Nordic market.",49,1100000000,1200000000,"RESERVOIR_HYDRO"],
-      ["geo-tallinn-baltic-market","Latvia and Continental Europe","Latvia's river dams run strongest in the spring flood, and the Baltic grid reaches Poland through Lithuania.",55,1300000000,1200000000,"SEASONAL_HYDRO"]
+      ["geo-tallinn-finnish-market","Finland","Two undersea DC links reach the Nordic market.",70,1100000000,1200000000,"RESERVOIR_HYDRO"],
+      ["geo-tallinn-baltic-market","Latvia and Continental Europe","Latvia's river dams run strongest in the spring flood, and the Baltic grid reaches Poland through Lithuania.",103,1300000000,1200000000,"SEASONAL_HYDRO"]
     ],
     [
       ["estonia-estlink-upgrade","geo-tallinn-finnish-market","Estlink corridor cable","EXISTING",350000000,230000000,4600000,2,27,0.01,0.02],
@@ -584,8 +584,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-riga": [
     [
-      ["geo-riga-baltic-market","Estonia and Lithuania","The three Baltic grids share power and one frequency, and the same cold snaps hit them all.",54,1300000000,1200000000,"PEAK_SHARING"],
-      ["geo-riga-nordic-market","Nordic market","Power reaches Finland through Estonia and Sweden through Lithuania.",48,1100000000,1100000000,"RESERVOIR_HYDRO"]
+      ["geo-riga-baltic-market","Estonia and Lithuania","The three Baltic grids share power and one frequency, and the same cold snaps hit them all.",100,1300000000,1200000000,"PEAK_SHARING"],
+      ["geo-riga-nordic-market","Nordic market","Power reaches Finland through Estonia and Sweden through Lithuania.",70,1100000000,1100000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["latvia-baltic-upgrade","geo-riga-baltic-market","Baltic corridor line","EXISTING",400000000,135000000,2700000,1,28,0.011,0.03],
@@ -594,8 +594,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-vilnius": [
     [
-      ["geo-vilnius-polish-market","Poland and Continental Europe","LitPol Link is the Baltic land gateway to Poland's coal- and gas-heavy grid.",57,1400000000,1500000000,"FIRM_THERMAL"],
-      ["geo-vilnius-swedish-market","Sweden","NordBalt reaches Nordic hydro, nuclear, and wind across the sea.",48,1100000000,1100000000,"RESERVOIR_HYDRO"]
+      ["geo-vilnius-polish-market","Poland and Continental Europe","LitPol Link is the Baltic land gateway to Poland's coal- and gas-heavy grid.",101,1400000000,1500000000,"FIRM_THERMAL"],
+      ["geo-vilnius-swedish-market","Sweden","NordBalt reaches Nordic hydro, nuclear, and wind across the sea.",69,1100000000,1100000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["lithuania-litpol-upgrade","geo-vilnius-polish-market","LitPol Link corridor line","EXISTING",450000000,175000000,3500000,2,29,0.011,0.03],
@@ -604,8 +604,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-moscow": [
     [
-      ["geo-moscow-russian-regions","Russia's connected regions","High-voltage lines join the Central, North-West, Volga, Ural, Southern, and Siberian systems.",44,2600000000,2500000000,"LARGE_POOL"],
-      ["geo-moscow-belarus-market","Belarus","Belarus and Russia remain synchronized, and Belarusian gas and nuclear plants can exchange steady power.",46,1300000000,1200000000,"FIRM_THERMAL"]
+      ["geo-moscow-russian-regions","Russia's connected regions","High-voltage lines join the Central, North-West, Volga, Ural, Southern, and Siberian systems.",19,2600000000,2500000000,"LARGE_POOL"],
+      ["geo-moscow-belarus-market","Belarus","Belarus and Russia remain synchronized, and Belarusian gas and nuclear plants can exchange steady power.",45,1300000000,1200000000,"FIRM_THERMAL"]
     ],
     [
       ["russia-regional-upgrade","geo-moscow-russian-regions","Inter-regional grid intertie","EXISTING",700000000,220000000,4400000,2,27,0.01,0.03],
@@ -614,8 +614,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-istanbul": [
     [
-      ["geo-istanbul-continental-europe","Continental Europe","Türkiye shares one frequency with Bulgaria and Greece, reaching Europe's large power market.",59,2000000000,2100000000,"LARGE_POOL"],
-      ["geo-istanbul-caucasus-market","Georgia and the Caucasus","An asynchronous gateway reaches Georgian hydro and the wider Caucasus grid.",47,1300000000,1200000000,"SEASONAL_HYDRO"]
+      ["geo-istanbul-continental-europe","Continental Europe","Türkiye shares one frequency with Bulgaria and Greece, reaching Europe's large power market.",123,2000000000,2100000000,"LARGE_POOL"],
+      ["geo-istanbul-caucasus-market","Georgia and the Caucasus","An asynchronous gateway reaches Georgian hydro and the wider Caucasus grid.",53,1300000000,1200000000,"SEASONAL_HYDRO"]
     ],
     [
       ["turkey-europe-upgrade","geo-istanbul-continental-europe","Thrace border intertie","EXISTING",600000000,210000000,4200000,2,35,0.014,0.05],
@@ -624,8 +624,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-dubai": [
     [
-      ["geo-dubai-gcc-north","Saudi Arabia and the northern Gulf","The GCC backbone shares gas-fired power and emergency reserves, but the whole Gulf peaks on the same hot afternoons.",53,1500000000,1500000000,"PEAK_SHARING"],
-      ["geo-dubai-oman-market","Oman","Oman's later afternoon peak can differ from the Emirates, creating time to trade.",51,900000000,1000000000,"FIRM_THERMAL"]
+      ["geo-dubai-gcc-north","Saudi Arabia and the northern Gulf","The GCC backbone shares gas-fired power and emergency reserves, but the whole Gulf peaks on the same hot afternoons.",56,1500000000,1500000000,"PEAK_SHARING"],
+      ["geo-dubai-oman-market","Oman","Oman's later afternoon peak can differ from the Emirates, creating time to trade.",61,900000000,1000000000,"FIRM_THERMAL"]
     ],
     [
       ["uae-gcc-upgrade","geo-dubai-gcc-north","GCC backbone line","EXISTING",500000000,190000000,3800000,2,38,0.018,0.08],
@@ -634,7 +634,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-doha": [
     [
-      ["geo-doha-gcc-backbone","GCC power market","A regional safety net lets Qatar exchange power and reserves, though its neighbours peak on the same hot afternoons.",52,1100000000,1200000000,"PEAK_SHARING"]
+      ["geo-doha-gcc-backbone","GCC power market","A regional safety net lets Qatar exchange power and reserves, though its neighbours peak on the same hot afternoons.",56,1100000000,1200000000,"PEAK_SHARING"]
     ],
     [
       ["qatar-gcc-upgrade","geo-doha-gcc-backbone","Qatar–GCC intertie","EXISTING",400000000,175000000,3500000,2,38,0.018,0.08]
@@ -642,7 +642,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-manama": [
     [
-      ["geo-manama-gcc-backbone","GCC power market","Two undersea cables connect Bahrain to a regional grid that shares reserves but peaks on the same hot afternoons.",52,900000000,1000000000,"PEAK_SHARING"]
+      ["geo-manama-gcc-backbone","GCC power market","Two undersea cables connect Bahrain to a regional grid that shares reserves but peaks on the same hot afternoons.",56,900000000,1000000000,"PEAK_SHARING"]
     ],
     [
       ["bahrain-cable-upgrade","geo-manama-gcc-backbone","New Bahrain cable","EXISTING",300000000,210000000,4200000,2,38,0.016,0.03]
@@ -650,7 +650,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kuwaitcity": [
     [
-      ["geo-kuwaitcity-gcc-backbone","Saudi Arabia and the GCC","A 400 kV backbone shares power and reserves across the Gulf, where every grid peaks in the same summer heat.",52,1400000000,1500000000,"PEAK_SHARING"],
+      ["geo-kuwaitcity-gcc-backbone","Saudi Arabia and the GCC","A 400 kV backbone shares power and reserves across the Gulf, where every grid peaks in the same summer heat.",56,1400000000,1500000000,"PEAK_SHARING"],
       ["geo-kuwaitcity-iraq-market","Southern Iraq","A new route can send Gulf electricity to Iraq and create a new trading border.",58,700000000,1000000000,"FIRM_THERMAL"]
     ],
     [
@@ -660,8 +660,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-muscat": [
     [
-      ["geo-muscat-uae-market","United Arab Emirates","Oman reaches the wider GCC grid through the Emirates, where large solar parks make midday power cheap.",53,1000000000,1100000000,"SOLAR_HEAVY"],
-      ["geo-muscat-gcc-direct","Direct GCC backbone","A planned direct route would reduce reliance on the single path through the UAE.",51,1300000000,1300000000,"FIRM_THERMAL"]
+      ["geo-muscat-uae-market","United Arab Emirates","Oman reaches the wider GCC grid through the Emirates, where large solar parks make midday power cheap.",49,1000000000,1100000000,"SOLAR_HEAVY"],
+      ["geo-muscat-gcc-direct","Direct GCC backbone","A planned direct route would reduce reliance on the single path through the UAE.",56,1300000000,1300000000,"FIRM_THERMAL"]
     ],
     [
       ["oman-uae-upgrade","geo-muscat-uae-market","Mahdha gateway intertie","EXISTING",300000000,145000000,2900000,1,38,0.018,0.08],
@@ -670,7 +670,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-riyadh": [
     [
-      ["geo-riyadh-gcc-market","GCC neighbours","A frequency converter reaches the GCC's 50 Hz backbone, whose neighbours face the same summer heat.",52,1700000000,1700000000,"PEAK_SHARING"],
+      ["geo-riyadh-gcc-market","GCC neighbours","A frequency converter reaches the GCC's 50 Hz backbone, whose neighbours face the same summer heat.",55,1700000000,1700000000,"PEAK_SHARING"],
       ["geo-riyadh-egypt-market","Egypt","Different evening peak times across the Red Sea can help both grids share power.",55,1500000000,1600000000,"FIRM_THERMAL"]
     ],
     [
@@ -680,8 +680,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-baghdad": [
     [
-      ["geo-baghdad-iran-market","Iran","Existing eastern links can import power, but availability and contracts can change.",54,900000000,1100000000,"FIRM_THERMAL"],
-      ["geo-baghdad-gcc-jordan-market","GCC and Jordan","New western and southern routes can diversify Iraq's supply, though neighbours share the same summer heat.",56,1200000000,1200000000,"PEAK_SHARING"]
+      ["geo-baghdad-iran-market","Iran","Existing eastern links can import power, but availability and contracts can change.",48,900000000,1100000000,"FIRM_THERMAL"],
+      ["geo-baghdad-gcc-jordan-market","GCC and Jordan","New western and southern routes can diversify Iraq's supply, though neighbours share the same summer heat.",61,1200000000,1200000000,"PEAK_SHARING"]
     ],
     [
       ["iraq-iran-upgrade","geo-baghdad-iran-market","Eastern intertie","EXISTING",350000000,175000000,3500000,2,40,0.018,0.08],
@@ -690,8 +690,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tehran": [
     [
-      ["geo-tehran-caucasus-market","Armenia and Azerbaijan","Northern links exchange mostly gas-fired power with the Caucasus, whose winter peak differs from Iran's summer one.",47,1100000000,1000000000,"FIRM_THERMAL"],
-      ["geo-tehran-western-market","Türkiye and Iraq","Western links can trade power, though transfer limits and operating agreements vary.",55,1100000000,1200000000,"LARGE_POOL"]
+      ["geo-tehran-caucasus-market","Armenia and Azerbaijan","Northern links exchange mostly gas-fired power with the Caucasus, whose winter peak differs from Iran's summer one.",49,1100000000,1000000000,"FIRM_THERMAL"],
+      ["geo-tehran-western-market","Türkiye and Iraq","Western links can trade power, though transfer limits and operating agreements vary.",76,1100000000,1200000000,"LARGE_POOL"]
     ],
     [
       ["iran-armenia-upgrade","geo-tehran-caucasus-market","Armenia border intertie","EXISTING",400000000,190000000,3800000,2,38,0.017,0.07],
@@ -700,8 +700,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-amman": [
     [
-      ["geo-amman-egypt-market","Egypt","A short cable under the Gulf of Aqaba connects two grids with different peak times.",54,1000000000,1100000000,"FIRM_THERMAL"],
-      ["geo-amman-iraq-saudi-market","Iraq and Saudi Arabia","New desert routes can widen regional trade, though Iraq and Saudi Arabia swelter in the same summer heat.",55,900000000,1000000000,"PEAK_SHARING"]
+      ["geo-amman-egypt-market","Egypt","A short cable under the Gulf of Aqaba connects two grids with different peak times.",55,1000000000,1100000000,"FIRM_THERMAL"],
+      ["geo-amman-iraq-saudi-market","Iraq and Saudi Arabia","New desert routes can widen regional trade, though Iraq and Saudi Arabia swelter in the same summer heat.",57,900000000,1000000000,"PEAK_SHARING"]
     ],
     [
       ["jordan-egypt-upgrade","geo-amman-egypt-market","New Aqaba cable","EXISTING",350000000,220000000,4400000,2,38,0.016,0.03],
@@ -710,7 +710,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-beirut": [
     [
-      ["geo-beirut-levant-market","Syria and Jordan","Physical links can bring regional power, but outages and contracts may leave little available.",59,250000000,450000000,"FIRM_THERMAL"]
+      ["geo-beirut-levant-market","Syria and Jordan","Physical links can bring regional power, but outages and contracts may leave little available.",76,250000000,450000000,"FIRM_THERMAL"]
     ],
     [
       ["lebanon-levant-repair","geo-beirut-levant-market","Levant intertie","EXISTING",200000000,140000000,2800000,2,35,0.014,0.05]
@@ -718,8 +718,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-damascus": [
     [
-      ["geo-damascus-jordan-market","Jordan and Egypt","The southbound link reaches Jordan and Egypt, but transfers may be unavailable.",57,300000000,500000000,"FIRM_THERMAL"],
-      ["geo-damascus-turkey-market","Türkiye","A northern 400 kV route exists, but it is not part of Türkiye's synchronous European trading border.",60,250000000,450000000,"LARGE_POOL"]
+      ["geo-damascus-jordan-market","Jordan and Egypt","The southbound link reaches Jordan and Egypt, but transfers may be unavailable.",70,300000000,500000000,"FIRM_THERMAL"],
+      ["geo-damascus-turkey-market","Türkiye","A northern 400 kV route exists, but it is not part of Türkiye's synchronous European trading border.",76,250000000,450000000,"LARGE_POOL"]
     ],
     [
       ["syria-jordan-restoration","geo-damascus-jordan-market","Jordan link","EXISTING",200000000,150000000,3000000,2,38,0.017,0.07],
@@ -728,7 +728,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-telaviv": [
     [
-      ["geo-telaviv-east-mediterranean","Cyprus and Greece","A planned long subsea cable could connect today's isolated market to sunny Cyprus and Greece, and onward to Europe.",63,900000000,1000000000,"SOLAR_HEAVY"]
+      ["geo-telaviv-east-mediterranean","Cyprus and Greece","A planned long subsea cable could connect today's isolated market to sunny Cyprus and Greece, and onward to Europe.",133,900000000,1000000000,"SOLAR_HEAVY"]
     ],
     [
       ["israel-great-sea","geo-telaviv-east-mediterranean","Great Sea Interconnector","NEW",500000000,850000000,14000000,4,36,0.014,0.02]
@@ -736,8 +736,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-baku": [
     [
-      ["geo-baku-caucasus-market","Georgia and Russia","Azerbaijan trades through Georgia, whose hydro surplus peaks in spring and summer, and on to Russia's synchronous system.",46,1200000000,1100000000,"SEASONAL_HYDRO"],
-      ["geo-baku-turkey-market","Türkiye via Nakhchivan","A smaller western route reaches Türkiye, with a wider green corridor planned through Georgia.",58,700000000,800000000,"LARGE_POOL"]
+      ["geo-baku-caucasus-market","Georgia and Russia","Azerbaijan trades through Georgia, whose hydro surplus peaks in spring and summer, and on to Russia's synchronous system.",47,1200000000,1100000000,"SEASONAL_HYDRO"],
+      ["geo-baku-turkey-market","Türkiye via Nakhchivan","A smaller western route reaches Türkiye, with a wider green corridor planned through Georgia.",76,700000000,800000000,"LARGE_POOL"]
     ],
     [
       ["azerbaijan-georgia-upgrade","geo-baku-caucasus-market","Georgia border intertie","EXISTING",400000000,165000000,3300000,2,37,0.016,0.06],
@@ -746,8 +746,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tbilisi": [
     [
-      ["geo-tbilisi-caucasus-market","Russia, Azerbaijan, and Armenia","Gas-fired and nuclear neighbours can cover Georgia's winter shortfall when its own rivers run low.",46,1300000000,1100000000,"FIRM_THERMAL"],
-      ["geo-tbilisi-turkey-market","Türkiye","A converter lets asynchronous grids trade without sharing one frequency.",58,900000000,1000000000,"LARGE_POOL"]
+      ["geo-tbilisi-caucasus-market","Russia, Azerbaijan, and Armenia","Gas-fired and nuclear neighbours can cover Georgia's winter shortfall when its own rivers run low.",45,1300000000,1100000000,"FIRM_THERMAL"],
+      ["geo-tbilisi-turkey-market","Türkiye","A converter lets asynchronous grids trade without sharing one frequency.",76,900000000,1000000000,"LARGE_POOL"]
     ],
     [
       ["georgia-caucasus-upgrade","geo-tbilisi-caucasus-market","Caucasus border intertie","EXISTING",450000000,175000000,3500000,2,35,0.015,0.05],
@@ -756,8 +756,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-yerevan": [
     [
-      ["geo-yerevan-iran-market","Iran","Gas-for-electricity exchange and power lines make Iran an important southern partner.",49,900000000,900000000,"FIRM_THERMAL"],
-      ["geo-yerevan-georgia-market","Georgia and the Caucasus","A northern link can reach Georgian hydro and wider regional trade.",46,800000000,850000000,"SEASONAL_HYDRO"]
+      ["geo-yerevan-iran-market","Iran","Gas-for-electricity exchange and power lines make Iran an important southern partner.",61,900000000,900000000,"FIRM_THERMAL"],
+      ["geo-yerevan-georgia-market","Georgia and the Caucasus","A northern link can reach Georgian hydro and wider regional trade.",52,800000000,850000000,"SEASONAL_HYDRO"]
     ],
     [
       ["armenia-iran-upgrade","geo-yerevan-iran-market","Iran 400 kV line","NEW",500000000,280000000,5200000,3,37,0.016,0.06],
@@ -766,8 +766,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tashkent": [
     [
-      ["geo-tashkent-central-asian-market","Kazakhstan and Central Asia","A regional system shares hydro and thermal power across seasons.",40,1300000000,1200000000,"SEASONAL_HYDRO"],
-      ["geo-tashkent-afghanistan-market","Afghanistan","Afghanistan buys power from Uzbekistan, and its winter shortages arrive when Uzbekistan's own demand is high.",50,300000000,600000000,"PEAK_SHARING"]
+      ["geo-tashkent-central-asian-market","Kazakhstan and Central Asia","A regional system shares hydro and thermal power across seasons.",29,1300000000,1200000000,"SEASONAL_HYDRO"],
+      ["geo-tashkent-afghanistan-market","Afghanistan","Afghanistan buys power from Uzbekistan, and its winter shortages arrive when Uzbekistan's own demand is high.",54,300000000,600000000,"PEAK_SHARING"]
     ],
     [
       ["uzbekistan-central-upgrade","geo-tashkent-central-asian-market","Central Asian grid intertie","EXISTING",450000000,150000000,3000000,2,39,0.017,0.07],
@@ -776,8 +776,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-almaty": [
     [
-      ["geo-almaty-russian-market","Russia","Kazakhstan operates in parallel with Russia and settles changing cross-border flows.",44,1800000000,1700000000,"LARGE_POOL"],
-      ["geo-almaty-central-asian-market","Uzbekistan and Central Asia","Southern links share thermal and hydro power across the region.",40,1400000000,1300000000,"SEASONAL_HYDRO"]
+      ["geo-almaty-russian-market","Russia","Kazakhstan operates in parallel with Russia and settles changing cross-border flows.",19,1800000000,1700000000,"LARGE_POOL"],
+      ["geo-almaty-central-asian-market","Uzbekistan and Central Asia","Southern links share thermal and hydro power across the region.",35,1400000000,1300000000,"SEASONAL_HYDRO"]
     ],
     [
       ["kazakhstan-russia-upgrade","geo-almaty-russian-market","Northern border intertie","EXISTING",600000000,190000000,3800000,2,34,0.014,0.05],
@@ -786,8 +786,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kabul": [
     [
-      ["geo-kabul-uzbek-market","Uzbekistan","Imported power travels south from Uzbekistan; Kabul depends on long transmission routes.",45,500000000,250000000,"FIRM_THERMAL"],
-      ["geo-kabul-tajik-hydro","Tajik and Kyrgyz hydropower","CASA-1000 is designed to move summer hydro surplus through Afghanistan.",38,400000000,250000000,"SEASONAL_HYDRO"]
+      ["geo-kabul-uzbek-market","Uzbekistan","Imported power travels south from Uzbekistan; Kabul depends on long transmission routes.",54,500000000,250000000,"FIRM_THERMAL"],
+      ["geo-kabul-tajik-hydro","Tajik and Kyrgyz hydropower","CASA-1000 is designed to move summer hydro surplus through Afghanistan.",33,400000000,250000000,"SEASONAL_HYDRO"]
     ],
     [
       ["afghanistan-uzbek-upgrade","geo-kabul-uzbek-market","Northern import line","EXISTING",250000000,170000000,3400000,2,40,0.018,0.08],
@@ -796,8 +796,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-cairo": [
     [
-      ["geo-cairo-libyan-coast","Libyan coast","A smaller neighbouring grid often needs imports, but the desert border line can also help during an Egyptian shortage.",76,300000000,500000000,"FIRM_THERMAL"],
-      ["geo-cairo-jordan-levant","Jordan and the Levant","A Red Sea cable reaches Jordan's growing solar fleet, and the two grids' busiest hours do not always match.",68,550000000,600000000,"SOLAR_HEAVY"]
+      ["geo-cairo-libyan-coast","Libyan coast","A smaller neighbouring grid often needs imports, but the desert border line can also help during an Egyptian shortage.",83,300000000,500000000,"FIRM_THERMAL"],
+      ["geo-cairo-jordan-levant","Jordan and the Levant","A Red Sea cable reaches Jordan's growing solar fleet, and the two grids' busiest hours do not always match.",89,550000000,600000000,"SOLAR_HEAVY"]
     ],
     [
       ["egypt-libya-upgrade","geo-cairo-libyan-coast","New western desert line","EXISTING",200000000,120000000,2400000,1,39,0.018,0.08],
@@ -806,8 +806,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-casablanca": [
     [
-      ["geo-casablanca-iberian-market","Spain and the Iberian market","Two undersea links reach Spain's large market, where solar makes midday power cheap.",58,1300000000,1500000000,"SOLAR_HEAVY"],
-      ["geo-casablanca-portuguese-atlantic","Portugal by Atlantic cable","A proposed cable would add another route to Atlantic wind and reservoir hydropower.",53,900000000,800000000,"WIND_HEAVY"]
+      ["geo-casablanca-iberian-market","Spain and the Iberian market","Two undersea links reach Spain's large market, where solar makes midday power cheap.",92,1300000000,1500000000,"SOLAR_HEAVY"],
+      ["geo-casablanca-portuguese-atlantic","Portugal by Atlantic cable","A proposed cable would add another route to Atlantic wind and reservoir hydropower.",92,900000000,800000000,"WIND_HEAVY"]
     ],
     [
       ["morocco-spain-upgrade","geo-casablanca-iberian-market","Strait of Gibraltar cable","EXISTING",600000000,300000000,5400000,2,34,0.014,0.03],
@@ -816,8 +816,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-algiers": [
     [
-      ["geo-algiers-tunisian-market","Tunisia","The Maghreb backbone can exchange gas-fired and renewable power, although a hot regional evening tightens both grids.",64,650000000,700000000,"FIRM_THERMAL"],
-      ["geo-algiers-spanish-market","Spain by Mediterranean cable","A proposed subsea link would reach Spain's sunny market without depending on a land border.",58,1000000000,1100000000,"SOLAR_HEAVY"]
+      ["geo-algiers-tunisian-market","Tunisia","The Maghreb backbone can exchange gas-fired and renewable power, although a hot regional evening tightens both grids.",98,650000000,700000000,"FIRM_THERMAL"],
+      ["geo-algiers-spanish-market","Spain by Mediterranean cable","A proposed subsea link would reach Spain's sunny market without depending on a land border.",92,1000000000,1100000000,"SOLAR_HEAVY"]
     ],
     [
       ["algeria-tunisia-upgrade","geo-algiers-tunisian-market","New Maghreb line","EXISTING",300000000,150000000,3000000,1,39,0.018,0.08],
@@ -826,8 +826,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tunis": [
     [
-      ["geo-tunis-algerian-market","Algeria","A larger gas-rich neighbour can send power west-to-east or buy Tunisian surplus when its own demand rises.",61,700000000,650000000,"FIRM_THERMAL"],
-      ["geo-tunis-sicilian-market","Sicily and Italy","A new undersea cable would reach Italy's much larger market, which can also buy North African solar power.",69,800000000,1000000000,"LARGE_POOL"]
+      ["geo-tunis-algerian-market","Algeria","A larger gas-rich neighbour can send power west-to-east or buy Tunisian surplus when its own demand rises.",52,700000000,650000000,"FIRM_THERMAL"],
+      ["geo-tunis-sicilian-market","Sicily and Italy","A new undersea cable would reach Italy's much larger market, which can also buy North African solar power.",136,800000000,1000000000,"LARGE_POOL"]
     ],
     [
       ["tunisia-algeria-upgrade","geo-tunis-algerian-market","Western Maghreb intertie","EXISTING",300000000,150000000,3000000,1,37,0.017,0.07],
@@ -836,8 +836,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-tripoli": [
     [
-      ["geo-tripoli-egyptian-market","Egypt","The eastern neighbour has a much larger grid, but a long desert line limits how much can arrive.",67,400000000,450000000,"LARGE_POOL"],
-      ["geo-tripoli-tunisian-market","Tunisia","The western route can bring Maghreb power when Libya's local plants are short.",64,500000000,550000000,"FIRM_THERMAL"]
+      ["geo-tripoli-egyptian-market","Egypt","The eastern neighbour has a much larger grid, but a long desert line limits how much can arrive.",69,400000000,450000000,"LARGE_POOL"],
+      ["geo-tripoli-tunisian-market","Tunisia","The western route can bring Maghreb power when Libya's local plants are short.",98,500000000,550000000,"FIRM_THERMAL"]
     ],
     [
       ["libya-egypt-upgrade","geo-tripoli-egyptian-market","Tobruk–Saloum line","EXISTING",200000000,125000000,2500000,1,39,0.018,0.08],
@@ -846,8 +846,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-lagos": [
     [
-      ["geo-lagos-benin-togo-market","Benin and Togo","The coastal backbone lets Nigeria sell power west or buy help when local plants and fuel supplies are tight.",72,550000000,700000000,"FIRM_THERMAL"],
-      ["geo-lagos-sahel-market","Niger and Burkina Faso","Northern neighbours have smaller grids and strong daytime solar, but very hot weather raises demand and line losses.",66,500000000,550000000,"SOLAR_HEAVY"]
+      ["geo-lagos-benin-togo-market","Benin and Togo","The coastal backbone lets Nigeria sell power west or buy help when local plants and fuel supplies are tight.",114,550000000,700000000,"FIRM_THERMAL"],
+      ["geo-lagos-sahel-market","Niger and Burkina Faso","Northern neighbours have smaller grids and strong daytime solar, but very hot weather raises demand and line losses.",92,500000000,550000000,"SOLAR_HEAVY"]
     ],
     [
       ["nigeria-benin-upgrade","geo-lagos-benin-togo-market","Lagos–Sakété line","EXISTING",350000000,155000000,3100000,1,36,0.016,0.06],
@@ -856,8 +856,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-accra": [
     [
-      ["geo-accra-ivorian-market","Côte d'Ivoire","Gas plants on the western grid, backed by some hydro, can cover a shortage, while Ghanaian surplus can flow the other way.",61,700000000,700000000,"FIRM_THERMAL"],
-      ["geo-accra-togo-benin-market","Togo and Benin","The coastal line reaches smaller importing grids and, beyond them, Nigeria; hot evenings strain them all at once.",70,500000000,650000000,"PEAK_SHARING"]
+      ["geo-accra-ivorian-market","Côte d'Ivoire","Gas plants on the western grid, backed by some hydro, can cover a shortage, while Ghanaian surplus can flow the other way.",90,700000000,700000000,"FIRM_THERMAL"],
+      ["geo-accra-togo-benin-market","Togo and Benin","The coastal line reaches smaller importing grids and, beyond them, Nigeria; hot evenings strain them all at once.",114,500000000,650000000,"PEAK_SHARING"]
     ],
     [
       ["ghana-ivory-coast-upgrade","geo-accra-ivorian-market","Western coastal intertie","EXISTING",400000000,180000000,3600000,1,35,0.016,0.05],
@@ -866,8 +866,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-abidjan": [
     [
-      ["geo-abidjan-ghanaian-market","Ghana","The coastal neighbour mixes hydro, gas, and growing solar, so either grid may have surplus at a different hour.",62,700000000,700000000,"MONSOON_HYDRO"],
-      ["geo-abidjan-sahel-west-market","Mali and Burkina Faso","Northern grids often need imports, while sunny hours can create a smaller solar surplus.",68,400000000,650000000,"SOLAR_HEAVY"]
+      ["geo-abidjan-ghanaian-market","Ghana","The coastal neighbour mixes hydro, gas, and growing solar, so either grid may have surplus at a different hour.",113,700000000,700000000,"MONSOON_HYDRO"],
+      ["geo-abidjan-sahel-west-market","Mali and Burkina Faso","Northern grids often need imports, while sunny hours can create a smaller solar surplus.",208,400000000,650000000,"SOLAR_HEAVY"]
     ],
     [
       ["ivory-coast-ghana-upgrade","geo-abidjan-ghanaian-market","Aboadze–Riviera line","EXISTING",400000000,180000000,3600000,1,35,0.016,0.05],
@@ -876,8 +876,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-dakar": [
     [
-      ["geo-dakar-mali-hydro-market","Mali and Senegal River hydropower","Shared river dams can provide low-cost power, but dry seasons leave less water to generate.",55,400000000,450000000,"MONSOON_HYDRO"],
-      ["geo-dakar-omvg-coastal-market","Gambia, Guinea, and Guinea-Bissau","A regional loop reaches Guinea's large dam reservoirs and several smaller grids with solar and thermal backup.",63,350000000,450000000,"RESERVOIR_HYDRO"]
+      ["geo-dakar-mali-hydro-market","Mali and Senegal River hydropower","Shared river dams can provide low-cost power, but dry seasons leave less water to generate.",69,400000000,450000000,"MONSOON_HYDRO"],
+      ["geo-dakar-omvg-coastal-market","Gambia, Guinea, and Guinea-Bissau","A regional loop reaches Guinea's large dam reservoirs and several smaller grids with solar and thermal backup.",101,350000000,450000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["senegal-mali-upgrade","geo-dakar-mali-hydro-market","Eastern 225 kV line","EXISTING",250000000,155000000,3100000,2,38,0.018,0.07],
@@ -886,8 +886,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-bamako": [
     [
-      ["geo-bamako-ivorian-market","Côte d'Ivoire","A larger coastal grid can send gas-fired and hydro power north when Mali's supply is tight.",62,450000000,500000000,"FIRM_THERMAL"],
-      ["geo-bamako-senegal-river-market","Senegal River grid","Shared hydropower is flexible, but output changes with the wet and dry seasons.",55,350000000,350000000,"MONSOON_HYDRO"]
+      ["geo-bamako-ivorian-market","Côte d'Ivoire","A larger coastal grid can send gas-fired and hydro power north when Mali's supply is tight.",89,450000000,500000000,"FIRM_THERMAL"],
+      ["geo-bamako-senegal-river-market","Senegal River grid","Shared hydropower is flexible, but output changes with the wet and dry seasons.",69,350000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["mali-ivory-coast-upgrade","geo-bamako-ivorian-market","Southern 225 kV line","EXISTING",250000000,150000000,3000000,2,40,0.019,0.08],
@@ -896,8 +896,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-ouagadougou": [
     [
-      ["geo-ouagadougou-ghanaian-market","Ghana","Power from Ghana's hydro and gas plants can travel north, while Burkina's midday solar can reduce imports.",62,450000000,550000000,"MONSOON_HYDRO"],
-      ["geo-ouagadougou-north-core-market","Niger, Benin, and Nigeria","A new high-voltage backbone would open a second direction toward Nigeria's gas-fired plants.",68,500000000,550000000,"FIRM_THERMAL"]
+      ["geo-ouagadougou-ghanaian-market","Ghana","Power from Ghana's hydro and gas plants can travel north, while Burkina's midday solar can reduce imports.",113,450000000,550000000,"MONSOON_HYDRO"],
+      ["geo-ouagadougou-north-core-market","Niger, Benin, and Nigeria","A new high-voltage backbone would open a second direction toward Nigeria's gas-fired plants.",59,500000000,550000000,"FIRM_THERMAL"]
     ],
     [
       ["burkina-ghana-upgrade","geo-ouagadougou-ghanaian-market","Bolgatanga–Ouagadougou line","EXISTING",250000000,145000000,2900000,2,40,0.019,0.08],
@@ -906,8 +906,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-niamey": [
     [
-      ["geo-niamey-nigerian-market","Nigeria","Long-running northern lines import power from Nigeria, but supply may tighten when both countries need cooling.",70,450000000,550000000,"PEAK_SHARING"],
-      ["geo-niamey-north-core-market","Benin and Burkina Faso","The new North Core backbone would reach fuel-fired plants in Benin and Burkina Faso instead of depending mainly on one neighbour.",68,400000000,450000000,"FIRM_THERMAL"]
+      ["geo-niamey-nigerian-market","Nigeria","Long-running northern lines import power from Nigeria, but supply may tighten when both countries need cooling.",49,450000000,550000000,"PEAK_SHARING"],
+      ["geo-niamey-north-core-market","Benin and Burkina Faso","The new North Core backbone would reach fuel-fired plants in Benin and Burkina Faso instead of depending mainly on one neighbour.",193,400000000,450000000,"FIRM_THERMAL"]
     ],
     [
       ["niger-nigeria-upgrade","geo-niamey-nigerian-market","Northern border intertie","EXISTING",200000000,135000000,2700000,2,42,0.02,0.09],
@@ -916,8 +916,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-khartoum": [
     [
-      ["geo-khartoum-ethiopian-hydro","Ethiopian hydropower","Rainy-season hydro can be inexpensive, while dry years reduce the surplus available to export.",45,500000000,350000000,"MONSOON_HYDRO"],
-      ["geo-khartoum-egyptian-market","Egypt","The northern grid is much larger and can support emergencies, but the present border path is limited.",69,350000000,400000000,"LARGE_POOL"]
+      ["geo-khartoum-ethiopian-hydro","Ethiopian hydropower","Rainy-season hydro can be inexpensive, while dry years reduce the surplus available to export.",50,500000000,350000000,"MONSOON_HYDRO"],
+      ["geo-khartoum-egyptian-market","Egypt","The northern grid is much larger and can support emergencies, but the present border path is limited.",66,350000000,400000000,"LARGE_POOL"]
     ],
     [
       ["sudan-ethiopia-upgrade","geo-khartoum-ethiopian-hydro","Eastern 230 kV line","EXISTING",250000000,150000000,3000000,2,41,0.019,0.08],
@@ -926,8 +926,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-addisababa": [
     [
-      ["geo-addisababa-kenyan-market","Kenya","A modern converter sends Ethiopian hydropower south to a grid with steady geothermal and oil-fired backup.",57,1000000000,1000000000,"FIRM_THERMAL"],
-      ["geo-addisababa-sudan-djibouti-market","Sudan and Djibouti","Older regional lines serve smaller markets; dry weather can tighten hydropower exports.",62,500000000,550000000,"MONSOON_HYDRO"]
+      ["geo-addisababa-kenyan-market","Kenya","A modern converter sends Ethiopian hydropower south to a grid with steady geothermal and oil-fired backup.",86,1000000000,1000000000,"FIRM_THERMAL"],
+      ["geo-addisababa-sudan-djibouti-market","Sudan and Djibouti","Older regional lines serve smaller markets; dry weather can tighten hydropower exports.",106,500000000,550000000,"MONSOON_HYDRO"]
     ],
     [
       ["ethiopia-kenya-upgrade","geo-addisababa-kenyan-market","Eastern Electricity Highway line","EXISTING",600000000,260000000,5200000,2,34,0.012,0.03],
@@ -936,8 +936,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-nairobi": [
     [
-      ["geo-nairobi-ethiopian-hydro","Ethiopian hydropower","The long HVDC highway brings low-carbon power, though drought can reduce how much is offered.",45,1000000000,700000000,"MONSOON_HYDRO"],
-      ["geo-nairobi-tanzanian-market","Tanzania","A newly energized 400 kV line reaches Tanzania's large new reservoir dam and gas plants.",60,700000000,750000000,"RESERVOIR_HYDRO"]
+      ["geo-nairobi-ethiopian-hydro","Ethiopian hydropower","The long HVDC highway brings low-carbon power, though drought can reduce how much is offered.",58,1000000000,700000000,"MONSOON_HYDRO"],
+      ["geo-nairobi-tanzanian-market","Tanzania","A newly energized 400 kV line reaches Tanzania's large new reservoir dam and gas plants.",84,700000000,750000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["kenya-ethiopia-upgrade","geo-nairobi-ethiopian-hydro","New Suswa converter","EXISTING",600000000,260000000,5200000,2,34,0.012,0.03],
@@ -946,8 +946,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kampala": [
     [
-      ["geo-kampala-kenyan-market","Kenya","Kenya's steady geothermal and oil-fired backup, plus imports from Ethiopia, make it a diverse eastern neighbour.",57,550000000,600000000,"FIRM_THERMAL"],
-      ["geo-kampala-great-lakes-market","Rwanda and the Great Lakes grid","Smaller linked grids share river hydropower and support one another when a plant is unavailable.",61,350000000,400000000,"SEASONAL_HYDRO"]
+      ["geo-kampala-kenyan-market","Kenya","Kenya's steady geothermal and oil-fired backup, plus imports from Ethiopia, make it a diverse eastern neighbour.",86,550000000,600000000,"FIRM_THERMAL"],
+      ["geo-kampala-great-lakes-market","Rwanda and the Great Lakes grid","Smaller linked grids share river hydropower and support one another when a plant is unavailable.",128,350000000,400000000,"SEASONAL_HYDRO"]
     ],
     [
       ["uganda-kenya-upgrade","geo-kampala-kenyan-market","Tororo border intertie","EXISTING",250000000,145000000,2900000,2,34,0.015,0.05],
@@ -956,8 +956,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kigali": [
     [
-      ["geo-kigali-uganda-market","Uganda","A northern connection reaches Uganda's Nile dams, steadied by Lake Victoria, and through it, Kenya.",58,350000000,350000000,"RESERVOIR_HYDRO"],
-      ["geo-kigali-great-lakes-market","Burundi and eastern DR Congo","Shared river plants and short border lines connect several small Great Lakes grids.",61,300000000,350000000,"SEASONAL_HYDRO"]
+      ["geo-kigali-uganda-market","Uganda","A northern connection reaches Uganda's Nile dams, steadied by Lake Victoria, and through it, Kenya.",75,350000000,350000000,"RESERVOIR_HYDRO"],
+      ["geo-kigali-great-lakes-market","Burundi and eastern DR Congo","Shared river plants and short border lines connect several small Great Lakes grids.",100,300000000,350000000,"SEASONAL_HYDRO"]
     ],
     [
       ["rwanda-uganda-upgrade","geo-kigali-uganda-market","Shango–Mirama line","EXISTING",200000000,135000000,2700000,2,31,0.012,0.04],
@@ -966,8 +966,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-daressalaam": [
     [
-      ["geo-daressalaam-kenyan-market","Kenya and Ethiopia","The northern route can bring Kenyan geothermal and Ethiopian hydro, with Kenya carrying power between markets.",55,750000000,700000000,"MONSOON_HYDRO"],
-      ["geo-daressalaam-southern-pool","Southern African Power Pool","A future southern gateway would connect Tanzania to Zambia and the larger SAPP market.",63,650000000,700000000,"LARGE_POOL"]
+      ["geo-daressalaam-kenyan-market","Kenya and Ethiopia","The northern route can bring Kenyan geothermal and Ethiopian hydro, with Kenya carrying power between markets.",72,750000000,700000000,"MONSOON_HYDRO"],
+      ["geo-daressalaam-southern-pool","Southern African Power Pool","A future southern gateway would connect Tanzania to Zambia and the larger SAPP market.",92,650000000,700000000,"LARGE_POOL"]
     ],
     [
       ["tanzania-kenya-upgrade","geo-daressalaam-kenyan-market","Arusha–Isinya line","EXISTING",400000000,190000000,3800000,2,36,0.016,0.05],
@@ -976,8 +976,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kinshasa": [
     [
-      ["geo-kinshasa-zambian-market","Zambia and the southern pool","The southern link reaches copper-belt demand and a much wider power pool.",62,600000000,700000000,"LARGE_POOL"],
-      ["geo-kinshasa-great-lakes-market","Rwanda and Burundi","Small eastern grids share river hydropower across the Great Lakes region.",60,300000000,350000000,"SEASONAL_HYDRO"]
+      ["geo-kinshasa-zambian-market","Zambia and the southern pool","The southern link reaches copper-belt demand and a much wider power pool.",92,600000000,700000000,"LARGE_POOL"],
+      ["geo-kinshasa-great-lakes-market","Rwanda and Burundi","Small eastern grids share river hydropower across the Great Lakes region.",128,300000000,350000000,"SEASONAL_HYDRO"]
     ],
     [
       ["drc-zambia-upgrade","geo-kinshasa-zambian-market","Copperbelt border intertie","EXISTING",350000000,190000000,3800000,2,36,0.016,0.05],
@@ -986,7 +986,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-luanda": [
     [
-      ["geo-luanda-southern-pool","Namibia and the southern pool","A first regional line would let Angola sell hydropower to Namibia and buy back midday solar power.",61,550000000,600000000,"SOLAR_HEAVY"]
+      ["geo-luanda-southern-pool","Namibia and the southern pool","A first regional line would let Angola sell hydropower to Namibia and buy back midday solar power.",106,550000000,600000000,"SOLAR_HEAVY"]
     ],
     [
       ["angola-namibia-anna","geo-luanda-southern-pool","Angola–Namibia interconnector","NEW",400000000,390000000,7000000,4,39,0.018,0.07]
@@ -994,8 +994,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-lusaka": [
     [
-      ["geo-lusaka-congo-copperbelt","DR Congo Copperbelt","Hydropower and mining demand sit on both sides of the border, so flows can change direction.",62,600000000,650000000,"MONSOON_HYDRO"],
-      ["geo-lusaka-zimbabwe-market","Zimbabwe and the Kariba grid","Hwange coal, shared Kariba water, and southern trade meet at a busy regional junction.",65,700000000,800000000,"FIRM_THERMAL"]
+      ["geo-lusaka-congo-copperbelt","DR Congo Copperbelt","Hydropower and mining demand sit on both sides of the border, so flows can change direction.",66,600000000,650000000,"MONSOON_HYDRO"],
+      ["geo-lusaka-zimbabwe-market","Zimbabwe and the Kariba grid","Hwange coal, shared Kariba water, and southern trade meet at a busy regional junction.",103,700000000,800000000,"FIRM_THERMAL"]
     ],
     [
       ["zambia-drc-upgrade","geo-lusaka-congo-copperbelt","Copperbelt intertie","EXISTING",350000000,190000000,3800000,2,36,0.016,0.05],
@@ -1004,8 +1004,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-harare": [
     [
-      ["geo-harare-zambian-market","Zambia","Hydropower crosses near Kariba, but drought can tighten both grids at the same time.",60,650000000,700000000,"MONSOON_HYDRO"],
-      ["geo-harare-mozambique-market","Mozambique","Cahora Bassa's huge reservoir and southern lines give a second direction for imports and exports.",58,700000000,650000000,"RESERVOIR_HYDRO"]
+      ["geo-harare-zambian-market","Zambia","Hydropower crosses near Kariba, but drought can tighten both grids at the same time.",87,650000000,700000000,"MONSOON_HYDRO"],
+      ["geo-harare-mozambique-market","Mozambique","Cahora Bassa's huge reservoir and southern lines give a second direction for imports and exports.",33,700000000,650000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["zimbabwe-zambia-upgrade","geo-harare-zambian-market","Kariba corridor line","EXISTING",400000000,200000000,4000000,2,37,0.016,0.06],
@@ -1014,8 +1014,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-maputo": [
     [
-      ["geo-maputo-south-african-market","South Africa","A very large coal-fired neighbour can buy Cahora Bassa power or send emergency support, but its own system can also be stressed.",67,1100000000,1200000000,"FIRM_THERMAL"],
-      ["geo-maputo-zimbabwe-zambia-market","Zimbabwe and Zambia","Northern routes reach Kariba and Kafue hydropower, which drought can cut, and mining demand across the pool.",61,650000000,700000000,"MONSOON_HYDRO"]
+      ["geo-maputo-south-african-market","South Africa","A very large coal-fired neighbour can buy Cahora Bassa power or send emergency support, but its own system can also be stressed.",78,1100000000,1200000000,"FIRM_THERMAL"],
+      ["geo-maputo-zimbabwe-zambia-market","Zimbabwe and Zambia","Northern routes reach Kariba and Kafue hydropower, which drought can cut, and mining demand across the pool.",93,650000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["mozambique-south-africa-upgrade","geo-maputo-south-african-market","MOTRACO corridor line","EXISTING",600000000,250000000,5000000,2,35,0.015,0.05],
@@ -1024,8 +1024,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-gaborone": [
     [
-      ["geo-gaborone-south-african-market","South Africa","Several border lines reach a huge market, but imports become expensive when the southern grid is short.",68,800000000,900000000,"LARGE_POOL"],
-      ["geo-gaborone-zimbabwe-market","Zimbabwe","A northern route adds diversity, though drought can reduce regional hydropower.",64,450000000,550000000,"MONSOON_HYDRO"]
+      ["geo-gaborone-south-african-market","South Africa","Several border lines reach a huge market, but imports become expensive when the southern grid is short.",78,800000000,900000000,"LARGE_POOL"],
+      ["geo-gaborone-zimbabwe-market","Zimbabwe","A northern route adds diversity, though drought can reduce regional hydropower.",103,450000000,550000000,"MONSOON_HYDRO"]
     ],
     [
       ["botswana-south-africa-upgrade","geo-gaborone-south-african-market","Gaborone border intertie","EXISTING",300000000,155000000,3100000,1,39,0.018,0.08],
@@ -1034,8 +1034,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-windhoek": [
     [
-      ["geo-windhoek-south-african-market","South Africa","The southern connection reaches South Africa's coal-heavy grid, while Namibian solar can create daytime export opportunities.",67,750000000,800000000,"FIRM_THERMAL"],
-      ["geo-windhoek-zambia-zimbabwe-market","Zambia and Zimbabwe","A northern path reaches Kariba and Kafue hydropower, but long distances and drought limit dependable supply.",61,450000000,500000000,"MONSOON_HYDRO"]
+      ["geo-windhoek-south-african-market","South Africa","The southern connection reaches South Africa's coal-heavy grid, while Namibian solar can create daytime export opportunities.",78,750000000,800000000,"FIRM_THERMAL"],
+      ["geo-windhoek-zambia-zimbabwe-market","Zambia and Zimbabwe","A northern path reaches Kariba and Kafue hydropower, but long distances and drought limit dependable supply.",93,450000000,500000000,"MONSOON_HYDRO"]
     ],
     [
       ["namibia-south-africa-upgrade","geo-windhoek-south-african-market","Kokerboom corridor line","EXISTING",350000000,180000000,3600000,2,39,0.018,0.08],
@@ -1044,8 +1044,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-johannesburg": [
     [
-      ["geo-johannesburg-mozambique-market","Mozambique","Cahora Bassa's large reservoir can send hydropower south, while South African surplus can support Maputo.",58,1200000000,900000000,"RESERVOIR_HYDRO"],
-      ["geo-johannesburg-northwest-pool","Botswana and Namibia","Smaller dry-climate neighbours often import, but daytime solar can sometimes reverse the flow.",65,750000000,950000000,"SOLAR_HEAVY"]
+      ["geo-johannesburg-mozambique-market","Mozambique","Cahora Bassa's large reservoir can send hydropower south, while South African surplus can support Maputo.",33,1200000000,900000000,"RESERVOIR_HYDRO"],
+      ["geo-johannesburg-northwest-pool","Botswana and Namibia","Smaller dry-climate neighbours often import, but daytime solar can sometimes reverse the flow.",106,750000000,950000000,"SOLAR_HEAVY"]
     ],
     [
       ["south-africa-mozambique-upgrade","geo-johannesburg-mozambique-market","Mozambique corridor line","EXISTING",650000000,260000000,5200000,2,34,0.014,0.04],
@@ -1054,8 +1054,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-delhi": [
     [
-      ["geo-delhi-himalayan-hydro-market","Nepal and Bhutan hydropower","Mountain rivers can send low-carbon power in wet months; winter and dry-season flows can be smaller.",43,1200000000,700000000,"MONSOON_HYDRO"],
-      ["geo-delhi-bangladesh-market","Bangladesh","A fast-growing, gas-fired neighbouring grid usually buys power, but a two-way market can share reserves during an emergency.",67,700000000,1300000000,"FIRM_THERMAL"]
+      ["geo-delhi-himalayan-hydro-market","Nepal and Bhutan hydropower","Mountain rivers can send low-carbon power in wet months; winter and dry-season flows can be smaller.",40,1200000000,700000000,"MONSOON_HYDRO"],
+      ["geo-delhi-bangladesh-market","Bangladesh","A fast-growing, gas-fired neighbouring grid usually buys power, but a two-way market can share reserves during an emergency.",90,700000000,1300000000,"FIRM_THERMAL"]
     ],
     [
       ["india-himalaya-upgrade","geo-delhi-himalayan-hydro-market","Himalayan border intertie","EXISTING",700000000,280000000,5600000,2,35,0.014,0.05],
@@ -1064,7 +1064,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-karachi": [
     [
-      ["geo-karachi-central-asian-hydro","Central Asian hydropower","CASA-1000 is designed to bring summer hydropower through Afghanistan when Pakistan's cooling demand is high.",46,1000000000,500000000,"SEASONAL_HYDRO"]
+      ["geo-karachi-central-asian-hydro","Central Asian hydropower","CASA-1000 is designed to bring summer hydropower through Afghanistan when Pakistan's cooling demand is high.",47,1000000000,500000000,"SEASONAL_HYDRO"]
     ],
     [
       ["pakistan-casa","geo-karachi-central-asian-hydro","CASA-1000 connection","NEW",800000000,620000000,11000000,4,40,0.018,0.07]
@@ -1072,8 +1072,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-dhaka": [
     [
-      ["geo-dhaka-india-west-market","Eastern India","Large Indian power stations and exchanges can supply Bangladesh through the western border.",61,1100000000,900000000,"LARGE_POOL"],
-      ["geo-dhaka-india-tripura-market","Tripura and northeast India","A smaller eastern connection reaches Tripura's gas-fired plants, especially useful nearer Chittagong.",64,300000000,350000000,"FIRM_THERMAL"]
+      ["geo-dhaka-india-west-market","Eastern India","Large Indian power stations and exchanges can supply Bangladesh through the western border.",55,1100000000,900000000,"LARGE_POOL"],
+      ["geo-dhaka-india-tripura-market","Tripura and northeast India","A smaller eastern connection reaches Tripura's gas-fired plants, especially useful nearer Chittagong.",55,300000000,350000000,"FIRM_THERMAL"]
     ],
     [
       ["bangladesh-bheramara-upgrade","geo-dhaka-india-west-market","Bheramara border intertie","EXISTING",600000000,260000000,5200000,2,35,0.015,0.05],
@@ -1082,8 +1082,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-kathmandu": [
     [
-      ["geo-kathmandu-indian-market","India","India can supply Nepal in a dry-season shortage and buy Nepalese hydropower when rivers are high.",57,1100000000,1100000000,"LARGE_POOL"],
-      ["geo-kathmandu-bangladesh-via-india","Bangladesh through India","A three-country trade route lets Nepalese hydropower reach Bangladesh's gas-fired grid using India's network.",65,250000000,450000000,"FIRM_THERMAL"]
+      ["geo-kathmandu-indian-market","India","India can supply Nepal in a dry-season shortage and buy Nepalese hydropower when rivers are high.",55,1100000000,1100000000,"LARGE_POOL"],
+      ["geo-kathmandu-bangladesh-via-india","Bangladesh through India","A three-country trade route lets Nepalese hydropower reach Bangladesh's gas-fired grid using India's network.",90,250000000,450000000,"FIRM_THERMAL"]
     ],
     [
       ["nepal-india-upgrade","geo-kathmandu-indian-market","Dhalkebar border intertie","EXISTING",600000000,250000000,5000000,2,32,0.012,0.04],
@@ -1092,8 +1092,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "jp-east": [
     [
-      ["jp-east-tohoku-grid","Tohoku","Northern wind and thermal power can support Tokyo, but cold snaps and heat waves often strain both regions together.",54,1400000000,900000000,"PEAK_SHARING"],
-      ["jp-east-chubu-grid","Chubu (60 Hz)","Frequency converters bridge eastern Japan's 50 Hz grid and western Japan's 60 Hz grid.",60,1000000000,1100000000,"LARGE_POOL"]
+      ["jp-east-tohoku-grid","Tohoku","Northern wind and thermal power can support Tokyo, but cold snaps and heat waves often strain both regions together.",103,1400000000,900000000,"PEAK_SHARING"],
+      ["jp-east-chubu-grid","Chubu (60 Hz)","Frequency converters bridge eastern Japan's 50 Hz grid and western Japan's 60 Hz grid.",100,1000000000,1100000000,"LARGE_POOL"]
     ],
     [
       ["tohoku-tokyo-upgrade","jp-east-tohoku-grid","Tohoku connection","EXISTING",900000000,280000000,5600000,2,28,0.01,0.03],
@@ -1102,8 +1102,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "jp-kansai": [
     [
-      ["jp-kansai-chubu-grid","Chubu","Move power between two large 60 Hz regions, though the same summer heat usually hits both.",59,1100000000,1200000000,"PEAK_SHARING"],
-      ["jp-kansai-chugoku-grid","Chugoku","A new western line reaches western Japan's midday solar surplus, plus coal-fired backup.",56,900000000,700000000,"SOLAR_HEAVY"]
+      ["jp-kansai-chubu-grid","Chubu","Move power between two large 60 Hz regions, though the same summer heat usually hits both.",100,1100000000,1200000000,"PEAK_SHARING"],
+      ["jp-kansai-chugoku-grid","Chugoku","A new western line reaches western Japan's midday solar surplus, plus coal-fired backup.",95,900000000,700000000,"SOLAR_HEAVY"]
     ],
     [
       ["kansai-chubu-reinforcement","jp-kansai-chubu-grid","Chubu connection","EXISTING",800000000,240000000,4800000,2,30,0.012,0.04],
@@ -1112,7 +1112,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "jp-hokkaido": [
     [
-      ["jp-hokkaido-tohoku-grid","Northern Honshu","Share Hokkaido wind and Honshu backup power through the undersea link, though both regions peak in the same winter cold.",52,900000000,700000000,"PEAK_SHARING"]
+      ["jp-hokkaido-tohoku-grid","Northern Honshu","Share Hokkaido wind and Honshu backup power through the undersea link, though both regions peak in the same winter cold.",103,900000000,700000000,"PEAK_SHARING"]
     ],
     [
       ["hokkaido-honshu-reinforcement","jp-hokkaido-tohoku-grid","Northern Honshu connection","EXISTING",500000000,360000000,6000000,2,35,0.005,0.01]
@@ -1120,7 +1120,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "jp-kyushu": [
     [
-      ["jp-kyushu-chugoku-grid","Chugoku","Add a line beside Kyushu's existing connection across the Kanmon Strait to Chugoku's coal and gas plants.",57,850000000,750000000,"FIRM_THERMAL"]
+      ["jp-kyushu-chugoku-grid","Chugoku","Add a line beside Kyushu's existing connection across the Kanmon Strait to Chugoku's coal and gas plants.",95,850000000,750000000,"FIRM_THERMAL"]
     ],
     [
       ["kyushu-kanmon-reinforcement","jp-kyushu-chugoku-grid","Chugoku connection","EXISTING",500000000,220000000,4400000,2,30,0.012,0.04]
@@ -1128,8 +1128,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "jp-chubu": [
     [
-      ["jp-chubu-tokyo-grid","Tokyo (50 Hz)","Converters make power exchange possible across Japan's frequency divide.",63,1200000000,1500000000,"LARGE_POOL"],
-      ["jp-chubu-kansai-grid","Kansai","Add a line along the 60 Hz west-Japan backbone toward Osaka, whose summer heat matches Nagoya's.",58,1000000000,1100000000,"PEAK_SHARING"]
+      ["jp-chubu-tokyo-grid","Tokyo (50 Hz)","Converters make power exchange possible across Japan's frequency divide.",109,1200000000,1500000000,"LARGE_POOL"],
+      ["jp-chubu-kansai-grid","Kansai","Add a line along the 60 Hz west-Japan backbone toward Osaka, whose summer heat matches Nagoya's.",95,1000000000,1100000000,"PEAK_SHARING"]
     ],
     [
       ["chubu-tokyo-frequency","jp-chubu-tokyo-grid","Tokyo (50 Hz) connection","EXISTING",650000000,440000000,7500000,3,30,0.012,0.04],
@@ -1138,8 +1138,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-north": [
     [
-      ["cn-north-northwest-energy","Northwest wind and solar","Long-distance UHV lines bring western wind and solar toward northern load centers.",43,2000000000,900000000,"SOLAR_HEAVY"],
-      ["cn-north-northeast-grid","Northeast China","A stronger regional seam reaches northeastern wind farms and shares winter reserves between northern systems.",49,1000000000,800000000,"WIND_HEAVY"]
+      ["cn-north-northwest-energy","Northwest wind and solar","Long-distance UHV lines bring western wind and solar toward northern load centers.",41,2000000000,900000000,"SOLAR_HEAVY"],
+      ["cn-north-northeast-grid","Northeast China","A stronger regional seam reaches northeastern wind farms and shares winter reserves between northern systems.",60,1000000000,800000000,"WIND_HEAVY"]
     ],
     [
       ["north-northwest-uhv","cn-north-northwest-energy","Northwest wind and solar connection","EXISTING",1200000000,520000000,9000000,3,28,0.01,0.03],
@@ -1148,8 +1148,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-east": [
     [
-      ["cn-east-southwest-hydro","Southwest hydropower","UHVDC carries large blocks of western hydropower to the east-coast load center.",46,2400000000,800000000,"MONSOON_HYDRO"],
-      ["cn-east-central-china-grid","Central China","Add a line to inland provinces that swelter in the same summer heat as the coast.",52,1200000000,1100000000,"PEAK_SHARING"]
+      ["cn-east-southwest-hydro","Southwest hydropower","UHVDC carries large blocks of western hydropower to the east-coast load center.",42,2400000000,800000000,"MONSOON_HYDRO"],
+      ["cn-east-central-china-grid","Central China","Add a line to inland provinces that swelter in the same summer heat as the coast.",64,1200000000,1100000000,"PEAK_SHARING"]
     ],
     [
       ["east-southwest-uhv","cn-east-southwest-hydro","Southwest hydropower connection","EXISTING",1500000000,620000000,10000000,3,30,0.012,0.04],
@@ -1159,7 +1159,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "cn-south": [
     [
       ["cn-south-southwest-renewables","Yunnan and Guizhou","Hydro-rich western provinces can serve the Pearl River Delta through the Southern Grid.",45,2100000000,800000000,"MONSOON_HYDRO"],
-      ["cn-south-hong-kong-system","Hong Kong system","A limited cross-system link can exchange support with Hong Kong's gas- and coal-fired plants; it is not an international border.",68,600000000,900000000,"FIRM_THERMAL"]
+      ["cn-south-hong-kong-system","Hong Kong system","A limited cross-system link can exchange support with Hong Kong's gas- and coal-fired plants; it is not an international border.",90,600000000,900000000,"FIRM_THERMAL"]
     ],
     [
       ["south-yunnan-guizhou-reinforcement","cn-south-southwest-renewables","Yunnan and Guizhou connection","EXISTING",1300000000,430000000,8000000,3,33,0.015,0.06],
@@ -1168,8 +1168,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-sichuan": [
     [
-      ["cn-sichuan-east-china-grid","East China","Export southwest hydropower to the dense east-coast grid.",61,900000000,2200000000,"LARGE_POOL"],
-      ["cn-sichuan-xinjiang-renewables","Xinjiang renewables","A long-distance HVDC route brings western wind and solar into Chongqing.",44,1800000000,700000000,"SOLAR_HEAVY"]
+      ["cn-sichuan-east-china-grid","East China","Export southwest hydropower to the dense east-coast grid.",64,900000000,2200000000,"LARGE_POOL"],
+      ["cn-sichuan-xinjiang-renewables","Xinjiang renewables","A long-distance HVDC route brings western wind and solar into Chongqing.",37,1800000000,700000000,"SOLAR_HEAVY"]
     ],
     [
       ["sichuan-east-uhv","cn-sichuan-east-china-grid","East China connection","EXISTING",1500000000,620000000,10000000,3,30,0.012,0.04],
@@ -1178,8 +1178,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-central": [
     [
-      ["cn-central-north-china-grid","North China","Use the interregional UHV mesh to share reserves north of Wuhan.",54,1100000000,1200000000,"LARGE_POOL"],
-      ["cn-central-southwest-hydro","Southwest hydropower","Western hydro can cover central-China peaks when river conditions allow.",46,1800000000,700000000,"MONSOON_HYDRO"]
+      ["cn-central-north-china-grid","North China","Use the interregional UHV mesh to share reserves north of Wuhan.",58,1100000000,1200000000,"LARGE_POOL"],
+      ["cn-central-southwest-hydro","Southwest hydropower","Western hydro can cover central-China peaks when river conditions allow.",42,1800000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["central-north-uhv","cn-central-north-china-grid","North China connection","EXISTING",850000000,310000000,6000000,2,30,0.012,0.04],
@@ -1188,7 +1188,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-northwest": [
     [
-      ["cn-northwest-central-china-grid","Central China","Send northwest wind, solar, and thermal output toward inland demand centers that share Xi'an's summer heat.",58,800000000,1700000000,"PEAK_SHARING"]
+      ["cn-northwest-central-china-grid","Central China","Send northwest wind, solar, and thermal output toward inland demand centers that share Xi'an's summer heat.",64,800000000,1700000000,"PEAK_SHARING"]
     ],
     [
       ["northwest-central-uhv","cn-northwest-central-china-grid","Central China connection","EXISTING",1100000000,480000000,8500000,3,28,0.01,0.03]
@@ -1196,8 +1196,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-northeast": [
     [
-      ["cn-northeast-north-china-grid","North China","Move northern winter reserves toward Beijing through the domestic regional seam.",55,800000000,1100000000,"LARGE_POOL"],
-      ["cn-northeast-russian-far-east","Russian Far East","A converter-backed border route can import power from large Russian Far East reservoirs.",50,900000000,500000000,"RESERVOIR_HYDRO"]
+      ["cn-northeast-north-china-grid","North China","Move northern winter reserves toward Beijing through the domestic regional seam.",58,800000000,1100000000,"LARGE_POOL"],
+      ["cn-northeast-russian-far-east","Russian Far East","A converter-backed border route can import power from large Russian Far East reservoirs.",39,900000000,500000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["northeast-north-reinforcement","cn-northeast-north-china-grid","North China connection","EXISTING",700000000,260000000,5000000,2,28,0.01,0.03],
@@ -1206,8 +1206,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-xinjiang": [
     [
-      ["cn-xinjiang-chongqing-grid","Chongqing","A very long UHVDC corridor exports desert wind and solar to southwest demand, which has hydropower to spare in wet months.",60,700000000,1700000000,"MONSOON_HYDRO"],
-      ["cn-xinjiang-east-china-grid","East China","Add another long-haul outlet for western renewable surpluses.",66,700000000,2000000000,"LARGE_POOL"]
+      ["cn-xinjiang-chongqing-grid","Chongqing","A very long UHVDC corridor exports desert wind and solar to southwest demand, which has hydropower to spare in wet months.",63,700000000,1700000000,"MONSOON_HYDRO"],
+      ["cn-xinjiang-east-china-grid","East China","Add another long-haul outlet for western renewable surpluses.",64,700000000,2000000000,"LARGE_POOL"]
     ],
     [
       ["xinjiang-chongqing-export","cn-xinjiang-chongqing-grid","Chongqing connection","EXISTING",1200000000,650000000,10500000,3,26,0.01,0.08],
@@ -1216,8 +1216,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-xizang": [
     [
-      ["cn-xizang-qinghai-grid","Qinghai","Add a line beside the high-altitude route to Qinghai's vast solar parks and China's wider grid.",48,600000000,450000000,"SOLAR_HEAVY"],
-      ["cn-xizang-sichuan-grid","Sichuan","A second mountain route adds support from Sichuan's hydro-rich grid to the east.",52,700000000,500000000,"MONSOON_HYDRO"]
+      ["cn-xizang-qinghai-grid","Qinghai","Add a line beside the high-altitude route to Qinghai's vast solar parks and China's wider grid.",47,600000000,450000000,"SOLAR_HEAVY"],
+      ["cn-xizang-sichuan-grid","Sichuan","A second mountain route adds support from Sichuan's hydro-rich grid to the east.",48,700000000,500000000,"MONSOON_HYDRO"]
     ],
     [
       ["qinghai-xizang-reinforcement","cn-xizang-qinghai-grid","Qinghai connection","EXISTING",350000000,300000000,5200000,3,26,0.01,0.08],
@@ -1226,8 +1226,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "hk-mainland": [
     [
-      ["hk-mainland-guangdong-grid","Guangdong grid","Add a line beside Hong Kong's limited mainland connection, though Guangdong swelters in the same summer heat.",57,1200000000,700000000,"PEAK_SHARING"],
-      ["hk-mainland-mainland-clean-power","Mainland clean power","Build a dedicated new circuit for additional low-carbon electricity.",54,1500000000,500000000,"LARGE_POOL"]
+      ["hk-mainland-guangdong-grid","Guangdong grid","Add a line beside Hong Kong's limited mainland connection, though Guangdong swelters in the same summer heat.",72,1200000000,700000000,"PEAK_SHARING"],
+      ["hk-mainland-mainland-clean-power","Mainland clean power","Build a dedicated new circuit for additional low-carbon electricity.",80,1500000000,500000000,"LARGE_POOL"]
     ],
     [
       ["hong-kong-guangdong-upgrade","hk-mainland-guangdong-grid","Guangdong grid connection","EXISTING",600000000,320000000,6000000,3,33,0.015,0.06],
@@ -1236,7 +1236,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mn-central": [
     [
-      ["mn-central-russian-siberia","Russian Siberia","Imported power from Siberia's large reservoirs covers winter peaks in Mongolia's Central Energy System.",50,500000000,350000000,"RESERVOIR_HYDRO"]
+      ["mn-central-russian-siberia","Russian Siberia","Imported power from Siberia's large reservoirs covers winter peaks in Mongolia's Central Energy System.",15,500000000,350000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["mongolia-russia-reinforcement","mn-central-russian-siberia","Russian Siberia connection","EXISTING",300000000,190000000,3800000,2,28,0.01,0.03]
@@ -1244,8 +1244,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ru-far-east": [
     [
-      ["ru-far-east-northeast-china","Northeast China","A converter station links the Far East system with China without synchronizing both grids.",56,800000000,1200000000,"LARGE_POOL"],
-      ["ru-far-east-siberia-grid","Siberia","Add a line across the constrained seam to Siberia's large hydro reservoirs in a separate synchronous zone.",49,1000000000,700000000,"RESERVOIR_HYDRO"]
+      ["ru-far-east-northeast-china","Northeast China","A converter station links the Far East system with China without synchronizing both grids.",60,800000000,1200000000,"LARGE_POOL"],
+      ["ru-far-east-siberia-grid","Siberia","Add a line across the constrained seam to Siberia's large hydro reservoirs in a separate synchronous zone.",15,1000000000,700000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["far-east-china-upgrade","ru-far-east-northeast-china","Northeast China connection","EXISTING",500000000,330000000,6000000,3,28,0.01,0.03],
@@ -1254,8 +1254,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ru-siberia": [
     [
-      ["ru-siberia-urals-grid","Urals grid","Add a line along the westbound route that balances Siberian hydro with the Urals' gas-fired plants.",57,1100000000,1300000000,"FIRM_THERMAL"],
-      ["ru-siberia-far-east-grid","Russian Far East","A controlled new seam can share Far East reservoir hydro and reserves without assuming normal synchronous operation.",55,700000000,900000000,"RESERVOIR_HYDRO"]
+      ["ru-siberia-urals-grid","Urals grid","Add a line along the westbound route that balances Siberian hydro with the Urals' gas-fired plants.",19,1100000000,1300000000,"FIRM_THERMAL"],
+      ["ru-siberia-far-east-grid","Russian Far East","A controlled new seam can share Far East reservoir hydro and reserves without assuming normal synchronous operation.",21,700000000,900000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["siberia-urals-reinforcement","ru-siberia-urals-grid","Urals grid connection","EXISTING",900000000,350000000,6500000,3,28,0.01,0.03],
@@ -1264,7 +1264,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ru-yakutia": [
     [
-      ["ru-yakutia-south-yakutia","South Yakutia","Add a line along the long internal route to South Yakutia's coal-fired plants and the Far East system.",58,450000000,350000000,"FIRM_THERMAL"]
+      ["ru-yakutia-south-yakutia","South Yakutia","Add a line along the long internal route to South Yakutia's coal-fired plants and the Far East system.",21,450000000,350000000,"FIRM_THERMAL"]
     ],
     [
       ["yakutia-south-reinforcement","ru-yakutia-south-yakutia","South Yakutia connection","EXISTING",350000000,310000000,5500000,3,28,0.01,0.03]
@@ -1272,8 +1272,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "th-central": [
     [
-      ["th-central-laos-hydro","Lao hydropower","Laos can export hydro to Thailand, while the same network supports wider regional trading.",45,1500000000,500000000,"MONSOON_HYDRO"],
-      ["th-central-peninsular-malaysia","Peninsular Malaysia","The controllable HVDC border link trades gas- and coal-fired power with Malaysia.",59,500000000,600000000,"FIRM_THERMAL"]
+      ["th-central-laos-hydro","Lao hydropower","Laos can export hydro to Thailand, while the same network supports wider regional trading.",60,1500000000,500000000,"MONSOON_HYDRO"],
+      ["th-central-peninsular-malaysia","Peninsular Malaysia","The controllable HVDC border link trades gas- and coal-fired power with Malaysia.",70,500000000,600000000,"FIRM_THERMAL"]
     ],
     [
       ["thailand-laos-reinforcement","th-central-laos-hydro","Lao hydropower connection","EXISTING",900000000,280000000,5500000,2,33,0.015,0.06],
@@ -1282,8 +1282,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "th-north": [
     [
-      ["th-north-northern-laos","Northern Laos","A nearby cross-border line exchanges hydro and dry-season backup.",47,500000000,300000000,"MONSOON_HYDRO"],
-      ["th-north-central-thailand","Central Thailand","Add a line along the domestic path to Thailand's main load center, which feels the same hot-season peaks.",61,400000000,700000000,"PEAK_SHARING"]
+      ["th-north-northern-laos","Northern Laos","A nearby cross-border line exchanges hydro and dry-season backup.",60,500000000,300000000,"MONSOON_HYDRO"],
+      ["th-north-central-thailand","Central Thailand","Add a line along the domestic path to Thailand's main load center, which feels the same hot-season peaks.",92,400000000,700000000,"PEAK_SHARING"]
     ],
     [
       ["north-thailand-laos","th-north-northern-laos","Northern Laos connection","EXISTING",300000000,150000000,3000000,2,33,0.015,0.06],
@@ -1292,8 +1292,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "vn-south": [
     [
-      ["vn-south-cambodia-grid","Cambodia","The Chau Doc-Takeo corridor mostly carries Vietnamese power toward Cambodia's coal- and oil-fired grid.",66,350000000,550000000,"FIRM_THERMAL"],
-      ["vn-south-north-vietnam-grid","Northern Vietnam","Add a line along the long 500 kV backbone to northern hydro plants, which run short in dry years.",58,900000000,1100000000,"MONSOON_HYDRO"]
+      ["vn-south-cambodia-grid","Cambodia","The Chau Doc-Takeo corridor mostly carries Vietnamese power toward Cambodia's coal- and oil-fired grid.",104,350000000,550000000,"FIRM_THERMAL"],
+      ["vn-south-north-vietnam-grid","Northern Vietnam","Add a line along the long 500 kV backbone to northern hydro plants, which run short in dry years.",68,900000000,1100000000,"MONSOON_HYDRO"]
     ],
     [
       ["vietnam-cambodia-upgrade","vn-south-cambodia-grid","Cambodia connection","EXISTING",300000000,170000000,3200000,2,33,0.015,0.06],
@@ -1302,8 +1302,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "vn-north": [
     [
-      ["vn-north-yunnan-grid","Yunnan grid","Existing northern border lines import power from China when Vietnam needs it.",53,800000000,600000000,"LARGE_POOL"],
-      ["vn-north-northern-laos","Northern Laos","Mountain hydro and wind enter Vietnam through growing Laos interconnections.",47,700000000,350000000,"MONSOON_HYDRO"]
+      ["vn-north-yunnan-grid","Yunnan grid","Existing northern border lines import power from China when Vietnam needs it.",38,800000000,600000000,"LARGE_POOL"],
+      ["vn-north-northern-laos","Northern Laos","Mountain hydro and wind enter Vietnam through growing Laos interconnections.",64,700000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["vietnam-china-upgrade","vn-north-yunnan-grid","Yunnan grid connection","EXISTING",500000000,210000000,4000000,2,33,0.015,0.06],
@@ -1312,8 +1312,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "kh-national": [
     [
-      ["kh-national-southern-vietnam","Southern Vietnam","Southern Vietnam's large solar farms support Phnom Penh through the existing 230 kV route.",57,700000000,400000000,"SOLAR_HEAVY"],
-      ["kh-national-laos-hydro","Lao hydropower","A northern border route brings hydropower into Cambodia.",48,600000000,250000000,"MONSOON_HYDRO"]
+      ["kh-national-southern-vietnam","Southern Vietnam","Southern Vietnam's large solar farms support Phnom Penh through the existing 230 kV route.",68,700000000,400000000,"SOLAR_HEAVY"],
+      ["kh-national-laos-hydro","Lao hydropower","A northern border route brings hydropower into Cambodia.",76,600000000,250000000,"MONSOON_HYDRO"]
     ],
     [
       ["cambodia-vietnam-reinforcement","kh-national-southern-vietnam","Southern Vietnam connection","EXISTING",350000000,180000000,3400000,2,33,0.015,0.06],
@@ -1322,8 +1322,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "la-national": [
     [
-      ["la-national-thailand-grid","Thailand","Export hydropower in wet periods and import gas-fired support during dry-season shortages.",60,650000000,1200000000,"FIRM_THERMAL"],
-      ["la-national-vietnam-grid","Vietnam","Newer high-voltage routes carry Lao wind and hydro east to Vietnam's much larger, diverse grid.",58,600000000,1000000000,"LARGE_POOL"]
+      ["la-national-thailand-grid","Thailand","Export hydropower in wet periods and import gas-fired support during dry-season shortages.",92,650000000,1200000000,"FIRM_THERMAL"],
+      ["la-national-vietnam-grid","Vietnam","Newer high-voltage routes carry Lao wind and hydro east to Vietnam's much larger, diverse grid.",68,600000000,1000000000,"LARGE_POOL"]
     ],
     [
       ["laos-thailand-reinforcement","la-national-thailand-grid","Thailand connection","EXISTING",800000000,260000000,5000000,2,33,0.015,0.06],
@@ -1332,8 +1332,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "mm-national": [
     [
-      ["mm-national-thailand-grid","Thailand","Build a first bulk route toward Thailand's gas-fired grid; today this remains a regional plan.",59,800000000,700000000,"FIRM_THERMAL"],
-      ["mm-national-central-myanmar","Central Myanmar","Add a line along the domestic 230 kV backbone to central hydro dams, which run short in the dry season.",54,500000000,600000000,"MONSOON_HYDRO"]
+      ["mm-national-thailand-grid","Thailand","Build a first bulk route toward Thailand's gas-fired grid; today this remains a regional plan.",92,800000000,700000000,"FIRM_THERMAL"],
+      ["mm-national-central-myanmar","Central Myanmar","Add a line along the domestic 230 kV backbone to central hydro dams, which run short in the dry season.",71,500000000,600000000,"MONSOON_HYDRO"]
     ],
     [
       ["myanmar-thailand-new-link","mm-national-thailand-grid","Thailand connection","NEW",500000000,720000000,9000000,5,33,0.015,0.06],
@@ -1342,8 +1342,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "my-peninsula": [
     [
-      ["my-peninsula-thailand-grid","Thailand","A controllable HVDC link and a smaller AC line connect the peninsula northward.",55,650000000,600000000,"LARGE_POOL"],
-      ["my-peninsula-singapore-market","Singapore","Submarine cables exchange emergency support and traded power with Singapore's gas-fired grid.",78,500000000,1000000000,"FIRM_THERMAL"]
+      ["my-peninsula-thailand-grid","Thailand","A controllable HVDC link and a smaller AC line connect the peninsula northward.",92,650000000,600000000,"LARGE_POOL"],
+      ["my-peninsula-singapore-market","Singapore","Submarine cables exchange emergency support and traded power with Singapore's gas-fired grid.",128,500000000,1000000000,"FIRM_THERMAL"]
     ],
     [
       ["malaysia-thailand-hvdc","my-peninsula-thailand-grid","Thailand connection","EXISTING",380000000,220000000,4200000,2,33,0.015,0.06],
@@ -1352,7 +1352,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "sg-national": [
     [
-      ["sg-national-peninsular-malaysia","Peninsular Malaysia","The island's physical interconnector can move gas- and coal-fired power in either direction.",58,1000000000,650000000,"FIRM_THERMAL"]
+      ["sg-national-peninsular-malaysia","Peninsular Malaysia","The island's physical interconnector can move gas- and coal-fired power in either direction.",70,1000000000,650000000,"FIRM_THERMAL"]
     ],
     [
       ["singapore-malaysia-upgrade","sg-national-peninsular-malaysia","Peninsular Malaysia connection","EXISTING",700000000,330000000,6000000,3,35,0.005,0.01]
@@ -1360,8 +1360,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "id-java": [
     [
-      ["id-java-bali-grid","Bali grid","Add a cable beside the domestic submarine cables to Bali, whose evening peaks arrive with Java's.",72,300000000,450000000,"PEAK_SHARING"],
-      ["id-java-sumatra-grid","Sumatra grid","Build the long-planned domestic HVDC bridge to Sumatra's mine-mouth coal plants.",49,1400000000,700000000,"FIRM_THERMAL"]
+      ["id-java-bali-grid","Bali grid","Add a cable beside the domestic submarine cables to Bali, whose evening peaks arrive with Java's.",67,300000000,450000000,"PEAK_SHARING"],
+      ["id-java-sumatra-grid","Sumatra grid","Build the long-planned domestic HVDC bridge to Sumatra's mine-mouth coal plants.",84,1400000000,700000000,"FIRM_THERMAL"]
     ],
     [
       ["java-bali-reinforcement","id-java-bali-grid","Bali grid connection","EXISTING",350000000,260000000,4800000,3,35,0.005,0.01],
@@ -1370,7 +1370,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "id-bali": [
     [
-      ["id-bali-java-grid","Java grid","Add a cable beside the domestic submarine connection that supplies part of Bali's demand.",54,900000000,500000000,"LARGE_POOL"]
+      ["id-bali-java-grid","Java grid","Add a cable beside the domestic submarine connection that supplies part of Bali's demand.",67,900000000,500000000,"LARGE_POOL"]
     ],
     [
       ["bali-java-reinforcement","id-bali-java-grid","Java grid connection","EXISTING",350000000,260000000,4800000,3,35,0.005,0.01]
@@ -1378,8 +1378,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "id-sumatra": [
     [
-      ["id-sumatra-south-sumatra-grid","South Sumatra","Add a line along the domestic 275 kV backbone to southern coal plants that supply northern demand.",50,900000000,500000000,"FIRM_THERMAL"],
-      ["id-sumatra-peninsular-malaysia","Peninsular Malaysia","Build the proposed cross-strait HVDC connection to Malaysia.",60,700000000,650000000,"LARGE_POOL"]
+      ["id-sumatra-south-sumatra-grid","South Sumatra","Add a line along the domestic 275 kV backbone to southern coal plants that supply northern demand.",75,900000000,500000000,"FIRM_THERMAL"],
+      ["id-sumatra-peninsular-malaysia","Peninsular Malaysia","Build the proposed cross-strait HVDC connection to Malaysia.",54,700000000,650000000,"LARGE_POOL"]
     ],
     [
       ["sumatra-backbone-reinforcement","id-sumatra-south-sumatra-grid","South Sumatra connection","EXISTING",600000000,280000000,5200000,3,33,0.015,0.06],
@@ -1388,7 +1388,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ph-luzon": [
     [
-      ["ph-luzon-visayas-grid","Visayas grid","Add a cable along the domestic submarine path to the Visayas' geothermal and coal plants.",61,550000000,500000000,"FIRM_THERMAL"]
+      ["ph-luzon-visayas-grid","Visayas grid","Add a cable along the domestic submarine path to the Visayas' geothermal and coal plants.",102,550000000,500000000,"FIRM_THERMAL"]
     ],
     [
       ["luzon-visayas-reinforcement","ph-luzon-visayas-grid","Visayas grid connection","EXISTING",450000000,330000000,6000000,3,35,0.005,0.01]
@@ -1396,8 +1396,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ph-visayas": [
     [
-      ["ph-visayas-luzon-grid","Luzon grid","Share generation and reserves with the country's largest demand center.",66,700000000,900000000,"LARGE_POOL"],
-      ["ph-visayas-mindanao-grid","Mindanao grid","Add capacity along the new domestic HVDC corridor to Mindanao's coal-heavy grid.",55,650000000,450000000,"FIRM_THERMAL"]
+      ["ph-visayas-luzon-grid","Luzon grid","Share generation and reserves with the country's largest demand center.",91,700000000,900000000,"LARGE_POOL"],
+      ["ph-visayas-mindanao-grid","Mindanao grid","Add capacity along the new domestic HVDC corridor to Mindanao's coal-heavy grid.",93,650000000,450000000,"FIRM_THERMAL"]
     ],
     [
       ["visayas-luzon-reinforcement","ph-visayas-luzon-grid","Luzon grid connection","EXISTING",450000000,330000000,6000000,3,35,0.005,0.01],
@@ -1406,8 +1406,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ph-mindanao": [
     [
-      ["ph-mindanao-visayas-grid","Visayas grid","Use the domestic HVDC link to share Mindanao power with the rest of the unified Philippine grid.",62,550000000,600000000,"LARGE_POOL"],
-      ["ph-mindanao-sabah-grid","Sabah grid","Build a future international cable toward Sabah's gas-fired grid.",58,650000000,500000000,"FIRM_THERMAL"]
+      ["ph-mindanao-visayas-grid","Visayas grid","Use the domestic HVDC link to share Mindanao power with the rest of the unified Philippine grid.",102,550000000,600000000,"LARGE_POOL"],
+      ["ph-mindanao-sabah-grid","Sabah grid","Build a future international cable toward Sabah's gas-fired grid.",67,650000000,500000000,"FIRM_THERMAL"]
     ],
     [
       ["mindanao-visayas-reinforcement","ph-mindanao-visayas-grid","Visayas grid connection","EXISTING",450000000,300000000,5500000,3,35,0.005,0.01],
@@ -1416,7 +1416,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "bn-proposed": [
     [
-      ["bn-proposed-sarawak-hydro","Sarawak hydropower","Build Brunei's planned first cross-border connection to Sarawak's large hydro reservoirs.",50,500000000,250000000,"RESERVOIR_HYDRO"]
+      ["bn-proposed-sarawak-hydro","Sarawak hydropower","Build Brunei's planned first cross-border connection to Sarawak's large hydro reservoirs.",48,500000000,250000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["brunei-sarawak-link","bn-proposed-sarawak-hydro","Sarawak hydropower connection","NEW",250000000,520000000,7000000,4,33,0.015,0.06]
@@ -1424,7 +1424,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "co-national": [
     [
-      ["co-national-ecuador-market","Ecuador","Mountain hydropower can flow either way when rain and demand differ across the border.",58,650000000,550000000,"SEASONAL_HYDRO"]
+      ["co-national-ecuador-market","Ecuador","Mountain hydropower can flow either way when rain and demand differ across the border.",45,650000000,550000000,"SEASONAL_HYDRO"]
     ],
     [
       ["co-ecuador-upgrade","co-national-ecuador-market","Ecuador mountain link","EXISTING",450000000,190000000,3800000,2,26,0.01,0.08]
@@ -1432,7 +1432,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ve-reconnection": [
     [
-      ["ve-reconnection-colombia-restart-market","Colombia (dormant connection)","Old wires still cross to Colombia's hydro-heavy grid, but regular trading stopped. A new line along that corridor creates a fragile new source of backup power.",66,300000000,350000000,"MONSOON_HYDRO"]
+      ["ve-reconnection-colombia-restart-market","Colombia (dormant connection)","Old wires still cross to Colombia's hydro-heavy grid, but regular trading stopped. A new line along that corridor creates a fragile new source of backup power.",86,300000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["ve-colombia-reactivation","ve-reconnection-colombia-restart-market","Colombia link","EXISTING",250000000,240000000,4800000,3,34,0.018,0.08]
@@ -1440,8 +1440,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ec-national": [
     [
-      ["ec-national-colombia-market","Colombia","A working Andean market can provide hydro backup or buy Ecuador's surplus.",60,600000000,650000000,"SEASONAL_HYDRO"],
-      ["ec-national-peru-market","Peru","Peru's gas and hydro mix complements Ecuador's rain-driven system.",64,500000000,550000000,"FIRM_THERMAL"]
+      ["ec-national-colombia-market","Colombia","A working Andean market can provide hydro backup or buy Ecuador's surplus.",86,600000000,650000000,"SEASONAL_HYDRO"],
+      ["ec-national-peru-market","Peru","Peru's gas and hydro mix complements Ecuador's rain-driven system.",38,500000000,550000000,"FIRM_THERMAL"]
     ],
     [
       ["ec-colombia-upgrade","ec-national-colombia-market","Northern Andean intertie","EXISTING",450000000,190000000,3800000,2,26,0.01,0.08],
@@ -1450,8 +1450,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "pe-national": [
     [
-      ["pe-national-ecuador-market-pe","Ecuador","Northern exchanges reach Ecuador's rain-fed hydropower, which swings with wet and dry years.",59,450000000,500000000,"SEASONAL_HYDRO"],
-      ["pe-national-bolivia-market-pe","Bolivia (proposed)","A new highland route could trade Bolivian gas-fired power with Peru.",55,350000000,300000000,"FIRM_THERMAL"]
+      ["pe-national-ecuador-market-pe","Ecuador","Northern exchanges reach Ecuador's rain-fed hydropower, which swings with wet and dry years.",45,450000000,500000000,"SEASONAL_HYDRO"],
+      ["pe-national-bolivia-market-pe","Bolivia (proposed)","A new highland route could trade Bolivian gas-fired power with Peru.",16,350000000,300000000,"FIRM_THERMAL"]
     ],
     [
       ["pe-ecuador-upgrade","pe-national-ecuador-market-pe","Northern border intertie","EXISTING",250000000,210000000,4200000,2,33,0.015,0.06],
@@ -1460,8 +1460,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "bo-national": [
     [
-      ["bo-national-argentina-market-bo","Argentina","The Juana Azurduy line lets Bolivia export generation to northern Argentina.",57,300000000,450000000,"LARGE_POOL"],
-      ["bo-national-peru-market-bo","Peru (proposed)","A future Andean connection could reach Peru's hydropower, which runs strongest in the rainy season.",60,300000000,350000000,"MONSOON_HYDRO"]
+      ["bo-national-argentina-market-bo","Argentina","The Juana Azurduy line lets Bolivia export generation to northern Argentina.",71,300000000,450000000,"LARGE_POOL"],
+      ["bo-national-peru-market-bo","Peru (proposed)","A future Andean connection could reach Peru's hydropower, which runs strongest in the rainy season.",34,300000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["bo-argentina-upgrade","bo-national-argentina-market-bo","Juana Azurduy intertie","EXISTING",200000000,150000000,3000000,2,26,0.01,0.08],
@@ -1470,8 +1470,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cl-national": [
     [
-      ["cl-national-argentina-market-cl","Argentina","The Andes-Salta route can move gas-fired power across the mountains when the two systems coordinate.",61,350000000,450000000,"FIRM_THERMAL"],
-      ["cl-national-peru-market-cl","Peru (proposed)","A northern line would extend the Andean corridor to Peru's rain-fed hydropower.",58,400000000,350000000,"MONSOON_HYDRO"]
+      ["cl-national-argentina-market-cl","Argentina","The Andes-Salta route can move gas-fired power across the mountains when the two systems coordinate.",71,350000000,450000000,"FIRM_THERMAL"],
+      ["cl-national-peru-market-cl","Peru (proposed)","A northern line would extend the Andean corridor to Peru's rain-fed hydropower.",34,400000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["cl-argentina-andes","cl-national-argentina-market-cl","Andes-Salta line","EXISTING",300000000,250000000,5000000,3,26,0.01,0.08],
@@ -1480,8 +1480,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ar-east": [
     [
-      ["ar-east-uruguay-market-ar","Uruguay","A tightly coordinated 50 Hz neighbour with a large wind fleet can buy surplus or provide fast regional backup.",56,800000000,700000000,"WIND_HEAVY"],
-      ["ar-east-brazil-market-ar","Southern Brazil","Frequency converters reach southern Brazil's hydro-heavy grid, which swings with wet and dry years.",59,900000000,850000000,"SEASONAL_HYDRO"]
+      ["ar-east-uruguay-market-ar","Uruguay","A tightly coordinated 50 Hz neighbour with a large wind fleet can buy surplus or provide fast regional backup.",58,800000000,700000000,"WIND_HEAVY"],
+      ["ar-east-brazil-market-ar","Southern Brazil","Frequency converters reach southern Brazil's hydro-heavy grid, which swings with wet and dry years.",31,900000000,850000000,"SEASONAL_HYDRO"]
     ],
     [
       ["ar-uruguay-upgrade","ar-east-uruguay-market-ar","Salto Grande corridor line","EXISTING",600000000,220000000,4400000,2,30,0.012,0.04],
@@ -1490,8 +1490,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ar-west": [
     [
-      ["ar-west-chile-market-ar","Chile","A mountain route links Argentina's gas-backed power with Chile's grid, where desert solar makes midday power cheap.",63,400000000,450000000,"SOLAR_HEAVY"],
-      ["ar-west-bolivia-market-ar","Bolivia","Northern Argentina can receive Bolivian gas-fired power over the Juana Azurduy line.",55,300000000,350000000,"FIRM_THERMAL"]
+      ["ar-west-chile-market-ar","Chile","A mountain route links Argentina's gas-backed power with Chile's grid, where desert solar makes midday power cheap.",76,400000000,450000000,"SOLAR_HEAVY"],
+      ["ar-west-bolivia-market-ar","Bolivia","Northern Argentina can receive Bolivian gas-fired power over the Juana Azurduy line.",56,300000000,350000000,"FIRM_THERMAL"]
     ],
     [
       ["ar-chile-andes","ar-west-chile-market-ar","Andes-Salta line","EXISTING",300000000,250000000,5000000,3,26,0.01,0.08],
@@ -1500,8 +1500,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "uy-national": [
     [
-      ["uy-national-argentina-market-uy","Argentina","Three connection points share reserves and gas-fired energy with Argentina's much larger 50 Hz system.",58,800000000,900000000,"FIRM_THERMAL"],
-      ["uy-national-brazil-market-uy","Southern Brazil","Converters let Uruguay exchange power with southern Brazil's hydro-heavy 60 Hz grid.",60,650000000,700000000,"SEASONAL_HYDRO"]
+      ["uy-national-argentina-market-uy","Argentina","Three connection points share reserves and gas-fired energy with Argentina's much larger 50 Hz system.",71,800000000,900000000,"FIRM_THERMAL"],
+      ["uy-national-brazil-market-uy","Southern Brazil","Converters let Uruguay exchange power with southern Brazil's hydro-heavy 60 Hz grid.",31,650000000,700000000,"SEASONAL_HYDRO"]
     ],
     [
       ["uy-argentina-upgrade","uy-national-argentina-market-uy","Argentina intertie","EXISTING",600000000,210000000,4200000,2,30,0.012,0.04],
@@ -1510,8 +1510,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "py-national": [
     [
-      ["py-national-brazil-market-py","Brazil","Itaipu's two frequencies physically join Paraguay and Brazil, with room for regional sales.",53,900000000,1000000000,"LARGE_POOL"],
-      ["py-national-argentina-market-py","Argentina","Yacyreta links Paraguay's hydro system to Argentina's larger, gas-heavy grid.",55,700000000,850000000,"FIRM_THERMAL"]
+      ["py-national-brazil-market-py","Brazil","Itaipu's two frequencies physically join Paraguay and Brazil, with room for regional sales.",31,900000000,1000000000,"LARGE_POOL"],
+      ["py-national-argentina-market-py","Argentina","Yacyreta links Paraguay's hydro system to Argentina's larger, gas-heavy grid.",71,700000000,850000000,"FIRM_THERMAL"]
     ],
     [
       ["py-brazil-itaipu","py-national-brazil-market-py","Itaipu corridor line","EXISTING",650000000,260000000,5200000,2,33,0.015,0.06],
@@ -1520,8 +1520,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "br-seco": [
     [
-      ["br-seco-br-south-market","Southern Brazil","Wind, hydro, and demand differ across the South and Southeast, creating two-way trade.",57,1200000000,1300000000,"SEASONAL_HYDRO"],
-      ["br-seco-br-northeast-market","Northeast Brazil","Strong Northeast wind can flow south; still weather can reverse the exchange.",54,1300000000,1100000000,"WIND_HEAVY"]
+      ["br-seco-br-south-market","Southern Brazil","Wind, hydro, and demand differ across the South and Southeast, creating two-way trade.",31,1200000000,1300000000,"SEASONAL_HYDRO"],
+      ["br-seco-br-northeast-market","Northeast Brazil","Strong Northeast wind can flow south; still weather can reverse the exchange.",29,1300000000,1100000000,"WIND_HEAVY"]
     ],
     [
       ["br-seco-south-upgrade","br-seco-br-south-market","South-Southeast backbone","EXISTING",800000000,260000000,5200000,2,33,0.015,0.06],
@@ -1530,8 +1530,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "br-ne": [
     [
-      ["br-ne-br-seco-market","Southeast and Centre-West Brazil","The country's largest demand centre can buy Northeast renewable surplus or send backup north.",61,1400000000,1500000000,"LARGE_POOL"],
-      ["br-ne-br-north-market","Northern Brazil","Hydro and long-distance renewable flows connect the North and Northeast.",55,1000000000,900000000,"MONSOON_HYDRO"]
+      ["br-ne-br-seco-market","Southeast and Centre-West Brazil","The country's largest demand centre can buy Northeast renewable surplus or send backup north.",31,1400000000,1500000000,"LARGE_POOL"],
+      ["br-ne-br-north-market","Northern Brazil","Hydro and long-distance renewable flows connect the North and Northeast.",31,1000000000,900000000,"MONSOON_HYDRO"]
     ],
     [
       ["br-ne-seco-upgrade","br-ne-br-seco-market","Northeast-Southeast line","EXISTING",850000000,310000000,6200000,3,33,0.015,0.06],
@@ -1540,8 +1540,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "br-north": [
     [
-      ["br-north-br-seco-market-north","Southeast and Centre-West Brazil","Long transmission routes reach the country's main demand centre and its diverse mix of generation.",60,1100000000,1400000000,"LARGE_POOL"],
-      ["br-north-br-ne-market-north","Northeast Brazil","A regional seam balances Amazon hydro against Northeast wind farms and demand.",56,900000000,1000000000,"WIND_HEAVY"]
+      ["br-north-br-seco-market-north","Southeast and Centre-West Brazil","Long transmission routes reach the country's main demand centre and its diverse mix of generation.",31,1100000000,1400000000,"LARGE_POOL"],
+      ["br-north-br-ne-market-north","Northeast Brazil","A regional seam balances Amazon hydro against Northeast wind farms and demand.",29,900000000,1000000000,"WIND_HEAVY"]
     ],
     [
       ["br-north-seco-upgrade","br-north-br-seco-market-north","North-Southeast trunk line","EXISTING",750000000,340000000,6800000,3,34,0.018,0.08],
@@ -1550,8 +1550,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "br-south": [
     [
-      ["br-south-argentina-market-br","Argentina","Garabi and Uruguaiana converters reach Argentina's gas-heavy 50 Hz system.",58,850000000,900000000,"FIRM_THERMAL"],
-      ["br-south-uruguay-market-br","Uruguay","Melo and Rivera converters support two-way trade with Uruguay's wind-heavy grid.",56,650000000,650000000,"WIND_HEAVY"]
+      ["br-south-argentina-market-br","Argentina","Garabi and Uruguaiana converters reach Argentina's gas-heavy 50 Hz system.",75,850000000,900000000,"FIRM_THERMAL"],
+      ["br-south-uruguay-market-br","Uruguay","Melo and Rivera converters support two-way trade with Uruguay's wind-heavy grid.",57,650000000,650000000,"WIND_HEAVY"]
     ],
     [
       ["br-argentina-garabi","br-south-argentina-market-br","New Garabi converter","EXISTING",650000000,310000000,6200000,3,33,0.015,0.06],
@@ -1560,8 +1560,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "au-nsw": [
     [
-      ["au-nsw-queensland-market","Queensland","Solar-rich Queensland and New South Wales share power over two northern links.",55,1200000000,1300000000,"SOLAR_HEAVY"],
-      ["au-nsw-victoria-market","Victoria","The Snowy and Murray network reaches Victoria's wind farms and brown-coal plants.",58,1300000000,1400000000,"WIND_HEAVY"]
+      ["au-nsw-queensland-market","Queensland","Solar-rich Queensland and New South Wales share power over two northern links.",70,1200000000,1300000000,"SOLAR_HEAVY"],
+      ["au-nsw-victoria-market","Victoria","The Snowy and Murray network reaches Victoria's wind farms and brown-coal plants.",55,1300000000,1400000000,"WIND_HEAVY"]
     ],
     [
       ["au-nsw-qld-upgrade","au-nsw-queensland-market","Queensland-NSW intertie","EXISTING",700000000,250000000,5000000,2,33,0.015,0.06],
@@ -1570,8 +1570,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "au-vic": [
     [
-      ["au-vic-nsw-market-vic","New South Wales","Snowy hydro and large city demand make this a busy two-way seam, though heat waves often hit both states together.",57,1300000000,1400000000,"PEAK_SHARING"],
-      ["au-vic-tasmania-market-vic","Tasmania","Basslink carries Tasmanian reservoir hydro north and mainland backup south.",53,550000000,500000000,"RESERVOIR_HYDRO"]
+      ["au-vic-nsw-market-vic","New South Wales","Snowy hydro and large city demand make this a busy two-way seam, though heat waves often hit both states together.",72,1300000000,1400000000,"PEAK_SHARING"],
+      ["au-vic-tasmania-market-vic","Tasmania","Basslink carries Tasmanian reservoir hydro north and mainland backup south.",54,550000000,500000000,"RESERVOIR_HYDRO"]
     ],
     [
       ["au-vic-nsw-upgrade","au-vic-nsw-market-vic","Victoria-NSW intertie","EXISTING",800000000,280000000,5600000,2,30,0.012,0.04],
@@ -1580,7 +1580,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "au-qld": [
     [
-      ["au-qld-nsw-market-qld","New South Wales","Two links let Queensland trade with New South Wales, though summer heat often strains both states at once.",59,1300000000,1400000000,"PEAK_SHARING"]
+      ["au-qld-nsw-market-qld","New South Wales","Two links let Queensland trade with New South Wales, though summer heat often strains both states at once.",72,1300000000,1400000000,"PEAK_SHARING"]
     ],
     [
       ["au-qld-nsw-qni","au-qld-nsw-market-qld","Queensland-NSW intertie","EXISTING",700000000,250000000,5000000,2,33,0.015,0.06]
@@ -1588,8 +1588,8 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "au-sa": [
     [
-      ["au-sa-victoria-market-sa","Victoria","Heywood and Murraylink connect South Australia with Victoria, though the same heat waves often hit both.",58,800000000,900000000,"PEAK_SHARING"],
-      ["au-sa-nsw-market-sa","New South Wales","EnergyConnect adds a second route, reaching New South Wales' coal fleet and reserves.",57,700000000,850000000,"FIRM_THERMAL"]
+      ["au-sa-victoria-market-sa","Victoria","Heywood and Murraylink connect South Australia with Victoria, though the same heat waves often hit both.",55,800000000,900000000,"PEAK_SHARING"],
+      ["au-sa-nsw-market-sa","New South Wales","EnergyConnect adds a second route, reaching New South Wales' coal fleet and reserves.",72,700000000,850000000,"FIRM_THERMAL"]
     ],
     [
       ["au-sa-vic-upgrade","au-sa-victoria-market-sa","Victoria intertie","EXISTING",500000000,240000000,4800000,2,33,0.015,0.06],
@@ -1598,7 +1598,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "au-tas": [
     [
-      ["au-tas-victoria-market-tas","Victoria","Basslink exports hydro when Tasmania is wet and imports Victorian wind power when local supply is tight.",60,500000000,550000000,"WIND_HEAVY"]
+      ["au-tas-victoria-market-tas","Victoria","Basslink exports hydro when Tasmania is wet and imports Victorian wind power when local supply is tight.",55,500000000,550000000,"WIND_HEAVY"]
     ],
     [
       ["au-tas-vic-basslink","au-tas-victoria-market-tas","Basslink corridor cable","EXISTING",450000000,390000000,6500000,3,35,0.005,0.01]
@@ -1606,7 +1606,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "nz-north": [
     [
-      ["nz-north-nz-south-market","South Island","South Island hydro often flows north; dry years can send North Island generation south.",51,900000000,700000000,"SEASONAL_HYDRO"]
+      ["nz-north-nz-south-market","South Island","South Island hydro often flows north; dry years can send North Island generation south.",84,900000000,700000000,"SEASONAL_HYDRO"]
     ],
     [
       ["nz-north-cook-strait","nz-north-nz-south-market","Cook Strait HVDC cable","EXISTING",650000000,430000000,7000000,3,35,0.005,0.01]
@@ -1614,7 +1614,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "nz-south": [
     [
-      ["nz-south-nz-north-market","North Island","The larger northern market buys southern hydro and sends gas- and geothermal-fired backup south in dry years.",59,800000000,1000000000,"FIRM_THERMAL"]
+      ["nz-south-nz-north-market","North Island","The larger northern market buys southern hydro and sends gas- and geothermal-fired backup south in dry years.",94,800000000,1000000000,"FIRM_THERMAL"]
     ],
     [
       ["nz-south-cook-strait","nz-south-nz-north-market","Cook Strait HVDC cable","EXISTING",650000000,430000000,7000000,3,35,0.005,0.01]
