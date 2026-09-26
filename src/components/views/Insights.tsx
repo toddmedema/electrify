@@ -1895,6 +1895,7 @@ export default class Insights extends React.Component<Props, State> {
                 fuels={fuels}
                 syncKey={SYNC_KEY}
                 highlightFuel={highlightFuel}
+                currentMinute={projection.forecast[0]?.minute}
               />
             </>
           );

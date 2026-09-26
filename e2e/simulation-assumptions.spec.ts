@@ -102,7 +102,7 @@ for (const theme of ["light", "dark"] as const) {
     expect((await citation.boundingBox())!.height).toBeGreaterThanOrEqual(
       testInfo.project.use.hasTouch ? 44 : 40,
     );
-    await manual.getByRole("button", { name: "back", exact: true }).click();
+    await manual.getByRole("button", { name: "close", exact: true }).click();
     await expect(manual).not.toBeVisible();
     expect(
       await page

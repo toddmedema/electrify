@@ -4915,6 +4915,74 @@ $sizemap: (
   gap: 0 4px;
   padding: 0 8px;
 }
+// A term's manual entry, pinned beside it (base/ManualHelpPopover) or previewed on mouse hover
+// (base/ManualLink). At most half the screen tall so the decision underneath stays in view;
+// the body scrolls, the title and close stay put
+.manual-popover.MuiPaper-root {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 16px));
+  max-height: 50vh;
+  overflow: hidden;
+}
+.manual-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  padding: $space-1 $space-2 $space-1 $space-4;
+  border-bottom: 1px solid var(--border-subtle);
+
+  .MuiIconButton-root {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+.manual-popover-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: $space-2 $space-4 $space-3;
+  font-size: 0.875rem;
+  line-height: 1.5;
+
+  > p:first-child {
+    margin-top: 0;
+  }
+  figure {
+    margin: $space-3 0;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  figcaption {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: $space-1;
+  }
+  .manual-sources {
+    margin: 0 0 $space-3;
+    padding-left: $space-4;
+
+    li {
+      margin-bottom: $space-2;
+    }
+    a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+    }
+  }
+}
+@media (pointer: coarse) {
+  .manual-popover-header .MuiIconButton-root {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .manual-popover-body .manual-sources a {
+    min-height: 44px;
+  }
+}
 .manual-related {
   display: flex;
   flex-wrap: wrap;
