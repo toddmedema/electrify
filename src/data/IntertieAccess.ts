@@ -4,6 +4,7 @@ import {
   corridorById,
   corridorsForLocation,
 } from "./AdjacentMarkets";
+import { corridorOpenInYear } from "./IntertieTrends";
 
 export interface IntertieAccessContext {
   scenarioId?: number;
@@ -275,10 +276,13 @@ export function effectiveMarket(
       }
     : market;
 }
+/** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
-  game: Pick<GameType, "scenarioId" | "location" | "customScenario">,
+  game: Pick<GameType, "scenarioId" | "location" | "customScenario"> & {
+    date: Pick<GameType["date"], "year">;
+  },
 ) {
-  return corridorsForLocation(game.location).map((c) =>
-    effectiveCorridor(c.id, accessContextForGame(game))!,
-  );
+  return corridorsForLocation(game.location)
+    .filter(({ id }) => corridorOpenInYear(id, game.date.year))
+    .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!);
 }

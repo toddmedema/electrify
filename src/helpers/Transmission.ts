@@ -28,6 +28,7 @@ import {
   effectiveMarket,
   IntertieAccessContext,
 } from "../data/IntertieAccess";
+import { intertiePriceIndex } from "../data/IntertieTrends";
 import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
 import {
   AdjacentMarketDefinitionType,
@@ -85,15 +86,27 @@ export interface IntertieContext extends IntertieAccessContext {
    * typical year to the player rather than the specific luck the next few years will bring.
    */
   expectedLuck?: boolean;
+  /**
+   * The run's first year, so a neighbour's price follows its researched trend. Absent means the
+   * reference era, where every market sits at its authored base price.
+   */
+  startingYear?: number;
 }
 
 export function intertieContextForGame(
   game: Pick<GameType, "seed" | "location" | "difficulty"> &
     Partial<
-      Pick<GameType, "scenarioId" | "customScenario" | "tutorialIntertieStress">
+      Pick<
+        GameType,
+        | "scenarioId"
+        | "customScenario"
+        | "tutorialIntertieStress"
+        | "startingYear"
+      >
     >,
 ): IntertieContext {
   return {
+    startingYear: game.startingYear,
     ...accessContextForGame({ ...game, scenarioId: game.scenarioId ?? -1 }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6
@@ -298,12 +311,20 @@ export function intertieImportLimitW(
   );
 }
 
-/** Offline, seeded wholesale price in dollars per MWh, shaped by the neighbour's archetype. */
+/** Fractional calendar year at a game minute, for the neighbours' researched trends. */
+export function intertieYear(minute: number, startingYear: number): number {
+  return startingYear + minute / (DAYS_PER_YEAR * 1440);
+}
+
+/**
+ * Offline, seeded wholesale price in dollars per MWh, shaped by the neighbour's archetype and
+ * scaled by its researched price trend for the year.
+ */
 export function adjacentMarketPricePerMWh(
   corridorId: string,
   context: Pick<
     IntertieContext,
-    "seed" | "southernHemisphere" | "expectedLuck"
+    "seed" | "southernHemisphere" | "expectedLuck" | "startingYear"
   >,
   minute: number,
   conditions: Pick<TransmissionConditions, "temperatureC">,
@@ -316,6 +337,13 @@ export function adjacentMarketPricePerMWh(
   const hour = Math.floor((minute % 1440) / 60);
   const stress = neighbourStress(archetype, conditions.temperatureC);
   const scarcity = 1 - neighbourLuck(market, context, minute);
+  const trend =
+    context.startingYear === undefined
+      ? 1
+      : intertiePriceIndex(
+          market.id,
+          intertieYear(minute, context.startingYear),
+        );
   // Each neighbour gets its own noise, so which line is cheaper can change tick to tick.
   // The index wraps to 32 bits inside normalAt; the collisions that allows are harmless here.
   const noise =
@@ -327,7 +355,7 @@ export function adjacentMarketPricePerMWh(
   return Math.max(
     5,
     Math.round(
-      (market.basePricePerMWh +
+      (market.basePricePerMWh * trend +
         archetype.hourlyPriceOffset[hour] +
         archetype.monthlyPriceOffset[month] +
         archetype.heatStressPremium * stress.heat +
