@@ -23,3 +23,22 @@ export async function prefetchScenarioData(
     // player actually asks to start the game.
   }
 }
+
+/**
+ * Asks the active service worker to download every icon in the background. Icons are small and
+ * shared by every screen, so this runs for all users at launch -- before any game starts -- not
+ * just installed apps. The worker skips what it already has, so repeat calls are cheap.
+ */
+export async function prefetchIcons(): Promise<void> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    registration.active?.postMessage({ type: "CACHE_ICONS" });
+  } catch {
+    // Prefetching is only an optimization. The service worker's fetch handler still caches any
+    // icon the app requests while online.
+  }
+}

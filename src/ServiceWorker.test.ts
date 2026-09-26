@@ -11,26 +11,48 @@ function response(ok = true) {
   return { ok, clone: () => response(ok) };
 }
 
+function jsonResponse(payload: unknown) {
+  return {
+    ok: true,
+    clone: () => jsonResponse(payload),
+    json: async () => payload,
+  };
+}
+
 type WorkerResponse = ReturnType<typeof response>;
+type FetchRequest = string | { url: string; method: string; mode: string };
 type FetchEvent = {
   request: { url: string; method: string; mode: string };
   respondWith: (result: Promise<WorkerResponse>) => void;
   waitUntil: (work: Promise<unknown>) => void;
 };
+type MessageEvent = {
+  data: unknown;
+  waitUntil: (work: Promise<unknown>) => void;
+};
+type WorkerEvent = FetchEvent | MessageEvent;
 
 function worker() {
-  const handlers = new Map<string, (event: FetchEvent) => void>();
-  const fetch = jest.fn<Promise<WorkerResponse>, unknown[]>();
+  const handlers = new Map<string, (event: WorkerEvent) => void>();
+  const fetch = jest.fn<
+    Promise<WorkerResponse>,
+    [FetchRequest, { cache?: string }?]
+  >();
   const put = jest.fn().mockResolvedValue(undefined);
-  const match = jest.fn().mockResolvedValue(undefined);
-  const open = jest.fn().mockResolvedValue({ put });
+  const match = jest
+    .fn<Promise<WorkerResponse | undefined>, [FetchRequest]>()
+    .mockResolvedValue(undefined);
+  const cacheMatch = jest
+    .fn<Promise<WorkerResponse | undefined>, [string]>()
+    .mockResolvedValue(undefined);
+  const open = jest.fn().mockResolvedValue({ put, match: cacheMatch });
   runInNewContext(workerSource, {
     URL,
     fetch,
     caches: { match, open },
     self: {
       location: { origin: "https://electrify.test" },
-      addEventListener: (name: string, handler: (event: FetchEvent) => void) =>
+      addEventListener: (name: string, handler: (event: WorkerEvent) => void) =>
         handlers.set(name, handler),
     },
   });
@@ -38,6 +60,7 @@ function worker() {
     fetch,
     put,
     match,
+    cacheMatch,
     open,
     request(mode = "cors") {
       let result: Promise<WorkerResponse> | undefined;
@@ -54,6 +77,14 @@ function worker() {
         waitUntil: (promise) => work.push(promise),
       });
       return { result: result!, work };
+    },
+    message(data: unknown) {
+      const work: Promise<unknown>[] = [];
+      handlers.get("message")!({
+        data,
+        waitUntil: (promise: Promise<unknown>) => work.push(promise),
+      });
+      return work;
     },
   };
 }
@@ -144,4 +175,126 @@ it("still reports a failed request when no cached asset exists", async () => {
   const event = sw.request();
   await expect(event.result).rejects.toThrow("offline");
   await Promise.all(event.work);
+});
+
+describe("CACHE_ICONS", () => {
+  const manifest = ["/images/transmission.svg", "/images/solar.svg"];
+
+  function iconWorker() {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) => {
+      if (typeof url === "string" && url === "/icons.json") {
+        return jsonResponse(manifest);
+      }
+      return response();
+    });
+    return sw;
+  }
+
+  it("downloads every icon from the manifest and caches the manifest itself", async () => {
+    const sw = iconWorker();
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    expect(sw.fetch).toHaveBeenCalledWith("/icons.json", { cache: "no-cache" });
+    expect(sw.fetch).toHaveBeenCalledWith("/images/transmission.svg", {
+      cache: "no-cache",
+    });
+    expect(sw.fetch).toHaveBeenCalledWith("/images/solar.svg", {
+      cache: "no-cache",
+    });
+    expect(sw.put).toHaveBeenCalledWith("/icons.json", expect.anything());
+    expect(sw.put).toHaveBeenCalledWith(
+      "/images/transmission.svg",
+      expect.anything(),
+    );
+  });
+
+  it("skips icons that are already cached", async () => {
+    const sw = iconWorker();
+    sw.cacheMatch.mockImplementation(async (url) =>
+      url === "/images/solar.svg" ? response() : undefined,
+    );
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    expect(sw.fetch).not.toHaveBeenCalledWith("/images/solar.svg", {
+      cache: "no-cache",
+    });
+    expect(sw.fetch).toHaveBeenCalledWith("/images/transmission.svg", {
+      cache: "no-cache",
+    });
+  });
+
+  it("falls back to the cached manifest when offline and still attempts every icon", async () => {
+    const sw = worker();
+    sw.fetch.mockRejectedValue(new Error("offline"));
+    sw.cacheMatch.mockImplementation(async (url) =>
+      url === "/icons.json" ? jsonResponse(manifest) : undefined,
+    );
+
+    // Offline icon downloads fail, but the background work must settle rather than reject.
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_ICONS" })),
+    ).resolves.toEqual([undefined]);
+
+    expect(sw.fetch).toHaveBeenCalledWith("/images/transmission.svg", {
+      cache: "no-cache",
+    });
+    expect(sw.fetch).toHaveBeenCalledWith("/images/solar.svg", {
+      cache: "no-cache",
+    });
+  });
+
+  it("ignores manifest entries that are not same-origin image paths", async () => {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) => {
+      if (typeof url === "string" && url === "/icons.json") {
+        return jsonResponse([
+          "/data/FuelPricesRaw.csv",
+          "https://example.com/images/evil.svg",
+          42,
+          "/images/transmission.svg",
+        ]);
+      }
+      return response();
+    });
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    // Only the manifest and the one valid image path are fetched.
+    expect(sw.fetch).toHaveBeenCalledTimes(2);
+    expect(sw.fetch).toHaveBeenCalledWith("/icons.json", { cache: "no-cache" });
+    expect(sw.fetch).toHaveBeenCalledWith("/images/transmission.svg", {
+      cache: "no-cache",
+    });
+    expect(sw.fetch).not.toHaveBeenCalledWith("/data/FuelPricesRaw.csv", {
+      cache: "no-cache",
+    });
+  });
+
+  it("ignores a malformed manifest", async () => {
+    const sw = worker();
+    sw.fetch.mockImplementation(async (url) => {
+      if (typeof url === "string" && url === "/icons.json") {
+        return jsonResponse({ icons: manifest });
+      }
+      return response();
+    });
+
+    await Promise.all(sw.message({ type: "CACHE_ICONS" }));
+
+    expect(sw.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing when the manifest is missing and offline", async () => {
+    const sw = worker();
+    sw.fetch.mockRejectedValue(new Error("offline"));
+
+    await expect(
+      Promise.all(sw.message({ type: "CACHE_ICONS" })),
+    ).resolves.toEqual([undefined]);
+
+    expect(sw.fetch).toHaveBeenCalledTimes(1);
+  });
 });

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { store } from "./Store";
 import App from "./App";
+import { prefetchIcons } from "./helpers/OfflineData";
 import "./app.scss";
 
 const container = document.getElementById("root")!;
@@ -38,9 +39,21 @@ if (process.env.NODE_ENV !== "production") {
 
 if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    let registered = false;
+    const syncIcons = () => {
+      if (!registered) {
+        return;
+      }
+      // Icons are small and every screen uses them, so cache them for all users -- not just
+      // installed apps -- before any game starts. The worker skips what it already has, so a
+      // repeat load only pays for the manifest check.
+      void prefetchIcons();
+    };
+
     navigator.serviceWorker
       .register("/service-worker.js")
       .then(() => {
+        registered = true;
         const installed = Boolean(
           (navigator as Navigator & { standalone?: boolean }).standalone ||
           window.matchMedia?.("(display-mode: standalone)").matches,
@@ -54,7 +67,11 @@ if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
             );
           }, 3000);
         }
+        window.setTimeout(syncIcons, 3000);
       })
       .catch((error) => console.warn("Couldn't enable offline play:", error));
+
+    // A session that started offline only learns about new icons when connectivity returns.
+    window.addEventListener("online", syncIcons);
   });
 }
