@@ -104,8 +104,8 @@ function pendingLabel(
   const when = labelMonth(game, pending.month);
   if (isOperatingPolicy(id))
     return pending.tier === "Off"
-      ? `Off starts ${when}`
-      : `On starts ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
+      ? `Turns off ${when}`
+      : `${program.tier === "On" ? "Window moves" : "Turns on"} ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
   if (pending.tier === "Off") return `Pauses ${when}`;
   return program.adoption > 0 ? `Resumes ${when}` : `Starts ${when}`;
 }
@@ -186,7 +186,7 @@ function BuildoutSummary({
       finish < end ? labelMonth(game, finish) : "After this run ends",
     ]);
   const progress = complete
-    ? `Completed ${program.completedMonth === undefined ? "" : `${labelMonth(game, program.completedMonth)} `}· no further cost`
+    ? programStatus(game, id, program)
     : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent`;
   return (
     <Box className="customerProgramProject" sx={{ display: "grid", gap: 1.5 }}>
@@ -430,6 +430,7 @@ function Decision({
             </Typography>
             <Typography
               id={`program-description-${id}`}
+              className="customerProgramDescription"
               component="span"
               variant="body2"
               color="textSecondary"
@@ -505,7 +506,7 @@ function Decision({
               {operating
                 ? POLICIES[selected].description
                 : complete
-                  ? "This one-time project is finished. Installed upgrades keep working with no further cost."
+                  ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
                   : POLICIES[selected].mechanism}
             </Typography>
             {buildout ? (

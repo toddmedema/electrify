@@ -93,7 +93,7 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   ).toBe(22);
   fireEvent.click(
     screen.getByRole("button", {
-      name: /^Time-of-use tariff · Off · on starts /,
+      name: /^Time-of-use tariff · Off · turns on /,
     }),
   );
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
@@ -350,9 +350,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
       name: "Efficiency rebates · Completed Jan 2022",
     }),
   );
-  expect(
-    screen.getByText("Completed Jan 2022 · no further cost"),
-  ).toBeVisible();
+  expect(screen.getByText("Completed Jan 2022")).toBeVisible();
   expect(screen.getByText("Result")).toBeVisible();
   expect(screen.getByText(/one-time project is finished/)).toBeVisible();
   expect(

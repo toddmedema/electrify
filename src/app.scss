@@ -5504,7 +5504,8 @@ $sizemap: (
   font-weight: 500;
 }
 .customerProgramChoice[data-completed] .customerProgramChoiceButton strong,
-.customerProgramChoice[data-completed] .customerProgramStatus {
+.customerProgramChoice[data-completed] .customerProgramStatus,
+.customerProgramChoice[data-completed] .customerProgramDescription {
   color: var(--font-color-faded);
 }
 .customerProgramChoiceButton > span:last-child {
