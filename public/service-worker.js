@@ -1,5 +1,7 @@
 const CACHE_VERSION = "electrify-v2";
 const WEATHER_INDEX = "/data/weather/index.json";
+// Generated from public/images at build time (scripts/generate-icon-manifest.js).
+const ICON_MANIFEST = "/icons.json";
 const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
 const APP_SHELL = [
   "/",
@@ -69,6 +71,51 @@ async function cacheScenarioData(locationIds) {
 }
 
 /**
+ * Download every icon in the background so offline play works before any screen has been
+ * visited. The manifest is fetched network-first so a deploy that adds icons is picked up on the
+ * next load; an offline load falls back to the last cached copy. Only what is missing is
+ * downloaded, so repeat calls are cheap.
+ */
+async function cacheIcons() {
+  const cache = await caches.open(CACHE_VERSION);
+  let manifestResponse;
+  try {
+    manifestResponse = await fetchAndCache(cache, ICON_MANIFEST);
+  } catch {
+    // Offline: the last cached manifest still lists every icon we have seen.
+    manifestResponse = await cache.match(ICON_MANIFEST);
+  }
+  if (!manifestResponse) {
+    return;
+  }
+
+  let manifest;
+  try {
+    manifest = await manifestResponse.json();
+  } catch {
+    return;
+  }
+  const urls = Array.isArray(manifest)
+    ? [
+        ...new Set(
+          manifest.filter(
+            (url) => typeof url === "string" && url.startsWith("/images/"),
+          ),
+        ),
+      ]
+    : [];
+  const missing = (
+    await Promise.all(
+      urls.map(async (url) => ({ url, cached: await cache.match(url) })),
+    )
+  )
+    .filter(({ cached }) => !cached)
+    .map(({ url }) => url);
+
+  await Promise.allSettled(missing.map((url) => fetchAndCache(cache, url)));
+}
+
+/**
  * An installed app asks for this after launch has gone idle. Compare the catalog first: an
  * unchanged one only fills holes, while a changed catalog refreshes every location because its
  * update date means the packed records may have changed in place.
@@ -122,6 +169,8 @@ self.addEventListener("message", (event) => {
     event.waitUntil(syncOfflineData());
   } else if (event.data?.type === "CACHE_SCENARIO_DATA") {
     event.waitUntil(cacheScenarioData(event.data.locationIds));
+  } else if (event.data?.type === "CACHE_ICONS") {
+    event.waitUntil(cacheIcons());
   }
 });
 

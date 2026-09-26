@@ -397,7 +397,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           peaks.
         </p>
         <Figure
-          src="/images/manual-demand-customer-types.png"
+          src="/images/manual-demand-customer-types.webp"
           alt="Three charts of monthly US retail electricity sales from 2009 to 2012. Residential sales swing hardest, peaking each summer and winter; commercial sales follow the same shape but with about half the swing; industrial sales stay nearly flat all year."
           width={576}
           height={288}
@@ -409,7 +409,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           how temperature, time of day and weekends affect it.
         </p>
         <Figure
-          src="/images/manual-demand.jpg"
+          src="/images/manual-demand.webp"
           alt="Hourly electricity load across a week in the PJM Mid-Atlantic region, plotted for a hot week, a cold week and a mild week of 2009. All three rise and fall once a day and drop over the weekend; the hot week peaks around 50,000 MW, roughly 20,000 MW above the mild week's overnight low."
           width={834}
           height={560}
@@ -547,7 +547,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>This 2008 PJM electricity-market chart ranks generators by cost:</p>
         <Figure
-          src="/images/manual-generation-stack.jpg"
+          src="/images/manual-generation-stack.webp"
           alt="Scatter chart of PJM generation capacity sorted from cheapest to most expensive. Renewables and nuclear supply the first 40 GW at under $20/MWh, coal carries the next 60 GW below $50/MWh, natural gas climbs steeply from there, and oil tops out around $300/MWh for the last few GW."
           width={825}
           height={471}
