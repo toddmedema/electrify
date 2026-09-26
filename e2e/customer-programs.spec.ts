@@ -32,7 +32,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText(
       "does not directly cover an evening peak",
     );
-    await expect(dialog).toContainText("24 months of installations");
+    await expect(dialog).toContainText("48 months of installations");
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
       name: "Start build-out next month",
@@ -55,10 +55,10 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
     await dialog
-      .getByRole("button", { name: "At completion (Jan 2022)" })
+      .getByRole("button", { name: "At completion (Jan 2024)" })
       .click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
-    await expect(dialog).toContainText("Estimated utility demand · Jan 2022");
+    await expect(dialog).toContainText("Estimated utility demand · Jan 2024");
     await dialog.getByRole("button", { name: "First effective month" }).click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();

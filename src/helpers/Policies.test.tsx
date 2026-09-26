@@ -4,10 +4,13 @@ import {
   applyPolicyDemand,
   buildoutCompletionMonth,
   buildoutMonthsDone,
+  efficiencyInEffect,
   emptyPolicies,
   policyBudget,
   policyTotalCost,
+  programCustomers,
 } from "./Policies";
+import { POLICIES, residentialSolarCostPerW } from "../data/Policies";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import gameReducer, {
   generateNewTimeline,
@@ -17,6 +20,7 @@ import gameReducer, {
 import {
   schedulePolicy,
   cancelPolicy,
+  chooseScenarioResponse,
   openPolicyDecision,
   closePolicyDecision,
 } from "../reducers/GameActions";
@@ -26,9 +30,10 @@ import {
   deriveExpandedSummary,
 } from "./DateTime";
 import { previewPolicy } from "./PolicyPreview";
+import { pendingScenarioChoice } from "./ScenarioChoices";
 import { parseSave, serializeSave } from "../SaveGame";
 import { decodeReplay, serializeReplay } from "../Replay";
-import { TICKS_PER_MONTH } from "../Constants";
+import { TICK_MINUTES, TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
 import { GameType } from "../Types";
 
 function month(game: GameType) {
@@ -36,6 +41,7 @@ function month(game: GameType) {
   while (game.date.monthsElapsed < target) tickState(game);
 }
 const change = { id: "efficiency", tier: "On", month: 1 } as const;
+const BUILDOUT = POLICIES.solar.buildoutMonths;
 
 test("only the dialog that owns a pause restores its previous speed", () => {
   jest.useFakeTimers();
@@ -123,9 +129,9 @@ test("adoption and actual spending are bounded, idempotent, and stop at saturati
   advancePolicies(game, 1);
   expect(program.adoption).toBe(1);
   expect(program.completedMonth).toBe(1);
-  // The final partial month pays for 0.01 of the pool at the 1/24-per-month rate.
+  // The final partial month pays for 0.01 of the pool at the one-month rate.
   expect(program.spending).toBeCloseTo(
-    policyBudget(game, "efficiency", "On", 1) * 0.01 * 24,
+    policyBudget(game, "efficiency", "On", 1) * 0.01 * BUILDOUT,
   );
   expect(program.spent).toBe(program.spending);
   const saved = cloneDeep(game.policies);
@@ -136,29 +142,31 @@ test("adoption and actual spending are bounded, idempotent, and stop at saturati
   expect(program.completedMonth).toBe(1);
 });
 
-test("a build-out finishes after exactly 24 funded months, then costs nothing and cannot be rescheduled", () => {
+test("a build-out finishes after exactly its funded months, then costs nothing and cannot be rescheduled", () => {
   const game = createGame({ scenarioId: 106, seed: 4 });
   game.policies = emptyPolicies();
   const program = game.policies.programs.solar;
-  expect(buildoutCompletionMonth("solar", 0, 1)).toBe(24);
+  expect(buildoutCompletionMonth("solar", 0, 1)).toBe(BUILDOUT);
   program.tier = "On";
   let total = 0;
   const completed: (number | undefined)[] = [];
-  for (let m = 1; m <= 24; m++) {
+  for (let m = 1; m <= BUILDOUT; m++) {
     advancePolicies(game, m);
     expect(buildoutMonthsDone("solar", program.adoption)).toBe(m);
     expect(program.spending).toBeCloseTo(policyBudget(game, "solar", "On", m));
     total += program.spending;
     completed.push(program.completedMonth);
   }
-  expect(completed.slice(0, 23).every((m) => m === undefined)).toBe(true);
+  expect(completed.slice(0, -1).every((m) => m === undefined)).toBe(true);
   expect(program.adoption).toBe(1);
-  expect(program.completedMonth).toBe(24);
+  expect(program.completedMonth).toBe(BUILDOUT);
   expect(program.spent).toBeCloseTo(total);
-  // Inflation moves the monthly price, so the sum stays near the start-month total.
-  expect(total / policyTotalCost(game, "solar", 1)).toBeGreaterThan(0.95);
-  expect(total / policyTotalCost(game, "solar", 24)).toBeLessThan(1.05);
-  advancePolicies(game, 25);
+  // Panel prices and inflation move the monthly price, so the sum lands between the totals
+  // quoted at the start and at the end of the build-out.
+  const quotes = [1, BUILDOUT].map((m) => policyTotalCost(game, "solar", m));
+  expect(total).toBeGreaterThan(Math.min(...quotes) * 0.99);
+  expect(total).toBeLessThan(Math.max(...quotes) * 1.01);
+  advancePolicies(game, BUILDOUT + 1);
   expect(program.spending).toBe(0);
   expect(program.spent).toBeCloseTo(total);
   // Pausing a finished project has no effect, so the reducer refuses to record it.
@@ -186,11 +194,24 @@ test("solar affects only eligible daylight load after efficiency; neutral demand
   tick.solarIrradianceWM2 = 0;
   applyPolicyDemand(game, tick);
   expect(tick.demandByType).toEqual(original.demandByType);
-  game.policies.programs.efficiency.adoption = 1;
-  tick.solarIrradianceWM2 = 100000;
-  applyPolicyDemand(game, tick);
-  expect(tick.demandByType.Residential).toBe(0);
-  expect(tick.demandByType.Commercial).toBe(0);
+  Object.assign(game.policies.programs.efficiency, {
+    adoption: 1,
+    installs: [[0, 1]],
+  });
+  // A 25 C cell at full sun produces exactly nameplate before the rooftop derate.
+  tick.solarIrradianceWM2 = 1000;
+  tick.temperatureC = -5;
+  const eligible =
+    original.demandByType.Residential + original.demandByType.Commercial;
+  applyPolicyDemand(game, tick, 0.5);
+  // Half the load is heating and cooling: 10% off the rest, 35% off that half.
+  expect(tick.efficiencySavedW).toBeCloseTo(eligible * 0.225);
+  const panels =
+    POLICIES.solar.cap * programCustomers(game) * POLICIES.solar.derate;
+  expect(tick.rooftopSolarW).toBeCloseTo(Math.min(panels, eligible * 0.775));
+  expect(
+    tick.demandByType.Residential + tick.demandByType.Commercial,
+  ).toBeCloseTo(eligible * 0.775 - tick.rooftopSolarW!);
   expect(tick.demandByType["Data centers"]).toBe(
     original.demandByType["Data centers"],
   );
@@ -214,7 +235,7 @@ test("preview is isolated, matches the real forecast and monthly costs reach cas
     preview.changed,
   );
   month(game);
-  expect(game.policies!.programs.efficiency.adoption).toBeCloseTo(1 / 24);
+  expect(game.policies!.programs.efficiency.adoption).toBeCloseTo(1 / BUILDOUT);
   const expected = game.policies!.programs.efficiency.spending;
   expect(
     summarizeTimeline(game.timeline, game.startingYear).expensesPolicy,
@@ -246,7 +267,7 @@ test("Off preserves installed upgrades through save/load and actions replay dete
   );
   month(game);
   const stock = game.policies!.programs.efficiency.adoption;
-  expect(stock).toBeCloseTo(1 / 24);
+  expect(stock).toBeCloseTo(1 / BUILDOUT);
   expect(game.policies!.programs.efficiency.spending).toBe(0);
   const restored = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),
@@ -322,17 +343,33 @@ test("a paused and resumed build-out completes through the reducer and its compl
   month(game);
   expect(program().tier).toBe("On");
   expect(buildoutMonthsDone("solar", program().adoption)).toBe(3);
-  // Two paused months push the finish from month 24 to month 26.
+  // Two paused months push the finish back by two months.
   expect(
     buildoutCompletionMonth(
       "solar",
       program().adoption,
       game.date.monthsElapsed + 1,
     ),
-  ).toBe(26);
-  while (game.date.monthsElapsed < 26) month(game);
+  ).toBe(BUILDOUT + 2);
+  while (game.date.monthsElapsed < BUILDOUT + 2) {
+    // Data Center Boom pauses for its connection decision; take the free option like the sim.
+    const decision = pendingScenarioChoice(game);
+    const difficulty = game.difficulty;
+    if (decision)
+      game = cloneDeep(
+        gameReducer(
+          game,
+          chooseScenarioResponse({
+            decisionId: decision.id,
+            optionId: decision.options.find((o) => o.cost(difficulty) === 0)!
+              .id,
+          }),
+        ),
+      );
+    month(game);
+  }
   expect(program().adoption).toBe(1);
-  expect(program().completedMonth).toBe(26);
+  expect(program().completedMonth).toBe(BUILDOUT + 2);
   const spent = program().spent;
   month(game);
   expect(program().spending).toBe(0);
@@ -356,4 +393,69 @@ test("a paused and resumed build-out completes through the reducer and its compl
     month: rescheduled.game.date.monthsElapsed + 1,
   };
   expect(parseSave(rescheduled)).toBeNull();
+});
+
+test("efficiency cohorts save fully for ten years, then fade to nothing at twenty", () => {
+  const program = {
+    ...emptyPolicies().programs.efficiency,
+    adoption: 1,
+    installs: [
+      [1, 0.5],
+      [13, 0.5],
+    ] as [number, number][],
+  };
+  expect(efficiencyInEffect(program, 121)).toBe(1);
+  // The first cohort is halfway through its fade; the second, a year younger, is 60% intact.
+  expect(efficiencyInEffect(program, 181)).toBeCloseTo(0.25 + 0.3);
+  expect(efficiencyInEffect(program, 241)).toBeCloseTo(0.5 * (12 / 120));
+  expect(efficiencyInEffect(program, 253)).toBe(0);
+});
+
+test("rooftop rebates follow the installed price of their year", () => {
+  expect(residentialSolarCostPerW(2000)).toBeCloseTo(14);
+  expect(residentialSolarCostPerW(2010)).toBeCloseTo(8.5);
+  expect(residentialSolarCostPerW(2023)).toBeCloseTo(4.2);
+  expect(residentialSolarCostPerW(2040)).toBeCloseTo(3.6);
+  const perWatt = (scenarioId: number) => {
+    const game = createGame({ scenarioId });
+    return (
+      policyTotalCost(game, "solar", 1) /
+      (programCustomers(game) * POLICIES.solar.cap)
+    );
+  };
+  // Start-year dollars: a quarter of the era's installed price per watt, plus a month of inflation.
+  expect(perWatt(105) / (0.25 * residentialSolarCostPerW(2004))).toBeCloseTo(
+    1,
+    1,
+  );
+  expect(perWatt(106)).toBeLessThan(perWatt(105) / 2);
+});
+
+test("efficiency saves more where heating and cooling drive demand", () => {
+  // A year of hourly forecast on the real demand path, with the whole pool installed.
+  const savedShare = (scenarioId: number) => {
+    const game = createGame({ scenarioId, seed: 4 });
+    game.policies = emptyPolicies(game.date.monthsElapsed);
+    Object.assign(game.policies.programs.efficiency, {
+      tier: "On",
+      adoption: 1,
+      installs: [[game.date.monthsElapsed, 1]],
+      completedMonth: game.date.monthsElapsed,
+    });
+    const now = game.timeline[0];
+    const year = generateNewTimeline(
+      game,
+      now.cash,
+      now.customers,
+      (TICKS_PER_YEAR * TICK_MINUTES) / 240,
+      240,
+    );
+    const total = (field: "efficiencySavedW" | "rebateEligibleW") =>
+      year.reduce((sum, tick) => sum + (tick[field] ?? 0), 0);
+    return total("efficiencySavedW") / total("rebateEligibleW");
+  };
+  const mild = savedShare(100); // San Francisco
+  const extreme = savedShare(107); // Austin
+  expect(mild).toBeGreaterThanOrEqual(POLICIES.efficiency.applianceSaving);
+  expect(extreme).toBeGreaterThan(mild);
 });

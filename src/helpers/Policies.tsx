@@ -2,6 +2,7 @@ import type {
   GameType,
   DeferredResidentialLoad,
   PoliciesType,
+  PolicyProgramType,
   PolicyChangeType,
   PolicyId,
   PolicyTier,
@@ -9,20 +10,29 @@ import type {
 } from "../Types";
 import {
   POLICIES,
+  residentialSolarCostPerW,
   POLICY_IDS,
   POLICY_TIERS,
   POLICY_SCENARIOS,
 } from "../data/Policies";
 import { getInflationIndex } from "../data/Economy";
-import { EQUATOR_RADIANCE, TICK_MINUTES } from "../Constants";
+import { TICK_MINUTES } from "../Constants";
+import { getSolarOutputFactor } from "./Energy";
+import { CUSTOMER_MARKET_MULTIPLIER } from "./Customers";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 
 export function emptyPolicies(month = 0): PoliciesType {
   return {
     month,
     programs: {
-      efficiency: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
-      solar: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
+      efficiency: {
+        tier: "Off",
+        adoption: 0,
+        spending: 0,
+        spent: 0,
+        installs: [],
+      },
+      solar: { tier: "Off", adoption: 0, spending: 0, spent: 0, installs: [] },
       timeOfUse: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
       curtailment: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
     },
@@ -45,6 +55,29 @@ export function validPolicyChange(value: unknown): value is PolicyChangeType {
     Number.isInteger(p.month) &&
     p.month > 0
   );
+}
+/** Build-out cohorts are installed in processed months and add up to the recorded progress. */
+function validInstalls(id: PolicyId, s: PolicyProgramType, month: number) {
+  if (isOperatingPolicy(id)) return s.installs === undefined;
+  if (!Array.isArray(s.installs)) return false;
+  let total = 0;
+  let last = 0;
+  for (const entry of s.installs) {
+    if (!Array.isArray(entry) || entry.length !== 2) return false;
+    const [installed, share] = entry;
+    if (
+      !Number.isInteger(installed) ||
+      installed <= last ||
+      installed > month ||
+      !Number.isFinite(share) ||
+      share <= 0 ||
+      share > 1
+    )
+      return false;
+    last = installed;
+    total += share;
+  }
+  return Math.abs(total - s.adoption) < 1e-6;
 }
 export function validPolicies(
   value: unknown,
@@ -70,6 +103,7 @@ export function validPolicies(
         s.spending >= 0 &&
         Number.isFinite(s.spent) &&
         s.spent >= s.spending &&
+        validInstalls(id, s, p.month) &&
         (s.completedMonth === undefined ||
           (!isOperatingPolicy(id) &&
             Number.isInteger(s.completedMonth) &&
@@ -102,24 +136,50 @@ export function policyBudget(
     buildoutMonths(id as BuildoutPolicyId)
   );
 }
-/** Whole build-out cost in the given month's dollars. */
+/** Programs are sized by the customers the utility served when the run opened, scaled like
+ * demand. The market also counts customers the utility could win, so it overstates the pool. */
+export const programCustomers = (game: GameType) =>
+  (game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) *
+  game.startingDemandScale;
+/** Whole build-out cost at the given month's technology prices, in that month's dollars. Like
+ * facility costs, the real price tables are start-year dollars carried forward by inflation. */
 export function policyTotalCost(
   game: GameType,
   id: BuildoutPolicyId,
   month: number,
 ): number {
+  const date = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
+  const perCustomer =
+    id === "solar"
+      ? POLICIES.solar.rebateShare *
+        residentialSolarCostPerW(date.year) *
+        POLICIES.solar.cap
+      : POLICIES.efficiency.costPerCustomer;
   return (
-    game.customerMarketSize *
-    game.startingDemandScale *
-    POLICIES[id].costPerCustomer *
-    getInflationIndex(
-      getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear),
-      game.startingYear,
-      game.seed,
-    )
+    programCustomers(game) *
+    perCustomer *
+    getInflationIndex(date, game.startingYear, game.seed)
   );
 }
-// Monthly increments are 1/24, which do not sum exactly to 1 in floating point.
+/** Share of an efficiency cohort's savings still working at the given age. */
+export function efficiencySurvival(ageMonths: number): number {
+  const { fullLifeMonths, endLifeMonths } = POLICIES.efficiency;
+  if (ageMonths <= fullLifeMonths) return 1;
+  if (ageMonths >= endLifeMonths) return 0;
+  return (endLifeMonths - ageMonths) / (endLifeMonths - fullLifeMonths);
+}
+/** Installed efficiency still saving energy in the given month, as a share of the full pool. */
+export function efficiencyInEffect(
+  program: PolicyProgramType,
+  month: number,
+): number {
+  if (!program.installs) return program.adoption;
+  let share = 0;
+  for (const [installed, amount] of program.installs)
+    share += amount * efficiencySurvival(month - installed);
+  return share;
+}
+// Monthly increments such as 1/48 do not sum exactly to 1 in floating point.
 const COMPLETE = 1 - 1e-9;
 export const buildoutComplete = (adoption: number) => adoption >= COMPLETE;
 /** Whole months of installation left, counting a partial final month as one. */
@@ -173,6 +233,7 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
           ? (policyBudget(game, id, s.tier, m) * increment) / rate
           : 0;
       s.spent += s.spending;
+      if (increment > 0) (s.installs ??= []).push([m, increment]);
       if (increment > 0 && buildoutComplete(s.adoption + increment)) {
         s.adoption = 1;
         s.completedMonth = m;
@@ -339,21 +400,39 @@ export function customerBillingRate(
       : 1)
   );
 }
-export function applyPolicyDemand(game: GameType, tick: TickPresentFutureType) {
+/** Efficiency first, then rooftop solar on what remains. `weatherShare` is the fraction of this
+ * tick's demand driven by heating and cooling, which envelope upgrades cut far more than the rest. */
+export function applyPolicyDemand(
+  game: GameType,
+  tick: TickPresentFutureType,
+  weatherShare = 0,
+) {
   const p = game.policies?.programs;
-  if (!p || (!p.efficiency.adoption && !p.solar.adoption)) return;
-  const reduction = 1 - p.efficiency.adoption * POLICIES.efficiency.cap;
+  if (!p) return;
+  const efficiency = efficiencyInEffect(
+    p.efficiency,
+    Math.floor(tick.minute / MINUTES_PER_MONTH),
+  );
+  if (!efficiency && !p.solar.adoption) return;
+  const { applianceSaving, weatherSaving } = POLICIES.efficiency;
+  const reduction =
+    1 -
+    efficiency *
+      (applianceSaving * (1 - weatherShare) + weatherSaving * weatherShare);
+  const eligible = tick.demandByType.Residential + tick.demandByType.Commercial;
   const residential = tick.demandByType.Residential * reduction;
   const commercial = tick.demandByType.Commercial * reduction;
   const load = residential + commercial;
   const solar =
-    (p.solar.adoption *
-      POLICIES.solar.cap *
-      game.customerMarketSize *
-      game.startingDemandScale *
-      Math.max(0, tick.solarIrradianceWM2)) /
-    EQUATOR_RADIANCE;
+    p.solar.adoption *
+    POLICIES.solar.cap *
+    programCustomers(game) *
+    getSolarOutputFactor(tick.solarIrradianceWM2, tick.temperatureC) *
+    POLICIES.solar.derate;
   const remaining = load > 0 ? Math.max(0, load - solar) / load : 0;
+  tick.rebateEligibleW = eligible;
+  tick.efficiencySavedW = eligible - load;
+  tick.rooftopSolarW = load * (1 - remaining);
   tick.demandByType = {
     ...tick.demandByType,
     Residential: residential * remaining,

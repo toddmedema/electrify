@@ -117,13 +117,21 @@ economy. `ScenarioChoiceBalance.test.tsx` waives the gate when checking physical
 Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
 `initialPrograms: { efficiency: "On", solar: "On" }` and schedules each through the real
 reducer for month two; `scheduledActions` can start a program later. The matrix compares Off,
-efficiency-only, solar-only, combined, and a late efficiency start through a full 24-month
-build-out in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant
-and zero spending after completion. Program costs are authored game assumptions (a total per
-initial market customer, spread evenly over the build-out), scaled by initial customer market
-and demand scale, then inflated from the starting year. Adoption is allocated once at the month
-boundary; its actual cost is spread across that month's ticks. Installed upgrades persist within
-the run.
+efficiency-only, solar-only, combined, and a late efficiency start through a full 48-month
+build-out in Data Center Boom, Deep Freeze, and Load Shedding, including every cash/energy
+invariant, no bankruptcy, and zero spending after completion; a mild San Francisco run checks that
+efficiency still saves something where little load is weather-driven. Paradise is excluded
+because its starting fleet goes bankrupt before a build-out can finish.
+
+Programs are sized by starting served customers (`programCustomers`, the market size over
+`CUSTOMER_MARKET_MULTIPLIER`) times demand scale. Efficiency costs a flat total per customer.
+Rooftop rebates pay a quarter of `residentialSolarCostPerW` for the installation year, so they are
+several times dearer in the early-2000s scenarios. Both use start-year dollars carried forward by
+inflation, like facility costs. Adoption is allocated once at the month boundary and recorded as a
+cohort in `installs`; its actual cost is spread across that month's ticks. Efficiency savings
+follow the heating and cooling share of demand and each cohort fades from year 10 to year 20;
+rooftop output uses `getSolarOutputFactor` with a rooftop derate. `Invariants.tsx` bounds both
+against the eligible home and business load and checks that finished build-outs never spend.
 These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
 
 `createGame` is exported for tests that want a realistic mid-game state without running a whole

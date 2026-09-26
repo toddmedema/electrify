@@ -48,6 +48,7 @@ import {
   policyAvailable,
   policyBudget,
   policyTotalCost,
+  programCustomers,
   isOperatingPolicy,
 } from "../../helpers/Policies";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -141,8 +142,8 @@ function choiceStatus(
 
 function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
   return id === "solar"
-    ? `Up to ${formatWatts(POLICIES.solar.cap * game.customerMarketSize * game.startingDemandScale)} of daytime rooftop generation`
-    : `Home and business use ${Math.round(POLICIES.efficiency.cap * 100)}% lower all day`;
+    ? `${formatWatts(POLICIES.solar.cap * programCustomers(game))} of rooftop panels`
+    : `Home and business use ${Math.round(POLICIES.efficiency.applianceSaving * 100)}% lower, heating and cooling ${Math.round(POLICIES.efficiency.weatherSaving * 100)}% lower`;
 }
 
 /** Project facts and progress for a finite rebate build-out. */

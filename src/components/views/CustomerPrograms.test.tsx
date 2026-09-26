@@ -145,7 +145,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   });
   const old = workers[workers.length - 1];
   fireEvent.click(
-    screen.getByRole("button", { name: "At completion (Jan 2022)" }),
+    screen.getByRole("button", { name: "At completion (Jan 2024)" }),
   );
   expect(old.terminate).toHaveBeenCalled();
   act(() => {
@@ -203,7 +203,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       .mockReturnValue(worker as unknown as Worker);
     const game = createGame({ scenarioId: 106 });
     const result = {
-      ...previewPolicy(game, { id, tier: "On", month: 1 }, 24),
+      ...previewPolicy(game, { id, tier: "On", month: 1 }, 48),
       current: [47000000, 40000000],
       changed: [47000000, 30000000],
     };
@@ -223,7 +223,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "At completion (Jan 2022)" }),
+      screen.getByRole("button", { name: "At completion (Jan 2024)" }),
     );
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
@@ -231,7 +231,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
     expect(screen.getByText(/^Change in utility cash/)).toBeVisible();
     expect(screen.getByText(/^Change in utility cash/)).toHaveTextContent(
-      `Jan 2022: ${formatMoneyConcise(result.cashChange)}`,
+      `Jan 2024: ${formatMoneyConcise(result.cashChange)}`,
     );
     const hint = screen.getByText(/^Little change in peak demand/);
     expect(hint).toBeVisible();
@@ -250,7 +250,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
 test("a paused build-out keeps its progress and offers to resume", () => {
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies();
-  game.policies.programs.efficiency.adoption = 8 / 24;
+  game.policies.programs.efficiency.adoption = 8 / 48;
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -263,19 +263,19 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", {
-      name: "Efficiency rebates · Paused · month 8 of 24",
+      name: "Efficiency rebates · Paused · month 8 of 48",
     }),
   );
   expect(
     screen.getByRole("progressbar", {
       name: "Efficiency rebates build-out progress",
     }),
-  ).toHaveAttribute("aria-valuenow", "33");
+  ).toHaveAttribute("aria-valuenow", "17");
   expect(
-    screen.getByText(/^Paused after month 8 of 24 · \$[\d.]+[KMB]? spent$/),
+    screen.getByText(/^Paused after month 8 of 48 · \$[\d.]+[KMB]? spent$/),
   ).toBeVisible();
-  expect(fact("Remaining")).toBe("16 months");
-  expect(fact("If resumed now")).toBe("May 2021");
+  expect(fact("Remaining")).toBe("40 months");
+  expect(fact("If resumed now")).toBe("May 2023");
   expect(fact("Finishes")).toBeUndefined();
   expect(
     screen.getByRole("button", { name: "Resume build-out next month" }),
@@ -292,7 +292,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   game.policies = emptyPolicies(game.date.monthsElapsed);
   Object.assign(game.policies.programs.solar, {
     tier: "On",
-    adoption: 8 / 24,
+    adoption: 8 / 48,
     spent: 1000000,
   });
   Object.assign(game.policies.programs.efficiency, {
@@ -313,7 +313,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   const entry = screen.getByRole("button", { name: "Customer programs" });
   // The finished project is neither active nor part of the monthly rebate total.
   expect(entry.title).toBe(
-    `Customer programs: 1 active · Rooftop solar build-out · month 8 of 24 · ${formatMoneyConcise(
+    `Customer programs: 1 active · Rooftop solar build-out · month 8 of 48 · ${formatMoneyConcise(
       policyBudget(game, "solar", "On", 0),
     )}/month in rebates`,
   );
@@ -326,20 +326,20 @@ test("in-progress and completed build-outs read as projects in the list and tool
   ).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", {
-      name: "Rooftop solar rebates · In progress · month 8 of 24",
+      name: "Rooftop solar rebates · In progress · month 8 of 48",
     }),
   );
-  expect(screen.getByText("Month 8 of 24 · $1M spent")).toBeVisible();
+  expect(screen.getByText("Month 8 of 48 · $1M spent")).toBeVisible();
   expect(
     screen.getByRole("progressbar", {
       name: "Rooftop solar rebates build-out progress",
     }),
-  ).toHaveAttribute("aria-valuetext", "Month 8 of 24 · $1M spent");
-  expect(fact("Remaining")).toBe("16 months");
-  expect(fact("Finishes")).toBe("May 2021");
+  ).toHaveAttribute("aria-valuetext", "Month 8 of 48 · $1M spent");
+  expect(fact("Remaining")).toBe("40 months");
+  expect(fact("Finishes")).toBe("May 2023");
   // The preview of a pause compares against the finish the project had planned.
   expect(
-    screen.getByRole("button", { name: "At planned completion (May 2021)" }),
+    screen.getByRole("button", { name: "At planned completion (May 2023)" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Pause new installations next month" }),
@@ -404,7 +404,7 @@ test("estimates on the page when the preview worker cannot load its data", () =>
 
 test.each([
   ["Off", "Pauses Feb 2020", "Cancel scheduled pause", undefined],
-  ["On", "Resumes Feb 2020", "Cancel scheduled resume", "May 2021"],
+  ["On", "Resumes Feb 2020", "Cancel scheduled resume", "May 2023"],
 ] as const)(
   "a scheduled %s shows its status and can be cancelled without an estimate",
   (pending, status, action, finish) => {
@@ -414,7 +414,7 @@ test.each([
     game.policies = emptyPolicies(game.date.monthsElapsed);
     Object.assign(game.policies.programs.solar, {
       tier: pending === "Off" ? "On" : "Off",
-      adoption: 8 / 24,
+      adoption: 8 / 48,
       spent: 1000000,
       pending: { tier: pending, month: game.date.monthsElapsed + 1 },
     });
@@ -430,7 +430,7 @@ test.each([
     fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
     // The list names the scheduled change in the program's status line.
     const entry = screen.getByRole("button", {
-      name: `Rooftop solar rebates · ${pending === "Off" ? "In progress" : "Paused"} · month 8 of 24 · ${status[0].toLowerCase()}${status.slice(1)}`,
+      name: `Rooftop solar rebates · ${pending === "Off" ? "In progress" : "Paused"} · month 8 of 48 · ${status[0].toLowerCase()}${status.slice(1)}`,
     });
     fireEvent.click(entry);
     expect(screen.getByText(status)).toBeVisible();

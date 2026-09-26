@@ -118,10 +118,14 @@ test("season/month windows repeat; no enrolled load means no effect; rebates com
     expect(tick.demandByType.Residential).toBe(90);
   }
   const tick = demand(18 * 60);
-  game.policies!.programs.efficiency.adoption = 1;
+  Object.assign(game.policies!.programs.efficiency, {
+    adoption: 1,
+    installs: [[0, 1]],
+  });
   applyPolicyDemand(game, tick);
   applyPeakDemand(game, tick);
-  expect(tick.demandByType.Residential).toBe(72);
+  // Appliance savings alone at no weather load, then the tariff's 10% shift.
+  expect(tick.demandByType.Residential).toBeCloseTo(81);
   tick.demandByType = {
     Residential: 0,
     Commercial: 0,
