@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {
   AppStateType,
   isGatedStep,
@@ -258,6 +260,25 @@ describe("authored starting fleets", () => {
         });
       });
     });
+  });
+
+  it("only labels starting facilities whose fleet icon still resolves", () => {
+    // The fleet draws each plant's icon from its name, and a label replaces that name. Only
+    // Uranium falls back to the Nuclear artwork, so any other label needs an image of its own.
+    const images = path.resolve(__dirname, "../../public/images");
+    const missing = SCENARIOS.flatMap((scenario) =>
+      [
+        ...scenario.facilities,
+        ...(scenario.tutorialSteps || []).flatMap(
+          (step) => step.capstone?.checkpoint?.facilities || [],
+        ),
+      ]
+        .filter(({ fuel, label }) => label && fuel !== "Uranium")
+        .map(({ label }) => `${label!.toLowerCase()}.svg`)
+        .filter((icon) => !fs.existsSync(path.join(images, icon)))
+        .map((icon) => `${scenario.name}: ${icon}`),
+    );
+    expect(missing).toEqual([]);
   });
 
   it("keeps researched municipal and Austin-scale portfolio anchors exact", () => {
