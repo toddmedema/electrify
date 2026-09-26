@@ -7,8 +7,8 @@ const rate = (dollarsPerkWh: number): ScheduledSimActionType => ({
 });
 
 const programs = (month: number): ScheduledSimActionType[] => [
-  { month, type: "policy", id: "efficiency", tier: "Small" },
-  { month, type: "policy", id: "solar", tier: "Small" },
+  { month, type: "policy", id: "efficiency", tier: "On" },
+  { month, type: "policy", id: "solar", tier: "On" },
 ];
 
 const dispatch = (

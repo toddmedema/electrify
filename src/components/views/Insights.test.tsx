@@ -73,7 +73,7 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
   const before = internals.getProjection(game.timeline[0]);
   const change = {
     id: "efficiency" as const,
-    tier: "Large" as const,
+    tier: "On" as const,
     month: 1,
   };
   const project = (nextGame: GameType) => {
@@ -92,22 +92,20 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
   };
   const scheduledGame = gameReducer(game, schedulePolicy(change));
   const scheduled = project(scheduledGame);
+  // Build-outs are on or off, so replacing a scheduled start means scheduling Off instead.
   const replacedGame = gameReducer(
     scheduledGame,
-    schedulePolicy({ ...change, tier: "Small" }),
+    schedulePolicy({ ...change, tier: "Off" }),
   );
   const replaced = project(replacedGame);
-  const cancelled = project(
-    gameReducer(replacedGame, cancelPolicy({ ...change, tier: "Small" })),
-  );
+  const rescheduledGame = gameReducer(replacedGame, schedulePolicy(change));
+  project(rescheduledGame);
+  const cancelled = project(gameReducer(rescheduledGame, cancelPolicy(change)));
   const future = (projection: typeof before) =>
     projection.timeline.find((tick) => tick.minute >= 3 * MINUTES_PER_MONTH)!;
-  expect(future(scheduled).demandW).toBeLessThan(future(replaced).demandW);
-  expect(future(replaced).demandW).toBeLessThan(future(before).demandW);
-  expect(future(scheduled).expensesPolicy).toBeGreaterThan(
-    future(replaced).expensesPolicy!,
-  );
-  expect(future(replaced).expensesPolicy).toBeGreaterThan(0);
+  expect(future(scheduled).demandW).toBeLessThan(future(before).demandW);
+  expect(future(scheduled).expensesPolicy).toBeGreaterThan(0);
+  expect(replaced.timeline).toEqual(before.timeline);
   expect(cancelled.timeline).toEqual(before.timeline);
   expect(
     insights.shouldComponentUpdate(

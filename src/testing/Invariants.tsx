@@ -20,6 +20,9 @@ import {
   isWeatherHazardEligible,
 } from "../helpers/Hazards";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { POLICIES } from "../data/Policies";
+import { getSolarOutputFactor } from "../helpers/Energy";
+import { programCustomers } from "../helpers/Policies";
 import {
   allocateIntertieFlows,
   neighborImportSupplyW,
@@ -173,6 +176,79 @@ function isFinite_(v: unknown): v is number {
 }
 
 /**
+ * Rebate programs can only remove load they physically could: efficiency never saves more than its
+ * largest per-use saving, rooftop output never exceeds what the installed panels produce in this
+ * tick's sun and heat, and a finished build-out never spends again.
+ */
+function checkRebatePrograms(
+  collector: InvariantCollector,
+  state: GameType,
+  now: TickPresentFutureType,
+  when: string,
+) {
+  const programs = state.policies?.programs;
+  if (!programs) return;
+  (["efficiency", "solar"] as const).forEach((id) => {
+    const program = programs[id];
+    const installed = (program.installs ?? []).reduce(
+      (sum, [, share]) => sum + share,
+      0,
+    );
+    if (Math.abs(installed - program.adoption) > RELATIVE_TOLERANCE) {
+      collector.add(
+        "rebate installs add up to build-out progress",
+        when,
+        `${id}: installs ${installed} vs adoption ${program.adoption}`,
+      );
+    }
+    if (
+      program.completedMonth !== undefined &&
+      program.completedMonth < state.policies!.month &&
+      program.spending !== 0
+    ) {
+      collector.add(
+        "finished build-outs spend nothing",
+        when,
+        `${id} completed month ${program.completedMonth}, spending ${program.spending}`,
+      );
+    }
+  });
+  if (now.rebateEligibleW === undefined) return;
+  const eligible = now.rebateEligibleW;
+  const saved = now.efficiencySavedW ?? 0;
+  const rooftop = now.rooftopSolarW ?? 0;
+  const maxSaving = Math.max(
+    POLICIES.efficiency.applianceSaving,
+    POLICIES.efficiency.weatherSaving,
+  );
+  const tolerance = eligible * RELATIVE_TOLERANCE + 1e-6;
+  if (saved < -tolerance || saved > eligible * maxSaving + tolerance) {
+    collector.add(
+      "efficiency saves at most its largest per-use saving",
+      when,
+      `saved ${saved} of ${eligible} eligible`,
+    );
+  }
+  const panels =
+    programs.solar.adoption *
+    POLICIES.solar.cap *
+    programCustomers(state) *
+    POLICIES.solar.derate *
+    getSolarOutputFactor(now.solarIrradianceWM2, now.temperatureC);
+  if (
+    rooftop < -tolerance ||
+    rooftop > panels + tolerance ||
+    rooftop > eligible - saved + tolerance
+  ) {
+    collector.add(
+      "rooftop solar is bounded by panels and remaining load",
+      when,
+      `rooftop ${rooftop}, panels ${panels}, load after efficiency ${eligible - saved}`,
+    );
+  }
+}
+
+/**
  * Checks everything that must hold on a single simulated tick.
  * `prev` is the previous tick, or null across a month boundary / at the start of a run, where
  * continuity checks don't apply because the timeline is regenerated and pre-rolled.
@@ -215,6 +291,7 @@ export function checkTick(
       }
     });
   }
+  checkRebatePrograms(collector, state, now, when);
 
   // Cancelling a retrofit refunds its price as negative O&M in the tick it happens, and nothing
   // else may take a tick's expenses below zero.

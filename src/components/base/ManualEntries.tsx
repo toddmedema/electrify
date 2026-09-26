@@ -178,20 +178,27 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates funding adoption demand time-of-use tariff curtailment contracts peak enrollment",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
       <div>
+        <p>Customer programs are set in Insights. Changes start next month.</p>
         <p>
-          Customer programs are set in Insights. Changes start next month and
-          stay until changed.
+          <strong>Efficiency and rooftop solar rebates:</strong> Each is a
+          one-time build-out project. Once started, it installs upgrades over 48
+          months at a steady monthly cost, then finishes and costs nothing more.
+          You can pause new installations and resume later; the project picks up
+          where it left off. Both reduce electricity sales.
         </p>
         <p>
-          <strong>Efficiency and rooftop solar rebates:</strong> Choose Off,
-          Small or Large. You pay for new upgrades up to a monthly budget;
-          spending stops at full adoption. Off stops new upgrades, but installed
-          ones stay. Efficiency cuts home and business use. Rooftop solar cuts
-          their daylight demand; surplus is discarded without payment. Both
-          reduce electricity sales.
+          Efficiency cuts home and business use by 10%, and heating and cooling
+          by 35%, so it saves most in hot or cold places. Upgrades wear out:
+          savings start fading after 10 years and are gone after 20.
+        </p>
+        <p>
+          Rooftop panels produce more in sunny, cooler places and lose output on
+          hot days. Their price follows the year: rebates cost several times
+          more in the early 2000s than today. Rooftop solar cuts home and
+          business daylight demand; surplus is discarded without payment.
         </p>
         <p>
           <strong>Time-of-use tariff:</strong> Half of homes move 20% of their

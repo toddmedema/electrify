@@ -5,6 +5,7 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { hasFuelPrices } from "./FuelPrices";
 import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
+import { costBetween } from "../helpers/Math";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -85,21 +86,6 @@ export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
   Geothermal: 0.15,
   "Enhanced Geothermal": 0.15,
 };
-
-/** Exponential interpolation between two real-cost observations, held flat outside them. */
-function costBetween(
-  year: number,
-  fromYear: number,
-  fromCost: number,
-  toYear: number,
-  toCost: number,
-): number {
-  const boundedYear = Math.max(fromYear, Math.min(toYear, year));
-  return (
-    fromCost *
-    Math.pow(toCost / fromCost, (boundedYear - fromYear) / (toYear - fromYear))
-  );
-}
 
 /**
  * Preserve the game's useful economies of scale while making the cited reference plant land on

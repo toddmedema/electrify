@@ -20,7 +20,7 @@ const decisions: MeaningfulDecisionType[] = [
     month: 1,
     kind: "policy",
     before: "Off",
-    after: "Small",
+    after: "On",
   },
   {
     key: "dispatch:1",
