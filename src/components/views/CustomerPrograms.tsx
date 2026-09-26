@@ -91,7 +91,7 @@ function programStatus(
   if (program.tier === "On")
     return `In progress · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
   if (program.adoption > 0)
-    return `Paused · ${Math.round(program.adoption * 100)}% installed`;
+    return `Paused · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
   return "Not started";
 }
 
@@ -108,6 +108,18 @@ function pendingLabel(
       : `On starts ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
   if (pending.tier === "Off") return `Pauses ${when}`;
   return program.adoption > 0 ? `Resumes ${when}` : `Starts ${when}`;
+}
+
+/** The list's status line: the current state, then any change scheduled for next month. */
+function choiceStatus(
+  game: GameType,
+  id: PolicyId,
+  program: PolicyProgramType,
+): string {
+  const status = programStatus(game, id, program);
+  if (!program.pending) return status;
+  const pending = pendingLabel(game, id, program);
+  return `${status} · ${pending[0].toLowerCase()}${pending.slice(1)}`;
 }
 
 function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
@@ -175,7 +187,7 @@ function BuildoutSummary({
     ]);
   const progress = complete
     ? `Completed ${program.completedMonth === undefined ? "" : `${labelMonth(game, program.completedMonth)} `}· no further cost`
-    : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent of about ${formatMoneyConcise(total)}`;
+    : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent`;
   return (
     <Box className="customerProgramProject" sx={{ display: "grid", gap: 1.5 }}>
       {program.pending && (
@@ -392,7 +404,7 @@ function Decision({
     setLater(false);
   };
   const choice = (id: PolicyId) => {
-    const status = programStatus(game, id, programs[id]);
+    const status = choiceStatus(game, id, programs[id]);
     return (
       <Box
         key={id}
@@ -409,7 +421,11 @@ function Decision({
         >
           <span>
             <strong>{POLICIES[id].name}</strong>
-            <Typography component="span" variant="body2">
+            <Typography
+              className="customerProgramStatus"
+              component="span"
+              variant="body2"
+            >
               {status}
             </Typography>
             <Typography
@@ -425,11 +441,6 @@ function Decision({
           </span>
           <span aria-hidden>›</span>
         </Button>
-        {programs[id].pending && (
-          <Typography variant="body2">
-            {pendingLabel(game, id, programs[id])}
-          </Typography>
-        )}
       </Box>
     );
   };
@@ -493,7 +504,9 @@ function Decision({
             <Typography>
               {operating
                 ? POLICIES[selected].description
-                : POLICIES[selected].mechanism}
+                : complete
+                  ? "This one-time project is finished. Installed upgrades keep working with no further cost."
+                  : POLICIES[selected].mechanism}
             </Typography>
             {buildout ? (
               <BuildoutSummary

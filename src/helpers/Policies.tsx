@@ -78,7 +78,9 @@ export function validPolicies(
             s.adoption === 1)) &&
         (!s.pending ||
           (validPolicyChange({ id, ...s.pending }) &&
-            s.pending.month === currentMonth + 1))
+            s.pending.month === currentMonth + 1 &&
+            // A finished build-out has nothing left to start or pause.
+            (isOperatingPolicy(id) || !buildoutComplete(s.adoption))))
       );
     })
   );

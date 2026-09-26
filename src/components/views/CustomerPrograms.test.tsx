@@ -92,7 +92,9 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
     store.getState().game.policies!.programs.timeOfUse.pending!.startHour,
   ).toBe(22);
   fireEvent.click(
-    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+    screen.getByRole("button", {
+      name: /^Time-of-use tariff · Off · on starts /,
+    }),
   );
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(
@@ -261,7 +263,7 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", {
-      name: "Efficiency rebates · Paused · 33% installed",
+      name: "Efficiency rebates · Paused · month 8 of 24",
     }),
   );
   expect(
@@ -269,7 +271,12 @@ test("a paused build-out keeps its progress and offers to resume", () => {
       name: "Efficiency rebates build-out progress",
     }),
   ).toHaveAttribute("aria-valuenow", "33");
-  expect(screen.getByText(/^Paused after month 8 of 24/)).toBeVisible();
+  expect(
+    screen.getByText(/^Paused after month 8 of 24 · \$[\d.]+[KMB]? spent$/),
+  ).toBeVisible();
+  expect(fact("Remaining")).toBe("16 months");
+  expect(fact("If resumed now")).toBe("May 2021");
+  expect(fact("Finishes")).toBeUndefined();
   expect(
     screen.getByRole("button", { name: "Resume build-out next month" }),
   ).toBeDisabled();
@@ -322,17 +329,12 @@ test("in-progress and completed build-outs read as projects in the list and tool
       name: "Rooftop solar rebates · In progress · month 8 of 24",
     }),
   );
-  expect(
-    screen.getByText(/^Month 8 of 24 · \$1M spent of about/),
-  ).toBeVisible();
+  expect(screen.getByText("Month 8 of 24 · $1M spent")).toBeVisible();
   expect(
     screen.getByRole("progressbar", {
       name: "Rooftop solar rebates build-out progress",
     }),
-  ).toHaveAttribute(
-    "aria-valuetext",
-    expect.stringMatching(/^Month 8 of 24 · \$1M spent of about/),
-  );
+  ).toHaveAttribute("aria-valuetext", "Month 8 of 24 · $1M spent");
   expect(fact("Remaining")).toBe("16 months");
   expect(fact("Finishes")).toBe("May 2021");
   // The preview of a pause compares against the finish the project had planned.
@@ -352,6 +354,10 @@ test("in-progress and completed build-outs read as projects in the list and tool
     screen.getByText("Completed Jan 2022 · no further cost"),
   ).toBeVisible();
   expect(screen.getByText("Result")).toBeVisible();
+  expect(screen.getByText(/one-time project is finished/)).toBeVisible();
+  expect(
+    screen.queryByText(POLICIES.efficiency.mechanism),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText(/next month$/)).not.toBeInTheDocument();
   expect(
     screen.queryByText(/Estimated utility demand/),
@@ -424,9 +430,11 @@ test.each([
       </Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Rooftop solar rebates · / }),
-    );
+    // The list names the scheduled change in the program's status line.
+    const entry = screen.getByRole("button", {
+      name: `Rooftop solar rebates · ${pending === "Off" ? "In progress" : "Paused"} · month 8 of 24 · ${status[0].toLowerCase()}${status.slice(1)}`,
+    });
+    fireEvent.click(entry);
     expect(screen.getByText(status)).toBeVisible();
     expect(
       screen.queryByText(/Estimated utility demand/),

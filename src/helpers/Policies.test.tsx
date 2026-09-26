@@ -349,4 +349,11 @@ test("a paused and resumed build-out completes through the reducer and its compl
   const early = saved();
   early.game.policies!.programs.solar.completedMonth = 0;
   expect(parseSave(early)).toBeNull();
+  // A finished build-out cannot carry a scheduled change.
+  const rescheduled = saved();
+  rescheduled.game.policies!.programs.solar.pending = {
+    tier: "Off",
+    month: rescheduled.game.date.monthsElapsed + 1,
+  };
+  expect(parseSave(rescheduled)).toBeNull();
 });

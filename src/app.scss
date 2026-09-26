@@ -5502,6 +5502,9 @@ $sizemap: (
 /* Finished projects need no decision, so they recede behind the programs still in play. */
 .customerProgramChoice[data-completed] .customerProgramChoiceButton strong {
   font-weight: 500;
+}
+.customerProgramChoice[data-completed] .customerProgramChoiceButton strong,
+.customerProgramChoice[data-completed] .customerProgramStatus {
   color: var(--font-color-faded);
 }
 .customerProgramChoiceButton > span:last-child {

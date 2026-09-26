@@ -23,7 +23,10 @@ for (const theme of ["light", "dark"]) {
     await entry.click();
     const dialog = page.getByRole("dialog");
     const solar = dialog.getByRole("button", {
-      name: "Rooftop solar rebates · Not started",
+      name: /^Rooftop solar rebates · Not started/,
+    });
+    const scheduled = dialog.getByRole("button", {
+      name: "Rooftop solar rebates · Not started · starts Feb 2020",
     });
     await solar.click();
     await expect(dialog).toContainText(
@@ -59,18 +62,19 @@ for (const theme of ["light", "dark"]) {
     await dialog.getByRole("button", { name: "First effective month" }).click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();
-    await expect(dialog).toContainText("Starts Feb 2020");
+    await expect(scheduled).toBeVisible();
     await solar.click();
     await expect(
       dialog.getByRole("button", { name: "Cancel scheduled start" }),
     ).toBeEnabled({ timeout: 30000 });
     await dialog.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(dialog).toContainText("Starts Feb 2020");
+    await expect(scheduled).toBeVisible();
     await solar.click();
     await dialog
       .getByRole("button", { name: "Cancel scheduled start" })
       .click();
-    await expect(dialog).not.toContainText("Starts Feb 2020");
+    await expect(dialog).not.toContainText("starts Feb 2020");
+    await expect(scheduled).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(entry).toBeFocused();
