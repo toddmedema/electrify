@@ -9,7 +9,7 @@ import {
   FacilityOperatingType,
   GameType,
   MonthlyHistoryType,
-  StorageOperatingType,
+  isStorage,
   TickPresentFutureType,
 } from "../Types";
 import { effectiveMarket } from "../data/IntertieAccess";
@@ -498,24 +498,21 @@ export function checkTick(
       );
     }
 
-    if (f.peakWh) {
-      // peakWh is only on storage; the union is indexable, so this is the narrowing the
-      // check above has already established
-      const storage = f as StorageOperatingType;
-      if (!isFinite_(storage.currentWh)) {
+    if (isStorage(f)) {
+      if (!isFinite_(f.currentWh)) {
         collector.add(
           "storage charge is finite",
           when,
-          `${label} currentWh = ${storage.currentWh}`,
+          `${label} currentWh = ${f.currentWh}`,
         );
       } else if (
-        storage.currentWh < 0 ||
-        storage.currentWh > f.peakWh * (1 + RELATIVE_TOLERANCE)
+        f.currentWh < 0 ||
+        f.currentWh > f.peakWh * (1 + RELATIVE_TOLERANCE)
       ) {
         collector.add(
           "storage charge stays within 0..peakWh",
           when,
-          `${label} currentWh = ${Math.round(storage.currentWh)} vs peakWh ${Math.round(f.peakWh)}`,
+          `${label} currentWh = ${Math.round(f.currentWh)} vs peakWh ${Math.round(f.peakWh)}`,
         );
       }
     }

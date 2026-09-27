@@ -41,10 +41,7 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { TICK_MINUTES } from "../../Constants";
 import {
   DerivedHistoryKeysType,
-  FacilityOperatingType,
-  FuelNameType,
   GameType,
-  GeneratorOperatingType,
   MonthlyHistoryType,
   TickPresentFutureType,
   UnitSystemType,
@@ -1528,8 +1525,7 @@ export default class Insights extends React.Component<Props, State> {
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
-    const lifetime =
-      selected && facilityLifetime(selected as FacilityOperatingType);
+    const lifetime = selected && facilityLifetime(selected);
     return (
       <>
         {selected && lifetime && (
@@ -1734,12 +1730,12 @@ export default class Insights extends React.Component<Props, State> {
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
-      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      getDispatchOrderedFuels(game.facilities),
       projection.sampled,
     );
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
-    ) as Partial<GeneratorOperatingType> | undefined;
+    );
     const highlightFuel =
       selected?.fuel && fuels.includes(selected.fuel)
         ? selected.fuel

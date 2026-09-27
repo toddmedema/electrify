@@ -528,22 +528,40 @@ export interface FuelType {
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }
 
-export type FacilityOperatingType =
-  GeneratorOperatingType | StorageOperatingType;
+/**
+ * `A` with every field that only `B` declares typed as absent. A union of two such types can be
+ * narrowed on any one-sided field (`if (facility.peakWh)`), and reading a one-sided field before
+ * narrowing yields `T | undefined` instead of a compile error.
+ */
+type Exclusive<A, B> = A & { [K in Exclude<keyof B, keyof A>]?: undefined };
 
-export interface GeneratorOperatingType
-  extends
-    GeneratorShoppingType,
-    LoanInfo,
-    LifetimeTotals,
-    ConstructionEmissions {
+/** Storage is the member with `peakWh`; narrow with `isStorage` or on that field directly. */
+export type FacilityOperatingType =
+  | Exclusive<GeneratorOperatingType, StorageOperatingType>
+  | Exclusive<StorageOperatingType, GeneratorOperatingType>;
+
+/** Narrows a shopping or operating facility union to its storage member. */
+export function isStorage<T extends { peakWh?: number }>(
+  facility: T,
+): facility is Extract<T, { peakWh: number }> {
+  return facility.peakWh !== undefined;
+}
+
+interface SharedOperatingType
+  extends LoanInfo, LifetimeTotals, ConstructionEmissions {
   id: number; // Monotonically increasing
+  // Signed for storage: negative while charging
   currentW: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
   // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
-  paused: boolean;
+  // Absent until the player first toggles it
+  paused?: boolean;
+}
+
+export interface GeneratorOperatingType
+  extends GeneratorShoppingType, SharedOperatingType {
   // A retrofit being installed, which holds the plant offline until it completes.
   upgradeInProgress?: FacilityUpgradeInProgressType;
   // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
@@ -561,12 +579,8 @@ export interface GeneratorOperatingType
 }
 
 export interface StorageOperatingType
-  extends StorageShoppingType, LoanInfo, LifetimeTotals, ConstructionEmissions {
-  id: number; // Monotonically increasing
+  extends StorageShoppingType, SharedOperatingType {
   currentWh: number;
-  yearsToBuildLeft: number;
-  minuteCreated: number; // That the user clicked buy, not construction complete
-  minuteOperational?: number;
 }
 
 /**
@@ -616,13 +630,17 @@ interface LoanInfo {
   interestRate: number;
 }
 
-export type FacilityShoppingType = StorageShoppingType | GeneratorShoppingType;
+/** Storage is the member with `peakWh`; narrow with `isStorage` or on that field directly. */
+export type FacilityShoppingType =
+  | Exclusive<GeneratorShoppingType, StorageShoppingType>
+  | Exclusive<StorageShoppingType, GeneratorShoppingType>;
 
 export interface StorageShoppingType extends SharedShoppingType {
   peakWh: number;
   maxPeakWh: number; // Maximum size the technology is currently buildable
   roundTripEfficiency: number; // 0 - 1, percentage (even though it's round trip, applied when inserting so capacity looks correct-to-user)
   hourlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
+  constructionKgco2ePerWh?: number; // See constructionKgco2ePerW
 }
 
 export interface GeneratorShoppingType extends SharedShoppingType {
@@ -632,7 +650,6 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Fraction of nameplate output permanently lost each operating year. Optional because most
   // generator types do not have a well-supported secular output decline.
   annualOutputDegradation?: number;
-  spinMinutes: number; // 1 for renewables, avoiding repeated fallback coercion in the tick loop
   btuPerWh: number; // Heat Rate, but per W for less math per frame
   // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
   // it transiently; an online unit otherwise produces at least this much.
@@ -656,15 +673,20 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // The part of buildCost that pays for the resilience option, kept on the quote so the build
   // dialog can add and remove the option exactly. Dropped once the quote becomes a facility.
   resilienceExtraBuildCost?: number;
+  // Levelized cost per Wh at quote time. Infinity when fuel prices have not loaded yet.
+  lcWh: number;
+  /**
+   * Embodied emissions from building the thing: materials, manufacturing, transport and
+   * installation, excluding everything the plant does once it runs. Generators carry a per-watt
+   * figure and storage a per-watt-hour one; neither carries both, because each storage
+   * technology has a fixed duration, which would make a second coefficient unidentifiable.
+   * Resolved against the catalogue's year at purchase, so a quote locks its vintage.
+   */
+  constructionKgco2ePerW?: number;
 }
 
 interface SharedShoppingType {
   hydroSiteId?: string;
-  // Facility reducers and presentation components read technology-specific fields through the
-  // generator/storage union. Keep that established structural API localized here; code that
-  // dynamically selects known fields should use a keyed union instead.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [index: string]: any;
   name: string;
   description: string;
   available: boolean;
@@ -679,15 +701,7 @@ interface SharedShoppingType {
   viableLocationsRemaining?: number;
   lifespanYears: number;
   yearsToBuild: number;
-  /**
-   * Embodied emissions from building the thing: materials, manufacturing, transport and
-   * installation, excluding everything the plant does once it runs. Generators carry a per-watt
-   * figure and storage a per-watt-hour one; neither carries both, because each storage
-   * technology has a fixed duration, which would make a second coefficient unidentifiable.
-   * Resolved against the catalogue's year at purchase, so a quote locks its vintage.
-   */
-  constructionKgco2ePerW?: number;
-  constructionKgco2ePerWh?: number;
+  spinMinutes: number; // 1 for renewables, avoiding repeated fallback coercion in the tick loop
 }
 
 export interface TutorialStepType {
@@ -1193,7 +1207,7 @@ export interface GameType {
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;
   commissionedHydroSiteIds: string[];
-  facilities: Array<StorageOperatingType | GeneratorOperatingType>;
+  facilities: FacilityOperatingType[];
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
   // scenarios and their normalized saves carry an explicit empty state.
   transmission?: TransmissionStateType;

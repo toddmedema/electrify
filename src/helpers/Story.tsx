@@ -1,19 +1,13 @@
 import {
   FacilityOperatingType,
-  FuelNameType,
   MonthlyHistoryType,
   StoryPeriodSnapshotType,
   StorySnapshotType,
+  isStorage,
 } from "../Types";
+import { WEATHER_DEPENDENT_FUELS } from "../Constants";
 import { summarizeHistory } from "./DateTime";
 import { facilityAgeYears } from "./Financials";
-
-const VARIABLE_FUELS = new Set<FuelNameType>([
-  "Sun",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-]);
 
 export function buildStoryPeriodSnapshot(
   monthlyHistory: MonthlyHistoryType[],
@@ -64,10 +58,10 @@ export function buildStorySnapshot(
     if (!fleet[index].operational) {
       return;
     }
-    if (facility.peakWh) {
+    if (isStorage(facility)) {
       storagePeakW += facility.peakW;
       storagePeakWh += facility.peakWh;
-    } else if (!VARIABLE_FUELS.has(facility.fuel)) {
+    } else if (!WEATHER_DEPENDENT_FUELS.includes(facility.fuel)) {
       firmPeakW += facility.peakW;
     }
   });

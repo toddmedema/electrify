@@ -6,6 +6,7 @@ import {
   LocationType,
   MonthlyHistoryType,
   TransmissionLineOperatingType,
+  isStorage,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
@@ -321,7 +322,7 @@ export function facilityOutputFactor(
 export function facilityEquivalentCycles(
   g: FacilityOperatingType,
 ): number | undefined {
-  return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
+  return isStorage(g) ? g.lifetimeWh / g.peakWh : undefined;
 }
 
 /** Nameplate-equivalent hours generated, using the already calendar-scaled lifetime energy. */

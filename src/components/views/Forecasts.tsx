@@ -11,12 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { TICKS_PER_YEAR } from "../../Constants";
-import {
-  FuelNameType,
-  GameType,
-  GeneratorOperatingType,
-  TickPresentFutureType,
-} from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
 import {
   formatHour,
   getDateFromMinute,
@@ -168,15 +163,13 @@ export default class Forecasts extends React.Component<Props, State> {
     // Derived here rather than inside the chart, since the legend beside the chart's title has
     // to name exactly the bands the chart draws
     const fuels = forecastFuels(
-      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      getDispatchOrderedFuels(game.facilities),
       sampledForecastedTimeline,
     );
 
     // Storage has no band of its own in this chart, so selecting a battery highlights
     // nothing rather than emptying the stack
-    const selected = game.facilities.find(
-      (f) => f.id === selectedFacilityId,
-    ) as Partial<GeneratorOperatingType> | undefined;
+    const selected = game.facilities.find((f) => f.id === selectedFacilityId);
     const highlightFuel =
       selected && selected.fuel && fuels.indexOf(selected.fuel) > -1
         ? selected.fuel

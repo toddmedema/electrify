@@ -8,7 +8,7 @@ import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
 import {
   FacilityOperatingType,
-  GeneratorOperatingType,
+  isStorage,
   StorageOperatingType,
 } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
@@ -20,7 +20,10 @@ function fixture() {
     t.demandW = 100;
   });
   const base = game.facilities[0];
-  const generator = (id: number, peakW = 300): GeneratorOperatingType =>
+  const generator = (
+    id: number,
+    peakW = 300,
+  ): Exclude<FacilityOperatingType, StorageOperatingType> =>
     ({
       ...base,
       id,
@@ -33,11 +36,11 @@ function fixture() {
       paused: false,
       minimumStableOutput: 0,
       tracksStarts: false,
-    }) as GeneratorOperatingType;
+    }) as Exclude<FacilityOperatingType, StorageOperatingType>;
   const battery = (
     id: number,
     overrides: Partial<StorageOperatingType> = {},
-  ): StorageOperatingType =>
+  ): FacilityOperatingType =>
     ({
       ...base,
       id,
@@ -53,7 +56,7 @@ function fixture() {
       spinMinutes: 1,
       paused: false,
       ...overrides,
-    }) as StorageOperatingType;
+    }) as FacilityOperatingType;
   const run = (facilities: FacilityOperatingType[]) => {
     game.facilities = facilities;
     tickState(game);
@@ -208,7 +211,10 @@ describe("storage dispatch energy accounting", () => {
       expect(credited).toBeCloseTo(now.revenue * revenueFraction);
       const gridChargeW = fleet.reduce(
         (sum, f) =>
-          sum + (f.currentW < 0 ? -f.currentW / f.roundTripEfficiency : 0),
+          sum +
+          (isStorage(f) && f.currentW < 0
+            ? -f.currentW / f.roundTripEfficiency
+            : 0),
         0,
       );
       expect(now.supplyW).toBeCloseTo(

@@ -1,6 +1,7 @@
 import {
   CardNameType,
   DifficultyMultipliersType,
+  FuelNameType,
   FuelType,
   LocationType,
   MonthType,
@@ -278,6 +279,15 @@ export const FUELS = {
     kgCO2ePerBtu: 0,
   },
 } as { [fuel: string]: FuelType };
+
+// Output follows the weather rather than dispatch, so these run whenever they can. Ordered the
+// way a dispatch stack draws them.
+export const WEATHER_DEPENDENT_FUELS: readonly FuelNameType[] = [
+  "Sun",
+  "Wind",
+  "Offshore Wind",
+  "Airborne Wind",
+];
 
 export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;

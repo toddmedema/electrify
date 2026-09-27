@@ -6,7 +6,7 @@ import { getHydroAvailability } from "../data/HydroSites";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import { parseSave, serializeSave } from "../SaveGame";
 import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
-import { GameType } from "../Types";
+import { GameType, ScenarioFacilityType } from "../Types";
 import gameReducer, { buildFacility, sellFacility, tickState } from "./Game";
 const options = { scenarioId: 103, seed: 123 };
 function dispatch(state: GameType, action: Parameters<typeof gameReducer>[1]) {
@@ -90,7 +90,14 @@ it("rejects invalid starting Hydro through initialization without silently dropp
     [{ name: "Coal", fuel: "Hydro" as const, peakW: 1000000 }],
     [{ name: "Hydro", peakW: 1e12 }],
     [{ name: "Hydro", peakW: 1000000, peakWh: 1000000 }],
-    [{ fuel: "Hydro" as const, peakW: 1000000, peakWh: 1000000 }],
+    // Deliberately both a generator and storage, which the type system otherwise forbids
+    [
+      {
+        fuel: "Hydro" as const,
+        peakW: 1000000,
+        peakWh: 1000000,
+      } as unknown as ScenarioFacilityType,
+    ],
   ]) {
     expect(() =>
       createGame({

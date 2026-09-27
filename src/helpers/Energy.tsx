@@ -1,5 +1,5 @@
-import { EQUATOR_RADIANCE } from "../Constants";
-import { FacilityOperatingType, GeneratorOperatingType } from "../Types";
+import { EQUATOR_RADIANCE, WEATHER_DEPENDENT_FUELS } from "../Constants";
+import { FacilityOperatingType, FuelNameType } from "../Types";
 
 const KPH_PER_MS = 3.6;
 
@@ -144,7 +144,6 @@ export function getSolarCapacityFactor(irradiancesWM2: number[]) {
 // Sun and Wind aren't dispatchable - they generate whatever the weather allows regardless of
 // where the player drags them - so a dispatch stack puts them on the bottom as must-run supply,
 // the same convention EIA and ISO generation stacks use.
-const MUST_RUN_FUELS = ["Sun", "Wind", "Offshore Wind", "Airborne Wind"];
 
 /**
  * The fuels present in a fleet, ordered the way a dispatch stack is drawn: must-run renewables
@@ -152,20 +151,24 @@ const MUST_RUN_FUELS = ["Sun", "Wind", "Offshore Wind", "Airborne Wind"];
  */
 export function getDispatchOrderedFuels(
   facilities: Array<Partial<FacilityOperatingType>>,
-): string[] {
-  const mustRun: string[] = [];
-  const dispatchable: string[] = [];
-  facilities.forEach((facility) => {
-    const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+): FuelNameType[] {
+  const mustRun: FuelNameType[] = [];
+  const dispatchable: FuelNameType[] = [];
+  facilities.forEach(({ fuel }) => {
     if (!fuel) {
       return; // storage, which the stack tracks separately
     }
-    const bucket = MUST_RUN_FUELS.indexOf(fuel) > -1 ? mustRun : dispatchable;
+    const bucket = WEATHER_DEPENDENT_FUELS.includes(fuel)
+      ? mustRun
+      : dispatchable;
     if (bucket.indexOf(fuel) === -1) {
       bucket.push(fuel);
     }
   });
   // Keep Sun below Wind for a stable stack rather than whichever the player happened to build first
-  mustRun.sort((a, b) => MUST_RUN_FUELS.indexOf(a) - MUST_RUN_FUELS.indexOf(b));
+  mustRun.sort(
+    (a, b) =>
+      WEATHER_DEPENDENT_FUELS.indexOf(a) - WEATHER_DEPENDENT_FUELS.indexOf(b),
+  );
   return [...mustRun, ...dispatchable];
 }

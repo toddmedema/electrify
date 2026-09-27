@@ -44,6 +44,7 @@ import {
   MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
+  WEATHER_DEPENDENT_FUELS,
 } from "../../Constants";
 import { getHydroAvailability } from "../../data/HydroSites";
 import { GENERATORS } from "../../data/Facilities";
@@ -305,9 +306,7 @@ export function GeneratorBuildItem(
           "Flexible water supply",
           "Rain and snow refill the reservoir; generation drains it.",
         ]
-      : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
-            generator.fuel,
-          )
+      : WEATHER_DEPENDENT_FUELS.includes(generator.fuel)
         ? ["Weather-dependent supply", "Pair with backup or storage."]
         : generator.spinMinutes > 60
           ? ["Steady supply", "Best for demand that lasts for hours."]

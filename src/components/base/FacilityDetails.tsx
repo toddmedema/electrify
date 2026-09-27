@@ -45,12 +45,11 @@ import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
 import {
   DateType,
   FacilityOperatingType,
+  isStorage,
   FuelNameType,
   GameType,
-  GeneratorOperatingType,
   LocationType,
   RetrofitFacilityAction,
-  StorageOperatingType,
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
@@ -326,13 +325,8 @@ function WeatherResilienceSection(props: {
 export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
-  const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
-  const variableOperatingCostPerMWh = (
-    facility as Partial<GeneratorOperatingType>
-  ).variableOperatingCostPerMWh;
-  const minimumStableOutput = (facility as Partial<GeneratorOperatingType>)
-    .minimumStableOutput;
-  const isStorage = facility.peakWh > 0;
+  const { fuel, variableOperatingCostPerMWh, minimumStableOutput } = facility;
+  const storage = isStorage(facility) ? facility : undefined;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
@@ -403,7 +397,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               <Stat
                 // Capacity factor is the generator's word for it; a battery isn't producing
                 // anything, it's being used or it isn't
-                label={isStorage ? "Time in use" : "Avg output"}
+                label={storage ? "Time in use" : "Avg output"}
                 value={
                   lifetime.capacityFactor === undefined
                     ? "—"
@@ -413,13 +407,10 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             </>
           )}
           <Stat label="Delivered" value={formatWattHours(lifetime.wh)} />
-          {isStorage && (
+          {storage && (
             <Stat
               label="Charge"
-              value={formatWattHoursOfPeak(
-                facility.currentWh,
-                (facility as StorageOperatingType).peakWh,
-              )}
+              value={formatWattHoursOfPeak(storage.currentWh, storage.peakWh)}
             />
           )}
           {facility.name === "Battery" && equivalentCycles !== undefined && (
@@ -440,12 +431,10 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
             />
           )}
-          {isStorage && (
+          {storage && (
             <Stat
               label="Round-trip efficiency"
-              value={percent(
-                (facility as StorageOperatingType).roundTripEfficiency,
-              )}
+              value={percent(storage.roundTripEfficiency)}
             />
           )}
           {hazard && (
@@ -463,7 +452,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               }
             />
           )}
-          {!isStorage && maxOutputFactor < 1 && (
+          {!storage && maxOutputFactor < 1 && (
             <Stat
               label="Current maximum output"
               value={

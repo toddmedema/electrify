@@ -161,14 +161,12 @@ function technologiesFor(
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
   return [
-    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map(
-      (g: FacilityShoppingType) => ({
-        name: g.name,
-        storage: false,
-        maxSize: g.maxPeakW,
-      }),
-    ),
-    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s: FacilityShoppingType) => ({
+    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map((g) => ({
+      name: g.name,
+      storage: false,
+      maxSize: g.maxPeakW,
+    })),
+    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s) => ({
       name: s.name,
       storage: true,
       maxSize: s.maxPeakWh,

@@ -15,7 +15,7 @@ import gameReducer, {
   generateNewTimeline,
   tickState,
 } from "../reducers/Game";
-import { GameType } from "../Types";
+import { FacilityShoppingType, GameType } from "../Types";
 const MW = 1000000;
 const sites = [10, 25, 80].map((n) => ({
   id: String(n),
@@ -115,7 +115,14 @@ it("rejects forged identities and capacity before any side effects; stale quotes
     { ...q, peakW: largest.maxPeakW + 1, maxPeakW: 1e15 },
     { ...q, name: "Wind" },
     { ...q, fuel: "Wind" as const },
-    { ...q, peakWh: 1, maxPeakWh: 1, roundTripEfficiency: 1, hourlyLoss: 0 },
+    // Deliberately both a generator and storage, which the type system otherwise forbids
+    {
+      ...q,
+      peakWh: 1,
+      maxPeakWh: 1,
+      roundTripEfficiency: 1,
+      hourlyLoss: 0,
+    } as unknown as FacilityShoppingType,
   ])
     expect(
       gameReducer(s, buildFacility({ facility, financed: false })),
