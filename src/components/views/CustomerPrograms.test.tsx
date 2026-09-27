@@ -547,7 +547,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   ).toBeVisible();
   expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
   expect(
-    screen.getByText(/Wildfire preparedness changes apply now/),
+    screen.getByText(/Wildfire preparedness billing changes now/),
   ).toBeVisible();
   const hazards = screen.getByRole("region", { name: "Hazard readiness" });
   fireEvent.click(
@@ -558,6 +558,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   const { annualCost } = wildfirePreparedness(store.getState().game)!;
   expect(fact("Annual budget")).toBe(`${formatMoneyConcise(annualCost)}/yr`);
   expect(fact("Next wildfire season")).toBe("Aug 2024 to Feb 2025");
+  expect(fact("Billing")).toBe("No charges while off · no upfront payment");
   expect(fact("One-time cost")).toBeUndefined();
   expect(fact("If funded now")).toBeUndefined();
   act(() => jest.advanceTimersByTime(250));
@@ -589,6 +590,14 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
     screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
   );
   expect(fact("Status")).toBe("On · stays on until turned off");
+  expect(
+    screen.getByRole("progressbar", {
+      name: "Wildfire preparedness effectiveness",
+    }),
+  ).toHaveAttribute("aria-valuenow", "0");
+  expect(
+    screen.getByText(/Ramping up · 12 months to full effectiveness/),
+  ).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", { name: "Turn off preparedness" }),
   );

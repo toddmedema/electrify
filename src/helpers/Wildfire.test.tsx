@@ -297,7 +297,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot: forward,
-      prepared: false,
+      effectiveness: 0,
     });
     const second = sampleWildfireIncident({
       profile: LA,
@@ -305,7 +305,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot: reversed,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(first.selectedFacilityIds).toEqual(second.selectedFacilityIds);
     expect(first.selectedFacilityNames).toEqual(second.selectedFacilityNames);
@@ -322,7 +322,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     };
     expect(sampleWildfireIncident(args)).toEqual(sampleWildfireIncident(args));
   });
@@ -339,7 +339,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     const b = sampleWildfireIncident({
       profile: LA,
@@ -347,7 +347,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(a).not.toEqual(b);
   });
@@ -403,7 +403,7 @@ describe("preparedness", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     const prepared = sampleWildfireIncident({
       profile: LA,
@@ -411,7 +411,7 @@ describe("preparedness", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: true,
+      effectiveness: 1,
     });
     // Disconnections are halved.
     expect(prepared.disconnectedDemand).toBeCloseTo(
@@ -455,7 +455,7 @@ describe("restoration cost scaling", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(incident.restorationCostPerMonth).toBeGreaterThanOrEqual(0);
   });
@@ -522,4 +522,32 @@ describe("preparedness program", () => {
     });
     expect(wildfirePreparedness(game)).toBeUndefined();
   });
+});
+
+test("partial preparedness scales both losses without changing the incident draw", () => {
+  const snapshot = makeSnapshot([
+    { id: 1, name: "Gas", fuel: "Natural Gas", peakW: 30e6 },
+  ]);
+  const args = {
+    profile: LA,
+    seed: 99,
+    locationId: "LA",
+    monthsElapsed: 8,
+    snapshot,
+  };
+  const standard = sampleWildfireIncident({ ...args, effectiveness: 0 });
+  for (const effectiveness of [0.125, 0.5, 0.75, 1]) {
+    const incident = sampleWildfireIncident({ ...args, effectiveness });
+    expect(incident.disconnectedDemand).toBeCloseTo(
+      standard.disconnectedDemand * (1 - effectiveness / 2),
+    );
+    expect(1 - incident.outputMultiplier).toBeCloseTo(
+      (1 - standard.outputMultiplier) * (1 - effectiveness / 2),
+    );
+    expect(incident.selectedFacilityIds).toEqual(standard.selectedFacilityIds);
+    expect(incident.restorationCostPerMonth).toBe(
+      standard.restorationCostPerMonth,
+    );
+    expect(incident.durationMonths).toBe(standard.durationMonths);
+  }
 });

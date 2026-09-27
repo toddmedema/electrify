@@ -145,7 +145,7 @@ import {
   getWeather,
 } from "../data/Weather";
 import {
-  activePreparedness,
+  wildfirePreparednessEffectiveness,
   wildfirePreparedness,
   wildfirePreparednessAnnualCost,
   wildfirePreparednessChange,
@@ -756,18 +756,19 @@ function updateWildfireHazards(state: GameType): void {
     state.facilities,
     state.date.minute,
   );
-  const prepared = activePreparedness(
+  const effectiveness = wildfirePreparednessEffectiveness(
     state.worldEvents.occurrences,
     locationId,
-    monthsElapsed,
+    monthsElapsed * MINUTES_PER_MONTH,
   );
+  const prepared = effectiveness > 0;
   const incident = sampleWildfireIncident({
     profile,
     seed: state.seed,
     locationId,
     monthsElapsed,
     snapshot,
-    prepared,
+    effectiveness,
   });
   const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
   const endsMinute =
@@ -776,7 +777,7 @@ function updateWildfireHazards(state: GameType): void {
     ? incident.selectedFacilityNames.join(", ")
     : "no operating generators";
   const endLabel = getDateFromMinute(endsMinute - 1, state.startingYear);
-  const message = `${prepared ? "Prepared crews are in place. " : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
+  const message = `${prepared ? `Prepared crews are in place. Preparedness is ${Math.round(effectiveness * 100)}% effective. ` : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
   const occurrence: ActiveWorldEventType = {
     key: occurrenceKey,
     definitionId: WILDFIRE_DEFINITION_ID,
@@ -793,6 +794,7 @@ function updateWildfireHazards(state: GameType): void {
       locationId,
       monthsElapsed,
       prepared,
+      preparednessEffectiveness: effectiveness,
       severity: incident.severity,
       disconnectedDemand: incident.disconnectedDemand,
       outputMultiplier: incident.outputMultiplier,
@@ -2603,6 +2605,11 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
       scenarioChoice: true,
       ...(decision.id === optional?.id
         ? {
+            startEffectiveness: wildfirePreparednessEffectiveness(
+              state.worldEvents.occurrences,
+              state.location.id,
+              state.date.minute,
+            ),
             annualCost:
               option.id === "prepare"
                 ? wildfirePreparedness(state)!.annualCost

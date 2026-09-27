@@ -266,6 +266,16 @@ describe("recurring wildfire hazard integration", () => {
       .outputMultiplier as number;
     const standardOutput = standard.incident.attributes
       .outputMultiplier as number;
+    const effectiveness = prepared.incident.attributes
+      .preparednessEffectiveness as number;
+    expect(effectiveness).toBeGreaterThan(0);
+    expect(effectiveness).toBeLessThanOrEqual(1);
+    expect(preparedDisconnected).toBeCloseTo(
+      standardDisconnected * (1 - effectiveness / 2),
+    );
+    expect(1 - preparedOutput).toBeCloseTo(
+      (1 - standardOutput) * (1 - effectiveness / 2),
+    );
     expect(preparedDisconnected).toBeLessThan(standardDisconnected);
     expect(preparedOutput).toBeGreaterThan(standardOutput);
     // Restoration cost is unchanged by preparedness.

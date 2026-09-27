@@ -18,7 +18,11 @@ import {
   optionalScenarioChoice,
   pendingScenarioChoice,
 } from "../helpers/ScenarioChoices";
-import { activePreparedness, wildfirePreparedness } from "../helpers/Wildfire";
+import {
+  activePreparedness,
+  wildfirePreparedness,
+  wildfirePreparednessEffectiveness,
+} from "../helpers/Wildfire";
 import {
   previewWildfire,
   wildfirePreviewMonth,
@@ -138,6 +142,18 @@ test("each year books the annual budget and stopping removes future costs withou
     }),
   );
   expect(wildfirePreparedness(stopped)!.active).toBe(false);
+  for (const [month, effectiveness] of [
+    [16, 1],
+    [22, 0.5],
+    [28, 0],
+  ])
+    expect(
+      wildfirePreparednessEffectiveness(
+        stopped.worldEvents.occurrences,
+        "LA",
+        month * MINUTES_PER_MONTH,
+      ),
+    ).toBe(effectiveness);
   expect(activePreparedness(stopped.worldEvents.occurrences, "LA", 15)).toBe(
     true,
   );
@@ -193,7 +209,8 @@ test("the preview simulates a typical fire both ways through the real forecast",
   expect(LA.monthlyWeights[month % 12]).toBe(Math.max(...weights));
   const result = previewWildfire(game, month);
   expect(result.preparedIncident.disconnectedDemand).toBeCloseTo(
-    result.standardIncident.disconnectedDemand / 2,
+    result.standardIncident.disconnectedDemand *
+      (1 - result.preparedEffectiveness / 2),
   );
   expect(result.preparedIncident.selectedFacilityIds).toEqual(
     result.standardIncident.selectedFacilityIds,
@@ -243,4 +260,53 @@ test("the preview stays within the remaining run and advances to the next season
   expect(wildfirePreviewMonth(game)).toBeUndefined();
   game.customScenario!.durationMonths = 36;
   expect(wildfirePreviewMonth(game)).toBe(20);
+});
+
+test("ramps, decays and restarts continuously, including save/load and trimmed history", () => {
+  const initial = ready(100000000, 0);
+  let game = cloneDeep(reducer(initial, fund(initial)));
+  const effectiveness = (month: number) =>
+    wildfirePreparednessEffectiveness(
+      game.worldEvents.occurrences,
+      "LA",
+      month * MINUTES_PER_MONTH,
+    );
+  expect(effectiveness(0)).toBe(0);
+  expect(effectiveness(0.5)).toBeCloseTo(1 / 24);
+  expect(effectiveness(6)).toBe(0.5);
+  expect(effectiveness(12)).toBe(1);
+  expect(effectiveness(24)).toBe(1);
+  const moveTo = (month: number) => {
+    game = cloneDeep(game);
+    game.date = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
+    advancePolicies(game, month);
+    game.timeline = generateNewTimeline(game, 100000000, 1000000);
+  };
+  moveTo(6);
+  game = reducer(
+    game,
+    chooseScenarioResponse({
+      decisionId: wildfirePreparedness(game)!.choice.id,
+      optionId: "stop",
+    }),
+  );
+  expect(effectiveness(6)).toBe(0.5);
+  expect(effectiveness(12)).toBe(0.25);
+  expect(effectiveness(18)).toBe(0);
+  expect(effectiveness(30)).toBe(0);
+  moveTo(12);
+  const loaded = parseSave(
+    JSON.parse(JSON.stringify(serializeSave(game))),
+  )!.game;
+  expect(wildfirePreparedness(loaded)!.effectiveness).toBe(0.25);
+  // Only the latest change is needed after the event log is compacted.
+  game.worldEvents.occurrences = game.worldEvents.occurrences.slice(-1);
+  expect(effectiveness(12)).toBe(0.25);
+  game = reducer(game, fund(game));
+  expect(effectiveness(12)).toBe(0.25);
+  expect(effectiveness(18)).toBe(0.625);
+  expect(effectiveness(24)).toBe(1);
+  const preview = previewWildfire(game, 20);
+  expect(preview.preparedEffectiveness).toBeCloseTo(0.75);
+  expect(preview.standardEffectiveness).toBeCloseTo(0.25 / 3);
 });

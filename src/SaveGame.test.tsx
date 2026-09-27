@@ -159,6 +159,15 @@ describe("SaveGame", () => {
         { ...event, effects: { facilityOutputMultipliersById: { "1": null } } },
         // Negative booked amounts would turn a charge into income.
         { ...event, attributes: { cost: -10 } },
+        ...[-0.1, 1.1, "0.5", undefined].map((startEffectiveness) => ({
+          ...event,
+          key: "wildfire:LA:preparedness:0",
+          attributes: {
+            choice: "prepare",
+            annualCost: 600000,
+            startEffectiveness,
+          },
+        })),
         { ...event, attributes: { annualCost: -10 } },
         { ...event, attributes: { annualCost: "600000" } },
         {

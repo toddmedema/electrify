@@ -61,6 +61,8 @@ export const WILDFIRE_PREPAREDNESS_DISCONNECTION_FACTOR = 0.5;
 /** Annual preparedness budget per MWh of average monthly demand, before difficulty scaling. */
 export const WILDFIRE_PREPAREDNESS_COST_PER_MWH = 3;
 
+export const WILDFIRE_PREPAREDNESS_RAMP_MONTHS = 12;
+
 function lerp(min: number, max: number, t: number): number {
   return min + (max - min) * Math.min(1, Math.max(0, t));
 }
@@ -301,7 +303,7 @@ export function wildfirePreparednessChange(
   return undefined;
 }
 
-/** Standing preparedness protects against new fires until the player turns it off. */
+/** Whether the standing program is funded (protection ramps and can outlast funding). */
 export function activePreparedness(
   occurrences: ActiveWorldEventType[],
   locationId: string,
@@ -313,6 +315,22 @@ export function activePreparedness(
       locationId,
       monthsElapsed * MINUTES_PER_MONTH,
     )?.attributes.choice === "prepare"
+  );
+}
+
+/** Continuous protection, with each change retaining its starting effectiveness. */
+export function wildfirePreparednessEffectiveness(
+  occurrences: ActiveWorldEventType[],
+  locationId: string,
+  minute: number,
+): number {
+  const change = wildfirePreparednessChange(occurrences, locationId, minute);
+  if (!change) return 0;
+  return lerp(
+    Number(change.attributes.startEffectiveness),
+    change.attributes.choice === "prepare" ? 1 : 0,
+    (minute - change.startsMinute) /
+      (WILDFIRE_PREPAREDNESS_RAMP_MONTHS * MINUTES_PER_MONTH),
   );
 }
 
@@ -450,13 +468,13 @@ function wildfireIncidentAt(args: {
   severity: number;
   durationMonths: number;
   snapshot: StorySnapshotType;
-  prepared: boolean;
+  effectiveness: number;
   selectFacilities: (targetCapacityShare: number) => {
     selectedFacilityIds: number[];
     selectedFacilityNames: string[];
   };
 }): WildfireIncidentType {
-  const { profile, severity, durationMonths, snapshot, prepared } = args;
+  const { profile, severity, durationMonths, snapshot, effectiveness } = args;
   const rawDisconnectedDemand = lerp(
     profile.disconnectedDemand.min,
     profile.disconnectedDemand.max,
@@ -475,12 +493,14 @@ function wildfireIncidentAt(args: {
 
   // Preparedness halves disconnections and output losses; it does not prevent the fire or reduce
   // restoration costs.
-  const disconnectedDemand = prepared
-    ? rawDisconnectedDemand * WILDFIRE_PREPAREDNESS_DISCONNECTION_FACTOR
-    : rawDisconnectedDemand;
-  const outputMultiplier = prepared
-    ? (1 + rawOutputMultiplier) / 2
-    : rawOutputMultiplier;
+  const disconnectedDemand =
+    rawDisconnectedDemand *
+    (1 - effectiveness * (1 - WILDFIRE_PREPAREDNESS_DISCONNECTION_FACTOR));
+  const outputMultiplier = lerp(
+    rawOutputMultiplier,
+    (1 + rawOutputMultiplier) / 2,
+    effectiveness,
+  );
 
   const exposedDemandMWh = snapshot.demandWh12m / 12 / 1e6;
   return {
@@ -508,9 +528,10 @@ export function sampleWildfireIncident(args: {
   locationId: string;
   monthsElapsed: number;
   snapshot: StorySnapshotType;
-  prepared: boolean;
+  effectiveness: number;
 }): WildfireIncidentType {
-  const { profile, seed, locationId, monthsElapsed, snapshot, prepared } = args;
+  const { profile, seed, locationId, monthsElapsed, snapshot, effectiveness } =
+    args;
   return wildfireIncidentAt({
     profile,
     severity: wildfireDraw(seed, locationId, monthsElapsed, "severity"),
@@ -520,7 +541,7 @@ export function sampleWildfireIncident(args: {
         ? 2
         : 1,
     snapshot,
-    prepared,
+    effectiveness,
     // Each candidate gets its own addressed draw.
     selectFacilities: (share) =>
       selectAffectedFacilities(snapshot, share, (facility) =>
@@ -545,15 +566,15 @@ export const WILDFIRE_TYPICAL_SEVERITY = 0.5;
 export function typicalWildfireIncident(args: {
   profile: WildfireProfileType;
   snapshot: StorySnapshotType;
-  prepared: boolean;
+  effectiveness: number;
 }): WildfireIncidentType {
-  const { profile, snapshot, prepared } = args;
+  const { profile, snapshot, effectiveness } = args;
   return wildfireIncidentAt({
     profile,
     severity: WILDFIRE_TYPICAL_SEVERITY,
     durationMonths: 1,
     snapshot,
-    prepared,
+    effectiveness,
     selectFacilities: (share) =>
       selectAffectedFacilities(snapshot, share, (facility) => -facility.peakW),
   });
@@ -649,6 +670,8 @@ export interface WildfirePreparednessType {
   profile: WildfireProfileType;
   season: WildfireSeasonType;
   active: boolean;
+  effectiveness: number;
+  remainingMonths: number;
   /** The next season starts after this run ends; starting the program can still protect earlier fires. */
   tooLate: boolean;
   annualCost: number;
@@ -706,6 +729,18 @@ export function wildfirePreparedness(
     season,
     active,
     annualCost,
+    effectiveness: wildfirePreparednessEffectiveness(
+      changes,
+      game.location.id,
+      game.date.minute,
+    ),
+    remainingMonths: current
+      ? Math.max(
+          0,
+          WILDFIRE_PREPAREDNESS_RAMP_MONTHS -
+            (game.date.minute - current.startsMinute) / MINUTES_PER_MONTH,
+        )
+      : 0,
     tooLate: season.startMonth >= runEnd,
     choice: {
       id: key,
@@ -719,11 +754,11 @@ export function wildfirePreparedness(
           label: active ? "Turn off preparedness" : "Start preparedness",
           cost: () => 0,
           description: active
-            ? "Stop ongoing spending and return to standard response for future fires."
-            : "Ongoing annual budget, billed monthly. Stays on until you turn it off.",
+            ? "Stop spending now; remaining protection fades linearly over 12 months."
+            : "Ongoing annual budget, billed monthly. Benefits ramp up over 12 months; stays on until turned off.",
           message: active
-            ? "Wildfire preparedness turned off. Future fires use the standard response."
-            : "Wildfire preparedness started. Its annual budget is billed monthly until turned off.",
+            ? "Wildfire preparedness turned off. Spending stops now; protection fades over 12 months."
+            : "Wildfire preparedness started. Benefits ramp up over 12 months; its annual budget is billed monthly until turned off.",
         },
       ],
     },

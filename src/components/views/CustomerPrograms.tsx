@@ -359,7 +359,7 @@ function useEstimate<T>(
 
 /** Keep the standing program's status and yearly budget visible in the list. */
 function preparednessStatus(preparedness: WildfirePreparednessType): string {
-  return `${preparedness.active ? "On" : "Off"} · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
+  return `${preparedness.active ? "On" : "Off"} · ${percent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
 }
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
@@ -378,15 +378,30 @@ function WildfireDetails({
   result?: WildfirePreviewResult;
   error?: string;
 }) {
-  const { season } = preparedness;
+  const { season, effectiveness, remainingMonths, active } = preparedness;
+  const progress = active
+    ? effectiveness >= 1
+      ? "Fully effective"
+      : `Ramping up · ${Math.ceil(remainingMonths)} months to full effectiveness`
+    : effectiveness > 0
+      ? `Fading · ${Math.ceil(remainingMonths)} months of protection remaining`
+      : "No protection";
+  const offLabel = active ? "Stop now" : "Keep off";
+  const onLabel = active ? "Keep on" : "Start now";
   const facts: [string, string][] = [
     ["Status", preparedness.active ? "On · stays on until turned off" : "Off"],
     ["Annual budget", `${formatMoneyConcise(preparedness.annualCost)}/yr`],
     [
       "Billing",
-      `${formatMoneyConcise(preparedness.annualCost / 12)}/month · no upfront payment`,
+      active
+        ? `${formatMoneyConcise(preparedness.annualCost / 12)}/month · no upfront payment`
+        : "No charges while off · no upfront payment",
     ],
-    ["Protection", "New wildfires while the program is on"],
+    [
+      "At full effectiveness",
+      "50% fewer disconnections and generator output losses",
+    ],
+    ["Ramp-up / decay", "12 months each · linear"],
     [
       "Next wildfire season",
       `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
@@ -397,14 +412,30 @@ function WildfireDetails({
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
       <Typography>
-        Crews, line inspections and vegetation clearing ready{" "}
-        {game.location.name} year-round. If a wildfire starts while the program
-        is on, safety shutoffs disconnect half as much customer load and
-        affected generators lose half as much output. It stays on across years
-        without another opt-in; turn it off to stop spending. Existing fires
-        keep the response they started with. Preparedness does not prevent
-        fires, and restoration costs apply either way.
+        Crews, inspections and vegetation clearing reduce wildfire
+        disconnections and generator losses by up to 50%. Benefits build
+        linearly over 12 months. Turning off stops charges now and fades
+        remaining protection over 12 months; restarting ramps from the current
+        level. Preparedness does not prevent fires or reduce restoration costs.
+        Existing fires keep their initial response.
       </Typography>
+      <Box
+        className="customerProgramProject"
+        sx={{ display: "grid", gap: 1.5 }}
+      >
+        <Typography variant="subtitle2">
+          {percent(effectiveness)} effective
+        </Typography>
+        <LinearProgress
+          variant="determinate"
+          value={effectiveness * 100}
+          aria-label="Wildfire preparedness effectiveness"
+          aria-valuetext={`${percent(effectiveness)} effective · ${progress}`}
+          color={effectiveness >= 1 ? "success" : "primary"}
+          sx={{ height: 8, borderRadius: 1 }}
+        />
+        <Typography variant="body2">{progress}</Typography>
+      </Box>
       <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
       <Box component="dl" className="customerProgramFacts">
         {facts.map(([term, value]) => (
@@ -441,7 +472,7 @@ function WildfireDetails({
           ) : !result || !standard || !prepared ? (
             <>
               <Typography variant="body2">
-                Standard response ━ · With preparedness ┄
+                {offLabel} ━ · {onLabel} ┄
               </Typography>
               <PolicyDemandChartPlaceholder />
               <Box aria-hidden>
@@ -455,15 +486,20 @@ function WildfireDetails({
           ) : (
             <>
               <Typography variant="body2">
-                Standard response ━ · With preparedness ┄
+                {offLabel} ━ · {onLabel} ┄
               </Typography>
               <PolicyDemandChart
                 current={result.standardDemandW}
                 changed={result.preparedDemandW}
-                labels={["Standard response", "With preparedness"]}
-                ariaLabel="Customer demand still connected during a simulated wildfire: standard response and with preparedness, over a representative day"
+                labels={[offLabel, onLabel]}
+                ariaLabel={`Customer demand still connected during a simulated wildfire: ${offLabel} and ${onLabel}, over a representative day`}
               />
               <Box role="status">
+                <Typography>
+                  Effectiveness at this fire: {offLabel}{" "}
+                  {percent(result.standardEffectiveness)} → {onLabel}{" "}
+                  {percent(result.preparedEffectiveness)}
+                </Typography>
                 <Typography>
                   Customer load disconnected:{" "}
                   {percent(standard.disconnectedDemand)} →{" "}
@@ -780,7 +816,7 @@ function ProgramsScreen({
           <Box className="customerProgramList">
             <Typography variant="body2" color="textSecondary">
               {preparedness
-                ? "Wildfire preparedness changes apply now. Other programs start next month."
+                ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
                 : "Changes start next month."}
             </Typography>
             {policiesOn &&
@@ -800,7 +836,7 @@ function ProgramsScreen({
                   name: "Wildfire preparedness",
                   status: preparednessStatus(preparedness),
                   description:
-                    "Ongoing protection: halve wildfire disconnections and generator losses. Billed monthly until turned off.",
+                    "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
                   Icon: LocalFireDepartmentIcon,
                   active: preparedness.active,
                   onOpen: () => setSelected("wildfire"),

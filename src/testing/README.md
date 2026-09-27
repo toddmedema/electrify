@@ -234,7 +234,9 @@ Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch
 an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
 Wildfire preparedness is an optional ongoing program and never blocks the clock. Set
 `scenarioResponses: { "wildfire:LA:preparedness:0": "prepare" }` to start it. Its annual budget
-is billed over time and protection persists across years without another response. Each accepted
+is billed over time and protection persists across years without another response. Effectiveness
+ramps linearly from its current value to 100% over 12 months after starting; stopping immediately
+ends billing and linearly decays the remaining effectiveness to zero over 12 months. Each accepted
 start/stop increments the final key number; map the next key to `stop` to turn it off. The bot
 checks once at the start of each month. Unknown options leave the program unchanged.
 See [the scenario choice balance report](SCENARIO_CHOICE_BALANCE.md) for the reproducible

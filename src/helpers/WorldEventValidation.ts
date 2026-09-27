@@ -53,7 +53,10 @@ export function validWorldEvent(value: unknown): boolean {
       !/^wildfire:[^:]+:preparedness:\d+$/.test(value.key) ||
       !["prepare", "stop"].includes(String(attributes.choice)) ||
       !finite(attributes.annualCost) ||
-      attributes.annualCost < 0
+      attributes.annualCost < 0 ||
+      !finite(attributes.startEffectiveness) ||
+      attributes.startEffectiveness < 0 ||
+      attributes.startEffectiveness > 1
     )
       return false;
   }

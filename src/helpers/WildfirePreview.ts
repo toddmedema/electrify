@@ -16,6 +16,8 @@ import {
   wildfireIncidentEffects,
   WildfireIncidentType,
   wildfirePreparedness,
+  wildfirePreparednessEffectiveness,
+  WILDFIRE_PREPAREDNESS_RAMP_MONTHS,
 } from "./Wildfire";
 import { getScenario } from "../data/Scenarios";
 import { TICK_MINUTES } from "../Constants";
@@ -95,21 +97,45 @@ export function previewWildfire(game: GameType, month: number) {
       endingCash: timeline[timeline.length - 1].cash,
     };
   };
+  const elapsed = Math.min(
+    1,
+    Math.max(
+      0,
+      (month * MINUTES_PER_MONTH - game.date.minute) /
+        (WILDFIRE_PREPAREDNESS_RAMP_MONTHS * MINUTES_PER_MONTH),
+    ),
+  );
+  const preparedEffectiveness = preparedness.active
+    ? wildfirePreparednessEffectiveness(
+        game.worldEvents.occurrences,
+        game.location.id,
+        month * MINUTES_PER_MONTH,
+      )
+    : preparedness.effectiveness + (1 - preparedness.effectiveness) * elapsed;
+  const standardEffectiveness = preparedness.active
+    ? preparedness.effectiveness * (1 - elapsed)
+    : wildfirePreparednessEffectiveness(
+        game.worldEvents.occurrences,
+        game.location.id,
+        month * MINUTES_PER_MONTH,
+      );
   const standardIncident = typicalWildfireIncident({
     profile: preparedness.profile,
     snapshot,
-    prepared: false,
+    effectiveness: standardEffectiveness,
   });
   const preparedIncident = typicalWildfireIncident({
     profile: preparedness.profile,
     snapshot,
-    prepared: true,
+    effectiveness: preparedEffectiveness,
   });
   const noFire = run();
   const standard = run(standardIncident);
   const prepared = run(preparedIncident);
   return {
     month,
+    standardEffectiveness,
+    preparedEffectiveness,
     standardIncident,
     preparedIncident,
     noFire: noFire.summary,

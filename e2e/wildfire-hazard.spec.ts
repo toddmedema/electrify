@@ -196,6 +196,14 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: /^Wildfire preparedness · On/ })
         .click();
       await expect(programs).toContainText("On · stays on until turned off");
+      await expect(
+        programs.getByRole("progressbar", {
+          name: "Wildfire preparedness effectiveness",
+        }),
+      ).toHaveAttribute("aria-valuenow", "0");
+      await expect(programs).toContainText(
+        "Ramping up · 12 months to full effectiveness",
+      );
       await programs
         .getByRole("button", { name: "Turn off preparedness" })
         .click();
@@ -278,6 +286,50 @@ for (const theme of ["light", "dark"] as const) {
       testInfo,
       `wildfire-hazard-events-${theme}-${testInfo.project.name}.png`,
     );
+
+    if (fund) {
+      await openInsightsPane(page);
+      await page
+        .locator(".insights:visible")
+        .getByRole("button", { name: "Customer programs", exact: true })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      const protection = programs.getByRole("progressbar", {
+        name: "Wildfire preparedness effectiveness",
+      });
+      const effectiveness = Number(
+        await protection.getAttribute("aria-valuenow"),
+      );
+      expect(effectiveness).toBeGreaterThan(0);
+      expect(effectiveness).toBeLessThan(100);
+      await programs
+        .getByRole("button", { name: "Turn off preparedness" })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
+        .click();
+      await expect(protection).toHaveAttribute(
+        "aria-valuenow",
+        String(effectiveness),
+      );
+      await expect(programs).toContainText(
+        "Fading · 12 months of protection remaining",
+      );
+      await expect(
+        programs.getByText(/^Customer load disconnected:/),
+      ).toBeVisible({ timeout: 30000 });
+      await captureReviewScreenshot(
+        page,
+        testInfo,
+        `wildfire-decay-${theme}-${testInfo.project.name}.png`,
+      );
+      await programs
+        .getByRole("button", { name: "Close customer programs" })
+        .click();
+      await openEventsPane(page);
+    }
 
     // October 2020: the one-month incident expires. Restoration is reported once and the ongoing
     // card clears; the ignition row returns to history.

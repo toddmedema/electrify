@@ -217,15 +217,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           <strong>Wildfire preparedness:</strong> In custom games in fire-prone
           areas, you can keep crews, inspections and vegetation clearing funded
-          year-round. The annual budget is billed monthly and stays fixed while
-          the program is on. It continues across years until you turn it off,
-          with no annual opt-in or upfront payment. If a wildfire starts while
-          the program is on, safety shutoffs disconnect half as much customer
-          load and affected generators lose half as much output. It does not
-          prevent fires, and restoration costs apply either way. Its page
-          simulates a typical fire in the next wildfire season both ways.
-          Turning it off stops spending and protection against new fires; an
-          existing fire keeps the response it started with.
+          year-round. Effectiveness ramps up linearly over 12 months. Turning it
+          off stops spending immediately; remaining protection fades over 12
+          months. Restarting ramps from the remaining effectiveness over 12
+          months. The annual budget is billed monthly and stays fixed while the
+          program is on. It continues across years until you turn it off, with
+          no annual opt-in or upfront payment. At full effectiveness, safety
+          shutoffs disconnect half as much customer load and affected generators
+          lose half as much output. Partial effectiveness reduces those benefits
+          proportionally. It does not prevent fires, and restoration costs apply
+          either way. Its page simulates a typical fire in the next wildfire
+          season with the effectiveness projected for that month. An existing
+          fire keeps the response it started with.
         </p>
       </div>
     ),
