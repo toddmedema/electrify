@@ -1919,6 +1919,10 @@ $pane_header_height: 48px;
     // The checkbox's 42px hit area less MUI's -11px start margin
     padding-left: 31px;
   }
+
+  .resilienceBuildOptionNoWrap {
+    white-space: nowrap;
+  }
 }
 
 .resilienceBuildOption .resilienceBuildOptionWarning {
@@ -4818,7 +4822,7 @@ $sizemap: (
   }
   .buildOptionMetrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
     gap: 12px;
     padding: 0 12px 8px;
   }
@@ -6027,4 +6031,19 @@ $sizemap: (
   position: absolute;
   right: 12px;
   top: 0;
+}
+
+// The dialog title's pause indicator: icon and text share a centerline
+.pausedChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+
+  svg {
+    display: block;
+  }
 }
