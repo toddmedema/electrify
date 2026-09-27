@@ -146,6 +146,9 @@ import {
 } from "../data/Weather";
 import {
   activePreparedness,
+  wildfirePreparedness,
+  wildfirePreparednessAnnualCost,
+  wildfirePreparednessChange,
   activeWildfire,
   dailyFireWeatherReading,
   isWildfireHazardEligible,
@@ -577,6 +580,23 @@ export function logFuelCrossovers(state: GameType) {
 
 const MAX_WORLD_EVENT_CHECKS = 2400;
 
+/** A standing program must outlive the bounded historical event log that records its changes. */
+function trimWorldEventOccurrences(state: GameType) {
+  const occurrences = state.worldEvents.occurrences;
+  if (occurrences.length <= MAX_WORLD_EVENT_CHECKS) return;
+  const program = wildfirePreparednessChange(
+    occurrences,
+    state.location.id,
+    state.date.minute,
+  );
+  const retained = occurrences.slice(-MAX_WORLD_EVENT_CHECKS);
+  if (program && !retained.includes(program)) {
+    retained.shift();
+    retained.unshift(program);
+  }
+  state.worldEvents.occurrences = retained;
+}
+
 /** Starts/ends authored events before this month's forecast is built. */
 function updateWorldEvents(state: GameType): Set<FuelNameType> {
   const storyPriceFuels = new Set<FuelNameType>();
@@ -642,12 +662,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
   return storyPriceFuels;
 }
 
@@ -745,7 +760,6 @@ function updateWildfireHazards(state: GameType): void {
     state.worldEvents.occurrences,
     locationId,
     monthsElapsed,
-    state.startingYear,
   );
   const incident = sampleWildfireIncident({
     profile,
@@ -799,12 +813,7 @@ function updateWildfireHazards(state: GameType): void {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
   logGameEvent(state, "WORLD_EVENT", message, {
     importance: "CRITICAL",
     actionTarget: occurrence.actionTarget,
@@ -825,12 +834,7 @@ function trimWorldEventRecords(state: GameType) {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
 }
 
 // Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
@@ -2469,12 +2473,7 @@ function recordRetrofitTransaction(
     },
     effects: {},
   });
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
 }
 
 /**
@@ -2571,10 +2570,10 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
   // A pending story choice the clock waits on, or an optional one the player chose to take up
-  const decision = [
-    pendingScenarioChoice(state),
-    optionalScenarioChoice(state),
-  ].find((choice) => choice?.id === payload.decisionId);
+  const optional = optionalScenarioChoice(state);
+  const decision = [pendingScenarioChoice(state), optional].find(
+    (choice) => choice?.id === payload.decisionId,
+  );
   if (!decision) return false;
   const option = decision.options.find(
     (option) => option.id === payload.optionId,
@@ -2597,7 +2596,20 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     definitionId: decision.id,
     startsMinute: state.date.minute,
     endsMinute: state.date.minute,
-    attributes: { choice: option.id, cost, upfrontGrant, scenarioChoice: true },
+    attributes: {
+      choice: option.id,
+      cost,
+      upfrontGrant,
+      scenarioChoice: true,
+      ...(decision.id === optional?.id
+        ? {
+            annualCost:
+              option.id === "prepare"
+                ? wildfirePreparedness(state)!.annualCost
+                : 0,
+          }
+        : {}),
+    },
     effects: {},
     title: decision.title,
     message: option.message,
@@ -2610,10 +2622,18 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   });
   if (option.meaningful !== false)
     recordMeaningfulDecision(state, {
-      lever: decision.id,
+      lever:
+        decision.id === optional?.id
+          ? `wildfire:${state.location.id.toLowerCase()}:preparedness`
+          : decision.id,
       label: decision.title,
       kind: "policy",
-      before: "undecided",
+      before:
+        decision.id === optional?.id
+          ? option.id === "prepare"
+            ? "stop"
+            : "prepare"
+          : "undecided",
       after: option.id,
     });
   state.timeline = reforecastSupply(state, true);
@@ -4157,6 +4177,12 @@ function updateSupplyFacilitiesFinances(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
+  expensesOM +=
+    wildfirePreparednessAnnualCost(
+      state.worldEvents.occurrences,
+      state.location.id,
+      now.minute,
+    ) / ticksPerYear;
   if (!rebookingFrame) expensesOM += immediateCosts;
   // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.

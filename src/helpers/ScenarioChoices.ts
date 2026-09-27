@@ -36,8 +36,8 @@ export function pendingScenarioChoice(
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );
 }
-/** Choices the player may take up without the clock waiting on them: this season's wildfire
- * preparedness, funded from Customer programs through the same replayable action. */
+/** Choices the player may take up without the clock waiting on them: ongoing wildfire
+ * preparedness, started or stopped from Customer programs through the same replayable action. */
 export function optionalScenarioChoice(game: GameType) {
   if (game.storyEffectsDisabled) return undefined;
   return wildfirePreparedness(game)?.choice;

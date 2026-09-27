@@ -17,18 +17,24 @@ import {
   WildfireIncidentType,
   wildfirePreparedness,
 } from "./Wildfire";
+import { getScenario } from "../data/Scenarios";
 import { TICK_MINUTES } from "../Constants";
 
 /**
- * The season month a preview illustrates: the highest-risk month preparedness could still cover,
- * earliest first on a tie. Undefined when funding would cover no month of the run.
+ * The next season month a preview illustrates: its highest-risk month,
+ * earliest first on a tie. Undefined when the next season starts after the run ends.
  */
 export function wildfirePreviewMonth(game: GameType): number | undefined {
   const preparedness = wildfirePreparedness(game);
   if (!preparedness || preparedness.tooLate) return undefined;
-  const { profile, season, firstCoveredMonth } = preparedness;
+  const { profile, season } = preparedness;
+  const endMonth = Math.min(
+    season.endMonth,
+    getScenario(game.scenarioId, game.customScenario)?.durationMonths ??
+      Infinity,
+  );
   let best: number | undefined;
-  for (let month = firstCoveredMonth; month < season.endMonth; month++) {
+  for (let month = season.startMonth; month < endMonth; month++) {
     const weight = profile.monthlyWeights[month % 12] ?? 0;
     if (best === undefined || weight > profile.monthlyWeights[best % 12])
       best = month;

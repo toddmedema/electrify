@@ -116,7 +116,7 @@ async function captureReviewScreenshot(
 }
 
 for (const theme of ["light", "dark"] as const) {
-  // Light funds the season's preparedness; dark leaves it unfunded, so both branches and both
+  // Light starts ongoing preparedness; dark leaves it off, so both branches and both
   // palettes' Events presentation are exercised.
   const fund = theme === "light";
 
@@ -143,7 +143,7 @@ for (const theme of ["light", "dark"] as const) {
     );
 
     // Preparedness is an optional customer program, never a prompt the clock waits on. The run
-    // opens at the tail of the 2019 season, so the August 2020 season is on offer from March.
+    // advances to spring so the next wildfire season is the August 2020 illustration.
     await setFastSpeed(page);
     await expect(page.locator("#appbar:visible").first()).toContainText(
       /(Mar|Apr|May|Jun) 2020/,
@@ -164,10 +164,14 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveAttribute("aria-pressed", "true");
     await programs
       .getByRole("button", {
-        name: "Wildfire preparedness · Not funded · fire season starts Aug 2020",
+        name: /^Wildfire preparedness · Off · .*\/yr$/,
       })
       .click();
-    await expect(programs).toContainText("Covers Aug 2020 to Feb 2021");
+    await expect(programs).toContainText("Annual budget");
+    await expect(programs).toContainText("no upfront payment");
+    await expect(programs).toContainText("Next wildfire season");
+    await expect(programs).not.toContainText("One-time cost");
+    await expect(programs).not.toContainText("If funded now");
     // The page simulates a typical fire with and without funded crews.
     await expect(
       programs.getByText(/^Customer load disconnected:/),
@@ -177,21 +181,45 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       programs.getByText(/^Utility cash if this fire strikes:/),
     ).toBeVisible();
+    if (fund) {
+      await programs
+        .getByRole("button", { name: /^Start preparedness \(/ })
+        .click();
+      await expect(
+        programs.getByRole("button", {
+          name: /^Wildfire preparedness · On · .*\/yr$/,
+        }),
+      ).toBeVisible();
+    }
+    if (fund) {
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      await expect(programs).toContainText("On · stays on until turned off");
+      await programs
+        .getByRole("button", { name: "Turn off preparedness" })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Start preparedness/ })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      await expect(
+        programs.getByRole("button", { name: "Turn off preparedness" }),
+      ).toBeEnabled();
+      await expect(
+        programs.getByText(/^Customer load disconnected:/),
+      ).toBeVisible({ timeout: 30000 });
+    }
     await captureReviewScreenshot(
       page,
       testInfo,
       `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
     );
-    if (fund) {
-      await programs
-        .getByRole("button", { name: /^Fund preparedness \(/ })
-        .click();
-      await expect(
-        programs.getByRole("button", {
-          name: "Wildfire preparedness · Funded · Aug 2020 to Feb 2021 season",
-        }),
-      ).toBeVisible();
-    }
     await programs
       .getByRole("button", { name: "Close customer programs" })
       .click();

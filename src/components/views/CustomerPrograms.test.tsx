@@ -510,7 +510,7 @@ test("the completion preview is capped at the run's last month", () => {
   view.unmount();
 });
 
-test("wildfire preparedness is a program row that simulates a fire and funds the season", () => {
+test("wildfire preparedness shows annual terms, previews the next season, and starts or stops", () => {
   jest.useFakeTimers();
   const worker = {
     onmessage: null as ((event: { data: unknown }) => void) | null,
@@ -546,15 +546,20 @@ test("wildfire preparedness is a program row that simulates a fire and funds the
     screen.getByRole("button", { name: "Close customer programs" }),
   ).toBeVisible();
   expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
+  expect(
+    screen.getByText(/Wildfire preparedness changes apply now/),
+  ).toBeVisible();
   const hazards = screen.getByRole("region", { name: "Hazard readiness" });
   fireEvent.click(
     within(hazards).getByRole("button", {
-      name: "Wildfire preparedness · Not funded · fire season starts Aug 2024",
+      name: /^Wildfire preparedness · Off · .*\/yr$/,
     }),
   );
-  const { cost } = wildfirePreparedness(store.getState().game)!;
-  expect(fact("One-time cost")).toBe(formatMoneyConcise(cost));
-  expect(fact("If funded now")).toBe("Covers Aug 2024 to Feb 2025");
+  const { annualCost } = wildfirePreparedness(store.getState().game)!;
+  expect(fact("Annual budget")).toBe(`${formatMoneyConcise(annualCost)}/yr`);
+  expect(fact("Next wildfire season")).toBe("Aug 2024 to Feb 2025");
+  expect(fact("One-time cost")).toBeUndefined();
+  expect(fact("If funded now")).toBeUndefined();
   act(() => jest.advanceTimersByTime(250));
   const month = wildfirePreviewMonth(store.getState().game)!;
   expect(worker.postMessage).toHaveBeenCalledWith(
@@ -562,22 +567,32 @@ test("wildfire preparedness is a program row that simulates a fire and funds the
   );
   const result = previewWildfire(store.getState().game, month);
   act(() => worker.onmessage!({ data: { result } }));
-  expect(screen.getByText(/^Simulated wildfire · /)).toBeVisible();
+  expect(
+    screen.getByText(/^Next wildfire season · simulated fire in /),
+  ).toBeVisible();
   expect(screen.getByText(/^Customer load disconnected:/)).toHaveTextContent(
     `${Math.round(result.standardIncident.disconnectedDemand * 100)}% → ${Math.round(result.preparedIncident.disconnectedDemand * 100)}%`,
   );
   expect(screen.getByText(/^Utility cash if this fire strikes:/)).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", {
-      name: `Fund preparedness (${formatMoneyConcise(cost)})`,
+      name: `Start preparedness (${formatMoneyConcise(annualCost)}/yr)`,
     }),
   );
-  expect(wildfirePreparedness(store.getState().game)!.funded).toBe(true);
+  expect(wildfirePreparedness(store.getState().game)!.active).toBe(true);
   expect(
     screen.getByRole("button", {
-      name: "Wildfire preparedness · Funded · Aug 2024 to Feb 2025 season",
+      name: /^Wildfire preparedness · On · .*\/yr$/,
     }),
   ).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
+  );
+  expect(fact("Status")).toBe("On · stays on until turned off");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Turn off preparedness" }),
+  );
+  expect(wildfirePreparedness(store.getState().game)!.active).toBe(false);
   view.unmount();
   stub.mockRestore();
   jest.useRealTimers();

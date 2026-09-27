@@ -357,24 +357,10 @@ function useEstimate<T>(
   return settled ? { result: preview.result, error: preview.error } : {};
 }
 
-/** The list status of the fire season's preparedness. */
-function preparednessStatus(
-  game: GameType,
-  preparedness: WildfirePreparednessType,
-): string {
-  const { season } = preparedness;
-  if (preparedness.funded)
-    return `Funded · ${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)} season`;
-  if (preparedness.tooLate) return "No fire season left in this run";
-  return season.startMonth > game.date.monthsElapsed
-    ? `Not funded · fire season starts ${labelMonth(game, season.startMonth)}`
-    : `Not funded · fire season runs through ${labelMonth(game, season.endMonth - 1)}`;
+/** Keep the standing program's status and yearly budget visible in the list. */
+function preparednessStatus(preparedness: WildfirePreparednessType): string {
+  return `${preparedness.active ? "On" : "Off"} · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
 }
-
-const coverage = (game: GameType, from: number, to: number) =>
-  from === to
-    ? `Covers ${labelMonth(game, from)}`
-    : `Covers ${labelMonth(game, from)} to ${labelMonth(game, to)}`;
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 
@@ -393,45 +379,31 @@ function WildfireDetails({
   error?: string;
 }) {
   const { season } = preparedness;
-  const end =
-    getScenario(game.scenarioId, game.customScenario)?.durationMonths ??
-    season.endMonth;
   const facts: [string, string][] = [
+    ["Status", preparedness.active ? "On · stays on until turned off" : "Off"],
+    ["Annual budget", `${formatMoneyConcise(preparedness.annualCost)}/yr`],
     [
-      "Fire season",
+      "Billing",
+      `${formatMoneyConcise(preparedness.annualCost / 12)}/month · no upfront payment`,
+    ],
+    ["Protection", "New wildfires while the program is on"],
+    [
+      "Next wildfire season",
       `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
     ],
-    [
-      "Status",
-      preparedness.funded
-        ? "Funded"
-        : preparedness.tooLate
-          ? "Ends before another month of this run"
-          : "Not funded",
-    ],
   ];
-  if (!preparedness.funded && !preparedness.tooLate)
-    facts.push(
-      [
-        "If funded now",
-        coverage(
-          game,
-          preparedness.firstCoveredMonth,
-          Math.min(season.endMonth, end) - 1,
-        ),
-      ],
-      ["One-time cost", formatMoneyConcise(preparedness.cost)],
-    );
   const standard = result?.standardIncident;
   const prepared = result?.preparedIncident;
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
       <Typography>
         Crews, line inspections and vegetation clearing ready{" "}
-        {game.location.name} for its fire season. If a wildfire starts while the
-        season is covered, safety shutoffs disconnect half as much customer load
-        and affected generators lose half as much output. Funding does not
-        prevent fires, and restoration costs apply either way.
+        {game.location.name} year-round. If a wildfire starts while the program
+        is on, safety shutoffs disconnect half as much customer load and
+        affected generators lose half as much output. It stays on across years
+        without another opt-in; turn it off to stop spending. Existing fires
+        keep the response they started with. Preparedness does not prevent
+        fires, and restoration costs apply either way.
       </Typography>
       <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
       <Box component="dl" className="customerProgramFacts">
@@ -446,16 +418,22 @@ function WildfireDetails({
           </React.Fragment>
         ))}
       </Box>
+      {month === undefined && (
+        <Typography variant="body2" color="textSecondary">
+          The next wildfire season starts after this run ends. The program can
+          still protect against new fires before then.
+        </Typography>
+      )}
       {month !== undefined && (
         <>
           <Box>
             <Typography component="h3" variant="subtitle1">
-              Simulated wildfire · {labelMonth(game, month)}
+              Next wildfire season · simulated fire in {labelMonth(game, month)}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              A typical fire in the season's highest-risk month you can still
-              cover. It is an illustration, not a forecast of when a fire will
-              start.
+              A typical fire in the next season's highest-risk month. It
+              illustrates the program's effects, not whether or when a real fire
+              will start.
             </Typography>
           </Box>
           {error ? (
@@ -515,9 +493,8 @@ function WildfireDetails({
                 <Typography>
                   Utility cash if this fire strikes:{" "}
                   {formatMoneyConcise(result.cashBenefit)} better with
-                  preparedness
-                  {!preparedness.funded &&
-                    `, for its ${formatMoneyConcise(preparedness.cost)} cost`}
+                  preparedness, before the{" "}
+                  {formatMoneyConcise(preparedness.annualCost)}/yr program cost
                 </Typography>
               </Box>
             </>
@@ -729,8 +706,7 @@ function ProgramsScreen({
     );
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
-  const fundable =
-    !!preparedness?.choice && !game.replayPlayback && cash >= preparedness.cost;
+  const canChangePreparedness = !!preparedness && !game.replayPlayback;
   const title = selected
     ? selected === "wildfire"
       ? "Wildfire preparedness"
@@ -803,7 +779,9 @@ function ProgramsScreen({
         {!selected ? (
           <Box className="customerProgramList">
             <Typography variant="body2" color="textSecondary">
-              Changes start next month.
+              {preparedness
+                ? "Wildfire preparedness changes apply now. Other programs start next month."
+                : "Changes start next month."}
             </Typography>
             {policiesOn &&
               section(
@@ -820,11 +798,11 @@ function ProgramsScreen({
                 row({
                   id: "wildfire",
                   name: "Wildfire preparedness",
-                  status: preparednessStatus(game, preparedness),
+                  status: preparednessStatus(preparedness),
                   description:
-                    "Halve wildfire disconnections and generator losses for a fire season.",
+                    "Ongoing protection: halve wildfire disconnections and generator losses. Billed monthly until turned off.",
                   Icon: LocalFireDepartmentIcon,
-                  active: preparedness.funded,
+                  active: preparedness.active,
                   onOpen: () => setSelected("wildfire"),
                 }),
               ])}
@@ -1070,21 +1048,20 @@ function ProgramsScreen({
             ? preparedness?.choice && (
                 <Button
                   variant="contained"
-                  disabled={!fundable}
-                  aria-describedby={
-                    cash < preparedness.cost ? "wildfire-cash-note" : undefined
-                  }
+                  disabled={!canChangePreparedness}
                   onClick={() => {
                     dispatch(
                       chooseScenarioResponse({
                         decisionId: preparedness.choice!.id,
-                        optionId: "prepare",
+                        optionId: preparedness.active ? "stop" : "prepare",
                       }),
                     );
                     setSelected(undefined);
                   }}
                 >
-                  Fund preparedness ({formatMoneyConcise(preparedness.cost)})
+                  {preparedness.active
+                    ? "Turn off preparedness"
+                    : `Start preparedness (${formatMoneyConcise(preparedness.annualCost)}/yr)`}
                 </Button>
               )
             : !complete && (
@@ -1132,17 +1109,6 @@ function ProgramsScreen({
                           : "Start build-out next month"}
                 </Button>
               )}
-          {selected === "wildfire" &&
-            preparedness?.choice &&
-            cash < preparedness.cost && (
-              <Typography
-                id="wildfire-cash-note"
-                variant="body2"
-                color="textSecondary"
-              >
-                Not enough cash
-              </Typography>
-            )}
         </div>
       )}
     </Dialog>
@@ -1176,7 +1142,7 @@ export default function CustomerPrograms({
         ).length
       : 0) +
     building.length +
-    (preparedness?.funded ? 1 : 0);
+    (preparedness?.active ? 1 : 0);
   const pending = POLICY_IDS.some((id) => programs[id].pending);
   const budget = building.reduce(
     (sum, id) => sum + policyBudget(game, id, "On", game.date.monthsElapsed),
@@ -1193,7 +1159,7 @@ export default function CustomerPrograms({
         title={
           pending
             ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
-            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.funded ? " · wildfire preparedness funded" : ""}`
+            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
         variant="contained"

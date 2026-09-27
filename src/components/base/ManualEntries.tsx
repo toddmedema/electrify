@@ -216,12 +216,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Wildfire preparedness:</strong> In custom games in fire-prone
-          areas, you can fund crews, inspections and vegetation clearing for the
-          current or next fire season, once per season. If a wildfire starts
-          while the season is covered, safety shutoffs disconnect half as much
-          customer load and affected generators lose half as much output. It
-          does not prevent fires, and restoration costs apply either way. Its
-          page simulates a typical fire both ways.
+          areas, you can keep crews, inspections and vegetation clearing funded
+          year-round. The annual budget is billed monthly and stays fixed while
+          the program is on. It continues across years until you turn it off,
+          with no annual opt-in or upfront payment. If a wildfire starts while
+          the program is on, safety shutoffs disconnect half as much customer
+          load and affected generators lose half as much output. It does not
+          prevent fires, and restoration costs apply either way. Its page
+          simulates a typical fire in the next wildfire season both ways.
+          Turning it off stops spending and protection against new fires; an
+          existing fire keeps the response it started with.
         </p>
       </div>
     ),

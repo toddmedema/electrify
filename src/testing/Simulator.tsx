@@ -610,7 +610,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       prevTick = null;
     }
     // Optional choices (wildfire preparedness) are only taken up when the run asks for them; an
-    // unknown option, like the free "standard" of a declined season, simply leaves them alone.
+    // unknown option leaves the ongoing program unchanged.
     // They change at most monthly, so the bot looks once at the start of each month.
     const offer =
       state.replayPlayback || offerCheckedMonth === state.date.monthsElapsed

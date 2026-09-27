@@ -1,7 +1,6 @@
 import {
   ActiveWorldEventType,
   DateType,
-  DifficultyType,
   GameType,
   MonthlyHistoryType,
   ScenarioChoiceType,
@@ -59,7 +58,7 @@ function restorationSeverityFactor(severity: number): number {
 /** Preparedness halves disconnections and output losses, mirroring the authored scenario 111. */
 export const WILDFIRE_PREPAREDNESS_DISCONNECTION_FACTOR = 0.5;
 
-/** Season-scoped preparedness price, per MWh of exposed monthly demand, before difficulty scaling. */
+/** Annual preparedness budget per MWh of average monthly demand, before difficulty scaling. */
 export const WILDFIRE_PREPAREDNESS_COST_PER_MWH = 3;
 
 function lerp(min: number, max: number, t: number): number {
@@ -74,12 +73,12 @@ export function wildfireOccurrenceKey(
   return `wildfire:${locationId}:${monthsElapsed}`;
 }
 
-/** The season-scoped preparedness decision key, stable per location and calendar year. */
+/** Each program change has its own replay-safe key, including toggles in the same month. */
 export function wildfirePreparednessKey(
   locationId: string,
-  year: number,
+  change: number,
 ): string {
-  return `wildfire:${locationId}:${year}:preparedness`;
+  return `wildfire:${locationId}:preparedness:${change}`;
 }
 
 /** One addressed draw in [0, 1) for a hazard attribute; pure and order-independent. */
@@ -243,9 +242,9 @@ export function activeWildfire(
   );
 }
 
-/** One fire season's preparedness coverage, in absolute months (end exclusive). */
+/** A fire season used by the preview, in absolute months (end exclusive). */
 export interface WildfireSeasonType {
-  /** Calendar year the season starts in; it names the season's preparedness key. */
+  /** Calendar year the season starts in. */
   year: number;
   startMonth: number;
   endMonth: number;
@@ -261,7 +260,7 @@ function wildfireSeasonStart(
 }
 
 /**
- * The fire season preparedness would cover from an absolute month: the one underway, or else the
+ * The fire season at an absolute month: the one underway, or else the
  * next one to start. Seasons run `preparednessDurationMonths` from the profile's preparedness month.
  */
 export function wildfireSeasonAt(
@@ -285,39 +284,48 @@ export function wildfireSeasonAt(
   };
 }
 
-/**
- * Whether funded preparedness covers this location at an absolute month: the player funded the
- * season whose window contains the month. Funding is season-scoped, so paying ahead of the season
- * covers all of it and paying partway through covers what is left.
- */
+/** Latest accepted program change at this instant. Array order breaks same-minute ties. */
+export function wildfirePreparednessChange(
+  occurrences: ActiveWorldEventType[],
+  locationId: string,
+  minute: number,
+): ActiveWorldEventType | undefined {
+  for (let i = occurrences.length - 1; i >= 0; i--) {
+    const event = occurrences[i];
+    if (
+      event.key.startsWith(`wildfire:${locationId}:preparedness:`) &&
+      event.startsMinute <= minute
+    )
+      return event;
+  }
+  return undefined;
+}
+
+/** Standing preparedness protects against new fires until the player turns it off. */
 export function activePreparedness(
   occurrences: ActiveWorldEventType[],
   locationId: string,
   monthsElapsed: number,
-  startingYear: number,
 ): boolean {
-  const profile = getWildfireProfile(locationId);
-  if (!profile) {
-    return false;
-  }
-  return occurrences.some((event) => {
-    if (event.attributes.choice !== "prepare") {
-      return false;
-    }
-    const match = /^wildfire:(.+):(\d+):preparedness$/.exec(event.key);
-    if (!match || match[1] !== locationId) {
-      return false;
-    }
-    const startMonth = wildfireSeasonStart(
-      profile,
-      startingYear,
-      Number(match[2]),
-    );
-    return (
-      monthsElapsed >= startMonth &&
-      monthsElapsed < startMonth + profile.preparednessDurationMonths
-    );
-  });
+  return (
+    wildfirePreparednessChange(
+      occurrences,
+      locationId,
+      monthsElapsed * MINUTES_PER_MONTH,
+    )?.attributes.choice === "prepare"
+  );
+}
+
+/** Annual operating budget, accrued by the same tick accounting as other operating costs. */
+export function wildfirePreparednessAnnualCost(
+  occurrences: ActiveWorldEventType[],
+  locationId: string,
+  minute: number,
+): number {
+  const change = wildfirePreparednessChange(occurrences, locationId, minute);
+  return change?.attributes.choice === "prepare"
+    ? Number(change.attributes.annualCost || 0)
+    : 0;
 }
 
 /** Restoration cost per active month, scaled to exposed system size and incident severity. */
@@ -636,59 +644,46 @@ export function wildfireSeasonOdds(profile: WildfireProfileType): string {
   return `About a 1-in-${odds} chance of a wildfire here before ${end}; risk peaks in ${MONTH_NAMES[peak]}.`;
 }
 
-/** Where the player stands on the upcoming or current fire season's preparedness. */
+/** Standing program terms and the next fire season used for its illustrative preview. */
 export interface WildfirePreparednessType {
   profile: WildfireProfileType;
   season: WildfireSeasonType;
-  /** First month a hazard check could still meet funded crews: the season's start or next month. */
-  firstCoveredMonth: number;
-  funded: boolean;
-  /** Funding would cover no month of this run. */
+  active: boolean;
+  /** The next season starts after this run ends; starting the program can still protect earlier fires. */
   tooLate: boolean;
-  /** The one-time price at the game's difficulty. */
-  cost: number;
-  /** The replayable choice that funds it; undefined once funded or too late. */
-  choice?: ScenarioChoiceType;
+  annualCost: number;
+  choice: ScenarioChoiceType;
 }
 
-/**
- * Season-scoped wildfire preparedness for an eligible game. It is an optional program rather than
- * a decision the clock waits on: the player can fund the current or next fire season at any time,
- * once per season, through the same replayable chooseScenarioResponse action. The price scales to
- * the exposed system's monthly demand and the difficulty, so it is a meaningful tradeoff rather
- * than a fixed municipal figure. Returns undefined when the hazard does not apply.
- */
+/** An ongoing, opt-in program. Its annual budget stays fixed until it is stopped and restarted. */
 export function wildfirePreparedness(
   game: GameType,
 ): WildfirePreparednessType | undefined {
-  if (!isWildfireHazardEligible(game)) {
-    return undefined;
-  }
+  if (!isWildfireHazardEligible(game)) return undefined;
   const profile = getWildfireProfile(game.location.id);
-  if (!profile) {
-    return undefined;
-  }
-  // Hazard checks run at each month's start, so next month is the first funding can still meet;
-  // a season that ends this month has nothing left to cover, and the next one is on offer.
-  const season = wildfireSeasonAt(
-    profile,
-    game.startingYear,
-    game.date.monthsElapsed + 1,
+  if (!profile) return undefined;
+  const firstMonth = game.date.monthsElapsed + 1;
+  let season = wildfireSeasonAt(profile, game.startingYear, firstMonth);
+  if (season.startMonth < firstMonth)
+    season = wildfireSeasonAt(profile, game.startingYear, season.endMonth);
+  const changes = game.worldEvents.occurrences.filter((event) =>
+    event.key.startsWith(`wildfire:${game.location.id}:preparedness:`),
   );
-  const key = wildfirePreparednessKey(game.location.id, season.year);
-  const funded = game.worldEvents.occurrences.some(
-    (event) => event.key === key && event.attributes.choice === "prepare",
+  const nextChange = changes.reduce(
+    (next, event) => Math.max(next, Number(event.key.split(":").pop()) + 1),
+    0,
   );
-  const firstCoveredMonth = Math.max(
-    season.startMonth,
-    game.date.monthsElapsed + 1,
+  const key = wildfirePreparednessKey(game.location.id, nextChange);
+  const current = wildfirePreparednessChange(
+    changes,
+    game.location.id,
+    game.date.minute,
   );
+  const active = current?.attributes.choice === "prepare";
   const runEnd =
     getScenario(game.scenarioId, game.customScenario)?.durationMonths ??
     Infinity;
-  const tooLate = firstCoveredMonth >= Math.min(season.endMonth, runEnd);
-  // Priced per month of recent demand. A run's first months have little or no history to
-  // average, so those fall back to the forecast's first month rather than pricing it at nothing.
+  // A starting run uses its forecast until completed monthly demand is available.
   const recent = game.monthlyHistory.slice(0, 12);
   const monthlyDemandWh = recent.length
     ? summarizeHistory(recent).demandWh / recent.length
@@ -700,39 +695,37 @@ export function wildfirePreparedness(
         ),
         game.startingYear,
       ).demandWh;
-  const exposedDemandMWh = monthlyDemandWh / 1e6;
-  const costAt = (difficulty: DifficultyType): number =>
-    Math.round(
-      WILDFIRE_PREPAREDNESS_COST_PER_MWH *
-        exposedDemandMWh *
-        DIFFICULTIES[difficulty].buildCost,
-    );
+  const annualCost = active
+    ? Number(current.attributes.annualCost)
+    : Math.round(
+        ((WILDFIRE_PREPAREDNESS_COST_PER_MWH * monthlyDemandWh) / 1e6) *
+          DIFFICULTIES[game.difficulty].buildCost,
+      );
   return {
     profile,
     season,
-    firstCoveredMonth,
-    funded,
-    tooLate: !funded && tooLate,
-    cost: costAt(game.difficulty),
-    choice:
-      funded || tooLate
-        ? undefined
-        : {
-            id: key,
-            scenarioId: game.scenarioId,
-            atMonth: game.date.monthsElapsed,
-            title: "Wildfire preparedness",
-            message: wildfireSeasonOdds(profile),
-            options: [
-              {
-                id: "prepare",
-                label: "Fund preparedness",
-                cost: costAt,
-                description:
-                  "Halve customer disconnections and generator output losses if a wildfire starts before the season ends.",
-                message: "Wildfire preparedness funded for the fire season.",
-              },
-            ],
-          },
+    active,
+    annualCost,
+    tooLate: season.startMonth >= runEnd,
+    choice: {
+      id: key,
+      scenarioId: game.scenarioId,
+      atMonth: game.date.monthsElapsed,
+      title: "Wildfire preparedness",
+      message: wildfireSeasonOdds(profile),
+      options: [
+        {
+          id: active ? "stop" : "prepare",
+          label: active ? "Turn off preparedness" : "Start preparedness",
+          cost: () => 0,
+          description: active
+            ? "Stop ongoing spending and return to standard response for future fires."
+            : "Ongoing annual budget, billed monthly. Stays on until you turn it off.",
+          message: active
+            ? "Wildfire preparedness turned off. Future fires use the standard response."
+            : "Wildfire preparedness started. Its annual budget is billed monthly until turned off.",
+        },
+      ],
+    },
   };
 }
