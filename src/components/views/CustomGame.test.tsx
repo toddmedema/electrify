@@ -294,6 +294,34 @@ it("re-quotes starting cash when the starting year changes", () => {
   );
 });
 
+it("quotes electricity rates at the prices of a historical starting year", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, dollarsPerkWh: 0.05 }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Starting year" }));
+  fireEvent.click(screen.getByRole("option", { name: "1980" }));
+  fireEvent.mouseDown(
+    screen.getByRole("combobox", { name: "Electricity rate" }),
+  );
+  expect(
+    screen.getAllByRole("option").map((option) => option.textContent),
+  ).toEqual(["$0.022/kWh", "$0.031/kWh", "$0.044/kWh", "$0.067/kWh"]);
+  fireEvent.click(screen.getByRole("option", { name: "$0.022/kWh" }));
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({ startingYear: 1980, dollarsPerkWh: 0.022 }),
+  );
+});
+
 it("scales starting nameplate capacity with starting customers", () => {
   const onStart = jest.fn();
   render(
