@@ -5613,6 +5613,10 @@ $sizemap: (
   font-weight: 500;
   color: var(--font-color-faded);
 }
+/* The mechanism prose is depth, not a decision input; it stays collapsed by default. */
+.customerProgramHowItWorks summary {
+  font-weight: 600;
+}
 .base_main .eventLogItem {
   border-style: solid;
   border-radius: 8px;
