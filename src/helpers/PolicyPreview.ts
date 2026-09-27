@@ -40,9 +40,6 @@ export function previewPolicy(
     changed: changed.map((t) => t.demandW),
     before: summarizeTimeline(current, game.startingYear),
     after: summarizeTimeline(changed, game.startingYear),
-    // The balance difference spans the same period as the projection, including every
-    // intervening month's program spending, reduced sales, dispatch, and debt payments.
-    cashChange: after[after.length - 1].cash - before[before.length - 1].cash,
   };
 }
 export type PolicyPreviewResult = ReturnType<typeof previewPolicy>;

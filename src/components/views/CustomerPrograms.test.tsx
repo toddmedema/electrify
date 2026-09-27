@@ -126,7 +126,11 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
       return worker as unknown as Worker;
     });
   const game = createGame({ scenarioId: 106 });
-  const result = previewPolicy(game, { id: "solar", tier: "On", month: 1 }, 1);
+  const result = previewPolicy(
+    game,
+    { id: "timeOfUse", tier: "On", month: 1, startHour: 22 },
+    1,
+  );
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -138,22 +142,31 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
+  fireEvent.click(screen.getByRole("radio", { name: /^On$/ }));
+  const dailyWindow = screen.getByLabelText(
+    "Daily window",
+  ) as HTMLSelectElement;
   act(() => {
     jest.advanceTimersByTime(250);
   });
+  // Moving the window starts a fresh preview that supersedes the previous worker.
+  const moveWindow = () => {
+    fireEvent.change(dailyWindow, {
+      target: { value: String((Number(dailyWindow.value) + 1) % 24) },
+    });
+    act(() => {
+      jest.advanceTimersByTime(250);
+    });
+  };
   const old = workers[workers.length - 1];
-  fireEvent.click(
-    screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-  );
+  moveWindow();
   expect(old.terminate).toHaveBeenCalled();
   act(() => {
     old.onmessage!({ data: { result } });
   });
-  const apply = screen.getByRole("button", {
-    name: "Start build-out next month",
-  });
+  const apply = screen.getByRole("button", { name: "Turn on next month" });
   expect(apply).toBeDisabled();
   act(() => {
     jest.advanceTimersByTime(250);
@@ -171,12 +184,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
   expect(apply).toBeDisabled();
   fallback.mockRestore();
-  fireEvent.click(
-    screen.getByRole("button", { name: "First effective month" }),
-  );
-  act(() => {
-    jest.advanceTimersByTime(250);
-  });
+  moveWindow();
   act(() => {
     workers[workers.length - 1].onmessage!({ data: { result } });
   });
@@ -190,7 +198,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
 });
 
 test.each<PolicyId>(["solar", "efficiency"])(
-  "%s keeps energy and cash tradeoffs visible when peak demand is unchanged",
+  "%s keeps energy tradeoffs visible when peak demand is unchanged",
   (id) => {
     jest.useFakeTimers();
     const worker = {
@@ -222,17 +230,10 @@ test.each<PolicyId>(["solar", "efficiency"])(
         name: `${POLICIES[id].name} · Not started`,
       }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-    );
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
 
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
-    expect(screen.getByText(/^Change in utility cash/)).toBeVisible();
-    expect(screen.getByText(/^Change in utility cash/)).toHaveTextContent(
-      `Jan 2024: ${formatMoneyConcise(result.cashChange)}`,
-    );
     const hint = screen.getByText(/^Little change in peak demand/);
     expect(hint).toBeVisible();
     expect(hint).toHaveTextContent(
@@ -337,10 +338,6 @@ test("in-progress and completed build-outs read as projects in the list and tool
   ).toHaveAttribute("aria-valuetext", "Month 8 of 48 · $1M spent");
   expect(fact("Remaining")).toBe("40 months");
   expect(fact("Finishes")).toBe("May 2023");
-  // The preview of a pause compares against the finish the project had planned.
-  expect(
-    screen.getByRole("button", { name: "At planned completion (May 2023)" }),
-  ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Pause new installations next month" }),
   ).toBeInTheDocument();
@@ -437,9 +434,6 @@ test.each([
     expect(
       screen.queryByText(/Estimated utility demand/),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /completion/ }),
-    ).not.toBeInTheDocument();
     // A scheduled pause has no finish to promise; a scheduled resume does.
     expect(fact("Finishes")).toBe(finish);
     act(() => jest.advanceTimersByTime(250));
@@ -471,7 +465,6 @@ test("the completion preview is capped at the run's last month", () => {
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
   expect(fact("If started now")).toBe("After this run ends");
-  fireEvent.click(screen.getByRole("button", { name: "By Dec 2035" }));
   expect(
     screen.getByText("Estimated utility demand · Dec 2035"),
   ).toBeInTheDocument();

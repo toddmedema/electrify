@@ -40,7 +40,6 @@ for (const theme of ["light", "dark"]) {
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
-    await expect(dialog.getByText(/^Change in utility cash/)).toBeVisible();
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -54,12 +53,8 @@ for (const theme of ["light", "dark"]) {
     await page.screenshot({
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
-    await dialog
-      .getByRole("button", { name: "At completion (Jan 2024)" })
-      .click();
-    await expect(apply).toBeEnabled({ timeout: 30000 });
+    // The estimate always shows the end of the program, so no toggle is needed.
     await expect(dialog).toContainText("Estimated utility demand · Jan 2024");
-    await dialog.getByRole("button", { name: "First effective month" }).click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();
     await expect(scheduled).toBeVisible();

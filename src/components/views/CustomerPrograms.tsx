@@ -277,7 +277,6 @@ function Decision({
   const [selected, setSelected] = React.useState<PolicyId>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
   const [startHour, setStartHour] = React.useState(17);
-  const [later, setLater] = React.useState(false);
   const [preview, setPreview] = React.useState<{
     key: string;
     snapshot: GameType;
@@ -300,13 +299,15 @@ function Decision({
     selected && !isOperatingPolicy(selected)
       ? (selected as BuildoutPolicyId)
       : undefined;
-  // The comparison month is the unpaused completion from next month: when a start or resume
-  // would finish, or when a pause cuts off what would otherwise have finished then.
+  // The estimate always shows the end of the program rather than its first month. For a
+  // build-out that is its unpaused completion from next month (when a start or resume would
+  // finish, or when a pause cuts off what would otherwise have finished then); an operating
+  // offer has no end, so its first effective month. Either way it is capped at the run's last
+  // month.
   const completion = buildout
     ? buildoutCompletionMonth(buildout, selectedProgram!.adoption, effective)
     : effective;
-  const laterMonth = Math.max(effective, Math.min(completion, end - 1));
-  const month = later ? laterMonth : effective;
+  const month = Math.max(effective, Math.min(completion, end - 1));
   const key = `${selected}/${tier}/${startHour}/${month}/${game.date.minute}`;
   React.useEffect(() => {
     if (
@@ -419,7 +420,6 @@ function Decision({
         program.startHour ??
         (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
     );
-    setLater(false);
   };
   // Rows share the scenario pick list's card, so both catalogs scan the same way.
   const choice = (id: PolicyId) => {
@@ -593,17 +593,6 @@ function Decision({
                 <Typography component="h3" variant="subtitle1">
                   Estimated utility demand · {labelMonth(game, month)}
                 </Typography>
-                {buildout && laterMonth > effective && (
-                  <Button onClick={() => setLater(!later)}>
-                    {later
-                      ? "First effective month"
-                      : completion >= end
-                        ? `By ${labelMonth(game, laterMonth)}`
-                        : tier === "Off"
-                          ? `At planned completion (${labelMonth(game, laterMonth)})`
-                          : `At completion (${labelMonth(game, laterMonth)})`}
-                  </Button>
-                )}
                 {error ? (
                   <Alert severity="error">{error}</Alert>
                 ) : !result ? (
@@ -615,7 +604,7 @@ function Decision({
                     </Typography>
                     <PolicyDemandChartPlaceholder />
                     <Box aria-hidden>
-                      {Array.from({ length: operating ? 2 : 4 }, (_, i) => (
+                      {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
                         <Typography key={i}>
                           <Skeleton width={i % 2 ? "60%" : "80%"} />
                         </Typography>
@@ -635,13 +624,6 @@ function Decision({
                       changed={result.changed}
                     />
                     <Box role="status">
-                      {!operating && (
-                        <Typography>
-                          Program spending:{" "}
-                          {formatMoneyConcise(result.spending)} in{" "}
-                          {labelMonth(game, month)}
-                        </Typography>
-                      )}
                       <Typography>
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
@@ -654,11 +636,6 @@ function Decision({
                           {labelMonth(game, month)}
                         </Typography>
                       )}
-                      <Typography>
-                        Change in utility cash from now through{" "}
-                        {labelMonth(game, month)}:{" "}
-                        {formatMoneyConcise(result.cashChange)}
-                      </Typography>
 
                       {formatWatts(peakBefore) === formatWatts(peakAfter) ||
                       Math.abs(peakAfter - peakBefore) < peakBefore * 0.001 ? (
