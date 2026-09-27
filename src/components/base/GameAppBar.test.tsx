@@ -127,6 +127,45 @@ describe("GameAppBar", () => {
     });
   });
 
+  it("shows active events beside the grid readout and opens Events", () => {
+    const onEvidence = jest.fn();
+    renderAppBar({
+      activeEvents: [
+        {
+          key: "fire",
+          title: "Wildfire emergency",
+          importance: "CRITICAL",
+          count: 1,
+          throughLabel: "through Mar 2026",
+        },
+      ],
+      onEvidence,
+    });
+    const chip = screen.getByRole("button", { name: /Wildfire emergency/ });
+    const readout = screen.getByLabelText(/Current grid status/);
+    expect(readout).toHaveClass("hasActiveEvents");
+    expect(readout).toContainElement(chip);
+    fireEvent.click(chip);
+    expect(onEvidence).toHaveBeenCalledWith({ card: "EVENTS" });
+  });
+
+  it("leaves active events to the tutorial HUD", () => {
+    const game = createGame({ scenarioId: 0 });
+    renderAppBar({
+      game: { ...game, inGame: true },
+      activeEvents: [
+        {
+          key: "fire",
+          title: "Wildfire emergency",
+          importance: "CRITICAL",
+          count: 1,
+          throughLabel: "through Mar 2026",
+        },
+      ],
+    });
+    expect(screen.queryByRole("button", { name: /Active events/ })).toBeNull();
+  });
+
   it("returns focus to the primary action after Save & Quit", () => {
     jest.useFakeTimers();
     const target = document.createElement("button");

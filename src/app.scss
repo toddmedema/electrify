@@ -901,6 +901,103 @@ $topbar_height: 56px;
   line-height: 1.25;
 }
 
+// Ongoing events ride at the trailing end of the grid readout instead of adding a row. The slot
+// takes its width from the row, not its content, so its container queries can shed the lead
+// title for a plain count before anything wraps. The chip matches the mission row's control
+// height, which already sets the bar's height, so an event never makes the bar taller.
+.activeEventsSlot {
+  container: active-events / inline-size;
+  display: flex;
+  flex: 1 1 0;
+  justify-content: flex-end;
+  align-self: center;
+  min-width: 4rem;
+  overflow: hidden;
+}
+
+.gridHealth .activeEventsChip {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border-tile);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: $font_color_primary;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: none;
+  white-space: nowrap;
+
+  .conceptIcon {
+    color: $interactive_blue;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--interactive-tint);
+  }
+
+  &.activeEventsChip-critical {
+    border-color: var(--delta-bad);
+    background: var(--blackout-tint);
+    color: var(--delta-bad);
+
+    .conceptIcon {
+      color: $blackout_red;
+    }
+  }
+}
+
+.activeEventsTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeEventsMore {
+  flex-shrink: 0;
+  font-weight: 400;
+}
+
+.activeEventsCount {
+  display: none;
+}
+
+@container active-events (max-width: 149px) {
+  .activeEventsTitle,
+  .activeEventsMore {
+    display: none;
+  }
+  .activeEventsCount {
+    display: inline;
+  }
+}
+
+@container active-events (max-width: 87px) {
+  .activeEventsIcon {
+    display: none;
+  }
+}
+
+// The grid state and its size keep their room; the metric's "reserve" suffix goes first.
+.gridHealth.hasActiveEvents .gridHealthMetric {
+  min-width: 6ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (pointer: coarse) {
+  .gridHealth .activeEventsChip {
+    height: 44px;
+  }
+}
+
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
 @media #{$pane_media} {
@@ -956,6 +1053,25 @@ $topbar_height: 56px;
     .gridHealthMetric {
       min-width: 0;
       text-align: right;
+    }
+  }
+  // With an event beside it the readout turns into one row: state and cushion on the left,
+  // the event on the right, still inside the row's 56px.
+  .gridHealth.hasActiveEvents {
+    flex-direction: row;
+    gap: 12px;
+    padding-block: 0;
+
+    .gridHealthSummary {
+      flex: 0 1 auto;
+      width: auto;
+      min-width: 0;
+      grid-template-columns: auto minmax(0, auto);
+      gap: 8px;
+    }
+
+    .gridHealthMetric {
+      text-align: left;
     }
   }
   // Same left inset as the grid readout above, so their warning icons stack in one column.
