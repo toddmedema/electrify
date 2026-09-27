@@ -179,21 +179,6 @@ $delta_bad: var(--delta-bad);
   transition: opacity 250ms ease-out;
 }
 
-.fade-enter {
-  opacity: 0.01;
-}
-.fade-enter.fade-enter-active {
-  opacity: 1;
-  transition: opacity 500ms ease-in;
-}
-.fade-exit {
-  opacity: 1;
-}
-.fade-exit.fade-exit-active {
-  opacity: 0.01;
-  transition: opacity 500ms ease-out;
-}
-
 .fadein-fast {
   opacity: 0;
   animation-name: fadein;
@@ -407,21 +392,10 @@ button,
   }
 }
 
-.draggable-indicator {
-  position: absolute;
-  left: -4px;
-  z-index: 1;
-  opacity: 0.5;
-}
-
 .base_main .MuiToolbar-root {
   min-height: 0 !important;
   flex: 0 0 auto;
   flex-flow: wrap !important;
-
-  &.bottomBorder {
-    border-bottom: $border_accent;
-  }
 
   h6 {
     flex-grow: 1;
@@ -459,21 +433,6 @@ table {
   // adds the same breathing room above the row without moving the text inside it.
   tr.bold td {
     border-top: 10px solid transparent;
-  }
-}
-
-// Table has base left padding of 16px, each tab is 20px
-.tabs-1 {
-  td {
-    padding-left: 36px;
-  }
-}
-.tabs-2 {
-  td:first-of-type {
-    padding-left: 56px;
-  }
-  td {
-    font-weight: 200;
   }
 }
 
@@ -790,12 +749,6 @@ $topbar_height: 56px;
   .missionSummary .missionDetailsButton {
     width: 44px;
     height: 44px;
-  }
-}
-
-@media (pointer: coarse), (max-width: 768px) {
-  .facilityActions .facilityReorderButton {
-    display: none;
   }
 }
 
@@ -1154,15 +1107,6 @@ $pane_header_height: 48px;
   }
 }
 
-.facilityTabs {
-  min-height: 40px !important;
-  border-bottom: 1px solid var(--border-subtle);
-
-  .MuiTab-root {
-    min-height: 40px;
-    padding: 8px 12px;
-  }
-}
 
 .transmissionPanel {
   display: flex;
@@ -1273,21 +1217,6 @@ $pane_header_height: 48px;
   height: 40px;
 }
 
-.transmissionEmpty {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 24px;
-  text-align: center;
-
-  img {
-    width: 64px;
-    height: 64px;
-  }
-}
 
 .powerExchangeSummary {
   display: flex;
@@ -1500,11 +1429,6 @@ $pane_header_height: 48px;
 
 .insightsRateSliderCollapsed {
   display: none;
-}
-
-.insightsHistoryNotice {
-  padding: 8px 16px;
-  border-bottom: $border_accent;
 }
 
 .insightsViewportToolbar {
@@ -2266,12 +2190,6 @@ html[data-theme="dark"] .uplot {
   justify-content: flex-end;
 }
 
-// Spaces one forecast chart from the one above it. The stack used to sit on pairs of <br>s,
-// which cost more height than the gap needs and more than a screenful of charts can spare
-.base_main .MuiToolbar-root.forecastSection {
-  margin-top: 12px;
-}
-
 .chartLegendItem {
   display: inline-flex;
   align-items: center;
@@ -2324,11 +2242,6 @@ html[data-theme="dark"] .uplot {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
   border-radius: 4px;
-}
-
-// for text inputs that are close to bottom, give the screen space to scroll up
-.inputSpacer {
-  margin-bottom: 100%;
 }
 
 .scenarioDossier {
@@ -2452,12 +2365,6 @@ html[data-theme="dark"] .uplot {
   .difficultyPicker .MuiToggleButton-root {
     padding-inline: 2px;
   }
-}
-
-// Units appended to numbers in tables, de-emphasized so the number still reads first
-.unitSuffix {
-  opacity: 0.6;
-  font-size: 0.85em;
 }
 
 // Two-column "key(s) -> meaning" listings: keyboard shortcuts (Settings + Manual) and the
@@ -2694,8 +2601,7 @@ html[data-theme="dark"] .uplot {
   // interface. Text remains beside it for first-time recognition and screen magnification.
   .gameStatus,
   .gameStatusValue,
-  .iconLabel,
-  .scoreBreakdownRow {
+  .iconLabel {
     display: flex;
     align-items: center;
   }
@@ -2706,13 +2612,8 @@ html[data-theme="dark"] .uplot {
   }
 
   .gameStatusValue,
-  .iconLabel,
-  .scoreBreakdownRow {
+  .iconLabel {
     gap: size(tiny);
-  }
-
-  .scoreBreakdownRow {
-    min-height: 24px;
   }
 
   .conceptLegend {
@@ -2730,13 +2631,6 @@ html[data-theme="dark"] .uplot {
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     background: var(--bg-raised);
-  }
-
-  .clickable-card {
-    &:hover {
-      cursor: pointer;
-      background: var(--bg-raised);
-    }
   }
 
   .MuiCard-root {
@@ -3773,52 +3667,6 @@ html[data-theme="dark"] .uplot {
     overflow: visible;
   }
 
-  // Every headline metric drawn at once, with the one on the big chart above promoted. A grid
-  // rather than a row of six, so the tiles rewrap as the pane is dragged narrower instead of
-  // being squeezed to the width of their labels
-  .metricTiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: size(small);
-    padding: size(small) size(base) 0 size(base);
-  }
-
-  .metricTile {
-    display: block;
-    padding: size(small);
-    border: 1px solid var(--border-tile);
-    border-radius: 4px;
-    background: none;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--bg-raised);
-    }
-
-    &:focus-visible {
-      outline: 2px solid $interactive_blue;
-      outline-offset: -2px;
-    }
-
-    &.selected {
-      border-color: $interactive_blue;
-      background: var(--bg-selected);
-    }
-  }
-
-  .metricTileLabel {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .metricTileValue {
-    font-weight: 500;
-  }
-
   // A slider that carries tick labels needs room for the outermost ones, which otherwise hang
   // off both ends of the pane
   .budgetSlider {
@@ -4004,28 +3852,6 @@ html[data-theme="dark"] .uplot {
     padding: $space-4;
   }
 
-  // The change column, and the facility figures that use the same two colours
-  .deltaCell {
-    white-space: nowrap;
-
-    &.good {
-      color: $delta_good;
-    }
-    &.bad {
-      color: $delta_bad;
-    }
-    &.flat {
-      color: $font_color_faded;
-    }
-  }
-
-  .deltaArrow {
-    // Sits on the text baseline rather than pushing the row taller
-    vertical-align: middle;
-    margin-right: -2px;
-    font-size: 1.1em;
-  }
-
   // Which money is the selected facility's, above the chart that shows the company's
   .selectedFacilitySummary {
     padding: size(small) 16px;
@@ -4041,11 +3867,6 @@ html[data-theme="dark"] .uplot {
     text-align: center;
     opacity: 0.7;
     margin-top: size(large);
-  }
-
-  .menu_popup {
-    background-color: $bg_primary;
-    color: $font_color_primary;
   }
 
   .outputProgressBar {
@@ -5069,12 +4890,6 @@ $sizemap: (
   text-align: left;
   text-transform: none;
 }
-.buildOptionHelp {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 4px;
-  padding: 0 8px;
-}
 // A term's manual entry, pinned beside it (base/ManualHelpPopover) or previewed on mouse hover
 // (base/ManualLink). At most half the screen tall so the decision underneath stays in view;
 // the body scrolls, the title and close stay put
@@ -5583,8 +5398,7 @@ $sizemap: (
 .screenCatalog > .cardList,
 .screenCatalog > .constructionHeader,
 .screenCatalog > .MuiToolbar-root,
-.screenCatalog > .generatorComparison,
-.screenCatalog > .buildOptionHelp {
+.screenCatalog > .generatorComparison {
   width: 100%;
   max-width: 1040px;
   margin-left: auto;
@@ -5685,18 +5499,15 @@ $sizemap: (
   font-size: 1rem;
   font-weight: 600;
 }
-.forecastScope > summary,
 .customerProgramHowItWorks > summary {
   display: flex;
   align-items: center;
   padding: 8px 0;
 }
-.forecastScope > summary::before,
 .customerProgramHowItWorks > summary::before {
   content: "›";
   margin-right: 8px;
 }
-.forecastScope[open] > summary::before,
 .customerProgramHowItWorks[open] > summary::before {
   transform: rotate(90deg);
 }

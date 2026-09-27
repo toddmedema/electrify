@@ -69,10 +69,6 @@ import {
   formatWatts,
 } from "../../helpers/Format";
 import {
-  formatLargeMassValueConcise,
-  largeMassUnit,
-} from "../../helpers/Units";
-import {
   getStorageJson,
   getStorageString,
   setStorageKeyValue,
@@ -114,7 +110,12 @@ import GameCard from "../base/GameCard";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
-import { buildChartKeys, formatCustomerChange } from "./Finances";
+import {
+  formatCustomerChange,
+  HISTORY_METRIC_KEYS,
+  HistoryMetricKeyType,
+  historyMetrics,
+} from "../../helpers/HistoryMetrics";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -599,6 +600,18 @@ export function withRequiredLayers(
   return next;
 }
 
+// The history metric each finance layer charts
+const FINANCE_LAYER_METRICS: Partial<
+  Record<InsightLayerId, HistoryMetricKeyType & DerivedHistoryKeysType>
+> = {
+  profit: "profit",
+  revenue: "revenue",
+  expenses: "expenses",
+  cash: "cash",
+  customers: "customers",
+  emissions: "kgco2e",
+};
+
 function financeMetadata(
   id: InsightLayerId,
   units: UnitSystemType,
@@ -607,33 +620,16 @@ function financeMetadata(
   label: string;
   format: (value: number) => string;
 } | null {
-  switch (id) {
-    case "profit":
-      return { key: "profit", label: "Profit", format: formatMoneyConcise };
-    case "revenue":
-      return { key: "revenue", label: "Revenue", format: formatMoneyConcise };
-    case "expenses":
-      return { key: "expenses", label: "Expenses", format: formatMoneyConcise };
-    case "cash":
-      return { key: "cash", label: "Cash", format: formatMoneyConcise };
-    case "customers":
-      return {
-        key: "customers",
-        label: "Customers",
-        format: (value) =>
-          new Intl.NumberFormat(undefined, { notation: "compact" }).format(
-            value,
-          ),
-      };
-    case "emissions":
-      return {
-        key: "kgco2e",
-        label: `CO2e Emitted (${largeMassUnit(units)})`,
-        format: (value) => formatLargeMassValueConcise(value, units),
-      };
-    default:
-      return null;
+  const key = FINANCE_LAYER_METRICS[id];
+  if (!key) {
+    return null;
   }
+  const metric = historyMetrics(units)[key];
+  return {
+    key,
+    label: metric.suffix ? `${metric.label} (${metric.suffix})` : metric.label,
+    format: metric.format,
+  };
 }
 
 function financeSeries(
@@ -1519,7 +1515,7 @@ export default class Insights extends React.Component<Props, State> {
     const summary = deriveExpandedSummary(
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
-    const units = this.context as UnitSystemType;
+    const metrics = historyMetrics(this.context as UnitSystemType);
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
@@ -1534,12 +1530,13 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
+            {HISTORY_METRIC_KEYS.map((key) => {
+              const metadata = metrics[key];
               const value =
                 key === "interestRate"
                   ? getTimeFromTimeline(game.date.minute, game.timeline)!
                       .interestRate
-                  : summary[key as DerivedHistoryKeysType];
+                  : (summary[key] ?? 0);
               return (
                 <TableRow key={key}>
                   <TableCell sx={{ pl: 2 + (metadata.nesting || 0) * 2 }}>

@@ -13,7 +13,7 @@ This revision corrects the first draft against the code. The changes that matter
   that Insights and the top bar's cash-runway warning share (`selectProjection`, 5,760 steps) was
   rebuilt in `render` on every month change. `HydroWaterSection` (one year) and the intertie outlook
   (two years, hourly) are also keyed on the month. The reducer's own rollover forecast is 96 ticks.
-  The `Forecasts` and `Finances` panes the first draft named are no longer mounted.
+  The `Forecasts` and `Finances` panes the first draft named have been removed.
 - Weather is already memoized: `getWeather` reads a cached row array and extrapolates each day once.
   "Load weather up front" is not a lever.
 - `TICK_MS` lives in `src/Constants.tsx` and the tick loop in `src/reducers/Game.tsx`, both inside
