@@ -29,7 +29,7 @@ for (const theme of ["light", "dark"]) {
       name: "Rooftop solar rebates · Not started · starts Feb 2020",
     });
     await solar.click();
-    // The mechanism prose is depth, not a decision input; it stays collapsed by default.
+    // The mechanism prose is depth behind the facts grid, so it starts collapsed.
     await dialog.getByText("How it works").click();
     await expect(
       dialog.getByText("does not directly cover an evening peak"),
@@ -57,7 +57,7 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
     await dialog
-      .getByRole("button", { name: "At completion (Jan 2024)" })
+      .getByRole("button", { name: "At completion", exact: true })
       .click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Estimated utility demand · Jan 2024");

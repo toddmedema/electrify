@@ -185,12 +185,6 @@ function BuildoutSummary({
         ["Total cost", formatMoneyConcise(program.spent)],
       ]
     : [
-        ...(program.adoption > 0
-          ? []
-          : ([["Duration", `${months} months of installations`]] as [
-              string,
-              string,
-            ][])),
         ["Total cost", `About ${formatMoneyConcise(total)}`],
         [
           "While active",
@@ -198,6 +192,9 @@ function BuildoutSummary({
         ],
         ["At completion", buildoutImpact(game, id)],
       ];
+  // Progress already says how far a started project has to go.
+  if (!complete && program.adoption === 0)
+    facts.unshift(["Duration", `${months} months of installations`]);
   if (!complete && finishLabel)
     facts.push([
       finishLabel,
@@ -538,7 +535,8 @@ function Decision({
               </details>
             )}
             {current!.pending && (
-              <Alert severity="info">
+              // A standing notice, not an interruption: it is already true when the card opens.
+              <Alert severity="info" role="status">
                 {pendingLabel(game, selected, current!)}
               </Alert>
             )}
@@ -617,6 +615,7 @@ function Decision({
                     <ToggleButtonGroup
                       exclusive
                       size="small"
+                      color="primary"
                       aria-label="Estimate month"
                       value={later ? "completion" : "next"}
                       onChange={(_event, value) => {
@@ -627,10 +626,10 @@ function Decision({
                       <ToggleButton value="next">Next month</ToggleButton>
                       <ToggleButton value="completion">
                         {completion >= end
-                          ? `By ${labelMonth(game, laterMonth)}`
+                          ? "End of run"
                           : tier === "Off"
-                            ? `At planned completion (${labelMonth(game, laterMonth)})`
-                            : `At completion (${labelMonth(game, laterMonth)})`}
+                            ? "Planned completion"
+                            : "At completion"}
                       </ToggleButton>
                     </ToggleButtonGroup>
                   )}

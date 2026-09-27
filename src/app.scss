@@ -5683,16 +5683,19 @@ $sizemap: (
   font-size: 1rem;
   font-weight: 600;
 }
-.forecastScope > summary {
+.forecastScope > summary,
+.customerProgramHowItWorks > summary {
   display: flex;
   align-items: center;
   padding: 8px 0;
 }
-.forecastScope > summary::before {
+.forecastScope > summary::before,
+.customerProgramHowItWorks > summary::before {
   content: "›";
   margin-right: 8px;
 }
-.forecastScope[open] > summary::before {
+.forecastScope[open] > summary::before,
+.customerProgramHowItWorks[open] > summary::before {
   transform: rotate(90deg);
 }
 .insights .insightsLevers {
@@ -5770,10 +5773,6 @@ $sizemap: (
 .customerProgramItem[data-completed] .MuiCardHeader-title {
   font-weight: 500;
   color: var(--font-color-faded);
-}
-/* The mechanism prose is depth, not a decision input; it stays collapsed by default. */
-.customerProgramHowItWorks summary {
-  font-weight: 600;
 }
 .base_main .eventLogItem {
   border-style: solid;

@@ -144,9 +144,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     jest.advanceTimersByTime(250);
   });
   const old = workers[workers.length - 1];
-  fireEvent.click(
-    screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "At completion" }));
   expect(old.terminate).toHaveBeenCalled();
   act(() => {
     old.onmessage!({ data: { result } });
@@ -220,9 +218,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
         name: `${POLICIES[id].name} · Not started`,
       }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "At completion" }));
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
 
@@ -307,9 +303,7 @@ test("a scheduled operating change is named in the card and cancelled from the f
     }),
   );
   // The card names the scheduled change instead of leaving it to inference.
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Turns on Feb 2020 · 17:00–21:00",
-  );
+  expect(screen.getByText("Turns on Feb 2020 · 17:00–21:00")).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", { name: "Cancel scheduled change" }),
   );
@@ -370,7 +364,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   expect(fact("Finishes")).toBe("May 2023");
   // The preview of a pause compares against the finish the project had planned.
   expect(
-    screen.getByRole("button", { name: "At planned completion (May 2023)" }),
+    screen.getByRole("button", { name: "Planned completion" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Pause new installations next month" }),
@@ -469,7 +463,7 @@ test.each([
       screen.queryByText(/Estimated utility demand/),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /completion/ }),
+      screen.queryByRole("group", { name: "Estimate month" }),
     ).not.toBeInTheDocument();
     // A scheduled pause has no finish to promise; a scheduled resume does.
     expect(fact("Finishes")).toBe(finish);
@@ -502,7 +496,7 @@ test("the completion preview is capped at the run's last month", () => {
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
   expect(fact("If started now")).toBe("After this run ends");
-  fireEvent.click(screen.getByRole("button", { name: "By Dec 2035" }));
+  fireEvent.click(screen.getByRole("button", { name: "End of run" }));
   expect(
     screen.getByText("Estimated utility demand · Dec 2035"),
   ).toBeInTheDocument();
