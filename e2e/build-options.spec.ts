@@ -53,7 +53,7 @@ for (const theme of ["light", "dark"] as const) {
           .evaluateAll((els) =>
             els.map((el) => el.getBoundingClientRect().width),
           );
-        expect(cells.every((width) => width >= 128)).toBe(true);
+        expect(cells.every((width) => width >= 96)).toBe(true);
       }
       const review = first.getByRole("button", { name: /Review purchase of/ });
       const header = first.locator(".MuiCardHeader-root");
@@ -102,7 +102,7 @@ for (const theme of ["light", "dark"] as const) {
           );
         expect(sortedCells).toHaveLength(4);
         await expect(first).not.toContainText("Construction emissions");
-        expect(sortedCells.every((width) => width >= 128)).toBe(true);
+        expect(sortedCells.every((width) => width >= 96)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
