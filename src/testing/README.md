@@ -79,7 +79,9 @@ starting era into the requested era using the projected fuel trend (`inEraMoney`
 or before 2020 share a base era; moving between them or keeping the same year preserves exact
 amounts. Moving forward or backward across projected eras uses their escalation ratio and
 rounds to two significant figures. This keeps future starts from paying escalated fuel prices
-against historical revenue, without escalating a recent scenario's money twice.
+against historical revenue, without escalating a recent scenario's money twice. The market's
+baseline rate is the exception before 2020: `inEraRate` follows EIA's recorded U.S. average
+retail price there, so a 2020 scenario moved to 1980 opens at 1980's rates rather than 2020's.
 `--location` alone leaves money unchanged. An explicit `--rate` is the player's rate, applied
 at face value after initialization; the competing market's baseline still follows the era.
 

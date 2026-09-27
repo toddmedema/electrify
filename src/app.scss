@@ -737,6 +737,14 @@ $topbar_height: 56px;
     padding-inline: 8px;
     white-space: nowrap;
   }
+  // Blue text is only 3.6:1 on the light bar, so the label stays body-coloured and the icon
+  // carries the interactive blue, as the active-events chip beside it does.
+  .missionRiskEvent .conceptIcon {
+    color: $interactive_blue;
+    // Roboto's capitals sit above the middle of their line box; lift the calendar's box outline
+    // onto their centre so it doesn't read as sagging below the label.
+    transform: translateY(-0.5px);
+  }
 }
 
 .missionSummaryHeader {
@@ -907,6 +915,118 @@ $topbar_height: 56px;
   line-height: 1.25;
 }
 
+// Ongoing events ride at the trailing end of the grid readout instead of adding a row. The slot
+// takes its width from the row, not its content, so its container queries can shed the lead
+// title for a plain count before anything wraps. Like .missionRiskButton, the chip is a
+// borderless 40px text button pulled out by its own padding, so its glyphs end on the row's
+// inset and its hit area fills the row without drawing an edge against the row dividers.
+.activeEventsSlot {
+  container: active-events / inline-size;
+  display: flex;
+  flex: 1 1 0;
+  justify-content: flex-end;
+  align-self: center;
+  min-width: 4rem;
+  margin-inline-end: -8px;
+  overflow: hidden;
+}
+
+.gridHealth .activeEventsChip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--control-size);
+  padding: 0 8px;
+  border-radius: 8px;
+  background: transparent;
+  color: $font_color_primary;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: none;
+  white-space: nowrap;
+
+  .conceptIcon {
+    color: $interactive_blue;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  // The slot clips overflow, so the global outside ring would vanish; draw it inside instead.
+  &:focus-visible {
+    outline-offset: -3px !important;
+  }
+
+  &.activeEventsChip-critical {
+    color: $delta_bad;
+
+    .conceptIcon {
+      color: inherit;
+    }
+  }
+}
+
+// A warning or blackout already colours the whole row, so the chip speaks in the row's voice and
+// its label keeps body-text contrast on the amber fill.
+.gridHealth.statusWarning .activeEventsChip,
+.gridHealth.gridHealth-blackout .activeEventsChip {
+  color: inherit;
+}
+.gridHealth.statusWarning .activeEventsChip .conceptIcon {
+  color: var(--warning-icon);
+}
+.gridHealth.gridHealth-blackout .activeEventsChip .conceptIcon {
+  color: $blackout_red;
+}
+
+.activeEventsTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeEventsMore {
+  flex-shrink: 0;
+  font-weight: 400;
+}
+
+.activeEventsCount {
+  display: none;
+}
+
+@container active-events (max-width: 149px) {
+  .activeEventsTitle,
+  .activeEventsMore {
+    display: none;
+  }
+  .activeEventsCount {
+    display: inline;
+  }
+}
+
+@container active-events (max-width: 87px) {
+  .activeEventsIcon {
+    display: none;
+  }
+}
+
+// The grid state and its size keep their room; the metric's "reserve" suffix goes first.
+.gridHealth.hasActiveEvents .gridHealthMetric {
+  min-width: 6ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (pointer: coarse) {
+  .gridHealth .activeEventsChip {
+    height: 44px;
+  }
+}
+
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
 @media #{$pane_media} {
@@ -922,6 +1042,9 @@ $topbar_height: 56px;
     flex: 0 0 var(--facilities-pane-width, auto);
     box-sizing: border-box;
     min-width: 0;
+    // The same 16px inset as the pane headers below and the mission row beside it.
+    padding-inline: max(16px, env(safe-area-inset-left))
+      max(16px, env(safe-area-inset-right));
     border: 0;
     border-right: 1px solid var(--border-subtle);
   }
@@ -964,11 +1087,35 @@ $topbar_height: 56px;
       text-align: right;
     }
   }
+  // With an event beside it the readout turns into one row: state and cushion on the left,
+  // the event on the right, still inside the row's 56px.
+  .gridHealth.hasActiveEvents {
+    flex-direction: row;
+    gap: 12px;
+    padding-block: 0;
+
+    .gridHealthSummary {
+      flex: 0 1 auto;
+      width: auto;
+      min-width: 0;
+      grid-template-columns: auto minmax(0, auto);
+      gap: 8px;
+    }
+
+    .gridHealthMetric {
+      text-align: left;
+    }
+  }
   // Same left inset as the grid readout above, so their warning icons stack in one column.
   .missionSummary {
     box-sizing: border-box;
     min-height: $topbar_height;
     padding-left: max(16px, env(safe-area-inset-left));
+  }
+  // One pixel less below than above: the 1px top border leaves an odd height, and centring a
+  // 44px control in it lands on a half pixel, where text snaps to the grid but icons don't.
+  .gameStatusBar .missionSummary {
+    padding-bottom: 3px;
   }
 }
 
@@ -2166,8 +2313,10 @@ html[data-theme="dark"] .uplot {
     overflow-wrap: anywhere;
   }
 
+  // The 48px tap target overhangs the title's first line instead of growing the bar beneath it
   .MuiIconButton-root {
     flex-shrink: 0;
+    margin: -12px 0;
   }
 }
 
@@ -4792,13 +4941,13 @@ $sizemap: (
       flex-shrink: 0;
     }
   }
-  .generatorPurchaseActions {
+  .buildPurchaseActions {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 4px;
   }
-  .MuiCardHeader-root.hydroBuildHeader {
+  .MuiCardHeader-root.stackedActionsHeader {
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;
     gap: 4px 8px;
@@ -5634,7 +5783,8 @@ $programs_column: 800px;
   background: var(--bg-primary);
   background-image: none;
 }
-.programsTitleShort {
+.programsTitleShort,
+.programsMobileCash {
   display: none;
 }
 .customerProgramsScreen .constructionHeader {
@@ -5646,9 +5796,7 @@ $programs_column: 800px;
   max-width: $programs_column;
   min-height: $topbar_height;
   margin: 0 auto;
-  // Where the title and speed control cannot share a line, the speed control drops below it,
-  // as it does on the build screen
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding-top: env(safe-area-inset-top);
   padding-left: max($space-4, env(safe-area-inset-left));
   padding-right: max($space-2, env(safe-area-inset-right));
@@ -5720,6 +5868,21 @@ $programs_column: 800px;
   }
   .programsTitleShort {
     display: inline;
+  }
+  .customerProgramsScreen .constructionTitle .iconLabel > svg,
+  .customerProgramsScreen .constructionCash,
+  .customerProgramsScreen .constructionTitle > .manual-link {
+    display: none;
+  }
+  .customerProgramsScreen .constructionTitle {
+    gap: 0;
+    font-size: 1rem;
+  }
+  .programsMobileCash {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $space-3;
   }
   .customerProgramsScreen .constructionTitleBar.MuiToolbar-root {
     padding-left: max($space-1, env(safe-area-inset-left));

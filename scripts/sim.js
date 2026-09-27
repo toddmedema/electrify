@@ -46,8 +46,9 @@ Runs the game's simulation headlessly and reports what happened.
 
   --scenario <id>        Scenario to play (default 101). --list shows the ids
   --year <n>             Override the scenario's starting year (1980 and up). The cash, rate
-                         and fee move from the scenario's era to the requested era. Years
-                         through 2020 share a base era; an explicit --rate stays at face value
+                         and fee move from the scenario's era to the requested era. Cash
+                         and fee share one era through 2020; the rate follows EIA's historical
+                         retail price. An explicit --rate stays at face value
   --location <id>        Override where it's played: any city with downloaded weather
                          (npm run fetch-weather -- --list)
   --difficulty <name>    Intern | Employee | Manager | VP | CEO (default Employee)

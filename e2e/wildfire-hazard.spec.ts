@@ -92,6 +92,16 @@ async function openEventsPane(page: Page): Promise<void> {
   );
 }
 
+/** The status rows whose height an active event must not change. */
+async function statusBarHeights(page: Page): Promise<number[]> {
+  return page.evaluate(() =>
+    ["#topbar", ".gameStatusBar"].map(
+      (selector) =>
+        document.querySelector(selector)!.getBoundingClientRect().height,
+    ),
+  );
+}
+
 async function captureReviewScreenshot(
   page: Page,
   testInfo: { project: { name: string }; outputPath: (name: string) => string },
@@ -118,6 +128,7 @@ for (const theme of ["light", "dark"] as const) {
     test.setTimeout(180_000);
 
     await startSeededLosAngelesGame(page, theme);
+    const heightsBeforeEvents = await statusBarHeights(page);
     await openEventsPane(page);
 
     // January 2020 is an above-average-risk month for the LA profile, so the seasonal notice is
@@ -128,7 +139,7 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("heading", { name: "Elevated wildfire risk" }),
     ).toBeVisible();
     await expect(notice).toContainText(
-      "raise the chance of a wildfire emergency this season",
+      "raise the chance of a wildfire emergency",
     );
 
     // Preparedness is an optional customer program, never a prompt the clock waits on. The run
@@ -210,6 +221,28 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await expect(ongoing).not.toContainText("Prepared crews are in place");
     }
+    // The status bar names the incident beside the grid readout without growing any taller.
+    const activeEvents = page.locator(".activeEventsChip:visible");
+    await expect(activeEvents).toHaveAccessibleName(
+      /Active events: Wildfire emergency \(critical\), through Sep 2020/,
+    );
+    await expect(activeEvents).toHaveClass(/activeEventsChip-critical/);
+    expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
+    if (testInfo.project.name.startsWith("mobile")) {
+      const heights = await page.evaluate(() =>
+        ["#topbar", ".gridHealth", ".missionSummary"].map(
+          (selector) =>
+            document.querySelector(selector)!.getBoundingClientRect().height,
+        ),
+      );
+      expect(heights).toEqual([56, 56, 56]);
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+
     // The risk notice stays up alongside the incident: September is a peak-risk month.
     await expect(page.locator(".wildfireRiskNotice:visible")).toBeVisible();
     await captureReviewScreenshot(
@@ -224,6 +257,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("heading", { name: "Ongoing events" }),
     ).toBeHidden({ timeout: 60_000 });
+    await expect(page.locator(".activeEventsChip:visible")).toHaveCount(0);
     await expect(
       page.getByText("Wildfire restoration complete", { exact: true }),
     ).toBeVisible();

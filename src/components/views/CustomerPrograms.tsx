@@ -81,6 +81,7 @@ import {
 } from "../../helpers/WildfirePreview";
 import {
   wildfirePreparedness,
+  wildfireSeasonOdds,
   WildfirePreparednessType,
 } from "../../helpers/Wildfire";
 import { isDesktopScreen } from "../../Globals";
@@ -438,6 +439,7 @@ function WildfireDetails({
         and affected generators lose half as much output. Funding does not
         prevent fires, and restoration costs apply either way.
       </Typography>
+      <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
       <Box component="dl" className="customerProgramFacts">
         {facts.map(([term, value]) => (
           <React.Fragment key={term}>
@@ -750,7 +752,7 @@ function ProgramsScreen({
       className="customerProgramsScreen"
     >
       <header className="constructionHeader">
-        <Toolbar className="constructionTitleBar">
+        <Toolbar className="constructionTitleBar" disableGutters>
           <IconButton
             color="primary"
             onClick={onClose}
@@ -797,6 +799,13 @@ function ProgramsScreen({
         role="region"
         aria-label={title ?? "Programs"}
       >
+        <div
+          className="programsMobileCash weak"
+          aria-label={`Available cash ${formatMoneyStable(cash)}`}
+        >
+          {formatMoneyStable(cash)} cash
+          <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
+        </div>
         {!selected ? (
           <Box className="customerProgramList">
             <Typography variant="body2" color="textSecondary">

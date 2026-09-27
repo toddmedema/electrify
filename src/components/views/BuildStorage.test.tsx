@@ -98,3 +98,25 @@ it("deduplicates storage purchase impact and shows loan terms inline", async () 
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
+
+it("offers an oversized storage project its max size", () => {
+  // Batteries exist by 2020 but can't yet reach the slider's largest size
+  const state = game();
+  render(
+    <BuildStorage
+      game={{ ...state, date: { ...state.date, year: 2020 } }}
+      onBuildStorage={jest.fn()}
+      onBack={jest.fn()}
+    />,
+  );
+  const slider = screen.getByRole("slider");
+  fireEvent.keyDown(slider, { key: "End" });
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Battery" }),
+  ).toBeDisabled();
+  const useMaxSize = screen.getByRole("button", { name: "Use max size" });
+
+  const before = slider.getAttribute("aria-valuenow");
+  fireEvent.click(useMaxSize);
+  expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+});

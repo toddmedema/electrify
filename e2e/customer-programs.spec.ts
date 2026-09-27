@@ -22,6 +22,30 @@ for (const theme of ["light", "dark"]) {
     });
     await entry.click();
     const dialog = page.getByRole("dialog");
+    const header = dialog.locator(".constructionTitleBar");
+    const closeBounds = await dialog
+      .getByRole("button", { name: "Close customer programs" })
+      .boundingBox();
+    const speedBounds = await header
+      .getByRole("group", { name: "game speed" })
+      .boundingBox();
+    expect(closeBounds).not.toBeNull();
+    expect(speedBounds).not.toBeNull();
+    expect(
+      Math.abs(
+        closeBounds!.y +
+          closeBounds!.height / 2 -
+          speedBounds!.y -
+          speedBounds!.height / 2,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      await header.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    const title = header.locator(".iconLabel");
+    expect(
+      await title.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
     const solar = dialog.getByRole("button", {
       name: /^Rooftop solar rebates · Not started/,
     });

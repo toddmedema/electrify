@@ -18,6 +18,7 @@ import {
   wildfireOccurrenceKey,
   wildfirePreparedness,
   wildfireSeasonAt,
+  wildfireSeasonOdds,
   weatherFireRiskModifier,
 } from "./Wildfire";
 
@@ -485,6 +486,15 @@ describe("preparedness program", () => {
       `wildfire:LA:${game.date.year}:preparedness`,
     );
     expect(preparedness.choice!.options.map((o) => o.id)).toEqual(["prepare"]);
+  });
+
+  it("states the season's odds instead of repeating the options", () => {
+    expect(wildfireSeasonOdds(LA)).toBe(
+      "About a 1-in-4 chance of a wildfire here before March; risk peaks in September.",
+    );
+    expect(wildfireSeasonOdds(getWildfireProfile("SF")!)).toBe(
+      "About a 1-in-6 chance of a wildfire here before February; risk peaks in September.",
+    );
   });
 
   it("covers what is left of a season underway, and moves on as it ends", () => {

@@ -624,8 +624,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           <strong>Inflation</strong> means rising prices. It increases fuel,
           construction and operating costs in the game. Your electricity rate
-          does not rise automatically; you set it in Insights. Future economic
-          conditions are estimates.
+          does not rise automatically; you set it in Insights. A public
+          utility's target rate and an investor's market rate both rise with
+          inflation. Future economic conditions are estimates.
         </p>
       </div>
     ),
@@ -849,17 +850,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <table className="points">
           <tbody>
             <tr>
-              <td>+80</td>
+              <td>±80</td>
               <td>
-                per $0.01/kWh that your lifetime average rate is below the
-                scenario's target rate
-              </td>
-            </tr>
-            <tr>
-              <td>-80</td>
-              <td>
-                per $0.01/kWh that your lifetime average rate is above the
-                scenario's target rate
+                per $0.01/kWh your rate is below/above the target rate (adjusted
+                for inflation)
               </td>
             </tr>
             <tr>

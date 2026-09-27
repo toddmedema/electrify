@@ -260,14 +260,13 @@ export function GeneratorBuildItem(
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
-  const { buildable, secondaryText } = getBuildAvailability({
+  const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
     hydroAvailability: props.hydroAvailability,
     name: generator.name,
     description: generator.description,
     available: generator.available,
     sizeBuildable,
     maxSizeLabel: formatWatts(maxSizeW),
-    onUseMaxSize: () => props.onUseMaxSize?.(maxSizeW),
     location: props.location,
     viableLocationsRemaining: generator.viableLocationsRemaining,
   });
@@ -427,6 +426,24 @@ export function GeneratorBuildItem(
       Use site maximum
     </Button>
   );
+  const useMaxSizeAction = offerMaxSize && props.onUseMaxSize && (
+    <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
+      Use max size
+    </Button>
+  );
+  // A resize shortcut sits under Review, so the context line moves up beside it
+  const sizeAction = useSiteMaximumAction || useMaxSizeAction;
+  const context = (
+    <>
+      {role}
+      {sites && sites.remaining > 0 && (
+        <>
+          {" · "}
+          <span className="nowrap">{siteCountLabel(sites)}</span>
+        </>
+      )}
+    </>
+  );
 
   // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
   if (props.hydroAvailability?.remaining.length === 0) {
@@ -464,7 +481,7 @@ export function GeneratorBuildItem(
       className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
     >
       <CardHeader
-        className={useSiteMaximumAction ? "hydroBuildHeader" : undefined}
+        className={sizeAction ? "stackedActionsHeader" : undefined}
         avatar={
           <Avatar
             alt={generator.name}
@@ -472,7 +489,7 @@ export function GeneratorBuildItem(
           />
         }
         action={
-          <Box className="generatorPurchaseActions">
+          <Box className="buildPurchaseActions">
             <Stack direction="row" spacing={0.5}>
               {wideLayout && compareAction}
               <Button
@@ -488,21 +505,15 @@ export function GeneratorBuildItem(
                 Review
               </Button>
             </Stack>
-            {useSiteMaximumAction}
+            {sizeAction}
           </Box>
         }
         title={generator.name}
-        subheader={useSiteMaximumAction ? role : undefined}
+        subheader={sizeAction ? context : undefined}
       />
-      {!useSiteMaximumAction && (
+      {!sizeAction && (
         <Typography className="buildOptionContext" variant="body2">
-          {role}
-          {sites && sites.remaining > 0 && (
-            <>
-              {" · "}
-              <span className="nowrap">{siteCountLabel(sites)}</span>
-            </>
-          )}
+          {context}
         </Typography>
       )}
       {props.hydroAvailability && (
