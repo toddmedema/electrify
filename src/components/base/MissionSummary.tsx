@@ -12,6 +12,7 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
 import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
 import ConceptIcon from "./ConceptIcon";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import {
   projectionReady,
   requestProjection,
@@ -108,7 +109,7 @@ export default function MissionSummary({
   const risk = useMissionRisk(game, mission, upcoming);
   // The grid readout beside this already reports a shortage happening right now.
   const shownRisk = risk && risk.id !== "shortage" ? risk : undefined;
-  // Upcoming events are news to act on (a blue forecast icon beside body-contrast text); every
+  // Upcoming events are news to act on (a blue calendar beside body-contrast text); every
   // other risk threatens the goal (amber).
   const warning = shownRisk && !shownRisk.id.startsWith("event:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
@@ -132,10 +133,14 @@ export default function MissionSummary({
             >
               {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
               <span className="statusIcon" aria-hidden="true">
-                <ConceptIcon
-                  concept={warning ? "danger" : "forecast"}
-                  fontSize="small"
-                />
+                {warning ? (
+                  <ConceptIcon concept="danger" fontSize="small" />
+                ) : (
+                  <CalendarTodayOutlinedIcon
+                    className="missionRiskEventIcon"
+                    fontSize="small"
+                  />
+                )}
               </span>
               <span className="missionRiskText statusLabel">
                 {shownRisk.shortLabel}
