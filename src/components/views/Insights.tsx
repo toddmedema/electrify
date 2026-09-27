@@ -1831,9 +1831,9 @@ export default class Insights extends React.Component<Props, State> {
                 >
                   <WarningAmberIcon fontSize="small" aria-hidden="true" />
                   <span>
-                    <strong>Shortfall, {projection.shortfall.label}:</strong>
-                    <br />~{formatWattHours(projection.shortfall.wh)} unmet ·
-                    peak ~{formatWatts(projection.shortfall.peakW)}
+                    <strong>Shortfall, {projection.shortfall.label}:</strong> ~
+                    {formatWattHours(projection.shortfall.wh)} unmet · peak ~
+                    {formatWatts(projection.shortfall.peakW)}
                   </span>
                 </Typography>
               )}

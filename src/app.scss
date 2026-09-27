@@ -2313,8 +2313,10 @@ html[data-theme="dark"] .uplot {
     overflow-wrap: anywhere;
   }
 
+  // The 48px tap target overhangs the title's first line instead of growing the bar beneath it
   .MuiIconButton-root {
     flex-shrink: 0;
+    margin: -12px 0;
   }
 }
 
@@ -4939,13 +4941,13 @@ $sizemap: (
       flex-shrink: 0;
     }
   }
-  .generatorPurchaseActions {
+  .buildPurchaseActions {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 4px;
   }
-  .MuiCardHeader-root.hydroBuildHeader {
+  .MuiCardHeader-root.stackedActionsHeader {
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;
     gap: 4px 8px;
