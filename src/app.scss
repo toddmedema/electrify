@@ -84,13 +84,19 @@
   --font-color-faded: #9aa9ba;
   --font-color-disabled: #627083;
   --interactive-contrast: #0a0a0a;
-  --interactive-blue: #0084f8; /* the logo blue - 5.1:1 on --bg-primary */
+  /* The light blue at full chroma glows and vibrates on near-black, so dark keeps its hue and
+     trades chroma for lightness: oklch(0.68 0.12 254) against light's oklch(0.62 0.2 254).
+     6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
+     (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
+  --interactive-blue: #629be1;
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
   --spark-marker-fill: #111820;
-  --interactive-tint: rgba(0, 132, 248, 0.42);
+  /* Light enough that blue text on it still clears 4.5:1 (4.6:1 over the page) */
+  --interactive-tint: rgba(98, 155, 225, 0.24);
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 34%, white);
+  --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 45%, transparent);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
@@ -105,7 +111,7 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
-  --cursor-line: rgba(0, 132, 248, 0.55);
+  --cursor-line: rgba(98, 155, 225, 0.55);
   --chart-surface: #0f161f;
   --chart-edge: rgba(148, 163, 184, 0.16);
   --chart-shadow: rgba(0, 0, 0, 0.28);
@@ -2686,7 +2692,8 @@ html[data-theme="dark"] .uplot {
     $homeSmokeCycle: 5.6s;
 
     .homeSmokePuff {
-      fill: #0084f8;
+      // The logo's own blue on each palette, so the puffs match logo-home(-dark).svg
+      fill: var(--interactive-blue);
       animation:
         homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3)
           infinite,
