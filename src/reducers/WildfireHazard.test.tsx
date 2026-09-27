@@ -4,7 +4,10 @@ import { SCENARIOS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import { ActiveWorldEventType, GameType } from "../Types";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { getWildfireProfile } from "../data/WildfireProfiles";
-import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
+import {
+  optionalScenarioChoice,
+  pendingScenarioChoice,
+} from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "./GameActions";
 import gameReducer, { tickState } from "./Game";
 import { WILDFIRE_DEFINITION_ID } from "../helpers/Wildfire";
@@ -28,7 +31,8 @@ type Respond = (
   decision: NonNullable<ReturnType<typeof pendingScenarioChoice>>,
 ) => string | undefined;
 
-/** Answers any pending choice (via respond, defaulting to the free option) then ticks one month. */
+/** Answers any pending choice (via respond, defaulting to the free option), takes up any optional
+ * choice respond names, then ticks one month. */
 function tickOneMonth(state: GameType, respond?: Respond): GameType {
   const decision = pendingScenarioChoice(state);
   if (decision && !state.replayPlayback) {
@@ -43,6 +47,17 @@ function tickOneMonth(state: GameType, respond?: Respond): GameType {
         ),
       );
     }
+  }
+  // Optional choices, like a season's wildfire preparedness, are only taken up when asked.
+  const offer = optionalScenarioChoice(state);
+  const offered = offer && respond?.(offer);
+  if (offer && offered && offer.options.some((o) => o.id === offered)) {
+    state = cloneDeep(
+      gameReducer(
+        state,
+        chooseScenarioResponse({ decisionId: offer.id, optionId: offered }),
+      ),
+    );
   }
   const target = state.date.monthsElapsed + 1;
   while (state.date.monthsElapsed < target) {
@@ -86,8 +101,8 @@ function findIgnitingSeed(maxSeeds = 40): number {
 
 const IGNITING_SEED = findIgnitingSeed();
 
-// A seed whose FIRST fire ignites after the preparedness month, so a funded response (offered in
-// August) is in place before it. A seed whose first fire precedes August is skipped, because the
+// A seed whose FIRST fire ignites after the preparedness month, so a season funded ahead of time
+// is in place before it. A seed whose first fire precedes August is skipped, because the
 // test observes that first fire.
 function findSeedIgnitingAfterPreparedness(maxSeeds = 60): number | undefined {
   for (let seed = 1; seed <= maxSeeds; seed++) {
@@ -251,6 +266,16 @@ describe("recurring wildfire hazard integration", () => {
       .outputMultiplier as number;
     const standardOutput = standard.incident.attributes
       .outputMultiplier as number;
+    const effectiveness = prepared.incident.attributes
+      .preparednessEffectiveness as number;
+    expect(effectiveness).toBeGreaterThan(0);
+    expect(effectiveness).toBeLessThanOrEqual(1);
+    expect(preparedDisconnected).toBeCloseTo(
+      standardDisconnected * (1 - effectiveness / 2),
+    );
+    expect(1 - preparedOutput).toBeCloseTo(
+      (1 - standardOutput) * (1 - effectiveness / 2),
+    );
     expect(preparedDisconnected).toBeLessThan(standardDisconnected);
     expect(preparedOutput).toBeGreaterThan(standardOutput);
     // Restoration cost is unchanged by preparedness.

@@ -114,11 +114,11 @@ describe("recurring wildfire hazard balance (many seeds, real reducer)", () => {
   });
 
   it("preparedness is a useful tradeoff that never prevents the fire", () => {
-    // Fund (or decline) the recurring preparedness choice in every year of the run.
+    // Fund (or decline) every fire season of the run, including the one a January start opens in.
     const responsesFor = (option: string): Record<string, string> => {
       const responses: Record<string, string> = {};
       for (
-        let year = wildfireScenario.startingYear;
+        let year = wildfireScenario.startingYear - 1;
         year < wildfireScenario.startingYear + MONTHS / 12;
         year++
       ) {

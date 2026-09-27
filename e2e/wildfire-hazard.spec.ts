@@ -7,7 +7,7 @@ import { openPane } from "./layout";
  *
  * The seed is fixed so the run is deterministic: with it, a custom game in Los Angeles starting
  * January 2020 has no ignition from February through August, its first fire starts in September
- * 2020 (the month after the season's preparedness choice), and it lasts one month. The seed was
+ * 2020 (inside the August 2020 fire season), and it lasts one month. The seed was
  * verified against the real reducer (runSimulation) before being pinned here; if the hazard's
  * draws or weather data change, re-derive it rather than editing the flow.
  */
@@ -78,6 +78,13 @@ async function setFastSpeed(page: Page): Promise<void> {
     .click();
 }
 
+async function openInsightsPane(page: Page): Promise<void> {
+  await openPane(
+    page.locator(".insights:visible"),
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+}
+
 async function openEventsPane(page: Page): Promise<void> {
   await openPane(
     page.locator(".eventLog:visible"),
@@ -109,8 +116,8 @@ async function captureReviewScreenshot(
 }
 
 for (const theme of ["light", "dark"] as const) {
-  // Light funds the season's preparedness; dark declines it, so both branches of the choice and
-  // both palettes' Events presentation are exercised.
+  // Light starts ongoing preparedness; dark leaves it off, so both branches and both
+  // palettes' Events presentation are exercised.
   const fund = theme === "light";
 
   test(`recurring wildfire: preparedness, onset and recovery (${theme})`, async ({
@@ -135,38 +142,97 @@ for (const theme of ["light", "dark"] as const) {
       "raise the chance of a wildfire emergency",
     );
 
-    // August 2020: the season's preparedness choice pauses the game and blocks speed changes.
+    // Preparedness is an optional customer program, never a prompt the clock waits on. The run
+    // advances to spring so the next wildfire season is the August 2020 illustration.
     await setFastSpeed(page);
-    const dialog = page.getByRole("dialog", {
-      name: /Wildfire season preparedness/,
-    });
-    await expect(dialog).toBeVisible({ timeout: 60_000 });
-    await expect(dialog).toContainText("Paused");
-    await expect(dialog).toContainText(
-      "Prepare for elevated fire risk in Los Angeles, CA",
+    await expect(page.locator("#appbar:visible").first()).toContainText(
+      /(Mar|Apr|May|Jun) 2020/,
+      { timeout: 60_000 },
     );
-    const fundButton = dialog.getByRole("button", {
-      name: "Fund preparedness",
+    await openInsightsPane(page);
+    // Opening the programs screen pauses the clock, like the build screen.
+    await page
+      .locator(".insights:visible")
+      .getByRole("button", { name: "Customer programs", exact: true })
+      .click();
+    const programs = page.getByRole("dialog");
+    await expect(
+      programs.getByRole("button", { name: "Close customer programs" }),
+    ).toBeVisible();
+    await expect(
+      programs.getByRole("button", { name: "pause" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await programs
+      .getByRole("button", {
+        name: /^Wildfire preparedness · Off · .*\/yr$/,
+      })
+      .click();
+    await expect(programs).toContainText("Annual budget");
+    await expect(programs).toContainText("no upfront payment");
+    await expect(programs).toContainText("Next wildfire season");
+    await expect(programs).not.toContainText("One-time cost");
+    await expect(programs).not.toContainText("If funded now");
+    // The page simulates a typical fire with and without funded crews.
+    await expect(
+      programs.getByText(/^Customer load disconnected:/),
+    ).toBeVisible({
+      timeout: 30_000,
     });
-    const keepButton = dialog.getByRole("button", { name: "Keep cash" });
-    await expect(fundButton).toBeEnabled();
-    await expect(keepButton).toBeEnabled();
-    await expect(dialog).toContainText(
-      /Spend \$[\d.,]+[MKmk]? to halve customer disconnections/,
-    );
-    await expect(dialog).toContainText("restoration costs apply either way");
+    await expect(
+      programs.getByText(/^Utility cash if this fire strikes:/),
+    ).toBeVisible();
+    if (fund) {
+      await programs
+        .getByRole("button", { name: /^Start preparedness \(/ })
+        .click();
+      await expect(
+        programs.getByRole("button", {
+          name: /^Wildfire preparedness · On · .*\/yr$/,
+        }),
+      ).toBeVisible();
+    }
+    if (fund) {
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      await expect(programs).toContainText("On · stays on until turned off");
+      await expect(
+        programs.getByRole("progressbar", {
+          name: "Wildfire preparedness effectiveness",
+        }),
+      ).toHaveAttribute("aria-valuenow", "0");
+      await expect(programs).toContainText(
+        "Ramping up · 12 months to full effectiveness",
+      );
+      await programs
+        .getByRole("button", { name: "Turn off preparedness" })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Start preparedness/ })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      await expect(
+        programs.getByRole("button", { name: "Turn off preparedness" }),
+      ).toBeEnabled();
+      await expect(
+        programs.getByText(/^Customer load disconnected:/),
+      ).toBeVisible({ timeout: 30000 });
+    }
     await captureReviewScreenshot(
       page,
       testInfo,
       `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
     );
-
-    if (fund) {
-      await fundButton.click();
-    } else {
-      await keepButton.click();
-    }
-    await expect(dialog).not.toBeVisible();
+    await programs
+      .getByRole("button", { name: "Close customer programs" })
+      .click();
+    await expect(programs).toHaveCount(0);
+    await openEventsPane(page);
 
     // September 2020: the seeded ignition. A critical event pauses the game and pins an ongoing
     // card in Events with the disconnected share, constrained generators and restoration cost.
@@ -220,6 +286,50 @@ for (const theme of ["light", "dark"] as const) {
       testInfo,
       `wildfire-hazard-events-${theme}-${testInfo.project.name}.png`,
     );
+
+    if (fund) {
+      await openInsightsPane(page);
+      await page
+        .locator(".insights:visible")
+        .getByRole("button", { name: "Customer programs", exact: true })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · On/ })
+        .click();
+      const protection = programs.getByRole("progressbar", {
+        name: "Wildfire preparedness effectiveness",
+      });
+      const effectiveness = Number(
+        await protection.getAttribute("aria-valuenow"),
+      );
+      expect(effectiveness).toBeGreaterThan(0);
+      expect(effectiveness).toBeLessThan(100);
+      await programs
+        .getByRole("button", { name: "Turn off preparedness" })
+        .click();
+      await programs
+        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
+        .click();
+      await expect(protection).toHaveAttribute(
+        "aria-valuenow",
+        String(effectiveness),
+      );
+      await expect(programs).toContainText(
+        "Fading · 12 months of protection remaining",
+      );
+      await expect(
+        programs.getByText(/^Customer load disconnected:/),
+      ).toBeVisible({ timeout: 30000 });
+      await captureReviewScreenshot(
+        page,
+        testInfo,
+        `wildfire-decay-${theme}-${testInfo.project.name}.png`,
+      );
+      await programs
+        .getByRole("button", { name: "Close customer programs" })
+        .click();
+      await openEventsPane(page);
+    }
 
     // October 2020: the one-month incident expires. Restoration is reported once and the ongoing
     // card clears; the ignition row returns to history.
