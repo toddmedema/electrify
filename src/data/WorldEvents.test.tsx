@@ -259,7 +259,8 @@ describe("The Shale Boom pilot arc", () => {
     expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
       {
         title: "Gas prices will fall",
-        message: "Local gas will sell 25% below the national price through Feb 2016.",
+        message:
+          "Local gas will sell 25% below the national price through Feb 2016.",
       },
       {
         title: "Winter freeze will hit",
