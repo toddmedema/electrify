@@ -1,4 +1,4 @@
-import { TICK_MS } from "../Constants";
+import { TICK_MINUTES, TICK_MS } from "../Constants";
 import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
 import { SpeedType } from "../Types";
@@ -10,7 +10,7 @@ import { loaded, quit, resume, setSpeed, tick as tickAction } from "./Game";
  * timestamps jitter by a fraction of a millisecond. This drives the real tick reducer through the
  * store with jittered frame times and counts the ticks each frame ran.
  */
-function ticksPerFrame(speed: SpeedType, hz: number, frames: number) {
+function startClock(speed: SpeedType) {
   let wallClockMs = 0;
   jest.spyOn(performance, "now").mockImplementation(() => wallClockMs);
   getStore().dispatch(quit());
@@ -18,17 +18,23 @@ function ticksPerFrame(speed: SpeedType, hz: number, frames: number) {
   getStore().dispatch(loaded());
   getStore().dispatch(setSpeed(speed));
 
+  // Presents a frame at the given wall time and returns how many ticks it ran
+  return (atMs: number) => {
+    const minute = getStore().getState().game.date.minute;
+    wallClockMs = atMs;
+    getStore().dispatch(tickAction());
+    return (getStore().getState().game.date.minute - minute) / TICK_MINUTES;
+  };
+}
+
+function ticksPerFrame(speed: SpeedType, hz: number, frames: number) {
+  const presentFrame = startClock(speed);
   const frameMs = 1000 / hz;
   // Deterministic jitter up to ±0.4 ms, about what a compositor's timestamps wander by
   const jitter = (i: number) => Math.sin(i * 12.9898) * 0.4;
   const counts: number[] = [];
-  let minute = getStore().getState().game.date.minute;
   for (let i = 1; i <= frames; i++) {
-    wallClockMs = i * frameMs + jitter(i);
-    getStore().dispatch(tickAction());
-    const next = getStore().getState().game.date.minute;
-    counts.push((next - minute) / 15);
-    minute = next;
+    counts.push(presentFrame(i * frameMs + jitter(i)));
   }
   return counts;
 }
@@ -71,5 +77,30 @@ describe("tick cadence on display frames", () => {
     expect(
       Math.abs(total - (600 * (1000 / 60)) / TICK_MS.FAST),
     ).toBeLessThanOrEqual(1);
+  });
+
+  it("resumes a frozen page where it stopped instead of fast-forwarding", () => {
+    const presentFrame = startClock("NORMAL");
+    const frameMs = 1000 / 60;
+    let nowMs = 0;
+    for (let i = 0; i < 30; i++) {
+      nowMs += frameMs;
+      presentFrame(nowMs);
+    }
+
+    // Ten minutes pass with no frames and no hide event, as when an Android screen lock
+    // freezes the page. The first frame back runs about a second's ticks, not ten minutes'
+    nowMs += 10 * 60 * 1000;
+    expect(
+      Math.abs(presentFrame(nowMs) - 1000 / TICK_MS.NORMAL),
+    ).toBeLessThanOrEqual(1);
+
+    // No debt from the freeze carries over: the clock is back to its ordinary rate at once
+    let total = 0;
+    for (let i = 0; i < 60; i++) {
+      nowMs += frameMs;
+      total += presentFrame(nowMs);
+    }
+    expect(Math.abs(total - 1000 / TICK_MS.NORMAL)).toBeLessThanOrEqual(1);
   });
 });
