@@ -215,7 +215,7 @@ export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const HOURS_PER_YEAR_REAL = 24 * 365;
 export const GAME_TO_REAL_YEARS = 365 / DAYS_PER_YEAR;
-export const MONTHS = [
+export const MONTHS: MonthType[] = [
   "Jan",
   "Feb",
   "Mar",
@@ -228,7 +228,7 @@ export const MONTHS = [
   "Oct",
   "Nov",
   "Dec",
-] as MonthType[];
+];
 export const MONTH_NAMES = [
   "January",
   "February",

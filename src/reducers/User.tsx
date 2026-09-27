@@ -94,7 +94,7 @@ async function submitScore(
   const replayId = submission.replay
     ? await uploadReplay(uid, submission.replay)
     : undefined;
-  const scoreSubmission = {
+  const scoreSubmission: ScoreType = {
     score: submission.score,
     scoreBreakdown: submission.scoreBreakdown, // For analytics purposes only
     scenarioId: submission.scenarioId,
@@ -105,7 +105,7 @@ async function submitScore(
     ...(replayId ? { replayId } : {}),
     // Denormalized so that rendering a board is one query rather than one plus a read per row
     ...(displayName ? { displayName } : {}),
-  } as ScoreType;
+  };
   try {
     await addDoc(collection(getDb(), "scores"), scoreSubmission);
   } catch (err) {

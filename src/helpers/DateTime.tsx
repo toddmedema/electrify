@@ -25,7 +25,7 @@ import {
 /** A game month, in minutes -- the unit the forecast charts step their x axis in. */
 export const MINUTES_PER_MONTH = DAYS_PER_MONTH * 1440;
 
-export const EMPTY_HISTORY = {
+export const EMPTY_HISTORY: MonthlyHistoryType = {
   month: 0,
   year: 0,
   supplyWh: 0,
@@ -49,7 +49,7 @@ export const EMPTY_HISTORY = {
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
-} as MonthlyHistoryType;
+};
 
 function emptyHistory(): MonthlyHistoryType {
   return { ...EMPTY_HISTORY, deliveredWhByFuel: {} };

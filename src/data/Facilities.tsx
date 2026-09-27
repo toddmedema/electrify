@@ -649,6 +649,7 @@ export function GENERATORS(
       capacityFactor: 0.83,
       lifespanYears: 30,
     },
+    // lcWh is priced below, once difficulty and inflation have scaled the costs
   ] as GeneratorShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers
@@ -707,7 +708,7 @@ export function STORAGE(state: GameType, peakWh: number) {
     "Pumped Hydro",
   );
 
-  let storage = [
+  let storage: StorageShoppingType[] = [
     {
       name: "Battery",
       description:
@@ -766,7 +767,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
       spinMinutes: 10,
     },
-  ] as StorageShoppingType[];
+  ];
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];

@@ -1537,14 +1537,14 @@ export const gameSlice = createSlice({
       const a = action.payload;
       delete state.blackout;
       previousFuelPrices = undefined;
-      state.eventLog = [] as GameEventType[];
+      state.eventLog = [];
       state.reportedEventKeys = [];
       state.eventLogReadThroughId = 0;
       state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
       state.meaningfulDecisions = [];
       state.transmission = undefined;
-      state.timeline = [] as TickPresentFutureType[];
+      state.timeline = [];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
       state.replayLog = state.replayPlayback ? undefined : [];
@@ -1886,7 +1886,7 @@ export const gameSlice = createSlice({
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
-      state.timeline = [] as TickPresentFutureType[];
+      state.timeline = [];
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
@@ -3691,7 +3691,7 @@ function updateSupplyFacilitiesFinances(
   let supply = 0;
   let spareGenerationW = 0;
   let reachableHeadroomW = 0;
-  const supplyByFuel = {} as FuelProductionType;
+  const supplyByFuel: FuelProductionType = {};
   let charge = 0;
   let dischargedW = 0;
   let storedWh = 0;
@@ -4638,11 +4638,6 @@ export function generateNewTimeline(
 /**
  * Edits the state in place to handle all of the one-off consequences of building
  * (not including reforecasting, which should be done once after multiple builds)
- * @param state
- * @param g
- * @param financed
- * @param newGame
- * @returns
  */
 function buildFacilityHelper(
   state: GameType,

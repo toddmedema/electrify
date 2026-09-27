@@ -818,6 +818,7 @@ export interface ScenarioBriefingType {
 
 export interface ScenarioType {
   hydroInventoryKey?: string;
+  // Persisted in scores, completion and shared links; append new ids rather than renumbering
   id: number;
   name: string;
   icon: string; // assumed to be images/<string>.svg
