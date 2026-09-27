@@ -315,7 +315,8 @@ export const MONEY_BASE_YEAR = 2020;
 
 /**
  * Re-quote money between starting eras using the projected fuel trend. Historical years share
- * the base era: their recorded fuel prices are not a projection to inflate or undo. Authored
+ * the base era: their recorded fuel prices are not a projection to inflate or undo. Retail rates
+ * are the exception and use inEraRate, which follows the recorded retail price instead. Authored
  * scenarios supply their own starting year; custom-game options default to the base era.
  * Preserve exact amounts when the eras agree, otherwise round to two significant figures.
  */
