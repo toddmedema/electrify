@@ -708,18 +708,6 @@ describe("weather hardening in the purchase dialog", () => {
     );
   });
 
-  it("describes hail-resistant panels' effect", () => {
-    showBuildList();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Solar" }),
-    );
-    const dialog = screen.getByRole("dialog");
-    const option = within(dialog).getByRole("checkbox", {
-      name: /^Hail-resistant panels \+\$/,
-    });
-    expect(option).toHaveAccessibleDescription("Less hail damage.");
-  });
-
   it("offers solar trackers at build, pitched on morning and evening output", () => {
     const onBuild = showBuildList();
     fireEvent.click(

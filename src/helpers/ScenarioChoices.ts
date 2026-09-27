@@ -16,7 +16,7 @@ export function scenarioChoiceDescription(
     (grant > 0
       ? "Receive {grant} in one-time funding."
       : cost > 0
-        ? "Spend {cost} upfront."
+        ? "One-time upfront cost."
         : "No upfront cost.");
   return description
     .replaceAll("{cost}", formatMoneyConcise(cost))

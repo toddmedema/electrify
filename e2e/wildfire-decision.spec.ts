@@ -17,10 +17,12 @@ for (const theme of ["light", "dark"]) {
     await fast.click();
     const region = page.getByRole("dialog", { name: /Wildfire preparedness/ });
     await expect(region).toBeVisible({ timeout: 30000 });
-    const fund = region.getByRole("button", { name: "Fund preparedness" });
+    const fund = region.getByRole("button", {
+      name: /^Fund preparedness \(\$2M\)$/,
+    });
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Paused");
-    await expect(region).toContainText("Spend $200k");
+    await expect(region).not.toContainText("Spend $2M");
     await expect(region).toContainText("restoration costs apply either way");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")
@@ -42,20 +44,22 @@ for (const theme of ["light", "dark"]) {
         page.viewportSize()!.width - 32,
       );
       const fundBox = (await fund.boundingBox())!;
-      const costBox = (await region
-        .getByText("Spend $200k", { exact: false })
-        .boundingBox())!;
       const keepCashBox = (await region
         .getByRole("button", { name: "Keep cash" })
         .boundingBox())!;
-      // Keep the cost attached to its own action and separate from the next choice.
-      expect(costBox.y - (fundBox.y + fundBox.height)).toBeLessThanOrEqual(8);
-      expect(
-        keepCashBox.y - (costBox.y + costBox.height),
-      ).toBeGreaterThanOrEqual(16);
+      expect(keepCashBox.y - (fundBox.y + fundBox.height)).toBeGreaterThan(0);
       expect(keepCashBox.x).toBe(fundBox.x);
       expect(keepCashBox.width).toBe(fundBox.width);
     }
+    // The pause icon shares a centerline with its label
+    const chip = region.locator(".pausedChip");
+    const chipBox = (await chip.boundingBox())!;
+    const iconBox = (await chip.locator("svg").boundingBox())!;
+    expect(
+      Math.abs(
+        iconBox.y + iconBox.height / 2 - (chipBox.y + chipBox.height / 2),
+      ),
+    ).toBeLessThanOrEqual(1);
     for (const button of await region.getByRole("button").all()) {
       const box = await button.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);

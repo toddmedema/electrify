@@ -361,12 +361,12 @@ export function GeneratorBuildItem(
       case "solarTrackers":
         return [
           {
-            text: "Follows the sun for more morning and evening power, about 20% more a year.",
+            text: "Follows the sun for about 20% more morning and evening power.",
           },
           { text: "Stows steeply in hail. Can't be added after building." },
         ];
       case "hailResistant":
-        return [{ text: "Less hail damage." }];
+        return [];
       default: {
         if (!props.withResilience) return [];
         const standardMinTempC =
@@ -774,7 +774,9 @@ export function GeneratorBuildItem(
                         className={
                           line.warning
                             ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
-                            : "resilienceBuildOptionDetail"
+                            : option.upgrade === "solarTrackers"
+                              ? "resilienceBuildOptionDetail resilienceBuildOptionNoWrap"
+                              : "resilienceBuildOptionDetail"
                         }
                       >
                         {line.text}
@@ -1221,9 +1223,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                   setSliderTick(getTickFromW(peakW));
                   setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
                 }}
-                onUseMaxSize={(peakW) =>
-                  setExactSizes((sizes) => ({ ...sizes, [g.name]: peakW }))
-                }
+                onUseMaxSize={(peakW) => {
+                  setSliderTick(Math.max(0, getTickFromW(peakW)));
+                  setExactSizes((sizes) => ({ ...sizes, [g.name]: peakW }));
+                }}
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

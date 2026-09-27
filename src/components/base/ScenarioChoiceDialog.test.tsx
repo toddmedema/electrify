@@ -83,15 +83,14 @@ test("an unaffordable paid option explains the shortfall and leaves a free respo
     id: "winterize",
     label: "Winterize plants",
     cost: () => 40000000,
-    description:
-      "Spend {cost} to halve output losses while demand and gas prices still surge.",
+    description: "Halve output losses while demand and gas prices still surge.",
     message: "Winterization funded.",
   };
   renderDialog();
-  const paid = screen.getByRole("button", { name: "Winterize plants" });
+  const paid = screen.getByRole("button", { name: "Winterize plants ($40M)" });
   expect(paid).toBeDisabled();
   expect(paid).toHaveAccessibleDescription(
-    "Spend $40M to halve output losses while demand and gas prices still surge. · Insufficient cash",
+    "Halve output losses while demand and gas prices still surge. · Insufficient cash",
   );
   expect(
     screen.getByRole("button", { name: "Phase connections" }),
