@@ -156,9 +156,6 @@ export const TICK_MS = {
   ULTRA: 1000 / 120,
 };
 
-// Fallbacks for the screens that run before any economic data has been loaded, and the anchor
-// the projected cycles rest near. The played game reads its rates from data/Economy instead.
-export const INFLATION = 0.03;
 export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
@@ -303,8 +300,6 @@ export const WEATHER_DEPENDENT_FUELS: readonly FuelNameType[] = [
 export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
-export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click
-export const AUDIO_COMMAND_DEBOUNCE_MS = 300;
 export const MUSIC_INTENSITY_MAX = 10;
 
 export interface MusicDefinition {

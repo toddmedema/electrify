@@ -62,7 +62,6 @@ export function getAllMusicFiles(): string[] {
 }
 
 // can't use Fetch for local files since audio files might come from file://, must use this instead
-// TODO: Switch to using promises, or https://tanstack.com/query/latest/docs/framework/react/overview
 export function loadAudioLocalFile(
   context: AudioContext,
   url: string,

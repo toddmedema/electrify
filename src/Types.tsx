@@ -4,9 +4,6 @@ import type { Action } from "@reduxjs/toolkit";
 import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
-export interface AudioType {
-  paused: boolean;
-}
 
 export type MonthType =
   | "Jan"

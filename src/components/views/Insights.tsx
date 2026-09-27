@@ -560,15 +560,6 @@ function storedLayers(): InsightLayerId[] {
   return valid.length ? valid : [...INSIGHT_PRESETS.overview.layers];
 }
 
-export function presetForLayers(layers: InsightLayerId[]): InsightPresetId {
-  const match = Object.entries(INSIGHT_PRESETS).find(
-    ([, preset]) =>
-      preset.layers.length === layers.length &&
-      preset.layers.every((layer, index) => layer === layers[index]),
-  );
-  return (match?.[0] as InsightPresetId | undefined) || "custom";
-}
-
 function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
   switch (scenarioId) {
     case 4:

@@ -2363,14 +2363,3 @@ export function upcomingStoryPhases(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
 }
-
-export function activeWorldEventEffects(
-  events: ActiveWorldEventType[] | undefined,
-  minute: number,
-): WorldEventEffectsType {
-  return combineStoryEffects(
-    (events || []).filter(
-      (event) => minute >= event.startsMinute && minute < event.endsMinute,
-    ),
-  );
-}

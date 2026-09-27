@@ -7,7 +7,6 @@ import {
   ScoreType,
   UserType,
 } from "../Types";
-import type { RootState } from "../Store";
 import {
   addDoc,
   collection,
@@ -356,7 +355,5 @@ export const userSlice = createSlice({
 });
 
 export const { delta, reset } = userSlice.actions;
-
-export const selectUid = (state: RootState) => state.user.uid;
 
 export default userSlice.reducer;
