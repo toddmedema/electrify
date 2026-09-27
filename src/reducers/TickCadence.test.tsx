@@ -1,4 +1,4 @@
-import { TICK_MS } from "../Constants";
+import { TICK_MINUTES, TICK_MS } from "../Constants";
 import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
 import { SpeedType } from "../Types";
@@ -71,5 +71,32 @@ describe("tick cadence on display frames", () => {
     expect(
       Math.abs(total - (600 * (1000 / 60)) / TICK_MS.FAST),
     ).toBeLessThanOrEqual(1);
+  });
+
+  it("treats a frozen page as paused instead of fast-forwarding", () => {
+    let wallClockMs = 0;
+    jest.spyOn(performance, "now").mockImplementation(() => wallClockMs);
+    getStore().dispatch(quit());
+    getStore().dispatch(resume(createGame({ scenarioId: 101 })));
+    getStore().dispatch(loaded());
+    getStore().dispatch(setSpeed("NORMAL"));
+
+    // Settle the loop with ordinary frames, then record where the clock stands
+    for (let i = 0; i < 30; i++) {
+      wallClockMs += 1000 / 60;
+      getStore().dispatch(tickAction());
+    }
+    const minuteBefore = getStore().getState().game.date.minute;
+
+    // Android does not fire visibilitychange when the screen locks, so a locked phone freezes
+    // the page with no hide event: ten minutes of wall time pass while no frames run at all
+    wallClockMs += 10 * 60 * 1000;
+
+    // The first frame back must not replay the frozen time
+    getStore().dispatch(tickAction());
+    const minuteAfter = getStore().getState().game.date.minute;
+
+    // At most the clamped one-second gap (~17 ticks at NORMAL), not ten minutes (~10,000)
+    expect(minuteAfter - minuteBefore).toBeLessThanOrEqual(30 * TICK_MINUTES);
   });
 });

@@ -299,6 +299,14 @@ let previousTickMs = 0;
 let accumulatedTickMs = 0;
 // Only for environments without requestAnimationFrame; a browser presents at its display rate.
 const MIN_PRESENTATION_INTERVAL_MS = 1000 / 60;
+// A frame gap this large means the page was frozen rather than merely slow: no frames ran
+// during it, so the clock must not fast-forward through the time it spent stopped. Android is
+// the case that needs this -- locking the screen suspends the page without firing
+// visibilitychange (unlike iOS, where it behaves like a background), so the first frame back
+// would otherwise owe every tick of the whole absence at once. The worst legitimate frame is a
+// month rollover on a phone, measured near 370 ms in the dev build (docs/perf-plan.md), so a
+// second of headroom keeps real slow frames intact while discarding freezes.
+const MAX_FRAME_GAP_MS = 1000;
 // A frame whose accumulated time is within this fraction of a step of a whole number of steps
 // runs that whole number. Display timestamps jitter by a fraction of a millisecond, and without
 // the snap a step that divides the frame evenly would still run 0, 2, 1, 1, 0, 2... ticks a frame.
@@ -1464,7 +1472,10 @@ export const gameSlice = createSlice({
       // since the last frame preserves each deterministic tick while giving React at most one
       // update per display frame.
       const nowMs = performance.now();
-      accumulatedTickMs += Math.max(0, nowMs - previousTickMs);
+      accumulatedTickMs += Math.min(
+        Math.max(0, nowMs - previousTickMs),
+        MAX_FRAME_GAP_MS,
+      );
       previousTickMs = nowMs;
       const simulationStepMs = TICK_MS[state.speed];
       while (
