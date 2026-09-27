@@ -17,14 +17,15 @@ const steps = [
 function run(step) {
   const started = Date.now();
   return new Promise((resolve) => {
-    const child = spawn(
-      "npm",
-      ["run", "--silent", step.script, ...(step.args || [])],
-      {
-        env: { ...process.env, CI: "true", NO_COLOR: "1" },
-        shell: process.platform === "win32",
-      },
-    );
+    const args = ["run", "--silent", step.script, ...(step.args || [])];
+    const options = { env: { ...process.env, CI: "true", NO_COLOR: "1" } };
+    // Windows can only start npm.cmd through a shell, and Node deprecates (DEP0190) passing an
+    // argument array alongside `shell`, so it gets one command line. Every argument here is a
+    // fixed script name or flag, so nothing needs quoting.
+    const child =
+      process.platform === "win32"
+        ? spawn(["npm", ...args].join(" "), { ...options, shell: true })
+        : spawn("npm", args, options);
     let output = "";
     child.stdout.on("data", (chunk) => (output += chunk));
     child.stderr.on("data", (chunk) => (output += chunk));

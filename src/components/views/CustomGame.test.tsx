@@ -5,6 +5,7 @@ import {
   DEFAULT_CUSTOM_SCENARIO,
 } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
+import { inEraRate } from "../../data/RetailRates";
 import { LOCATIONS } from "../../Constants";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
@@ -256,6 +257,8 @@ it("does not forecast a facility that is unavailable in the selected year", () =
       scenario={{
         ...DEFAULT_CUSTOM_SCENARIO,
         startingYear: 1980,
+        // An era-scaled rate, so the rate select has a matching option
+        dollarsPerkWh: inEraRate(DEFAULT_CUSTOM_SCENARIO.dollarsPerkWh, 1980),
         facilities: [{ name: "Solar", peakW: 500_000_000 }],
       }}
       onBack={jest.fn()}
