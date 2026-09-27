@@ -14,8 +14,15 @@ import {
   getTotalDebt,
   MAX_CREDIT_POINTS,
   LCWH,
+  maxLoanAmount,
+  purchaseTerms,
 } from "./Financials";
-import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL } from "../Constants";
+import {
+  DAYS_PER_YEAR,
+  DOWNPAYMENT_PERCENT,
+  HOURS_PER_YEAR_REAL,
+  LOAN_MONTHS,
+} from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -63,6 +70,42 @@ describe("getMonthlyPayment", () => {
     }
     // The last dollar of a ten year loan is where the rounding lands
     expect(balance).toBeCloseTo(0, 6);
+  });
+});
+
+describe("purchaseTerms", () => {
+  it("charges the whole price in cash and borrows nothing", () => {
+    expect(purchaseTerms(1000, false, 0.05)).toEqual({
+      amountDue: 1000,
+      downpayment: 1000,
+      loanAmount: 0,
+      monthlyPayment: 0,
+    });
+  });
+
+  it("takes the down payment now and amortizes the rest over the standard term", () => {
+    const terms = purchaseTerms(1000, true, 0.05);
+    expect(terms.amountDue).toBe(1000 * DOWNPAYMENT_PERCENT);
+    expect(terms.downpayment).toBe(terms.amountDue);
+    expect(terms.loanAmount).toBe(1000 - 1000 * DOWNPAYMENT_PERCENT);
+    expect(terms.monthlyPayment).toBe(
+      getMonthlyPayment(terms.loanAmount, 0.05, LOAN_MONTHS),
+    );
+  });
+
+  it("rolls a refinanced balance into the payment but not into the new borrowing", () => {
+    const terms = purchaseTerms(1000, true, 0.05, 500);
+    expect(terms.loanAmount).toBe(800);
+    expect(terms.monthlyPayment).toBe(
+      getMonthlyPayment(1300, 0.05, LOAN_MONTHS),
+    );
+    expect(purchaseTerms(1000, false, 0.05, 500).monthlyPayment).toBe(0);
+  });
+
+  it("bounds the borrowing an import may claim", () => {
+    expect(maxLoanAmount(1000)).toBeCloseTo(
+      purchaseTerms(1000, true, 0).loanAmount,
+    );
   });
 });
 

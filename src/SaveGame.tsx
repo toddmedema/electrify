@@ -1,3 +1,4 @@
+import { maxLoanAmount } from "./helpers/Financials";
 import {
   accessContextForGame,
   effectiveCorridor,
@@ -34,7 +35,6 @@ import {
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
 import {
-  DOWNPAYMENT_PERCENT,
   TICKS_PER_MONTH,
   INTERTIE_UPGRADE_STEP,
   MAX_INTERTIE_UPGRADES,
@@ -212,7 +212,7 @@ function validLineInvestment(
   return (
     approximatelyEqual(line.buildCost, buildCost) &&
     line.loanAmountLeft! <=
-      buildCost * (1 - DOWNPAYMENT_PERCENT) + Math.max(1, buildCost) * 1e-9 &&
+      maxLoanAmount(buildCost) + Math.max(1, buildCost) * 1e-9 &&
     line.yearsToBuildLeft! <= yearsToBuild &&
     validConstruction(line, constructionKgco2e)
   );

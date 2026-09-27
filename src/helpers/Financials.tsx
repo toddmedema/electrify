@@ -1,4 +1,10 @@
-import { DAYS_PER_YEAR, FUELS, HOURS_PER_YEAR_REAL } from "../Constants";
+import {
+  DAYS_PER_YEAR,
+  DOWNPAYMENT_PERCENT,
+  FUELS,
+  HOURS_PER_YEAR_REAL,
+  LOAN_MONTHS,
+} from "../Constants";
 import {
   DateType,
   FacilityOperatingType,
@@ -31,6 +37,55 @@ export function getMonthlyPayment(
     return months > 0 ? principal / months : principal;
   }
   return principal * (monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
+}
+
+export interface PurchaseTermsType {
+  /** Cash leaving the company now: the down payment when financed, else the whole price */
+  amountDue: number;
+  /** The share paid up front on a loan (the whole price for cash) */
+  downpayment: number;
+  /** New borrowing, 0 for cash */
+  loanAmount: number;
+  /** Monthly payment on the new borrowing plus any refinanced balance, 0 for cash */
+  monthlyPayment: number;
+}
+
+/**
+ * The one place the cash-or-loan arithmetic lives, shared by the reducer (which books it) and the
+ * purchase dialogs (which quote it). `refinancedBalance` is an existing loan rolled into the new
+ * one at today's rate and the standard term, as an intertie upgrade does.
+ */
+export function purchaseTerms(
+  buildCost: number,
+  financed: boolean,
+  interestRate: number,
+  refinancedBalance = 0,
+): PurchaseTermsType {
+  if (!financed) {
+    return {
+      amountDue: buildCost,
+      downpayment: buildCost,
+      loanAmount: 0,
+      monthlyPayment: 0,
+    };
+  }
+  const downpayment = buildCost * DOWNPAYMENT_PERCENT;
+  const loanAmount = buildCost - downpayment;
+  return {
+    amountDue: downpayment,
+    downpayment,
+    loanAmount,
+    monthlyPayment: getMonthlyPayment(
+      refinancedBalance + loanAmount,
+      interestRate,
+      LOAN_MONTHS,
+    ),
+  };
+}
+
+/** The most that a purchase at this price can have borrowed against it. */
+export function maxLoanAmount(buildCost: number): number {
+  return buildCost * (1 - DOWNPAYMENT_PERCENT);
 }
 
 // Of a month's payment on an amortizing loan, how many $'s go towards interest
