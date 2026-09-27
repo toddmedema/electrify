@@ -3,11 +3,31 @@ import {
   MonthlyHistoryType,
   StoryPeriodSnapshotType,
   StorySnapshotType,
+  WorldEventEffectsType,
   isStorage,
 } from "../Types";
 import { WEATHER_DEPENDENT_FUELS } from "../Constants";
 import { summarizeHistory } from "./DateTime";
 import { facilityAgeYears } from "./Financials";
+
+/**
+ * The share of rated output that active story effects leave a facility: its fuel's derate times
+ * any derate aimed at it by id. A multiplier of 0 is a full outage, so a missing entry, and only a
+ * missing one, means no limit. The simulation and the fleet list both read this, so they cannot
+ * disagree about what a plant can produce.
+ */
+export function storyOutputMultiplier(
+  facility: Pick<FacilityOperatingType, "id" | "fuel">,
+  effects: WorldEventEffectsType,
+): number {
+  const fuel = facility.fuel;
+  const byFuel = fuel
+    ? (effects.facilityOutputMultipliersByFuel?.[fuel] ?? 1)
+    : 1;
+  return (
+    byFuel * (effects.facilityOutputMultipliersById?.[String(facility.id)] ?? 1)
+  );
+}
 
 export function buildStoryPeriodSnapshot(
   monthlyHistory: MonthlyHistoryType[],
@@ -41,7 +61,7 @@ export function buildStorySnapshot(
 ): StorySnapshotType {
   const prior12Months = summarizeHistory(monthlyHistory.slice(0, 12));
   const fleet = facilities.map((facility) => {
-    const generatorFuel = facility.peakWh ? undefined : facility.fuel;
+    const generatorFuel = isStorage(facility) ? undefined : facility.fuel;
     return {
       id: facility.id,
       name: facility.name,

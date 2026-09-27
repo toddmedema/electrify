@@ -19,7 +19,7 @@ export function buildConsequenceMessage(
 
 /** A short event-feed title for the commitment itself; the snackbar carries the full forecast. */
 export function buildStartedMessage(facility: FacilityShoppingType): string {
-  if (facility.peakWh) {
+  if (isStorage(facility)) {
     const duration = Math.round((facility.peakWh / facility.peakW) * 10) / 10;
     return `Started construction on ${duration}hr ${formatWatts(facility.peakW)} ${facility.name}`;
   }

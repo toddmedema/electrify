@@ -96,7 +96,11 @@ import {
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
-import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
+import {
+  buildStoryPeriodSnapshot,
+  buildStorySnapshot,
+  storyOutputMultiplier,
+} from "../helpers/Story";
 import {
   isMaterialCapacityDecision,
   recordMeaningfulDecision,
@@ -3733,29 +3737,24 @@ function updateSupplyFacilitiesFinances(
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
-    // Only read or written behind hasMinimumStableOutput, which storage never has
-    const generator = g as GeneratorOperatingType;
-    const hasMinimumStableOutput = (g.minimumStableOutput || 0) > 0;
+    // Commitment is only read or written behind hasMinimumStableOutput, which storage never has
+    const generator = isStorage(g) ? undefined : g;
+    const hasMinimumStableOutput =
+      generator !== undefined && (generator.minimumStableOutput || 0) > 0;
     const previouslyCommitted = simulated
-      ? (generator.committed ?? previousW > 0)
-      : (generator.generatingLastRealTick ??
-        generator.committed ??
+      ? (generator?.committed ?? previousW > 0)
+      : (generator?.generatingLastRealTick ??
+        generator?.committed ??
         previousW > 0);
-    const generatorFuel = g.fuel;
-    const fuelOutputMultiplier = generatorFuel
-      ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
-      : 1;
     // A retrofit holds the plant offline until it completes.
-    const facilityOutputMultiplier = isUpgradingAt(g, now.minute)
+    const availablePeakW = isUpgradingAt(g, now.minute)
       ? 0
-      : (tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1);
-    const availablePeakW =
-      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
+      : g.peakW * storyOutputMultiplier(g, tickStoryEffects);
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
-    const storage = !!g.peakWh && g.yearsToBuildLeft === 0;
+    const storage = isStorage(g) && g.yearsToBuildLeft === 0;
     if (hydro && g.yearsToBuildLeft === 0) {
       const capacityWh = g.reservoirCapacityWh || 0;
       const inflowWh =
