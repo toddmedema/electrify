@@ -80,6 +80,7 @@ import {
   customerMarketSizeAt,
   getMarketRate,
   nextCustomerCount,
+  publicRateCap,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1523,7 +1524,10 @@ export const gameSlice = createSlice({
       ) {
         state.runIdentity = undefined;
       }
-      const recorded = recordedDelta(action.payload);
+      if (typeof payload.dollarsPerkWh === "number") {
+        payload.dollarsPerkWh = capRateForScenario(state, payload);
+      }
+      const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
       if (recorded && recorded.dollarsPerkWh !== rateBefore) {
@@ -2794,7 +2798,11 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     }
     case "delta": {
-      const recorded = recordedDelta((payload || {}) as Partial<GameType>);
+      const requested = { ...((payload || {}) as Partial<GameType>) };
+      if (typeof requested.dollarsPerkWh === "number") {
+        requested.dollarsPerkWh = capRateForScenario(state, requested);
+      }
+      const recorded = recordedDelta(requested);
       if (
         recorded?.dollarsPerkWh !== undefined &&
         recorded.dollarsPerkWh !== state.dollarsPerkWh
@@ -2814,6 +2822,37 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     default:
       break;
   }
+}
+
+/**
+ * A public utility's board caps its rate (see publicRateCap); investors are left to competition.
+ * Deltas that also pick the scenario are setup, not a player's rate choice, and pass unchanged.
+ */
+function capRateForScenario(
+  state: GameType,
+  payload: Partial<GameType>,
+): number {
+  const rate = payload.dollarsPerkWh as number;
+  if (
+    !Number.isFinite(rate) ||
+    "scenarioId" in payload ||
+    "customScenario" in payload
+  ) {
+    return rate;
+  }
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (!scenario || scenario.ownership !== "Public" || scenario.tutorialSteps) {
+    return rate;
+  }
+  return Math.min(
+    rate,
+    publicRateCap(
+      scenario.dollarsPerkWh,
+      state.date,
+      state.startingYear,
+      state.seed,
+    ),
+  );
 }
 
 /**

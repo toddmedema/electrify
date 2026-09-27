@@ -31,6 +31,29 @@ export function getMarketRate(
   return startingRate * getInflationIndex(date, startingYear, seed);
 }
 
+/**
+ * A public utility's customers cannot switch away, so its board caps the rate instead: at most
+ * this multiple of the authored target rate, carried forward by the same inflation index the
+ * score deflates by. Investors face the competitor benchmark rather than a cap.
+ */
+export const PUBLIC_RATE_CAP_MULTIPLE = 2;
+/** The cap never falls below a nickel, so tiny authored targets still leave a usable slider. */
+export const PUBLIC_RATE_CAP_FLOOR = 0.05;
+
+export function publicRateCap(
+  targetRate: number,
+  date: Pick<DateType, "year" | "monthNumber">,
+  startingYear: number,
+  seed: number,
+): number {
+  const cap =
+    targetRate *
+    PUBLIC_RATE_CAP_MULTIPLE *
+    getInflationIndex(date, startingYear, seed);
+  // Rounded up to whole cents so the slider ends on a clean mark and never below the exact cap
+  return Math.max(PUBLIC_RATE_CAP_FLOOR, Math.ceil(cap * 100 - 1e-9) / 100);
+}
+
 export interface CustomerTickInputType {
   customers: number;
   customerRate: number;

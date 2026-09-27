@@ -32,6 +32,7 @@ import {
   customerMarketSizeAt,
   getMarketRate,
   projectCustomerChange,
+  publicRateCap,
 } from "../../helpers/Customers";
 import {
   formatMoneyConcise,
@@ -449,12 +450,6 @@ function DeltaCell(props: DeltaCellProps): React.JSX.Element {
   );
 }
 
-// The rate slider runs $0 to $0.30/kWh, so its ticks are a fixed nickel apart
-const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
-  value: rate,
-  label: formatMoneyConcise(rate),
-}));
-
 /**
  * The useful part of the customer forecast is its change, not its resulting total. At large
  * customer counts, formatting both totals compactly can turn `1m -> 1m` and hide the effect.
@@ -798,6 +793,22 @@ export default class Finances extends React.Component<Props, State> {
       Math.ceil(marketRate * 200) / 100,
       game.dollarsPerkWh,
     );
+    // A public board caps the rate at twice its target in today's dollars; the reducer enforces it
+    const publicRateMax = Math.max(
+      publicRateCap(scenario.dollarsPerkWh, date, startingYear, game.seed),
+      game.dollarsPerkWh,
+    );
+    const publicRateMarks = [
+      { value: 0, label: "$0" },
+      {
+        value: marketRate,
+        label: `${formatMoneyConcise(marketRate)} target`,
+      },
+      {
+        value: publicRateMax,
+        label: `${formatMoneyConcise(publicRateMax)} board cap`,
+      },
+    ];
     const investorRateMarks = [
       { value: 0, label: "$0" },
       {
@@ -981,11 +992,15 @@ export default class Finances extends React.Component<Props, State> {
                 marks={
                   scenario.ownership === "Investor"
                     ? investorRateMarks
-                    : RATE_MARKS
+                    : publicRateMarks
                 }
                 min={0}
                 step={scenario.ownership === "Investor" ? 0.001 : 0.01}
-                max={scenario.ownership === "Investor" ? investorRateMax : 0.3}
+                max={
+                  scenario.ownership === "Investor"
+                    ? investorRateMax
+                    : publicRateMax
+                }
                 onChange={(_e: Event, newTick: number | number[]) =>
                   onDelta({
                     dollarsPerkWh: Array.isArray(newTick)
