@@ -53,9 +53,11 @@ for (const theme of ["light", "dark"]) {
       name: "Rooftop solar rebates · Not started · starts Feb 2020",
     });
     await solar.click();
-    await expect(dialog).toContainText(
-      "does not directly cover an evening peak",
-    );
+    // The mechanism prose is depth behind the facts grid, so it starts collapsed.
+    await dialog.getByText("How it works").click();
+    await expect(
+      dialog.getByText("does not directly cover an evening peak"),
+    ).toBeVisible();
     await expect(dialog).toContainText("48 months of installations");
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
@@ -64,7 +66,7 @@ for (const theme of ["light", "dark"]) {
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
-    await expect(dialog.getByText(/^Change in utility cash/)).toBeVisible();
+    await expect(dialog.getByText(/^Cash change through/)).toBeVisible();
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -79,11 +81,13 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
     await dialog
-      .getByRole("button", { name: "At completion (Jan 2024)" })
+      .getByRole("button", { name: "At completion", exact: true })
       .click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Estimated utility demand · Jan 2024");
-    await dialog.getByRole("button", { name: "First effective month" }).click();
+    await dialog
+      .getByRole("button", { name: "Next month", exact: true })
+      .click();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();
     await expect(scheduled).toBeVisible();

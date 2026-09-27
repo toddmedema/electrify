@@ -151,9 +151,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     jest.advanceTimersByTime(250);
   });
   const old = workers[workers.length - 1];
-  fireEvent.click(
-    screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "At completion" }));
   expect(old.terminate).toHaveBeenCalled();
   act(() => {
     old.onmessage!({ data: { result } });
@@ -178,9 +176,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
   expect(apply).toBeDisabled();
   fallback.mockRestore();
-  fireEvent.click(
-    screen.getByRole("button", { name: "First effective month" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Next month" }));
   act(() => {
     jest.advanceTimersByTime(250);
   });
@@ -229,15 +225,13 @@ test.each<PolicyId>(["solar", "efficiency"])(
         name: `${POLICIES[id].name} · Not started`,
       }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "At completion (Jan 2024)" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "At completion" }));
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
 
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
-    expect(screen.getByText(/^Change in utility cash/)).toBeVisible();
-    expect(screen.getByText(/^Change in utility cash/)).toHaveTextContent(
+    expect(screen.getByText(/^Cash change through/)).toBeVisible();
+    expect(screen.getByText(/^Cash change through/)).toHaveTextContent(
       `Jan 2024: ${formatMoneyConcise(result.cashChange)}`,
     );
     const hint = screen.getByText(/^Little change in peak demand/);
@@ -281,7 +275,6 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   expect(
     screen.getByText(/^Paused after month 8 of 48 · \$[\d.]+[KMB]? spent$/),
   ).toBeVisible();
-  expect(fact("Remaining")).toBe("40 months");
   expect(fact("If resumed now")).toBe("May 2023");
   expect(fact("Finishes")).toBeUndefined();
   expect(
@@ -291,6 +284,39 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   expect(
     screen.queryByText(/Larger funding|Monthly funding/),
   ).not.toBeInTheDocument();
+  view.unmount();
+});
+
+test("a scheduled operating change is named in the card and cancelled from the footer", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.policies = emptyPolicies(game.date.monthsElapsed);
+  Object.assign(game.policies.programs.timeOfUse, {
+    pending: { tier: "On", month: game.date.monthsElapsed + 1, startHour: 17 },
+  });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  // The list names the scheduled change in the program's status line.
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /Time-of-use tariff · Off · turns on Feb 2020/,
+    }),
+  );
+  // The card names the scheduled change instead of leaving it to inference.
+  expect(screen.getByText("Turns on Feb 2020 · 17:00–21:00")).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Cancel scheduled change" }),
+  );
+  expect(
+    store.getState().game.policies!.programs.timeOfUse.pending,
+  ).toBeUndefined();
   view.unmount();
 });
 
@@ -342,11 +368,10 @@ test("in-progress and completed build-outs read as projects in the list and tool
       name: "Rooftop solar rebates build-out progress",
     }),
   ).toHaveAttribute("aria-valuetext", "Month 8 of 48 · $1M spent");
-  expect(fact("Remaining")).toBe("40 months");
   expect(fact("Finishes")).toBe("May 2023");
   // The preview of a pause compares against the finish the project had planned.
   expect(
-    screen.getByRole("button", { name: "At planned completion (May 2023)" }),
+    screen.getByRole("button", { name: "Planned completion" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Pause new installations next month" }),
@@ -445,7 +470,7 @@ test.each([
       screen.queryByText(/Estimated utility demand/),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /completion/ }),
+      screen.queryByRole("group", { name: "Estimate month" }),
     ).not.toBeInTheDocument();
     // A scheduled pause has no finish to promise; a scheduled resume does.
     expect(fact("Finishes")).toBe(finish);
@@ -478,7 +503,7 @@ test("the completion preview is capped at the run's last month", () => {
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
   expect(fact("If started now")).toBe("After this run ends");
-  fireEvent.click(screen.getByRole("button", { name: "By Dec 2035" }));
+  fireEvent.click(screen.getByRole("button", { name: "End of run" }));
   expect(
     screen.getByText("Estimated utility demand · Dec 2035"),
   ).toBeInTheDocument();

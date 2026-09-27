@@ -5685,16 +5685,19 @@ $sizemap: (
   font-size: 1rem;
   font-weight: 600;
 }
-.forecastScope > summary {
+.forecastScope > summary,
+.customerProgramHowItWorks > summary {
   display: flex;
   align-items: center;
   padding: 8px 0;
 }
-.forecastScope > summary::before {
+.forecastScope > summary::before,
+.customerProgramHowItWorks > summary::before {
   content: "›";
   margin-right: 8px;
 }
-.forecastScope[open] > summary::before {
+.forecastScope[open] > summary::before,
+.customerProgramHowItWorks[open] > summary::before {
   transform: rotate(90deg);
 }
 .insights .insightsLevers {
@@ -5825,6 +5828,10 @@ $programs_column: 800px;
   overflow-y: auto;
   padding-top: $space-4;
   padding-bottom: $space-4;
+}
+.customerProgramsBody summary {
+  min-height: 44px;
+  cursor: pointer;
 }
 // A program's decision is the screen's one action, so its buttons keep the full touch target
 .customerProgramsBody .MuiButton-root,
