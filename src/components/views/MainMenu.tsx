@@ -6,6 +6,7 @@ import {
   Stack,
   SvgIcon,
   Typography,
+  useTheme,
 } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
@@ -45,6 +46,9 @@ const DiscordIcon = () => (
 const MainMenu = (props: Props): React.JSX.Element => {
   const startLabel = props.hasSavedGame ? "Start a new game" : "Start playing";
   const [shareStatus, setShareStatus] = React.useState("");
+  // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
+  // in dark's desaturated blue; the overlaid pulse and smoke follow --interactive-blue on their own
+  const dark = useTheme().palette.mode === "dark";
 
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
@@ -59,7 +63,10 @@ const MainMenu = (props: Props): React.JSX.Element => {
     <div id="menuCard">
       <div id="logo">
         <div className="homeLogo">
-          <img src="images/logo-home.svg" alt="Electrify" />
+          <img
+            src={dark ? "images/logo-home-dark.svg" : "images/logo-home.svg"}
+            alt="Electrify"
+          />
           <svg
             className="homeEnergyTrace"
             viewBox="0 0 300 70"

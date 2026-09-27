@@ -559,7 +559,7 @@ export function wildfirePreparednessChoice(
         id: "prepare",
         label: "Fund preparedness",
         cost,
-        description: `Spend {cost} to halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
+        description: `Halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
         message: "Preparedness funded for the season.",
       },
       {

@@ -13,6 +13,7 @@ import {
 } from "../../helpers/ScenarioChoices";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { chooseScenarioResponse } from "../../reducers/GameActions";
+import { formatMoneyConcise } from "../../helpers/Format";
 import ConceptIcon from "./ConceptIcon";
 
 export default function ScenarioChoiceDialog() {
@@ -101,7 +102,9 @@ export default function ScenarioChoiceDialog() {
                     )
                   }
                 >
-                  {option.label}
+                  {cost > 0
+                    ? `${option.label} (${formatMoneyConcise(cost)})`
+                    : option.label}
                 </Button>
                 <Typography
                   id={`scenarioChoiceOption-${option.id}`}

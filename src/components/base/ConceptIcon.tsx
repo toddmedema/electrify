@@ -2,6 +2,7 @@ import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import BoltIcon from "@mui/icons-material/Bolt";
 import BuildIcon from "@mui/icons-material/Build";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import FactoryIcon from "@mui/icons-material/Factory";
@@ -13,7 +14,6 @@ import PauseCircleIcon from "@mui/icons-material/PauseCircle";
 import PeopleIcon from "@mui/icons-material/People";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PriceChangeIcon from "@mui/icons-material/PriceChange";
-import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import ThunderstormIcon from "@mui/icons-material/Thunderstorm";
@@ -98,7 +98,7 @@ const CONCEPT_ICONS: Record<
   time: HourglassEmptyIcon,
   construction: ConstructionIcon,
   finances: AccountBalanceIcon,
-  forecast: QueryStatsIcon,
+  forecast: CalendarTodayOutlinedIcon,
   rate: PriceChangeIcon,
   fuel: LocalGasStationIcon,
   weather: WbSunnyIcon,

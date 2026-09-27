@@ -438,9 +438,10 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             storage={g}
             key={i}
             cash={cash}
-            onUseMaxSize={(peakWh) =>
-              setExactSizes((sizes) => ({ ...sizes, [g.name]: peakWh }))
-            }
+            onUseMaxSize={(peakWh) => {
+              setSliderTick(Math.max(0, getTickFromW(peakWh)));
+              setExactSizes((sizes) => ({ ...sizes, [g.name]: peakWh }));
+            }}
             interestRate={game.interestRate}
             location={game.location}
             onBuild={(financed: boolean) => {

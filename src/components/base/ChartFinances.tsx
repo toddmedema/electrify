@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   bandsPlugin,
+  FORECAST_RIGHT_PAD,
   padRange,
   spansBelow,
   splitPastProjected,
@@ -97,7 +98,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     height: 0,
     // Month labels are centred on their ticks. The final tick sits on the plot edge,
     // so reserve half a label beyond it rather than clipping its trailing characters.
-    padding: [10 * scale, 24 * scale, 0, 0],
+    padding: [10 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
     cursor: {
       x: true,
       y: false,

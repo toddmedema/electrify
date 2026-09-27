@@ -5,7 +5,7 @@ import {
   AXIS_LABEL_SIZE,
   dashArray,
   FORECAST_AXIS_LEFT,
-  FORECAST_AXIS_RIGHT,
+  FORECAST_RIGHT_PAD,
   padRange,
   SPLINE,
   forecastMonthAxis,
@@ -50,7 +50,7 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
