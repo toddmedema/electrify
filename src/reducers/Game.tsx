@@ -432,26 +432,31 @@ function logFuelPriceMoves(
   if (!previous) {
     return;
   }
-  const burned = new Set<string>();
+  const burned = new Set<FuelNameType>();
   state.facilities.forEach((f: FacilityOperatingType) => {
-    const fuel = f.fuel;
-    // Wind and sun are fuels the game names but nobody prices
-    if (fuel && previous[fuel] !== undefined && prices[fuel] !== undefined) {
-      burned.add(fuel);
+    if (f.fuel) {
+      burned.add(f.fuel);
     }
   });
-  burned.forEach((fuel: string) => {
-    if (storyPriceFuels.has(fuel as FuelNameType)) {
+  burned.forEach((fuel) => {
+    const before = previous[fuel];
+    const after = prices[fuel];
+    // Wind and sun are fuels the game names but nobody prices
+    if (
+      before === undefined ||
+      after === undefined ||
+      storyPriceFuels.has(fuel)
+    ) {
       return;
     }
-    const change = (prices[fuel] - previous[fuel]) / previous[fuel];
+    const change = (after - before) / before;
     if (Math.abs(change) < FUEL_PRICE_SPIKE) {
       return;
     }
     logGameEvent(
       state,
       "FUEL_PRICE",
-      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MMBtu`,
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(after)}/MMBtu`,
     );
   });
 }
@@ -1331,11 +1336,14 @@ function getEffectiveFuelPrices(
     return prices;
   }
   const effective = { ...prices };
-  Object.entries(multipliers).forEach(([fuel, multiplier]) => {
-    if (multiplier !== undefined && effective[fuel] !== undefined) {
-      effective[fuel] *= multiplier;
-    }
-  });
+  (Object.entries(multipliers) as [FuelNameType, number][]).forEach(
+    ([fuel, multiplier]) => {
+      const price = effective[fuel];
+      if (multiplier !== undefined && price !== undefined) {
+        effective[fuel] = price * multiplier;
+      }
+    },
+  );
   return effective;
 }
 
@@ -4198,14 +4206,13 @@ function updateSupplyFacilitiesFinances(
         // represents the same daily start repeated throughout that month.
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
-      const operatingFuel = g.fuel;
       facilityOM *=
-        (operatingFuel &&
-          tickStoryEffects.operatingCostMultipliersByFuel?.[operatingFuel]) ||
+        (g.fuel && tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
         1;
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
-      if (g.fuel && FUELS[g.fuel]) {
+      const fuel = g.fuel && FUELS[g.fuel];
+      if (fuel) {
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / ticksPerHour) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
@@ -4215,7 +4222,7 @@ function updateSupplyFacilitiesFinances(
         // used to feed that through expenses into cash, where saving or charting exposed it as
         // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
         const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
-        const facilityKgco2e = fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
+        const facilityKgco2e = fuelBtu * fuel.kgCO2ePerBtu;
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
         facilityExpenses +=

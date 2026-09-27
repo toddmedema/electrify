@@ -13,6 +13,7 @@ import {
 } from "./UPlotHelpers";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
+import { PRICED_FUELS } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
 import { fuelColors, fuelDashArrays } from "../../Theme";
 
@@ -27,16 +28,6 @@ export interface Props {
   /** Shares a cursor with the other charts drawn against the same months */
   syncKey?: string;
 }
-
-export type PricedFuelType =
-  "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
-export const PRICED_FUELS: PricedFuelType[] = [
-  "Biomass",
-  "Coal",
-  "Natural Gas",
-  "Oil",
-  "Uranium",
-];
 
 interface State {
   prices: number[][];

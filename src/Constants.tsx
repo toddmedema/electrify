@@ -1,10 +1,12 @@
 import {
   CardNameType,
   DifficultyMultipliersType,
+  DifficultyType,
   FuelNameType,
   FuelType,
   LocationType,
   MonthType,
+  PricedFuelNameType,
 } from "./Types";
 
 export const DIFFICULTIES = {
@@ -52,7 +54,7 @@ export const DIFFICULTIES = {
     description:
       "Full challenge: unadjusted game costs, building times, and outage penalties.",
   },
-} as { [index: string]: DifficultyMultipliersType };
+} satisfies Record<DifficultyType, DifficultyMultipliersType>;
 
 export const DIFFICULTY_LABELS: Record<string, string> = {
   Intern: "Beginner",
@@ -251,7 +253,8 @@ export const INIT_DELAY = {
 // Excludes upstream methane, construction, regrowth credits and other lifecycle effects.
 // Coal is modeled as bituminous; geothermal as zero-venting/binary cycle.
 // https://www.eia.gov/electricity/annual/table.php?t=epa_a_03.html
-export const FUELS = {
+// Weather-driven fuels burn nothing and have no entry
+export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
   Coal: {
     kgCO2ePerBtu: 0.00009324, // Bituminous coal: 93.24 kg CO2/MMBtu.
   },
@@ -278,7 +281,15 @@ export const FUELS = {
   Hydro: {
     kgCO2ePerBtu: 0,
   },
-} as { [fuel: string]: FuelType };
+};
+
+export const PRICED_FUELS: readonly PricedFuelNameType[] = [
+  "Biomass",
+  "Coal",
+  "Natural Gas",
+  "Oil",
+  "Uranium",
+];
 
 // Output follows the weather rather than dispatch, so these run whenever they can. Ordered the
 // way a dispatch stack draws them.

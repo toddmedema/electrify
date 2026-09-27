@@ -10,7 +10,6 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { TICKS_PER_YEAR } from "../../Constants";
 import { GameType, TickPresentFutureType } from "../../Types";
 import {
   formatHour,
@@ -21,9 +20,7 @@ import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { getStorageChoice, setStorageKeyValue } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
-import ChartForecastFuelPrices, {
-  PRICED_FUELS,
-} from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -37,7 +34,7 @@ import GameCard from "../base/GameCard";
 import ForecastScope from "../base/ForecastScope";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
-import { TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS, TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
 import {
   waterDashArrays,
   chartPalette,

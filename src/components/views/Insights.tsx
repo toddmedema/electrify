@@ -38,7 +38,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS, TICK_MINUTES } from "../../Constants";
 import {
   DerivedHistoryKeysType,
   GameType,
@@ -100,9 +100,7 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
-import ChartForecastFuelPrices, {
-  PRICED_FUELS,
-} from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {

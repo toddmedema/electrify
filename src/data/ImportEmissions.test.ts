@@ -108,11 +108,14 @@ it("scales authored base prices by the researched price shape", () => {
 });
 
 it("compares fuel energy with a consistent combustion CO2 boundary", () => {
-  expect(FUELS.Coal.kgCO2ePerBtu * 1000000).toBeCloseTo(93.24);
-  expect(FUELS["Natural Gas"].kgCO2ePerBtu * 1000000).toBeCloseTo(52.91);
-  expect(FUELS.Oil.kgCO2ePerBtu * 1000000).toBeCloseTo(74.14);
-  expect(FUELS.Biomass.kgCO2ePerBtu * 1000000).toBeCloseTo(195 * 0.45359237, 2);
-  expect(FUELS.Biomass.kgCO2ePerBtu).toBeGreaterThan(
-    FUELS["Natural Gas"].kgCO2ePerBtu,
+  expect(FUELS.Coal!.kgCO2ePerBtu * 1000000).toBeCloseTo(93.24);
+  expect(FUELS["Natural Gas"]!.kgCO2ePerBtu * 1000000).toBeCloseTo(52.91);
+  expect(FUELS.Oil!.kgCO2ePerBtu * 1000000).toBeCloseTo(74.14);
+  expect(FUELS.Biomass!.kgCO2ePerBtu * 1000000).toBeCloseTo(
+    195 * 0.45359237,
+    2,
+  );
+  expect(FUELS.Biomass!.kgCO2ePerBtu).toBeGreaterThan(
+    FUELS["Natural Gas"]!.kgCO2ePerBtu,
   );
 });

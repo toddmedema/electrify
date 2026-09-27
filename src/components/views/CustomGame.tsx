@@ -755,20 +755,22 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         })
                       }
                     >
-                      {Object.keys(DIFFICULTIES).map((d: string) => {
-                        return (
-                          <MenuItem value={d} key={d}>
-                            <Tooltip
-                              title={DIFFICULTIES[d].description}
-                              placement="right"
-                            >
-                              <span>
-                                {DIFFICULTY_LABELS[d as DifficultyType]}
-                              </span>
-                            </Tooltip>
-                          </MenuItem>
-                        );
-                      })}
+                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
+                        (d) => {
+                          return (
+                            <MenuItem value={d} key={d}>
+                              <Tooltip
+                                title={DIFFICULTIES[d].description}
+                                placement="right"
+                              >
+                                <span>
+                                  {DIFFICULTY_LABELS[d as DifficultyType]}
+                                </span>
+                              </Tooltip>
+                            </MenuItem>
+                          );
+                        },
+                      )}
                     </Select>
                   </TableCell>
                 </TableRow>

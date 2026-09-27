@@ -7,6 +7,7 @@ import {
 import {
   ConstructionEmissions,
   FacilityOperatingType,
+  FuelNameType,
   GameType,
   MonthlyHistoryType,
   isStorage,
@@ -358,7 +359,7 @@ export function checkTick(
 
   // Fuel totals are gross generation; the local grid also includes storage and trade.
   let supplyByFuelTotal = 0;
-  Object.keys(now.supplyByFuel || {}).forEach((fuel: string) => {
+  (Object.keys(now.supplyByFuel || {}) as FuelNameType[]).forEach((fuel) => {
     const value = now.supplyByFuel[fuel];
     if (!isFinite_(value) || value < 0) {
       collector.add(

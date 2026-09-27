@@ -236,7 +236,7 @@ export function GeneratorBuildItem(
   const { generator, cash } = props;
   const units = useUnits();
   const wideLayout = useMediaQuery("(min-width:600px)");
-  const fuel = FUELS[generator.fuel] || {};
+  const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
     props.seed,
@@ -288,9 +288,7 @@ export function GeneratorBuildItem(
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
-  const kgCO2ePerMWh = Math.round(
-    1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
-  );
+  const kgCO2ePerMWh = Math.round(1000000 * generator.btuPerWh * kgCO2ePerBtu);
   const constructionKgco2eTotal =
     (generator.constructionKgco2ePerW || 0) * generator.peakW;
   const outputShape =
@@ -691,7 +689,7 @@ export function GeneratorBuildItem(
                   label="Fuel costs"
                   value={
                     formatMoneyConcise(
-                      generator.btuPerWh * fuelPrices[generator.fuel] || 0,
+                      generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
                     ) + "/MWh"
                   }
                   entry={MANUAL_ENTRY.FUEL_COSTS}

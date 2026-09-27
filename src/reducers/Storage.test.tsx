@@ -232,7 +232,7 @@ describe("storage dispatch energy accounting", () => {
       (100 / TICKS_PER_HOUR) *
         GAME_TO_REAL_YEARS *
         gen.btuPerWh *
-        FUELS["Natural Gas"].kgCO2ePerBtu,
+        FUELS["Natural Gas"]!.kgCO2ePerBtu,
     );
     expect(now.importedKgco2e).toBe(0);
   });

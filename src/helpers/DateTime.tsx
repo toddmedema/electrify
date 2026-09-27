@@ -16,6 +16,7 @@ import {
 import {
   DateType,
   DerivedHistoryType,
+  FuelNameType,
   LocationType,
   MonthlyHistoryType,
   TickPresentFutureType,
@@ -66,7 +67,9 @@ export function reduceHistories(
   }
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
-  Object.entries(t.deliveredWhByFuel || {}).forEach(([fuel, wh]) => {
+  (
+    Object.entries(t.deliveredWhByFuel || {}) as [FuelNameType, number][]
+  ).forEach(([fuel, wh]) => {
     if (wh !== undefined) {
       acc.deliveredWhByFuel[fuel] = (acc.deliveredWhByFuel[fuel] || 0) + wh;
     }
@@ -223,15 +226,17 @@ function accumulateTick(
     (t.importedW || 0);
   const deliveredShare =
     grossSourcesW > 0 ? Math.min(t.demandW, t.supplyW) / grossSourcesW : 0;
-  Object.entries(t.supplyByFuel).forEach(([fuel, watts]) => {
-    if (watts !== undefined) {
-      summary.deliveredWhByFuel[fuel] =
-        (summary.deliveredWhByFuel[fuel] || 0) +
-        ((watts * deliveredShare) / TICKS_PER_HOUR) *
-          GAME_TO_REAL_YEARS *
-          tickScale;
-    }
-  });
+  (Object.entries(t.supplyByFuel) as [FuelNameType, number][]).forEach(
+    ([fuel, watts]) => {
+      if (watts !== undefined) {
+        summary.deliveredWhByFuel[fuel] =
+          (summary.deliveredWhByFuel[fuel] || 0) +
+          ((watts * deliveredShare) / TICKS_PER_HOUR) *
+            GAME_TO_REAL_YEARS *
+            tickScale;
+      }
+    },
+  );
   summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
   const supplyMarginW = t.reserveW ?? t.supplyW - t.demandW;
   summary.minimumSupplyMarginW =

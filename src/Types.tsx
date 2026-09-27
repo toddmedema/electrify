@@ -157,28 +157,14 @@ export type FuelNameType =
   | "Oil"
   | "Geothermal"
   | "Hydro";
-export interface FuelPricesType {
-  [index: string]: number;
-  Biomass: number; // $/btu
-  "Natural Gas": number; // $/btu
-  Coal: number; // $/btu
-  Uranium: number; // $/btu
-  Oil: number; // $/btu
-}
-export interface FuelProductionType {
-  [index: string]: number | undefined;
-  Biomass?: number; // wh
-  "Natural Gas"?: number; // wh
-  Coal?: number; // wh
-  Uranium?: number; // wh
-  Oil?: number; // wh
-  Sun?: number; // wh
-  Wind?: number; //wh
-  "Offshore Wind"?: number; // wh
-  "Airborne Wind"?: number; // wh
-  Geothermal?: number; // wh
-  Hydro?: number; // wh
-}
+/** The fuels bought on a market. The rest are free once a plant is built. */
+export type PricedFuelNameType =
+  "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
+/** $/Btu. Indexing by an unpriced fuel reads undefined. */
+export type FuelPricesType = Record<PricedFuelNameType, number> &
+  Partial<Record<FuelNameType, number>>;
+/** Energy or power by fuel; the field it sits in names the unit. */
+export type FuelProductionType = Partial<Record<FuelNameType, number>>;
 
 /** The five high-level end-use groups used by the demand model and its stacked chart. */
 export type DemandTypeNameType =
