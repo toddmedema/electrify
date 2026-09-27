@@ -12,7 +12,6 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
 import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
 import ConceptIcon from "./ConceptIcon";
-import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import {
   projectionReady,
   requestProjection,
@@ -133,14 +132,10 @@ export default function MissionSummary({
             >
               {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
               <span className="statusIcon" aria-hidden="true">
-                {warning ? (
-                  <ConceptIcon concept="danger" fontSize="small" />
-                ) : (
-                  <CalendarTodayOutlinedIcon
-                    className="missionRiskEventIcon"
-                    fontSize="small"
-                  />
-                )}
+                <ConceptIcon
+                  concept={warning ? "danger" : "forecast"}
+                  fontSize="small"
+                />
               </span>
               <span className="missionRiskText statusLabel">
                 {shownRisk.shortLabel}

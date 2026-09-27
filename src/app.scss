@@ -733,8 +733,11 @@ $topbar_height: 56px;
   }
   // Blue text is only 3.6:1 on the light bar, so the label stays body-coloured and the icon
   // carries the interactive blue, as the active-events chip beside it does.
-  .missionRiskEventIcon {
+  .missionRiskEvent .conceptIcon {
     color: $interactive_blue;
+    // Roboto's capitals sit above the middle of their line box; lift the calendar's box outline
+    // onto their centre so it doesn't read as sagging below the label.
+    transform: translateY(-0.5px);
   }
 }
 
@@ -1102,6 +1105,11 @@ $topbar_height: 56px;
     box-sizing: border-box;
     min-height: $topbar_height;
     padding-left: max(16px, env(safe-area-inset-left));
+  }
+  // One pixel less below than above: the 1px top border leaves an odd height, and centring a
+  // 44px control in it lands on a half pixel, where text snaps to the grid but icons don't.
+  .gameStatusBar .missionSummary {
+    padding-bottom: 3px;
   }
 }
 
