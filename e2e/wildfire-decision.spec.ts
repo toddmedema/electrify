@@ -23,7 +23,8 @@ for (const theme of ["light", "dark"]) {
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Paused");
     await expect(region).not.toContainText("Spend $2M");
-    await expect(region).toContainText("restoration costs apply either way");
+    await expect(region).toContainText("pre-position repair crews");
+    await expect(region).not.toContainText("Cash available");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")
       .evaluate(

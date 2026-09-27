@@ -16,7 +16,7 @@ import {
   MonthlyClimatologyType,
 } from "../data/Weather";
 import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
-import { DIFFICULTIES } from "../Constants";
+import { DIFFICULTIES, MONTH_NAMES } from "../Constants";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { buildStorySnapshot } from "./Story";
@@ -513,6 +513,30 @@ export function wildfireRiskNotice(
 }
 
 /**
+ * The season's odds as a short line, e.g. "About a 1-in-4 chance of a wildfire here before March;
+ * risk peaks in September." Uses the profile at normal weather, so it never hints at a seeded
+ * ignition; it ignores the cooldown, which only lowers the odds slightly.
+ */
+export function wildfireSeasonOdds(profile: WildfireProfileType): string {
+  const months = Array.from(
+    { length: profile.preparednessDurationMonths },
+    (_, offset) => (profile.preparednessMonth + offset) % 12,
+  );
+  const lambda =
+    profile.annualHazard *
+    months.reduce((sum, month) => sum + profile.monthlyWeights[month], 0);
+  const peak = months.reduce((best, month) =>
+    profile.monthlyWeights[month] > profile.monthlyWeights[best] ? month : best,
+  );
+  const odds = Math.max(2, Math.round(1 / (1 - Math.exp(-lambda))));
+  const end =
+    MONTH_NAMES[
+      (profile.preparednessMonth + profile.preparednessDurationMonths) % 12
+    ];
+  return `About a 1-in-${odds} chance of a wildfire here before ${end}; risk peaks in ${MONTH_NAMES[peak]}.`;
+}
+
+/**
  * The season-scoped preparedness decision for an eligible game, offered in the profile's
  * preparedness month and answered at most once per calendar year. The price scales to the exposed
  * system's monthly demand and the difficulty, so it is a meaningful tradeoff rather than a fixed
@@ -553,7 +577,7 @@ export function wildfirePreparednessChoice(
     scenarioId: game.scenarioId,
     atMonth: game.date.monthsElapsed,
     title: "Wildfire season preparedness",
-    message: `Prepare for elevated fire risk in ${game.location.name} or save cash; restoration costs apply either way.`,
+    message: wildfireSeasonOdds(profile),
     options: [
       {
         id: "prepare",

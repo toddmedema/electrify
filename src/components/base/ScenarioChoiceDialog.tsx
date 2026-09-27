@@ -68,11 +68,8 @@ export default function ScenarioChoiceDialog() {
         </span>
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
-        <Typography id="scenarioChoiceDescription">
+        <Typography id="scenarioChoiceDescription" sx={{ mb: 2 }}>
           {decision.message}
-        </Typography>
-        <Typography sx={{ my: 2 }}>
-          Cash available: ${(cash / 1000000).toFixed(1)}M
         </Typography>
         <Box
           sx={{
