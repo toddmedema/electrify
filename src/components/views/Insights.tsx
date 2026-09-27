@@ -63,6 +63,7 @@ import {
   getMarketRate,
   projectCustomerChange,
 } from "../../helpers/Customers";
+import { getInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
@@ -1237,8 +1238,14 @@ export default class Insights extends React.Component<Props, State> {
     const investor = scenario.ownership === "Investor";
     // A public utility's customers never switch and its growth is fixed, so the market rate
     // changes nothing it can act on. What the rate does move is the score, against the
-    // scenario's own target.
-    const targetRate = scenario.dollarsPerkWh;
+    // scenario's own target. That target is authored in starting-year dollars and scored against
+    // deflated revenue, so the slider shows it in today's dollars, beside the rate being set.
+    const inflationIndex = getInflationIndex(
+      game.date,
+      game.startingYear,
+      game.seed,
+    );
+    const targetRate = scenario.dollarsPerkWh * inflationIndex;
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
       : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
@@ -1255,10 +1262,11 @@ export default class Insights extends React.Component<Props, State> {
     const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
     const rateScore = (rate: number) =>
       publicRateYearContribution(
-        targetRate,
+        scenario.dollarsPerkWh,
         pastTotals,
         { supplyWh: nextSupplyWh },
         rate,
+        inflationIndex,
       );
     const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
     const marks = investor
