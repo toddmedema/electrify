@@ -21,7 +21,7 @@ import ChartLegend from "./ChartLegend";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   FORECAST_AXIS_LEFT,
-  FORECAST_AXIS_RIGHT,
+  FORECAST_RIGHT_PAD,
   stepTicks,
   xAxis,
   yAxis,
@@ -84,7 +84,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0,
     height: 0,
-    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
     cursor: {
       x: true,
       y: false,

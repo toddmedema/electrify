@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   bandsPlugin,
+  FORECAST_RIGHT_PAD,
   padRange,
   spansFromEdges,
   splitPastProjected,
@@ -49,9 +50,7 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    // Keep only enough trailing room for a centred x-axis label. This chart has no right axis,
-    // so reserving the weather chart's gutter made its plot visibly narrower than its peers.
-    padding: [10 * scale, 24 * scale, 0, 0],
+    padding: [10 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
