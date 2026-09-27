@@ -5,9 +5,26 @@ import {
   publicRateScoreChange,
   publicRateScore,
   publicRateYearContribution,
+  startingDollarRevenue,
   totalScore,
 } from "./Scoring";
 import { EMPTY_HISTORY } from "./DateTime";
+import { initEconomyFromCsv } from "../data/Economy";
+
+// 12% a year, as 1% a month, so the index is exactly 1.01 ^ months elapsed
+function loadSteadyInflation(years: number[]) {
+  initEconomyFromCsv(
+    "month,year,prime,inflation\n" +
+      years
+        .flatMap((year) =>
+          Array.from(
+            { length: 12 },
+            (_, month) => `${month + 1},${year},4,0.12`,
+          ),
+        )
+        .join("\n"),
+  );
+}
 
 it("gives a public utility that supplied no electricity a finite score", () => {
   const scenario = SCENARIOS.find(
@@ -33,7 +50,7 @@ it("gives a public utility that supplied no electricity a finite score", () => {
     inflationRate: 0.02,
   };
 
-  const breakdown = computeScoreBreakdown(scenario, summary);
+  const breakdown = computeScoreBreakdown(scenario, summary, summary.revenue);
 
   expect(Object.values(breakdown).every(Number.isFinite)).toBe(true);
   expect(Number.isFinite(totalScore(breakdown))).toBe(true);
@@ -47,14 +64,79 @@ it("counts purchased emissions in the score just like the same local total", () 
     localKgco2e: 0,
     importedKgco2e: 1000000000,
   };
-  const imports = computeScoreBreakdown(scenario, summary);
-  const local = computeScoreBreakdown(scenario, {
-    ...summary,
-    localKgco2e: 1000000000,
-    importedKgco2e: 0,
-  });
+  const imports = computeScoreBreakdown(scenario, summary, summary.revenue);
+  const local = computeScoreBreakdown(
+    scenario,
+    {
+      ...summary,
+      localKgco2e: 1000000000,
+      importedKgco2e: 0,
+    },
+    summary.revenue,
+  );
   expect(imports.emissions).toBe(-2);
   expect(imports).toEqual(local);
+});
+
+describe("inflation and the public rate target", () => {
+  const scenario = {
+    ...SCENARIOS.find((s) => s.ownership === "Public")!,
+    dollarsPerkWh: 0.1,
+    startingYear: 2020,
+  };
+  const kWhPerMonth = 1000;
+  // Months newest first, like state.monthlyHistory, each billed at the target raised by that
+  // month's inflation: a rate that only keeps pace with costs
+  const history = Array.from({ length: 36 }, (_, elapsed) => ({
+    ...EMPTY_HISTORY,
+    deliveredWhByFuel: {},
+    year: 2020 + Math.floor(elapsed / 12),
+    month: (elapsed % 12) + 1,
+    supplyWh: kWhPerMonth * 1000,
+    revenue: 0.1 * Math.pow(1.01, elapsed) * kWhPerMonth,
+  })).reverse();
+  const summary = history.reduce(
+    (acc, month) => ({
+      ...acc,
+      supplyWh: acc.supplyWh + month.supplyWh,
+      revenue: acc.revenue + month.revenue,
+    }),
+    { ...EMPTY_HISTORY, deliveredWhByFuel: {} },
+  );
+
+  beforeEach(() => loadSteadyInflation([2020, 2021, 2022]));
+
+  it("deflates each month's revenue by the index in force that month", () => {
+    expect(startingDollarRevenue(history, 2020, 1)).toBeCloseTo(
+      0.1 * 36 * kWhPerMonth,
+      6,
+    );
+  });
+
+  it("scores a rate that only tracks inflation as meeting the target", () => {
+    const real = computeScoreBreakdown(
+      scenario,
+      summary,
+      startingDollarRevenue(history, 2020, 1),
+    );
+    expect(real.rate).toBe(0);
+    // Judged on nominal revenue, the same run would lose points for inflation alone
+    expect(
+      computeScoreBreakdown(scenario, summary, summary.revenue).rate,
+    ).toBeLessThan(-100);
+  });
+
+  it("compares the coming year's rate to the target in today's dollars", () => {
+    const past = { supplyWh: kWhPerMonth * 1000 * 12 };
+    const next = { supplyWh: kWhPerMonth * 1000 * 12 };
+    const index = Math.pow(1.01, 24);
+    expect(
+      publicRateYearContribution(0.1, past, next, 0.1 * index, index),
+    ).toBe(0);
+    expect(
+      publicRateYearContribution(0.1, past, next, 0.1, index),
+    ).toBeGreaterThan(0);
+  });
 });
 
 describe("publicRateScoreChange", () => {

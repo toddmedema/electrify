@@ -17,7 +17,11 @@ import {
   deriveExpandedSummary,
   summarizeHistory,
 } from "../../helpers/DateTime";
-import { computeScoreBreakdown, totalScore } from "../../helpers/Scoring";
+import {
+  computeScoreBreakdown,
+  startingDollarRevenue,
+  totalScore,
+} from "../../helpers/Scoring";
 import { scoreRules } from "./VictoryConditions";
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
@@ -60,7 +64,13 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
     history.length > 0
       ? deriveExpandedSummary(summarizeHistory(history))
       : null;
-  const breakdown = summary ? computeScoreBreakdown(scenario, summary) : null;
+  const breakdown = summary
+    ? computeScoreBreakdown(
+        scenario,
+        summary,
+        startingDollarRevenue(history, game.startingYear, game.seed),
+      )
+    : null;
   const rules = scoreRules(
     scenario.ownership,
     scenario.dollarsPerkWh,

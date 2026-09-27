@@ -87,7 +87,11 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
-import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
+import {
+  computeScoreBreakdown,
+  startingDollarRevenue,
+  totalScore,
+} from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
@@ -3035,6 +3039,7 @@ export function tickState(state: GameType) {
         const score: ScoreBreakdownType = computeScoreBreakdown(
           scenario,
           summary,
+          startingDollarRevenue(history, state.startingYear, state.seed),
         );
         const finalScore = totalScore(score);
         const difficulty = state.difficulty;
@@ -3218,7 +3223,11 @@ export function tickState(state: GameType) {
             // finish the objectives and enter the capstone, which rebuilds its own checkpoint.
             state.speed = "PAUSED";
           } else {
-            const score = computeScoreBreakdown(scenario, summary);
+            const score = computeScoreBreakdown(
+              scenario,
+              summary,
+              startingDollarRevenue(history, state.startingYear, state.seed),
+            );
             const finalScore = totalScore(score);
             const { id: scoredScenarioId, endTitle, endMessage } = scenario;
             const difficulty = state.difficulty;
