@@ -7,7 +7,7 @@ import { openPane } from "./layout";
  *
  * The seed is fixed so the run is deterministic: with it, a custom game in Los Angeles starting
  * January 2020 has no ignition from February through August, its first fire starts in September
- * 2020 (the month after the season's preparedness choice), and it lasts one month. The seed was
+ * 2020 (inside the August 2020 fire season), and it lasts one month. The seed was
  * verified against the real reducer (runSimulation) before being pinned here; if the hazard's
  * draws or weather data change, re-derive it rather than editing the flow.
  */
@@ -78,6 +78,13 @@ async function setFastSpeed(page: Page): Promise<void> {
     .click();
 }
 
+async function openInsightsPane(page: Page): Promise<void> {
+  await openPane(
+    page.locator(".insights:visible"),
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+}
+
 async function openEventsPane(page: Page): Promise<void> {
   await openPane(
     page.locator(".eventLog:visible"),
@@ -99,8 +106,8 @@ async function captureReviewScreenshot(
 }
 
 for (const theme of ["light", "dark"] as const) {
-  // Light funds the season's preparedness; dark declines it, so both branches of the choice and
-  // both palettes' Events presentation are exercised.
+  // Light funds the season's preparedness; dark leaves it unfunded, so both branches and both
+  // palettes' Events presentation are exercised.
   const fund = theme === "light";
 
   test(`recurring wildfire: preparedness, onset and recovery (${theme})`, async ({
@@ -124,38 +131,61 @@ for (const theme of ["light", "dark"] as const) {
       "raise the chance of a wildfire emergency this season",
     );
 
-    // August 2020: the season's preparedness choice pauses the game and blocks speed changes.
+    // Preparedness is an optional customer program, never a prompt the clock waits on. The run
+    // opens at the tail of the 2019 season, so the August 2020 season is on offer from March.
     await setFastSpeed(page);
-    const dialog = page.getByRole("dialog", {
-      name: /Wildfire season preparedness/,
-    });
-    await expect(dialog).toBeVisible({ timeout: 60_000 });
-    await expect(dialog).toContainText("Paused");
-    await expect(dialog).toContainText(
-      "Fire risk is elevated in Los Angeles, CA this season",
+    await expect(page.locator("#appbar:visible").first()).toContainText(
+      /(Mar|Apr|May|Jun) 2020/,
+      { timeout: 60_000 },
     );
-    const fundButton = dialog.getByRole("button", {
-      name: "Fund preparedness",
+    await openInsightsPane(page);
+    // Opening the programs screen pauses the clock, like the build screen.
+    await page
+      .locator(".insights:visible")
+      .getByRole("button", { name: "Customer programs", exact: true })
+      .click();
+    const programs = page.getByRole("dialog");
+    await expect(
+      programs.getByRole("button", { name: "Close customer programs" }),
+    ).toBeVisible();
+    await expect(
+      programs.getByRole("button", { name: "pause" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await programs
+      .getByRole("button", {
+        name: "Wildfire preparedness · Not funded · fire season starts Aug 2020",
+      })
+      .click();
+    await expect(programs).toContainText("Covers Aug 2020 to Feb 2021");
+    // The page simulates a typical fire with and without funded crews.
+    await expect(
+      programs.getByText(/^Customer load disconnected:/),
+    ).toBeVisible({
+      timeout: 30_000,
     });
-    const keepButton = dialog.getByRole("button", { name: "Keep cash" });
-    await expect(fundButton).toBeEnabled();
-    await expect(keepButton).toBeEnabled();
-    await expect(dialog).toContainText(/Spend \$[\d.,]+[MKmk]? on inspections/);
-    await expect(dialog).toContainText(
-      "Restoration costs still apply either way",
-    );
+    await expect(
+      programs.getByText(/^Utility cash if this fire strikes:/),
+    ).toBeVisible();
     await captureReviewScreenshot(
       page,
       testInfo,
       `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
     );
-
     if (fund) {
-      await fundButton.click();
-    } else {
-      await keepButton.click();
+      await programs
+        .getByRole("button", { name: /^Fund preparedness \(/ })
+        .click();
+      await expect(
+        programs.getByRole("button", {
+          name: "Wildfire preparedness · Funded · Aug 2020 to Feb 2021 season",
+        }),
+      ).toBeVisible();
     }
-    await expect(dialog).not.toBeVisible();
+    await programs
+      .getByRole("button", { name: "Close customer programs" })
+      .click();
+    await expect(programs).toHaveCount(0);
+    await openEventsPane(page);
 
     // September 2020: the seeded ignition. A critical event pauses the game and pins an ongoing
     // card in Events with the disconnected share, constrained generators and restoration cost.

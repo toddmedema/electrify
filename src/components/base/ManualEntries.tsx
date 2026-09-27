@@ -178,7 +178,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment wildfire preparedness fire season",
     entry: (
       <div>
         <p>Customer programs are set in Insights. Changes start next month.</p>
@@ -213,6 +213,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           separate four-hour window, even with enough supply. That use is
           canceled, not delayed. Participants get 10% off electricity delivered
           all day.
+        </p>
+        <p>
+          <strong>Wildfire preparedness:</strong> In custom games in fire-prone
+          areas, you can fund crews, inspections and vegetation clearing for the
+          current or next fire season, once per season. If a wildfire starts
+          while the season is covered, safety shutoffs disconnect half as much
+          customer load and affected generators lose half as much output. It
+          does not prevent fires, and restoration costs apply either way. Its
+          page simulates a typical fire both ways.
         </p>
       </div>
     ),

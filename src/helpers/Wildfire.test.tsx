@@ -16,7 +16,8 @@ import {
   wildfireInCooldown,
   wildfireMonthlyProbability,
   wildfireOccurrenceKey,
-  wildfirePreparednessChoice,
+  wildfirePreparedness,
+  wildfireSeasonAt,
   weatherFireRiskModifier,
 } from "./Wildfire";
 
@@ -352,23 +353,50 @@ describe("deterministic, order-independent draws", () => {
 });
 
 describe("preparedness", () => {
-  it("is active within its window and expires after", () => {
-    const answered = preparednessOccurrence("LA", 2024, 8); // September
-    expect(activePreparedness([answered], "LA", 8)).toBe(true);
-    expect(
-      activePreparedness(
-        [answered],
-        "LA",
-        8 + LA.preparednessDurationMonths - 1,
-      ),
-    ).toBe(true);
-    expect(
-      activePreparedness([answered], "LA", 8 + LA.preparednessDurationMonths),
-    ).toBe(false);
+  it("covers the funded season's window, however early it was funded", () => {
+    // Funded in March 2024 for the season that starts in August 2024 (month 7).
+    const funded = preparednessOccurrence("LA", 2024, 2);
+    const start = LA.preparednessMonth;
+    const end = start + LA.preparednessDurationMonths;
+    expect(activePreparedness([funded], "LA", start - 1, 2024)).toBe(false);
+    expect(activePreparedness([funded], "LA", start, 2024)).toBe(true);
+    expect(activePreparedness([funded], "LA", end - 1, 2024)).toBe(true);
+    expect(activePreparedness([funded], "LA", end, 2024)).toBe(false);
+    // The next season is its own purchase.
+    expect(activePreparedness([funded], "LA", start + 12, 2024)).toBe(false);
     // A different region's preparedness does not apply.
     expect(
-      activePreparedness([preparednessOccurrence("SF", 2024, 8)], "LA", 8),
+      activePreparedness(
+        [preparednessOccurrence("SF", 2024, 8)],
+        "LA",
+        8,
+        2024,
+      ),
     ).toBe(false);
+  });
+
+  it("picks the season underway, or else the next one", () => {
+    const start = LA.preparednessMonth;
+    const end = start + LA.preparednessDurationMonths;
+    // A run that starts in January opens inside the previous August's season.
+    expect(wildfireSeasonAt(LA, 2024, 0)).toEqual({
+      year: 2023,
+      startMonth: start - 12,
+      endMonth: end - 12,
+    });
+    expect(wildfireSeasonAt(LA, 2024, 3)).toEqual({
+      year: 2024,
+      startMonth: start,
+      endMonth: end,
+    });
+    expect(wildfireSeasonAt(LA, 2024, start + 1).year).toBe(2024);
+    // The August-to-February season is still underway in the following January.
+    expect(wildfireSeasonAt(LA, 2024, 12).year).toBe(2024);
+    expect(wildfireSeasonAt(LA, 2024, end)).toEqual({
+      year: 2025,
+      startMonth: start + 12,
+      endMonth: end + 12,
+    });
   });
 
   it("halves disconnections and output losses but not restoration cost", () => {
@@ -440,38 +468,46 @@ describe("restoration cost scaling", () => {
   });
 });
 
-describe("preparedness choice", () => {
-  it("is offered in the preparedness month for an eligible custom game", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(
-        LA.preparednessMonth * MINUTES_PER_MONTH,
-        g.startingYear,
-      );
+describe("preparedness program", () => {
+  const atMonth = (month: number) =>
+    produceGame(customGameAtLA(), (g) => {
+      g.date = getDateFromMinute(month * MINUTES_PER_MONTH, g.startingYear);
     });
-    const choice = wildfirePreparednessChoice(game);
-    expect(choice).toBeDefined();
-    expect(choice!.id).toBe(`wildfire:LA:${game.date.year}:preparedness`);
-    expect(choice!.options.map((o) => o.id)).toEqual(["prepare", "standard"]);
+
+  it("offers the next fire season at any time, never as a pending decision", () => {
+    const game = atMonth(3); // April, between seasons
+    const preparedness = wildfirePreparedness(game)!;
+    expect(preparedness.season.year).toBe(game.date.year);
+    expect(preparedness.firstCoveredMonth).toBe(LA.preparednessMonth);
+    expect(preparedness.funded).toBe(false);
+    expect(preparedness.cost).toBeGreaterThan(0);
+    expect(preparedness.choice!.id).toBe(
+      `wildfire:LA:${game.date.year}:preparedness`,
+    );
+    expect(preparedness.choice!.options.map((o) => o.id)).toEqual(["prepare"]);
   });
 
-  it("is not offered outside the preparedness month", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(0 * MINUTES_PER_MONTH, g.startingYear); // January
-    });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+  it("covers what is left of a season underway, and moves on as it ends", () => {
+    const midSeason = wildfirePreparedness(atMonth(LA.preparednessMonth + 2))!;
+    expect(midSeason.firstCoveredMonth).toBe(LA.preparednessMonth + 3);
+    // In the season's last month nothing is left to cover, so the next season is on offer.
+    const lastMonth = LA.preparednessMonth + LA.preparednessDurationMonths - 1;
+    const game = atMonth(lastMonth);
+    expect(wildfirePreparedness(game)!.season.year).toBe(game.date.year);
+    expect(wildfirePreparedness(game)!.season.startMonth).toBe(
+      LA.preparednessMonth + 12,
+    );
   });
 
-  it("is not re-offered once answered this season", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(
-        LA.preparednessMonth * MINUTES_PER_MONTH,
-        g.startingYear,
-      );
+  it("is funded once per season", () => {
+    const game = produceGame(atMonth(LA.preparednessMonth), (g) => {
       g.worldEvents.occurrences.push(
         preparednessOccurrence("LA", g.date.year, LA.preparednessMonth),
       );
     });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+    const preparedness = wildfirePreparedness(game)!;
+    expect(preparedness.funded).toBe(true);
+    expect(preparedness.choice).toBeUndefined();
   });
 
   it("is not offered for the authored scenario 111", () => {
@@ -481,6 +517,6 @@ describe("preparedness choice", () => {
         g.startingYear,
       );
     });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+    expect(wildfirePreparedness(game)).toBeUndefined();
   });
 });

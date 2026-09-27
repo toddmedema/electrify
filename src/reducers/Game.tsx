@@ -25,6 +25,7 @@ import {
   validRetrofitFacility,
 } from "../helpers/BuildValidation";
 import {
+  optionalScenarioChoice,
   pendingScenarioChoice,
   validScenarioResponse,
 } from "../helpers/ScenarioChoices";
@@ -149,6 +150,7 @@ import {
   wildfireDraw,
   wildfireInCooldown,
   wildfireMonthlyProbability,
+  wildfireIncidentEffects,
   wildfireOccurrenceKey,
   weatherFireRiskModifier,
 } from "../helpers/Wildfire";
@@ -739,6 +741,7 @@ function updateWildfireHazards(state: GameType): void {
     state.worldEvents.occurrences,
     locationId,
     monthsElapsed,
+    state.startingYear,
   );
   const incident = sampleWildfireIncident({
     profile,
@@ -751,12 +754,6 @@ function updateWildfireHazards(state: GameType): void {
   const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
   const endsMinute =
     (monthsElapsed + incident.durationMonths) * MINUTES_PER_MONTH;
-  const outputMultipliers = Object.fromEntries(
-    incident.selectedFacilityIds.map((id) => [
-      String(id),
-      incident.outputMultiplier,
-    ]),
-  );
   const affected = incident.selectedFacilityNames.length
     ? incident.selectedFacilityNames.join(", ")
     : "no operating generators";
@@ -787,11 +784,7 @@ function updateWildfireHazards(state: GameType): void {
       selectedFacilityNames: incident.selectedFacilityNames,
       restorationCostPerMonth: incident.restorationCostPerMonth,
     },
-    effects: {
-      demandMultiplier: 1 - incident.disconnectedDemand,
-      facilityOutputMultipliersById: outputMultipliers,
-      operatingExpensePerMonth: incident.restorationCostPerMonth,
-    },
+    effects: wildfireIncidentEffects(incident),
   };
   state.worldEvents.checkedKeys.push(occurrenceKey);
   state.worldEvents.active.push(occurrence);
@@ -2573,8 +2566,12 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
-  const decision = pendingScenarioChoice(state);
-  if (!decision || decision.id !== payload.decisionId) return false;
+  // A pending story choice the clock waits on, or an optional one the player chose to take up
+  const decision = [
+    pendingScenarioChoice(state),
+    optionalScenarioChoice(state),
+  ].find((choice) => choice?.id === payload.decisionId);
+  if (!decision) return false;
   const option = decision.options.find(
     (option) => option.id === payload.optionId,
   );

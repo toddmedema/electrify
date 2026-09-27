@@ -15,11 +15,14 @@ import {
   getWeather,
   MonthlyClimatologyType,
 } from "../data/Weather";
-import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { DIFFICULTIES } from "../Constants";
 import { randomAt, RANDOM_STREAM } from "./Math";
-import { MINUTES_PER_MONTH } from "./DateTime";
-import { buildStorySnapshot } from "./Story";
+import {
+  MINUTES_PER_MONTH,
+  summarizeHistory,
+  summarizeTimeline,
+} from "./DateTime";
 
 /**
  * Recurring, location-aware wildfire hazards.
@@ -240,14 +243,58 @@ export function activeWildfire(
   );
 }
 
+/** One fire season's preparedness coverage, in absolute months (end exclusive). */
+export interface WildfireSeasonType {
+  /** Calendar year the season starts in; it names the season's preparedness key. */
+  year: number;
+  startMonth: number;
+  endMonth: number;
+}
+
+/** The absolute month a calendar year's fire season starts. */
+function wildfireSeasonStart(
+  profile: WildfireProfileType,
+  startingYear: number,
+  year: number,
+): number {
+  return (year - startingYear) * 12 + profile.preparednessMonth;
+}
+
 /**
- * Whether a funded preparedness is still in force for this location at an absolute month: answered
- * within the last `preparednessDurationMonths` and chosen as "prepare".
+ * The fire season preparedness would cover from an absolute month: the one underway, or else the
+ * next one to start. Seasons run `preparednessDurationMonths` from the profile's preparedness month.
+ */
+export function wildfireSeasonAt(
+  profile: WildfireProfileType,
+  startingYear: number,
+  monthsElapsed: number,
+): WildfireSeasonType {
+  const year = startingYear + Math.floor(monthsElapsed / 12);
+  for (const candidate of [year - 1, year]) {
+    const startMonth = wildfireSeasonStart(profile, startingYear, candidate);
+    const endMonth = startMonth + profile.preparednessDurationMonths;
+    if (monthsElapsed < endMonth) {
+      return { year: candidate, startMonth, endMonth };
+    }
+  }
+  const startMonth = wildfireSeasonStart(profile, startingYear, year + 1);
+  return {
+    year: year + 1,
+    startMonth,
+    endMonth: startMonth + profile.preparednessDurationMonths,
+  };
+}
+
+/**
+ * Whether funded preparedness covers this location at an absolute month: the player funded the
+ * season whose window contains the month. Funding is season-scoped, so paying ahead of the season
+ * covers all of it and paying partway through covers what is left.
  */
 export function activePreparedness(
   occurrences: ActiveWorldEventType[],
   locationId: string,
   monthsElapsed: number,
+  startingYear: number,
 ): boolean {
   const profile = getWildfireProfile(locationId);
   if (!profile) {
@@ -257,13 +304,18 @@ export function activePreparedness(
     if (event.attributes.choice !== "prepare") {
       return false;
     }
-    if (!event.key.startsWith(`wildfire:${locationId}:`)) {
+    const match = /^wildfire:(.+):(\d+):preparedness$/.exec(event.key);
+    if (!match || match[1] !== locationId) {
       return false;
     }
-    const answerMonth = Math.floor(event.startsMinute / MINUTES_PER_MONTH);
+    const startMonth = wildfireSeasonStart(
+      profile,
+      startingYear,
+      Number(match[2]),
+    );
     return (
-      monthsElapsed >= answerMonth &&
-      monthsElapsed < answerMonth + profile.preparednessDurationMonths
+      monthsElapsed >= startMonth &&
+      monthsElapsed < startMonth + profile.preparednessDurationMonths
     );
   });
 }
@@ -351,28 +403,18 @@ export interface WildfireIncidentType {
 }
 
 /**
- * Selects the affected operational generators, reusing the authored story's approach: score each
- * candidate with its own addressed draw, take them cheapest-score-first until the target share of
- * fleet peak capacity is reached. Deterministic and independent of fleet array order.
+ * Selects the affected operational generators, reusing the authored story's approach: rank each
+ * candidate by its score, lowest first, and take them until the target share of fleet peak
+ * capacity is reached. Deterministic and independent of fleet array order.
  */
 function selectAffectedFacilities(
   snapshot: StorySnapshotType,
   targetCapacityShare: number,
-  seed: number,
-  locationId: string,
-  monthsElapsed: number,
+  score: (facility: StorySnapshotType["facilities"][number]) => number,
 ): { selectedFacilityIds: number[]; selectedFacilityNames: string[] } {
   const candidates = snapshot.facilities
     .filter((facility) => facility.operational && !!facility.fuel)
-    .map((facility) => ({
-      ...facility,
-      score: wildfireDraw(
-        seed,
-        locationId,
-        monthsElapsed,
-        `facility|${facility.id}`,
-      ),
-    }))
+    .map((facility) => ({ ...facility, score: score(facility) }))
     .sort((a, b) => a.score - b.score || a.id - b.id);
   const totalPeakW = candidates.reduce(
     (total, facility) => total + facility.peakW,
@@ -394,26 +436,19 @@ function selectAffectedFacilities(
   };
 }
 
-/**
- * Samples one incident's onset attributes from separate addressed draws. Pure: the same inputs
- * always yield the same incident, which is what makes saves, forecasts and replays agree.
- */
-export function sampleWildfireIncident(args: {
+/** An incident's physical effects at a severity, with preparedness applied. */
+function wildfireIncidentAt(args: {
   profile: WildfireProfileType;
-  seed: number;
-  locationId: string;
-  monthsElapsed: number;
+  severity: number;
+  durationMonths: number;
   snapshot: StorySnapshotType;
   prepared: boolean;
+  selectFacilities: (targetCapacityShare: number) => {
+    selectedFacilityIds: number[];
+    selectedFacilityNames: string[];
+  };
 }): WildfireIncidentType {
-  const { profile, seed, locationId, monthsElapsed, snapshot, prepared } = args;
-  const severity = wildfireDraw(seed, locationId, monthsElapsed, "severity");
-  const durationMonths =
-    wildfireDraw(seed, locationId, monthsElapsed, "duration") <
-    WILDFIRE_TWO_MONTH_TAIL_PROBABILITY
-      ? 2
-      : 1;
-
+  const { profile, severity, durationMonths, snapshot, prepared } = args;
   const rawDisconnectedDemand = lerp(
     profile.disconnectedDemand.min,
     profile.disconnectedDemand.max,
@@ -439,31 +474,96 @@ export function sampleWildfireIncident(args: {
     ? (1 + rawOutputMultiplier) / 2
     : rawOutputMultiplier;
 
-  const { selectedFacilityIds, selectedFacilityNames } =
-    selectAffectedFacilities(
-      snapshot,
-      targetCapacityShare,
-      seed,
-      locationId,
-      monthsElapsed,
-    );
-
   const exposedDemandMWh = snapshot.demandWh12m / 12 / 1e6;
-  const restorationCost = restorationCostPerMonth(
-    profile,
-    exposedDemandMWh,
-    severity,
-  );
-
   return {
     severity,
     disconnectedDemand,
     outputMultiplier,
     targetCapacityShare,
     durationMonths,
-    selectedFacilityIds,
-    selectedFacilityNames,
-    restorationCostPerMonth: restorationCost,
+    ...args.selectFacilities(targetCapacityShare),
+    restorationCostPerMonth: restorationCostPerMonth(
+      profile,
+      exposedDemandMWh,
+      severity,
+    ),
+  };
+}
+
+/**
+ * Samples one incident's onset attributes from separate addressed draws. Pure: the same inputs
+ * always yield the same incident, which is what makes saves, forecasts and replays agree.
+ */
+export function sampleWildfireIncident(args: {
+  profile: WildfireProfileType;
+  seed: number;
+  locationId: string;
+  monthsElapsed: number;
+  snapshot: StorySnapshotType;
+  prepared: boolean;
+}): WildfireIncidentType {
+  const { profile, seed, locationId, monthsElapsed, snapshot, prepared } = args;
+  return wildfireIncidentAt({
+    profile,
+    severity: wildfireDraw(seed, locationId, monthsElapsed, "severity"),
+    durationMonths:
+      wildfireDraw(seed, locationId, monthsElapsed, "duration") <
+      WILDFIRE_TWO_MONTH_TAIL_PROBABILITY
+        ? 2
+        : 1,
+    snapshot,
+    prepared,
+    // Each candidate gets its own addressed draw.
+    selectFacilities: (share) =>
+      selectAffectedFacilities(snapshot, share, (facility) =>
+        wildfireDraw(
+          seed,
+          locationId,
+          monthsElapsed,
+          `facility|${facility.id}`,
+        ),
+      ),
+  });
+}
+
+/** The severity a preview illustrates: the middle of the profile's sampled range. */
+export const WILDFIRE_TYPICAL_SEVERITY = 0.5;
+
+/**
+ * A representative one-month incident for previews. It uses the typical severity and constrains
+ * the largest generators first rather than the seeded draws, so a preview never reveals when a
+ * fire will start, how severe it will be, or which plants it will reach.
+ */
+export function typicalWildfireIncident(args: {
+  profile: WildfireProfileType;
+  snapshot: StorySnapshotType;
+  prepared: boolean;
+}): WildfireIncidentType {
+  const { profile, snapshot, prepared } = args;
+  return wildfireIncidentAt({
+    profile,
+    severity: WILDFIRE_TYPICAL_SEVERITY,
+    durationMonths: 1,
+    snapshot,
+    prepared,
+    selectFacilities: (share) =>
+      selectAffectedFacilities(snapshot, share, (facility) => -facility.peakW),
+  });
+}
+
+/** The persisted effects a wildfire incident applies while it is active. */
+export function wildfireIncidentEffects(
+  incident: WildfireIncidentType,
+): ActiveWorldEventType["effects"] {
+  return {
+    demandMultiplier: 1 - incident.disconnectedDemand,
+    facilityOutputMultipliersById: Object.fromEntries(
+      incident.selectedFacilityIds.map((id) => [
+        String(id),
+        incident.outputMultiplier,
+      ]),
+    ),
+    operatingExpensePerMonth: incident.restorationCostPerMonth,
   };
 }
 
@@ -512,15 +612,31 @@ export function wildfireRiskNotice(
   };
 }
 
+/** Where the player stands on the upcoming or current fire season's preparedness. */
+export interface WildfirePreparednessType {
+  profile: WildfireProfileType;
+  season: WildfireSeasonType;
+  /** First month a hazard check could still meet funded crews: the season's start or next month. */
+  firstCoveredMonth: number;
+  funded: boolean;
+  /** Funding would cover no month of this run. */
+  tooLate: boolean;
+  /** The one-time price at the game's difficulty. */
+  cost: number;
+  /** The replayable choice that funds it; undefined once funded or too late. */
+  choice?: ScenarioChoiceType;
+}
+
 /**
- * The season-scoped preparedness decision for an eligible game, offered in the profile's
- * preparedness month and answered at most once per calendar year. The price scales to the exposed
- * system's monthly demand and the difficulty, so it is a meaningful tradeoff rather than a fixed
- * municipal figure. Returns undefined when there is nothing to offer this month.
+ * Season-scoped wildfire preparedness for an eligible game. It is an optional program rather than
+ * a decision the clock waits on: the player can fund the current or next fire season at any time,
+ * once per season, through the same replayable chooseScenarioResponse action. The price scales to
+ * the exposed system's monthly demand and the difficulty, so it is a meaningful tradeoff rather
+ * than a fixed municipal figure. Returns undefined when the hazard does not apply.
  */
-export function wildfirePreparednessChoice(
+export function wildfirePreparedness(
   game: GameType,
-): ScenarioChoiceType | undefined {
+): WildfirePreparednessType | undefined {
   if (!isWildfireHazardEligible(game)) {
     return undefined;
   }
@@ -528,50 +644,71 @@ export function wildfirePreparednessChoice(
   if (!profile) {
     return undefined;
   }
-  const monthIndex = game.date.monthNumber - 1;
-  if (monthIndex !== profile.preparednessMonth) {
-    return undefined;
-  }
-  const key = wildfirePreparednessKey(game.location.id, game.date.year);
-  if (game.worldEvents.occurrences.some((event) => event.key === key)) {
-    return undefined; // Already answered this season.
-  }
-  const snapshot = buildStorySnapshot(
-    game.monthlyHistory,
-    game.facilities,
-    game.date.minute,
+  // Hazard checks run at each month's start, so next month is the first funding can still meet;
+  // a season that ends this month has nothing left to cover, and the next one is on offer.
+  const season = wildfireSeasonAt(
+    profile,
+    game.startingYear,
+    game.date.monthsElapsed + 1,
   );
-  const exposedDemandMWh = snapshot.demandWh12m / 12 / 1e6;
-  const cost = (difficulty: DifficultyType): number =>
+  const key = wildfirePreparednessKey(game.location.id, season.year);
+  const funded = game.worldEvents.occurrences.some(
+    (event) => event.key === key && event.attributes.choice === "prepare",
+  );
+  const firstCoveredMonth = Math.max(
+    season.startMonth,
+    game.date.monthsElapsed + 1,
+  );
+  const runEnd =
+    getScenario(game.scenarioId, game.customScenario)?.durationMonths ??
+    Infinity;
+  const tooLate = firstCoveredMonth >= Math.min(season.endMonth, runEnd);
+  // Priced per month of recent demand. A run's first months have little or no history to
+  // average, so those fall back to the forecast's first month rather than pricing it at nothing.
+  const recent = game.monthlyHistory.slice(0, 12);
+  const monthlyDemandWh = recent.length
+    ? summarizeHistory(recent).demandWh / recent.length
+    : summarizeTimeline(
+        game.timeline.filter(
+          (tick) =>
+            Math.floor(tick.minute / MINUTES_PER_MONTH) ===
+            Math.floor((game.timeline[0]?.minute ?? 0) / MINUTES_PER_MONTH),
+        ),
+        game.startingYear,
+      ).demandWh;
+  const exposedDemandMWh = monthlyDemandWh / 1e6;
+  const costAt = (difficulty: DifficultyType): number =>
     Math.round(
       WILDFIRE_PREPAREDNESS_COST_PER_MWH *
         exposedDemandMWh *
         DIFFICULTIES[difficulty].buildCost,
     );
   return {
-    id: key,
-    scenarioId: game.scenarioId,
-    atMonth: game.date.monthsElapsed,
-    title: "Wildfire season preparedness",
-    message: `Prepare for elevated fire risk in ${game.location.name} or save cash; restoration costs apply either way.`,
-    options: [
-      {
-        id: "prepare",
-        label: "Fund preparedness",
-        cost,
-        description: `Halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
-        message: "Preparedness funded for the season.",
-      },
-      {
-        id: "standard",
-        meaningful: false,
-        label: "Keep cash",
-        cost: () => 0,
-        description:
-          "Save cash and accept full customer disconnections and generator output losses if a wildfire strikes this season.",
-        message:
-          "Cash is preserved, with the full impact of any wildfire that starts this season.",
-      },
-    ],
+    profile,
+    season,
+    firstCoveredMonth,
+    funded,
+    tooLate: !funded && tooLate,
+    cost: costAt(game.difficulty),
+    choice:
+      funded || tooLate
+        ? undefined
+        : {
+            id: key,
+            scenarioId: game.scenarioId,
+            atMonth: game.date.monthsElapsed,
+            title: "Wildfire preparedness",
+            message: `Prepare ${game.location.name} for the fire season; restoration costs apply either way.`,
+            options: [
+              {
+                id: "prepare",
+                label: "Fund preparedness",
+                cost: costAt,
+                description:
+                  "Halve customer disconnections and generator output losses if a wildfire starts before the season ends.",
+                message: "Wildfire preparedness funded for the fire season.",
+              },
+            ],
+          },
   };
 }

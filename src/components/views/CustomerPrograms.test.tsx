@@ -2,7 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
-import gameReducer from "../../reducers/Game";
+import gameReducer, { generateNewTimeline } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
@@ -14,6 +14,13 @@ import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { emptyPolicies, policyBudget } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { wildfirePreparedness } from "../../helpers/Wildfire";
+import {
+  previewWildfire,
+  wildfirePreviewMonth,
+} from "../../helpers/WildfirePreview";
 
 /** The value beside a build-out fact's label, if the fact is shown. */
 const fact = (label: string) => {
@@ -476,4 +483,77 @@ test("the completion preview is capped at the run's last month", () => {
     screen.getByText("Estimated utility demand · Dec 2035"),
   ).toBeInTheDocument();
   view.unmount();
+});
+
+test("wildfire preparedness is a program row that simulates a fire and funds the season", () => {
+  jest.useFakeTimers();
+  const worker = {
+    onmessage: null as ((event: { data: unknown }) => void) | null,
+    postMessage: jest.fn(),
+    terminate: jest.fn(),
+  };
+  const stub = jest
+    .spyOn(client, "createPolicyPreviewWorker")
+    .mockReturnValue(worker as unknown as Worker);
+  const game = createGame({
+    scenarioId: CUSTOM_SCENARIO_ID,
+    scenario: {
+      ...SCENARIOS.find((s) => s.id === 111)!,
+      id: CUSTOM_SCENARIO_ID,
+      name: "Custom LA",
+    },
+  });
+  game.date = getDateFromMinute(3 * MINUTES_PER_MONTH, game.startingYear);
+  game.timeline = generateNewTimeline(game, 100000000, 1000000);
+  game.inGame = true;
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  // A full screen like Build: close on the left, the speed control beside the title.
+  expect(
+    screen.getByRole("button", { name: "Close customer programs" }),
+  ).toBeVisible();
+  expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
+  const hazards = screen.getByRole("region", { name: "Hazard readiness" });
+  fireEvent.click(
+    within(hazards).getByRole("button", {
+      name: "Wildfire preparedness · Not funded · fire season starts Aug 2024",
+    }),
+  );
+  const { cost } = wildfirePreparedness(store.getState().game)!;
+  expect(fact("One-time cost")).toBe(formatMoneyConcise(cost));
+  expect(fact("If funded now")).toBe("Covers Aug 2024 to Feb 2025");
+  act(() => jest.advanceTimersByTime(250));
+  const month = wildfirePreviewMonth(store.getState().game)!;
+  expect(worker.postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ month }),
+  );
+  const result = previewWildfire(store.getState().game, month);
+  act(() => worker.onmessage!({ data: { result } }));
+  expect(screen.getByText(/^Simulated wildfire · /)).toBeVisible();
+  expect(screen.getByText(/^Customer load disconnected:/)).toHaveTextContent(
+    `${Math.round(result.standardIncident.disconnectedDemand * 100)}% → ${Math.round(result.preparedIncident.disconnectedDemand * 100)}%`,
+  );
+  expect(screen.getByText(/^Utility cash if this fire strikes:/)).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: `Fund preparedness (${formatMoneyConcise(cost)})`,
+    }),
+  );
+  expect(wildfirePreparedness(store.getState().game)!.funded).toBe(true);
+  expect(
+    screen.getByRole("button", {
+      name: "Wildfire preparedness · Funded · Aug 2024 to Feb 2025 season",
+    }),
+  ).toBeVisible();
+  view.unmount();
+  stub.mockRestore();
+  jest.useRealTimers();
 });

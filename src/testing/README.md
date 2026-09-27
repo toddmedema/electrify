@@ -230,5 +230,8 @@ The headless baseline bot explicitly selects the first free option. Add focused 
 for each consequential branch, including future effects, save and replay parity.
 Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch in a simulation;
 an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
+Recurring wildfire preparedness is optional and never blocks the clock: the bot funds a season
+only when `scenarioResponses` maps its `wildfire:<location>:<year>:preparedness` key to `prepare`,
+checking once at the start of each month; any other value leaves the season unfunded.
 See [the scenario choice balance report](SCENARIO_CHOICE_BALANCE.md) for the reproducible
 Data Center, Deep Freeze and Wildfire win/loss matrix and price rationale.

@@ -41,13 +41,18 @@ export function demandRange(min: number, max: number): [number, number] {
 export default function PolicyDemandChart({
   current,
   changed,
+  labels = ["Current plan", "With this change"],
+  ariaLabel = "Estimated utility demand: current plan and with this change, over a representative day",
 }: {
   current: number[];
   changed: number[];
+  /** The solid and dashed series' names. */
+  labels?: [string, string];
+  ariaLabel?: string;
 }) {
   return (
     <UPlotChart
-      ariaLabel="Estimated utility demand: current plan and with this change, over a representative day"
+      ariaLabel={ariaLabel}
       height={CHART_HEIGHT}
       state={{}}
       data={[
@@ -55,7 +60,7 @@ export default function PolicyDemandChart({
         current,
         changed,
       ]}
-      seriesLabels={["Current plan (solid)", "With this change (dashed)"]}
+      seriesLabels={[`${labels[0]} (solid)`, `${labels[1]} (dashed)`]}
       formatSummaryValue={formatWatts}
       buildOptions={() => ({
         width: 0,
@@ -85,9 +90,9 @@ export default function PolicyDemandChart({
         ],
         series: [
           {},
-          { label: "Current plan", stroke: chartPalette().demand, width: 2 },
+          { label: labels[0], stroke: chartPalette().demand, width: 2 },
           {
-            label: "With this change",
+            label: labels[1],
             stroke: chartPalette().supply,
             dash: [6, 4],
             width: 2,

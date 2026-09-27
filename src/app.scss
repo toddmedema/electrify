@@ -5616,6 +5616,117 @@ $sizemap: (
 .customerProgramItem[data-active] .customerProgramStatus {
   color: var(--font-color-primary);
 }
+// Customer programs share the build screen's frame: a full-screen sheet with one centered column,
+// close on the left and the speed control on the right. The column is narrower than the build
+// catalog's because a program page is read top to bottom rather than compared side by side.
+$programs_column: 800px;
+
+.customerProgramsScreen .MuiDialog-paper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-primary);
+  background-image: none;
+}
+.programsTitleShort {
+  display: none;
+}
+.customerProgramsScreen .constructionHeader {
+  border-bottom: $border_accent;
+}
+.customerProgramsScreen .constructionTitleBar.MuiToolbar-root {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: $programs_column;
+  min-height: $topbar_height;
+  margin: 0 auto;
+  // Where the title and speed control cannot share a line, the speed control drops below it,
+  // as it does on the build screen
+  flex-wrap: wrap;
+  padding-top: env(safe-area-inset-top);
+  padding-left: max($space-4, env(safe-area-inset-left));
+  padding-right: max($space-2, env(safe-area-inset-right));
+}
+.constructionTitleBar .constructionSpeed {
+  flex: 0 0 auto;
+}
+// Full-width scroll areas, so the scrollbar sits at the screen's edge, padded in to the column
+.customerProgramsBody,
+.customerProgramsActions {
+  box-sizing: border-box;
+  padding-left: max(
+    $space-4,
+    calc((100% - #{$programs_column}) / 2 + #{$space-4}),
+    env(safe-area-inset-left)
+  );
+  padding-right: max(
+    $space-4,
+    calc((100% - #{$programs_column}) / 2 + #{$space-4}),
+    env(safe-area-inset-right)
+  );
+}
+.customerProgramsBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: $space-4;
+  padding-bottom: $space-4;
+}
+// A program's decision is the screen's one action, so its buttons keep the full touch target
+.customerProgramsBody .MuiButton-root,
+.customerProgramsActions .MuiButton-root {
+  min-height: 44px;
+}
+// The page's one decision, kept in reach below however long the estimate runs
+.customerProgramsActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $space-2;
+  padding-top: $space-3;
+  padding-bottom: max($space-3, env(safe-area-inset-bottom));
+  border-top: $border_accent;
+
+  > :first-child {
+    margin-right: auto;
+  }
+}
+.customerProgramFacts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: $space-4;
+  row-gap: $space-1;
+  margin: 0;
+
+  dt {
+    color: var(--font-color-faded);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+@media screen and (max-width: 599px) {
+  .programsTitleLong {
+    display: none;
+  }
+  .programsTitleShort {
+    display: inline;
+  }
+  .customerProgramsScreen .constructionTitleBar.MuiToolbar-root {
+    padding-left: max($space-1, env(safe-area-inset-left));
+    padding-right: max($space-1, env(safe-area-inset-right));
+  }
+}
+
 /* Finished projects need no decision, so they recede behind the programs still in play. */
 .customerProgramItem[data-completed] {
   border-style: dashed;
@@ -6034,10 +6145,19 @@ $sizemap: (
     margin-right: -52px;
   }
 }
+// Inset like the Facilities pane's Build button: 4px from the top and 16px from the pane's edge,
+// at the shared control size, which grows to the full 44px target on touch
 .customerProgramsControl {
   position: absolute;
-  right: 12px;
-  top: 0;
+  right: 16px;
+  top: 4px;
+
+  .MuiButton-root {
+    min-width: var(--control-size);
+    height: var(--control-size);
+    min-height: var(--control-size);
+    padding: 0 8px;
+  }
 }
 
 // The dialog title's pause indicator: icon and text share a centerline
