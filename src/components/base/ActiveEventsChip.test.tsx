@@ -17,12 +17,12 @@ const hail: ActiveEventGroupType = {
   count: 4,
   throughLabel: "through Jan 2026",
 };
-const gas: ActiveEventGroupType = {
-  key: "gas",
-  title: "Gas prices fall",
-  importance: "ROUTINE",
+const cold: ActiveEventGroupType = {
+  key: "cold",
+  title: "Extreme cold",
+  importance: "NOTABLE",
   count: 1,
-  throughLabel: "through Dec 2030",
+  throughLabel: "through Feb 2026",
 };
 
 describe("ActiveEventsChip", () => {
@@ -35,11 +35,11 @@ describe("ActiveEventsChip", () => {
 
   it("names a single event and opens Events", () => {
     const onOpen = jest.fn();
-    render(<ActiveEventsChip groups={[gas]} onOpen={onOpen} />);
+    render(<ActiveEventsChip groups={[cold]} onOpen={onOpen} />);
     const chip = screen.getByRole("button", {
-      name: "Active events: Gas prices fall, through Dec 2030. Open Events.",
+      name: "Active events: Extreme cold, through Feb 2026. Open Events.",
     });
-    expect(chip).toHaveTextContent("Gas prices fall");
+    expect(chip).toHaveTextContent("Extreme cold");
     expect(chip).not.toHaveClass("activeEventsChip-critical");
     fireEvent.click(chip);
     expect(onOpen).toHaveBeenCalledTimes(1);
@@ -47,7 +47,7 @@ describe("ActiveEventsChip", () => {
 
   it("leads with the first group and counts the rest", () => {
     render(
-      <ActiveEventsChip groups={[fire, hail, gas]} onOpen={() => undefined} />,
+      <ActiveEventsChip groups={[fire, hail, cold]} onOpen={() => undefined} />,
     );
     const chip = screen.getByRole("button", { name: /^Active events:/ });
     expect(chip).toHaveClass("activeEventsChip-critical");

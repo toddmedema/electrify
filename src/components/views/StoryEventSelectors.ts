@@ -188,8 +188,10 @@ let activeGroupsCache:
   { key: string; groups: ActiveEventGroupType[] } | undefined;
 
 /**
- * The events in effect right now, grouped by title and most severe first. The status bar reads
- * this every tick, so it hands back the same array until an event starts or ends.
+ * The critical and notable events in effect right now, grouped by title and most severe first.
+ * Routine ones, such as a years-long drift in gas prices, stay in the Events pane so the status
+ * bar only speaks up for something worth a glance. It reads this every tick, so it hands back
+ * the same array until an event starts or ends.
  */
 export function selectActiveEventGroups(
   state: AppStateType,
@@ -200,7 +202,8 @@ export function selectActiveEventGroups(
     (event) =>
       event.startsMinute <= now &&
       event.endsMinute > now &&
-      event.message !== undefined,
+      event.message !== undefined &&
+      (event.importance === "CRITICAL" || event.importance === "NOTABLE"),
   );
   if (inEffect.length === 0) {
     return NO_ACTIVE_GROUPS;
@@ -217,7 +220,7 @@ export function selectActiveEventGroups(
   >();
   for (const event of inEffect) {
     const title = event.title ?? event.key;
-    const importance = event.importance ?? "ROUTINE";
+    const importance = event.importance!;
     const existing = byTitle.get(title);
     if (!existing) {
       byTitle.set(title, {

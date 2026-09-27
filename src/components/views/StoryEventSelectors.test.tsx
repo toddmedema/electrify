@@ -29,7 +29,7 @@ function stateAt(minute: number, active: ActiveWorldEventType[]) {
 }
 
 describe("active event groups", () => {
-  it("includes only events in effect now that have something to say", () => {
+  it("includes only critical and notable events in effect now", () => {
     const now = 13 * MINUTES_PER_MONTH;
     const groups = selectActiveEventGroups(
       stateAt(now, [
@@ -37,6 +37,8 @@ describe("active event groups", () => {
         event("later", { startsMinute: now + 1 }),
         event("over", { endsMinute: now }),
         event("silent", { message: undefined }),
+        event("routine", { importance: "ROUTINE" }),
+        event("unranked", { importance: undefined }),
       ]),
     );
     expect(groups.map((group) => group.title)).toEqual(["now"]);
@@ -47,7 +49,6 @@ describe("active event groups", () => {
     const now = 13 * MINUTES_PER_MONTH;
     const groups = selectActiveEventGroups(
       stateAt(now, [
-        event("Gas prices fall", { importance: "ROUTINE" }),
         event("hail:1", { title: "Hail damage", importance: "CRITICAL" }),
         event("hail:2", { title: "Hail damage", importance: "CRITICAL" }),
         event("Extreme cold"),
@@ -58,7 +59,6 @@ describe("active event groups", () => {
     ).toEqual([
       ["Hail damage", 2, "CRITICAL"],
       ["Extreme cold", 1, "NOTABLE"],
-      ["Gas prices fall", 1, "ROUTINE"],
     ]);
   });
 

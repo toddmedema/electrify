@@ -15,9 +15,10 @@ function describeGroup(group: ActiveEventGroupType): string {
 }
 
 /**
- * What is happening to the grid right now, sitting beside the grid readout rather than in a row
- * of its own. It is exactly as tall as the mission row's controls, so the status bar never grows;
- * narrow rows trade the lead title for a plain count via the slot's container queries.
+ * What is happening to the grid right now: a borderless text button in the mission row's family,
+ * sitting beside the grid readout rather than in a row of its own. It is exactly as tall as the
+ * mission row's controls, so the status bar never grows; narrow rows trade the lead title for a
+ * plain count via the slot's container queries.
  */
 function ActiveEventsChip({ groups, onOpen }: Props) {
   if (groups.length === 0) {
