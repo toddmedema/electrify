@@ -690,7 +690,7 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("payments start now");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
@@ -835,7 +835,7 @@ describe("the intertie upgrade control", () => {
     await user.click(upgrade);
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Interest rate:");
+    expect(dialog).toHaveTextContent(/for 30 years/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     await user.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(handleUpgrade).toHaveBeenCalledWith(line.corridorId, true);

@@ -8,9 +8,6 @@ import {
   Checkbox,
   Chip,
   Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
   FormControlLabel,
   List,
   Stack,
@@ -24,12 +21,11 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
   estimatedAnnualVariableOperatingCost,
-  getMonthlyPayment,
+  purchaseTerms,
 } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
@@ -38,9 +34,7 @@ import {
 } from "../../helpers/Format";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
-  DOWNPAYMENT_PERCENT,
   FUELS,
-  LOAN_MONTHS,
   MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
@@ -84,7 +78,9 @@ import {
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
-import DecisionImpactPreview from "../base/DecisionImpactPreview";
+import PurchaseReviewDialog, {
+  financingShortfallText,
+} from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
@@ -252,12 +248,15 @@ export function GeneratorBuildItem(
     );
   const [resilienceSelection, setResilienceSelection] =
     React.useState<ResilienceSelectionType>(defaultSelection);
-  const purchaseSubmitted = React.useRef(false);
   // A default hardening option is only a default: the card stays buyable whenever the plant
   // without it is affordable, and the dialog lets the player clear it
   const cheapestQuote =
     hasOptions && props.withResilience ? props.withResilience({}) : generator;
-  const downpayment = DOWNPAYMENT_PERCENT * cheapestQuote.buildCost;
+  const { downpayment } = purchaseTerms(
+    cheapestQuote.buildCost,
+    true,
+    props.interestRate,
+  );
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
@@ -278,12 +277,9 @@ export function GeneratorBuildItem(
         props.location,
         generator.viableLocationsRemaining,
       );
-  const financingGap = Math.max(0, downpayment - cash);
-  const canBuild = buildable && financingGap === 0;
-  const buildSubtitle =
-    buildable && financingGap > 0
-      ? `${formatMoneyConcise(financingGap)} cash needed to afford loan downpayment`
-      : secondaryText;
+  const shortfall = financingShortfallText(cash, downpayment);
+  const canBuild = buildable && !shortfall;
+  const buildSubtitle = (buildable && shortfall) || secondaryText;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
@@ -313,27 +309,10 @@ export function GeneratorBuildItem(
     setExpanded(!expanded);
   };
 
-  const toggleOpen = (e: React.SyntheticEvent) => {
-    if (!open) {
-      purchaseSubmitted.current = false;
-      setResilienceSelection(defaultSelection());
-    }
-    setOpen(!open);
+  const openReview = (e: React.SyntheticEvent) => {
+    setResilienceSelection(defaultSelection());
+    setOpen(true);
     e.stopPropagation();
-  };
-
-  const submitPurchase = (
-    financed: boolean,
-    e: React.MouseEvent<HTMLElement>,
-  ) => {
-    // A double-click dispatches two click events before the closing dialog has necessarily
-    // unmounted. The ref closes that tiny window synchronously.
-    if (purchaseSubmitted.current) {
-      return;
-    }
-    purchaseSubmitted.current = true;
-    props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
-    toggleOpen(e);
   };
 
   // The dialog prices the quote with the player's hardening choice; the card keeps the default
@@ -341,13 +320,10 @@ export function GeneratorBuildItem(
     hasOptions && props.withResilience
       ? props.withResilience(resilienceSelection)
       : generator;
-  const quoteDownpayment = DOWNPAYMENT_PERCENT * quote.buildCost;
-  const quoteMonthlyPayment = getMonthlyPayment(
-    quote.buildCost - quoteDownpayment,
-    props.interestRate,
-    LOAN_MONTHS,
-  );
-  const quoteCanBuild = buildable && quoteDownpayment <= cash;
+  const quoteCanBuild =
+    buildable &&
+    purchaseTerms(quote.buildCost, true, props.interestRate).downpayment <=
+      cash;
   const resilienceOptionId = React.useId();
   // Each line under an option says what it buys; a warning line says what it costs the player
   const optionDetails = (
@@ -494,7 +470,7 @@ export function GeneratorBuildItem(
                 size="small"
                 variant="outlined"
                 color="primary"
-                onClick={toggleOpen}
+                onClick={openReview}
                 disabled={!canBuild}
                 startIcon={<ConceptIcon concept="buy" fontSize="small" />}
                 aria-label={`Review purchase of ${generator.name}`}
@@ -732,157 +708,130 @@ export function GeneratorBuildItem(
         </TableContainer>
       </Collapse>
 
-      <Dialog open={open} onClose={toggleOpen} fullWidth maxWidth="sm">
-        <ClosableDialogTitle onClose={toggleOpen}>
-          Build {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
-          {generator.name}?
-        </ClosableDialogTitle>
-        <DialogContent className="noPadding">
-          {props.hydroAvailability?.selected && (
-            <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
-              {props.hydroAvailability.selected.name} ·{" "}
-              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
-              Uses the whole site. Only cancelling before completion frees it.
-            </Typography>
-          )}
-          {hasOptions &&
-            resilienceOptions.map((option, index) => {
-              const describedBy = `${resilienceOptionId}-${option.upgrade}`;
-              const lines = optionDetails(option);
-              if (
-                affordabilityWarning &&
-                index === resilienceOptions.length - 1
-              )
-                lines.push({ text: affordabilityWarning, warning: true });
-              return (
-                <Box className="resilienceBuildOption" key={option.upgrade}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={!!resilienceSelection[option.upgrade]}
-                        onChange={(event) =>
-                          setResilienceSelection((selection) => ({
-                            ...selection,
-                            [option.upgrade]: event.target.checked,
-                          }))
-                        }
-                        slotProps={{
-                          input: { "aria-describedby": describedBy },
-                        }}
-                      />
-                    }
-                    label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
-                  />
-                  <Box id={describedBy}>
-                    {lines.map((line) => (
-                      <Typography
-                        key={line.text}
-                        variant="body2"
-                        color={line.warning ? undefined : "textSecondary"}
-                        className={
-                          line.warning
-                            ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
-                            : option.upgrade === "solarTrackers"
-                              ? "resilienceBuildOptionDetail resilienceBuildOptionNoWrap"
-                              : "resilienceBuildOptionDetail"
-                        }
-                      >
-                        {line.text}
-                      </Typography>
-                    ))}
+      <PurchaseReviewDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={
+          <>
+            Build{" "}
+            {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
+            {generator.name}?
+          </>
+        }
+        cash={cash}
+        buildCost={quote.buildCost}
+        interestRate={props.interestRate}
+        cashDisabled={!buildable}
+        loanDisabled={!buildable}
+        upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
+        upkeepDetail={
+          fuelPrices[generator.fuel]
+            ? "Plus fuel and loan payments."
+            : "Plus loan payments."
+        }
+        onlineInMonths={Math.round(generator.yearsToBuild * 12)}
+        onPurchase={(financed) => {
+          props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
+          setOpen(false);
+        }}
+        preface={
+          <>
+            {props.hydroAvailability?.selected && (
+              <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
+                {props.hydroAvailability.selected.name} ·{" "}
+                {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
+                Uses the whole site. Only cancelling before completion frees it.
+              </Typography>
+            )}
+            {hasOptions &&
+              resilienceOptions.map((option, index) => {
+                const describedBy = `${resilienceOptionId}-${option.upgrade}`;
+                const lines = optionDetails(option);
+                if (
+                  affordabilityWarning &&
+                  index === resilienceOptions.length - 1
+                )
+                  lines.push({ text: affordabilityWarning, warning: true });
+                return (
+                  <Box className="resilienceBuildOption" key={option.upgrade}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={!!resilienceSelection[option.upgrade]}
+                          onChange={(event) =>
+                            setResilienceSelection((selection) => ({
+                              ...selection,
+                              [option.upgrade]: event.target.checked,
+                            }))
+                          }
+                          slotProps={{
+                            input: { "aria-describedby": describedBy },
+                          }}
+                        />
+                      }
+                      label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
+                    />
+                    <Box id={describedBy}>
+                      {lines.map((line) => (
+                        <Typography
+                          key={line.text}
+                          variant="body2"
+                          color={line.warning ? undefined : "textSecondary"}
+                          className={
+                            line.warning
+                              ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
+                              : option.upgrade === "solarTrackers"
+                                ? "resilienceBuildOptionDetail resilienceBuildOptionNoWrap"
+                                : "resilienceBuildOptionDetail"
+                          }
+                        >
+                          {line.text}
+                        </Typography>
+                      ))}
+                    </Box>
                   </Box>
-                </Box>
-              );
-            })}
-          <DecisionImpactPreview
-            facts={[
-              {
-                concept: "money",
-                label: "Cash purchase",
-                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - quote.buildCost)}`,
-              },
-              {
-                concept: "finances",
-                label: "Loan option",
-                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
-                detail: "Payments start now.",
-              },
-              {
-                concept: "money",
-                label: "Estimated upkeep",
-                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
-                detail: fuelPrices[generator.fuel]
-                  ? "Plus fuel and loan payments."
-                  : "Plus loan payments.",
-              },
-              {
-                concept: "time",
-                label: "Online in",
-                value: `${Math.round(generator.yearsToBuild * 12)} months`,
-              },
-              {
-                concept: "supply",
-                label: "Typical output",
-                // The selected quote's trackers add their morning and evening energy
-                value: `+${formatWatts(
-                  typicalOutputW *
-                    (quote.resilience?.solarTrackers
-                      ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
-                      : 1),
-                )}`,
-                detail: waterShape
-                  ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
-                  : `${formatWatts(generator.peakW)} max; weather may limit it.`,
-              },
-              ...(sites
-                ? [
-                    {
-                      concept: "build" as const,
-                      label: "Project site",
-                      value:
-                        sites.remaining === 1
-                          ? "Uses your last site"
-                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
-                      detail: "Each project takes one site, whatever its size.",
-                    },
-                  ]
-                : []),
-              {
-                concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
-                label: "Direct emissions",
-                value:
-                  kgCO2ePerMWh > 0
-                    ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                    : "No direct emissions modeled",
-              },
-            ]}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            disabled={!quoteCanBuild || cash < quote.buildCost}
-            variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(false, e)
-            }
-            startIcon={<ConceptIcon concept="money" fontSize="small" />}
-          >
-            Pay cash
-          </Button>
-          <Button
-            color="primary"
-            variant="outlined"
-            disabled={!quoteCanBuild}
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(true, e)
-            }
-            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
-          >
-            Take loan
-          </Button>
-        </DialogActions>
-      </Dialog>
+                );
+              })}
+          </>
+        }
+        extraFacts={[
+          {
+            concept: "supply",
+            label: "Typical output",
+            // The selected quote's trackers add their morning and evening energy
+            value: `+${formatWatts(
+              typicalOutputW *
+                (quote.resilience?.solarTrackers
+                  ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
+                  : 1),
+            )}`,
+            detail: waterShape
+              ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
+              : `${formatWatts(generator.peakW)} max; weather may limit it.`,
+          },
+          ...(sites
+            ? [
+                {
+                  concept: "build" as const,
+                  label: "Project site",
+                  value:
+                    sites.remaining === 1
+                      ? "Uses your last site"
+                      : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                  detail: "Each project takes one site, whatever its size.",
+                },
+              ]
+            : []),
+          {
+            concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
+            label: "Direct emissions",
+            value:
+              kgCO2ePerMWh > 0
+                ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+                : "No direct emissions modeled",
+          },
+        ]}
+      />
     </Card>
   );
 }

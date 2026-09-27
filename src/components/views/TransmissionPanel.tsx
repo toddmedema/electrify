@@ -16,7 +16,6 @@ import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import {
   Avatar,
   Box,
@@ -25,9 +24,6 @@ import {
   CardHeader,
   Chip,
   Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
   FormControl,
   InputLabel,
   Link,
@@ -37,8 +33,6 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  DOWNPAYMENT_PERCENT,
-  LOAN_MONTHS,
   MAX_INTERTIE_UPGRADES,
   MONTH_NAMES,
   MONTHS,
@@ -82,7 +76,7 @@ import {
   pricePeriodCaption,
 } from "../../helpers/IntertieOutlook";
 import { generateNewTimeline } from "../../reducers/Game";
-import { getMonthlyPayment } from "../../helpers/Financials";
+import { purchaseTerms } from "../../helpers/Financials";
 import {
   GameType,
   TickPresentFutureType,
@@ -98,7 +92,9 @@ import {
 } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
-import DecisionImpactPreview from "../base/DecisionImpactPreview";
+import PurchaseReviewDialog, {
+  financingShortfallText,
+} from "../base/PurchaseReviewDialog";
 import Sparkline from "../base/Sparkline";
 import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
@@ -254,11 +250,10 @@ function IntertieBuildItem(props: {
   const [expanded, setExpanded] = React.useState(false);
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
-  const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
-  const financed = corridor.buildCost - downpayment;
+  const loan = purchaseTerms(corridor.buildCost, true, props.interestRate);
   // The loan is the cheaper of the two ways in, so it sets the bar for whether this is a
   // decision at all. Cash purchase is still offered in the review dialog when it's affordable.
-  const buildable = cash !== undefined && cash >= downpayment;
+  const buildable = cash !== undefined && cash >= loan.downpayment;
   return (
     <Card
       className="build-list-item buildOption transmissionProject"
@@ -312,8 +307,7 @@ function IntertieBuildItem(props: {
           className="buildOptionWarning"
           color="textSecondary"
         >
-          Need {formatMoneyConcise(downpayment)} down payment · you have{" "}
-          {formatMoneyConcise(cash || 0)}
+          {financingShortfallText(cash || 0, loan.downpayment)}
         </Typography>
       )}
       <Box className="buildOptionMetrics">
@@ -331,9 +325,7 @@ function IntertieBuildItem(props: {
         />
         <BuildMetric
           label="Loan payment"
-          value={`${formatMoneyConcise(
-            getMonthlyPayment(financed, props.interestRate, LOAN_MONTHS),
-          )}/mo`}
+          value={`${formatMoneyConcise(loan.monthlyPayment)}/mo`}
         />
         {market && (
           <BuildMetric
@@ -383,11 +375,11 @@ function IntertieBuildItem(props: {
 
             <div>
               <dt>Down payment</dt>
-              <dd>{formatMoneyConcise(downpayment)}</dd>
+              <dd>{formatMoneyConcise(loan.downpayment)}</dd>
             </div>
             <div>
               <dt>Amount financed</dt>
-              <dd>{formatMoneyConcise(financed)}</dd>
+              <dd>{formatMoneyConcise(loan.loanAmount)}</dd>
             </div>
           </dl>
         </Box>
@@ -442,7 +434,6 @@ function IntertieUpgradeControl(props: {
     context,
   } = props;
   const [reviewing, setReviewing] = React.useState(false);
-  const titleId = React.useId();
   if (line.upgrade) {
     const years = line.upgrade.yearsToBuildLeft;
     return (
@@ -475,8 +466,8 @@ function IntertieUpgradeControl(props: {
     );
   }
   if (readOnly) return null;
-  const downpayment = quote.buildCost * DOWNPAYMENT_PERCENT;
-  const affordable = (cash ?? 0) >= downpayment;
+  const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
+  const shortfall = financingShortfallText(cash ?? 0, downpayment);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
   return (
     <div className="transmissionUpgrade">
@@ -509,17 +500,16 @@ function IntertieUpgradeControl(props: {
         . Wider wires do not increase the neighbor’s spare supply or export
         budget.
       </Typography>
-      {!affordable && (
+      {shortfall && (
         <Typography variant="caption" color="textSecondary" component="div">
-          Need {formatMoneyConcise(downpayment)} down · you have{" "}
-          {formatMoneyConcise(cash ?? 0)}
+          {shortfall}
         </Typography>
       )}
       <Button
         size="small"
         variant="outlined"
         color="primary"
-        disabled={!affordable}
+        disabled={!!shortfall}
         aria-label={`Upgrade ${line.name} to ${formatWatts(quote.targetCapacityW, 3)}`}
         startIcon={<ConceptIcon concept="build" fontSize="small" />}
         onClick={() => setReviewing(true)}
@@ -527,79 +517,41 @@ function IntertieUpgradeControl(props: {
         Review upgrade
       </Button>
       {reviewing && (
-        <Dialog
+        <PurchaseReviewDialog
           open
           onClose={() => setReviewing(false)}
-          fullWidth
-          maxWidth="sm"
-          aria-labelledby={titleId}
-        >
-          <ClosableDialogTitle id={titleId} onClose={() => setReviewing(false)}>
-            Upgrade {line.name}?
-          </ClosableDialogTitle>
-          <DialogContent className="noPadding">
-            <DecisionImpactPreview
-              facts={[
-                {
-                  concept: "supply",
-                  label: "Connection capacity",
-                  value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
-                  detail:
-                    "The line keeps its current capacity during construction. Imports still need spare neighboring supply.",
-                },
-                {
-                  concept: "money",
-                  label: "Cash purchase",
-                  value: `${formatMoneyConcise(cash ?? 0)} → ${formatMoneyConcise((cash ?? 0) - quote.buildCost)}`,
-                },
-                {
-                  concept: "finances",
-                  label: "Loan",
-                  value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(getMonthlyPayment(line.loanAmountLeft + quote.buildCost - downpayment, interestRate, LOAN_MONTHS))}/mo`,
-                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(interestRate * 100).toFixed(2)}%.${line.loanAmountLeft > 0 ? ` Includes refinancing the existing ${formatMoneyConcise(line.loanAmountLeft)} balance at this rate and term.` : ""}`,
-                },
-                {
-                  concept: "money",
-                  label: "Upkeep after upgrade",
-                  value: `${formatMoneyConcise(line.annualOperatingCost / 12)} → ${formatMoneyConcise(quote.annualOperatingCost / 12)}/mo`,
-                  detail: "Electricity purchases and loan payments are extra.",
-                },
-                {
-                  concept: "time",
-                  label: "Upgrade complete in",
-                  value: `${months} months`,
-                },
-                {
-                  concept: "construction",
-                  label: "Construction emits",
-                  value: `${formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)} ${largeMassUnit(units)} CO2e`,
-                },
-              ]}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button
-              variant="contained"
-              disabled={(cash ?? 0) < quote.buildCost}
-              onClick={() => {
-                setReviewing(false);
-                onUpgrade(line.corridorId, false);
-              }}
-            >
-              Pay cash
-            </Button>
-            <Button
-              variant="outlined"
-              disabled={!affordable}
-              onClick={() => {
-                setReviewing(false);
-                onUpgrade(line.corridorId, true);
-              }}
-            >
-              Take loan
-            </Button>
-          </DialogActions>
-        </Dialog>
+          title={`Upgrade ${line.name}?`}
+          cash={cash ?? 0}
+          buildCost={quote.buildCost}
+          interestRate={interestRate}
+          refinancedBalance={line.loanAmountLeft}
+          leadingFacts={[
+            {
+              concept: "supply",
+              label: "Connection capacity",
+              value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
+              detail:
+                "The line keeps its current capacity during construction. Imports still need spare neighboring supply.",
+            },
+          ]}
+          upkeepLabel="Upkeep after upgrade"
+          upkeepBeforePerMonth={line.annualOperatingCost / 12}
+          upkeepPerMonth={quote.annualOperatingCost / 12}
+          upkeepDetail="Plus electricity purchases and loan payments."
+          onlineInLabel="Upgrade complete in"
+          onlineInMonths={months}
+          extraFacts={[
+            {
+              concept: "construction",
+              label: "Construction emits",
+              value: `${formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)} ${largeMassUnit(units)} CO2e`,
+            },
+          ]}
+          onPurchase={(financed) => {
+            setReviewing(false);
+            onUpgrade(line.corridorId, financed);
+          }}
+        />
       )}
     </div>
   );
@@ -732,7 +684,6 @@ export default function TransmissionPanel({
       ? buildQuote(reviewId)
       : undefined;
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
-  const reviewDownpayment = (review?.buildCost || 0) * DOWNPAYMENT_PERCENT;
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed, tier);
@@ -1138,20 +1089,18 @@ export default function TransmissionPanel({
         <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
       )}
       {review && (
-        <Dialog
+        <PurchaseReviewDialog
           open
           onClose={() => setReviewId(null)}
-          fullWidth
-          maxWidth="sm"
-          aria-labelledby="intertie-review-title"
-        >
-          <ClosableDialogTitle
-            id="intertie-review-title"
-            onClose={() => setReviewId(null)}
-          >
-            Build {reviewMarket?.name} · Tier {tier}?
-          </ClosableDialogTitle>
-          <DialogContent className="noPadding">
+          titleId="intertie-review-title"
+          loanButtonId={`approve-intertie-${review.id}`}
+          title={`Build ${reviewMarket?.name} · Tier ${tier}?`}
+          cash={now?.cash ?? 0}
+          buildCost={review.buildCost}
+          interestRate={game.interestRate}
+          cashDisabled={readOnly || !now}
+          loanDisabled={readOnly || !now}
+          preface={
             <Box sx={{ px: 2, pb: 1 }}>
               <Typography variant="body2">
                 {formatWatts(review.capacityW)} access · Ready in{" "}
@@ -1165,45 +1114,11 @@ export default function TransmissionPanel({
                 </Typography>
               )}
             </Box>
-            <DecisionImpactPreview
-              facts={[
-                {
-                  concept: "money",
-                  label: "Cash",
-                  value: `${formatMoneyConcise(review.buildCost)} · ${formatMoneyConcise((now?.cash || 0) - review.buildCost)} left`,
-                },
-                {
-                  concept: "finances",
-                  label: "Loan",
-                  value: `${formatMoneyConcise(reviewDownpayment)} now + ${formatMoneyConcise(getMonthlyPayment(review.buildCost - reviewDownpayment, game.interestRate, LOAN_MONTHS))}/mo`,
-                  detail: `${LOAN_MONTHS / 12} years at ${(game.interestRate * 100).toFixed(2)}%; payments start now.`,
-                },
-                {
-                  concept: "money",
-                  label: "Upkeep",
-                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo + power purchases`,
-                },
-              ]}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button
-              variant="contained"
-              disabled={readOnly || !now || now.cash < review.buildCost}
-              onClick={() => approve(false)}
-            >
-              Pay cash
-            </Button>
-            <Button
-              id={`approve-intertie-${review.id}`}
-              variant="outlined"
-              disabled={readOnly || !now || now.cash < reviewDownpayment}
-              onClick={() => approve(true)}
-            >
-              Take loan
-            </Button>
-          </DialogActions>
-        </Dialog>
+          }
+          upkeepPerMonth={review.annualOperatingCost / 12}
+          upkeepDetail="Plus electricity purchases and loan payments."
+          onPurchase={approve}
+        />
       )}
     </div>
   );

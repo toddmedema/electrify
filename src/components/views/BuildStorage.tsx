@@ -6,9 +6,6 @@ import {
   Card,
   CardHeader,
   Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
   List,
   Table,
   TableBody,
@@ -19,21 +16,21 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { getMonthlyPayment } from "../../helpers/Financials";
+import { purchaseTerms } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
-import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ManualLink from "../base/ManualLink";
 import ConceptIcon from "../base/ConceptIcon";
-import DecisionImpactPreview from "../base/DecisionImpactPreview";
+import PurchaseReviewDialog, {
+  financingShortfallText,
+} from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
@@ -63,13 +60,10 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const units = useUnits();
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const purchaseSubmitted = React.useRef(false);
-  const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
-  const loanAmount = props.storage.buildCost - downpayment;
-  const monthlyPayment = getMonthlyPayment(
-    loanAmount,
+  const { downpayment } = purchaseTerms(
+    storage.buildCost,
+    true,
     props.interestRate,
-    LOAN_MONTHS,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
@@ -87,34 +81,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.location,
     storage.viableLocationsRemaining,
   );
-  const financingGap = Math.max(0, downpayment - cash);
-  const buildSubtitle =
-    buildable && financingGap > 0
-      ? `${formatMoneyConcise(financingGap)} cash needed to afford loan downpayment`
-      : secondaryText;
+  const shortfall = financingShortfallText(cash, downpayment);
+  const buildSubtitle = (buildable && shortfall) || secondaryText;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
 
-  const toggleOpen = (e: React.SyntheticEvent) => {
-    if (!open) {
-      purchaseSubmitted.current = false;
-    }
-    setOpen(!open);
+  const openReview = (e: React.SyntheticEvent) => {
+    setOpen(true);
     e.stopPropagation();
-  };
-
-  const submitPurchase = (
-    financed: boolean,
-    e: React.MouseEvent<HTMLElement>,
-  ) => {
-    if (purchaseSubmitted.current) {
-      return;
-    }
-    purchaseSubmitted.current = true;
-    props.onBuild(financed);
-    toggleOpen(e);
   };
 
   return (
@@ -134,8 +110,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               size="small"
               variant="outlined"
               color="primary"
-              onClick={toggleOpen}
-              disabled={downpayment > cash || !buildable}
+              onClick={openReview}
+              disabled={!!shortfall || !buildable}
               startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
               Review
@@ -157,7 +133,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           {siteCountLabel(sites)}
         </Typography>
       )}
-      {(!buildable || financingGap > 0) && (
+      {(!buildable || shortfall) && (
         <Typography
           component="div"
           className="buildOptionWarning"
@@ -262,90 +238,53 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         </TableContainer>
       </Collapse>
 
-      <Dialog open={open} onClose={toggleOpen}>
-        <ClosableDialogTitle onClose={toggleOpen}>
-          Build {formatWattHours(storage.peakWh)} {storage.name}?
-        </ClosableDialogTitle>
-        <DialogContent className="noPadding">
-          <DecisionImpactPreview
-            facts={[
-              {
-                concept: "money",
-                label: "Cash purchase",
-                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
-              },
-              {
-                concept: "finances",
-                label: "Loan option",
-                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
-                detail: "Payments start now.",
-              },
-              {
-                concept: "money",
-                label: "Estimated upkeep",
-                value: `${formatMoneyConcise(storage.annualOperatingCost / 12)}/mo`,
-                detail: "Plus charging and loan payments.",
-              },
-              {
-                concept: "time",
-                label: "Online in",
-                value: `${Math.round(storage.yearsToBuild * 12)} months`,
-              },
-              {
-                concept: "storage",
-                label: "Energy storage",
-                value: formatWattHours(storage.peakWh),
-              },
-              {
-                concept: "supply",
-                label: "Charge/discharge rate",
-                value: formatWatts(storage.peakW),
-              },
-              {
-                concept: "supply",
-                label: "Round-trip efficiency",
-                value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
-              },
-              ...(sites
-                ? [
-                    {
-                      concept: "build" as const,
-                      label: "Project site",
-                      value:
-                        sites.remaining === 1
-                          ? "Uses your last site"
-                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
-                      detail: "Each project takes one site, whatever its size.",
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            disabled={cash < storage.buildCost}
-            variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(false, e)
-            }
-            startIcon={<ConceptIcon concept="money" fontSize="small" />}
-          >
-            Pay cash
-          </Button>
-          <Button
-            color="primary"
-            variant="outlined"
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(true, e)
-            }
-            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
-          >
-            Take loan
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <PurchaseReviewDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Build ${formatWattHours(storage.peakWh)} ${storage.name}?`}
+        cash={cash}
+        buildCost={storage.buildCost}
+        interestRate={props.interestRate}
+        cashDisabled={!buildable}
+        loanDisabled={!buildable}
+        upkeepPerMonth={storage.annualOperatingCost / 12}
+        upkeepDetail="Plus charging and loan payments."
+        onlineInMonths={Math.round(storage.yearsToBuild * 12)}
+        onPurchase={(financed) => {
+          props.onBuild(financed);
+          setOpen(false);
+        }}
+        extraFacts={[
+          {
+            concept: "storage",
+            label: "Energy storage",
+            value: formatWattHours(storage.peakWh),
+          },
+          {
+            concept: "supply",
+            label: "Charge/discharge rate",
+            value: formatWatts(storage.peakW),
+          },
+          {
+            concept: "supply",
+            label: "Round-trip efficiency",
+            value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
+          },
+          ...(sites
+            ? [
+                {
+                  concept: "build" as const,
+                  label: "Project site",
+                  value:
+                    sites.remaining === 1
+                      ? "Uses your last site"
+                      : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                  detail: "Each project takes one site, whatever its size.",
+                },
+              ]
+            : []),
+        ]}
+      />
     </Card>
   );
 }
