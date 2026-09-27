@@ -299,13 +299,10 @@ let previousTickMs = 0;
 let accumulatedTickMs = 0;
 // Only for environments without requestAnimationFrame; a browser presents at its display rate.
 const MIN_PRESENTATION_INTERVAL_MS = 1000 / 60;
-// A frame gap this large means the page was frozen rather than merely slow: no frames ran
-// during it, so the clock must not fast-forward through the time it spent stopped. Android is
-// the case that needs this -- locking the screen suspends the page without firing
-// visibilitychange (unlike iOS, where it behaves like a background), so the first frame back
-// would otherwise owe every tick of the whole absence at once. The worst legitimate frame is a
-// month rollover on a phone, measured near 370 ms in the dev build (docs/perf-plan.md), so a
-// second of headroom keeps real slow frames intact while discarding freezes.
+// A frame gap this long means the page was frozen, not slow, so the clock resumes where it
+// stopped instead of fast-forwarding through the absence. This is the backstop for freezes that
+// skip every hide event, such as an Android screen lock. The slowest real frame, a phone's month
+// rollover, measured about 370 ms in the dev build (docs/perf-plan.md).
 const MAX_FRAME_GAP_MS = 1000;
 // A frame whose accumulated time is within this fraction of a step of a whole number of steps
 // runs that whole number. Display timestamps jitter by a fraction of a millisecond, and without
