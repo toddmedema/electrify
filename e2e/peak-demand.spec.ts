@@ -57,7 +57,7 @@ for (const theme of ["light", "dark"]) {
       });
       await expect(apply).toBeEnabled({ timeout: 30000 });
       await expect(dialog).toContainText("Peak demand:");
-      await expect(dialog).toContainText("Change in utility cash");
+      await expect(dialog).toContainText("Cash change through");
       expect(
         await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);

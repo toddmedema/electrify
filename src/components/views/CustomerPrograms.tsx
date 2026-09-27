@@ -18,6 +18,8 @@ import {
   RadioGroup,
   Skeleton,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -43,7 +45,6 @@ import {
   buildoutCompletionMonth,
   buildoutMonths,
   buildoutMonthsDone,
-  buildoutMonthsRemaining,
   emptyPolicies,
   policyAvailable,
   policyBudget,
@@ -163,7 +164,6 @@ function BuildoutSummary({
   const months = buildoutMonths(id);
   const complete = buildoutComplete(program.adoption);
   const done = buildoutMonthsDone(id, program.adoption);
-  const remaining = buildoutMonthsRemaining(id, program.adoption);
   const total = complete
     ? program.spent
     : program.spent +
@@ -185,12 +185,6 @@ function BuildoutSummary({
         ["Total cost", formatMoneyConcise(program.spent)],
       ]
     : [
-        program.adoption > 0
-          ? [
-              "Remaining",
-              `${remaining} ${remaining === 1 ? "month" : "months"}`,
-            ]
-          : ["Duration", `${months} months of installations`],
         ["Total cost", `About ${formatMoneyConcise(total)}`],
         [
           "While active",
@@ -198,6 +192,9 @@ function BuildoutSummary({
         ],
         ["At completion", buildoutImpact(game, id)],
       ];
+  // Progress already says how far a started project has to go.
+  if (!complete && program.adoption === 0)
+    facts.unshift(["Duration", `${months} months of installations`]);
   if (!complete && finishLabel)
     facts.push([
       finishLabel,
@@ -208,9 +205,6 @@ function BuildoutSummary({
     : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent`;
   return (
     <Box className="customerProgramProject" sx={{ display: "grid", gap: 1.5 }}>
-      {program.pending && (
-        <Typography>{pendingLabel(game, id, program)}</Typography>
-      )}
       {program.adoption > 0 && (
         <Box sx={{ display: "grid", gap: 1 }}>
           <LinearProgress
@@ -528,12 +522,24 @@ function Decision({
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
             <Typography>
-              {operating
-                ? POLICIES[selected].description
-                : complete
-                  ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
-                  : POLICIES[selected].mechanism}
+              {complete
+                ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
+                : POLICIES[selected].description}
             </Typography>
+            {!complete && (
+              <details className="customerProgramHowItWorks">
+                <summary>How it works</summary>
+                <Typography sx={{ mt: 1 }}>
+                  {POLICIES[selected].mechanism}
+                </Typography>
+              </details>
+            )}
+            {current!.pending && (
+              // A standing notice, not an interruption: it is already true when the card opens.
+              <Alert severity="info" role="status">
+                {pendingLabel(game, selected, current!)}
+              </Alert>
+            )}
             {buildout ? (
               <BuildoutSummary
                 game={game}
@@ -543,46 +549,50 @@ function Decision({
                 end={end}
               />
             ) : (
-              <RadioGroup
-                row
-                aria-label="Program status"
-                value={tier}
-                onChange={(e) => setTier(e.target.value as PolicyTier)}
-              >
-                {POLICY_TIERS.map((choice) => (
-                  <FormControlLabel
-                    key={choice}
-                    value={choice}
-                    control={<Radio />}
-                    sx={{ minHeight: 44, m: 0, flex: 1 }}
-                    label={choice}
-                  />
-                ))}
-              </RadioGroup>
-            )}
-            {operating && tier !== "Off" && (
-              <TextField
-                select
-                fullWidth
-                label="Daily window"
-                value={startHour}
-                onChange={(event) => setStartHour(Number(event.target.value))}
-                slotProps={{
-                  select: { native: true },
-                  htmlInput: { style: { minHeight: 24 } },
-                }}
-                helperText={
-                  selected === "timeOfUse"
-                    ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
-                    : undefined
-                }
-              >
-                {Array.from({ length: 24 }, (_, hour) => (
-                  <option key={hour} value={hour}>
-                    {policyWindowLabel(hour)}
-                  </option>
-                ))}
-              </TextField>
+              <>
+                <RadioGroup
+                  row
+                  aria-label="Program status"
+                  value={tier}
+                  onChange={(e) => setTier(e.target.value as PolicyTier)}
+                >
+                  {POLICY_TIERS.map((choice) => (
+                    <FormControlLabel
+                      key={choice}
+                      value={choice}
+                      control={<Radio />}
+                      sx={{ minHeight: 44, m: 0, flex: 1 }}
+                      label={choice}
+                    />
+                  ))}
+                </RadioGroup>
+                {tier !== "Off" && (
+                  <TextField
+                    select
+                    fullWidth
+                    label="Daily window"
+                    value={startHour}
+                    onChange={(event) =>
+                      setStartHour(Number(event.target.value))
+                    }
+                    slotProps={{
+                      select: { native: true },
+                      htmlInput: { style: { minHeight: 24 } },
+                    }}
+                    helperText={
+                      selected === "timeOfUse"
+                        ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                        : undefined
+                    }
+                  >
+                    {Array.from({ length: 24 }, (_, hour) => (
+                      <option key={hour} value={hour}>
+                        {policyWindowLabel(hour)}
+                      </option>
+                    ))}
+                  </TextField>
+                )}
+              </>
             )}
             {complete || cancelling ? null : effective >= end ? (
               <Alert severity="info">
@@ -590,20 +600,40 @@ function Decision({
               </Alert>
             ) : (
               <>
-                <Typography component="h3" variant="subtitle1">
-                  Estimated utility demand · {labelMonth(game, month)}
-                </Typography>
-                {buildout && laterMonth > effective && (
-                  <Button onClick={() => setLater(!later)}>
-                    {later
-                      ? "First effective month"
-                      : completion >= end
-                        ? `By ${labelMonth(game, laterMonth)}`
-                        : tier === "Off"
-                          ? `At planned completion (${labelMonth(game, laterMonth)})`
-                          : `At completion (${labelMonth(game, laterMonth)})`}
-                  </Button>
-                )}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Typography component="h3" variant="subtitle1">
+                    Estimated utility demand · {labelMonth(game, month)}
+                  </Typography>
+                  {buildout && laterMonth > effective && (
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      color="primary"
+                      aria-label="Estimate month"
+                      value={later ? "completion" : "next"}
+                      onChange={(_event, value) => {
+                        if (value) setLater(value === "completion");
+                      }}
+                      sx={{ ml: "auto" }}
+                    >
+                      <ToggleButton value="next">Next month</ToggleButton>
+                      <ToggleButton value="completion">
+                        {completion >= end
+                          ? "End of run"
+                          : tier === "Off"
+                            ? "Planned completion"
+                            : "At completion"}
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
+                </Box>
                 {error ? (
                   <Alert severity="error">{error}</Alert>
                 ) : !result ? (
@@ -615,7 +645,7 @@ function Decision({
                     </Typography>
                     <PolicyDemandChartPlaceholder />
                     <Box aria-hidden>
-                      {Array.from({ length: operating ? 2 : 4 }, (_, i) => (
+                      {Array.from({ length: operating ? 2 : 3 }, (_, i) => (
                         <Typography key={i}>
                           <Skeleton width={i % 2 ? "60%" : "80%"} />
                         </Typography>
@@ -635,13 +665,6 @@ function Decision({
                       changed={result.changed}
                     />
                     <Box role="status">
-                      {!operating && (
-                        <Typography>
-                          Program spending:{" "}
-                          {formatMoneyConcise(result.spending)} in{" "}
-                          {labelMonth(game, month)}
-                        </Typography>
-                      )}
                       <Typography>
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
@@ -650,13 +673,11 @@ function Decision({
                         <Typography>
                           Electricity supplied:{" "}
                           {formatWattHours(result.before.supplyWh)} →{" "}
-                          {formatWattHours(result.after.supplyWh)} in{" "}
-                          {labelMonth(game, month)}
+                          {formatWattHours(result.after.supplyWh)}
                         </Typography>
                       )}
                       <Typography>
-                        Change in utility cash from now through{" "}
-                        {labelMonth(game, month)}:{" "}
+                        Cash change through {labelMonth(game, month)}:{" "}
                         {formatMoneyConcise(result.cashChange)}
                       </Typography>
 
@@ -686,18 +707,6 @@ function Decision({
                 )}
               </>
             )}
-            {operating && current!.pending && (
-              <Button
-                onClick={() => {
-                  dispatch(
-                    cancelPolicy({ id: selected, ...current!.pending! }),
-                  );
-                  setSelected(undefined);
-                }}
-              >
-                Cancel scheduled change
-              </Button>
-            )}
             <Button
               onClick={() => {
                 onClose();
@@ -721,47 +730,63 @@ function Decision({
           {selected ? "Back" : "Close"}
         </Button>
         {selected && !complete && (
-          <Button
-            variant="contained"
-            disabled={
-              // Undoing a scheduled change needs no estimate.
-              (!cancelling && (unchanged || !result)) ||
-              effective >= end ||
-              !!game.replayPlayback
-            }
-            onClick={() => {
-              if (cancelling)
-                dispatch(cancelPolicy({ id: selected, ...current!.pending! }));
-              else
-                dispatch(
-                  schedulePolicy({
-                    id: selected,
-                    tier,
-                    month: effective,
-                    ...(operating ? { startHour } : {}),
-                  }),
-                );
-              setSelected(undefined);
-            }}
-          >
-            {operating
-              ? tier === "Off"
-                ? "Turn off next month"
-                : planned !== "Off"
-                  ? "Update next month"
-                  : "Turn on next month"
-              : current!.pending
-                ? current!.pending.tier === "Off"
-                  ? "Cancel scheduled pause"
-                  : current!.adoption > 0
-                    ? "Cancel scheduled resume"
-                    : "Cancel scheduled start"
-                : tier === "Off"
-                  ? "Pause new installations next month"
-                  : current!.adoption > 0
-                    ? "Resume build-out next month"
-                    : "Start build-out next month"}
-          </Button>
+          <>
+            {operating && current!.pending && (
+              <Button
+                onClick={() => {
+                  dispatch(
+                    cancelPolicy({ id: selected, ...current!.pending! }),
+                  );
+                  setSelected(undefined);
+                }}
+              >
+                Cancel scheduled change
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              disabled={
+                // Undoing a scheduled change needs no estimate.
+                (!cancelling && (unchanged || !result)) ||
+                effective >= end ||
+                !!game.replayPlayback
+              }
+              onClick={() => {
+                if (cancelling)
+                  dispatch(
+                    cancelPolicy({ id: selected, ...current!.pending! }),
+                  );
+                else
+                  dispatch(
+                    schedulePolicy({
+                      id: selected,
+                      tier,
+                      month: effective,
+                      ...(operating ? { startHour } : {}),
+                    }),
+                  );
+                setSelected(undefined);
+              }}
+            >
+              {operating
+                ? tier === "Off"
+                  ? "Turn off next month"
+                  : planned !== "Off"
+                    ? "Update next month"
+                    : "Turn on next month"
+                : current!.pending
+                  ? current!.pending.tier === "Off"
+                    ? "Cancel scheduled pause"
+                    : current!.adoption > 0
+                      ? "Cancel scheduled resume"
+                      : "Cancel scheduled start"
+                  : tier === "Off"
+                    ? "Pause new installations next month"
+                    : current!.adoption > 0
+                      ? "Resume build-out next month"
+                      : "Start build-out next month"}
+            </Button>
+          </>
         )}
       </DialogActions>
     </Dialog>
