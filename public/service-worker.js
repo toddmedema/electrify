@@ -7,6 +7,7 @@ const APP_SHELL = [
   "/",
   "/manifest.json",
   "/images/logo.svg",
+  "/images/logo-dark.svg",
   "/images/icon/192x192.png",
   "/images/icon/512x512.png",
   WEATHER_INDEX,
