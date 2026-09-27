@@ -181,7 +181,6 @@ test("scheduled preview uses real demand/billing; even partial and zero supply b
   expect(forecast.slice(TICKS_PER_MONTH).map((t) => t.demandW)).toEqual(
     preview.changed,
   );
-  expect(preview.spending).toBe(0);
   expect(preview.current).not.toEqual(preview.changed);
   game = cloneDeep(
     gameReducer(

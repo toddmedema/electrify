@@ -16,8 +16,6 @@ import {
   Skeleton,
   TextField,
   Toolbar,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -568,7 +566,6 @@ function ProgramsScreen({
   const [selected, setSelected] = React.useState<Selection>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
   const [startHour, setStartHour] = React.useState(17);
-  const [later, setLater] = React.useState(false);
   React.useEffect(() => {
     dispatch(openPolicyDecision(token));
     return () => {
@@ -589,13 +586,15 @@ function ProgramsScreen({
     policy && !isOperatingPolicy(policy)
       ? (policy as BuildoutPolicyId)
       : undefined;
-  // The comparison month is the unpaused completion from next month: when a start or resume
-  // would finish, or when a pause cuts off what would otherwise have finished then.
+  // The estimate always shows the end of the program rather than its first month. For a
+  // build-out that is its unpaused completion from next month (when a start or resume would
+  // finish, or when a pause cuts off what would otherwise have finished then); an operating
+  // offer has no end, so its first effective month. Either way it is capped at the run's last
+  // month.
   const completion = buildout
     ? buildoutCompletionMonth(buildout, current!.adoption, effective)
     : effective;
-  const laterMonth = Math.max(effective, Math.min(completion, end - 1));
-  const month = later ? laterMonth : effective;
+  const month = Math.max(effective, Math.min(completion, end - 1));
   const policyEstimate = useEstimate<PolicyPreviewResult>(
     policy &&
       effective < end &&
@@ -659,7 +658,6 @@ function ProgramsScreen({
         program.startHour ??
         (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
     );
-    setLater(false);
   };
   // Rows share the scenario pick list's card, so both catalogs scan the same way.
   const row = ({
@@ -942,40 +940,9 @@ function ProgramsScreen({
                   </Alert>
                 ) : (
                   <>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <Typography component="h3" variant="subtitle1">
-                        Estimated utility demand · {labelMonth(game, month)}
-                      </Typography>
-                      {buildout && laterMonth > effective && (
-                        <ToggleButtonGroup
-                          exclusive
-                          size="small"
-                          color="primary"
-                          aria-label="Estimate month"
-                          value={later ? "completion" : "next"}
-                          onChange={(_event, value) => {
-                            if (value) setLater(value === "completion");
-                          }}
-                          sx={{ ml: "auto" }}
-                        >
-                          <ToggleButton value="next">Next month</ToggleButton>
-                          <ToggleButton value="completion">
-                            {completion >= end
-                              ? "End of run"
-                              : tier === "Off"
-                                ? "Planned completion"
-                                : "At completion"}
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-                      )}
-                    </Box>
+                    <Typography component="h3" variant="subtitle1">
+                      Estimated utility demand · {labelMonth(game, month)}
+                    </Typography>
                     {error ? (
                       <Alert severity="error">{error}</Alert>
                     ) : !result ? (
@@ -987,7 +954,7 @@ function ProgramsScreen({
                         </Typography>
                         <PolicyDemandChartPlaceholder />
                         <Box aria-hidden>
-                          {Array.from({ length: operating ? 2 : 3 }, (_, i) => (
+                          {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
                             <Typography key={i}>
                               <Skeleton width={i % 2 ? "60%" : "80%"} />
                             </Typography>
@@ -1018,10 +985,6 @@ function ProgramsScreen({
                               {formatWattHours(result.after.supplyWh)}
                             </Typography>
                           )}
-                          <Typography>
-                            Cash change through {labelMonth(game, month)}:{" "}
-                            {formatMoneyConcise(result.cashChange)}
-                          </Typography>
 
                           {formatWatts(peakBefore) === formatWatts(peakAfter) ||
                           Math.abs(peakAfter - peakBefore) <
@@ -1032,7 +995,7 @@ function ProgramsScreen({
                                 ? "Only eligible loads respond. Try a different daily window to target your peak."
                                 : selected === "solar"
                                   ? "Daylight savings may leave the evening peak unchanged."
-                                  : "Efficiency savings build gradually as upgrades are installed."}
+                                  : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
                             </Typography>
                           ) : (
                             <Typography

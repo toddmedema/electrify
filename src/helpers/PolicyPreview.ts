@@ -6,7 +6,7 @@ import {
   MINUTES_PER_MONTH,
   summarizeTimeline,
 } from "./DateTime";
-import { advancePolicies, emptyPolicies, samePolicyChoice } from "./Policies";
+import { emptyPolicies, samePolicyChoice } from "./Policies";
 import { TICK_MINUTES } from "../Constants";
 
 export function previewPolicy(
@@ -33,16 +33,11 @@ export function previewPolicy(
     timeline.filter((t) => Math.floor(t.minute / MINUTES_PER_MONTH) === month);
   const current = selected(before);
   const changed = selected(after);
-  advancePolicies(draft, month);
   return {
-    spending: draft.policies!.programs[change.id].spending,
     current: current.map((t) => t.demandW),
     changed: changed.map((t) => t.demandW),
     before: summarizeTimeline(current, game.startingYear),
     after: summarizeTimeline(changed, game.startingYear),
-    // The balance difference spans the same period as the projection, including every
-    // intervening month's program spending, reduced sales, dispatch, and debt payments.
-    cashChange: after[after.length - 1].cash - before[before.length - 1].cash,
   };
 }
 export type PolicyPreviewResult = ReturnType<typeof previewPolicy>;
