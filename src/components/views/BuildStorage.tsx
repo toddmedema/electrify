@@ -73,13 +73,12 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
-  const { buildable, secondaryText } = getBuildAvailability({
+  const { buildable, secondaryText, offerMaxSize } = getBuildAvailability({
     name: storage.name,
     description: storage.description,
     available: storage.available,
     sizeBuildable,
     maxSizeLabel: formatWattHours(maxSizeWh),
-    onUseMaxSize: () => props.onUseMaxSize(maxSizeWh),
     location: props.location,
     viableLocationsRemaining: storage.viableLocationsRemaining,
   });
@@ -121,6 +120,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   return (
     <Card className="build-list-item buildOption">
       <CardHeader
+        className={offerMaxSize ? "stackedActionsHeader" : undefined}
         avatar={
           <Avatar
             alt={storage.name}
@@ -128,7 +128,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           />
         }
         action={
-          <span>
+          <Box className="buildPurchaseActions">
             <Button
               aria-label={`Review purchase of ${storage.name}`}
               size="small"
@@ -140,7 +140,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             >
               Review
             </Button>
-          </span>
+            {offerMaxSize && (
+              <Button
+                size="small"
+                onClick={() => props.onUseMaxSize(maxSizeWh)}
+              >
+                Use max size
+              </Button>
+            )}
+          </Box>
         }
         title={storage.name}
       />

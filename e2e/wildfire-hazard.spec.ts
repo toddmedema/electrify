@@ -121,7 +121,7 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("heading", { name: "Elevated wildfire risk" }),
     ).toBeVisible();
     await expect(notice).toContainText(
-      "raise the chance of a wildfire emergency this season",
+      "raise the chance of a wildfire emergency",
     );
 
     // August 2020: the season's preparedness choice pauses the game and blocks speed changes.

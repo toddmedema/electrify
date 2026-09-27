@@ -508,7 +508,7 @@ export function wildfireRiskNotice(
   }
   return {
     title: "Elevated wildfire risk",
-    message: `${weatherReason} in ${game.location.name} raise the chance of a wildfire emergency this season, which could disconnect customers and constrain generation.`,
+    message: `${weatherReason} raise the chance of a wildfire emergency, which disconnects customers and constrains generation.`,
   };
 }
 
