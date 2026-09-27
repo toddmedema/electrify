@@ -33,7 +33,7 @@ import {
 // Where color still can't carry it alone, the charts add a second channel: stacked bands with
 // direct labels in Supply by Fuel, dash patterns and end-of-line labels in Fuel Prices.
 // Uranium is teal rather than green so that no series pairs red with green.
-const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
+const FUEL_COLORS: Record<ThemeModeType, Record<FuelNameType, string>> = {
   light: {
     Coal: "#1a1a1a", // 17.4:1 on white
     Biomass: "#356b20",
@@ -63,7 +63,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
 };
 
 /** The fuel colours for the palette in use. */
-export function fuelColors(): { [fuel: string]: string } {
+export function fuelColors(): Record<FuelNameType, string> {
   return FUEL_COLORS[currentMode];
 }
 

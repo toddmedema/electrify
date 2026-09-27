@@ -35,8 +35,8 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
   FacilityOperatingType,
+  isStorage,
   GameType,
-  GeneratorOperatingType,
   RetrofitFacilityAction,
   WorldEventEffectsType,
   EvidenceRequestType,
@@ -153,7 +153,7 @@ function storyOutputMultiplierForFacility(
   facility: FacilityOperatingType,
   effects: WorldEventEffectsType,
 ): number {
-  const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  const fuel = facility.fuel;
   return (
     (effects.facilityOutputMultipliersById?.[String(facility.id)] || 1) *
     (fuel ? effects.facilityOutputMultipliersByFuel?.[fuel] || 1 : 1)
@@ -376,7 +376,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const upgrading = !!installing && isUpgradingAt(facility, game.date.minute);
   // Building and upgrading both hold the plant out of service behind a progress bar
   const offlineForWork = underConstruction || upgrading;
-  const isStorage = facility.peakWh > 0;
+  const storage = isStorage(facility) ? facility : undefined;
   const wasBuilding = React.useRef(underConstruction);
   const [arriving, setArriving] = React.useState(arrivalRequested);
   const [ready, setReady] = React.useState(false);
@@ -411,7 +411,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     activity = "UPGRADING";
   } else if (facility.paused) {
     activity = "PAUSED";
-  } else if (isStorage) {
+  } else if (storage) {
     // Use the same dispatch reading as the flow bar. Render-to-render energy deltas
     // disappear on selection and cannot describe an already-running battery on mount.
     activity =
@@ -424,10 +424,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     activity = "IDLE";
   }
 
-  const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  const fuel = facility.fuel;
   const accentColor = facilityColor(fuel);
-  const capacityFraction = isStorage
-    ? facility.currentWh / facility.peakWh
+  const capacityFraction = storage
+    ? storage.currentWh / storage.peakWh
     : fuel === "Hydro" && facility.reservoirCapacityWh
       ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
       : null;
@@ -518,7 +518,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         >
           <div
             className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
-            data-storage={isStorage || undefined}
+            data-storage={!!storage || undefined}
             onAnimationEnd={(event) => {
               if (event.animationName === "facilityArrival") setArriving(false);
             }}
@@ -547,7 +547,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
-                (isStorage ? `, ${status}` : "")
+                (storage ? `, ${status}` : "")
               }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}

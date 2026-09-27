@@ -6,6 +6,7 @@ import {
   LocationType,
   MonthlyHistoryType,
   TransmissionLineOperatingType,
+  isStorage,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
@@ -147,7 +148,7 @@ export function LCWH(
   location?: LocationType,
   feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
 ) {
-  const fuel = FUELS[g.fuel] || {};
+  const kgCO2ePerBtu = FUELS[g.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelCostPerWh =
     ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
     1000000;
@@ -165,7 +166,7 @@ export function LCWH(
     }
     lifetimeFee = weight > 0 ? weightedFee / weight : feePerKgCO2e;
   }
-  const carbonCostPerWh = (lifetimeFee * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
+  const carbonCostPerWh = (lifetimeFee * kgCO2ePerBtu || 0) * g.btuPerWh;
   // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
   // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money
@@ -321,7 +322,7 @@ export function facilityOutputFactor(
 export function facilityEquivalentCycles(
   g: FacilityOperatingType,
 ): number | undefined {
-  return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
+  return isStorage(g) ? g.lifetimeWh / g.peakWh : undefined;
 }
 
 /** Nameplate-equivalent hours generated, using the already calendar-scaled lifetime energy. */

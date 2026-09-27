@@ -68,6 +68,10 @@ failures should be rare; agents without that hook should run `npm run format` be
   action creators there instead of importing `Game.tsx` from another slice.
 - `src/Types.tsx` is the canonical domain model and `src/Constants.tsx` holds shared simulation
   constants. Search both before introducing another local shape or magic number.
+- Facilities are exclusive generator/storage unions (`FacilityOperatingType`,
+  `FacilityShoppingType`): a field only one side declares reads as `T | undefined` on the union.
+  Narrow with `isStorage` instead of casting. Key maps by the domain union (`FuelNameType`,
+  `DifficultyType`) rather than `string`.
 - `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
   Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
   screen from the card-navigation state.
@@ -77,10 +81,12 @@ failures should be rare; agents without that hook should run `npm run format` be
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
-  `docs/facilities-economics.md` (facility cost sources), `docs/intertie-trends.md` (neighbour
-  emissions, prices and intertie opening years), `docs/run-compatibility.md`
-  (challenge compatibility), and `src/testing/SCENARIO_CHOICE_BALANCE.md` (scenario choice
-  balance).
+  `docs/facilities-economics.md` (facility cost sources), `docs/construction-emissions.md`
+  (embodied emissions sources), `docs/hydro-sites.md` (hydro site catalogue and provenance),
+  `docs/intertie-trends.md` (neighbour emissions, prices and intertie opening years),
+  `docs/intertie-balance.md` (intertie access rules and balance evidence),
+  `docs/run-compatibility.md` (challenge compatibility), and
+  `src/testing/SCENARIO_CHOICE_BALANCE.md` (scenario choice balance).
 - Several files are large: `app.scss`, `reducers/Game.tsx`, `views/Insights.tsx`,
   `data/WorldEvents.tsx`, `data/TransmissionProfiles.ts`, `data/Scenarios.tsx`, and `Types.tsx`.
   Search them for the symbol you need and read that range instead of loading the whole file.

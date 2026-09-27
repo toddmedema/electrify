@@ -161,14 +161,12 @@ function technologiesFor(
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
   return [
-    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map(
-      (g: FacilityShoppingType) => ({
-        name: g.name,
-        storage: false,
-        maxSize: g.maxPeakW,
-      }),
-    ),
-    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s: FacilityShoppingType) => ({
+    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map((g) => ({
+      name: g.name,
+      storage: false,
+      maxSize: g.maxPeakW,
+    })),
+    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s) => ({
       name: s.name,
       storage: true,
       maxSize: s.maxPeakWh,
@@ -757,20 +755,22 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         })
                       }
                     >
-                      {Object.keys(DIFFICULTIES).map((d: string) => {
-                        return (
-                          <MenuItem value={d} key={d}>
-                            <Tooltip
-                              title={DIFFICULTIES[d].description}
-                              placement="right"
-                            >
-                              <span>
-                                {DIFFICULTY_LABELS[d as DifficultyType]}
-                              </span>
-                            </Tooltip>
-                          </MenuItem>
-                        );
-                      })}
+                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
+                        (d) => {
+                          return (
+                            <MenuItem value={d} key={d}>
+                              <Tooltip
+                                title={DIFFICULTIES[d].description}
+                                placement="right"
+                              >
+                                <span>
+                                  {DIFFICULTY_LABELS[d as DifficultyType]}
+                                </span>
+                              </Tooltip>
+                            </MenuItem>
+                          );
+                        },
+                      )}
                     </Select>
                   </TableCell>
                 </TableRow>

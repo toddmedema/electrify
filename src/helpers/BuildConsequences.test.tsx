@@ -38,6 +38,7 @@ it("keeps construction event titles focused on what was started", () => {
     yearsToBuild: 1,
     roundTripEfficiency: 0.85,
     hourlyLoss: 0.001,
+    spinMinutes: 1,
   };
   expect(buildStartedMessage(storage)).toBe(
     "Started construction on 4hr 200MW Battery",

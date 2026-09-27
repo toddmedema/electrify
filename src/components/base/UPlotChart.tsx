@@ -57,7 +57,7 @@ export interface UPlotChartProps<S> {
    */
   syncKey?: string;
   /** Human names for each y-series, used by the screen-reader label. */
-  seriesLabels?: string[];
+  seriesLabels?: readonly string[];
   /** Formats label values with the same compact units the visible chart uses. */
   formatSummaryValue?: (value: number, seriesIndex: number) => string;
 }

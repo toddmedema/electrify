@@ -38,13 +38,10 @@ import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS, TICK_MINUTES } from "../../Constants";
 import {
   DerivedHistoryKeysType,
-  FacilityOperatingType,
-  FuelNameType,
   GameType,
-  GeneratorOperatingType,
   MonthlyHistoryType,
   TickPresentFutureType,
   UnitSystemType,
@@ -103,9 +100,7 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
-import ChartForecastFuelPrices, {
-  PRICED_FUELS,
-} from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
@@ -1528,8 +1523,7 @@ export default class Insights extends React.Component<Props, State> {
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
-    const lifetime =
-      selected && facilityLifetime(selected as FacilityOperatingType);
+    const lifetime = selected && facilityLifetime(selected);
     return (
       <>
         {selected && lifetime && (
@@ -1734,12 +1728,12 @@ export default class Insights extends React.Component<Props, State> {
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
-      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      getDispatchOrderedFuels(game.facilities),
       projection.sampled,
     );
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
-    ) as Partial<GeneratorOperatingType> | undefined;
+    );
     const highlightFuel =
       selected?.fuel && fuels.includes(selected.fuel)
         ? selected.fuel

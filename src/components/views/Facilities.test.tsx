@@ -139,7 +139,8 @@ describe("the fleet list", () => {
           currentW: Number(currentW),
           yearsToBuildLeft: 0,
           paused: false,
-        },
+          // Turn the scenario's generator into storage rather than build a full fixture
+        } as unknown as FacilityOperatingType,
       ];
       renderFacilities(storageGame, null);
       expect(rows()[0]).toHaveTextContent(String(label));
