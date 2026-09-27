@@ -239,7 +239,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
     expect(hint).toHaveTextContent(
       id === "solar"
         ? "Little change in peak demand. Daylight savings may leave the evening peak unchanged."
-        : "Little change in peak demand. Efficiency savings build gradually as upgrades are installed.",
+        : "Little change in peak demand. Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged.",
     );
 
     view.unmount();

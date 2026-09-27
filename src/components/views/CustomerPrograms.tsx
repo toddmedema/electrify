@@ -652,7 +652,7 @@ function Decision({
                             ? "Only eligible loads respond. Try a different daily window to target your peak."
                             : selected === "solar"
                               ? "Daylight savings may leave the evening peak unchanged."
-                              : "Efficiency savings build gradually as upgrades are installed."}
+                              : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
                         </Typography>
                       ) : (
                         <Typography variant="body2" sx={NOTE_SLOT} aria-hidden>
