@@ -19,18 +19,14 @@ import {
   TableRow,
   Toolbar,
   Typography,
-  Dialog,
-  DialogContent,
-  DialogActions,
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
-import VictoryConditions from "../base/VictoryConditions";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { getDb, login } from "../../Globals";
@@ -502,36 +498,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </div>
           </section>
 
-          <Dialog
+          <VictoryConditionsDialog
             open={victoryDialogOpen || false}
-            onClose={toggleVictoryDialog}
-          >
-            <ClosableDialogTitle onClose={toggleVictoryDialog}>
-              What counts as a win
-            </ClosableDialogTitle>
-            <DialogContent>
-              <VictoryConditions
-                ownership={scenario.ownership}
-                dollarsPerkWh={scenario.dollarsPerkWh}
-                startingCustomers={scenario.startingCustomers}
-                minimumCustomerRetention={scenario.minimumCustomerRetention}
-                reliabilityObjective={scenario.reliabilityObjective}
-                difficulty={game.difficulty}
-                meaningfulDecisions={[]}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button
-                color="primary"
-                variant="contained"
-                onClick={(e: React.MouseEvent<HTMLElement>) => {
-                  toggleVictoryDialog(e);
-                }}
-              >
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
+            onClose={() => this.setState({ victoryDialogOpen: false })}
+            title="What counts as a win"
+            scenario={scenario}
+            difficulty={game.difficulty}
+            meaningfulDecisions={[]}
+          />
 
           {!challenge && (
             <div className="leaderboard">

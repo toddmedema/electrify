@@ -3,11 +3,7 @@ import {
   Avatar,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
   DialogContentText,
-  DialogTitle,
   List,
   ListItem,
   ListItemAvatar,
@@ -16,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
+import ConfirmDialog from "../base/ConfirmDialog";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -668,56 +665,46 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             </button>
           </div>
           {open && (
-            // Inside the row, so without this every click in the confirmation dialog also
-            // lands on the row behind it and toggles the selection
-            <Dialog
+            // Inside the row, so isolateClicks keeps every click in the confirmation dialog
+            // from also landing on the row behind it and toggling the selection
+            <ConfirmDialog
               open
-              onClose={toggleDialog}
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              isolateClicks
+              title={
+                <>
+                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
+                  {facility.peakWh
+                    ? formatWattHours(facility.peakWh)
+                    : formatWatts(facility.peakW)}{" "}
+                  {facility.name.toLowerCase()} facility?
+                </>
+              }
+              cancelLabel="Nevermind"
+              confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
+              onCancel={toggleDialog}
+              onConfirm={() => {
+                props.onSell(facility.id);
+                toggleDialog();
+              }}
             >
-              <DialogTitle>
-                {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                {facility.peakWh
-                  ? formatWattHours(facility.peakWh)
-                  : formatWatts(facility.peakW)}{" "}
-                {facility.name.toLowerCase()} facility?
-              </DialogTitle>
-              <DialogContent>
-                {facility.hydroSiteId && (
-                  <DialogContentText>
-                    {underConstruction
-                      ? "Cancelling frees this site."
-                      : "Selling won't free this site."}
-                  </DialogContentText>
-                )}
+              {facility.hydroSiteId && (
                 <DialogContentText>
-                  You will receive{" "}
-                  {formatMoneyConcise(
-                    facilityCashBack(facility, game.date.minute),
-                  )}
-                  {facility.loanAmountLeft > 0
-                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                    : ""}
-                  .
+                  {underConstruction
+                    ? "Cancelling frees this site."
+                    : "Selling won't free this site."}
                 </DialogContentText>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={toggleDialog} color="primary">
-                  Nevermind
-                </Button>
-                <Button
-                  onClick={() => {
-                    props.onSell(facility.id);
-                    toggleDialog();
-                  }}
-                  color="primary"
-                  variant="contained"
-                  autoFocus
-                >
-                  {underConstruction ? "Cancel construction" : "Sell"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+              )}
+              <DialogContentText>
+                You will receive{" "}
+                {formatMoneyConcise(
+                  facilityCashBack(facility, game.date.minute),
+                )}
+                {facility.loanAmountLeft > 0
+                  ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                  : ""}
+                .
+              </DialogContentText>
+            </ConfirmDialog>
           )}
           {selected && (
             <MemoizedFacilityActions

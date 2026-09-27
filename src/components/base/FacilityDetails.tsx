@@ -1,15 +1,8 @@
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { Button, DialogContentText, Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
   facilityEquivalentCycles,
@@ -262,61 +255,47 @@ function WeatherResilienceSection(props: {
         </div>
       )}
       {canOffer && confirming && (
-        <Dialog
+        <ConfirmDialog
           open
-          onClose={() => setConfirming(false)}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          isolateClicks
+          title={`${actionLabel} to ${facility.name}?`}
+          contentClassName="facilityRetrofitDialog"
+          confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
+          confirmDisabled={shortfall > 0}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            onRetrofit?.({
+              facilityId: facility.id,
+              upgrade: summary.upgrade,
+            });
+            setConfirming(false);
+            setFocusHeading((count) => count + 1);
+          }}
         >
-          <DialogTitle>
-            {actionLabel} to {facility.name}?
-          </DialogTitle>
-          <DialogContent className="facilityRetrofitDialog">
-            <DialogContentText>
-              {hail
-                ? "Less damage from future hail."
-                : coldPackageEffect(
-                    retrofitted?.designMinTempC ?? designMinTempC,
-                    designMinTempC,
-                    units,
-                  )}
+          <DialogContentText>
+            {hail
+              ? "Less damage from future hail."
+              : coldPackageEffect(
+                  retrofitted?.designMinTempC ?? designMinTempC,
+                  designMinTempC,
+                  units,
+                )}
+          </DialogContentText>
+          <DialogContentText>
+            {facility.name} goes offline for a month while it&apos;s installed.
+            Adding it now costs{" "}
+            {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
+            building it in. Cancel before it&apos;s done for a full refund.
+          </DialogContentText>
+          {activeOutage && (
+            <DialogContentText>{activeOutage}</DialogContentText>
+          )}
+          {shortfall > 0 && (
+            <DialogContentText className="facilityRetrofitShortfall">
+              {shortfallText}.
             </DialogContentText>
-            <DialogContentText>
-              {facility.name} goes offline for a month while it&apos;s
-              installed. Adding it now costs{" "}
-              {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
-              building it in. Cancel before it&apos;s done for a full refund.
-            </DialogContentText>
-            {activeOutage && (
-              <DialogContentText>{activeOutage}</DialogContentText>
-            )}
-            {shortfall > 0 && (
-              <DialogContentText className="facilityRetrofitShortfall">
-                {shortfallText}.
-              </DialogContentText>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setConfirming(false)} color="primary">
-              Cancel
-            </Button>
-            <Button
-              color="primary"
-              variant="contained"
-              autoFocus
-              disabled={shortfall > 0}
-              onClick={() => {
-                onRetrofit?.({
-                  facilityId: facility.id,
-                  upgrade: summary.upgrade,
-                });
-                setConfirming(false);
-                setFocusHeading((count) => count + 1);
-              }}
-            >
-              Pay {formatMoneyConcise(cost)}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          )}
+        </ConfirmDialog>
       )}
     </section>
   );

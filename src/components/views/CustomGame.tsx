@@ -8,10 +8,6 @@ import {
   Button,
   Card,
   CardHeader,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   MenuItem,
   Select,
@@ -30,12 +26,12 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
-import VictoryConditions from "../base/VictoryConditions";
+import InfoDialog from "../base/InfoDialog";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
@@ -1025,53 +1021,25 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </div>
       </div>
 
-      <Dialog
+      <VictoryConditionsDialog
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
-      >
-        <ClosableDialogTitle onClose={() => setVictoryDialogOpen(false)}>
-          Victory Conditions: {scenario.ownership}-Owned
-        </ClosableDialogTitle>
-        <DialogContent>
-          <VictoryConditions
-            ownership={scenario.ownership}
-            dollarsPerkWh={scenario.dollarsPerkWh}
-            startingCustomers={scenario.startingCustomers}
-            minimumCustomerRetention={scenario.minimumCustomerRetention}
-            reliabilityObjective={scenario.reliabilityObjective}
-            difficulty={game.difficulty}
-            meaningfulDecisions={game.meaningfulDecisions}
-            meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setVictoryDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={`Victory Conditions: ${scenario.ownership}-Owned`}
+        scenario={scenario}
+        difficulty={game.difficulty}
+        meaningfulDecisions={game.meaningfulDecisions}
+        meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
+      />
 
-      <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)}>
-        <DialogTitle>Carbon fee</DialogTitle>
-        <DialogContent>
-          A carbon fee charges for greenhouse gas emissions. The game measures
-          them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
-          common unit for comparing different greenhouse gases.
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setFeeDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <InfoDialog
+        open={feeDialogOpen}
+        onClose={() => setFeeDialogOpen(false)}
+        title="Carbon fee"
+      >
+        A carbon fee charges for greenhouse gas emissions. The game measures
+        them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
+        common unit for comparing different greenhouse gases.
+      </InfoDialog>
     </div>
   );
 }

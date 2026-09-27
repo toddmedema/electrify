@@ -1,13 +1,7 @@
 import * as React from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import InstallMobileIcon from "@mui/icons-material/InstallMobile";
+import InfoDialog from "./InfoDialog";
 import {
   getPlayedScenarioIds,
   getStorageNumber,
@@ -197,38 +191,36 @@ export default function InstallAppButton(props: {
       >
         {props.label || "Install app"}
       </Button>
-      <Dialog
+      <InfoDialog
         open={instructionsOpen}
         onClose={() => setInstructionsOpen(false)}
-        aria-labelledby="install-instructions-title"
+        titleId="install-instructions-title"
+        title="Add Electrify to your Home Screen"
+        actions={
+          <>
+            <Button
+              onClick={() => {
+                install.snooze();
+                setInstructionsOpen(false);
+              }}
+            >
+              Not now
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setInstructionsOpen(false)}
+            >
+              Got it
+            </Button>
+          </>
+        }
       >
-        <DialogTitle id="install-instructions-title">
-          Add Electrify to your Home Screen
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            {install.isIosSafari
-              ? "In Safari, tap Share, choose Add to Home Screen, turn on Open as Web App, then tap Add."
-              : "Open this page in Safari, then tap Share and Add to Home Screen. iPhone and iPad browsers can only install web apps through Safari."}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              install.snooze();
-              setInstructionsOpen(false);
-            }}
-          >
-            Not now
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => setInstructionsOpen(false)}
-          >
-            Got it
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography>
+          {install.isIosSafari
+            ? "In Safari, tap Share, choose Add to Home Screen, turn on Open as Web App, then tap Add."
+            : "Open this page in Safari, then tap Share and Add to Home Screen. iPhone and iPad browsers can only install web apps through Safari."}
+        </Typography>
+      </InfoDialog>
     </>
   );
 }

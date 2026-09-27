@@ -1248,6 +1248,8 @@ export interface DialogType {
   secondaryLabel?: string;
   notCancellable?: boolean;
   closeText?: string;
+  // A milestone worth celebrating, where offering to install the app lands well
+  offerInstall?: boolean;
   open: boolean;
 }
 
