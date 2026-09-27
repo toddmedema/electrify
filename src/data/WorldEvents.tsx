@@ -121,6 +121,10 @@ function deliveredFrom(
   return fuels.reduce((total, fuel) => total + (delivered[fuel] || 0), 0);
 }
 
+// The national gas record already contains the shale price collapse (EIA MER Table 9.9: $8.87 in
+// 2008 to $3.45 in 2012), so the boom's multiplier is not a second national drop. It is the local
+// Marcellus glut: Appalachian hubs such as Dominion South traded 25-50% below Henry Hub through
+// 2013-2016 as production outran pipeline capacity out of the region.
 export interface ShaleBoomBalanceType {
   boomGasMultiplier: number;
   freezeSurcharge: number;
@@ -185,13 +189,13 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       durationMonths: 74,
       preview: ({ difficulty }) => ({
         title: "Gas prices will fall",
-        message: `Natural gas prices will drop ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% through Feb 2016.`,
+        message: `Local gas will sell ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% below the national price through Feb 2016.`,
       }),
       describe: ({ difficulty }) => {
         const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
         return {
           title: "Gas prices fall",
-          message: `Natural gas prices fall ${Math.round((1 - boomGasMultiplier) * 100)}% through Feb 2016.`,
+          message: `A regional shale glut puts local gas ${Math.round((1 - boomGasMultiplier) * 100)}% below the national price through Feb 2016.`,
           concept: "fuel",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",

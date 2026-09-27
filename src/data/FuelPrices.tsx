@@ -8,19 +8,27 @@ import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
 
-// GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
-// Sources: (all prices real / in that year's $'s, per million BTU)
+// Sources: every column is nominal (that month's own dollars) per million Btu delivered to the
+// generator, so a fuel's price times a plant's heat rate is its fuel cost per MWh.
 
-// Coal: lignite https://www.eia.gov/totalenergy/data/annual/xls/stb0709.xls
-// ^^ 1949 - 2011, whole years only
+// Coal and natural gas: EIA Monthly Energy Review Table 9.9, "Cost of Fossil-Fuel Receipts at
+// Electric Generating Plants" (series CLERDUS and NGERDUS, including taxes), monthly 1975-2019:
+// https://www.eia.gov/totalenergy/data/browser/?tbl=T09.09
+// Retrieved 2026-09. The gas column used to hold a series 2-5x below every published benchmark,
+// which flattered gas against every other technology and set neighbours' import prices adrift.
 
-// Natural gas: https://www.eia.gov/dnav/ng/hist/n3020us3M.htm
-// ^^ 1983 - 2019, whole years only
+// Oil: the facility is a distillate-burning reciprocating engine, so from 2001 the column is MER
+// Table 9.9's distillate receipts (DKERDUS). Before 2001 EIA does not publish that series; those
+// months carry the earlier imported-crude record (https://www.eia.gov/outlooks/steo/realprices/)
+// times 1.415, the geometric-mean distillate/crude ratio across the 228 months both exist.
 
-// Uranium: https://www.eia.gov/uranium/marketing/html/summarytable1b.php
-// 35Bbtu / lb - https://smartenergy.illinois.edu/energy-efficiency-basics/energy-concepts-and-terms
-
-// Oil: imported crude oil prices https://www.eia.gov/outlooks/steo/realprices/
+// Uranium: reactor fuel rather than ore. The earlier column divided the U3O8 contract price
+// (https://www.eia.gov/uranium/marketing/html/summarytable1b.php) by 35,000 MMBtu/lb, the fission
+// energy of pure U-235, which priced nuclear fuel ~600x too cheap. A light-water reactor gets
+// about 177 MMBtu of heat per lb of U3O8 after enrichment tails and burnup, so the ore term was
+// multiplied by 35e9 / 177e6 (~198) and $0.40/MMBtu of conversion, enrichment and fabrication
+// added. 2019 lands at $0.62/MMBtu, ~$6.6/MWh at the game's heat rate, against EIA Electric Power
+// Annual Table 8.4's ~5-7 mills/kWh nuclear fuel expense.
 
 // The first year in FuelPricesRaw.csv. Asking for a year before this means the CSV was never
 // loaded, rather than that the game is being played in the 1970s.
