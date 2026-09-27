@@ -841,17 +841,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <table className="points">
           <tbody>
             <tr>
-              <td>+80</td>
+              <td>±80</td>
               <td>
-                per $0.01/kWh that your lifetime average rate is below the
-                scenario's target rate, which rises with inflation
-              </td>
-            </tr>
-            <tr>
-              <td>-80</td>
-              <td>
-                per $0.01/kWh that your lifetime average rate is above the
-                scenario's target rate, which rises with inflation
+                per $0.01/kWh your rate is below/above the target rate (adjusted
+                for inflation)
               </td>
             </tr>
             <tr>
