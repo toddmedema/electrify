@@ -8,6 +8,7 @@ function finite(value: unknown): value is number {
 
 const NON_NEGATIVE_ATTRIBUTES: readonly string[] = [
   "cost",
+  "annualCost",
   "oneTimeCost",
   "repairCost",
   "upfrontGrant",
@@ -44,6 +45,21 @@ export function validWorldEvent(value: unknown): boolean {
   // Money amounts the tick books directly. The reducer only ever records them as non-negative,
   // so a negative one in a save could only come from an edit that turns a charge into income.
   const attributes = value.attributes;
+  if (
+    value.key.includes(":preparedness:") &&
+    value.key.startsWith("wildfire:")
+  ) {
+    if (
+      !/^wildfire:[^:]+:preparedness:\d+$/.test(value.key) ||
+      !["prepare", "stop"].includes(String(attributes.choice)) ||
+      !finite(attributes.annualCost) ||
+      attributes.annualCost < 0 ||
+      !finite(attributes.startEffectiveness) ||
+      attributes.startEffectiveness < 0 ||
+      attributes.startEffectiveness > 1
+    )
+      return false;
+  }
   if (
     NON_NEGATIVE_ATTRIBUTES.some((key) => {
       const amount = attributes[key];

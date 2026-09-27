@@ -16,7 +16,8 @@ import {
   wildfireInCooldown,
   wildfireMonthlyProbability,
   wildfireOccurrenceKey,
-  wildfirePreparednessChoice,
+  wildfirePreparedness,
+  wildfireSeasonAt,
   wildfireSeasonOdds,
   weatherFireRiskModifier,
 } from "./Wildfire";
@@ -84,16 +85,16 @@ function incidentOccurrence(
 
 function preparednessOccurrence(
   locationId: string,
-  year: number,
+  change: number,
   monthsElapsed: number,
 ): ActiveWorldEventType {
-  const key = `wildfire:${locationId}:${year}:preparedness`;
+  const key = `wildfire:${locationId}:preparedness:${change}`;
   return {
     key,
     definitionId: key,
     startsMinute: monthsElapsed * MINUTES_PER_MONTH,
     endsMinute: monthsElapsed * MINUTES_PER_MONTH,
-    attributes: { choice: "prepare" },
+    attributes: { choice: "prepare", annualCost: 600000 },
     effects: {},
   };
 }
@@ -296,7 +297,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot: forward,
-      prepared: false,
+      effectiveness: 0,
     });
     const second = sampleWildfireIncident({
       profile: LA,
@@ -304,7 +305,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot: reversed,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(first.selectedFacilityIds).toEqual(second.selectedFacilityIds);
     expect(first.selectedFacilityNames).toEqual(second.selectedFacilityNames);
@@ -321,7 +322,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     };
     expect(sampleWildfireIncident(args)).toEqual(sampleWildfireIncident(args));
   });
@@ -338,7 +339,7 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     const b = sampleWildfireIncident({
       profile: LA,
@@ -346,30 +347,49 @@ describe("deterministic, order-independent draws", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(a).not.toEqual(b);
   });
 });
 
 describe("preparedness", () => {
-  it("is active within its window and expires after", () => {
-    const answered = preparednessOccurrence("LA", 2024, 8); // September
-    expect(activePreparedness([answered], "LA", 8)).toBe(true);
-    expect(
-      activePreparedness(
-        [answered],
-        "LA",
-        8 + LA.preparednessDurationMonths - 1,
-      ),
-    ).toBe(true);
-    expect(
-      activePreparedness([answered], "LA", 8 + LA.preparednessDurationMonths),
-    ).toBe(false);
-    // A different region's preparedness does not apply.
-    expect(
-      activePreparedness([preparednessOccurrence("SF", 2024, 8)], "LA", 8),
-    ).toBe(false);
+  it("stays active across years and outside fire season until stopped", () => {
+    const funded = preparednessOccurrence("LA", 0, 2);
+    expect(activePreparedness([funded], "LA", 1)).toBe(false);
+    for (const month of [2, 7, 14, 19, 36])
+      expect(activePreparedness([funded], "LA", month)).toBe(true);
+    const stopped = {
+      ...preparednessOccurrence("LA", 1, 20),
+      attributes: { choice: "stop", annualCost: 0 },
+    };
+    expect(activePreparedness([funded, stopped], "LA", 19)).toBe(true);
+    expect(activePreparedness([funded, stopped], "LA", 20)).toBe(false);
+    expect(activePreparedness([funded], "SF", 8)).toBe(false);
+  });
+
+  it("picks the season underway, or else the next one", () => {
+    const start = LA.preparednessMonth;
+    const end = start + LA.preparednessDurationMonths;
+    // A run that starts in January opens inside the previous August's season.
+    expect(wildfireSeasonAt(LA, 2024, 0)).toEqual({
+      year: 2023,
+      startMonth: start - 12,
+      endMonth: end - 12,
+    });
+    expect(wildfireSeasonAt(LA, 2024, 3)).toEqual({
+      year: 2024,
+      startMonth: start,
+      endMonth: end,
+    });
+    expect(wildfireSeasonAt(LA, 2024, start + 1).year).toBe(2024);
+    // The August-to-February season is still underway in the following January.
+    expect(wildfireSeasonAt(LA, 2024, 12).year).toBe(2024);
+    expect(wildfireSeasonAt(LA, 2024, end)).toEqual({
+      year: 2025,
+      startMonth: start + 12,
+      endMonth: end + 12,
+    });
   });
 
   it("halves disconnections and output losses but not restoration cost", () => {
@@ -383,7 +403,7 @@ describe("preparedness", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     const prepared = sampleWildfireIncident({
       profile: LA,
@@ -391,7 +411,7 @@ describe("preparedness", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: true,
+      effectiveness: 1,
     });
     // Disconnections are halved.
     expect(prepared.disconnectedDemand).toBeCloseTo(
@@ -435,24 +455,27 @@ describe("restoration cost scaling", () => {
       locationId: "LA",
       monthsElapsed: 8,
       snapshot,
-      prepared: false,
+      effectiveness: 0,
     });
     expect(incident.restorationCostPerMonth).toBeGreaterThanOrEqual(0);
   });
 });
 
-describe("preparedness choice", () => {
-  it("is offered in the preparedness month for an eligible custom game", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(
-        LA.preparednessMonth * MINUTES_PER_MONTH,
-        g.startingYear,
-      );
+describe("preparedness program", () => {
+  const atMonth = (month: number) =>
+    produceGame(customGameAtLA(), (g) => {
+      g.date = getDateFromMinute(month * MINUTES_PER_MONTH, g.startingYear);
     });
-    const choice = wildfirePreparednessChoice(game);
-    expect(choice).toBeDefined();
-    expect(choice!.id).toBe(`wildfire:LA:${game.date.year}:preparedness`);
-    expect(choice!.options.map((o) => o.id)).toEqual(["prepare", "standard"]);
+
+  it("offers the next fire season at any time, never as a pending decision", () => {
+    const game = atMonth(3); // April, between seasons
+    const preparedness = wildfirePreparedness(game)!;
+    expect(preparedness.season.year).toBe(game.date.year);
+    expect(preparedness.season.startMonth).toBe(LA.preparednessMonth);
+    expect(preparedness.active).toBe(false);
+    expect(preparedness.annualCost).toBeGreaterThan(0);
+    expect(preparedness.choice!.id).toBe("wildfire:LA:preparedness:0");
+    expect(preparedness.choice!.options.map((o) => o.id)).toEqual(["prepare"]);
   });
 
   it("states the season's odds instead of repeating the options", () => {
@@ -464,24 +487,30 @@ describe("preparedness choice", () => {
     );
   });
 
-  it("is not offered outside the preparedness month", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(0 * MINUTES_PER_MONTH, g.startingYear); // January
-    });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+  it("previews the next season even while the current one is underway", () => {
+    const midSeason = wildfirePreparedness(atMonth(LA.preparednessMonth + 2))!;
+    expect(midSeason.season.startMonth).toBe(LA.preparednessMonth + 12);
+    // The preview always looks ahead to the next season.
+    const lastMonth = LA.preparednessMonth + LA.preparednessDurationMonths - 1;
+    const game = atMonth(lastMonth);
+    expect(wildfirePreparedness(game)!.season.year).toBe(game.date.year);
+    expect(wildfirePreparedness(game)!.season.startMonth).toBe(
+      LA.preparednessMonth + 12,
+    );
   });
 
-  it("is not re-offered once answered this season", () => {
-    const game = produceGame(customGameAtLA(), (g) => {
-      g.date = getDateFromMinute(
-        LA.preparednessMonth * MINUTES_PER_MONTH,
-        g.startingYear,
-      );
+  it("offers stopping instead of another purchase while active", () => {
+    const game = produceGame(atMonth(LA.preparednessMonth), (g) => {
       g.worldEvents.occurrences.push(
-        preparednessOccurrence("LA", g.date.year, LA.preparednessMonth),
+        preparednessOccurrence("LA", 0, LA.preparednessMonth),
       );
     });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+    const preparedness = wildfirePreparedness(game)!;
+    expect(preparedness.active).toBe(true);
+    expect(preparedness.choice.options.map((option) => option.id)).toEqual([
+      "stop",
+    ]);
+    expect(preparedness.annualCost).toBe(600000);
   });
 
   it("is not offered for the authored scenario 111", () => {
@@ -491,6 +520,34 @@ describe("preparedness choice", () => {
         g.startingYear,
       );
     });
-    expect(wildfirePreparednessChoice(game)).toBeUndefined();
+    expect(wildfirePreparedness(game)).toBeUndefined();
   });
+});
+
+test("partial preparedness scales both losses without changing the incident draw", () => {
+  const snapshot = makeSnapshot([
+    { id: 1, name: "Gas", fuel: "Natural Gas", peakW: 30e6 },
+  ]);
+  const args = {
+    profile: LA,
+    seed: 99,
+    locationId: "LA",
+    monthsElapsed: 8,
+    snapshot,
+  };
+  const standard = sampleWildfireIncident({ ...args, effectiveness: 0 });
+  for (const effectiveness of [0.125, 0.5, 0.75, 1]) {
+    const incident = sampleWildfireIncident({ ...args, effectiveness });
+    expect(incident.disconnectedDemand).toBeCloseTo(
+      standard.disconnectedDemand * (1 - effectiveness / 2),
+    );
+    expect(1 - incident.outputMultiplier).toBeCloseTo(
+      (1 - standard.outputMultiplier) * (1 - effectiveness / 2),
+    );
+    expect(incident.selectedFacilityIds).toEqual(standard.selectedFacilityIds);
+    expect(incident.restorationCostPerMonth).toBe(
+      standard.restorationCostPerMonth,
+    );
+    expect(incident.durationMonths).toBe(standard.durationMonths);
+  }
 });

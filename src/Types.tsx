@@ -972,9 +972,9 @@ export interface WildfireProfileType {
   restorationCostPerMWh: number;
   /** Months after an incident before the next one may start. */
   cooldownMonths: number;
-  /** Month (0-based) the season's preparedness choice is offered. */
+  /** Month (0-based) each fire season starts, used for the preparedness preview. */
   preparednessMonth: number;
-  /** How many months a funded preparedness remains in force. */
+  /** How many months the fire season lasts; ongoing preparedness also covers off-season fires. */
   preparednessDurationMonths: number;
 }
 

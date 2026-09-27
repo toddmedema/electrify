@@ -34,8 +34,8 @@ const LOS_ANGELES: WildfireProfileType = {
   targetCapacityShare: { min: 0.3, max: 0.7 },
   restorationCostPerMWh: 5,
   cooldownMonths: 6,
-  // Offered in August, ahead of the peak season, so a funded response is in place before any
-  // September-onward ignition -- including the winter wind events -- rather than racing a fire.
+  // The season starts in August, ahead of the peak, so funded crews meet any September-onward
+  // ignition -- including the winter wind events -- rather than racing a fire.
   preparednessMonth: 7,
   preparednessDurationMonths: 7, // August through February
 };

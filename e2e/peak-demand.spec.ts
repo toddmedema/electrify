@@ -66,7 +66,7 @@ for (const theme of ["light", "dark"]) {
         (await large.locator("..").locator("..").boundingBox())!.height,
       ).toBeGreaterThanOrEqual(44);
       await dialog.getByRole("heading", { level: 2 }).scrollIntoViewIfNeeded();
-      await dialog.locator(".MuiDialogContent-root").evaluate((el) => {
+      await dialog.locator(".customerProgramsBody").evaluate((el) => {
         el.scrollTop = 0;
       });
       await page.screenshot({

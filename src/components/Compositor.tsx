@@ -323,6 +323,19 @@ export function isNavCard(name: CardNameType) {
 }
 
 const SNACKBAR_SWIPE_DISTANCE = 56;
+const SNACKBAR_SWIPE_EXIT_MS = 180;
+
+/** A toast follows the dominant axis of a drag: sideways either way, or down only. */
+export function snackbarSwipeOffset(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): { axis: "x" | "y"; distance: number } {
+  const x = end.x - start.x;
+  const y = Math.max(0, end.y - start.y);
+  return Math.abs(x) > y
+    ? { axis: "x", distance: x }
+    : { axis: "y", distance: y };
+}
 
 export function shouldDismissSnackbarSwipe(
   start: { x: number; y: number },
@@ -338,6 +351,7 @@ export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
   private snackbarDrag?: { x: number; y: number; pointerId: number };
+  private snackbarDismissTimeout: ReturnType<typeof setTimeout> | undefined;
 
   // react-transition-group falls back to ReactDOM.findDOMNode when no nodeRef is given, and
   // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
@@ -366,9 +380,24 @@ export default class Compositor extends React.Component<Props, {}> {
     window.addEventListener("resize", this.handleResize);
   }
 
+  public componentDidUpdate(prevProps: Props) {
+    // A new toast replaces one that is still flying out: keep it on screen and open
+    const { snackbar } = this.props.ui;
+    if (
+      snackbar.open &&
+      (!prevProps.ui.snackbar.open ||
+        snackbar.message !== prevProps.ui.snackbar.message)
+    ) {
+      clearTimeout(this.snackbarDismissTimeout);
+      this.snackbarDismissTimeout = undefined;
+      this.resetSnackbarDrag();
+    }
+  }
+
   public componentWillUnmount() {
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
+    clearTimeout(this.snackbarDismissTimeout);
   }
 
   public moveTutorial = (toStep: number) => {
@@ -389,8 +418,11 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private resetSnackbarDrag = () => {
     this.snackbarDrag = undefined;
-    if (this.snackbarContentRef.current) {
-      this.snackbarContentRef.current.style.transform = "";
+    const content = this.snackbarContentRef.current;
+    if (content) {
+      content.style.transition = "";
+      content.style.transform = "";
+      content.style.opacity = "";
     }
   };
 
@@ -398,7 +430,11 @@ export default class Compositor extends React.Component<Props, {}> {
     // A press on Missions or the close button has to stay a click. Capturing the pointer
     // retargets its pointerup to the snackbar itself, so the browser fires the click there
     // instead of on the button and neither one ever did anything
-    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) {
+    if (
+      event.button !== 0 ||
+      this.snackbarDismissTimeout !== undefined ||
+      (event.target as HTMLElement).closest("button")
+    ) {
       return;
     }
     this.snackbarDrag = {
@@ -414,20 +450,47 @@ export default class Compositor extends React.Component<Props, {}> {
     if (!start || start.pointerId !== event.pointerId) {
       return;
     }
-    const x = event.clientX - start.x;
-    const y = Math.max(0, event.clientY - start.y);
-    event.currentTarget.style.transform =
-      Math.abs(x) > y ? `translateX(${x}px)` : `translateY(${y}px)`;
+    const { axis, distance } = snackbarSwipeOffset(start, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+    const style = event.currentTarget.style;
+    // Follow the finger directly; the release animates the snap back or the fly-out
+    style.transition = "none";
+    style.transform =
+      axis === "x" ? `translateX(${distance}px)` : `translateY(${distance}px)`;
+    style.opacity = String(
+      1 - Math.min(0.6, Math.abs(distance) / (SNACKBAR_SWIPE_DISTANCE * 4)),
+    );
   };
 
   private snackbarPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     const start = this.snackbarDrag;
+    const content = this.snackbarContentRef.current;
+    const end = { x: event.clientX, y: event.clientY };
     if (
       start &&
+      content &&
       start.pointerId === event.pointerId &&
-      shouldDismissSnackbarSwipe(start, { x: event.clientX, y: event.clientY })
+      shouldDismissSnackbarSwipe(start, end)
     ) {
-      this.props.closeSnackbar();
+      this.snackbarDrag = undefined;
+      // Carry on in the swipe's direction and fade, then close. The toast's own exit
+      // transition (a shrink toward its anchor) only starts once it is already invisible,
+      // so the player sees one continuous slide rather than a slide that turns into a shrink
+      const { axis, distance } = snackbarSwipeOffset(start, end);
+      const exit =
+        axis === "x"
+          ? `translateX(${Math.sign(distance) * window.innerWidth}px)`
+          : `translateY(${content.offsetHeight + 96}px)`;
+      content.style.transition = `transform ${SNACKBAR_SWIPE_EXIT_MS}ms ease-out, opacity ${SNACKBAR_SWIPE_EXIT_MS}ms ease-out`;
+      content.style.transform = exit;
+      content.style.opacity = "0";
+      this.snackbarDismissTimeout = setTimeout(() => {
+        this.snackbarDismissTimeout = undefined;
+        this.props.closeSnackbar();
+      }, SNACKBAR_SWIPE_EXIT_MS);
+      return;
     }
     this.resetSnackbarDrag();
   };

@@ -178,7 +178,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment wildfire preparedness fire season",
     entry: (
       <div>
         <p>Customer programs are set in Insights. Changes start next month.</p>
@@ -213,6 +213,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           separate four-hour window, even with enough supply. That use is
           canceled, not delayed. Participants get 10% off electricity delivered
           all day.
+        </p>
+        <p>
+          <strong>Wildfire preparedness:</strong> In custom games in fire-prone
+          areas, you can keep crews, inspections and vegetation clearing funded
+          year-round. Effectiveness ramps up linearly over 12 months. Turning it
+          off stops spending immediately; remaining protection fades over 12
+          months. Restarting ramps from the remaining effectiveness over 12
+          months. The annual budget is billed monthly and stays fixed while the
+          program is on. It continues across years until you turn it off, with
+          no annual opt-in or upfront payment. At full effectiveness, safety
+          shutoffs disconnect half as much customer load and affected generators
+          lose half as much output. Partial effectiveness reduces those benefits
+          proportionally. It does not prevent fires, and restoration costs apply
+          either way. Its page simulates a typical fire in the next wildfire
+          season with the effectiveness projected for that month. An existing
+          fire keeps the response it started with.
         </p>
       </div>
     ),

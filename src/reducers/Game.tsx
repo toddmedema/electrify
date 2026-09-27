@@ -25,6 +25,7 @@ import {
   validRetrofitFacility,
 } from "../helpers/BuildValidation";
 import {
+  optionalScenarioChoice,
   pendingScenarioChoice,
   validScenarioResponse,
 } from "../helpers/ScenarioChoices";
@@ -144,7 +145,10 @@ import {
   getWeather,
 } from "../data/Weather";
 import {
-  activePreparedness,
+  wildfirePreparednessEffectiveness,
+  wildfirePreparedness,
+  wildfirePreparednessAnnualCost,
+  wildfirePreparednessChange,
   activeWildfire,
   dailyFireWeatherReading,
   isWildfireHazardEligible,
@@ -153,6 +157,7 @@ import {
   wildfireDraw,
   wildfireInCooldown,
   wildfireMonthlyProbability,
+  wildfireIncidentEffects,
   wildfireOccurrenceKey,
   weatherFireRiskModifier,
 } from "../helpers/Wildfire";
@@ -580,6 +585,23 @@ export function logFuelCrossovers(state: GameType) {
 
 const MAX_WORLD_EVENT_CHECKS = 2400;
 
+/** A standing program must outlive the bounded historical event log that records its changes. */
+function trimWorldEventOccurrences(state: GameType) {
+  const occurrences = state.worldEvents.occurrences;
+  if (occurrences.length <= MAX_WORLD_EVENT_CHECKS) return;
+  const program = wildfirePreparednessChange(
+    occurrences,
+    state.location.id,
+    state.date.minute,
+  );
+  const retained = occurrences.slice(-MAX_WORLD_EVENT_CHECKS);
+  if (program && !retained.includes(program)) {
+    retained.shift();
+    retained.unshift(program);
+  }
+  state.worldEvents.occurrences = retained;
+}
+
 /** Starts/ends authored events before this month's forecast is built. */
 function updateWorldEvents(state: GameType): Set<FuelNameType> {
   const storyPriceFuels = new Set<FuelNameType>();
@@ -645,12 +667,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
   return storyPriceFuels;
 }
 
@@ -744,33 +761,28 @@ function updateWildfireHazards(state: GameType): void {
     state.facilities,
     state.date.minute,
   );
-  const prepared = activePreparedness(
+  const effectiveness = wildfirePreparednessEffectiveness(
     state.worldEvents.occurrences,
     locationId,
-    monthsElapsed,
+    monthsElapsed * MINUTES_PER_MONTH,
   );
+  const prepared = effectiveness > 0;
   const incident = sampleWildfireIncident({
     profile,
     seed: state.seed,
     locationId,
     monthsElapsed,
     snapshot,
-    prepared,
+    effectiveness,
   });
   const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
   const endsMinute =
     (monthsElapsed + incident.durationMonths) * MINUTES_PER_MONTH;
-  const outputMultipliers = Object.fromEntries(
-    incident.selectedFacilityIds.map((id) => [
-      String(id),
-      incident.outputMultiplier,
-    ]),
-  );
   const affected = incident.selectedFacilityNames.length
     ? incident.selectedFacilityNames.join(", ")
     : "no operating generators";
   const endLabel = getDateFromMinute(endsMinute - 1, state.startingYear);
-  const message = `${prepared ? "Prepared crews are in place. " : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
+  const message = `${prepared ? `Prepared crews are in place. Preparedness is ${Math.round(effectiveness * 100)}% effective. ` : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
   const occurrence: ActiveWorldEventType = {
     key: occurrenceKey,
     definitionId: WILDFIRE_DEFINITION_ID,
@@ -787,6 +799,7 @@ function updateWildfireHazards(state: GameType): void {
       locationId,
       monthsElapsed,
       prepared,
+      preparednessEffectiveness: effectiveness,
       severity: incident.severity,
       disconnectedDemand: incident.disconnectedDemand,
       outputMultiplier: incident.outputMultiplier,
@@ -796,11 +809,7 @@ function updateWildfireHazards(state: GameType): void {
       selectedFacilityNames: incident.selectedFacilityNames,
       restorationCostPerMonth: incident.restorationCostPerMonth,
     },
-    effects: {
-      demandMultiplier: 1 - incident.disconnectedDemand,
-      facilityOutputMultipliersById: outputMultipliers,
-      operatingExpensePerMonth: incident.restorationCostPerMonth,
-    },
+    effects: wildfireIncidentEffects(incident),
   };
   state.worldEvents.checkedKeys.push(occurrenceKey);
   state.worldEvents.active.push(occurrence);
@@ -811,12 +820,7 @@ function updateWildfireHazards(state: GameType): void {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
   logGameEvent(state, "WORLD_EVENT", message, {
     importance: "CRITICAL",
     actionTarget: occurrence.actionTarget,
@@ -837,12 +841,7 @@ function trimWorldEventRecords(state: GameType) {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
 }
 
 // Below this share of the solar fleet, hail on hail-resistant panels is logged without pausing.
@@ -2480,12 +2479,7 @@ function recordRetrofitTransaction(
     },
     effects: {},
   });
-  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.occurrences.splice(
-      0,
-      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
+  trimWorldEventOccurrences(state);
 }
 
 /**
@@ -2581,8 +2575,12 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
-  const decision = pendingScenarioChoice(state);
-  if (!decision || decision.id !== payload.decisionId) return false;
+  // A pending story choice the clock waits on, or an optional one the player chose to take up
+  const optional = optionalScenarioChoice(state);
+  const decision = [pendingScenarioChoice(state), optional].find(
+    (choice) => choice?.id === payload.decisionId,
+  );
+  if (!decision) return false;
   const option = decision.options.find(
     (option) => option.id === payload.optionId,
   );
@@ -2604,7 +2602,25 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     definitionId: decision.id,
     startsMinute: state.date.minute,
     endsMinute: state.date.minute,
-    attributes: { choice: option.id, cost, upfrontGrant, scenarioChoice: true },
+    attributes: {
+      choice: option.id,
+      cost,
+      upfrontGrant,
+      scenarioChoice: true,
+      ...(decision.id === optional?.id
+        ? {
+            startEffectiveness: wildfirePreparednessEffectiveness(
+              state.worldEvents.occurrences,
+              state.location.id,
+              state.date.minute,
+            ),
+            annualCost:
+              option.id === "prepare"
+                ? wildfirePreparedness(state)!.annualCost
+                : 0,
+          }
+        : {}),
+    },
     effects: {},
     title: decision.title,
     message: option.message,
@@ -2617,10 +2633,18 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   });
   if (option.meaningful !== false)
     recordMeaningfulDecision(state, {
-      lever: decision.id,
+      lever:
+        decision.id === optional?.id
+          ? `wildfire:${state.location.id.toLowerCase()}:preparedness`
+          : decision.id,
       label: decision.title,
       kind: "policy",
-      before: "undecided",
+      before:
+        decision.id === optional?.id
+          ? option.id === "prepare"
+            ? "stop"
+            : "prepare"
+          : "undecided",
       after: option.id,
     });
   state.timeline = reforecastSupply(state, true);
@@ -4162,6 +4186,12 @@ function updateSupplyFacilitiesFinances(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
+  expensesOM +=
+    wildfirePreparednessAnnualCost(
+      state.worldEvents.occurrences,
+      state.location.id,
+      now.minute,
+    ) / ticksPerYear;
   if (!rebookingFrame) expensesOM += immediateCosts;
   // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.
