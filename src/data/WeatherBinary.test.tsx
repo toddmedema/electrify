@@ -232,9 +232,13 @@ describe("the shipped weather files", () => {
     "Naples",
     "Mumbai",
     "Karachi",
+    "Male",
+    "Osaka",
     "PortLouis",
     "Pune",
     "Reykjavik",
+    "Sapporo",
+    "Tokyo",
   ];
   const ids = fs
     .readdirSync(DATA_DIR)
