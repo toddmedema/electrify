@@ -186,3 +186,22 @@ it("cancels the requested projection on unmount", () => {
   });
   expect(mockSelectProjection).not.toHaveBeenCalled();
 });
+
+it("marks an upcoming event as news rather than a warning", () => {
+  const view = steadyState(event);
+  expect(
+    screen.getByRole("button", { name: /^Upcoming: Winter freeze\./ }),
+  ).toHaveClass("missionRiskEvent");
+  expect(screen.getByLabelText("Mission progress")).not.toHaveClass(
+    "statusWarning",
+  );
+  view.unmount();
+
+  steadyState(runway(4));
+  expect(screen.getByLabelText("Mission progress")).toHaveClass(
+    "statusWarning",
+  );
+  expect(screen.getByRole("button", { name: /Cash/ })).not.toHaveClass(
+    "missionRiskEvent",
+  );
+});

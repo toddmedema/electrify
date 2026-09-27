@@ -731,6 +731,11 @@ $topbar_height: 56px;
     padding-inline: 8px;
     white-space: nowrap;
   }
+  // Blue text is only 3.6:1 on the light bar, so the label stays body-coloured and the icon
+  // carries the interactive blue, as the active-events chip beside it does.
+  .missionRiskEvent .conceptIcon {
+    color: $interactive_blue;
+  }
 }
 
 .missionSummaryHeader {

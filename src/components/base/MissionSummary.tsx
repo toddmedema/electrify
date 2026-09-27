@@ -108,7 +108,8 @@ export default function MissionSummary({
   const risk = useMissionRisk(game, mission, upcoming);
   // The grid readout beside this already reports a shortage happening right now.
   const shownRisk = risk && risk.id !== "shortage" ? risk : undefined;
-  // Upcoming events are news to act on (blue); every other risk threatens the goal (amber).
+  // Upcoming events are news to act on (a blue forecast icon beside body-contrast text); every
+  // other risk threatens the goal (amber).
   const warning = shownRisk && !shownRisk.id.startsWith("event:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
   const announcement = React.useMemo(() => risk?.label || "", [risk?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -123,18 +124,19 @@ export default function MissionSummary({
               itself is always one tap away in All requirements. */}
           {shownRisk ? (
             <Button
-              className="missionRiskButton"
-              color={warning ? "inherit" : "primary"}
+              className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
+              color="inherit"
               aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
               title={shownRisk.label}
               onClick={() => onEvidence?.(shownRisk.target)}
             >
               {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
-              {warning && (
-                <span className="statusIcon" aria-hidden="true">
-                  <ConceptIcon concept="danger" fontSize="small" />
-                </span>
-              )}
+              <span className="statusIcon" aria-hidden="true">
+                <ConceptIcon
+                  concept={warning ? "danger" : "forecast"}
+                  fontSize="small"
+                />
+              </span>
               <span className="missionRiskText statusLabel">
                 {shownRisk.shortLabel}
               </span>
