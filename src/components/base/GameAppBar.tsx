@@ -28,10 +28,13 @@ import { connectToStore } from "./ConnectToStore";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
+import ActiveEventsChip from "./ActiveEventsChip";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import {
+  ActiveEventGroupType,
+  selectActiveEventGroups,
   selectUpcomingStoryEvents,
   UpcomingStoryEventType,
 } from "../views/StoryEventSelectors";
@@ -47,6 +50,7 @@ import {
  */
 
 export interface StateProps {
+  activeEvents?: ActiveEventGroupType[];
   upcomingEvents?: UpcomingStoryEventType[];
   game: GameType;
   evidenceRequest?: EvidenceRequestType;
@@ -87,6 +91,7 @@ function speedMultiplier(speed: SpeedType): string {
 }
 
 const LOW_RESERVE_RATIO = 0.1;
+const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 
 type GridHealthState = "stable" | "low-reserve" | "at-limit" | "blackout";
 
@@ -193,7 +198,12 @@ export function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
-  const { evidenceRequest, facilityDragActive, onEvidenceAcknowledged } = props;
+  const {
+    evidenceRequest,
+    facilityDragActive,
+    onEvidence,
+    onEvidenceAcknowledged,
+  } = props;
   const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
     props;
   const date = game.date;
@@ -316,6 +326,11 @@ export function GameAppBar(props: Props) {
     ],
   );
 
+  const openEvents = React.useCallback(
+    () => onEvidence?.({ card: "EVENTS" }),
+    [onEvidence],
+  );
+
   if (!game.inGame || !now) {
     return <span />;
   }
@@ -324,6 +339,10 @@ export function GameAppBar(props: Props) {
   const inBlackout = gridHealth.state === "blackout";
   // Low reserve and at-limit share the mission tracker's goal-risk warning treatment.
   const inWarning = !inBlackout && gridHealth.state !== "stable";
+  // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
+  // their HUD tells the story instead.
+  const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
+  const hasActiveEvents = activeEvents.length > 0;
 
   return (
     <div id="appbar">
@@ -345,7 +364,7 @@ export function GameAppBar(props: Props) {
       </div>
       <div className="gameStatusBar">
         <div
-          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}${hasActiveEvents ? " hasActiveEvents" : ""}`}
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <div className="gridHealthSummary">
@@ -369,6 +388,7 @@ export function GameAppBar(props: Props) {
             </span>
             <strong className="gridHealthMetric">{gridHealth.metric}</strong>
           </div>
+          <ActiveEventsChip groups={activeEvents} onOpen={openEvents} />
         </div>
         {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
         {!isTutorial && (
@@ -416,6 +436,7 @@ export function GameAppBar(props: Props) {
 }
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
+  activeEvents: selectActiveEventGroups(state),
   upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,

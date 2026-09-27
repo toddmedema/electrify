@@ -1,4 +1,5 @@
 import { inEraMoney } from "../data/FuelPrices";
+import { inEraRate } from "../data/RetailRates";
 import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import { ScenarioType } from "../Types";
 import { getSimLocation, simLocationIds } from "./SimData";
@@ -28,7 +29,7 @@ export function withScenarioOverrides(
     ...(year !== undefined
       ? {
           cash: inEraMoney(scenario.cash, year, scenario.startingYear),
-          dollarsPerkWh: inEraMoney(
+          dollarsPerkWh: inEraRate(
             scenario.dollarsPerkWh,
             year,
             scenario.startingYear,

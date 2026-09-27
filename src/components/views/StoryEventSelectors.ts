@@ -167,3 +167,101 @@ export function selectWildfireRiskNotice(
   riskNoticeCache = { key, notice };
   return notice;
 }
+
+/** Occurrences of one ongoing event, e.g. hail at four plants, summarised for the status bar. */
+export interface ActiveEventGroupType {
+  key: string;
+  title: string;
+  concept?: ConceptNameType;
+  importance: GameEventImportanceType;
+  count: number;
+  throughLabel: string;
+}
+
+const IMPORTANCE_RANK: Record<GameEventImportanceType, number> = {
+  CRITICAL: 0,
+  NOTABLE: 1,
+  ROUTINE: 2,
+};
+const NO_ACTIVE_GROUPS: ActiveEventGroupType[] = [];
+let activeGroupsCache:
+  { key: string; groups: ActiveEventGroupType[] } | undefined;
+
+/**
+ * The critical and notable events in effect right now, grouped by title and most severe first.
+ * Routine ones, such as a years-long drift in gas prices, stay in the Events pane so the status
+ * bar only speaks up for something worth a glance. It reads this every tick, so it hands back
+ * the same array until an event starts or ends.
+ */
+export function selectActiveEventGroups(
+  state: AppStateType,
+): ActiveEventGroupType[] {
+  const game = state.game;
+  const now = game.date.minute;
+  const inEffect = game.worldEvents.active.filter(
+    (event) =>
+      event.startsMinute <= now &&
+      event.endsMinute > now &&
+      event.message !== undefined &&
+      (event.importance === "CRITICAL" || event.importance === "NOTABLE"),
+  );
+  if (inEffect.length === 0) {
+    return NO_ACTIVE_GROUPS;
+  }
+  const cacheKey =
+    game.startingYear + "|" + inEffect.map((event) => event.key).join("|");
+  if (activeGroupsCache?.key === cacheKey) {
+    return activeGroupsCache.groups;
+  }
+
+  const byTitle = new Map<
+    string,
+    { group: ActiveEventGroupType; startsMinute: number; endsMinute: number }
+  >();
+  for (const event of inEffect) {
+    const title = event.title ?? event.key;
+    const importance = event.importance!;
+    const existing = byTitle.get(title);
+    if (!existing) {
+      byTitle.set(title, {
+        group: {
+          key: event.key,
+          title,
+          concept: event.concept,
+          importance,
+          count: 1,
+          throughLabel: "",
+        },
+        startsMinute: event.startsMinute,
+        endsMinute: event.endsMinute,
+      });
+      continue;
+    }
+    existing.group.count += 1;
+    if (
+      IMPORTANCE_RANK[importance] < IMPORTANCE_RANK[existing.group.importance]
+    ) {
+      existing.group.importance = importance;
+    }
+    existing.startsMinute = Math.max(existing.startsMinute, event.startsMinute);
+    existing.endsMinute = Math.max(existing.endsMinute, event.endsMinute);
+  }
+
+  const groups = Array.from(byTitle.values())
+    .sort(
+      (a, b) =>
+        IMPORTANCE_RANK[a.group.importance] -
+          IMPORTANCE_RANK[b.group.importance] ||
+        b.startsMinute - a.startsMinute ||
+        a.group.key.localeCompare(b.group.key),
+    )
+    .map(({ group, endsMinute }) => {
+      const through = getDateFromMinute(endsMinute - 1, game.startingYear);
+      return {
+        ...group,
+        throughLabel: `through ${through.month} ${through.year}`,
+      };
+    });
+  activeGroupsCache = { key: cacheKey, groups };
+  return groups;
+}

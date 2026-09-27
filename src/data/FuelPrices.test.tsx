@@ -8,7 +8,7 @@ import {
   TREND_ESCALATION_YEARLY,
 } from "./FuelPrices";
 import { getDateFromMinute } from "../helpers/DateTime";
-import { FuelPricesType } from "../Types";
+import { FuelPricesType, PricedFuelNameType } from "../Types";
 
 const FIXTURE_STARTING_YEAR = 2000;
 const FIXTURE_YEARS = 20;
@@ -21,7 +21,7 @@ const SEED = 1;
 // sits within 20% of its trend while oil swings by half again.
 interface FixtureFuelType {
   column: string;
-  name: string;
+  name: PricedFuelNameType;
   base: number;
   trendYearly: number;
   swing: number;

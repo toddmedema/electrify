@@ -38,13 +38,10 @@ import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS, TICK_MINUTES } from "../../Constants";
 import {
   DerivedHistoryKeysType,
-  FacilityOperatingType,
-  FuelNameType,
   GameType,
-  GeneratorOperatingType,
   MonthlyHistoryType,
   TickPresentFutureType,
   UnitSystemType,
@@ -63,6 +60,7 @@ import {
   getMarketRate,
   projectCustomerChange,
 } from "../../helpers/Customers";
+import { getInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
@@ -102,9 +100,7 @@ import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
 } from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
-import ChartForecastFuelPrices, {
-  PRICED_FUELS,
-} from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
@@ -1237,8 +1233,14 @@ export default class Insights extends React.Component<Props, State> {
     const investor = scenario.ownership === "Investor";
     // A public utility's customers never switch and its growth is fixed, so the market rate
     // changes nothing it can act on. What the rate does move is the score, against the
-    // scenario's own target.
-    const targetRate = scenario.dollarsPerkWh;
+    // scenario's own target. That target is authored in starting-year dollars and scored against
+    // deflated revenue, so the slider shows it in today's dollars, beside the rate being set.
+    const inflationIndex = getInflationIndex(
+      game.date,
+      game.startingYear,
+      game.seed,
+    );
+    const targetRate = scenario.dollarsPerkWh * inflationIndex;
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
       : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
@@ -1255,10 +1257,11 @@ export default class Insights extends React.Component<Props, State> {
     const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
     const rateScore = (rate: number) =>
       publicRateYearContribution(
-        targetRate,
+        scenario.dollarsPerkWh,
         pastTotals,
         { supplyWh: nextSupplyWh },
         rate,
+        inflationIndex,
       );
     const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
     const marks = investor
@@ -1520,8 +1523,7 @@ export default class Insights extends React.Component<Props, State> {
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
-    const lifetime =
-      selected && facilityLifetime(selected as FacilityOperatingType);
+    const lifetime = selected && facilityLifetime(selected);
     return (
       <>
         {selected && lifetime && (
@@ -1726,12 +1728,12 @@ export default class Insights extends React.Component<Props, State> {
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
-      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      getDispatchOrderedFuels(game.facilities),
       projection.sampled,
     );
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
-    ) as Partial<GeneratorOperatingType> | undefined;
+    );
     const highlightFuel =
       selected?.fuel && fuels.includes(selected.fuel)
         ? selected.fuel
@@ -1823,9 +1825,9 @@ export default class Insights extends React.Component<Props, State> {
                 >
                   <WarningAmberIcon fontSize="small" aria-hidden="true" />
                   <span>
-                    <strong>Shortfall, {projection.shortfall.label}:</strong>
-                    <br />~{formatWattHours(projection.shortfall.wh)} unmet ·
-                    peak ~{formatWatts(projection.shortfall.peakW)}
+                    <strong>Shortfall, {projection.shortfall.label}:</strong> ~
+                    {formatWattHours(projection.shortfall.wh)} unmet · peak ~
+                    {formatWatts(projection.shortfall.peakW)}
                   </span>
                 </Typography>
               )}

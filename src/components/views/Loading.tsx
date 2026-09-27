@@ -1,5 +1,11 @@
 import * as React from "react";
-import { Button, CircularProgress, Stack, Typography } from "@mui/material";
+import {
+  Button,
+  CircularProgress,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
 import { GameType } from "../../Types";
 
 export interface StateProps {
@@ -19,6 +25,15 @@ export interface Props extends StateProps, DispatchProps {}
 interface LoadingState {
   error?: string;
   progress: string;
+}
+
+// An <img> can't read the page's custom properties, so dark mode swaps in a copy of the logo
+// painted in dark's desaturated blue rather than recolouring this one
+function LoadingLogo(): React.JSX.Element {
+  const dark = useTheme().palette.mode === "dark";
+  return (
+    <img src={dark ? "images/logo-dark.svg" : "images/logo.svg"} alt="Logo" />
+  );
 }
 
 export default class Loading extends React.PureComponent<Props, LoadingState> {
@@ -47,7 +62,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
     return (
       <div className="flex-fully-centered">
         <div id="logo" className="fadein-slow">
-          <img src="images/logo.svg" alt="Logo"></img>
+          <LoadingLogo />
         </div>
         {this.state.error ? (
           <Stack spacing={2} sx={{ px: 3, textAlign: "center", maxWidth: 420 }}>

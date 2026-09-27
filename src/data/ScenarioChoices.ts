@@ -67,14 +67,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 36,
     title: "Prepare for the deep freeze",
     message:
-      "Protect plant output during February 2021’s freeze or save cash for construction; demand and gas prices surge either way.",
+      "February demand and gas prices will spike, so every lost megawatt-hour costs more.",
     options: [
       {
         id: "winterize",
         label: "Fund winterization",
         cost: winterizationCost,
         description:
-          "Spend {cost} to halve February’s output losses at gas, coal, nuclear, and wind plants.",
+          "Halve February’s output losses at gas, coal, nuclear, and wind plants.",
         message:
           "Winterization halves February 2021 plant output losses, but demand and gas prices still surge.",
       },
@@ -96,14 +96,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Prepare for January's extreme Santa Ana winds; restoration costs apply either way.",
+      "Before Santa Ana wind events, utilities patrol lines and pre-position repair crews and equipment.",
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
         description:
-          "Spend {cost} to halve customer disconnections and generator output losses in January and February.",
+          "Halve customer disconnections and generator output losses in January and February.",
         message:
           "Preparedness halves January and February customer disconnections and generator output losses, with restoration costs unchanged.",
       },

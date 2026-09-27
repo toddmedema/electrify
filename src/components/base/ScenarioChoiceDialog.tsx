@@ -13,6 +13,7 @@ import {
 } from "../../helpers/ScenarioChoices";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { chooseScenarioResponse } from "../../reducers/GameActions";
+import { formatMoneyConcise } from "../../helpers/Format";
 import ConceptIcon from "./ConceptIcon";
 
 export default function ScenarioChoiceDialog() {
@@ -67,11 +68,8 @@ export default function ScenarioChoiceDialog() {
         </span>
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
-        <Typography id="scenarioChoiceDescription">
+        <Typography id="scenarioChoiceDescription" sx={{ mb: 2 }}>
           {decision.message}
-        </Typography>
-        <Typography sx={{ my: 2 }}>
-          Cash available: ${(cash / 1000000).toFixed(1)}M
         </Typography>
         <Box
           sx={{
@@ -101,7 +99,9 @@ export default function ScenarioChoiceDialog() {
                     )
                   }
                 >
-                  {option.label}
+                  {cost > 0
+                    ? `${option.label} (${formatMoneyConcise(cost)})`
+                    : option.label}
                 </Button>
                 <Typography
                   id={`scenarioChoiceOption-${option.id}`}

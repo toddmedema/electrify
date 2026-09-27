@@ -42,6 +42,7 @@ import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { inEraMoney } from "../../data/FuelPrices";
+import { inEraRate } from "../../data/RetailRates";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
@@ -116,6 +117,12 @@ function nearestIndex(options: number[], value: number): number {
   return best;
 }
 
+// Older eras quote rates in fractions of a cent, which two decimal places would round together.
+function formatRateOption(dollarsPerkWh: number): string {
+  const tenthsOfCents = Math.round(dollarsPerkWh * 1000);
+  return dollarsPerkWh.toFixed(tenthsOfCents % 10 === 0 ? 2 : 3);
+}
+
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
 const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
@@ -154,14 +161,12 @@ function technologiesFor(
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
   return [
-    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map(
-      (g: FacilityShoppingType) => ({
-        name: g.name,
-        storage: false,
-        maxSize: g.maxPeakW,
-      }),
-    ),
-    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s: FacilityShoppingType) => ({
+    ...GENERATORS(state, GENERATOR_SIZES_W[0], [], []).map((g) => ({
+      name: g.name,
+      storage: false,
+      maxSize: g.maxPeakW,
+    })),
+    ...STORAGE(state, STORAGE_SIZES_WH[0]).map((s) => ({
       name: s.name,
       storage: true,
       maxSize: s.maxPeakWh,
@@ -339,8 +344,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
     [scenario.startingYear],
   );
   const rateOptions = React.useMemo(
-    () =>
-      RATES_PER_KWH.map((r: number) => inEraMoney(r, scenario.startingYear)),
+    () => RATES_PER_KWH.map((r: number) => inEraRate(r, scenario.startingYear)),
     [scenario.startingYear],
   );
   const feeOptions = React.useMemo(
@@ -489,7 +493,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
     change({
       startingYear,
       cash: inEraMoney(STARTING_CASH[cash], startingYear),
-      dollarsPerkWh: inEraMoney(RATES_PER_KWH[rate], startingYear),
+      dollarsPerkWh: inEraRate(RATES_PER_KWH[rate], startingYear),
       feePerKgCO2e: inEraMoney(FEES_PER_TON[fee], startingYear) / 1000,
     });
   };
@@ -696,7 +700,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       {rateOptions.map((r: number) => {
                         return (
                           <MenuItem value={r} key={r}>
-                            ${r.toFixed(2)}/kWh
+                            ${formatRateOption(r)}/kWh
                           </MenuItem>
                         );
                       })}
@@ -751,20 +755,22 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         })
                       }
                     >
-                      {Object.keys(DIFFICULTIES).map((d: string) => {
-                        return (
-                          <MenuItem value={d} key={d}>
-                            <Tooltip
-                              title={DIFFICULTIES[d].description}
-                              placement="right"
-                            >
-                              <span>
-                                {DIFFICULTY_LABELS[d as DifficultyType]}
-                              </span>
-                            </Tooltip>
-                          </MenuItem>
-                        );
-                      })}
+                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
+                        (d) => {
+                          return (
+                            <MenuItem value={d} key={d}>
+                              <Tooltip
+                                title={DIFFICULTIES[d].description}
+                                placement="right"
+                              >
+                                <span>
+                                  {DIFFICULTY_LABELS[d as DifficultyType]}
+                                </span>
+                              </Tooltip>
+                            </MenuItem>
+                          );
+                        },
+                      )}
                     </Select>
                   </TableCell>
                 </TableRow>

@@ -398,7 +398,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       if (typeof facility !== "object" || facility === null) {
         return true;
       }
-      const current = facility as Record<string, unknown>;
+      const current = facility as unknown as Record<string, unknown>;
       const requiredNumbersInvalid = [
         current.annualOperatingCost,
         current.lifespanYears,

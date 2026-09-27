@@ -470,18 +470,9 @@ export function getWeather(
 // Rough approximation of solar output: https://www.wolframalpha.com/input?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+200%29%29%29+from+0+to+420
 // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
 /**
- * Calculates the raw solar irradiance in watts per square meter (W/m2) for a given date and location, not accounting for weather
- * It first calculates the base irradiance based on the latitude, with a reduction factor for higher latitudes.
- * It then gets the sunrise and sunset times for the given date and location.
- * If the current time is between sunrise and sunset, it calculates the minutes from darkness (either sunrise or sunset, whichever is closer).
- * It then calculates the irradiance based on a mathematical model that approximates the solar output as a bell curve.
- * This model takes into account the time of day and the length of the day to approximate the height of the sun and the season.
- * If the current time is outside of sunrise and sunset, it returns 0, indicating no solar irradiance.
- *
- * @param {DateType} date - The date and time to calculate the irradiance for.
- * @param {LocationType} location - The location to calculate the irradiance for.
- * @param {number} cloudCoverPercent - The percentage of cloud cover, from 0 to 100.
- * @returns {number} - The calculated raw solar irradiance in W/m2.
+ * Solar irradiance at a date and location, reduced for cloud cover but no other weather. A
+ * logistic curve in minutes from the nearer of sunrise or sunset stands in for the sun's height,
+ * so day length carries the season. Zero between sunset and sunrise and through polar night.
  */
 export function getRawSolarIrradianceWM2(
   date: DateType,

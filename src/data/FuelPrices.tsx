@@ -1,4 +1,9 @@
-import { DateType, FuelPricesType, LocationType } from "../Types";
+import {
+  DateType,
+  FuelPricesType,
+  LocationType,
+  PricedFuelNameType,
+} from "../Types";
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
@@ -39,7 +44,13 @@ export function getFuelPriceProvenance(
 // Fixed so that each fuel always draws from the same slot of the fuel stream, whatever order
 // the CSV's columns happen to arrive in. New fuels belong at the end so adding one cannot shift
 // the established simulations for every fuel before it.
-const FUEL_KEYS = ["Natural Gas", "Coal", "Uranium", "Oil", "Biomass"];
+const FUEL_KEYS: readonly PricedFuelNameType[] = [
+  "Natural Gas",
+  "Coal",
+  "Uranium",
+  "Oil",
+  "Biomass",
+];
 
 // Annual U.S. wood-and-waste prices for electric power, repeated across the twelve months because
 // EIA publishes this series annually. Kept beside the older four-fuel CSV until that sheet grows a
@@ -160,7 +171,7 @@ export function hasFuelPrices(): boolean {
 // One entry per fuel, rebuilt from the record on each load, and the absolute month its baseline
 // is quoted at. Empty until a CSV has been read, which is also when the projection is first asked
 // for anything.
-const fuelTrends: Record<string, FuelTrendType> = {};
+const fuelTrends: Partial<Record<PricedFuelNameType, FuelTrendType>> = {};
 let anchorMonth = 0;
 
 // A contiguous month index, so that December of one year and January of the next are one apart.
@@ -176,14 +187,14 @@ function resetFuelPrices() {
   Object.keys(fuelPrices).forEach((year: string) => {
     delete fuelPrices[+year];
   });
-  Object.keys(fuelTrends).forEach((fuel: string) => {
+  FUEL_KEYS.forEach((fuel) => {
     delete fuelTrends[fuel];
   });
   anchorMonth = 0;
 }
 
 /** Every recorded month for one fuel, oldest first. Only ever run over real rows. */
-function recordedPrices(fuel: string, years: number[]): number[] {
+function recordedPrices(fuel: PricedFuelNameType, years: number[]): number[] {
   const prices: number[] = [];
   years.forEach((year: number) => {
     for (let month = 1; month <= 12; month++) {
@@ -276,7 +287,7 @@ function buildFuelTrends() {
   const latestYear = years[years.length - 1];
   anchorMonth = absoluteMonth(latestYear, 12);
 
-  FUEL_KEYS.forEach((fuel: string) => {
+  FUEL_KEYS.forEach((fuel) => {
     const prices = recordedPrices(fuel, years);
     if (prices.length === 0) {
       return; // A fuel the CSV never carried. Nothing to escalate, nothing to project.
@@ -315,7 +326,8 @@ export const MONEY_BASE_YEAR = 2020;
 
 /**
  * Re-quote money between starting eras using the projected fuel trend. Historical years share
- * the base era: their recorded fuel prices are not a projection to inflate or undo. Authored
+ * the base era: their recorded fuel prices are not a projection to inflate or undo. Retail rates
+ * are the exception and use inEraRate, which follows the recorded retail price instead. Authored
  * scenarios supply their own starting year; custom-game options default to the base era.
  * Preserve exact amounts when the eras agree, otherwise round to two significant figures.
  */
@@ -428,7 +440,7 @@ function projectYear(
     const prices = { ...previous };
     const thisMonth = absoluteMonth(year, month);
     const draw = thisMonth * FUEL_KEYS.length;
-    FUEL_KEYS.forEach((fuel: string, fuelIndex: number) => {
+    FUEL_KEYS.forEach((fuel, fuelIndex) => {
       const trend = fuelTrends[fuel];
       if (prices[fuel] === undefined || !trend) {
         return; // A fuel the CSV never carried, or one with no measurable trend, is held flat

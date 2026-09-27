@@ -38,7 +38,7 @@ export function scoreRules(
         blackouts: "Lose 8 points per TWh of customer demand not served.",
       }
     : {
-        rate: `Earn 80 points for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose 80 points for each $0.01/kWh it is above.`,
+        rate: `Earn 80 points for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose 80 points for each $0.01/kWh it is above. The target is in the starting year's dollars and rises with inflation.`,
         supply:
           "Earn 10 points per terawatt-hour (TWh) of electricity supplied.",
         emissions: `Lose 5 points per ${perEmissions} of greenhouse gas emissions.`,

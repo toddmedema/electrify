@@ -685,7 +685,7 @@ export default class Finances extends React.Component<Props, State> {
       };
     };
 
-    const series = [] as ChartPointType[];
+    const series: ChartPointType[] = [];
     // game.monthlyHistory is newest first, so unshifting puts the chart back in time order
     for (const m of monthlyHistory) {
       series.unshift(point(m, false));

@@ -462,16 +462,18 @@ export default class NewGameDetails extends React.Component<Props, State> {
                         }
                       }}
                     >
-                      {Object.keys(DIFFICULTIES).map((d: string) => (
-                        <ToggleButton
-                          value={d}
-                          key={d}
-                          title={DIFFICULTIES[d].description}
-                          aria-label={DIFFICULTY_LABELS[d]}
-                        >
-                          {DIFFICULTY_LABELS[d]}
-                        </ToggleButton>
-                      ))}
+                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
+                        (d) => (
+                          <ToggleButton
+                            value={d}
+                            key={d}
+                            title={DIFFICULTIES[d].description}
+                            aria-label={DIFFICULTY_LABELS[d]}
+                          >
+                            {DIFFICULTY_LABELS[d]}
+                          </ToggleButton>
+                        ),
+                      )}
                     </ToggleButtonGroup>
                     <Typography
                       className="difficultyDescription"

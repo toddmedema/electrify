@@ -161,28 +161,18 @@ if (typeof window !== "undefined") {
 /**
  * Compact phone chrome belongs on every common phone width, not just devices narrower than an
  * old 375px breakpoint. Larger controls also matter most on coarse-pointer devices.
- *
- * @returns {boolean} - Returns true if the screen width is less than 375, otherwise false.
  */
 export function isSmallScreen(): boolean {
   return getViewportWidth() < 600;
 }
 
-/**
- * This function checks if the screen size is large, based on the width of the document being > 650
- * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
- *
- * @returns {boolean} - Returns true if the screen width is greater than 650, otherwise false.
- */
 export function isBigScreen(): boolean {
   return getViewportWidth() > 650;
 }
 
 /**
- * This function checks if the screen is wide enough to show Facilities and Insights side by
- * side without the bottom navigation -- keep in sync with $desktop_breakpoint in app.scss.
- *
- * @returns {boolean} - Returns true if the screen width is at least 1300, otherwise false.
+ * Wide enough to show Facilities and Insights side by side without the bottom navigation.
+ * Keep in sync with $desktop_breakpoint in app.scss.
  */
 export function isDesktopScreen(): boolean {
   return getViewportWidth() >= 1300;
@@ -198,8 +188,6 @@ export function isDesktopScreen(): boolean {
  * navigation because a facility row and its controls do not fit in the default split. Unfolded
  * foldables are the exception: at least 700x600 and near-square, each pane still gets about a
  * phone's width. Keep in sync with $pane_media in app.scss.
- *
- * @returns {boolean} - Returns true for the two-pane layout, otherwise false.
  */
 export function isPaneLayout(): boolean {
   const width = getViewportWidth();

@@ -5,7 +5,7 @@ import {
   AXIS_LABEL_SIZE,
   dashArray,
   FORECAST_AXIS_LEFT,
-  FORECAST_AXIS_RIGHT,
+  FORECAST_RIGHT_PAD,
   padRange,
   SPLINE,
   forecastMonthAxis,
@@ -13,6 +13,7 @@ import {
 } from "./UPlotHelpers";
 import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
+import { PRICED_FUELS } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
 import { fuelColors, fuelDashArrays } from "../../Theme";
 
@@ -28,16 +29,6 @@ export interface Props {
   syncKey?: string;
 }
 
-export type PricedFuelType =
-  "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
-export const PRICED_FUELS: PricedFuelType[] = [
-  "Biomass",
-  "Coal",
-  "Natural Gas",
-  "Oil",
-  "Uranium",
-];
-
 interface State {
   prices: number[][];
   minutes: number[];
@@ -50,7 +41,7 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
+    padding: [5 * scale, FORECAST_RIGHT_PAD * scale, 0, 0],
     cursor: {
       x: true,
       y: false,

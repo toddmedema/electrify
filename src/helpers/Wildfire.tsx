@@ -16,7 +16,7 @@ import {
   MonthlyClimatologyType,
 } from "../data/Weather";
 import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
-import { DIFFICULTIES } from "../Constants";
+import { DIFFICULTIES, MONTH_NAMES } from "../Constants";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { buildStorySnapshot } from "./Story";
@@ -508,8 +508,32 @@ export function wildfireRiskNotice(
   }
   return {
     title: "Elevated wildfire risk",
-    message: `${weatherReason} in ${game.location.name} raise the chance of a wildfire emergency this season, which could disconnect customers and constrain generation.`,
+    message: `${weatherReason} raise the chance of a wildfire emergency, which disconnects customers and constrains generation.`,
   };
+}
+
+/**
+ * The season's odds as a short line, e.g. "About a 1-in-4 chance of a wildfire here before March;
+ * risk peaks in September." Uses the profile at normal weather, so it never hints at a seeded
+ * ignition; it ignores the cooldown, which only lowers the odds slightly.
+ */
+export function wildfireSeasonOdds(profile: WildfireProfileType): string {
+  const months = Array.from(
+    { length: profile.preparednessDurationMonths },
+    (_, offset) => (profile.preparednessMonth + offset) % 12,
+  );
+  const lambda =
+    profile.annualHazard *
+    months.reduce((sum, month) => sum + profile.monthlyWeights[month], 0);
+  const peak = months.reduce((best, month) =>
+    profile.monthlyWeights[month] > profile.monthlyWeights[best] ? month : best,
+  );
+  const odds = Math.max(2, Math.round(1 / (1 - Math.exp(-lambda))));
+  const end =
+    MONTH_NAMES[
+      (profile.preparednessMonth + profile.preparednessDurationMonths) % 12
+    ];
+  return `About a 1-in-${odds} chance of a wildfire here before ${end}; risk peaks in ${MONTH_NAMES[peak]}.`;
 }
 
 /**
@@ -553,13 +577,13 @@ export function wildfirePreparednessChoice(
     scenarioId: game.scenarioId,
     atMonth: game.date.monthsElapsed,
     title: "Wildfire season preparedness",
-    message: `Prepare for elevated fire risk in ${game.location.name} or save cash; restoration costs apply either way.`,
+    message: wildfireSeasonOdds(profile),
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost,
-        description: `Spend {cost} to halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
+        description: `Halve customer disconnections and generator output losses if a wildfire starts within ${profile.preparednessDurationMonths} months.`,
         message: "Preparedness funded for the season.",
       },
       {

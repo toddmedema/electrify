@@ -1,6 +1,26 @@
 # Intertie balance experiment
 
-The change separates a utility's fixed transmission access from the regional corridor and separates neighboring spare generation from the wire rating. The authored allocations and implementation requirements are in [the implementation plan](intertie-implementation-plan.md). They are calibrated game assumptions, not estimates of actual utility transmission rights.
+The change separates a utility's fixed transmission access from the regional corridor and separates neighboring spare generation from the wire rating. The per-scenario allocations live only in `src/data/IntertieAccess.ts`. They are calibrated game assumptions, not estimates of actual utility transmission rights.
+
+## Design rules
+
+- Access is authored per scenario and corridor, fixed at initialization, and never scales with live customers or demand. Custom games, including year or location overrides of a built-in scenario, use the regional profile defaults rather than inheriting that scenario's allocation. Island scenarios (Hurricane Season, Paradise) have no interties.
+- Import room is the smaller of the weather-adjusted purchased wire rating and the neighbor's spare supply times its archetype availability. All lines to one neighboring market share one supply budget and one export-demand budget, so upgrading a wire cannot create neighboring generation, and export access never grows with upgrades.
+- Quotes, dispatch, forecasts and invariants read access through the same effective-corridor helpers, so they cannot disagree.
+- Detail text names the binding constraint (own wire rating, neighbor spare supply, local need or trading rule, neighbor export demand) in words, not color alone.
+
+## Allocation rationale
+
+- 100/101 and 102/103 share a starting scale and geography, so each pair keeps equal access.
+- 106 uses small municipal rights: 40 MW of neighbor supply before availability against 100 MW of new data-center load.
+- 107 keeps full wire economics because Austin is multi-GW but caps neighboring spare power; the six-year new line still misses the 2021 freeze.
+- 108 keeps Portugal useful at 65 MW while the four-year Biscay line cannot finish inside the 36-month mission.
+- 110 supports an import-led mixed plan: the 200 MW core corridor helps replace the lost 500 MW reactor, and the four-year Biscay line visibly misses the emergency.
+- 111 scales to 1% of LADWP, so the three-year south line still misses the 2025 emergency; imports may cover a small remaining deficit.
+- 112 (Mission 7) keeps a 500 MW normal neighbor ceiling for the import and export demonstrations, then restricts it to 150 MW for one month after an acknowledged warning so the player practices recovery with existing gas.
+- 113 uses 1%-of-Eskom scale: 8.5 MW of spare neighbor power helps but cannot replace widespread coal losses.
+- 114 supports an import-led option with 160 MW combined access; the two-year build just reaches 2016 if started immediately, and import prices above the tariff keep finances relevant. Shared-Kariba drought correlation is a known limitation.
+- 115 uses 10%-of-Delhi wire scale, with asymmetric Bangladesh access (25 MW supply, 100 MW export) matching its net-buyer character.
 
 ## Reproducing the report
 
@@ -52,7 +72,7 @@ The wider baseline matrix exposed a preexisting numerical invariant failure: tin
 
 ## Final measured results
 
-All allocation rows in [the implementation plan](intertie-implementation-plan.md) were retained after measurement. The executable source of truth is `src/data/IntertieAccess.ts`. Two reference operating plans changed to prepare for risks previously hidden by oversized imports; the mission objectives and researched preparedness fee remain unchanged.
+All proposed allocations were retained after measurement. Two reference operating plans changed to prepare for risks previously hidden by oversized imports; the mission objectives and researched preparedness fee remain unchanged.
 
 | Experiment                                                        | Before: Intern | After: Intern | Before: CEO | After: CEO |
 | ----------------------------------------------------------------- | -------------: | ------------: | ----------: | ---------: |

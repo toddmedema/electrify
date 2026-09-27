@@ -10,13 +10,7 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { TICKS_PER_YEAR } from "../../Constants";
-import {
-  FuelNameType,
-  GameType,
-  GeneratorOperatingType,
-  TickPresentFutureType,
-} from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
 import {
   formatHour,
   getDateFromMinute,
@@ -26,9 +20,7 @@ import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { getStorageChoice, setStorageKeyValue } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
-import ChartForecastFuelPrices, {
-  PRICED_FUELS,
-} from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -42,7 +34,7 @@ import GameCard from "../base/GameCard";
 import ForecastScope from "../base/ForecastScope";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
-import { TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS, TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
 import {
   waterDashArrays,
   chartPalette,
@@ -168,15 +160,13 @@ export default class Forecasts extends React.Component<Props, State> {
     // Derived here rather than inside the chart, since the legend beside the chart's title has
     // to name exactly the bands the chart draws
     const fuels = forecastFuels(
-      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      getDispatchOrderedFuels(game.facilities),
       sampledForecastedTimeline,
     );
 
     // Storage has no band of its own in this chart, so selecting a battery highlights
     // nothing rather than emptying the stack
-    const selected = game.facilities.find(
-      (f) => f.id === selectedFacilityId,
-    ) as Partial<GeneratorOperatingType> | undefined;
+    const selected = game.facilities.find((f) => f.id === selectedFacilityId);
     const highlightFuel =
       selected && selected.fuel && fuels.indexOf(selected.fuel) > -1
         ? selected.fuel

@@ -33,7 +33,7 @@ import {
 // Where color still can't carry it alone, the charts add a second channel: stacked bands with
 // direct labels in Supply by Fuel, dash patterns and end-of-line labels in Fuel Prices.
 // Uranium is teal rather than green so that no series pairs red with green.
-const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
+const FUEL_COLORS: Record<ThemeModeType, Record<FuelNameType, string>> = {
   light: {
     Coal: "#1a1a1a", // 17.4:1 on white
     Biomass: "#356b20",
@@ -63,7 +63,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
 };
 
 /** The fuel colours for the palette in use. */
-export function fuelColors(): { [fuel: string]: string } {
+export function fuelColors(): Record<FuelNameType, string> {
   return FUEL_COLORS[currentMode];
 }
 
@@ -154,8 +154,17 @@ interface ChartPaletteType {
   background: string;
 }
 
-/** The blue of public/images/logo.svg, which the interactive colour matches on both palettes */
-const LOGO_BLUE = "#0084f8";
+/**
+ * The logo's blue, which the interactive colour matches on each palette: public/images/logo.svg
+ * and logo-home.svg on light, their -dark.svg twins on dark. Dark keeps the hue but not the
+ * chroma - full-strength #0084f8 glows against near-black - and lifts lightness to hold
+ * contrast: oklch(0.68 0.12 254), 6.6:1 on --bg-primary. Kept in step with
+ * --interactive-blue in app.scss.
+ */
+const LOGO_BLUE: { [mode in ThemeModeType]: string } = {
+  light: "#0084f8",
+  dark: "#629be1",
+};
 
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
@@ -181,7 +190,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     tick: "#90A4AE",
     legendText: "#252525",
     // The logo's blue, on purpose: 3.7:1 on white, short of the 4.5:1 small text would want.
-    interactive: LOGO_BLUE,
+    interactive: LOGO_BLUE.light,
     background: "#ffffff",
   },
   dark: {
@@ -211,7 +220,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     grid: "rgba(148, 163, 184, 0.13)",
     tick: "rgba(148, 163, 184, 0.34)",
     legendText: "#dce6f0",
-    interactive: LOGO_BLUE,
+    interactive: LOGO_BLUE.dark,
     background: "#0f161f",
   },
 };
@@ -289,9 +298,11 @@ export function createAppTheme(mode: ThemeModeType): Theme {
     palette: {
       mode,
       primary: {
-        light: mode === "dark" ? blue[200] : disabledColor,
+        // Dark's variants step along the same desaturated hue as main rather than jumping to
+        // MUI's saturated blue ramp: hover lightens to oklch(0.74 0.1 254), 8.6:1 under the label
+        light: mode === "dark" ? "#bbd3f2" : disabledColor,
         main: palette.interactive,
-        dark: mode === "dark" ? blue[400] : primaryDarkColor,
+        dark: mode === "dark" ? "#7eaee9" : primaryDarkColor,
         // Dark's primary is a pale blue, so the label on a filled button is the page behind it
         contrastText: mode === "dark" ? "#0a0a0a" : grey[100],
       },

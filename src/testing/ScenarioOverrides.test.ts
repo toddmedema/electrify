@@ -26,17 +26,19 @@ describe("simulation scenario overrides", () => {
     },
   );
 
-  it("does not round or deflate money between historical years", () => {
+  it("keeps cash and fees between historical years but follows the recorded retail rate", () => {
     const scenario = { ...shale, cash: 275123456, dollarsPerkWh: 0.025 };
-    expect(money(withScenarioOverrides(scenario, { year: 1990 })!)).toEqual(
-      money(scenario),
-    );
+    expect(money(withScenarioOverrides(scenario, { year: 1990 })!)).toEqual([
+      275123456,
+      0.018,
+      scenario.feePerKgCO2e,
+    ]);
   });
 
   it("re-quotes historical cash, rates and fees for a future start", () => {
     const scenario = { ...shale, feePerKgCO2e: 0.05 };
     const shifted = withScenarioOverrides(scenario, { year: 2080 })!;
-    expect(money(shifted)).toEqual([2300000000, 0.32, 0.53]);
+    expect(money(shifted)).toEqual([2300000000, 0.38, 0.53]);
     expect(shifted.id).toBe(CUSTOM_SCENARIO_ID);
     expect(scenario.cash).toBe(220000000);
   });
@@ -55,7 +57,7 @@ describe("simulation scenario overrides", () => {
       dollarsPerkWh: 0.32,
     };
     expect(money(withScenarioOverrides(future, { year: 2000 })!)).toEqual([
-      220000000, 0.03, 0,
+      220000000, 0.02, 0,
     ]);
   });
 
@@ -83,6 +85,6 @@ describe("simulation scenario overrides", () => {
     });
     expect(game.startingYear).toBe(2080);
     expect(game.dollarsPerkWh).toBe(0.05);
-    expect(game.customScenario?.dollarsPerkWh).toBe(0.32);
+    expect(game.customScenario?.dollarsPerkWh).toBe(0.38);
   });
 });

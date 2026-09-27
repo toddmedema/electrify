@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { getBuildAvailability, siteCountLabel } from "./BuildAvailability";
 import { LocationType } from "../../Types";
 
@@ -21,17 +21,16 @@ const hydroOption = {
 };
 
 describe("getBuildAvailability", () => {
-  test("offers a use max size action when the size is too large", () => {
-    const onUseMaxSize = jest.fn();
+  test("offers the max size when the size is too large", () => {
     const result = getBuildAvailability({
       ...hydroOption,
       name: "Natural Gas",
       sizeBuildable: false,
-      onUseMaxSize,
     });
+    expect(result.buildable).toBe(false);
+    expect(result.offerMaxSize).toBe(true);
     render(<>{result.secondaryText}</>);
-    fireEvent.click(screen.getByRole("button", { name: "Use max size" }));
-    expect(onUseMaxSize).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("10GW")).toBeInTheDocument();
   });
 
   test.each([

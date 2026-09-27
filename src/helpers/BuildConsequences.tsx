@@ -1,5 +1,5 @@
 import { DOWNPAYMENT_PERCENT } from "../Constants";
-import { FacilityShoppingType, GeneratorShoppingType } from "../Types";
+import { FacilityShoppingType, isStorage } from "../Types";
 import { formatMoneyConcise, formatWattHours, formatWatts } from "./Format";
 
 export function buildConsequenceMessage(
@@ -10,11 +10,9 @@ export function buildConsequenceMessage(
     ? facility.buildCost * DOWNPAYMENT_PERCENT
     : facility.buildCost;
   const months = Math.round(facility.yearsToBuild * 12);
-  const contribution = facility.peakWh
+  const contribution = isStorage(facility)
     ? `${formatWatts(facility.peakW)} output / ${formatWattHours(facility.peakWh)} storage`
-    : `${formatWatts(
-        facility.peakW * (facility as GeneratorShoppingType).capacityFactor,
-      )} typical supply`;
+    : `${formatWatts(facility.peakW * facility.capacityFactor)} typical supply`;
   return `${formatMoneyConcise(committed)} ${
     financed ? "down payment" : "committed"
   } → ${facility.name} online in ${months} mo → +${contribution}`;

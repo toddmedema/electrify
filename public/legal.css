@@ -120,6 +120,11 @@ a:hover {
   text-decoration: none;
 }
 
+/* Lets the img stay the flex item, as it was before the dark-logo <source> wrapped it */
+.brand picture {
+  display: contents;
+}
+
 .brand img {
   display: block;
   width: 9.4rem;

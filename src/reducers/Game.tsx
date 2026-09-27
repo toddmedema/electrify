@@ -87,7 +87,11 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
-import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
+import {
+  computeScoreBreakdown,
+  startingDollarRevenue,
+  totalScore,
+} from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
@@ -205,6 +209,7 @@ import {
   TICKS_PER_YEAR,
   YEARS_PER_TICK,
   LOCATIONS,
+  WEATHER_DEPENDENT_FUELS,
 } from "../Constants";
 import {
   GENERATORS,
@@ -251,7 +256,6 @@ import {
   ScenarioType,
   ScoreBreakdownType,
   SpeedType,
-  StorageOperatingType,
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
@@ -261,6 +265,7 @@ import {
   TransmissionLineOperatingType,
   VictoryType,
   WorldEventEffectsType,
+  isStorage,
 } from "../Types";
 
 interface BuildFacilityAction {
@@ -427,26 +432,31 @@ function logFuelPriceMoves(
   if (!previous) {
     return;
   }
-  const burned = new Set<string>();
+  const burned = new Set<FuelNameType>();
   state.facilities.forEach((f: FacilityOperatingType) => {
-    const fuel = (f as Partial<GeneratorOperatingType>).fuel;
-    // Wind and sun are fuels the game names but nobody prices
-    if (fuel && previous[fuel] !== undefined && prices[fuel] !== undefined) {
-      burned.add(fuel);
+    if (f.fuel) {
+      burned.add(f.fuel);
     }
   });
-  burned.forEach((fuel: string) => {
-    if (storyPriceFuels.has(fuel as FuelNameType)) {
+  burned.forEach((fuel) => {
+    const before = previous[fuel];
+    const after = prices[fuel];
+    // Wind and sun are fuels the game names but nobody prices
+    if (
+      before === undefined ||
+      after === undefined ||
+      storyPriceFuels.has(fuel)
+    ) {
       return;
     }
-    const change = (prices[fuel] - previous[fuel]) / previous[fuel];
+    const change = (after - before) / before;
     if (Math.abs(change) < FUEL_PRICE_SPIKE) {
       return;
     }
     logGameEvent(
       state,
       "FUEL_PRICE",
-      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MMBtu`,
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(after)}/MMBtu`,
     );
   });
 }
@@ -499,22 +509,21 @@ function currentFuelCosts(
     state,
   ).operatingCostMultipliersByFuel;
   state.facilities.forEach((facility: FacilityOperatingType) => {
-    const generator = facility as Partial<GeneratorOperatingType>;
-    if (!generator.fuel) {
+    if (isStorage(facility)) {
       return;
     }
     const cost = generatorCostPerMWh(
-      facility as GeneratorOperatingType,
+      facility,
       prices,
       effectiveCarbonFee(state.date, state),
-      operatingCostMultipliers?.[generator.fuel] || 1,
+      operatingCostMultipliers?.[facility.fuel] || 1,
     );
     if (cost === undefined) {
       return;
     }
     // A fuel can have several plants. The cheapest one is the one dispatch order can actually
     // choose at the margin, and avoids plant size turning the comparison into an average.
-    costs[generator.fuel] = Math.min(costs[generator.fuel] ?? Infinity, cost);
+    costs[facility.fuel] = Math.min(costs[facility.fuel] ?? Infinity, cost);
   });
   return costs;
 }
@@ -1074,7 +1083,7 @@ function completeRetrofits(state: GameType) {
       state,
       upgrade.upgrade,
     );
-    delete (facility as GeneratorOperatingType).upgradeInProgress;
+    delete facility.upgradeInProgress;
     const message = `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
     logGameEvent(state, "CONSTRUCTION", message, {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1327,11 +1336,14 @@ function getEffectiveFuelPrices(
     return prices;
   }
   const effective = { ...prices };
-  Object.entries(multipliers).forEach(([fuel, multiplier]) => {
-    if (multiplier !== undefined && effective[fuel] !== undefined) {
-      effective[fuel] *= multiplier;
-    }
-  });
+  (Object.entries(multipliers) as [FuelNameType, number][]).forEach(
+    ([fuel, multiplier]) => {
+      const price = effective[fuel];
+      if (multiplier !== undefined && price !== undefined) {
+        effective[fuel] = price * multiplier;
+      }
+    },
+  );
   return effective;
 }
 
@@ -1525,14 +1537,14 @@ export const gameSlice = createSlice({
       const a = action.payload;
       delete state.blackout;
       previousFuelPrices = undefined;
-      state.eventLog = [] as GameEventType[];
+      state.eventLog = [];
       state.reportedEventKeys = [];
       state.eventLogReadThroughId = 0;
       state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
       state.meaningfulDecisions = [];
       state.transmission = undefined;
-      state.timeline = [] as TickPresentFutureType[];
+      state.timeline = [];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
       state.replayLog = state.replayPlayback ? undefined : [];
@@ -1874,7 +1886,7 @@ export const gameSlice = createSlice({
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
-      state.timeline = [] as TickPresentFutureType[];
+      state.timeline = [];
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
@@ -1930,10 +1942,8 @@ export const gameSlice = createSlice({
         state.timeline,
       );
       const needsCommitmentForecast = state.facilities.some((facility) => {
-        const generator = facility as GeneratorOperatingType;
         return (
-          !facility.peakWh &&
-          (generator.minimumStableOutput || 0) > 0 &&
+          (facility.minimumStableOutput || 0) > 0 &&
           !hasPreparedGeneratorCommitment(currentTick, facility.id)
         );
       });
@@ -2107,8 +2117,8 @@ function matchesFacilitySearch(
   if (candidate.viableLocationsRemaining === 0) {
     return false;
   }
-  return Object.keys(search).every(
-    (property: string) => candidate[property] === search[property],
+  return (Object.keys(search) as Array<keyof FacilityShoppingType>).every(
+    (property) => candidate[property] === search[property],
   );
 }
 
@@ -2183,21 +2193,19 @@ function applySellFacility(state: GameType, id: number): boolean {
       ? `Cancelled construction of ${sold.name}`
       : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
   );
-  const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.financed ? "financed" : "cash"}`;
+  const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.loanAmountTotal > 0 ? "financed" : "cash"}`;
   endWeatherHazardsForFacility(state, id);
   // in one loop, refund cash from selling + remove from list
-  state.facilities = state.facilities.filter(
-    (g: GeneratorOperatingType | StorageOperatingType) => {
-      if (g.id === id) {
-        const now = getTimeFromTimeline(state.date.minute, state.timeline);
-        if (now) {
-          now.cash += facilityCashBack(g, state.date.minute);
-        }
-        return false;
+  state.facilities = state.facilities.filter((g: FacilityOperatingType) => {
+    if (g.id === id) {
+      const now = getTimeFromTimeline(state.date.minute, state.timeline);
+      if (now) {
+        now.cash += facilityCashBack(g, state.date.minute);
       }
-      return true;
-    },
-  );
+      return false;
+    }
+    return true;
+  });
   if (isMaterialCapacityDecision(state, sold.peakW)) {
     recordMeaningfulDecision(state, {
       lever: `asset-sale:${id}`,
@@ -2499,7 +2507,7 @@ function applyRetrofitFacility(state: GameType, payload: unknown): boolean {
   now.netWorth -= cost;
   now.expensesOM += cost;
   facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) + cost;
-  (facility as GeneratorOperatingType).upgradeInProgress = {
+  facility.upgradeInProgress = {
     upgrade: payload.upgrade,
     cost,
     startsMinute: state.date.minute,
@@ -2555,7 +2563,7 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   now.netWorth += refund;
   now.expensesOM -= refund;
   facility.lifetimeExpenses = (facility.lifetimeExpenses || 0) - refund;
-  delete (facility as GeneratorOperatingType).upgradeInProgress;
+  delete facility.upgradeInProgress;
   recordRetrofitTransaction(state, facility.id, upgrade.upgrade, -refund);
   logGameEvent(
     state,
@@ -3035,6 +3043,7 @@ export function tickState(state: GameType) {
         const score: ScoreBreakdownType = computeScoreBreakdown(
           scenario,
           summary,
+          startingDollarRevenue(history, state.startingYear, state.seed),
         );
         const finalScore = totalScore(score);
         const difficulty = state.difficulty;
@@ -3218,7 +3227,11 @@ export function tickState(state: GameType) {
             // finish the objectives and enter the capstone, which rebuilds its own checkpoint.
             state.speed = "PAUSED";
           } else {
-            const score = computeScoreBreakdown(scenario, summary);
+            const score = computeScoreBreakdown(
+              scenario,
+              summary,
+              startingDollarRevenue(history, state.startingYear, state.seed),
+            );
             const finalScore = totalScore(score);
             const { id: scoredScenarioId, endTitle, endMessage } = scenario;
             const difficulty = state.difficulty;
@@ -3678,7 +3691,7 @@ function updateSupplyFacilitiesFinances(
   let supply = 0;
   let spareGenerationW = 0;
   let reachableHeadroomW = 0;
-  const supplyByFuel = {} as FuelProductionType;
+  const supplyByFuel: FuelProductionType = {};
   let charge = 0;
   let dischargedW = 0;
   let storedWh = 0;
@@ -3691,15 +3704,15 @@ function updateSupplyFacilitiesFinances(
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
+    // Only read or written behind hasMinimumStableOutput, which storage never has
     const generator = g as GeneratorOperatingType;
-    const hasMinimumStableOutput =
-      !g.peakWh && (generator.minimumStableOutput || 0) > 0;
+    const hasMinimumStableOutput = (g.minimumStableOutput || 0) > 0;
     const previouslyCommitted = simulated
       ? (generator.committed ?? previousW > 0)
       : (generator.generatingLastRealTick ??
         generator.committed ??
         previousW > 0);
-    const generatorFuel = generator.fuel as FuelNameType | undefined;
+    const generatorFuel = g.fuel;
     const fuelOutputMultiplier = generatorFuel
       ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
       : 1;
@@ -3942,14 +3955,12 @@ function updateSupplyFacilitiesFinances(
       // Report capacity that automatic dispatch can actually add within the next 15 minutes.
       // Keep this response window fixed even when long forecasts integrate hourly samples.
       // Ramping, weather/event derates and remaining water/charge constrain that headroom.
-      if (g.peakWh) {
+      if (isStorage(g)) {
         const dischargeW = Math.min(g.peakW, g.currentWh * TICKS_PER_HOUR);
         const currentGridW =
           g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
         reachableHeadroomW += Math.max(0, dischargeW - currentGridW);
-      } else if (
-        !["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(g.fuel)
-      ) {
+      } else if (!WEATHER_DEPENDENT_FUELS.includes(g.fuel)) {
         const energyLimitedPeakW = hydro
           ? Math.min(
               availablePeakW,
@@ -4195,14 +4206,13 @@ function updateSupplyFacilitiesFinances(
         // represents the same daily start repeated throughout that month.
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
-      const operatingFuel = (g as Partial<GeneratorOperatingType>).fuel;
       facilityOM *=
-        (operatingFuel &&
-          tickStoryEffects.operatingCostMultipliersByFuel?.[operatingFuel]) ||
+        (g.fuel && tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
         1;
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
-      if (g.fuel && FUELS[g.fuel]) {
+      const fuel = g.fuel && FUELS[g.fuel];
+      if (fuel) {
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / ticksPerHour) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
@@ -4212,7 +4222,7 @@ function updateSupplyFacilitiesFinances(
         // used to feed that through expenses into cash, where saving or charting exposed it as
         // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
         const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
-        const facilityKgco2e = fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
+        const facilityKgco2e = fuelBtu * fuel.kgCO2ePerBtu;
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
         facilityExpenses +=
@@ -4395,8 +4405,8 @@ function supplyForecastPass(
   };
   if (withoutMinimumStableOutput) {
     newState.facilities.forEach((facility) => {
-      if (!facility.peakWh) {
-        (facility as GeneratorOperatingType).minimumStableOutput = undefined;
+      if (!isStorage(facility)) {
+        facility.minimumStableOutput = undefined;
       }
     });
   }
@@ -4485,13 +4495,12 @@ function reforecastSupply(
     forecastIndexAt(state, state.date.minute),
   );
   state.facilities.forEach((facility) => {
-    const generator = facility as GeneratorOperatingType;
-    if (!facility.peakWh && (generator.minimumStableOutput || 0) > 0) {
+    if (!isStorage(facility) && (facility.minimumStableOutput || 0) > 0) {
       prepareGeneratorCommitment({
         facilityId: facility.id,
         forecast: futureBaseline,
         minimumOperatingCost: (futureTick) =>
-          minimumStableOperatingCost(state, generator, futureTick, stepMinutes),
+          minimumStableOperatingCost(state, facility, futureTick, stepMinutes),
       });
     }
   });
@@ -4629,11 +4638,6 @@ export function generateNewTimeline(
 /**
  * Edits the state in place to handle all of the one-off consequences of building
  * (not including reforecasting, which should be done once after multiple builds)
- * @param state
- * @param g
- * @param financed
- * @param newGame
- * @returns
  */
 function buildFacilityHelper(
   state: GameType,
@@ -4680,7 +4684,7 @@ function buildFacilityHelper(
       viableLocationsRemaining: _viableLocationsRemaining,
       resilienceExtraBuildCost: _resilienceExtraBuildCost,
       ...facilitySnapshot
-    } = g as FacilityShoppingType & { resilienceExtraBuildCost?: number };
+    } = g;
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,

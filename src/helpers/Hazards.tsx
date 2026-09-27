@@ -3,7 +3,6 @@ import {
   DateType,
   FacilityOperatingType,
   FacilityUpgradeInProgressType,
-  GeneratorOperatingType,
   FacilityResilienceType,
   GameType,
   GeneratorShoppingType,
@@ -417,7 +416,7 @@ export const RETROFIT_DOWNTIME_MINUTES = MINUTES_PER_MONTH;
 export function upgradeInProgress(
   facility: FacilityOperatingType,
 ): FacilityUpgradeInProgressType | undefined {
-  return (facility as Partial<GeneratorOperatingType>).upgradeInProgress;
+  return facility.upgradeInProgress;
 }
 
 /** Whether a retrofit holds the facility offline at this minute. */

@@ -130,9 +130,10 @@ const intertiesCapstoneSucceeded = (state: AppStateType) =>
   tutorialSawImports(state) &&
   tutorialSawSafeExport(state);
 
-export const SCENARIOS = [
+// Order sets the menu and tutorial sequence; ids are persisted, so never renumber them
+export const SCENARIOS: ScenarioType[] = [
   {
-    id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 0,
     name: "Mission 1: Electricity",
     icon: "solar",
     summary: "Meet your grid",
@@ -217,7 +218,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 1, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 1,
     name: "Mission 2: Generators",
     icon: "natural gas",
     summary: "Build a generator",
@@ -313,7 +314,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 2, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 2,
     name: "Mission 3: Storage",
     icon: "pumped hydro",
     summary: "Store energy for later",
@@ -433,7 +434,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 4,
     name: "Mission 4: Finances",
     icon: "coal",
     summary: "Read the books",
@@ -519,7 +520,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 3,
     name: "Mission 5: Pricing",
     icon: "wind",
     summary: "Grow your customers",
@@ -602,7 +603,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 5,
     name: "Mission 6: Forecasting",
     icon: "geothermal",
     summary: "See what's coming",
@@ -787,7 +788,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 112, // Append-only persisted scenario id; tutorial order is its position in this array
+    id: 112,
     name: "Mission 7: Interties",
     icon: "transmission",
     summary: "Share power with neighbors",
@@ -1019,7 +1020,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 100, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 100,
     name: "Carbon Fee",
     icon: "carbon fee",
     locationId: "SF",
@@ -1044,7 +1045,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 103,
     name: "The Shale Boom",
     icon: "the shale boom",
     locationId: "PIT",
@@ -1065,7 +1066,7 @@ export const SCENARIOS = [
     facilities: [{ fuel: "Coal", peakW: 500000000, initialAgeYears: 25 }],
   },
   {
-    id: 105, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 105,
     name: "Paradise",
     icon: "paradise",
     locationId: "HNL",
@@ -1090,7 +1091,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 101, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 101,
     name: "Rise of Renewables",
     icon: "rise of renewables",
     locationId: "SF",
@@ -1115,7 +1116,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 104, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 104,
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
@@ -1141,7 +1142,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 102,
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
@@ -1167,7 +1168,7 @@ export const SCENARIOS = [
     ],
   },
   {
-    id: 106, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 106,
     name: "Data Center Boom",
     icon: "ai data center boom",
     locationId: "Manassas",
@@ -1227,7 +1228,7 @@ export const SCENARIOS = [
       "Sixteen years tested whether a small public utility could prepare for growth without leaving residents behind.",
   },
   {
-    id: 107, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    id: 107,
     name: "Deep Freeze",
     icon: "texas deep freeze",
     locationId: "Austin",
@@ -1282,7 +1283,7 @@ export const SCENARIOS = [
     endMessage: "The storm tested every choice you made to prepare Austin.",
   },
   {
-    id: 108, // Scenario IDs are persisted and shared; append rather than renumbering.
+    id: 108,
     name: "Heatwave + Drought",
     icon: "heatwave-drought",
     locationId: "Madrid",
@@ -1405,7 +1406,7 @@ export const SCENARIOS = [
       "The sudden shutdown tested the backup capacity your normal plan rarely needed.",
   },
   {
-    id: 111, // Scenario IDs are persisted and shared; append rather than renumbering.
+    id: 111,
     name: "Wildfire Emergency",
     icon: "wildfire emergency",
     locationId: "LA",
@@ -1459,7 +1460,7 @@ export const SCENARIOS = [
       "The emergency tested whether backup power and financial reserves could carry Los Angeles through shutoffs and restoration.",
   },
   {
-    id: 113, // Scenario IDs are persisted and shared; append rather than renumbering.
+    id: 113,
     name: "Load Shedding",
     icon: "load shedding",
     locationId: "Johannesburg",
@@ -1528,7 +1529,7 @@ export const SCENARIOS = [
       "Five years of breakdowns tested whether new capacity could be built faster than the old fleet gave out.",
   },
   {
-    id: 114, // Scenario IDs are persisted and shared; append rather than renumbering.
+    id: 114,
     name: "The River Runs Dry",
     icon: "river runs dry",
     locationId: "Lusaka",
@@ -1629,7 +1630,7 @@ export const SCENARIOS = [
       "The drought tested whether a grid built on one river could find firm power anywhere else in time.",
   },
   {
-    id: 115, // Scenario IDs are persisted and shared; append rather than renumbering.
+    id: 115,
     name: "Delhi Summer",
     icon: "delhi summer",
     locationId: "Delhi",
@@ -1691,7 +1692,7 @@ export const SCENARIOS = [
     endMessage:
       "Four summers tested whether a grid could grow fast enough to stay ahead of its own peak.",
   },
-] as ScenarioType[];
+];
 
 // The opening missions, in the order a new player should work through them
 export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);
@@ -1737,7 +1738,7 @@ export function getScenario(
  * Deliberately not in SCENARIOS: everything that walks that array (the sim CLI and its tests, the
  * scenario list itself) means the authored scenarios.
  */
-export const DEFAULT_CUSTOM_SCENARIO = {
+export const DEFAULT_CUSTOM_SCENARIO: ScenarioType = {
   id: CUSTOM_SCENARIO_ID,
   name: "Custom Game",
   icon: "battery",
@@ -1751,4 +1752,4 @@ export const DEFAULT_CUSTOM_SCENARIO = {
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,
   facilities: [{ name: "Natural Gas", peakW: 500000000 }],
-} as ScenarioType;
+};

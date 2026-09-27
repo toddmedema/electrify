@@ -29,9 +29,11 @@ for (const theme of ["light", "dark"]) {
       name: "Rooftop solar rebates · Not started · starts Feb 2020",
     });
     await solar.click();
-    await expect(dialog).toContainText(
-      "does not directly cover an evening peak",
-    );
+    // The mechanism prose is depth behind the facts grid, so it starts collapsed.
+    await dialog.getByText("How it works").click();
+    await expect(
+      dialog.getByText("does not directly cover an evening peak"),
+    ).toBeVisible();
     await expect(dialog).toContainText("48 months of installations");
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
