@@ -6700,3 +6700,11 @@ $programs_column: 800px;
     border-top: 1px solid var(--border-subtle);
   }
 }
+
+// Settings' header shares its body's 760px column, as the catalog and Manual headers do
+#gameCard:has(.settingsGroup) > .screenHeader > .MuiToolbar-root {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
