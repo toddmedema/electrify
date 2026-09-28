@@ -99,6 +99,10 @@ export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
  * based wind reports put 5-20 MW projects only ~10-40% above 100+ MW ones), large thermal and
  * hydro sites far more. The old flat 25% made a 10 MW solar farm cost 4.5x its reference per W.
  */
+// Levelized costs discount capital at the company's own borrowing rate; this stands in only
+// where no rate is known yet (a quote made before the game has one).
+const DEFAULT_LCOE_DISCOUNT_RATE = 0.07;
+
 export const BUILD_COST_FIXED_SHARE = {
   solar: 0.01,
   wind: 0.02,
@@ -755,6 +759,9 @@ export function GENERATORS(
           state.seed,
           state.location,
           carbonFeeAtYear,
+          Number.isFinite(state.interestRate)
+            ? state.interestRate
+            : DEFAULT_LCOE_DISCOUNT_RATE,
         )
       : Infinity;
     return g.available || (g.name === "Hydro" && year > 1882);

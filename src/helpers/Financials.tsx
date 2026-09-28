@@ -139,7 +139,18 @@ export function getCreditInputs(
   };
 }
 
-// Fuel prices stay at the current forecast value across the quoted lifetime.
+/** Annual payment per dollar of capital that repays it over `years` at `rate`. */
+export function capitalRecoveryFactor(rate: number, years: number): number {
+  if (!(years > 0)) return 1;
+  return rate > 0 ? rate / (1 - Math.pow(1 + rate, -years)) : 1 / years;
+}
+
+/**
+ * Levelized cost per Wh. Capital is annualized with a capital recovery factor at
+ * `discountRate` (the company's borrowing rate in play), as NREL ATB, Lazard and EIA levelize:
+ * an undiscounted average made capital-heavy, long-lived plants look 2-3x cheaper than any
+ * published LCOE. Fuel prices stay at the current forecast value across the quoted lifetime.
+ */
 export function LCWH(
   g: GeneratorShoppingType,
   date: DateType,
@@ -147,6 +158,7 @@ export function LCWH(
   seed: number,
   location?: LocationType,
   feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
+  discountRate = 0,
 ) {
   const kgCO2ePerBtu = FUELS[g.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelCostPerWh =
@@ -177,12 +189,16 @@ export function LCWH(
   );
   const totalWh =
     g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
-  const costPerWh =
-    (g.buildCost +
-      estimatedAnnualOperatingCost(g) * g.lifespanYears +
-      (fuelCostPerWh + carbonCostPerWh) * totalWh) /
-    totalWh;
-  return costPerWh;
+  // Averaged over the design life; with no discounting this is exactly
+  // (build + O&M x life + fuel and carbon x lifetime Wh) / lifetime Wh
+  const annualWh = totalWh / g.lifespanYears;
+  return (
+    (g.buildCost * capitalRecoveryFactor(discountRate, g.lifespanYears) +
+      estimatedAnnualOperatingCost(g)) /
+      annualWh +
+    fuelCostPerWh +
+    carbonCostPerWh
+  );
 }
 
 // The build quote needs one legible operating pattern. A daily start matches a peaking turbine

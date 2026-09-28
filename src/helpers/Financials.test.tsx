@@ -1,4 +1,5 @@
 import {
+  capitalRecoveryFactor,
   CreditInputsType,
   degradedLifetimeYears,
   facilityCashBack,
@@ -134,6 +135,19 @@ describe("LCWH", () => {
       (200000000 + 4000000 * 25) / totalWh,
       12,
     );
+  });
+
+  it("annualizes capital with a capital recovery factor at the discount rate", () => {
+    const annualWh = 100000000 * HOURS_PER_YEAR_REAL * 0.35;
+    const crf = 0.07 / (1 - Math.pow(1.07, -25));
+    expect(capitalRecoveryFactor(0.07, 25)).toBeCloseTo(crf, 12);
+    expect(capitalRecoveryFactor(0, 25)).toBe(1 / 25);
+    expect(
+      LCWH(generator, date, 0, SEED, undefined, undefined, 0.07),
+    ).toBeCloseTo((200000000 * crf + 4000000) / annualWh, 12);
+    expect(
+      LCWH(generator, date, 0, SEED, undefined, undefined, 0.07),
+    ).toBeGreaterThan(LCWH(generator, date, 0, SEED));
   });
 
   it("includes compounding output degradation in a lifetime quote", () => {

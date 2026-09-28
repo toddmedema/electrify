@@ -282,7 +282,7 @@ Everything a run pays or earns is in the same nominal dollars:
 
 Purchase reviews lead with down payment, monthly payment and estimated upkeep; detailed plant
 operation and loan terms are optional. Starts, ramps, water releases and underwriting remain
-automatic. Loan payments begin during construction. LCOE excludes loan interest and holds quoted
+automatic. Loan payments begin during construction. LCOE annualizes capital with a capital recovery factor at the company's borrowing rate (7% before a rate exists) and holds quoted
 fuel-price assumptions; neither it nor the five-year fixed-use economic comparison guarantees
 future costs. Site counts are projects available in this game, not a site survey. Displayed
 accounting life controls depreciation and estimates, not automatic retirement.
