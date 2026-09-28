@@ -59,6 +59,7 @@ function offshoreEraMultiple(year: number): number {
 const CPI_2019_TO_2023 = 304.702 / 255.657;
 const CPI_2020_TO_2024 = 313.689 / 258.811;
 const CPI_2015_TO_2023 = 304.702 / 237.017;
+const CPI_2025_TO_2023 = 304.702 / 321.943;
 // NREL's 500-1,300 MW supercritical-coal class reports $54/MW-start of capitalized
 // cycling/maintenance plus $5.81/MW-start of other startup operations, in 2011 dollars.
 const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
@@ -159,7 +160,7 @@ function annualOperatingCost(
   return (dollarsPerKWYear / 1000) * peakW;
 }
 
-function windCostPerW(year: number): number {
+function windCostPerW2024(year: number): number {
   const cost2020 = 1.355 * CPI_2020_TO_2024;
   if (year < 2020) {
     // Preserve the established long-run historical learning curve, but anchor it to IRENA's
@@ -174,7 +175,7 @@ function windCostPerW(year: number): number {
   return costBetween(year, 2024, 1.041, 2029, 0.861);
 }
 
-function solarCostPerW(year: number): number {
+function solarCostPerW2024(year: number): number {
   const cost2020 = 0.883 * CPI_2020_TO_2024;
   if (year < 2020) {
     return cost2020 * Math.pow(2, (2020 - year) / 8);
@@ -186,17 +187,32 @@ function solarCostPerW(year: number): number {
   return costBetween(year, 2024, 0.691, 2029, 0.388);
 }
 
-function hydroCostPerW(year: number): number {
+function hydroCostPerW2024(year: number): number {
   return costBetween(year, 2020, 1.87 * CPI_2020_TO_2024, 2024, 2.267);
 }
 
-function geothermalCostPerW(year: number): number {
+function geothermalCostPerW2024(year: number): number {
   return costBetween(year, 2020, 4.468 * CPI_2020_TO_2024, 2024, 4.015);
 }
 
-function batteryCostPerWh(year: number): number {
+function batteryCostPerWh2024(year: number): number {
   return costBetween(year, 2020, 0.345 * CPI_2020_TO_2024, 2024, 0.192);
 }
+
+// The curves above are anchored on IRENA's (and NREL's) 2024-dollar observations. Every table
+// here is priced in 2023 dollars, the EIA AEO2025 vintage the thermal plants use, so they are
+// brought back one year with CPI-U before getCostInflation re-dates the whole table.
+const CPI_2024_TO_2023 = 304.702 / 313.689;
+const windCostPerW = (year: number) =>
+  windCostPerW2024(year) * CPI_2024_TO_2023;
+const solarCostPerW = (year: number) =>
+  solarCostPerW2024(year) * CPI_2024_TO_2023;
+const hydroCostPerW = (year: number) =>
+  hydroCostPerW2024(year) * CPI_2024_TO_2023;
+const geothermalCostPerW = (year: number) =>
+  geothermalCostPerW2024(year) * CPI_2024_TO_2023;
+const batteryCostPerWh = (year: number) =>
+  batteryCostPerWh2024(year) * CPI_2024_TO_2023;
 
 /**
  * Early-commercial Airborne Wind estimate, held flat outside the evidence window.
@@ -423,12 +439,12 @@ export function GENERATORS(
         "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
       available: true,
       // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
-      // to the table's 2018 base with CPI-U (251.107 / 321.943), then split into the same
-      // one-quarter fixed / three-quarter variable shape used by the other thermal plants, so
-      // small biomass plants retain the real technology's poor economies of scale.
+      // to the table's 2023 base with CPI-U (304.702 / 321.943 = 0.94645), then split into the
+      // same one-quarter fixed / three-quarter variable shape used by the other thermal plants,
+      // so small biomass plants retain the real technology's poor economies of scale.
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/EMM_Assumptions.pdf
       // https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm
-      buildCost: 47217644 + 2.833059 * peakW,
+      buildCost: scaledBuildCost(4.843 * CPI_2025_TO_2023, 50000000, peakW),
       peakW,
       // DOE's project-screening guidance describes 10-50 MW as the economic range; larger
       // fleets can still be assembled as several plants with separate feedstock logistics.
@@ -436,10 +452,15 @@ export function GENERATORS(
       maxPeakW: 50000000,
       btuPerWh: 13.3,
       spinMinutes: 240,
-      // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars. The engine
-      // has one annual O&M field, so both are converted to 2018 dollars and variable O&M is
-      // annualized at the observed 60.2% capacity factor.
-      annualOperatingCost: 0.14471 * peakW,
+      // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars, which are
+      // $146.0 and $5.61 in 2023 dollars. Variable O&M is annualized at the observed 60.2%
+      // capacity factor.
+      annualOperatingCost: annualOperatingCost(
+        peakW,
+        0.602,
+        154.26 * CPI_2025_TO_2023,
+        5.93 * CPI_2025_TO_2023,
+      ),
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Biomass,
       tracksStarts: true,
       yearsToBuild: 5,

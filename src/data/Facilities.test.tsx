@@ -71,15 +71,18 @@ function generatorAt(
 
 describe("current facility economics", () => {
   it("prices reference plants at their published benchmarks", () => {
+    // IRENA's 2024-dollar observations are carried in the tables' 2023 dollars
+    const in2023Dollars = 304.702 / 313.689;
     const benchmarks: Array<[string, number, number, number]> = [
       ["Coal", 2023, 650000000, 4.103],
       ["Nuclear", 2023, 2156000000, 7.861],
       ["Natural Gas", 2023, 419000000, 0.836],
       ["Oil", 2023, 3000000, 1.248],
-      ["Wind", 2024, 200000000, 1.041],
-      ["Solar", 2024, 150000000, 0.691],
-      ["Hydro", 2024, 100000000, 2.267],
-      ["Geothermal", 2024, 50000000, 4.015],
+      ["Wind", 2024, 200000000, 1.041 * in2023Dollars],
+      ["Solar", 2024, 150000000, 0.691 * in2023Dollars],
+      ["Hydro", 2024, 100000000, 2.267 * in2023Dollars],
+      ["Geothermal", 2024, 50000000, 4.015 * in2023Dollars],
+      ["Biomass", 2023, 50000000, (4843 * (304.702 / 321.943)) / 1000],
     ];
     benchmarks.forEach(([name, year, peakW, dollarsPerW]) => {
       const location =
@@ -102,7 +105,10 @@ describe("current facility economics", () => {
       annualOperatingCost: 6000000,
       roundTripEfficiency: 0.85,
     });
-    expect(battery?.buildCost).toBeCloseTo(115210000, -2);
+    expect(battery?.buildCost).toBeCloseTo(
+      10000 + 0.192 * 600000000 * (304.702 / 313.689),
+      -2,
+    );
     expect(battery?.yearsToBuild).toBeCloseTo(1.5, 2);
   });
 

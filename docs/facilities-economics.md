@@ -7,8 +7,11 @@ estimates and 2024 for IRENA's global deployment data.
 
 The previous model mixed figures from several dollar years. This refresh separates two effects:
 
-1. Published observations are converted to the newer report's dollars with annual-average U.S.
-   CPI-U (2019: 255.657; 2020: 258.811; 2023: 304.702; 2024: 313.689).
+1. Published observations are converted to one vintage, 2023 dollars, with annual-average U.S.
+   CPI-U (2019: 255.657; 2020: 258.811; 2023: 304.702; 2024: 313.689; 2025: 321.943). The
+   IRENA and NREL 2024-dollar curves (wind, solar, hydro, geothermal, battery) are multiplied by
+   `304.702 / 313.689`, and EIA's 2025-dollar biomass plant by `304.702 / 321.943`. The table
+   below quotes each source in its own dollars.
 2. The remaining change is treated as a real technology-cost trend. The game's own inflation
    multiplier is still applied later, so inflation is not counted twice.
 

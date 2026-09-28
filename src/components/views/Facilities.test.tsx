@@ -185,14 +185,16 @@ describe("the fleet list", () => {
   });
 
   it("shows Oil fixed and variable O&M without turbine start details", () => {
+    // Rise of Renewables opens in 2002, so the 2023-dollar EIA figures are deflated by CPI-U
+    // (179.9 / 304.702): $3.09M/yr and $25.71/MWh become $1.82M/yr and $15.18/MWh.
     const oilGame = createGame({ scenarioId: 101, difficulty: "CEO" });
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
     expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
-    expect(screen.getByText("$3.09M/yr")).toBeInTheDocument();
+    expect(screen.getByText("$1.82M/yr")).toBeInTheDocument();
     expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
-    expect(screen.getByText("$25.71/MWh")).toBeInTheDocument();
+    expect(screen.getByText("$15.18/MWh")).toBeInTheDocument();
     expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
   });
