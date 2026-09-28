@@ -149,4 +149,3 @@ export function getCustomScenario(fallback: ScenarioType): ScenarioType {
 export function recordCustomScenario(scenario: ScenarioType) {
   setStorageKeyValue(CUSTOM_GAME_KEY, scenario);
 }
-
