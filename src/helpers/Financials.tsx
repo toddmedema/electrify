@@ -142,7 +142,11 @@ export function getCreditInputs(
 /** Annual payment per dollar of capital that repays it over `years` at `rate`. */
 export function capitalRecoveryFactor(rate: number, years: number): number {
   if (!(years > 0)) return 1;
-  return rate > 0 ? rate / (1 - Math.pow(1 + rate, -years)) : 1 / years;
+  // exp/log1p rather than a power: V8 evaluates those with its own fdlibm port, so the result is
+  // the same on every platform (see helpers/Pow on the coordinator branch)
+  return rate > 0
+    ? rate / (1 - Math.exp(-years * Math.log1p(rate)))
+    : 1 / years;
 }
 
 /**
