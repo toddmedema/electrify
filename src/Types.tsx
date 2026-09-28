@@ -72,6 +72,8 @@ export interface TransmissionLineOperatingType {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
   interestRate: number;
+  // Inflation index when ordered; annual O&M escalates from it. Absent (1) at the run's start.
+  costIndexAtBuild?: number;
   /**
    * Net power over this line in the current tick: positive importing, negative selling.
    * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
@@ -544,6 +546,10 @@ interface SharedOperatingType
   minuteOperational?: number;
   // Absent until the player first toggles it
   paused?: boolean;
+  // The game's inflation index on the day it was bought, which its quoted O&M, variable O&M and
+  // start costs are denominated in. Operating costs escalate from here with the index rather
+  // than staying frozen in purchase-year dollars. Absent (1) for the starting fleet.
+  costIndexAtBuild?: number;
 }
 
 export interface GeneratorOperatingType

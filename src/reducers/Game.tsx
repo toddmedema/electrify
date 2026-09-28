@@ -74,7 +74,12 @@ import {
   facilityOutputFactor,
   estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
-import { getInflationRate, getPrimeRate } from "../data/Economy";
+import {
+  getInflationIndex,
+  getInflationRate,
+  getPrimeRate,
+  hasEconomy,
+} from "../data/Economy";
 import {
   CUSTOMER_MARKET_MULTIPLIER,
   customerMarketSizeAt,
@@ -3510,6 +3515,22 @@ function reforecastDemand(
   });
 }
 
+/**
+ * How far a facility's non-fuel operating costs have escalated since it was bought. Its O&M,
+ * variable O&M and start costs are quoted in purchase-month dollars; labour and parts rise with
+ * inflation afterwards, just as fuel and the market's rate do.
+ */
+function operatingCostEscalation(
+  state: GameType,
+  facility: { costIndexAtBuild?: number },
+  date: { year: number; monthNumber: number },
+): number {
+  return (
+    getInflationIndex(date, state.startingYear, state.seed) /
+    (facility.costIndexAtBuild || 1)
+  );
+}
+
 /** Variable cost of holding one generator at its minimum stable output for one game tick. */
 function minimumStableOperatingCost(
   state: GameType,
@@ -3528,7 +3549,8 @@ function minimumStableOperatingCost(
   const variableOM =
     (generatedWh / 1000000) *
     (generator.variableOperatingCostPerMWh || 0) *
-    operatingCostMultiplier;
+    operatingCostMultiplier *
+    operatingCostEscalation(state, generator, tickDate);
   const fuel = FUELS[generator.fuel];
   if (!fuel) {
     return variableOM;
@@ -3894,6 +3916,7 @@ function updateSupplyFacilitiesFinances(
                     startCost:
                       (generator.costPerStart || 0) *
                       GAME_TO_REAL_YEARS *
+                      operatingCostEscalation(state, generator, tickDate) *
                       (tickStoryEffects.operatingCostMultipliersByFuel?.[
                         generator.fuel
                       ] || 1),
@@ -4219,6 +4242,13 @@ function updateSupplyFacilitiesFinances(
   const revenueBasisW = grossLocalSupplyW + importedW;
   const revenuePerSuppliedW =
     revenueBasisW > 0 ? (customerRevenue + revenueExports) / revenueBasisW : 0;
+  // Non-fuel operating costs were quoted in each facility's purchase-month dollars and escalate
+  // with inflation from there (see operatingCostEscalation)
+  const costIndexNow = getInflationIndex(
+    tickDate,
+    state.startingYear,
+    state.seed,
+  );
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
@@ -4245,8 +4275,10 @@ function updateSupplyFacilitiesFinances(
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
       facilityOM *=
-        (g.fuel && tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
-        1;
+        ((g.fuel &&
+          tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
+          1) *
+        (costIndexNow / (g.costIndexAtBuild || 1));
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
@@ -4736,6 +4768,17 @@ function buildFacilityHelper(
           }
         : {}),
       ...financing,
+      // The quote's O&M is in this month's dollars; escalation is measured from here. The
+      // starting fleet is quoted on the opening day, where the index is 1.
+      ...(!newGame && hasEconomy()
+        ? {
+            costIndexAtBuild: getInflationIndex(
+              state.date,
+              state.startingYear,
+              state.seed,
+            ),
+          }
+        : {}),
       lifetimeWh: 0,
       lifetimePotentialWh: 0,
       lifetimeRevenue: 0,

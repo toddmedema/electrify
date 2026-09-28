@@ -432,6 +432,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
+        (current.costIndexAtBuild !== undefined &&
+          !(
+            typeof current.costIndexAtBuild === "number" &&
+            Number.isFinite(current.costIndexAtBuild) &&
+            current.costIndexAtBuild > 0
+          )) ||
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validUpgradeInProgress(current.upgradeInProgress)

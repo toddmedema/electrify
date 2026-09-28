@@ -66,8 +66,8 @@ The EIA AEO2025 reference designs also update:
   to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and
   variable O&M is charged against actual representative-month generation. A 100 MW build at the
   modeled 20% capacity factor therefore quotes $3.085 million/year fixed plus $4.505 million/year
-  variable, or $7.590 million/year before difficulty and later game inflation. Those multipliers
-  are persisted at construction.
+  variable, or $7.590 million/year before difficulty and later game inflation. Difficulty is
+  persisted at construction; the quote then escalates with game inflation from the purchase month.
 - Onshore wind: $33.06/kW-year fixed O&M, 21-month reference lead time, and 25-year life.
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
@@ -176,7 +176,7 @@ The simulation now distinguishes three aging effects that were previously easy t
 At 0.5% annual degradation, solar retains `0.995^20 = 90.5%` of its original output after 20
 years—about a 9.5% loss, not 20%. Weather and curtailment still vary actual production around that
 aged maximum. The build screen's lifetime cost integrates the same compounding output curve. Fixed
-annual O&M remains flat; Oil variable O&M, fuel, and carbon costs scale only with energy actually
+annual O&M does not fall with output but escalates with inflation from purchase; Oil variable O&M, fuel, and carbon costs scale only with energy actually
 produced.
 
 Scenario starting ages are deliberately authored rather than inferred from technology or scenario
@@ -227,8 +227,8 @@ Coal uses NREL's conservative hot-start values for 500-1,300 MW supercritical un
 of capitalized cycling and maintenance plus $5.81/MW-start of auxiliary operations, chemicals,
 water, and additives. Converting 2011 dollars with CPI-U (`304.702 / 224.939`) gives
 $81.0185278/MW-start in 2023 dollars, or $52,662.04 for the game's 650 MW reference plant before
-difficulty and game inflation. The resulting cost is fixed when the facility is created and is not
-repriced each month. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
+difficulty and game inflation. The resulting cost is quoted when the facility is created and then escalates with game
+inflation, like every other non-fuel operating cost. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
 
 Natural Gas alone shows the 900-start hot-gas-path and 1,800-start major-inspection context. Those
 intervals do not trigger a second refurbishment bill: EIA's per-start value is already the

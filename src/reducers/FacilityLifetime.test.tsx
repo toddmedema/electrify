@@ -181,6 +181,29 @@ describe("per-facility lifetime totals", () => {
     });
   });
 
+  it("escalates O&M quoted in purchase-month dollars with inflation since", () => {
+    const state = createGame({ scenarioId: 103, difficulty: "CEO" });
+    tickState(state);
+    const coal = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Coal",
+    ) as FacilityOperatingType;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.btuPerWh = 0;
+      facility.paused = facility.id !== coal.id;
+    });
+    coal.annualOperatingCost = TICKS_PER_YEAR * 1000;
+    coal.costPerStart = 0;
+    // Bought when prices were half of today's: its O&M now costs twice the quote
+    coal.costIndexAtBuild = 0.5;
+
+    tickState(state);
+
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(2000, 6);
+  });
+
   it("charges Oil fixed and actual-output O&M once to both sets of books", () => {
     const state = createGame({ scenarioId: 101, difficulty: "CEO" });
     tickState(state);
