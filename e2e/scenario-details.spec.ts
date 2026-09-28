@@ -13,12 +13,12 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game" }).click();
-    const menu = page
+    // The mission summary's info button is the way into the full requirements
+    const details = page
       .locator("#appbar:visible")
-      .getByRole("button", { name: "menu", exact: true })
+      .getByRole("button", { name: "All requirements" })
       .first();
-    await menu.click();
-    await page.getByRole("menuitem", { name: "Scenario details" }).click();
+    await details.click();
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });
     await expect(dialog).toBeVisible();
     await expect(
@@ -71,8 +71,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "pause", exact: true })
       .first()
       .click();
-    await menu.click();
-    await page.getByRole("menuitem", { name: "Scenario details" }).click();
+    await details.click();
     await expect(dialog.getByText(/points per/).first()).toBeAttached();
     const content = dialog.locator(".MuiDialogContent-root");
     expect(

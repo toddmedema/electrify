@@ -70,13 +70,11 @@ test("public insights show the rate score and an absolute customer objective", a
   }
   await page
     .locator("#appbar:visible")
-    .getByRole("button", { name: "menu", exact: true })
+    .getByRole("button", { name: "All requirements" })
     .first()
     .click();
-  await page.getByRole("menuitem", { name: "Scenario details" }).click();
   await expect(page.getByRole("dialog")).toContainText("14,850 customers");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
-    await page.getByRole("menu").waitFor({ state: "hidden" });
     await page.waitForTimeout(400);
     await page.screenshot({
       path: path.join(reviewDir, "customer-objective.png"),
