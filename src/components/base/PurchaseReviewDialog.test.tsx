@@ -1,4 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { store } from "../../Store";
 import PurchaseReviewDialog, {
   financingShortfallText,
 } from "./PurchaseReviewDialog";
@@ -10,18 +12,20 @@ function renderDialog(
 ) {
   const onPurchase = jest.fn();
   render(
-    <PurchaseReviewDialog
-      open
-      title="Build it?"
-      cash={1000000}
-      buildCost={2000000}
-      interestRate={0.05}
-      upkeepPerMonth={1000}
-      onlineInMonths={12}
-      onClose={jest.fn()}
-      onPurchase={onPurchase}
-      {...overrides}
-    />,
+    <Provider store={store}>
+      <PurchaseReviewDialog
+        open
+        title="Build it?"
+        cash={1000000}
+        buildCost={2000000}
+        interestRate={0.05}
+        upkeepPerMonth={1000}
+        onlineInMonths={12}
+        onClose={jest.fn()}
+        onPurchase={onPurchase}
+        {...overrides}
+      />
+    </Provider>,
   );
   const button = (label: string) =>
     screen.getByText(label, { selector: "button" });

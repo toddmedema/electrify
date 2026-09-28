@@ -137,6 +137,7 @@ export function validBuildFacility(raw: unknown): raw is {
       "annualOutputDegradation",
       "minimumStableOutput",
       "costPerStart",
+      "assumedStartsPerYear",
       "variableOperatingCostPerMWh",
       "reservoirCapacityWh",
       "hydroWhPerMm",

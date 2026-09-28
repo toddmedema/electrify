@@ -35,13 +35,32 @@ for (const theme of ["light", "dark"] as const) {
     await expect(card).toContainText("Portfolio outlook");
     await expect(card).toContainText("Shortfall covered");
     await expect(card).toContainText("Gap with half the spare supply");
+    // Freeze the quote before checking its exact cash delta; navigation may have
+    // allowed a tick before the catalog opened.
+    await page.getByRole("button", { name: "pause", exact: true }).click();
+    const cash = await page.evaluate(() => {
+      window.dispatchEvent(new Event("pagehide"));
+      const { game } = JSON.parse(localStorage.getItem("savedGame")!);
+      return game.timeline.find(
+        (tick: { minute: number }) => tick.minute === game.date.minute,
+      ).cash as number;
+    });
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
     await expect(dialog).toContainText("5MW access · Ready in 12 months");
-    await expect(dialog).toContainText("$50M → $48.2M");
+    const cashFact = dialog
+      .locator(".decisionImpactFact")
+      .filter({ hasText: "Cash purchase" });
+    const quoted = (await cashFact.innerText()).match(
+      /\$([\d.]+)M → \$([\d.]+)M/,
+    );
+    expect(quoted).not.toBeNull();
+    // This scenario's balances are quoted in millions, rounded to one decimal.
+    expect(Number(quoted![1])).toBeCloseTo(cash / 1_000_000, 1);
+    expect(Number(quoted![2])).toBeCloseTo((cash - 1_800_000) / 1_000_000, 1);
     await expect(dialog).toContainText("Payments start now");
     await expect(dialog).toContainText("$3k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone.

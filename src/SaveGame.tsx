@@ -411,6 +411,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       ].some((value) => typeof value !== "number" || !Number.isFinite(value));
       const optionalNumbersInvalid = [
         current.costPerStart,
+        current.assumedStartsPerYear,
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,

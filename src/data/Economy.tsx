@@ -476,3 +476,15 @@ export function getCostTableDeflator(startingYear: number): number {
     CPI_U_ANNUAL_AVERAGE[year] / CPI_U_ANNUAL_AVERAGE[COST_TABLE_DOLLAR_YEAR]
   );
 }
+
+/** Carries an authored 2023-dollar cost into the current month of a run. */
+export function getCostTableIndex(
+  date: MonthRefType,
+  startingYear: number,
+  seed: number,
+): number {
+  return (
+    getCostTableDeflator(startingYear) *
+    getInflationIndex(date, startingYear, seed)
+  );
+}

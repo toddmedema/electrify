@@ -114,6 +114,14 @@ export function useWorkerRequest<Req, Reply, Res>(
           // An unhandled worker error is re-raised on the window. It is handled here, so it must
           // not also be reported as an uncaught runtime error.
           event.preventDefault();
+          // A failed script may leave a Worker object that accepts messages but never
+          // replies. Retire it so the next request can create a working replacement.
+          if (shared.current === worker) shared.current = undefined;
+          if (worker) {
+            worker.onmessage = null;
+            worker.onerror = null;
+            worker.terminate();
+          }
           failed();
         };
         worker.postMessage(current.message(id));

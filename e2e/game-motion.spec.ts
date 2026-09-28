@@ -121,11 +121,12 @@ test("exchange direction stays readable on narrow screens and with reduced motio
     window.dispatchEvent(new Event("pagehide"));
     const save = JSON.parse(localStorage.getItem("savedGame")!);
     save.game.transmission.lines[0].yearsToBuildLeft = 0;
-    const coal = save.game.facilities.find(
-      (plant: { fuel: string }) => plant.fuel === "Coal",
-    );
-    coal.paused = true;
-    coal.currentW = 0;
+    // Guarantee a local shortfall: a gas plant can cover demand even with coal paused.
+    // This test exercises import presentation, not the scenario's generation balance.
+    for (const plant of save.game.facilities) {
+      plant.paused = true;
+      plant.currentW = 0;
+    }
     localStorage.setItem("savedGame", JSON.stringify(save));
   });
   await page.reload();
@@ -137,6 +138,13 @@ test("exchange direction stays readable on narrow screens and with reduced motio
   );
   const exchange = page.locator(".powerExchangeSummary");
   await exchange.scrollIntoViewIfNeeded();
+  // Loading restores the saved timeline. Let dispatch refresh the edited fleet and line.
+  await expect(page.getByRole("group", { name: "game speed" })).toHaveCount(1);
+  await page.getByRole("button", { name: "normal speed", exact: true }).click();
+  await expect(
+    exchange.getByRole("heading", { name: "Importing" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
     exchange.getByRole("heading", { name: "Importing" }),
   ).toBeVisible();

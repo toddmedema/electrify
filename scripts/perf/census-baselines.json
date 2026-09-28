@@ -3,28 +3,28 @@
     "ordinary": {
       "commits": 31,
       "dispatches": 31,
-      "mutationRecords": 65,
+      "mutationRecords": 67,
       "addedNodes": 0,
       "removedNodes": 0,
       "attributeMutations": 49,
-      "textMutations": 16
+      "textMutations": 18
     },
     "rollover": {
       "commits": 7,
       "dispatches": 6,
-      "mutationRecords": 42,
+      "mutationRecords": 43,
       "addedNodes": 1,
       "removedNodes": 0,
       "attributeMutations": 31,
-      "textMutations": 10
+      "textMutations": 11
     },
     "catalog": {
       "commits": 11,
       "dispatches": 1,
       "mutationRecords": 45,
-      "addedNodes": 5,
+      "addedNodes": 4,
       "removedNodes": 11,
-      "attributeMutations": 29,
+      "attributeMutations": 30,
       "textMutations": 0
     }
   },
@@ -32,28 +32,28 @@
     "ordinary": {
       "commits": 31,
       "dispatches": 31,
-      "mutationRecords": 58,
+      "mutationRecords": 60,
       "addedNodes": 0,
       "removedNodes": 0,
       "attributeMutations": 49,
-      "textMutations": 9
+      "textMutations": 11
     },
     "rollover": {
       "commits": 7,
       "dispatches": 6,
-      "mutationRecords": 12,
+      "mutationRecords": 13,
       "addedNodes": 0,
       "removedNodes": 0,
       "attributeMutations": 9,
-      "textMutations": 3
+      "textMutations": 4
     },
     "catalog": {
       "commits": 13,
       "dispatches": 1,
-      "mutationRecords": 37,
+      "mutationRecords": 38,
       "addedNodes": 6,
       "removedNodes": 6,
-      "attributeMutations": 25,
+      "attributeMutations": 26,
       "textMutations": 0
     }
   }

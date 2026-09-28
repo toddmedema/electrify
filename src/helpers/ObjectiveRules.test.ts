@@ -1,7 +1,8 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { runSimulation } from "../testing/Simulator";
 import { MonthlyHistoryType, ScenarioType } from "../Types";
-import { bestReachableCustomers } from "./Customers";
+import { bestReachableCustomers, nextCustomerCount } from "./Customers";
+import { TICKS_PER_MONTH } from "../Constants";
 import {
   decidedObjectiveFailure,
   formatRequiredShare,
@@ -27,7 +28,7 @@ const row = (
 
 describe("best reachable customers", () => {
   it("grows a public utility only organically", () => {
-    expect(bestReachableCustomers(1000, 12, "Public")).toBeCloseTo(1015, 6);
+    expect(bestReachableCustomers(1000, 12, "Public")).toBeCloseTo(1015.113, 3);
     expect(bestReachableCustomers(1000, 0, "Public")).toBe(1000);
   });
 
@@ -135,4 +136,31 @@ describe("required share formatting", () => {
     expect(formatRequiredShare(0.995)).toBe("99.5%");
     expect(formatRequiredShare(0.98)).toBe("98%");
   });
+});
+
+it("does not declare attainable public retention impossible", () => {
+  let customers = 1000;
+  for (let tick = 0; tick < 84 * TICKS_PER_MONTH; tick++) {
+    customers = nextCustomerCount({
+      customers,
+      customerRate: 0.1,
+      marketRate: 0.1,
+      marketSize: 2000,
+      ownership: "Public",
+    });
+  }
+  expect(bestReachableCustomers(1000, 84, "Public")).toBeGreaterThanOrEqual(
+    customers,
+  );
+  const recoverable = {
+    ...scenario(106),
+    startingCustomers: customers,
+    minimumCustomerRetention: 1,
+  };
+  expect(
+    decidedObjectiveFailure(recoverable, [row(2029, 1, 1, 1000)], {
+      startingCustomers: customers,
+      monthsRemaining: 84,
+    }),
+  ).toBeUndefined();
 });

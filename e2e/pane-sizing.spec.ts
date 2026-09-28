@@ -21,6 +21,11 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     for (const width of [1024, 1100, 1440, 1920, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 });
+      // Wait for the resized layout to mount before checking that the old one left.
+      // A count of one can also describe the old layout before resize is processed.
+      await expect(
+        page.locator(width >= 1300 ? ".desktop-layout" : ".pane-layout"),
+      ).toBeVisible();
       // A pane-count breakpoint keeps the outgoing layout mounted during its exit.
       // Interact only with the settled layout, not a menu that is about to unmount.
       await expect(page.locator(".cardTransitions > main")).toHaveCount(1);

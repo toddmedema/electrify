@@ -40,7 +40,7 @@ describe("plants running above demand", () => {
       ),
     ).toHaveLength(0);
     expect(mothballAdvice(coal() as never)).toMatch(
-      /^Coal ran above demand at its 40% minimum output/,
+      /^Coal has a 40% minimum output/,
     );
   });
 
@@ -64,6 +64,19 @@ describe("plants running above demand", () => {
       (event) => event.title === "Plant running above demand",
     );
     expect(advice).toHaveLength(1);
-    expect(advice[0].message).toMatch(/Pause it on the Facilities screen/);
+    expect(advice[0].message).toMatch(
+      /Consider pausing it on the Facilities screen/,
+    );
   }, 120000);
 });
+
+it.each(["exportedW", "storageChargeW"] as const)(
+  "does not call useful %s output wasted",
+  (flow) => {
+    const month = {
+      demandWh: 150_000_000 * HOURS,
+      chartAverage: { [flow]: 60_000_000 },
+    };
+    expect(generatorsAboveDemandFloor([coal()], month)).toHaveLength(0);
+  },
+);

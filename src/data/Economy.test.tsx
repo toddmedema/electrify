@@ -1,5 +1,6 @@
 import {
   getCostTableDeflator,
+  getCostTableIndex,
   getInflationIndex,
   hasEconomy,
   initEconomy,
@@ -248,4 +249,14 @@ describe("getCostTableDeflator", () => {
     expect(getCostTableDeflator(2023)).toBe(1);
     expect(getCostTableDeflator(2080)).toBe(1);
   });
+});
+
+it("carries table-dollar upkeep through historical deflation and subsequent inflation", () => {
+  initEconomyFromCsv(fixtureCsv());
+  const opening = getCostTableIndex(dateIn(2000, 1), 2000, SEED);
+  expect(opening).toBeCloseTo(172.2 / 304.702, 12);
+  expect(getCostTableIndex(dateIn(2005, 1), 2000, SEED)).toBeCloseTo(
+    opening * Math.pow(1 + FIXTURE_INFLATION / 12, 60),
+    10,
+  );
 });

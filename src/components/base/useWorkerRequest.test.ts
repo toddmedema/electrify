@@ -150,3 +150,32 @@ it("reuses one worker and ignores replies to older requests", () => {
   unmount();
   expect(worker.terminate).toHaveBeenCalled();
 });
+
+it("replaces a worker after an asynchronous failure so later forecasts can finish", () => {
+  const broken = stubWorker();
+  const replacement = stubWorker();
+  const create = jest
+    .fn()
+    .mockReturnValueOnce(broken)
+    .mockReturnValueOnce(replacement);
+  const { result, rerender } = renderHook(
+    ({ key }) => useWorkerRequest(job(key), options(create, true)),
+    { initialProps: { key: "a" } },
+  );
+  act(() => jest.advanceTimersByTime(100));
+  act(() =>
+    broken.onerror!({ preventDefault: jest.fn() } as unknown as ErrorEvent),
+  );
+  expect(result.current).toEqual({ status: "error", reason: "failed" });
+  rerender({ key: "b" });
+  act(() => jest.advanceTimersByTime(100));
+  expect(create).toHaveBeenCalledTimes(2);
+  expect(broken.terminate).toHaveBeenCalledTimes(1);
+  const id = replacement.postMessage.mock.calls[0][0].id;
+  act(() =>
+    replacement.onmessage!({
+      data: { requestId: id, value: 9 },
+    } as MessageEvent<Reply>),
+  );
+  expect(result.current).toEqual({ status: "ready", result: 9 });
+});

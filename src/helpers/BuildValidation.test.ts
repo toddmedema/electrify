@@ -131,3 +131,16 @@ describe("validRetrofitFacility", () => {
     });
   });
 });
+
+it.each([-1, NaN, Infinity, "daily", null])(
+  "rejects invalid annual start assumptions (%p) in imported build quotes",
+  (assumedStartsPerYear) => {
+    expect(valid(generator({ assumedStartsPerYear }))).toBe(false);
+  },
+);
+it.each([0, 20, 100, 365])(
+  "accepts finite nonnegative annual start assumptions (%p)",
+  (assumedStartsPerYear) => {
+    expect(valid(generator({ assumedStartsPerYear }))).toBe(true);
+  },
+);

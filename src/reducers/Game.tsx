@@ -83,7 +83,7 @@ import {
   estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
 import {
-  getCostTableDeflator,
+  getCostTableIndex,
   getInflationIndex,
   getInflationRate,
   getPrimeRate,
@@ -4457,8 +4457,11 @@ function updateSupplyFacilitiesFinances(
   // into the run's money the same way: deflated to the starting year, then escalated with the
   // game's inflation. Line capex is still charged at the authored quote, because saves validate
   // a line's investment by rebuilding those quotes exactly.
-  const transmissionCostIndex =
-    getCostTableDeflator(state.startingYear) * costIndexNow;
+  const transmissionCostIndex = getCostTableIndex(
+    tickDate,
+    state.startingYear,
+    state.seed,
+  );
   operatingLines.forEach((line) => {
     expensesOM +=
       (line.annualOperatingCost * transmissionCostIndex) / ticksPerYear;

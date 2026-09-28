@@ -30,7 +30,23 @@ for (const scenario of [106, 107]) {
             ? "Negotiate the data-center connection"
             : "Prepare for the deep freeze",
       });
-      await expect(dialog).toBeVisible({ timeout: 120000 });
+      // Critical weather/news can pause the clock before the required story choice.
+      // Resume those pauses, but leave every modal for the assertions below to inspect.
+      await expect
+        .poll(
+          async () => {
+            if (await dialog.isVisible()) return true;
+            if (
+              (await page.getByRole("dialog").count()) === 0 &&
+              (await fast.getAttribute("aria-pressed")) === "false"
+            ) {
+              await fast.click();
+            }
+            return dialog.isVisible();
+          },
+          { timeout: 120000, intervals: [1000] },
+        )
+        .toBe(true);
       await expect(dialog).toContainText("Paused");
       await expect(dialog.getByRole("button")).toHaveCount(2);
       if (scenario === 106) {

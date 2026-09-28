@@ -1,3 +1,4 @@
+import { getCostTableIndex } from "../../data/Economy";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import {
   accessContextForGame,
@@ -389,6 +390,7 @@ function IntertieBuildItem(props: {
  * more, not which corridor to open.
  */
 function IntertieUpgradeControl(props: {
+  costIndex: number;
   line: TransmissionLineOperatingType;
   cash?: number;
   year: number;
@@ -510,8 +512,10 @@ function IntertieUpgradeControl(props: {
             },
           ]}
           upkeepLabel="Upkeep after upgrade"
-          upkeepBeforePerMonth={line.annualOperatingCost / 12}
-          upkeepPerMonth={quote.annualOperatingCost / 12}
+          upkeepBeforePerMonth={
+            (line.annualOperatingCost * props.costIndex) / 12
+          }
+          upkeepPerMonth={(quote.annualOperatingCost * props.costIndex) / 12}
           upkeepDetail="Plus electricity purchases and loan payments."
           onlineInLabel="Upgrade complete in"
           onlineInMonths={months}
@@ -888,6 +892,11 @@ export default function TransmissionPanel({
                     {outlook && <IntertieYear outlook={outlook} />}
                     {!building && (
                       <IntertieUpgradeControl
+                        costIndex={getCostTableIndex(
+                          game.date,
+                          game.startingYear,
+                          game.seed,
+                        )}
                         line={line}
                         context={accessContextForGame(game)}
                         cash={now?.cash}
@@ -1081,7 +1090,11 @@ export default function TransmissionPanel({
               )}
             </Box>
           }
-          upkeepPerMonth={review.annualOperatingCost / 12}
+          upkeepPerMonth={
+            (review.annualOperatingCost *
+              getCostTableIndex(game.date, game.startingYear, game.seed)) /
+            12
+          }
           upkeepDetail="Plus electricity purchases and loan payments."
           onPurchase={approve}
         />
