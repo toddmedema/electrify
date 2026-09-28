@@ -3,7 +3,7 @@ import { LCWH } from "../helpers/Financials";
 import { buildStorySnapshot } from "../helpers/Story";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { hasFuelPrices } from "./FuelPrices";
-import { getInflationIndex, hasEconomy } from "./Economy";
+import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
@@ -23,22 +23,22 @@ import { resolveStoryAtDate } from "./WorldEvents";
 import { applyDefaultResilience } from "../helpers/Hazards";
 
 /**
- * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
- * here is quoted in real terms - the exponents that remain are technology trends, not price
- * levels - so inflation is what carries them forward from the day the run opens.
- *
- * The index is anchored on the game's own starting year, so the opening month always costs
- * exactly what the table says whether the scenario begins in 1980 or 2020. Anchoring it on a
- * fixed year instead would hand a 1980 run 1980 dollar costs against a nominal retail rate and
- * make it trivially profitable.
+ * What a dollar in the tables below is worth by the time the game reaches this month. The tables
+ * are in 2023 dollars (COST_TABLE_DOLLAR_YEAR); the exponents that remain are technology trends,
+ * not price levels. A run that opens before 2023 has them deflated into its starting year's own
+ * dollars with recorded CPI-U, because its fuel prices and retail rates are that year's nominal
+ * values too. From there the game's own inflation index carries them forward.
  *
  * The custom game screen asks what can be built before any game has loaded the economic data,
  * so an unloaded index is 1 rather than a thrown error - the same reason hasFuelPrices exists.
  */
 function getCostInflation(state: GameType): number {
-  return hasEconomy()
-    ? getInflationIndex(state.date, state.startingYear, state.seed)
-    : 1;
+  return (
+    getCostTableDeflator(state.startingYear) *
+    (hasEconomy()
+      ? getInflationIndex(state.date, state.startingYear, state.seed)
+      : 1)
+  );
 }
 
 // Offshore wind is the only technology here whose real costs rose before learning won: projects
