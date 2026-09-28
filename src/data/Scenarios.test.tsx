@@ -290,7 +290,7 @@ describe("authored starting fleets", () => {
       durationMonths: 192,
       startingCustomers: 16_500,
       ownership: "Public",
-      dollarsPerkWh: 0.055,
+      dollarsPerkWh: 0.1,
       minimumCustomerRetention: 0.9,
     });
     expect(manassas.location).toMatchObject({
@@ -319,7 +319,7 @@ describe("authored starting fleets", () => {
       durationMonths: 84,
       startingCustomers: 472_701,
       ownership: "Public",
-      dollarsPerkWh: 0.05,
+      dollarsPerkWh: 0.09,
       reliabilityObjective: {
         year: 2021,
         month: 2,

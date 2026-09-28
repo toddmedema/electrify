@@ -283,7 +283,10 @@ Everything a run pays or earns is in the same nominal dollars:
   value scaled by the state's 1990 ratio. The game carries no distribution network costs, so the
   rate is the generation-plus-transmission share: EIA's energy-only providers charged 59% of full
   retail nationally in 2020. Tutorials keep their authored teaching rates, and non-U.S. scenarios
-  keep their researched local rates.
+  keep their researched local rates. The two researched U.S. public utilities (Data Center Boom,
+  Deep Freeze) also keep their utilities' own average tariffs for now, because their demand,
+  fleets and choice balance are calibrated to them; moving them to the generation share needs its
+  own rebalance of those calibrations.
 
 ## Simulation and teaching boundaries
 

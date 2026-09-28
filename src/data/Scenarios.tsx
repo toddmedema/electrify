@@ -1202,7 +1202,10 @@ export const SCENARIOS: ScenarioType[] = [
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
     minimumCustomerRetention: 0.9,
-    dollarsPerkWh: 0.055, // 0.6 x EIA 2020 VA average retail, 9.16 cents
+    // Manassas City Utilities' researched average tariff. The two researched public-utility
+    // scenarios keep their calibrated full tariffs rather than the 60% generation-share convention
+    // (docs/facilities-economics.md): their demand, fleet and choice balance are fitted to them.
+    dollarsPerkWh: 0.1,
     cash: 25000000,
     feePerKgCO2e: 0,
     facilities: [
@@ -1261,7 +1264,8 @@ export const SCENARIOS: ScenarioType[] = [
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
     // Calibrated without utility-emissions weather forcing; representative days remain approximate.
     startingDemandScale: 7.75,
-    dollarsPerkWh: 0.05, // 0.6 x EIA 2017 TX average retail, 8.38 cents
+    // Austin Energy's researched average tariff; see the Manassas note above.
+    dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
     reliabilityObjective: {
