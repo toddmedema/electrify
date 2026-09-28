@@ -19,6 +19,7 @@ export interface Props {
   dollarsPerkWh: number;
   startingCustomers?: number;
   minimumCustomerRetention?: number;
+  requiresGridInvestment?: boolean;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
   difficulty?: DifficultyType;
   meaningfulDecisions?: MeaningfulDecisionType[];
@@ -101,6 +102,12 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
             ? " in every event month"
             : ""}
           . A month below target ends the run.
+        </p>
+      )}
+      {props.requiresGridInvestment && (
+        <p>
+          Required: build or upgrade the grid. Changing prices alone does not
+          fulfill this mission.
         </p>
       )}
       {minimumCustomerRetention !== undefined && (

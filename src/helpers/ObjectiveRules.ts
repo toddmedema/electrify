@@ -160,6 +160,12 @@ export function scenarioObjectiveFailure(
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the customers you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
     }
   }
+  if (
+    scenario.requiresGridInvestment &&
+    !meaningfulDecisions.some((d) => d.kind === "asset")
+  ) {
+    return "Build or upgrade the grid; changing prices alone does not fulfill this mission.";
+  }
   const gate = difficulty && meaningfulDecisionRequirement(difficulty);
   if (!scenario.tutorialSteps && !decisionGateWaived && gate) {
     const categories = meaningfulDecisionCategoryCount(meaningfulDecisions);

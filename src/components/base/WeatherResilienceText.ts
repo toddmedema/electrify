@@ -1,5 +1,9 @@
 import { formatTemperature } from "../../helpers/Units";
-import { ResilienceUpgradeType, UnitSystemType } from "../../Types";
+import {
+  FacilityUpgradeType,
+  ResilienceUpgradeType,
+  UnitSystemType,
+} from "../../Types";
 
 /**
  * Copy shared by the build dialog, the facility details pane and the fleet row, so a weather
@@ -15,8 +19,10 @@ export function formatDesignTemperature(
 }
 
 /** The upgrade's name mid-sentence, e.g. "cold-weather package". */
-export function resilienceName(upgrade: ResilienceUpgradeType): string {
+export function resilienceName(upgrade: FacilityUpgradeType): string {
   switch (upgrade) {
+    case "combinedCycle":
+      return "combined-cycle generation";
     case "hailResistant":
       return "hail-resistant panels";
     case "solarTrackers":

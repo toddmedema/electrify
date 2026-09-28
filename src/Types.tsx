@@ -872,6 +872,7 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
+  requiresGridInvestment?: boolean;
   /** Optional requirement to serve a specific month without falling below a reliability target. */
   reliabilityObjective?: {
     year: number;
@@ -1033,15 +1034,17 @@ export interface WeatherHazardProfileType {
 /** The replayed payload for adding a resilience upgrade to a standing facility. */
 export interface RetrofitFacilityAction {
   facilityId: number;
-  upgrade: ResilienceUpgradeType;
+  upgrade: FacilityUpgradeType;
 }
+
+export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";
 
 /**
  * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
  * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
  */
 export interface FacilityUpgradeInProgressType {
-  upgrade: ResilienceUpgradeType;
+  upgrade: FacilityUpgradeType;
   cost: number; // What the player paid, and what a cancellation refunds
   startsMinute: number;
   completesMinute: number;

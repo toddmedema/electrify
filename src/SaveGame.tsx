@@ -443,7 +443,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
         !validGasCycle(current.fuel, current.gasCycle) ||
-        !validUpgradeInProgress(current.upgradeInProgress)
+        !validUpgradeInProgress(current.upgradeInProgress) ||
+        ((current.upgradeInProgress as { upgrade?: unknown } | undefined)
+          ?.upgrade === "combinedCycle" &&
+          (current.fuel !== "Natural Gas" || current.gasCycle !== "simple"))
       );
     }) ||
     !Array.isArray(game.timeline) ||

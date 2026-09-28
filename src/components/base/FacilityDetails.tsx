@@ -1,3 +1,4 @@
+import GasConversion from "./GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
@@ -534,6 +535,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           )}
         </dl>
       </section>
+      {props.game && !props.readOnly && (
+        <GasConversion
+          facility={facility}
+          game={props.game}
+          onRetrofit={props.onRetrofit}
+        />
+      )}
       {resilience && props.game && (
         <WeatherResilienceSection
           facility={facility}

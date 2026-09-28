@@ -37,6 +37,7 @@ export default function VictoryConditionsDialog({
           dollarsPerkWh={scenario.dollarsPerkWh}
           startingCustomers={scenario.startingCustomers}
           minimumCustomerRetention={scenario.minimumCustomerRetention}
+          requiresGridInvestment={scenario.requiresGridInvestment}
           reliabilityObjective={scenario.reliabilityObjective}
           difficulty={difficulty}
           meaningfulDecisions={meaningfulDecisions}

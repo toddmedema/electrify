@@ -59,22 +59,22 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   },
   101: {
     initialBuild: {
-      name: "Natural Gas Peaker",
-      peakW: 300000000,
+      name: "Natural Gas CC",
+      peakW: 600000000,
       financed: true,
     },
     sellFacilityId: 2,
-    sellAtMonth: 143,
+    sellAtMonth: 100,
     scheduledActions: [
-      rate(0.1),
+      rate(0.075),
       {
         month: 1,
         type: "build",
         build: { name: "Natural Gas Peaker", peakW: 20000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4]),
-      { month: 141, type: "toggle", facilityId: 1 },
-      { month: 142, type: "toggle", facilityId: 2 },
+      { month: 99, type: "toggle", facilityId: 1 },
+      { month: 99, type: "toggle", facilityId: 2 },
     ],
   },
   102: {
@@ -87,6 +87,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellAtMonth: 39,
     scheduledActions: [
       rate(0.15),
+      { month: 120, type: "rate", dollarsPerkWh: 0.04 },
       {
         month: 1,
         type: "build",
@@ -107,6 +108,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellAtMonth: 39,
     scheduledActions: [
       rate(0.11),
+      { month: 120, type: "rate", dollarsPerkWh: 0.055 },
       {
         month: 1,
         type: "build",
