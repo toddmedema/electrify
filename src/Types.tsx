@@ -1033,15 +1033,17 @@ export interface WeatherHazardProfileType {
 /** The replayed payload for adding a resilience upgrade to a standing facility. */
 export interface RetrofitFacilityAction {
   facilityId: number;
-  upgrade: ResilienceUpgradeType;
+  upgrade: FacilityUpgradeType;
 }
+
+export type FacilityUpgradeType = ResilienceUpgradeType | "combinedCycle";
 
 /**
  * A retrofit being installed on a standing facility. The plant is offline from startsMinute until
  * completesMinute, when the upgrade takes effect; cancelling before then refunds `cost` in full.
  */
 export interface FacilityUpgradeInProgressType {
-  upgrade: ResilienceUpgradeType;
+  upgrade: FacilityUpgradeType;
   cost: number; // What the player paid, and what a cancellation refunds
   startsMinute: number;
   completesMinute: number;

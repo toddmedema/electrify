@@ -1,7 +1,7 @@
 import {
   FacilityShoppingType,
   GasCycleType,
-  ResilienceUpgradeType,
+  FacilityUpgradeType,
   RetrofitFacilityAction,
 } from "../Types";
 import { DESIGN_MIN_TEMP_BOUNDS_C } from "../data/Hazards";
@@ -15,10 +15,11 @@ function nonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-const RESILIENCE_UPGRADES: readonly ResilienceUpgradeType[] = [
+const FACILITY_UPGRADES: readonly FacilityUpgradeType[] = [
   "hailResistant",
   "coldWeatherPackage",
   "solarTrackers",
+  "combinedCycle",
 ];
 
 const RESILIENCE_FIELDS_BY_FUEL: Readonly<Record<string, readonly string[]>> = {
@@ -77,7 +78,7 @@ export function validUpgradeInProgress(raw: unknown): boolean {
   if (!raw || typeof raw !== "object") return false;
   const upgrade = raw as Record<string, unknown>;
   return (
-    RESILIENCE_UPGRADES.includes(upgrade.upgrade as ResilienceUpgradeType) &&
+    FACILITY_UPGRADES.includes(upgrade.upgrade as FacilityUpgradeType) &&
     nonNegative(upgrade.cost) &&
     nonNegative(upgrade.startsMinute) &&
     nonNegative(upgrade.completesMinute) &&
@@ -105,7 +106,7 @@ export function validRetrofitFacility(
   return (
     Number.isSafeInteger(payload.facilityId) &&
     (payload.facilityId as number) >= 0 &&
-    RESILIENCE_UPGRADES.includes(payload.upgrade as ResilienceUpgradeType)
+    FACILITY_UPGRADES.includes(payload.upgrade as FacilityUpgradeType)
   );
 }
 

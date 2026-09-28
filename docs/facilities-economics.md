@@ -433,3 +433,20 @@ All values are rounded game balance, not a site-specific risk assessment.
 ## Conventional Hydro site inventories
 
 Capacity ceilings, provenance, coverage gaps, deterministic allocation and scenario exceptions are documented in [Hydro sites](hydro-sites.md).
+
+## Peaker conversion gameplay assumptions
+
+Existing simple-cycle gas plants can convert from 1990 onward. The conversion
+retains nameplate capacity, remaining life, debt, weather hardening, dispatch
+position and lifetime accounting. It costs half the current same-capacity CC
+build quote, including difficulty, historical dollars, inflation and story
+cost modifiers, paid in cash. Six months offline and the 50% cost share are
+explicit game-design assumptions, not sourced engineering estimates. Plants
+with six months or less of remaining design life are ineligible.
+
+Completion applies the existing EIA-based CC heat rate, ramp/start time,
+minimum output, fixed and variable O&M, start cost and capacity factor. Costs
+are translated back to the asset's original cost-index basis so subsequent
+inflation is applied exactly once. Cancellation before completion refunds
+payment and removes the investment decision. The shared retrofit replay and
+save paths preserve both the outage and completion.

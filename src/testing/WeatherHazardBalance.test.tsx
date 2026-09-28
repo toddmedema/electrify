@@ -18,6 +18,8 @@ const base = SCENARIOS.find((s) => s.id === 100)!;
 function customAt(locationId: string): ScenarioType {
   return {
     ...base,
+    // This fixture measures physical hazards, independent of authored mission objectives.
+    minimumCustomerRetention: undefined,
     id: CUSTOM_SCENARIO_ID,
     name: `Custom ${locationId}`,
     locationId,

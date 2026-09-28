@@ -1,6 +1,10 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { runSimulation } from "../testing/Simulator";
-import { MonthlyHistoryType, ScenarioType } from "../Types";
+import {
+  MeaningfulDecisionType,
+  MonthlyHistoryType,
+  ScenarioType,
+} from "../Types";
 import { bestReachableCustomers, nextCustomerCount } from "./Customers";
 import { TICKS_PER_MONTH } from "../Constants";
 import {
@@ -25,6 +29,48 @@ const row = (
     supplyWh: 1000 * served,
     customers,
   }) as MonthlyHistoryType;
+
+it("requires 80% retention without requiring a grid investment", () => {
+  const rate: MeaningfulDecisionType = {
+    key: "rate",
+    lever: "rate",
+    kind: "rate",
+    label: "Change rate",
+    before: "0",
+    after: "1",
+    month: 0,
+  };
+  expect(
+    scenarioObjectiveFailure(
+      scenario(100),
+      [row(2031, 12, 1, 799)],
+      "Employee",
+      [rate],
+      false,
+      1000,
+    ),
+  ).toMatch(/customers/);
+  expect(
+    scenarioObjectiveFailure(
+      scenario(100),
+      [row(2031, 12, 1, 800)],
+      "Employee",
+      [rate],
+      false,
+      1000,
+    ),
+  ).toBeUndefined();
+  expect(
+    scenarioObjectiveFailure(
+      scenario(100),
+      [row(2031, 12, 1, 1000)],
+      "Employee",
+      [],
+      true,
+      1000,
+    ),
+  ).toBeUndefined();
+});
 
 describe("best reachable customers", () => {
   it("grows a public utility only organically", () => {
@@ -94,7 +140,12 @@ describe("retention baseline", () => {
     expect(retentionBaseline(scenario(106), 1)).toBe(16500);
     const investor = { ...scenario(100), minimumCustomerRetention: 0.5 };
     expect(retentionBaseline(investor, 2_000_000)).toBe(1_000_000);
-    expect(retentionBaseline(scenario(100), 2_000_000)).toBeUndefined();
+    expect(
+      retentionBaseline(
+        { ...scenario(100), minimumCustomerRetention: undefined },
+        2_000_000,
+      ),
+    ).toBeUndefined();
     expect(
       scenarioObjectiveFailure(
         investor,

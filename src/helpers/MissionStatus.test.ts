@@ -153,7 +153,7 @@ test("survival is chronological completed evidence and ignores current partial h
 
 test("retention shows current customers against final target while recoverable", () => {
   const scenario = SCENARIOS.find(
-    (s) => s.minimumCustomerRetention !== undefined,
+    (s) => s.minimumCustomerRetention !== undefined && s.ownership === "Public",
   )!;
   const game = createGame({ scenarioId: scenario.id });
   const threshold =
@@ -176,7 +176,7 @@ test("retention shows current customers against final target while recoverable",
 
 test("retention reads as failed once best-case growth cannot recover it", () => {
   const scenario = SCENARIOS.find(
-    (s) => s.minimumCustomerRetention !== undefined,
+    (s) => s.minimumCustomerRetention !== undefined && s.ownership === "Public",
   )!;
   const game = createGame({ scenarioId: scenario.id });
   const lost = createNextState(game, (g) => {

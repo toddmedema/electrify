@@ -126,7 +126,9 @@ describe("meaningful decisions", () => {
   });
 
   it("makes the Intern and diverse CEO objectives explicit, with a legacy waiver", () => {
-    const scenario = SCENARIOS.find(({ id }) => id === 100)!;
+    const scenario = {
+      ...SCENARIOS.find(({ id }) => id === 100)!,
+    };
     const one = choices(1);
     const nine = choices(9, ["asset", "rate", "policy", "dispatch"]);
     const tenOneKind = choices(10);
@@ -152,7 +154,9 @@ describe("meaningful decisions", () => {
   });
 
   it("asks for a larger, more varied plan at every step up in difficulty", () => {
-    const scenario = SCENARIOS.find(({ id }) => id === 100)!;
+    const scenario = {
+      ...SCENARIOS.find(({ id }) => id === 100)!,
+    };
     const order = ["Intern", "Employee", "Manager", "VP", "CEO"] as const;
     order.slice(1).forEach((difficulty, index) => {
       const easier = MEANINGFUL_DECISION_REQUIREMENTS[order[index]];

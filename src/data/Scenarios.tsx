@@ -1035,10 +1035,11 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
       objective:
-        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee.",
+        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee. Retain at least 80% of your starting customers.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
+    minimumCustomerRetention: 0.8,
     startingYear: 2020,
     cash: 330000000,
     feePerKgCO2e: 50 / 1000,
@@ -1066,10 +1067,11 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
       objective:
-        "Stay solvent for 20 years through a gas boom and whatever follows.",
+        "Stay solvent for 20 years through a gas boom and whatever follows. Retain at least 80% of your starting customers.",
       threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
+    minimumCustomerRetention: 0.8,
     startingYear: 2006,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -1087,10 +1089,12 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
-      objective: "Keep the island supplied and solvent as oil prices swing.",
+      objective:
+        "Keep the island supplied and solvent as oil prices swing. Retain at least 80% of your starting customers.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
+    minimumCustomerRetention: 0.8,
     startingYear: 2004,
     cash: 275000000,
     feePerKgCO2e: 0,
@@ -1113,11 +1117,12 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
       objective:
-        "Stay solvent and keep up with demand as clean technology gets cheaper.",
+        "Stay solvent and keep up with demand as clean technology gets cheaper. Retain at least 80% of your starting customers.",
       threat:
         "Invest too early and overpay; wait too long and demand may exceed supply.",
     },
     ownership: "Investor",
+    minimumCustomerRetention: 0.8,
     startingYear: 2002,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -1172,10 +1177,12 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "legacy",
       fantasy: "Decide what comes after a century of coal.",
-      objective: "Build a new business before old coal plants hold you back.",
+      objective:
+        "Build a new business before old coal plants hold you back. Retain at least 80% of your starting customers.",
       threat: "Old plants, new rivals, and slow construction punish delay.",
     },
     ownership: "Investor",
+    minimumCustomerRetention: 0.8,
     startingYear: 1980,
     // The authored coal derate temporarily avoids loss-making generation. Keep the original
     // CEO balance gate intact: a passive fleet still runs out of runway before year twenty.
