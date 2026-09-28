@@ -1,3 +1,4 @@
+import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -21,6 +22,7 @@ for (const theme of ["light", "dark"] as const) {
     await details.click();
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });
     await expect(dialog).toBeVisible();
+    await expectDialogToFit(dialog);
     await expect(
       dialog.getByText(/Score appears after your first month/),
     ).toBeAttached();
@@ -55,7 +57,25 @@ for (const theme of ["light", "dark"] as const) {
     const preparedness = page.getByRole("dialog", {
       name: "Wildfire preparedness",
     });
-    await expect(preparedness).toBeVisible({ timeout: 30000 });
+    // Weather/news may pause before this choice. Resume those ordinary pauses only.
+    const fast = page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first();
+    await expect
+      .poll(
+        async () => {
+          if (await preparedness.isVisible()) return true;
+          if (
+            (await page.getByRole("dialog").count()) === 0 &&
+            (await fast.getAttribute("aria-pressed")) === "false"
+          )
+            await fast.click();
+          return preparedness.isVisible();
+        },
+        { timeout: 30000, intervals: [1000] },
+      )
+      .toBe(true);
     await preparedness.getByRole("button", { name: "Keep cash" }).click();
     await page
       .locator("#appbar:visible")

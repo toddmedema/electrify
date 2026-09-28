@@ -1,3 +1,4 @@
+import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "@playwright/test";
 
@@ -43,6 +44,7 @@ for (const theme of ["light", "dark"]) {
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
+    await expectDialogToFit(dialog);
     const newGame = dialog.getByRole("button", {
       name: "New game",
       exact: true,
@@ -73,6 +75,15 @@ for (const theme of ["light", "dark"]) {
         ),
       });
     }
+    await dialog
+      .getByRole("button", { name: /Challenge a friend|Share result/ })
+      .click();
+    const preview = page.getByRole("dialog", {
+      name: /Challenge a friend|Share result/,
+    });
+    await expectDialogToFit(preview);
+    await preview.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(preview).toHaveCount(0);
     await replay.click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();

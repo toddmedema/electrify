@@ -398,7 +398,12 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           },
         },
       },
-      MuiDialogTitle: { styleOverrides: { root: { padding: 16 } } },
+      MuiDialogTitle: {
+        styleOverrides: {
+          // User-entered preset names and imported names can have no word boundaries.
+          root: { padding: 16, overflowWrap: "anywhere" },
+        },
+      },
       MuiDialogContent: { styleOverrides: { root: { padding: 16 } } },
       MuiDialogActions: {
         defaultProps: { disableSpacing: true },

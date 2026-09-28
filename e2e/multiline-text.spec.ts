@@ -1,3 +1,4 @@
+import { expectDialogToFit } from "./dialog-layout";
 import { expect, Locator, test } from "@playwright/test";
 import { openPane } from "./layout";
 
@@ -48,6 +49,47 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.locator("main.base_main")).toHaveCount(1);
     });
 
+    test(`Build header keeps title, cash and speed controls together in ${theme}`, async ({
+      page,
+    }, info) => {
+      const header = page.locator(".constructionTitleBar");
+      const title = header.locator(".constructionTitle");
+      const speeds = header.locator(".constructionSpeed");
+      const close = header.getByRole("button", { name: "close", exact: true });
+      await expect(speeds).toBeVisible();
+      const boxes = await Promise.all(
+        [header, title, speeds, close].map((el) => el.boundingBox()),
+      );
+      const [bar, heading, clock, dismiss] = boxes.map((box) => box!);
+      expect(bar.height).toBeLessThanOrEqual(56);
+      expect(
+        Math.abs(clock.y + clock.height / 2 - dismiss.y - dismiss.height / 2),
+      ).toBeLessThanOrEqual(1);
+      expect(heading.x + heading.width).toBeLessThanOrEqual(clock.x + 1);
+      expect(clock.x + clock.width).toBeLessThanOrEqual(bar.x + bar.width);
+      await expectTextToFit(title.locator(".iconLabel, .constructionCash"));
+      if (info.project.use.hasTouch) {
+        for (const button of await speeds.getByRole("button").all()) {
+          const box = (await button.boundingBox())!;
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+        }
+      }
+      await page.screenshot({
+        path: info.outputPath(`build-header-${theme}.png`),
+        animations: "disabled",
+      });
+      // Stress the same layout with the formatter's wider negative-balance text.
+      // This probe changes only text, keeping the real header, styles and controls.
+      const cash = title.locator(".constructionCash");
+      await cash.evaluate((el) => {
+        el.textContent = "$-9.99M cash";
+      });
+      await expectTextToFit(title.locator(".iconLabel, .constructionCash"));
+      const cashBox = (await cash.boundingBox())!;
+      expect(cashBox.x + cashBox.width + 4).toBeLessThanOrEqual(clock.x);
+    });
+
     test(`purchase explanations and long titles wrap in ${theme}`, async ({
       page,
     }, info) => {
@@ -67,6 +109,7 @@ for (const theme of ["light", "dark"] as const) {
         const dialog = page.getByRole("dialog");
         await expect(dialog).toBeVisible();
         await expect(page.locator(".MuiDialog-root")).toHaveCSS("opacity", "1");
+        await expectDialogToFit(dialog);
         const content = dialog.locator(".MuiDialogContent-root");
         expect(
           await content.evaluate((el) => el.scrollWidth - el.clientWidth),
