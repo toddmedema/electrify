@@ -841,7 +841,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       roundTripEfficiency: 0.8,
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
-      hourlyLoss: 0.001,
+      // Evaporation and seepage only: about 0.012%/day, within the 0-0.02%/day that published
+      // storage comparisons give (Luo et al. 2015, Applied Energy 137:511, Table 5). The former
+      // 0.1%/h lost half an upper reservoir in a month, penalizing the multi-day holding pumped
+      // hydro exists for.
+      hourlyLoss: 0.000005,
       annualOperatingCost: 0.0019 * peakWh,
       // NREL 2024 ATB fixed O&M is $19/kW-year, or $1.90/kWh-year at ten hours.
       yearsToBuild: 6 + magnitude,
