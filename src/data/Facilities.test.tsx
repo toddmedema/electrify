@@ -6,6 +6,7 @@ import {
   STORAGE,
 } from "./Facilities";
 import { LOCATIONS, GAME_TO_REAL_YEARS } from "../Constants";
+import { getCostTableDeflator } from "./Economy";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { estimatedAnnualOperatingCost } from "../helpers/Financials";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
@@ -332,6 +333,23 @@ describe("offshore wind", () => {
     const perW =
       (generatorAt(newYork, 2000, 5000000)?.buildCost as number) / 5e6;
     expect(perW).toBeLessThan(15);
+  });
+});
+
+describe("pre-2020 batteries", () => {
+  it("costs about $2/Wh in 2010 rather than the 2020 price", () => {
+    const perWh = (year: number) => {
+      const battery = STORAGE(stateAt(france, year), 600000000).find(
+        (facility) => facility.name === "Battery",
+      )!;
+      // Undo the starting-year deflator so years compare in the table's 2023 dollars
+      return battery.buildCost / 600000000 / getCostTableDeflator(year);
+    };
+    expect(perWh(2010) / perWh(2020)).toBeCloseTo(
+      Math.exp((10 / 4.5) * Math.LN2),
+      3,
+    );
+    expect(perWh(2010)).toBeGreaterThan(1.8);
   });
 });
 

@@ -19,7 +19,9 @@ Capital costs use exponential interpolation between observations. Costs are held
 observation before the comparison window and at the latest observation afterward, except for wind
 and solar: IRENA publishes five-year outlook values for those technologies, so they continue to
 those values through 2029 and then stop. Pre-2020 wind and solar retain the game's historical
-learning curves, re-anchored to the inflation-normalized 2020 observation.
+learning curves, re-anchored to the inflation-normalized 2020 observation. Pre-2020 batteries
+double in cost every 4.5 years back from 2020 (about $2/Wh in 2010, consistent with BNEF pack prices
+of $1,100-1,400/kWh then plus balance of system) instead of being held at the 2020 price.
 
 Published costs are for reference projects, while the player can choose almost any plant size. The
 model therefore treats a technology-specific share of the reference project as fixed and the rest

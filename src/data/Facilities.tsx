@@ -218,8 +218,21 @@ function geothermalCostPerW2024(year: number): number {
   return costBetween(year, 2020, 4.468 * CPI_2020_TO_2024, 2024, 4.015);
 }
 
+// Before 2020, installed cost doubles every 4.5 years back in time: about $2/Wh in 2010, in line
+// with BNEF's ~$1,100-1,400/kWh pack prices then (real) plus balance of system. Clamping to the
+// 2020 cost handed the 2000s scenarios modern storage at a quarter of its price.
+const BATTERY_PRE_2020_DOUBLING_YEARS = 4.5;
+
 function batteryCostPerWh2024(year: number): number {
-  return costBetween(year, 2020, 0.345 * CPI_2020_TO_2024, 2024, 0.192);
+  const cost2020 = 0.345 * CPI_2020_TO_2024;
+  if (year < 2020) {
+    // exp rather than a power: V8's exp is platform-independent (fdlibm)
+    return (
+      cost2020 *
+      Math.exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
+    );
+  }
+  return costBetween(year, 2020, cost2020, 2024, 0.192);
 }
 
 // The curves above are anchored on IRENA's (and NREL's) 2024-dollar observations. Every table
