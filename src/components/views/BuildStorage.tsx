@@ -21,14 +21,17 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { getMonthlyPayment } from "../../helpers/Financials";
+import {
+  facilityLoanMonths,
+  getMonthlyPayment,
+} from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
-import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
+import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import ManualLink from "../base/ManualLink";
@@ -69,7 +72,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
     props.interestRate,
-    LOAN_MONTHS,
+    facilityLoanMonths(props.storage.lifespanYears),
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const maxSizeWh = floorToTwoSignificantDigits(storage.maxPeakWh);
@@ -277,7 +280,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               {
                 concept: "finances",
                 label: "Loan option",
-                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${facilityLoanMonths(props.storage.lifespanYears) / 12} years)`,
                 detail: "Payments start now.",
               },
               {

@@ -69,6 +69,7 @@ import {
   facilityCashBack,
   getCreditInputs,
   getCreditPremium,
+  facilityLoanMonths,
   getMonthlyPayment,
   getPaymentInterest,
   facilityOutputFactor,
@@ -4770,7 +4771,7 @@ function buildFacilityHelper(
         loanMonthlyPayment: getMonthlyPayment(
           loanAmount,
           state.interestRate,
-          LOAN_MONTHS,
+          facilityLoanMonths(g.lifespanYears),
         ),
         interestRate: state.interestRate,
       };

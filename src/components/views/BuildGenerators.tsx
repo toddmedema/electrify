@@ -29,6 +29,7 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
   estimatedAnnualVariableOperatingCost,
+  facilityLoanMonths,
   getMonthlyPayment,
 } from "../../helpers/Financials";
 import {
@@ -40,7 +41,6 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
-  LOAN_MONTHS,
   MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
@@ -345,7 +345,7 @@ export function GeneratorBuildItem(
   const quoteMonthlyPayment = getMonthlyPayment(
     quote.buildCost - quoteDownpayment,
     props.interestRate,
-    LOAN_MONTHS,
+    facilityLoanMonths(quote.lifespanYears),
   );
   const quoteCanBuild = buildable && quoteDownpayment <= cash;
   const resilienceOptionId = React.useId();
@@ -804,7 +804,7 @@ export function GeneratorBuildItem(
               {
                 concept: "finances",
                 label: "Loan option",
-                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
+                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${facilityLoanMonths(quote.lifespanYears) / 12} years)`,
                 detail: "Payments start now.",
               },
               {

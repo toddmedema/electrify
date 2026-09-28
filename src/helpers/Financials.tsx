@@ -2,6 +2,7 @@ import {
   DAYS_PER_YEAR,
   feeableKgCO2ePerBtu,
   HOURS_PER_YEAR_REAL,
+  LOAN_MONTHS,
 } from "../Constants";
 import {
   DateType,
@@ -18,6 +19,22 @@ import {
   EMPTY_HISTORY,
   reduceHistories,
 } from "./DateTime";
+
+// Project finance tenors run shorter than the asset: about 15-20 years for renewables and storage.
+const LOAN_TENOR_SHARE_OF_LIFE = 0.8;
+
+/**
+ * A facility build loan's term: the standard LOAN_MONTHS, but never beyond 80% of the asset's
+ * life, so a 20-year battery or 25-year wind farm is not still amortizing debt after its resale
+ * value has reached zero.
+ */
+export function facilityLoanMonths(lifespanYears: number): number {
+  if (!(lifespanYears > 0)) return LOAN_MONTHS;
+  return Math.min(
+    LOAN_MONTHS,
+    Math.round(lifespanYears * 12 * LOAN_TENOR_SHARE_OF_LIFE),
+  );
+}
 
 // Get the monthly payment amount for a new loan
 // https://codepen.io/joeymack47/pen/fHwvd?editors=1010

@@ -1,5 +1,6 @@
 import {
   capitalRecoveryFactor,
+  facilityLoanMonths,
   CreditInputsType,
   degradedLifetimeYears,
   facilityCashBack,
@@ -466,5 +467,14 @@ describe("facility aging", () => {
     });
     expect(facilityEquivalentCycles(battery)).toBeCloseTo(2.5, 10);
     expect(facilityEquivalentCycles(aFacility())).toBeUndefined();
+  });
+});
+
+describe("facilityLoanMonths", () => {
+  it("never lends beyond 80% of the asset's life, up to 30 years", () => {
+    expect(facilityLoanMonths(20)).toBe(192);
+    expect(facilityLoanMonths(25)).toBe(240);
+    expect(facilityLoanMonths(40)).toBe(360);
+    expect(facilityLoanMonths(75)).toBe(360);
   });
 });
