@@ -16,7 +16,9 @@ import {
 } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
 import {
+  decidedObjectiveFailure,
   hasChronicBlackouts,
+  retentionBaseline,
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
@@ -3197,16 +3199,32 @@ export function tickState(state: GameType) {
       };
 
       const chronicBlackouts = hasChronicBlackouts(history);
+      const termMonths = scenario.durationMonths || 12 * 20;
+      const retentionStart = retentionBaseline(
+        scenario,
+        state.customerMarketSize,
+      );
+      // Objectives are judged in full at term end; before that, only once already decided
       const objectiveFailure =
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20)
+        state.date.monthsElapsed === termMonths
           ? scenarioObjectiveFailure(
               scenario,
               history,
               state.difficulty,
               state.meaningfulDecisions,
               !!state.meaningfulDecisionGateWaived,
+              retentionStart,
             )
-          : undefined;
+          : state.date.monthsElapsed < termMonths && !isTutorial
+            ? decidedObjectiveFailure(scenario, history, {
+                startingCustomers: retentionStart,
+                monthsRemaining: termMonths - state.date.monthsElapsed,
+                marketSize: customerMarketSizeAt(
+                  state.customerMarketSize,
+                  now.minute,
+                ),
+              })
+            : undefined;
       const failure =
         now.cash < 0
           ? ({

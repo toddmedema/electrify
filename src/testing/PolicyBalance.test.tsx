@@ -18,6 +18,7 @@ describe.each([106, 107, 113])(
           scenarioId,
           seed: 4,
           months: MONTHS,
+          endOnDecidedObjective: false,
           initialPrograms: { efficiency, solar },
         });
       const off = play("Off", "Off");
@@ -29,6 +30,7 @@ describe.each([106, 107, 113])(
         scenarioId,
         seed: 4,
         months: MONTHS,
+        endOnDecidedObjective: false,
         scheduledActions: [
           { month: 6, type: "policy", id: "efficiency", tier: "On" },
         ],

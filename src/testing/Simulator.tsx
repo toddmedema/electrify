@@ -37,6 +37,11 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { customerMarketSizeAt } from "../helpers/Customers";
+import {
+  decidedObjectiveFailure,
+  retentionBaseline,
+} from "../helpers/ObjectiveRules";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
 import { summarizeWildfireImpact } from "../helpers/Wildfire";
@@ -126,6 +131,9 @@ export interface SimOptionsType {
   wildfireHazardEnabled?: boolean;
   // Hail and extreme-cold hazards, on by default. Off runs the identical strategy without them.
   weatherHazardsEnabled?: boolean;
+  // On by default, like the real game: a decided objective ends the run. Accounting checks that
+  // need a fixed horizon regardless of the objective can keep playing, like an unscored sandbox.
+  endOnDecidedObjective?: boolean;
   scheduledActions?: ScheduledSimActionType[];
 }
 
@@ -144,6 +152,7 @@ export interface ResolvedSimOptionsType {
   storyEffectsEnabled: boolean;
   wildfireHazardEnabled: boolean;
   weatherHazardsEnabled: boolean;
+  endOnDecidedObjective: boolean;
   scheduledActions: ScheduledSimActionType[];
 }
 
@@ -403,6 +412,7 @@ function resolveOptions(
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
     wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
     weatherHazardsEnabled: options.weatherHazardsEnabled !== false,
+    endOnDecidedObjective: options.endOnDecidedObjective !== false,
     scheduledActions: options.scheduledActions || [],
   };
 }
@@ -680,6 +690,24 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       break;
     }
 
+    // The real game ends a run as soon as an objective is decided; see decidedObjectiveFailure
+    if (
+      resolved.endOnDecidedObjective &&
+      state.date.monthsElapsed < scenario.durationMonths &&
+      !scenario.tutorialSteps &&
+      decidedObjectiveFailure(scenario, state.monthlyHistory, {
+        startingCustomers: retentionBaseline(
+          scenario,
+          state.customerMarketSize,
+        ),
+        monthsRemaining: scenario.durationMonths - state.date.monthsElapsed,
+        marketSize: customerMarketSizeAt(state.customerMarketSize, now.minute),
+      })
+    ) {
+      firedAtMonth = state.date.monthsElapsed;
+      break;
+    }
+
     if (
       resolved.sellFacilityId !== null &&
       resolved.sellAtMonth > 0 &&
@@ -725,6 +753,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       state.difficulty,
       state.meaningfulDecisions,
       !!state.meaningfulDecisionGateWaived,
+      retentionBaseline(scenario, state.customerMarketSize),
     )
   ) {
     firedAtMonth = state.date.monthsElapsed;

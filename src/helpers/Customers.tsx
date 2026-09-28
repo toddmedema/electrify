@@ -135,6 +135,35 @@ export function customerMarketSizeAt(
   );
 }
 
+/**
+ * The most customers a utility could have after `months`, assuming the best case every month:
+ * full organic growth and, for an investor, winning the maximum switching share of the unserved
+ * market. Public utilities have captive territories, so organic growth is their only path back.
+ * Used to tell when a retention objective can no longer be met.
+ */
+export function bestReachableCustomers(
+  customers: number,
+  months: number,
+  ownership: "Investor" | "Public",
+  marketSize = customers,
+): number {
+  const monthlyGrowth = Math.pow(1 + ORGANIC_GROWTH_MAX_ANNUAL, 1 / 12);
+  let best = customers;
+  let market = marketSize;
+  for (let month = 0; month < months; month++) {
+    best *= monthlyGrowth;
+    market *= monthlyGrowth;
+    if (ownership === "Investor") {
+      best = Math.min(
+        market,
+        best +
+          (Math.max(0, market - best) * CUSTOMER_SWITCHING_MAX_ANNUAL) / 12,
+      );
+    }
+  }
+  return best;
+}
+
 export interface CustomerProjectionInputType {
   customers: number;
   customerRate: number;
