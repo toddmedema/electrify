@@ -25,6 +25,7 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import SortIcon from "@mui/icons-material/Sort";
+import NavigableCardRow from "../base/NavigableCardRow";
 import { getScenarioPlayCounts } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -137,47 +138,40 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
       </span>
     );
   return (
-    <Card
-      data-testid={`mission-row-${s.id}`}
-      className="build-list-item missionItem"
-    >
-      <CardActionArea
-        onClick={onSelect}
-        aria-label={
-          isTutorial
-            ? `${completed ? "Review" : "Start"} ${name}`
-            : `View ${name} details`
-        }
-      >
-        <CardHeader
-          avatar={
-            <Badge
-              overlap="circular"
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              badgeContent={
-                completed ? (
-                  <CheckCircleIcon
-                    data-testid={`mission-complete-${s.id}`}
-                    className="tutorialComplete"
-                    color="primary"
-                    fontSize="small"
-                    titleAccess={`${s.name} completed`}
-                  />
-                ) : undefined
-              }
-            >
-              <Avatar
-                src={`/images/${s.icon.toLowerCase()}.svg`}
-                alt={`${name} icon`}
+    <NavigableCardRow
+      testId={`mission-row-${s.id}`}
+      onOpen={onSelect}
+      ariaLabel={
+        isTutorial
+          ? `${completed ? "Review" : "Start"} ${name}`
+          : `View ${name} details`
+      }
+      showChevron={!isTutorial}
+      avatar={
+        <Badge
+          overlap="circular"
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          badgeContent={
+            completed ? (
+              <CheckCircleIcon
+                data-testid={`mission-complete-${s.id}`}
+                className="tutorialComplete"
+                color="primary"
+                fontSize="small"
+                titleAccess={`${s.name} completed`}
               />
-            </Badge>
+            ) : undefined
           }
-          title={<span>{name}</span>}
-          subheader={<span>{summary}</span>}
-          action={!isTutorial && <ArrowRightIcon color="primary" aria-hidden />}
-        />
-      </CardActionArea>
-    </Card>
+        >
+          <Avatar
+            src={`/images/${s.icon.toLowerCase()}.svg`}
+            alt={`${name} icon`}
+          />
+        </Badge>
+      }
+      title={<span>{name}</span>}
+      description={<span>{summary}</span>}
+    />
   );
 }
 

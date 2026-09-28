@@ -4,9 +4,6 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardActionArea,
-  CardHeader,
   Dialog,
   FormControlLabel,
   IconButton,
@@ -20,13 +17,13 @@ import {
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CloseIcon from "@mui/icons-material/Close";
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import FactoryIcon from "@mui/icons-material/Factory";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import NavigableCardRow from "../base/NavigableCardRow";
 import {
   cancelPolicy,
   chooseScenarioResponse,
@@ -53,14 +50,9 @@ import {
   policyAvailable,
   policyBudget,
   policyTotalCost,
-  programCustomers,
   isOperatingPolicy,
 } from "../../helpers/Policies";
-import {
-  getDateFromMinute,
-  getTimeFromTimeline,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   formatPercent,
   formatMoneyConcise,
@@ -84,6 +76,13 @@ import {
   wildfireSeasonOdds,
   WildfirePreparednessType,
 } from "../../helpers/Wildfire";
+import {
+  buildoutImpact,
+  choiceStatus,
+  labelMonth,
+  programStatus,
+  pendingLabel,
+} from "../../helpers/PolicyStatus";
 import { isDesktopScreen } from "../../Globals";
 import { buildSpeedOptions } from "../base/GameAppBar";
 import PolicyDemandChart, {
@@ -99,15 +98,6 @@ import {
 // it appears keeps the dialog from changing height when an estimate arrives.
 const NOTE_SLOT = { minHeight: "2lh" };
 
-// A fire season can open before the run did, so months may be negative.
-const labelMonth = (game: GameType, month: number) => {
-  const d = getDateFromMinute(
-    (((month % 12) + 12) % 12) * MINUTES_PER_MONTH,
-    game.startingYear + Math.floor(month / 12),
-  );
-  return `${d.month} ${d.year}`;
-};
-
 const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   efficiency: EnergySavingsLeafIcon,
   solar: SolarPowerIcon,
@@ -120,58 +110,6 @@ const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
   efficiency: "Efficiency",
   solar: "Rooftop solar",
 };
-
-/** Build-out programs read as projects; operating offers are simply on or off. */
-function programStatus(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  if (isOperatingPolicy(id)) return program.tier;
-  const buildout = id as BuildoutPolicyId;
-  if (buildoutComplete(program.adoption))
-    return program.completedMonth === undefined
-      ? "Completed"
-      : `Completed ${labelMonth(game, program.completedMonth)}`;
-  if (program.tier === "On")
-    return `In progress · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
-  if (program.adoption > 0)
-    return `Paused · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
-  return "Not started";
-}
-
-function pendingLabel(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  const pending = program.pending!;
-  const when = labelMonth(game, pending.month);
-  if (isOperatingPolicy(id))
-    return pending.tier === "Off"
-      ? `Turns off ${when}`
-      : `${program.tier === "On" ? "Window moves" : "Turns on"} ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
-  if (pending.tier === "Off") return `Pauses ${when}`;
-  return program.adoption > 0 ? `Resumes ${when}` : `Starts ${when}`;
-}
-
-/** The list's status line: the current state, then any change scheduled for next month. */
-function choiceStatus(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  const status = programStatus(game, id, program);
-  if (!program.pending) return status;
-  const pending = pendingLabel(game, id, program);
-  return `${status} · ${pending[0].toLowerCase()}${pending.slice(1)}`;
-}
-
-function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
-  return id === "solar"
-    ? `${formatWatts(POLICIES.solar.cap * programCustomers(game))} of rooftop panels`
-    : `Home and business use ${Math.round(POLICIES.efficiency.applianceSaving * 100)}% lower, heating and cooling ${Math.round(POLICIES.efficiency.weatherSaving * 100)}% lower`;
-}
 
 /** Project facts and progress for a finite rebate build-out. */
 function BuildoutSummary({
@@ -538,6 +476,339 @@ function WildfireDetails({
   );
 }
 
+/** The catalog of programs, grouped by what kind of commitment each one is. */
+function ProgramList({
+  game,
+  programs,
+  policiesOn,
+  preparedness,
+  onOpen,
+  onOpenWildfire,
+}: {
+  game: GameType;
+  programs: Record<PolicyId, PolicyProgramType>;
+  policiesOn: boolean;
+  preparedness: WildfirePreparednessType | undefined;
+  onOpen: (id: PolicyId) => void;
+  onOpenWildfire: () => void;
+}) {
+  const finished = (id: PolicyId) =>
+    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
+  // Rows share the scenario pick list's card, so both catalogs scan the same way.
+  const row = ({
+    id,
+    name,
+    status,
+    description,
+    Icon,
+    done,
+    active,
+    onOpen: open,
+  }: {
+    id: string;
+    name: string;
+    status: string;
+    description?: string;
+    Icon: typeof ScheduleIcon;
+    done?: boolean;
+    active?: boolean;
+    onOpen: () => void;
+  }) => (
+    <NavigableCardRow
+      key={id}
+      className="customerProgramItem"
+      done={done}
+      active={active}
+      ariaLabel={`${name} · ${status}`}
+      ariaDescribedBy={description ? `program-description-${id}` : undefined}
+      onOpen={open}
+      avatar={
+        <Avatar className="customerProgramIcon">
+          <Icon aria-hidden />
+        </Avatar>
+      }
+      title={
+        <span className="customerProgramTitle">
+          <span>{name}</span>
+          <span className="customerProgramStatus">{status}</span>
+        </span>
+      }
+      description={
+        description && (
+          <span id={`program-description-${id}`}>{description}</span>
+        )
+      }
+    />
+  );
+  const choice = (id: PolicyId) => {
+    const done = finished(id);
+    return row({
+      id,
+      name: POLICIES[id].name,
+      status: choiceStatus(game, id, programs[id]),
+      description: done ? undefined : POLICIES[id].description,
+      Icon: PROGRAM_ICONS[id],
+      done,
+      active: !done && (programs[id].tier === "On" || !!programs[id].pending),
+      onOpen: () => onOpen(id),
+    });
+  };
+  const section = (title: string, rows: React.ReactNode[]) =>
+    rows.length > 0 && (
+      <Box
+        component="section"
+        aria-label={title}
+        className="customerProgramSection"
+      >
+        <Typography component="h3" variant="subtitle2">
+          {title}
+        </Typography>
+        {rows}
+      </Box>
+    );
+  return (
+    <Box className="customerProgramList">
+      <Typography variant="body2" color="textSecondary">
+        {preparedness
+          ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
+          : "Changes start next month."}
+      </Typography>
+      {policiesOn &&
+        section(
+          "Rebate projects",
+          BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
+        )}
+      {policiesOn &&
+        section(
+          "Rates and contracts",
+          POLICY_IDS.filter(isOperatingPolicy).map(choice),
+        )}
+      {preparedness &&
+        section("Hazard readiness", [
+          row({
+            id: "wildfire",
+            name: "Wildfire preparedness",
+            status: preparednessStatus(preparedness),
+            description:
+              "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
+            Icon: LocalFireDepartmentIcon,
+            active: preparedness.active,
+            onOpen: onOpenWildfire,
+          }),
+        ])}
+      {policiesOn &&
+        section("Completed", POLICY_IDS.filter(finished).map(choice))}
+    </Box>
+  );
+}
+
+/** One demand program: what it does, its settings, and an estimate of the change. */
+function PolicyProgramDetail({
+  game,
+  selected,
+  current,
+  buildout,
+  complete,
+  cancelling,
+  operating,
+  effective,
+  end,
+  month,
+  tier,
+  onTierChange,
+  startHour,
+  onStartHourChange,
+  result,
+  error,
+  onClose,
+  onViewDemand,
+}: {
+  game: GameType;
+  selected: PolicyId;
+  current: PolicyProgramType;
+  buildout: BuildoutPolicyId | undefined;
+  complete: boolean;
+  cancelling: boolean;
+  operating: boolean;
+  effective: number;
+  end: number;
+  month: number;
+  tier: PolicyTier;
+  onTierChange: (tier: PolicyTier) => void;
+  startHour: number;
+  onStartHourChange: (hour: number) => void;
+  result: PolicyPreviewResult | undefined;
+  error: string | undefined;
+  onClose: () => void;
+  onViewDemand: () => void;
+}) {
+  const peakBefore = result ? Math.max(...result.current) : 0;
+  const peakAfter = result ? Math.max(...result.changed) : 0;
+  return (
+    <>
+      <Typography>
+        {complete
+          ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
+          : POLICIES[selected].description}
+      </Typography>
+      {!complete && (
+        <details className="customerProgramHowItWorks">
+          <summary>How it works</summary>
+          <Typography sx={{ mt: 1 }}>{POLICIES[selected].mechanism}</Typography>
+        </details>
+      )}
+      {current.pending && (
+        // A standing notice, not an interruption: it is already true when the card opens.
+        <Alert severity="info" role="status">
+          {pendingLabel(game, selected, current)}
+        </Alert>
+      )}
+      {buildout ? (
+        <BuildoutSummary
+          game={game}
+          id={buildout}
+          program={current}
+          effective={effective}
+          end={end}
+        />
+      ) : (
+        <>
+          <RadioGroup
+            row
+            aria-label="Program status"
+            value={tier}
+            onChange={(e) => {
+              const next = POLICY_TIERS.find((t) => t === e.target.value);
+              if (next) onTierChange(next);
+            }}
+          >
+            {POLICY_TIERS.map((choice) => (
+              <FormControlLabel
+                key={choice}
+                value={choice}
+                control={<Radio />}
+                sx={{ minHeight: 44, m: 0, flex: 1 }}
+                label={choice}
+              />
+            ))}
+          </RadioGroup>
+          {tier !== "Off" && (
+            <TextField
+              select
+              fullWidth
+              label="Daily window"
+              value={startHour}
+              onChange={(event) =>
+                onStartHourChange(Number(event.target.value))
+              }
+              slotProps={{
+                select: { native: true },
+                htmlInput: { style: { minHeight: 24 } },
+              }}
+              helperText={
+                selected === "timeOfUse"
+                  ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                  : undefined
+              }
+            >
+              {Array.from({ length: 24 }, (_, hour) => (
+                <option key={hour} value={hour}>
+                  {policyWindowLabel(hour)}
+                </option>
+              ))}
+            </TextField>
+          )}
+        </>
+      )}
+      {complete || cancelling ? null : effective >= end ? (
+        <Alert severity="info">
+          This run ends before another program change could take effect.
+        </Alert>
+      ) : (
+        <>
+          <Typography component="h3" variant="subtitle1">
+            Estimated utility demand · {labelMonth(game, month)}
+          </Typography>
+          {error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : !result ? (
+            // Mirrors the loaded layout line for line so the dialog keeps its height
+            // when the estimate arrives instead of jumping under the player's pointer
+            <>
+              <Typography variant="body2">
+                Current plan ━ · With this change ┄
+              </Typography>
+              <PolicyDemandChartPlaceholder />
+              <Box aria-hidden>
+                {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
+                  <Typography key={i}>
+                    <Skeleton width={i % 2 ? "60%" : "80%"} />
+                  </Typography>
+                ))}
+                <Typography variant="body2" sx={NOTE_SLOT}>
+                  &nbsp;
+                </Typography>
+              </Box>
+            </>
+          ) : (
+            <>
+              <Typography variant="body2">
+                Current plan ━ · With this change ┄
+              </Typography>
+              <PolicyDemandChart
+                current={result.current}
+                changed={result.changed}
+              />
+              <Box role="status">
+                <Typography>
+                  Peak demand: {formatWatts(peakBefore)} →{" "}
+                  {formatWatts(peakAfter)}
+                </Typography>
+                {!operating && (
+                  <Typography>
+                    Electricity supplied:{" "}
+                    {formatWattHours(result.before.supplyWh)} →{" "}
+                    {formatWattHours(result.after.supplyWh)}
+                  </Typography>
+                )}
+
+                {formatWatts(peakBefore) === formatWatts(peakAfter) ||
+                Math.abs(peakAfter - peakBefore) < peakBefore * 0.001 ? (
+                  <Typography variant="body2" sx={NOTE_SLOT}>
+                    Little change in peak demand.{" "}
+                    {operating
+                      ? "Only eligible loads respond. Try a different daily window to target your peak."
+                      : selected === "solar"
+                        ? "Daylight savings may leave the evening peak unchanged."
+                        : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" sx={NOTE_SLOT} aria-hidden>
+                    &nbsp;
+                  </Typography>
+                )}
+              </Box>
+              {result.after.cash < 0 && (
+                <Alert severity="warning">
+                  Projected cash is negative. Existing debt rules still apply.
+                </Alert>
+              )}
+            </>
+          )}
+        </>
+      )}
+      <Button
+        onClick={() => {
+          onClose();
+          onViewDemand();
+        }}
+      >
+        View demand
+      </Button>
+    </>
+  );
+}
+
 type Selection = PolicyId | "wildfire";
 
 function ProgramsScreen({
@@ -637,8 +908,6 @@ function ProgramsScreen({
     (!operating ||
       tier === "Off" ||
       startHour === (current?.pending?.startHour ?? current?.startHour ?? 17));
-  const finished = (id: PolicyId) =>
-    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
   const open = (id: PolicyId) => {
     const program = programs[id];
     setSelected(id);
@@ -658,87 +927,6 @@ function ProgramsScreen({
         (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
     );
   };
-  // Rows share the scenario pick list's card, so both catalogs scan the same way.
-  const row = ({
-    id,
-    name,
-    status,
-    description,
-    Icon,
-    done,
-    active,
-    onOpen,
-  }: {
-    id: string;
-    name: string;
-    status: string;
-    description?: string;
-    Icon: typeof ScheduleIcon;
-    done?: boolean;
-    active?: boolean;
-    onOpen: () => void;
-  }) => (
-    <Card
-      key={id}
-      className="build-list-item missionItem customerProgramItem"
-      data-completed={done || undefined}
-      data-active={active || undefined}
-    >
-      <CardActionArea
-        aria-label={`${name} · ${status}`}
-        aria-describedby={description ? `program-description-${id}` : undefined}
-        onClick={onOpen}
-      >
-        <CardHeader
-          avatar={
-            <Avatar className="customerProgramIcon">
-              <Icon aria-hidden />
-            </Avatar>
-          }
-          title={
-            <span className="customerProgramTitle">
-              <span>{name}</span>
-              <span className="customerProgramStatus">{status}</span>
-            </span>
-          }
-          subheader={
-            description && (
-              <span id={`program-description-${id}`}>{description}</span>
-            )
-          }
-          action={<ArrowRightIcon color="primary" aria-hidden />}
-        />
-      </CardActionArea>
-    </Card>
-  );
-  const choice = (id: PolicyId) => {
-    const done = finished(id);
-    return row({
-      id,
-      name: POLICIES[id].name,
-      status: choiceStatus(game, id, programs[id]),
-      description: done ? undefined : POLICIES[id].description,
-      Icon: PROGRAM_ICONS[id],
-      done,
-      active: !done && (programs[id].tier === "On" || !!programs[id].pending),
-      onOpen: () => open(id),
-    });
-  };
-  const section = (title: string, rows: React.ReactNode[]) =>
-    rows.length > 0 && (
-      <Box
-        component="section"
-        aria-label={title}
-        className="customerProgramSection"
-      >
-        <Typography component="h3" variant="subtitle2">
-          {title}
-        </Typography>
-        {rows}
-      </Box>
-    );
-  const peakBefore = result ? Math.max(...result.current) : 0;
-  const peakAfter = result ? Math.max(...result.changed) : 0;
   const canChangePreparedness = !!preparedness && !game.replayPlayback;
   const title = selected
     ? selected === "wildfire"
@@ -810,38 +998,14 @@ function ProgramsScreen({
           <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
         </div>
         {!selected ? (
-          <Box className="customerProgramList">
-            <Typography variant="body2" color="textSecondary">
-              {preparedness
-                ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
-                : "Changes start next month."}
-            </Typography>
-            {policiesOn &&
-              section(
-                "Rebate projects",
-                BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
-              )}
-            {policiesOn &&
-              section(
-                "Rates and contracts",
-                POLICY_IDS.filter(isOperatingPolicy).map(choice),
-              )}
-            {preparedness &&
-              section("Hazard readiness", [
-                row({
-                  id: "wildfire",
-                  name: "Wildfire preparedness",
-                  status: preparednessStatus(preparedness),
-                  description:
-                    "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
-                  Icon: LocalFireDepartmentIcon,
-                  active: preparedness.active,
-                  onOpen: () => setSelected("wildfire"),
-                }),
-              ])}
-            {policiesOn &&
-              section("Completed", POLICY_IDS.filter(finished).map(choice))}
-          </Box>
+          <ProgramList
+            game={game}
+            programs={programs}
+            policiesOn={policiesOn}
+            preparedness={preparedness}
+            onOpen={open}
+            onOpenWildfire={() => setSelected("wildfire")}
+          />
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
             <Typography component="h2" variant="h6">
@@ -858,173 +1022,26 @@ function ProgramsScreen({
                 />
               )
             ) : (
-              <>
-                <Typography>
-                  {complete
-                    ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
-                    : POLICIES[selected].description}
-                </Typography>
-                {!complete && (
-                  <details className="customerProgramHowItWorks">
-                    <summary>How it works</summary>
-                    <Typography sx={{ mt: 1 }}>
-                      {POLICIES[selected].mechanism}
-                    </Typography>
-                  </details>
-                )}
-                {current!.pending && (
-                  // A standing notice, not an interruption: it is already true when the card opens.
-                  <Alert severity="info" role="status">
-                    {pendingLabel(game, selected, current!)}
-                  </Alert>
-                )}
-                {buildout ? (
-                  <BuildoutSummary
-                    game={game}
-                    id={buildout}
-                    program={current!}
-                    effective={effective}
-                    end={end}
-                  />
-                ) : (
-                  <>
-                    <RadioGroup
-                      row
-                      aria-label="Program status"
-                      value={tier}
-                      onChange={(e) => setTier(e.target.value as PolicyTier)}
-                    >
-                      {POLICY_TIERS.map((choice) => (
-                        <FormControlLabel
-                          key={choice}
-                          value={choice}
-                          control={<Radio />}
-                          sx={{ minHeight: 44, m: 0, flex: 1 }}
-                          label={choice}
-                        />
-                      ))}
-                    </RadioGroup>
-                    {tier !== "Off" && (
-                      <TextField
-                        select
-                        fullWidth
-                        label="Daily window"
-                        value={startHour}
-                        onChange={(event) =>
-                          setStartHour(Number(event.target.value))
-                        }
-                        slotProps={{
-                          select: { native: true },
-                          htmlInput: { style: { minHeight: 24 } },
-                        }}
-                        helperText={
-                          selected === "timeOfUse"
-                            ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
-                            : undefined
-                        }
-                      >
-                        {Array.from({ length: 24 }, (_, hour) => (
-                          <option key={hour} value={hour}>
-                            {policyWindowLabel(hour)}
-                          </option>
-                        ))}
-                      </TextField>
-                    )}
-                  </>
-                )}
-                {complete || cancelling ? null : effective >= end ? (
-                  <Alert severity="info">
-                    This run ends before another program change could take
-                    effect.
-                  </Alert>
-                ) : (
-                  <>
-                    <Typography component="h3" variant="subtitle1">
-                      Estimated utility demand · {labelMonth(game, month)}
-                    </Typography>
-                    {error ? (
-                      <Alert severity="error">{error}</Alert>
-                    ) : !result ? (
-                      // Mirrors the loaded layout line for line so the dialog keeps its height
-                      // when the estimate arrives instead of jumping under the player's pointer
-                      <>
-                        <Typography variant="body2">
-                          Current plan ━ · With this change ┄
-                        </Typography>
-                        <PolicyDemandChartPlaceholder />
-                        <Box aria-hidden>
-                          {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
-                            <Typography key={i}>
-                              <Skeleton width={i % 2 ? "60%" : "80%"} />
-                            </Typography>
-                          ))}
-                          <Typography variant="body2" sx={NOTE_SLOT}>
-                            &nbsp;
-                          </Typography>
-                        </Box>
-                      </>
-                    ) : (
-                      <>
-                        <Typography variant="body2">
-                          Current plan ━ · With this change ┄
-                        </Typography>
-                        <PolicyDemandChart
-                          current={result.current}
-                          changed={result.changed}
-                        />
-                        <Box role="status">
-                          <Typography>
-                            Peak demand: {formatWatts(peakBefore)} →{" "}
-                            {formatWatts(peakAfter)}
-                          </Typography>
-                          {!operating && (
-                            <Typography>
-                              Electricity supplied:{" "}
-                              {formatWattHours(result.before.supplyWh)} →{" "}
-                              {formatWattHours(result.after.supplyWh)}
-                            </Typography>
-                          )}
-
-                          {formatWatts(peakBefore) === formatWatts(peakAfter) ||
-                          Math.abs(peakAfter - peakBefore) <
-                            peakBefore * 0.001 ? (
-                            <Typography variant="body2" sx={NOTE_SLOT}>
-                              Little change in peak demand.{" "}
-                              {operating
-                                ? "Only eligible loads respond. Try a different daily window to target your peak."
-                                : selected === "solar"
-                                  ? "Daylight savings may leave the evening peak unchanged."
-                                  : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
-                            </Typography>
-                          ) : (
-                            <Typography
-                              variant="body2"
-                              sx={NOTE_SLOT}
-                              aria-hidden
-                            >
-                              &nbsp;
-                            </Typography>
-                          )}
-                        </Box>
-                        {result.after.cash < 0 && (
-                          <Alert severity="warning">
-                            Projected cash is negative. Existing debt rules
-                            still apply.
-                          </Alert>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                <Button
-                  onClick={() => {
-                    onClose();
-                    onViewDemand();
-                  }}
-                >
-                  View demand
-                </Button>
-              </>
+              <PolicyProgramDetail
+                game={game}
+                selected={selected}
+                current={current!}
+                buildout={buildout}
+                complete={complete}
+                cancelling={cancelling}
+                operating={operating}
+                effective={effective}
+                end={end}
+                month={month}
+                tier={tier}
+                onTierChange={setTier}
+                startHour={startHour}
+                onStartHourChange={setStartHour}
+                result={result}
+                error={error}
+                onClose={onClose}
+                onViewDemand={onViewDemand}
+              />
             )}
           </Box>
         )}
