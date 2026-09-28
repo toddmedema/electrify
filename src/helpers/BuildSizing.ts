@@ -1,4 +1,5 @@
 import { FacilityOperatingType, isStorage } from "../Types";
+import { pow } from "./Pow";
 
 /** The size the catalog opens at when nothing of that kind has been built yet */
 export const DEFAULT_BUILD_SIZE = 500000000;
@@ -10,7 +11,7 @@ export const DEFAULT_BUILD_SIZE = 500000000;
 export function sliderTickToW(tick: number): number {
   const exponent = Math.floor(tick / 9) + 6;
   const frontNumber = (tick % 9) + 1;
-  return frontNumber * Math.pow(10, exponent);
+  return frontNumber * pow(10, exponent);
 }
 
 /** The inverse of sliderTickToW, rounding down to the tick at or below the size */
