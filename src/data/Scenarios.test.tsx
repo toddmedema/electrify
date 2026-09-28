@@ -441,3 +441,18 @@ describe("authored starting fleets", () => {
     });
   });
 });
+
+describe("briefing objectives", () => {
+  // A briefing objective is what the player optimises for, so it must not promise a check the
+  // game never makes. The classics that name a clean-up goal are won by surviving the term.
+  it("describe the real win condition in the classic scenarios", () => {
+    [100, 101, 103, 105].forEach((id) => {
+      const scenario = getScenario(id)!;
+      expect(scenario.reliabilityObjective).toBeUndefined();
+      expect([scenario.name, scenario.briefing!.objective]).toEqual([
+        scenario.name,
+        expect.stringMatching(/solvent/),
+      ]);
+    });
+  });
+});

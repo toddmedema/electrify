@@ -1030,7 +1030,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
-      objective: "Replace high-emission power while keeping the lights on.",
+      objective:
+        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
@@ -1054,7 +1055,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
-      objective: "Grow with cheaper gas without relying on it alone.",
+      objective:
+        "Stay solvent for 20 years through a gas boom and whatever follows.",
       threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
@@ -1075,7 +1077,7 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
-      objective: "Use less costly oil while meeting changing demand.",
+      objective: "Keep the island supplied and solvent as oil prices swing.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
@@ -1100,7 +1102,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
-      objective: "Replace aging oil plants with cleaner options.",
+      objective:
+        "Stay solvent and keep up with demand as clean technology gets cheaper.",
       threat:
         "Invest too early and overpay; wait too long and demand may exceed supply.",
     },
