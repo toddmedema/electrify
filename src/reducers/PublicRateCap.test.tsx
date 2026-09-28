@@ -1,4 +1,5 @@
 import { publicRateCap } from "../helpers/Customers";
+import { getScenario } from "../data/Scenarios";
 import { createGame, runSimulation } from "../testing/Simulator";
 import gameReducer, { delta } from "./Game";
 
@@ -16,10 +17,16 @@ describe("public utility board rate cap", () => {
   });
 
   it("caps a public scenario's rate and records the capped value", () => {
-    // Hurricane Season is a public utility with a $0.05 target
+    // Hurricane Season is a public utility
     const game = createGame({ scenarioId: 104 });
-    const cap = publicRateCap(0.05, game.date, game.startingYear, game.seed);
-    const next = gameReducer(game, delta({ dollarsPerkWh: 0.2 }));
+    const cap = publicRateCap(
+      getScenario(104).dollarsPerkWh,
+      game.date,
+      game.startingYear,
+      game.seed,
+    );
+    expect(cap).toBeLessThan(0.3);
+    const next = gameReducer(game, delta({ dollarsPerkWh: 0.3 }));
     expect(next.dollarsPerkWh).toBe(cap);
     expect(next.meaningfulDecisions.find((d) => d.kind === "rate")?.after).toBe(
       String(cap),
@@ -38,17 +45,24 @@ describe("public utility board rate cap", () => {
   });
 
   it("stops a passive public utility from banking a fortune at an extreme rate", () => {
+    const game = createGame({ scenarioId: 104, difficulty: "Employee" });
+    const cap = publicRateCap(
+      getScenario(104).dollarsPerkWh,
+      game.date,
+      game.startingYear,
+      game.seed,
+    );
     const capped = runSimulation({
       scenarioId: 104,
       difficulty: "Employee",
       months: 24,
-      dollarsPerkWh: 0.2,
+      dollarsPerkWh: 0.5,
     });
     const atCap = runSimulation({
       scenarioId: 104,
       difficulty: "Employee",
       months: 24,
-      dollarsPerkWh: 0.1,
+      dollarsPerkWh: cap,
     });
     expect(capped.finalCash).toBe(atCap.finalCash);
   });
