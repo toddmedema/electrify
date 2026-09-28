@@ -491,7 +491,7 @@ export function getRawSolarIrradianceWM2(
       date.minuteOfDay - sunrise,
       sunset - date.minuteOfDay,
     );
-    return irradiance / (1 + pow(Math.E, -0.015 * (minutesFromDark - 200)));
+    return irradiance / (1 + Math.exp(-0.015 * (minutesFromDark - 200)));
   }
   return 0;
 }
