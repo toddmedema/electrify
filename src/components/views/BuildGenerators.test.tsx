@@ -145,7 +145,7 @@ describe("the three-year build forecast", () => {
 it("shows natural-gas base, per-start, and daily-start estimated O&M", async () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
-    (candidate) => candidate.name === "Natural Gas",
+    (candidate) => candidate.name === "Natural Gas Peaker",
   );
   expect(generator).toBeDefined();
 
@@ -164,11 +164,11 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(
     screen.queryByText("Est. operations & maintenance"),
   ).not.toBeInTheDocument();
-  expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
+  expect(screen.queryByText("$11.9M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
   expect(screen.queryByText(/Typical output/)).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Show Natural Gas details" }),
+    screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
 
   expect(
@@ -188,12 +188,14 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated annual O&M.*\$13\.4M\/yr/,
+      name: /Estimated annual O&M.*\$11\.9M\/yr/,
     }),
   ).toBeInTheDocument();
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    screen.getByRole("button", {
+      name: "Review purchase of Natural Gas Peaker",
+    }),
   );
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).not.toHaveTextContent("What changes");
@@ -293,7 +295,7 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
 it("keeps primary generator metrics visible and discloses secondary details", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
-    (candidate) => candidate.name === "Natural Gas",
+    (candidate) => candidate.name === "Natural Gas Peaker",
   )!;
 
   render(
@@ -309,7 +311,7 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
     />,
   );
 
-  expect(screen.getByText("Natural Gas")).toBeInTheDocument();
+  expect(screen.getByText("Natural Gas Peaker")).toBeInTheDocument();
   expect(screen.getByText("On demand")).toBeInTheDocument();
   expect(
     screen.getByRole("img", { name: "Available on demand." }),
@@ -324,7 +326,7 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   expect(screen.queryByText("Emissions")).not.toBeInTheDocument();
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Show Natural Gas details" }),
+    screen.getByRole("button", { name: "Show Natural Gas Peaker details" }),
   );
 
   expect(
@@ -337,7 +339,7 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
 it("keeps the active lifetime-cost sort metric visible on collapsed cards", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
-    (candidate) => candidate.name === "Natural Gas",
+    (candidate) => candidate.name === "Natural Gas Peaker",
   )!;
 
   render(
@@ -359,7 +361,7 @@ it("keeps the active lifetime-cost sort metric visible on collapsed cards", () =
 it("submits a generator purchase only once on a double-click", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
-    (candidate) => candidate.name === "Natural Gas",
+    (candidate) => candidate.name === "Natural Gas Peaker",
   )!;
   const onBuild = jest.fn();
 
@@ -376,7 +378,9 @@ it("submits a generator purchase only once on a double-click", () => {
   );
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    screen.getByRole("button", {
+      name: "Review purchase of Natural Gas Peaker",
+    }),
   );
   const takeLoan = screen.getByRole("button", { name: "Take loan" });
   fireEvent.click(takeLoan);
@@ -388,7 +392,7 @@ it("submits a generator purchase only once on a double-click", () => {
 it("explains affordability and hides comparison when a build is disabled", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
-    (candidate) => candidate.name === "Natural Gas",
+    (candidate) => candidate.name === "Natural Gas Peaker",
   )!;
 
   render(
@@ -408,10 +412,12 @@ it("explains affordability and hides comparison when a build is disabled", () =>
     screen.getByText(/^Need \$.+ down payment · you have \$0$/),
   ).toBeVisible();
   expect(
-    screen.queryByRole("button", { name: /Compare Natural Gas/ }),
+    screen.queryByRole("button", { name: /Compare Natural Gas Peaker/ }),
   ).toBeNull();
   expect(
-    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+    screen.getByRole("button", {
+      name: "Review purchase of Natural Gas Peaker",
+    }),
   ).toBeDisabled();
 });
 
@@ -509,7 +515,7 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
   expect(
     screen.getAllByRole("button", { name: /^Review purchase of/ }),
-  ).toHaveLength(3);
+  ).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
   rerender(
     <BuildGenerators game={{ ...game, tutorialStep: 2 }} {...callbacks} />,
@@ -644,7 +650,9 @@ describe("weather hardening in the purchase dialog", () => {
   it("prices the default cold-weather package and builds without it when cleared", () => {
     const onBuild = showBuildList();
     fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+      screen.getByRole("button", {
+        name: "Review purchase of Natural Gas Peaker",
+      }),
     );
     const dialog = screen.getByRole("dialog");
     const option = within(dialog).getByRole("checkbox", {
@@ -682,7 +690,9 @@ describe("weather hardening in the purchase dialog", () => {
       />,
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+      screen.getByRole("button", {
+        name: "Review purchase of Natural Gas Peaker",
+      }),
     );
     expect(
       within(screen.getByRole("dialog")).queryByRole("checkbox", {
@@ -740,7 +750,7 @@ describe("weather hardening in the purchase dialog", () => {
   function gasItem(cash: number, onBuild = jest.fn()) {
     const game = coldGame();
     const quote = GENERATORS(game, 419000000, [], []).find(
-      (candidate) => candidate.name === "Natural Gas",
+      (candidate) => candidate.name === "Natural Gas Peaker",
     )!;
     render(
       <GeneratorBuildItem
@@ -769,7 +779,7 @@ describe("weather hardening in the purchase dialog", () => {
   it("keeps the card buyable when only the default package is unaffordable", () => {
     const game = coldGame();
     const quote = GENERATORS(game, 419000000, [], []).find(
-      (candidate) => candidate.name === "Natural Gas",
+      (candidate) => candidate.name === "Natural Gas Peaker",
     )!;
     const plainDownpayment =
       DOWNPAYMENT_PERCENT * withResilienceOptions(quote, game, {}).buildCost;
@@ -779,7 +789,7 @@ describe("weather hardening in the purchase dialog", () => {
 
     expect(screen.getByText("Incl. cold-weather package")).toBeVisible();
     const review = screen.getByRole("button", {
-      name: "Review purchase of Natural Gas",
+      name: "Review purchase of Natural Gas Peaker",
     });
     expect(review).toBeEnabled();
     fireEvent.click(review);
@@ -808,7 +818,9 @@ describe("weather hardening in the purchase dialog", () => {
     const cash = 1e12;
     const { packaged, plain, onBuild } = gasItem(cash);
     fireEvent.click(
-      screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+      screen.getByRole("button", {
+        name: "Review purchase of Natural Gas Peaker",
+      }),
     );
     const dialog = screen.getByRole("dialog");
     const impact = within(dialog).getByRole("region", {

@@ -1,6 +1,7 @@
 import { getHydroAvailability } from "./HydroSites";
 import {
   batteryYearsToBuild,
+  naturalGasCCYearsToBuild,
   naturalGasYearsToBuild,
 } from "../helpers/BuildLeadTime";
 import { LCWH } from "../helpers/Financials";
@@ -70,7 +71,13 @@ const CPI_2015_TO_2023 = 304.702 / 237.017;
 const CPI_2025_TO_2023 = 304.702 / 321.943;
 // NREL's 500-1,300 MW supercritical-coal class reports $54/MW-start of capitalized
 // cycling/maintenance plus $5.81/MW-start of other startup operations, in 2011 dollars.
-const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
+const CPI_2011_TO_2023 = 304.702 / 224.939;
+const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * CPI_2011_TO_2023;
+// The same NREL study's lower-bound median hot start for a gas combined cycle (GT, HRSG and
+// steam turbine) is $35/MW-start of capital and maintenance cost, 2011$. It reports no separate
+// other-start cost for combined cycles, and EIA folds the plant's routine turbine maintenance into
+// variable O&M, so this is the cycling damage alone.
+const GAS_CC_START_COST_PER_MW_2023 = 35 * CPI_2011_TO_2023;
 
 // EIA's directly matched 340 kW commercial Oil reciprocating-engine case, normalized from
 // 2015$ to 2023$ with annual-average CPI-U. These stay separate because fixed service is paid for
@@ -84,12 +91,16 @@ export const OIL_VARIABLE_OPERATING_COST_PER_MWH = 20 * CPI_2015_TO_2023;
 // for heavy-duty simple-cycle gas turbines and 50% for reciprocating engines. NREL production-
 // cost studies commonly model coal/nuclear and gas units in the 30-60% range. Midpoints keep the
 // gameplay legible while preventing a nominally online thermal plant from idling at trace output.
+// A combined cycle sits a little lower than a lone peaking turbine because it can turn down one
+// of several turbines, but NREL's cycling-cost study notes that emissions limits often keep a
+// combined cycle from following load below 50%, so it stays close.
 export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
   Record<string, number>
 > = {
   Coal: 0.4,
   Nuclear: 0.5,
-  "Natural Gas": 0.5,
+  "Natural Gas Peaker": 0.5,
+  "Natural Gas CC": 0.45,
   Oil: 0.5,
   Biomass: 0.4,
   Geothermal: 0.15,
@@ -413,10 +424,11 @@ export function GENERATORS(
       lifespanYears: 40,
     },
     {
-      name: "Natural Gas",
+      name: "Natural Gas Peaker",
       fuel: "Natural Gas",
+      gasCycle: "simple",
       description:
-        "Runs on demand; ramps faster than coal with lower, still significant direct emissions",
+        "A single gas turbine: cheap to build and running in minutes, but it burns about half again as much gas per MWh as a combined cycle",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
@@ -424,25 +436,74 @@ export function GENERATORS(
         peakW,
         BUILD_COST_FIXED_SHARE.thermal,
       ),
-      // H-class simple-cycle gas best matches this facility's fast-start gameplay role. EIA's
-      // AEO2025 reference is $836/kW, nearly flat in real terms from AEO2020.
+      // EIA AEO2025 Case 4, a 419 MW H-class simple-cycle turbine: $836/kW in 2023$, nearly
+      // flat in real terms from AEO2020's 237 MW F-class frame turbine ($713/kW in 2019$).
+      // https://www.eia.gov/analysis/studies/powerplants/capitalcost/
       peakW,
-      maxPeakW: 6000000000,
-      // ~6GW, build in the late 80's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
+      // About five of EIA's reference turbines at one site. The larger gas stations are combined
+      // cycles, which are their own facility below.
+      maxPeakW: 2000000000,
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: fixedOperatingCost(peakW, 6.87),
       variableOperatingCostPerMWh: 1.24,
-      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas"],
+      minimumStableOutput:
+        MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas Peaker"],
       tracksStarts: true,
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
       // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
       costPerStart: 23100 * (peakW / 419000000),
       yearsToBuild: naturalGasYearsToBuild(peakW),
       constructionKgco2ePerW: 0.06,
-      capacityFactor: 0.45,
-      // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-      // 55% = max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      // U.S. natural-gas combustion turbines averaged 12.1% from 2016 to 2025 (EIA Electric
+      // Power Monthly Table 6.07.A, 9.6-14.1% in each year).
+      // https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      capacityFactor: 0.12,
+      lifespanYears: 40,
+    },
+    {
+      name: "Natural Gas CC",
+      fuel: "Natural Gas",
+      gasCycle: "combined",
+      description:
+        "Reuses the turbine's hot exhaust to raise steam for a second turbine, burning about a third less gas per MWh, but it is slow to start and ramp",
+      // Combined cycles existed from the 1960s, but the modern baseload design dates from the
+      // first F-class turbine entering combined-cycle service at Virginia Power's Chesterfield
+      // station in 1990; the 1990s "dash for gas" followed.
+      available: year >= 1990,
+      buildCost: scaledBuildCost(
+        costBetween(year, 2019, 0.958 * CPI_2019_TO_2023, 2023, 0.868),
+        1227000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
+      ),
+      // EIA AEO2025 Case 5, a 1,227 MW 2x2x1 H-class combined cycle: $868/kW in 2023$. AEO2020's
+      // 1,083 MW 2x2x1 case was $958/kW in 2019$ ($1,142 in 2023$), a 24% real decline. Per watt
+      // a reference combined cycle costs about as much as a reference peaker; the peaker's
+      // advantage is that it stays cheap when built small.
+      peakW,
+      // ~6GW, the largest gas stations of the late 1980s onward - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
+      maxPeakW: 6000000000,
+      // AEO2025 Case 5 net HHV heat rate, 6,266 Btu/kWh: 31% less fuel per MWh than the peaker.
+      btuPerWh: 6.266,
+      // A hot start of an H-class combined cycle reaches full load in well under an hour, a
+      // warm or cold start takes hours while the steam side heats. 90 minutes blends them.
+      spinMinutes: 90,
+      annualOperatingCost: fixedOperatingCost(peakW, 12.12),
+      // Case 5's variable O&M includes the turbines' hours-based major maintenance.
+      variableOperatingCostPerMWh: 3.41,
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas CC"],
+      tracksStarts: true,
+      costPerStart: GAS_CC_START_COST_PER_MW_2023 * (peakW / 1000000),
+      // A gameplay assumption between baseload coal (20) and a daily peaker (365): a combined
+      // cycle that shuts down most weekends and some nights.
+      assumedStartsPerYear: 100,
+      yearsToBuild: naturalGasCCYearsToBuild(peakW),
+      // AEO2025 Case 5: 42-month total lead time and a 40-year operating life.
+      constructionKgco2ePerW: 0.09,
+      // U.S. natural-gas combined cycles averaged 56.6% from 2016 to 2025 (EIA Electric Power
+      // Monthly Table 6.07.A, 51.2-60.5% in each year).
+      capacityFactor: 0.57,
       lifespanYears: 40,
     },
     {

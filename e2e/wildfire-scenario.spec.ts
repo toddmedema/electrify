@@ -26,7 +26,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   }
 
   await page.getByRole("button", { name: "Start game" }).click();
-  await expect(page.getByText("Natural Gas", { exact: true })).toBeVisible();
+  await expect(page.getByText("Natural Gas CC", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Events", exact: true }).click();
   await page
     .locator("#appbar:visible")

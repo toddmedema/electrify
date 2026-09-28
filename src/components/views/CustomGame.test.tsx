@@ -350,7 +350,7 @@ it("scales starting nameplate capacity with starting customers", () => {
 
   const scenario = onStart.mock.calls[0][0];
   expect(scenario.facilities).toEqual([
-    expect.objectContaining({ name: "Natural Gas", peakW: 1000000000 }),
+    expect.objectContaining({ name: "Natural Gas Peaker", peakW: 1000000000 }),
     expect.objectContaining({ name: "Pumped Hydro", peakWh: 500000000 }),
   ]);
 

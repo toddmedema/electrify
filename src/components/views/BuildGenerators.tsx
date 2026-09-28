@@ -301,9 +301,13 @@ export function GeneratorBuildItem(
         ]
       : WEATHER_DEPENDENT_FUELS.includes(generator.fuel)
         ? ["Weather-dependent supply", "Pair with backup or storage."]
-        : generator.spinMinutes > 60
-          ? ["Steady supply", "Best for demand that lasts for hours."]
-          : ["Fast response", "Can follow changing demand."];
+        : generator.gasCycle === "simple"
+          ? ["Fast-start, costly per MWh", "Covers peaks and backup."]
+          : generator.gasCycle === "combined"
+            ? ["Efficient, slow to start", "Best run steadily for hours."]
+            : generator.spinMinutes > 60
+              ? ["Steady supply", "Best for demand that lasts for hours."]
+              : ["Fast response", "Can follow changing demand."];
   const openReview = (e: React.SyntheticEvent) => {
     setResilienceSelection(defaultSelection());
     setOpen(true);
@@ -952,7 +956,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     game,
     exactSizes.Hydro ?? sliderTickToW(sliderTick),
   );
-  const generators = GENERATORS(
+  const shownGenerators = GENERATORS(
     game,
     sliderTickToW(sliderTick),
     windSpeeds,
@@ -977,26 +981,40 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         game.scenarioId !== 1 ||
         game.tutorialStep !== 1 ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
-    )
-    .sort((a, b) => {
-      // Hydro with no sites left always sinks to the bottom
-      const spentA =
-        a.name === "Hydro" && hydroAvailability.remaining.length === 0;
-      const spentB =
-        b.name === "Hydro" && hydroAvailability.remaining.length === 0;
-      if (spentA !== spentB) {
-        return spentA ? 1 : -1;
+    );
+  // Technologies that burn the same fuel stay side by side, placed among the rest by their better
+  // member, so the gas peaker and combined cycle read as one choice of how to burn gas
+  const bestInFuel = new Map<string, number>();
+  shownGenerators.forEach((generator) =>
+    bestInFuel.set(
+      generator.fuel,
+      Math.min(bestInFuel.get(generator.fuel) ?? Infinity, generator[sort]),
+    ),
+  );
+  const generators = shownGenerators.sort((a, b) => {
+    // Hydro with no sites left always sinks to the bottom
+    const spentA =
+      a.name === "Hydro" && hydroAvailability.remaining.length === 0;
+    const spentB =
+      b.name === "Hydro" && hydroAvailability.remaining.length === 0;
+    if (spentA !== spentB) {
+      return spentA ? 1 : -1;
+    }
+    if (props.focusFuel && a.fuel !== b.fuel) {
+      if (a.fuel === props.focusFuel) {
+        return -1;
       }
-      if (props.focusFuel && a.fuel !== b.fuel) {
-        if (a.fuel === props.focusFuel) {
-          return -1;
-        }
-        if (b.fuel === props.focusFuel) {
-          return 1;
-        }
+      if (b.fuel === props.focusFuel) {
+        return 1;
       }
-      return a[sort] - b[sort];
-    });
+    }
+    const groupA = bestInFuel.get(a.fuel) as number;
+    const groupB = bestInFuel.get(b.fuel) as number;
+    if (a.fuel !== b.fuel && groupA !== groupB) {
+      return groupA - groupB;
+    }
+    return a[sort] - b[sort];
+  });
   const outputShapes = new Map(
     generators.map((generator) => [
       generator.name,

@@ -1,7 +1,8 @@
 # Facility economics refresh
 
-Last reviewed: 2026-08-29. The implemented latest observations are 2023 for EIA's engineering
-estimates and 2024 for IRENA's global deployment data.
+Last reviewed: 2026-09-28 (gas split into a simple-cycle peaker and a combined cycle). The
+implemented latest observations are 2023 for EIA's engineering estimates and 2024 for IRENA's
+global deployment data.
 
 ## Method
 
@@ -39,6 +40,7 @@ early 5 MW offshore farm over $30/W.
 | Coal                      |                         $4,381/kW (2019) |   $4,103/kW (2023) |              -6.3% | EIA standardized reference plant                     |
 | Nuclear                   |                         $7,200/kW (2019) |   $7,861/kW (2023) |              +9.2% | EIA standardized reference plant                     |
 | Natural gas, simple cycle |                           $850/kW (2019) |     $836/kW (2023) |              -1.6% | EIA standardized reference plant                     |
+| Natural gas, combined     |                         $1,142/kW (2019) |     $868/kW (2023) |             -24.0% | EIA standardized reference plant                     |
 | Oil / internal combustion |              $2,145/kW (2019 assumption) |   $1,248/kW (2023) |             -41.8% | EIA-860 actual installed generators                  |
 | Onshore wind              |                         $1,642/kW (2020) |   $1,041/kW (2024) |             -36.6% | IRENA global weighted average                        |
 | Solar PV                  |                         $1,070/kW (2020) |     $691/kW (2024) |             -35.4% | IRENA global weighted average                        |
@@ -56,7 +58,8 @@ detailed design is used for duration, life, construction time, and augmentation 
 
 Where a source separates fixed O&M in $/kW-year from variable O&M in $/MWh, the fixed part is
 charged on standing capacity and the variable part on energy actually generated: coal $6.40, nuclear
-$2.52, natural gas $1.24 and biomass $5.61 per MWh (2023$), plus oil as described below. An idle or
+$2.52, gas peaker $1.24, gas combined cycle $3.41 and biomass $5.61 per MWh (2023$), plus oil as
+described below. An idle or
 paused plant therefore pays no variable O&M, and the keep-online versus restart decision counts it.
 Build quotes still annualize it at the modeled capacity factor. Actual fuel and carbon expenses
 remain separate for every generator.
@@ -65,7 +68,7 @@ The EIA AEO2025 reference designs also update:
 
 - Coal: 8,638 Btu/kWh, 60-month reference lead time, and 40-year operating life.
 - Nuclear: 10,608 Btu/kWh, 84-month reference lead time, and 40-year economic life.
-- Natural gas: the H-class simple-cycle design matches the facility's fast-start role: 9,142
+- Natural Gas Peaker (Case 4, a 419 MW H-class simple-cycle turbine): 9,142
   Btu/kWh, a 40-month lead time, and a 40-year life. Its $6.87/kW-year fixed O&M and $1.24/MWh
   consumables remain the base O&M; EIA reports start maintenance separately at $23,100 per
   equivalent start for the 419 MW reference plant, scaled linearly for the player's chosen size.
@@ -73,7 +76,28 @@ The EIA AEO2025 reference designs also update:
   tradeoff legible, while live play charges only on actual off-to-on edges. Because one simulated
   day represents a month, each visible edge represents 365/12 equivalent starts. Coal's quote
   assumes 20 starts a year instead, within the 10-50 that NREL's cycling-cost and WWSIS Phase 2
-  studies report for large coal units; a daily start had added ~$5/MWh to its quoted LCOE.
+  studies report for large coal units; a daily start had added ~$5/MWh to its quoted LCOE. The
+  peaker's capacity factor is 12%, the 2016-2025 average of 9.6-14.1% for U.S. gas combustion
+  turbines in EIA Electric Power Monthly Table 6.07.A. It had been 45%, a figure for all gas that
+  made the peaker's quoted cost per MWh look like baseload. Its size cap is 2 GW (about five
+  reference turbines); the 6 GW cap now belongs to the combined cycle.
+- Natural Gas CC (Case 5, a 1,227 MW 2x2x1 H-class combined cycle): $868/kW, 6,266 Btu/kWh (31%
+  less fuel per MWh than the peaker), $12.12/kW-year fixed and $3.41/MWh variable O&M, a
+  42-month lead time (18 months development, 24 construction) and a 40-year life. AEO2020's
+  1,083 MW 2x2x1 case was $958/kW in 2019$ (6,370 Btu/kWh, $12.20 and $1.90). EIA reports no
+  separate per-start charge for this case because its turbine maintenance is hours-driven and
+  sits in variable O&M, so the start charge is NREL's cycling damage instead (below). Capacity
+  factor is 57%, the 2016-2025 average of 51.2-60.5% for U.S. combined cycles in Table 6.07.A.
+  The quote assumes 100 starts a year, a gameplay assumption between coal's 20 and the peaker's
+  daily start. Spin-up is 90 minutes, a blend of hot starts that reach full load in well under an
+  hour and warm or cold starts that take hours while the steam side heats; minimum stable output
+  is 45%. It is available from 1990, when the first F-class turbine entered combined-cycle
+  service at Virginia Power's Chesterfield station. Per watt, EIA's reference combined cycle costs
+  about as much as its reference peaker; the peaker's economic case is that it stays cheap when
+  built small (a 100 MW peaker quotes about $1,150/kW, a 100 MW combined cycle about $2,040/kW,
+  because 12% of each reference project is fixed) and that it costs little to keep in reserve.
+  Heat rates are held at the reference plant for every year, as they are for the other thermal
+  plants, so an early combined cycle is somewhat more efficient than its real contemporaries.
 - Oil: the matched EIA commercial Oil reciprocating-engine case reports $24/kW-year fixed O&M and
   $20/MWh variable O&M in 2015 dollars. Annual-average CPI-U (`304.702 / 237.017`) converts these
   to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and
@@ -151,7 +175,8 @@ poor proxy for the physical value the player can sell:
 | ------------------- | -------: | ---------------------------------------------------------------- |
 | Coal                | 40 years | EIA AEO2025 standardized plant operating life                    |
 | Nuclear             | 40 years | EIA AEO2025 new-build economic operating life                    |
-| Natural gas         | 40 years | EIA AEO2025 H-class simple-cycle operating life                  |
+| Natural gas peaker  | 40 years | EIA AEO2025 H-class simple-cycle operating life                  |
+| Natural gas CC      | 40 years | EIA AEO2025 H-class 2x2x1 combined-cycle operating life          |
 | Oil                 | 30 years | NREL technology-comparison economic life for combustion turbines |
 | Onshore wind        | 25 years | EIA AEO2025 large-plant operating life                           |
 | Offshore wind       | 25 years | EIA AEO2025 fixed-bottom operating life                          |
@@ -198,7 +223,7 @@ year. The narrative scenarios now begin with mixed-age inherited fleets; tutoria
 so their introductory economics and controls remain predictable.
 
 The facility panel now reports equivalent operating hours for generators. It also reports
-equivalent starts for Natural Gas, Coal, Nuclear, Biomass, Geothermal, and Enhanced Geothermal.
+equivalent starts for both gas plants, Coal, Nuclear, Biomass, Geothermal, and Enhanced Geothermal.
 A real zero-to-generating edge represents `365 / 12` starts because the visible day stands for the
 average day in its month; ramping while already above zero does not add another start. Oil remains
 an internal-combustion-generator benchmark whose use-driven maintenance follows generated MWh, and
@@ -208,7 +233,8 @@ Start tracking and start charges are deliberately separate capabilities:
 
 | Facility            | Tracks starts | Non-fuel start charge                              | Basis                                                                                   |
 | ------------------- | ------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Natural Gas         | Yes           | EIA's $23,100 per start at 419 MW, size-normalized | H-class simple-cycle reference                                                          |
+| Natural Gas Peaker  | Yes           | EIA's $23,100 per start at 419 MW, size-normalized | H-class simple-cycle reference                                                          |
+| Natural Gas CC      | Yes           | $47.41/MW-start in 2023$, size-normalized          | NREL combined-cycle hot-start cycling cost; EIA's maintenance is in variable O&M        |
 | Coal                | Yes           | $81.0185278/MW-start in 2023$, size-normalized     | NREL supercritical hot-start cycling plus startup operations                            |
 | Nuclear             | Yes           | None                                               | IAEA finds shutdown/startup cycling consequential but unit-specific                     |
 | Biomass             | Yes           | None                                               | EIA documents diesel startup burners but no transferable quantity or wear cost          |
@@ -223,7 +249,8 @@ representative production-cost inputs rather than limits for every individual un
 | ------------------- | --------------------: | --------------------------------------------------------------------------------------- |
 | Coal                |                   40% | GE Energy/HNEI ancillary-services study: 35-40% typical turndown level                  |
 | Nuclear             |                   50% | NREL production-cost modeling; individual IAEA load-following examples can reach 20-30% |
-| Natural Gas         |                   50% | Representative heavy-duty simple-cycle value within the published 15-70% range          |
+| Natural Gas Peaker  |                   50% | Representative heavy-duty simple-cycle value within the published 15-70% range          |
+| Natural Gas CC      |                   45% | NREL: emissions limits often keep combined cycles from following load below 50%         |
 | Oil                 |                   50% | GE Energy/HNEI reciprocating-engine value                                               |
 | Biomass             |                   40% | GE Energy/HNEI ancillary-services study: 35-40%                                         |
 | Geothermal          |                   15% | GE Energy/HNEI ancillary-services study: 12-15%                                         |
@@ -244,14 +271,36 @@ $81.0185278/MW-start in 2023 dollars, or $52,662.04 for the game's 650 MW refere
 difficulty and game inflation. The resulting cost is quoted when the facility is created and then escalates with game
 inflation, like every other non-fuel operating cost. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
 
-Natural Gas alone shows the 900-start hot-gas-path and 1,800-start major-inspection context. Those
+The combined cycle uses the same study's lower-bound median hot start for a gas combined cycle
+(gas turbine, heat-recovery steam generator and steam turbine): $35/MW-start of capital and
+maintenance cost in 2011 dollars, or $47.41/MW-start in 2023 dollars ($58,173 for the 1,227 MW
+reference plant). The study reports no other-start cost for combined cycles, and EIA already
+counts the plant's routine turbine maintenance in variable O&M, so nothing else is added.
+[NREL/SR-5500-55433, Table 1-1](https://www.osti.gov/servlets/purl/1046269).
+
+## Default dispatch order
+
+The facility list is the dispatch order. A newly bought generator used to go to the top, so an
+expensive peaker ran as baseload until the player moved it. Now a new Natural Gas Peaker joins
+just above the existing peakers and storage, below every other generator; every other new
+generator still goes to the top, and storage to the bottom. The rule reads the plant's
+`gasCycle`, not its display name, and never reorders what the player has arranged. Oil is not
+treated as a peaker because the game's oil plant also stands in for island oil-fired baseload.
+
+Natural Gas Peaker alone shows the 900-start hot-gas-path and 1,800-start major-inspection context. Those
 intervals do not trigger a second refurbishment bill: EIA's per-start value is already the
 levelized major-maintenance cost. Maintenance decisions and wear-driven outage risk remain separate
 future work.
 
 ## Commercial technology review
 
-No additional facility type is added in this pass:
+Natural gas is now two facilities, Natural Gas Peaker and Natural Gas CC, because the one gas
+plant mixed a simple-cycle turbine's cost, heat rate and start time with an all-gas capacity
+factor and a combined cycle's 6 GW size. Both keep the "Natural Gas" fuel, so fuel prices, cold
+snaps and their cold-weather package, story effects and the supply charts treat them alike; their
+`gasCycle` field names the technology. A simple-to-combined conversion (adding a heat-recovery
+steam generator to an existing peaker) is left for later, as an upgrade that changes
+`gasCycle` in place. No other facility type is added in this pass:
 
 - Solar-plus-storage is commercially routine, but players can already construct the two facilities
   independently; a combined entry would duplicate their capabilities.
@@ -379,6 +428,7 @@ All values are rounded game balance, not a site-specific risk assessment.
 - [NREL 2024 ATB, Geothermal](https://atb.nrel.gov/electricity/2024/geothermal)
 - [DOE, Geothermal Basics](https://www.energy.gov/hgeo/geothermal/geothermal-basics)
 - [DOE, Long-Duration Energy Storage portfolio](https://www.energy.gov/cmei/oced/long-duration-energy-storage)
+- [EIA, Electric Power Monthly Table 6.07.A, capacity factors for utility-scale generators primarily using fossil fuels](https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a)
 
 ## Conventional Hydro site inventories
 

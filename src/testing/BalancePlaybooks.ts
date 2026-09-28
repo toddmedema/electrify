@@ -42,7 +42,11 @@ const line = (
  */
 export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   100: {
-    initialBuild: { name: "Natural Gas", peakW: 150000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 150000000,
+      financed: true,
+    },
     sellFacilityId: 2,
     sellAtMonth: 37,
     scheduledActions: [
@@ -54,7 +58,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   101: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 300000000,
+      financed: true,
+    },
     sellFacilityId: 2,
     sellAtMonth: 143,
     scheduledActions: [
@@ -62,7 +70,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas", peakW: 20000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 20000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4]),
       { month: 141, type: "toggle", facilityId: 1 },
@@ -70,7 +78,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   102: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 300000000,
+      financed: true,
+    },
     sellFacilityId: 1,
     sellAtMonth: 39,
     scheduledActions: [
@@ -78,7 +90,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas", peakW: 20000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 20000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },
@@ -86,7 +98,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   103: {
-    initialBuild: { name: "Natural Gas", peakW: 600000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 600000000,
+      financed: true,
+    },
     sellFacilityId: 1,
     sellAtMonth: 39,
     scheduledActions: [
@@ -94,19 +110,23 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       {
         month: 1,
         type: "build",
-        build: { name: "Natural Gas", peakW: 10000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 10000000, financed: true },
       },
       {
         month: 2,
         type: "build",
-        build: { name: "Natural Gas", peakW: 10000000, financed: true },
+        build: { name: "Natural Gas Peaker", peakW: 10000000, financed: true },
       },
       ...dispatch([1, 2, 3, 4], 3),
       { month: 38, type: "toggle", facilityId: 1 },
     ],
   },
   104: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 300000000,
+      financed: true,
+    },
     sellFacilityId: 1,
     sellAtMonth: 110,
     scheduledActions: [
@@ -117,7 +137,9 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   105: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    // The gas replaces the island's oil as baseload, so it is a combined cycle: a peaker would
+    // default below the oil plant and leave oil burning around the clock.
+    initialBuild: { name: "Natural Gas CC", peakW: 300000000, financed: true },
     sellFacilityId: 3,
     sellAtMonth: 39,
     scheduledActions: [
@@ -128,7 +150,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   106: {
-    initialBuild: { name: "Natural Gas", peakW: 50000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 50000000,
+      financed: true,
+    },
     sellFacilityId: 2,
     sellAtMonth: 191,
     scheduledActions: [
@@ -140,7 +166,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   107: {
-    initialBuild: { name: "Natural Gas", peakW: 1800000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 1800000000,
+      financed: true,
+    },
     scheduledActions: [
       rate(0.091),
       ...dispatch([1, 2, 3, 4, 5]),
@@ -182,7 +212,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   113: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 300000000,
+      financed: true,
+    },
     scheduledActions: [
       rate(0.115),
       ...line("south-africa-mozambique-upgrade", 8, 7),
@@ -206,7 +240,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   115: {
-    initialBuild: { name: "Natural Gas", peakW: 700000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 700000000,
+      financed: true,
+    },
     scheduledActions: [
       rate(0.095),
       ...line("india-himalaya-upgrade", 8, 7),
@@ -226,44 +264,85 @@ export const INTERN_ONE_BUILD_PLAYS: Record<
     initialBuild: { name: "Geothermal", peakW: 500000000, financed: true },
   },
   101: {
-    initialBuild: { name: "Natural Gas", peakW: 390000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 390000000,
+      financed: true,
+    },
   },
   102: {
-    initialBuild: { name: "Natural Gas", peakW: 350000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 350000000,
+      financed: true,
+    },
   },
   // 2006 gas cost about $7/MMBtu delivered, so the first lesson is cheaper baseload, not a peaker
   103: {
     initialBuild: { name: "Coal", peakW: 300000000, financed: true },
   },
+  // Puerto Rico's answer to costly oil in 2000 was EcoEléctrica, a 507 MW LNG combined cycle
   104: {
-    initialBuild: { name: "Natural Gas", peakW: 500000000, financed: true },
+    initialBuild: { name: "Natural Gas CC", peakW: 500000000, financed: true },
   },
   // Hawaii's cheapest firm option in 2004 was imported coal, as at AES Hawaii
   105: {
     initialBuild: { name: "Coal", peakW: 500000000, financed: true },
   },
   106: {
-    initialBuild: { name: "Natural Gas", peakW: 50000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 50000000,
+      financed: true,
+    },
   },
   107: {
-    initialBuild: { name: "Natural Gas", peakW: 1800000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 1800000000,
+      financed: true,
+    },
   },
   108: {
-    initialBuild: { name: "Natural Gas", peakW: 250000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 250000000,
+      financed: true,
+    },
   },
   110: {
-    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 400000000,
+      financed: true,
+    },
   },
   111: {
-    initialBuild: { name: "Natural Gas", peakW: 20000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 20000000,
+      financed: true,
+    },
   },
   113: {
-    initialBuild: { name: "Natural Gas", peakW: 200000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 200000000,
+      financed: true,
+    },
   },
   114: {
-    initialBuild: { name: "Natural Gas", peakW: 150000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 150000000,
+      financed: true,
+    },
   },
   115: {
-    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
+    initialBuild: {
+      name: "Natural Gas Peaker",
+      peakW: 400000000,
+      financed: true,
+    },
   },
 };

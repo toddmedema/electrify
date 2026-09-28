@@ -235,7 +235,7 @@ test("custom setup uses side-by-side settings and facilities only in two-pane la
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
   const removeBox = await row
-    .getByRole("button", { name: "Remove Natural Gas" })
+    .getByRole("button", { name: "Remove Natural Gas Peaker" })
     .boundingBox();
   expect(contentBox).not.toBeNull();
   expect(removeBox).not.toBeNull();
@@ -293,14 +293,14 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
   });
 
   await page
-    .getByRole("button", { name: "Remove Natural Gas", exact: true })
+    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
     .click();
   await expect(outlook).toContainText("Calculating Year 1 outlook…");
   await expect(outlook).toContainText("0%", { timeout: 20000 });
   await expect(outlook).toContainText("Deficit forecast");
 
   await page.getByRole("combobox", { name: "Facility type" }).click();
-  await page.getByRole("option", { name: "Natural Gas" }).click();
+  await page.getByRole("option", { name: "Natural Gas Peaker" }).click();
   await page.getByRole("combobox", { name: "Facility size" }).click();
   await page.getByRole("option", { name: "2GW" }).click();
   await page.getByRole("button", { name: "Add facility" }).click();
@@ -321,7 +321,7 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
   const icon = page
     .getByRole("region", { name: "Facilities", exact: true })
     .locator(".MuiCardHeader-avatar img");
-  await expect(icon).toHaveAttribute("src", "/images/natural gas.svg");
+  await expect(icon).toHaveAttribute("src", "/images/natural gas peaker.svg");
   await expect
     .poll(() => icon.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);

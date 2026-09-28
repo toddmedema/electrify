@@ -24,7 +24,7 @@ describe("getBuildAvailability", () => {
   test("offers the max size when the size is too large", () => {
     const result = getBuildAvailability({
       ...hydroOption,
-      name: "Natural Gas",
+      name: "Natural Gas Peaker",
       sizeBuildable: false,
     });
     expect(result.buildable).toBe(false);

@@ -51,7 +51,8 @@ of the year it was actually built rather than drifting as the technology improve
 | Option                     | Value | Ref year |     k | Floor |
 | -------------------------- | ----: | -------: | ----: | ----: |
 | Coal                       |  0.32 |     2025 |     0 |     — |
-| Natural Gas (simple cycle) |  0.06 |     2025 |     0 |     — |
+| Natural Gas Peaker         |  0.06 |     2025 |     0 |     — |
+| Natural Gas CC             |  0.09 |     2025 |     0 |     — |
 | Oil                        |  0.15 |     2025 |     0 |     — |
 | Biomass                    |  0.45 |     2025 |     0 |     — |
 | Nuclear                    |  0.30 |     2025 |     0 |     — |
@@ -63,10 +64,14 @@ of the year it was actually built rather than drifting as the technology improve
 | Solar                      |  0.60 |     2025 | 0.055 |  0.12 |
 | Hydro                      |   2.0 |     2025 |     0 |     — |
 
-The gas coefficient represents the game's simple-cycle plant, rather than a combined-cycle
-plant. The offshore-wind coefficient represents a fixed-bottom project. Neither distinction
-establishes a universal numeric multiplier: plant equipment, foundations, water depth and supply
-chains need project-specific inventories. Oil and biomass are particularly weakly anchored
+The peaker coefficient represents a simple-cycle plant. The combined cycle adds a heat-recovery
+steam generator, a steam turbine, a condenser and a cooling tower to the same gas turbines, so its
+steel and concrete per watt are higher even though the steam side adds about half again as much
+output; 0.09 is 1.5 times the peaker, an engineering estimate rather than an inventory, and it
+remains small beside the plant's lifetime combustion emissions. The offshore-wind coefficient
+represents a fixed-bottom project. Neither distinction establishes a universal numeric
+multiplier: plant equipment, foundations, water depth and supply chains need project-specific
+inventories. Oil and biomass are particularly weakly anchored
 engineering estimates; the sources below do not directly validate their construction coefficients.
 
 ## Storage, kgCO2e per watt-hour of capacity

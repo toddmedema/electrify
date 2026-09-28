@@ -77,7 +77,8 @@ describe("current facility economics", () => {
     const benchmarks: Array<[string, number, number, number]> = [
       ["Coal", 2023, 650000000, 4.103],
       ["Nuclear", 2023, 2156000000, 7.861],
-      ["Natural Gas", 2023, 419000000, 0.836],
+      ["Natural Gas Peaker", 2023, 419000000, 0.836],
+      ["Natural Gas CC", 2023, 1227000000, 0.868],
       ["Oil", 2023, 3000000, 1.248],
       ["Wind", 2024, 200000000, 1.041 * in2023Dollars],
       ["Solar", 2024, 150000000, 0.691 * in2023Dollars],
@@ -114,12 +115,82 @@ describe("current facility economics", () => {
   });
 
   it("scales natural-gas start maintenance from EIA's 419 MW reference", () => {
-    expect(generatorAt(2023, "Natural Gas", 419000000)?.costPerStart).toBe(
-      23100,
-    );
     expect(
-      generatorAt(2023, "Natural Gas", 100000000)?.costPerStart,
+      generatorAt(2023, "Natural Gas Peaker", 419000000)?.costPerStart,
+    ).toBe(23100);
+    expect(
+      generatorAt(2023, "Natural Gas Peaker", 100000000)?.costPerStart,
     ).toBeCloseTo((23100 * 100) / 419, 8);
+  });
+
+  describe("the two gas plants", () => {
+    const peaker = (year = 2023, peakW = 419000000) =>
+      generatorAt(year, "Natural Gas Peaker", peakW)!;
+    const cc = (year = 2023, peakW = 1227000000) =>
+      generatorAt(year, "Natural Gas CC", peakW)!;
+
+    it("burn the same fuel but name their cycle", () => {
+      expect([peaker().fuel, cc().fuel]).toEqual([
+        "Natural Gas",
+        "Natural Gas",
+      ]);
+      expect([peaker().gasCycle, cc().gasCycle]).toEqual([
+        "simple",
+        "combined",
+      ]);
+    });
+
+    it("trade the peaker's quick start for the combined cycle's fuel economy", () => {
+      // EIA AEO2025 Cases 4 and 5
+      expect(peaker().btuPerWh).toBe(9.142);
+      expect(cc().btuPerWh).toBe(6.266);
+      expect(peaker().spinMinutes).toBeLessThan(cc().spinMinutes);
+      expect(cc().minimumStableOutput).toBe(0.45);
+      expect(peaker().minimumStableOutput).toBe(0.5);
+      expect(cc().variableOperatingCostPerMWh).toBe(3.41);
+      expect(cc().annualOperatingCost).toBeCloseTo(12.12 * 1227000, 0);
+      // U.S. fleet averages, EIA Electric Power Monthly Table 6.07.A
+      expect(peaker().capacityFactor).toBe(0.12);
+      expect(cc().capacityFactor).toBe(0.57);
+      expect(cc().lifespanYears).toBe(40);
+      // Case 5's 42-month lead time at its reference size
+      expect(cc().yearsToBuild * 12).toBeCloseTo(42, 0);
+      expect(peaker(2023, 300000000).yearsToBuild).toBeLessThan(
+        cc(2023, 300000000).yearsToBuild,
+      );
+    });
+
+    it("keep the peaker cheap when small and cap it below the combined cycle", () => {
+      // 12% of each reference project is fixed, and the combined cycle's is three times larger
+      expect(peaker(2023, 100000000).buildCost).toBeLessThan(
+        cc(2023, 100000000).buildCost * 0.6,
+      );
+      expect(peaker().maxPeakW).toBe(2000000000);
+      expect(cc().maxPeakW).toBe(6000000000);
+    });
+
+    it("anchors the combined cycle's older cost on AEO2020 in 2023 dollars", () => {
+      // $958/kW in 2019 dollars is $1,142/kW in the table's 2023 dollars
+      const realRatio = (0.958 * (304.702 / 255.657)) / 0.868;
+      expect(cc(2019).buildCost / cc(2023).buildCost).toBeCloseTo(
+        (realRatio * getCostTableDeflator(2019)) / getCostTableDeflator(2023),
+        6,
+      );
+    });
+
+    it("charges NREL's combined-cycle hot start by nameplate MW", () => {
+      expect(cc(2023, 1000000000).costPerStart).toBeCloseTo(
+        35 * (304.702 / 224.939) * 1000,
+        6,
+      );
+      expect(cc().assumedStartsPerYear).toBe(100);
+    });
+
+    it("arrives in 1990 while peakers were always available", () => {
+      expect(cc(1989)).toBeUndefined();
+      expect(cc(1990)).toBeDefined();
+      expect(peaker(1980)).toBeDefined();
+    });
   });
 
   it("splits Oil O&M into fixed capacity and variable generation costs", () => {

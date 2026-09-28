@@ -297,6 +297,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           fuel. Keeping one idle can be cheaper than a blackout.
         </p>
         <p>
+          Gas comes in both roles. A <strong>Natural Gas Peaker</strong> is a
+          single turbine that starts in minutes. A{" "}
+          <strong>Natural Gas CC</strong> (combined cycle) reuses the turbine's
+          hot exhaust to raise steam for a second turbine, so it burns about a
+          third less gas per MWh, but it starts slowly and suits steady,
+          mid-merit demand. A new gas peaker joins the dispatch order below your
+          other generators; other new plants join at the top.
+        </p>
+        <p>
           Many grids use both steady and flexible plants. These are operating
           roles: hydro, for example, can provide steady power or change output
           quickly.

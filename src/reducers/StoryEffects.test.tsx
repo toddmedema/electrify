@@ -12,7 +12,7 @@ describe("story effects in dispatch", () => {
       difficulty: "Manager",
       seed: 2468,
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 500_000_000,
         financed: true,
       },
@@ -117,7 +117,7 @@ describe("story effects in dispatch", () => {
       difficulty: "Manager",
       seed: 1357,
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 500_000_000,
         financed: true,
       },

@@ -9,8 +9,17 @@ import { DifficultyType } from "../Types";
  */
 export const sizeMagnitude = (size: number): number => Math.log10(size) - 6;
 
+/** Simple-cycle peaker: EIA AEO2025's 419 MW H-class reference takes 40 months. */
 export const naturalGasYearsToBuild = (peakW: number): number =>
   2.46 + sizeMagnitude(peakW) / 3;
+
+/**
+ * Combined cycle: EIA AEO2025's 1,227 MW 2x2x1 H-class reference takes 42 months (18 development,
+ * 24 construction, two more than the peaker's for the steam side). Size scales it the same way,
+ * so most of a combined cycle's longer wait comes from being built bigger.
+ */
+export const naturalGasCCYearsToBuild = (peakW: number): number =>
+  2.47 + sizeMagnitude(peakW) / 3;
 
 export const batteryYearsToBuild = (peakWh: number): number =>
   0.57 + sizeMagnitude(peakWh) / 3;

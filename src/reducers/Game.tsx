@@ -30,6 +30,7 @@ import {
   validBuildFacility,
   validRetrofitFacility,
 } from "../helpers/BuildValidation";
+import { defaultDispatchIndex } from "../helpers/DispatchOrder";
 import {
   optionalScenarioChoice,
   pendingScenarioChoice,
@@ -4931,8 +4932,17 @@ function buildFacilityHelper(
     if (g.peakWh) {
       facility.currentWh = 0;
       state.facilities.push(facility); // add storage to bottom so that it's on by default
+    } else if (newGame) {
+      // The authored fleet is put back into scenario order after it is built; see initGame
+      state.facilities.unshift(facility);
     } else {
-      state.facilities.unshift(facility); // add generators to top so that they produce by default
+      // New generators go to the top so that they produce by default, and peakers above only
+      // the other peakers so they are not run as baseload
+      state.facilities.splice(
+        defaultDispatchIndex(state.facilities, facility),
+        0,
+        facility,
+      );
     }
   }
 

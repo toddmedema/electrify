@@ -5,7 +5,7 @@ import {
 } from "./BuildConsequences";
 
 const generator = {
-  name: "Natural Gas",
+  name: "Natural Gas Peaker",
   buildCost: 150000000,
   yearsToBuild: 1,
   peakW: 200000000,
@@ -14,7 +14,7 @@ const generator = {
 
 it("connects the commitment to construction and expected supply", () => {
   expect(buildConsequenceMessage(generator, false)).toBe(
-    "$150M committed → Natural Gas online in 12 mo → +90MW typical supply",
+    "$150M committed → Natural Gas Peaker online in 12 mo → +90MW typical supply",
   );
   expect(buildConsequenceMessage(generator, true)).toContain(
     "$30M down payment",
@@ -23,7 +23,7 @@ it("connects the commitment to construction and expected supply", () => {
 
 it("keeps construction event titles focused on what was started", () => {
   expect(buildStartedMessage(generator)).toBe(
-    "Started construction on 200MW Natural Gas",
+    "Started construction on 200MW Natural Gas Peaker",
   );
   const storage: StorageShoppingType = {
     name: "Battery",
