@@ -2,8 +2,6 @@ import { resolveHydroInventory, isConventionalHydro } from "./HydroSites";
 import type { LocationType } from "../Types";
 import { hasGeothermalResource } from "./LocationProfiles";
 
-export type SiteLimitedFacilityName = "Hydro" | "Geothermal" | "Pumped Hydro";
-
 /** The only facility state needed to determine whether a project has claimed a site. */
 export interface FacilitySiteClaim {
   name: string;

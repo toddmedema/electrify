@@ -8,7 +8,7 @@ import { DEFAULT_UNIT_SYSTEM } from "../../helpers/Units";
  *
  * A context rather than a prop, because the things that show a unit are leaves - a chart axis,
  * a row in the build list, a paragraph of the manual - sitting under components that block
- * re-renders on purpose (Compositor, Finances and Forecasts all have a shouldComponentUpdate
+ * re-renders on purpose (Compositor and Insights have a shouldComponentUpdate
  * that ignores everything but the clock and the card). Context updates go through those
  * regardless, so changing the setting repaints the labels without loosening any of them.
  *

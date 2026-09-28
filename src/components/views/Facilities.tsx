@@ -785,7 +785,7 @@ export interface StateProps {
   facilityDragActive?: boolean;
   game: GameType;
   // The row the player has open, from the UI slice rather than this component's own state:
-  // Finances and Forecasts read it too, and building a facility unmounts this pane
+  // Insights reads it too, and building a facility unmounts this pane
   selectedFacilityId: number | null;
 }
 

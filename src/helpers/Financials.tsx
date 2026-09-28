@@ -325,13 +325,6 @@ export function facilityEquivalentCycles(
   return isStorage(g) ? g.lifetimeWh / g.peakWh : undefined;
 }
 
-/** Nameplate-equivalent hours generated, using the already calendar-scaled lifetime energy. */
-export function facilityEquivalentOperatingHours(
-  g: FacilityOperatingType,
-): number | undefined {
-  return !g.peakWh && g.peakW > 0 ? g.lifetimeWh / g.peakW : undefined;
-}
-
 // Returns how much cash the user receives if they sell / cancel the facility. Construction
 // refunds committed equity; an operating asset depreciates linearly to zero over the
 // technology-specific life in Facilities.tsx. Any outstanding loan is settled on sale.

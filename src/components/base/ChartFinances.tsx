@@ -72,7 +72,7 @@ interface State {
 }
 
 /**
- * Finances normally plots one x unit per month. Insights converts those points to game minutes
+ * Finance series plot one x unit per month. Insights converts those points to game minutes
  * so its cursor can line up with the forecast charts, and must convert the tick unit with them.
  */
 export function financeXTicks(
@@ -251,6 +251,6 @@ const ChartFinances = (props: Props): React.JSX.Element => {
 /**
  * The series only changes when a month rolls over or the player changes something, so memoising
  * lets the whole chart -- data prep, aligned arrays and the canvas redraw -- be skipped on the
- * frames in between. Finances hands over a referentially stable series for exactly this.
+ * frames in between. Callers should hand over a referentially stable series for exactly this.
  */
 export default React.memo(ChartFinances);

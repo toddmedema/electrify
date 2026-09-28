@@ -449,18 +449,6 @@ export function GENERATORS(
       capacityFactor: 0.602,
       lifespanYears: 30,
     },
-    // {
-    //   name: 'Trash Incinerator',
-    //   fuel: 'Trash',
-    //   description: 'Good substitute for coal when there\'s trash nearby',
-    //   buildCost: 200000000,
-    //   peakW,
-    //   btuPerW: 14, // ~20-25% efficiency https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
-    //   spinMinutes: 60,
-    //   annualOperatingCost: 1000000, // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    //   yearsToBuild: 1,
-    // },
-
     // RENEWABLE
     {
       name: "Wind",

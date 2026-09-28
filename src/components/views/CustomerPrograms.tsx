@@ -69,6 +69,7 @@ import {
 } from "../../helpers/Format";
 import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
+import { useWorkerRequest } from "../base/useWorkerRequest";
 import {
   PolicyPreviewResult,
   previewPolicy,
@@ -287,72 +288,38 @@ interface EstimateRequest<T> {
 
 /**
  * Runs one estimate in the preview worker. A result only counts for the request and snapshot it
- * answers, so a stale reply can never enable an action.
+ * answers, so a stale reply can never enable an action. The worker reloads its data over the
+ * network, which fails offline; the page already has that data loaded, so a failed worker falls
+ * back to estimating here.
  */
 function useEstimate<T>(
   request: EstimateRequest<T> | undefined,
   snapshot: GameType,
 ): { result?: T; error?: string } {
-  const [preview, setPreview] = React.useState<{
-    key: string;
-    snapshot: GameType;
-    result?: T;
-    error?: string;
-  }>();
-  const latest = React.useRef(request);
-  latest.current = request;
-  const key = request?.key;
-  React.useEffect(() => {
-    const current = latest.current;
-    if (!key || !current) return;
-    let worker: Worker | undefined;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      try {
-        worker = createPolicyPreviewWorker();
-        // The worker reloads its data over the network, which fails offline. The page already
-        // has that data loaded, so fall back to estimating here.
-        const estimateHere = () => {
-          if (cancelled) return;
-          try {
-            setPreview({ key, snapshot, result: current.estimate() });
-          } catch (_error) {
-            setPreview({
-              key,
-              snapshot,
-              error:
-                "Could not estimate this change. Reopen the program to retry.",
-            });
-          }
-        };
-        worker.onmessage = (event) => {
-          if (event.data?.error) estimateHere();
-          else if (!cancelled) setPreview({ key, snapshot, ...event.data });
-        };
-        worker.onerror = (event: ErrorEvent) => {
-          // An unhandled worker error is re-raised on the window. The preview falls back to
-          // the page itself, so it must not also be reported as an uncaught runtime error.
-          event.preventDefault();
-          estimateHere();
-        };
-        worker.postMessage(current.message);
-      } catch (_error) {
-        setPreview({
-          key,
-          snapshot,
-          error: "Could not start the preview. Reopen the program to retry.",
-        });
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      worker?.terminate();
+  const state = useWorkerRequest(
+    request && {
+      key: request.key,
+      scope: snapshot,
+      message: () => request.message,
+      fallback: request.estimate,
+    },
+    {
+      createWorker: () => createPolicyPreviewWorker(),
+      debounceMs: 250,
+      read: (data: { result?: T; error?: string } | undefined) =>
+        data && !data.error ? { result: data.result as T } : undefined,
+    },
+  );
+  if (state.status === "ready") return { result: state.result };
+  if (state.status === "error") {
+    return {
+      error:
+        state.reason === "startup"
+          ? "Could not start the preview. Reopen the program to retry."
+          : "Could not estimate this change. Reopen the program to retry.",
     };
-  }, [key, snapshot]);
-  const settled =
-    !!key && preview?.key === key && preview.snapshot === snapshot;
-  return settled ? { result: preview.result, error: preview.error } : {};
+  }
+  return {};
 }
 
 /** Keep the standing program's status and yearly budget visible in the list. */

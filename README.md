@@ -50,7 +50,7 @@ Types, lint, formatting and tests, which is what CI runs on every pull request. 
 
 | Command                | Purpose                                                   |
 | ---------------------- | --------------------------------------------------------- |
-| `npm run typecheck`    | `tsc --noEmit`                                            |
+| `npm run typecheck`    | `tsc --noEmit` for the app, then `tsc -p e2e`             |
 | `npm run lint`         | ESLint for app and data scripts; warnings are errors      |
 | `npm run format`       | Rewrite app and script files with Prettier                |
 | `npm run format:check` | Report unformatted app or script files                    |
@@ -146,11 +146,10 @@ so losses never compound. `src/ManualFigures.test.ts` checks the two stay in ste
 
 To release, install and authenticate the AWS CLI.
 
-Before deploying to production, run `npm run deploy` and have it deploy to beta. Then check that:
+Merging to `master` deploys prod through GitHub Actions (`.github/workflows/deploy-prod.yml`).
+To preview a change first, run `npm run deploy beta` and check that:
 
 - basic functionality works (app loads, game starts, music plays)
-
-Once functionality is verified, you can deploy prod with the same script.
 
 ### Troubleshooting
 
@@ -164,9 +163,5 @@ Player names live in `users/{uid}.displayName`. Display names are not unique;
 Firebase Auth UIDs identify accounts. Scores retain a display-name copy for efficient
 leaderboard reads, with best-effort backfilling when a player renames themselves.
 
-When deploying the removal of username reservations, deploy the new client before
-removing the `usernames` security-rule match. Older cached clients cannot save names
-after those rules are removed and must reload. Existing profiles already contain
-their names, so no data migration is needed. Legacy `usernames` documents and
-`displayNameLower` profile fields are unused and may be removed separately with
-admin tooling after rollout; deploying rules does not delete stored data.
+Legacy `usernames` documents and `displayNameLower` profile fields are unused and may be
+deleted with admin tooling; deploying rules does not delete stored data.

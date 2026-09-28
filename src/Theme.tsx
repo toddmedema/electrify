@@ -259,10 +259,6 @@ let currentMode: ThemeModeType = "light";
 let themeVersion = 0;
 const THEME_EVENT = "electrify-theme";
 
-export function getThemeMode(): ThemeModeType {
-  return currentMode;
-}
-
 export function setThemeMode(mode: ThemeModeType) {
   if (mode === currentMode) {
     return;

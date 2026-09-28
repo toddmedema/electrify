@@ -43,10 +43,6 @@ const InstallContext = React.createContext<InstallContextType>({
   snooze: () => undefined,
 });
 
-export function useIsInstalledApp(): boolean {
-  return React.useContext(InstallContext).installed || standalone();
-}
-
 /** Whether this visit can currently offer a real install action. */
 export function useCanInstallApp(afterMilestone = false): boolean {
   const install = React.useContext(InstallContext);

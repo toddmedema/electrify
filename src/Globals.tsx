@@ -158,14 +158,6 @@ if (typeof window !== "undefined") {
   window.addEventListener("orientationchange", invalidate);
 }
 
-/**
- * Compact phone chrome belongs on every common phone width, not just devices narrower than an
- * old 375px breakpoint. Larger controls also matter most on coarse-pointer devices.
- */
-export function isSmallScreen(): boolean {
-  return getViewportWidth() < 600;
-}
-
 export function isBigScreen(): boolean {
   return getViewportWidth() > 650;
 }

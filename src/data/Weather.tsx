@@ -306,11 +306,8 @@ export function getMonthlyClimatology(
 }
 
 /**
- * Downloads a location's record, for the browser.
- *
- * TODO download several locations at start with a 2s init delay, like loading audio (but after
- * audio) for offline play. At 57-69KB apiece rather than 265KB of CSV that is far cheaper than it
- * was, though at 282 catalogued locations it can no longer be all of them.
+ * Downloads a location's record, for the browser. Offline play is covered by the service worker,
+ * which caches the scenario's weather (see helpers/OfflineData).
  *
  * @param callback - Called once, with the reason if the record could not be loaded. A caller that
  *   starts the game regardless would be starting one played on DUMMY_WEATHER: every hour of every
