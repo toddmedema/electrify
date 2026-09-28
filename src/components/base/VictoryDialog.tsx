@@ -21,7 +21,7 @@ import { VictoryDebriefType, VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
 import ConceptIcon from "./ConceptIcon";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatScore } from "../../helpers/Format";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 
@@ -53,10 +53,6 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
-
-export function formatScore(score: number): string {
-  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
-}
 
 function RunDebrief({
   debrief,

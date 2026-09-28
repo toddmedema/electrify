@@ -53,6 +53,8 @@ import {
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
+  formatCount,
+  formatFacilitySize,
 } from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
@@ -183,9 +185,10 @@ function facilityName(facility: Partial<FacilityShoppingType>): string {
 }
 
 function facilitySize(facility: Partial<FacilityShoppingType>): string {
-  return facility.peakWh
-    ? formatWattHours(facility.peakWh)
-    : formatWatts(facility.peakW || 0);
+  return formatFacilitySize({
+    peakW: facility.peakW || 0,
+    peakWh: facility.peakWh,
+  });
 }
 
 function demandServedLabel(outlook: YearOneOutlook): string {
@@ -569,9 +572,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         getStartingCustomers(getScenarioLocation(scenario))
                       }
                       valueLabelDisplay="auto"
-                      valueLabelFormat={(value: number) =>
-                        value.toLocaleString()
-                      }
+                      valueLabelFormat={(value: number) => formatCount(value)}
                       onChange={(_event: Event, value: number | number[]) =>
                         changeStartingCustomers(
                           Array.isArray(value) ? value[0] : value,
@@ -579,10 +580,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       }
                     />
                     <Typography variant="caption" color="textSecondary">
-                      {(
+                      {formatCount(
                         scenario.startingCustomers ||
-                        getStartingCustomers(getScenarioLocation(scenario))
-                      ).toLocaleString()}
+                          getStartingCustomers(getScenarioLocation(scenario)),
+                      )}
                     </Typography>
                   </TableCell>
                 </TableRow>

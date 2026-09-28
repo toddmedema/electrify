@@ -41,10 +41,9 @@ import {
 import { facilityCashBack } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
-  formatWattHours,
   formatWattHoursOfPeak,
-  formatWatts,
   formatWattsOfPeak,
+  formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FlowBar from "../base/FlowBar";
@@ -673,10 +672,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               title={
                 <>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {facility.peakWh
-                    ? formatWattHours(facility.peakWh)
-                    : formatWatts(facility.peakW)}{" "}
-                  {facility.name.toLowerCase()} facility?
+                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  facility?
                 </>
               }
               cancelLabel="Nevermind"

@@ -18,7 +18,7 @@ import {
 } from "./MeaningfulDecisions";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
-import { formatMoneyConcise } from "./Format";
+import { formatMoneyConcise, formatCount } from "./Format";
 import { selectProjection } from "./Projection";
 
 export interface MissionRequirement {
@@ -113,11 +113,11 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "retention",
       label: "Retain the community",
-      compact: `Customers ≥ ${Math.ceil(threshold).toLocaleString()} (${now ? Math.round(now.customers).toLocaleString() : "unavailable"})`,
+      compact: `Customers ≥ ${formatCount(Math.ceil(threshold))} (${now ? formatCount(now.customers) : "unavailable"})`,
       current: now
-        ? `${Math.round(now.customers).toLocaleString()} current customers`
+        ? `${formatCount(now.customers)} current customers`
         : "Current customers unavailable",
-      target: `Keep ${Math.ceil(threshold).toLocaleString()} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
+      target: `Keep ${formatCount(Math.ceil(threshold))} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
       timing: "Required at term end; current customers can still change",
       status: now ? "in-progress" : "unknown",
       deadline: end,
@@ -141,7 +141,7 @@ export function getMissionStatus(game: GameType) {
     label: "Keep the utility solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
     current: now
-      ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
+      ? `$${formatCount(now.cash)} now (partial month)`
       : "Current cash unavailable",
     target: "Cash must be $0 or more at every month-end",
     timing:

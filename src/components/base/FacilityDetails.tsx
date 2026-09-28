@@ -10,10 +10,13 @@ import {
   facilityOutputFactor,
 } from "../../helpers/Financials";
 import {
+  formatPercent,
   formatMoneyConcise,
   formatWattHours,
   formatWattHoursOfPeak,
   formatWatts,
+  formatCount,
+  formatPricePerMWh,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -95,8 +98,6 @@ function Stat(props: StatProps): React.JSX.Element {
     </div>
   );
 }
-
-const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
 /**
  * The last year of this fuel's price, oldest first. Empty when the game hasn't been running long
@@ -380,7 +381,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={
                   lifetime.capacityFactor === undefined
                     ? "—"
-                    : percent(lifetime.capacityFactor)
+                    : formatPercent(lifetime.capacityFactor)
                 }
               />
             </>
@@ -395,25 +396,25 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           {facility.name === "Battery" && equivalentCycles !== undefined && (
             <Stat
               label="Cycles"
-              value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+              value={`${formatCount(equivalentCycles)} / 7,300`}
             />
           )}
           {minimumStableOutput !== undefined && (
             <Stat
               label="Minimum stable output"
-              value={`${percent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
+              value={`${formatPercent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
             />
           )}
           {facility.tracksStarts && (
             <Stat
               label="Starts"
-              value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
+              value={formatCount(facility.lifetimeStarts || 0)}
             />
           )}
           {storage && (
             <Stat
               label="Round-trip efficiency"
-              value={percent(storage.roundTripEfficiency)}
+              value={formatPercent(storage.roundTripEfficiency)}
             />
           )}
           {hazard && (
@@ -421,7 +422,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               label={hazard.label}
               value={
                 <span className="facilityStatWarning">
-                  {percent(hazard.availableFraction)} available
+                  {formatPercent(hazard.availableFraction)} available
                   <span className="facilityStatNote">
                     {hazard.daysLeft !== undefined
                       ? `${dayCount(hazard.daysLeft)} to repair`
@@ -438,7 +439,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 <>
                   {formatWatts(facility.peakW * maxOutputFactor)}
                   <span className="facilityStatNote">
-                    {`Limited to ${percent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
+                    {`Limited to ${formatPercent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
                   </span>
                 </>
               }
@@ -459,7 +460,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={
               lifetime.costPerMWh === undefined
                 ? "—"
-                : `${formatMoneyConcise(lifetime.costPerMWh)}/MWh`
+                : formatPricePerMWh(lifetime.costPerMWh)
             }
           />
           <Stat
@@ -467,7 +468,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={
               lifetime.revenuePerMWh === undefined
                 ? "—"
-                : `${formatMoneyConcise(lifetime.revenuePerMWh)}/MWh`
+                : formatPricePerMWh(lifetime.revenuePerMWh)
             }
           />
           <Stat

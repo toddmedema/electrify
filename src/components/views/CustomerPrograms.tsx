@@ -62,6 +62,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
+  formatPercent,
   formatMoneyConcise,
   formatMoneyStable,
   formatWatts,
@@ -357,10 +358,8 @@ function useEstimate<T>(
 
 /** Keep the standing program's status and yearly budget visible in the list. */
 function preparednessStatus(preparedness: WildfirePreparednessType): string {
-  return `${preparedness.active ? "On" : "Off"} · ${percent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
+  return `${preparedness.active ? "On" : "Off"} · ${formatPercent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
 }
-
-const percent = (share: number) => `${Math.round(share * 100)}%`;
 
 /** Season facts and a simulated typical wildfire, met with and without funded crews. */
 function WildfireDetails({
@@ -422,13 +421,13 @@ function WildfireDetails({
         sx={{ display: "grid", gap: 1.5 }}
       >
         <Typography variant="subtitle2">
-          {percent(effectiveness)} effective
+          {formatPercent(effectiveness)} effective
         </Typography>
         <LinearProgress
           variant="determinate"
           value={effectiveness * 100}
           aria-label="Wildfire preparedness effectiveness"
-          aria-valuetext={`${percent(effectiveness)} effective · ${progress}`}
+          aria-valuetext={`${formatPercent(effectiveness)} effective · ${progress}`}
           color={effectiveness >= 1 ? "success" : "primary"}
           sx={{ height: 8, borderRadius: 1 }}
         />
@@ -495,19 +494,19 @@ function WildfireDetails({
               <Box role="status">
                 <Typography>
                   Effectiveness at this fire: {offLabel}{" "}
-                  {percent(result.standardEffectiveness)} → {onLabel}{" "}
-                  {percent(result.preparedEffectiveness)}
+                  {formatPercent(result.standardEffectiveness)} → {onLabel}{" "}
+                  {formatPercent(result.preparedEffectiveness)}
                 </Typography>
                 <Typography>
                   Customer load disconnected:{" "}
-                  {percent(standard.disconnectedDemand)} →{" "}
-                  {percent(prepared.disconnectedDemand)}
+                  {formatPercent(standard.disconnectedDemand)} →{" "}
+                  {formatPercent(prepared.disconnectedDemand)}
                 </Typography>
                 {standard.selectedFacilityNames.length > 0 && (
                   <Typography>
                     {standard.selectedFacilityNames.join(", ")} limited to{" "}
-                    {percent(standard.outputMultiplier)} →{" "}
-                    {percent(prepared.outputMultiplier)} output
+                    {formatPercent(standard.outputMultiplier)} →{" "}
+                    {formatPercent(prepared.outputMultiplier)} output
                   </Typography>
                 )}
                 <Typography>

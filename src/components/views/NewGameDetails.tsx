@@ -44,11 +44,7 @@ import {
   ScoreType,
 } from "../../Types";
 
-import numbro from "numbro";
-
-function formatScore(score: number): string {
-  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
-}
+import { formatScore } from "../../helpers/Format";
 
 function formatDifficulty(difficulty: string): string {
   return DIFFICULTY_LABELS[difficulty] || difficulty;

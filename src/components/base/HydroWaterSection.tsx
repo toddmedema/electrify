@@ -3,7 +3,11 @@ import { Typography } from "@mui/material";
 import { MONTH_NAMES, MONTHS, TICKS_PER_YEAR } from "../../Constants";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatWattHours, formatWattHoursOfPeak } from "../../helpers/Format";
+import {
+  formatPercent,
+  formatWattHours,
+  formatWattHoursOfPeak,
+} from "../../helpers/Format";
 import {
   describeHydroStatus,
   ReservoirOutlookPoint,
@@ -14,8 +18,6 @@ import { FacilityOperatingType, GameType } from "../../Types";
 import ManualLink from "./ManualLink";
 import { useAfterPaintValue } from "./AfterPaint";
 import Sparkline from "./Sparkline";
-
-const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
 /**
  * The year ahead only changes meaningfully when the month or the operating fleet does, so the
@@ -108,9 +110,9 @@ export default function HydroWaterSection(props: {
   // The combined level would contradict this dam's own Reservoir stat above, so it's only
   // shown for a lone dam
   const outlookLabel = [
-    fleet ? undefined : `Now ${percent(values[0])}`,
+    fleet ? undefined : `Now ${formatPercent(values[0])}`,
     lowIndex > 0 && lowPoint
-      ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`
+      ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${formatPercent(lowPoint.fraction)}`
       : undefined,
   ]
     .filter(Boolean)
@@ -161,7 +163,7 @@ export default function HydroWaterSection(props: {
                 fill
                 baseline
                 lowMarker
-                ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${percent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${percent(lowPoint.fraction)}.`}
+                ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${formatPercent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${formatPercent(lowPoint.fraction)}.`}
               />
               {outlookLabel && (
                 <Typography variant="caption" color="textSecondary">

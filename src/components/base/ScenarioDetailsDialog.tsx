@@ -26,7 +26,8 @@ import { scoreRules } from "./VictoryConditions";
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
-import { formatScore, SCORE_LABELS } from "./VictoryDialog";
+import { SCORE_LABELS } from "./VictoryDialog";
+import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import type { MissionRequirement } from "../../helpers/MissionStatus";
 
