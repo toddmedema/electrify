@@ -63,8 +63,12 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     // Wait for a real completed month, then stop the clock before inspecting its score.
+    // The status bar's event chip names the emergency too; wait on the ongoing event card.
     await expect(
-      page.getByText("Wildfire emergency", { exact: true }),
+      page
+        .locator(".ongoingEvents")
+        .getByText("Wildfire emergency", { exact: true })
+        .first(),
     ).toBeAttached({ timeout: 25000 });
     await page
       .locator("#appbar:visible")

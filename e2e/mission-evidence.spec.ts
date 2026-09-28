@@ -189,7 +189,9 @@ test("status boundary follows the saved movable pane divider and window width", 
         if ((await layouts.count()) !== 1) return Infinity;
         const grids = page.locator(".gridHealth:visible");
         if ((await grids.count()) !== 1) return Infinity;
-        const grid = await grids.boundingBox();
+        // A transition can mount a second app bar between the count and the measurement;
+        // strict mode then throws, which should retry rather than fail the poll.
+        const grid = await grids.boundingBox().catch(() => null);
         const divider = await page
           .locator(".pane-splitter")
           .first()
@@ -413,7 +415,8 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
         .length;
     }),
   ).toBe(countBefore + 1);
+  // Build repeats the speed controls over the game's app bar; both reflect one clock.
   await expect(
-    page.getByRole("button", { name: "pause", exact: true }),
+    page.getByRole("button", { name: "pause", exact: true }).first(),
   ).toHaveAttribute("aria-pressed", "true");
 });
