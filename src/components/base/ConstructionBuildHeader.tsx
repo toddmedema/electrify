@@ -6,38 +6,25 @@ import {
   MenuItem,
   Select,
   Slider,
-  Toolbar,
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
 import SortIcon from "@mui/icons-material/Sort";
-import { ConceptNameType } from "../../Types";
-import { formatMoneyStable } from "../../helpers/Format";
-import ConceptIcon from "./ConceptIcon";
 
 interface Props {
-  hideTitle?: boolean;
-  concept: ConceptNameType;
-  title: string;
-  cash: number;
   capacity: string;
   sliderValue: number;
   sliderMin: number;
   sliderMax: number;
   sort: string;
   sortOptions: ReadonlyArray<readonly [string, string]>;
-  onClose: () => void;
   onSliderChange: (value: number) => void;
   onSortChange: (value: string) => void;
 }
 
 /**
- * Shared chrome for the generator and storage catalogs.
- *
- * The first row follows the same hierarchy as GameAppBar: current context on the left and the
- * one global action on the right. The decision controls get their own shorter row so the title,
- * cash, capacity and sort order do not compete for one wrapped toolbar.
+ * The size and sort controls shared by the generator and storage catalogs. The title, cash and
+ * close button belong to the Build screen's CatalogTitleBar above them.
  */
 export default function ConstructionBuildHeader(
   props: Props,
@@ -59,31 +46,6 @@ export default function ConstructionBuildHeader(
 
   return (
     <header className="constructionHeader">
-      {!props.hideTitle && (
-        <Toolbar className="constructionTitleBar">
-          <Typography variant="h6" className="constructionTitle">
-            <span className="iconLabel">
-              <ConceptIcon concept={props.concept} fontSize="small" />
-              {props.title}
-            </span>
-            <span
-              className="weak constructionCash"
-              aria-label={`Available cash ${formatMoneyStable(props.cash)}`}
-            >
-              {formatMoneyStable(props.cash)} cash
-            </span>
-          </Typography>
-          <IconButton
-            id="close-button"
-            color="primary"
-            onClick={props.onClose}
-            aria-label="close"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-        </Toolbar>
-      )}
       <div className="constructionControls">
         <Typography
           id="construction-capacity"

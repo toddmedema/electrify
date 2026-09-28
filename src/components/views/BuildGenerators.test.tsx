@@ -399,7 +399,7 @@ it("explains affordability and hides comparison when a build is disabled", () =>
   );
 
   expect(
-    screen.getByText(/cash needed to afford loan downpayment/),
+    screen.getByText(/^Need \$.+ down payment · you have \$0$/),
   ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Natural Gas/ }),

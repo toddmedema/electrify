@@ -38,10 +38,10 @@ import {
   isStorage,
   GameType,
   RetrofitFacilityAction,
-  WorldEventEffectsType,
   EvidenceRequestType,
 } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
+import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatMoneyConcise,
   formatWattHours,
@@ -146,17 +146,6 @@ function HazardStatusLead(props: {
 function isWeatherHazardEvent(definitionId: string): boolean {
   return (
     definitionId === HAIL_DEFINITION_ID || definitionId === COLD_DEFINITION_ID
-  );
-}
-
-function storyOutputMultiplierForFacility(
-  facility: FacilityOperatingType,
-  effects: WorldEventEffectsType,
-): number {
-  const fuel = facility.fuel;
-  return (
-    (effects.facilityOutputMultipliersById?.[String(facility.id)] || 1) *
-    (fuel ? effects.facilityOutputMultipliersByFuel?.[fuel] || 1 : 1)
   );
 }
 
@@ -978,7 +967,7 @@ export default class Facilities extends React.Component<Props> {
                             onCancelRetrofit={this.props.onCancelRetrofit}
                             onSelect={onSelect}
                             selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplierForFacility(
+                            storyOutputMultiplier={storyOutputMultiplier(
                               g,
                               storyEffects,
                             )}

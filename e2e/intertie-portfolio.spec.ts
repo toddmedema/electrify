@@ -41,9 +41,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
     await expect(dialog).toContainText("5MW access · Ready in 12 months");
-    await expect(dialog).toContainText("$1.8M · $48.2M left");
-    await expect(dialog).toContainText("payments start now");
-    await expect(dialog).toContainText("$3k/mo + power purchases");
+    await expect(dialog).toContainText("$50M → $48.2M");
+    await expect(dialog).toContainText("Payments start now");
+    await expect(dialog).toContainText("$3k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone.
     for (const fact of await dialog.locator(".decisionImpactFact").all()) {
       await expect(fact).toBeInViewport();

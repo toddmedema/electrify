@@ -1,4 +1,4 @@
-import { DOWNPAYMENT_PERCENT } from "../Constants";
+import { purchaseTerms } from "./Financials";
 import { FacilityShoppingType, isStorage } from "../Types";
 import { formatMoneyConcise, formatWattHours, formatWatts } from "./Format";
 
@@ -6,9 +6,8 @@ export function buildConsequenceMessage(
   facility: FacilityShoppingType,
   financed: boolean,
 ): string {
-  const committed = financed
-    ? facility.buildCost * DOWNPAYMENT_PERCENT
-    : facility.buildCost;
+  // The rate only prices the monthly payment, which this message does not quote
+  const committed = purchaseTerms(facility.buildCost, financed, 0).amountDue;
   const months = Math.round(facility.yearsToBuild * 12);
   const contribution = isStorage(facility)
     ? `${formatWatts(facility.peakW)} output / ${formatWattHours(facility.peakWh)} storage`
@@ -20,7 +19,7 @@ export function buildConsequenceMessage(
 
 /** A short event-feed title for the commitment itself; the snackbar carries the full forecast. */
 export function buildStartedMessage(facility: FacilityShoppingType): string {
-  if (facility.peakWh) {
+  if (isStorage(facility)) {
     const duration = Math.round((facility.peakWh / facility.peakW) * 10) / 10;
     return `Started construction on ${duration}hr ${formatWatts(facility.peakW)} ${facility.name}`;
   }

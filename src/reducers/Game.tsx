@@ -69,7 +69,7 @@ import {
   facilityCashBack,
   getCreditInputs,
   getCreditPremium,
-  getMonthlyPayment,
+  purchaseTerms,
   getPaymentInterest,
   facilityOutputFactor,
   estimatedAnnualOperatingCost,
@@ -96,7 +96,11 @@ import {
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
-import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
+import {
+  buildStoryPeriodSnapshot,
+  buildStorySnapshot,
+  storyOutputMultiplier,
+} from "../helpers/Story";
 import {
   isMaterialCapacityDecision,
   recordMeaningfulDecision,
@@ -200,11 +204,9 @@ import { navigate, navigateBack } from "./Card";
 import {
   DAYS_PER_YEAR,
   DIFFICULTIES,
-  DOWNPAYMENT_PERCENT,
   FUELS,
   GAME_TO_REAL_YEARS,
   INTEREST_RATE_YEARLY,
-  LOAN_MONTHS,
   ORGANIC_GROWTH_MAX_ANNUAL,
   TICK_MINUTES,
   TICK_MS,
@@ -2146,9 +2148,11 @@ function applyBuildFacility(
     ? { ...requested, hydroSiteId: hydroSite!.selected!.id }
     : requested;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  const amountDue = payload.financed
-    ? built.buildCost * DOWNPAYMENT_PERCENT
-    : built.buildCost;
+  const { amountDue } = purchaseTerms(
+    built.buildCost,
+    !!payload.financed,
+    state.interestRate,
+  );
   // The dialog's quote can be stale by the time an action lands (or a replay/import can be
   // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
   if (!now || now.cash < amountDue) {
@@ -2329,12 +2333,13 @@ function applyBuildTransmissionLine(
     return false;
   }
   const financed = !!payload.financed;
-  const amountDue = financed
-    ? corridor.buildCost * DOWNPAYMENT_PERCENT
-    : corridor.buildCost;
+  const { amountDue, loanAmount, monthlyPayment } = purchaseTerms(
+    corridor.buildCost,
+    financed,
+    state.interestRate,
+  );
   if (now.cash < amountDue) return false;
   now.cash -= amountDue;
-  const loanAmount = financed ? corridor.buildCost - amountDue : 0;
   const line: TransmissionLineOperatingType = {
     id:
       state.transmission.lines.reduce(
@@ -2350,9 +2355,7 @@ function applyBuildTransmissionLine(
     minuteCreated: state.date.minute,
     financed,
     loanAmountLeft: loanAmount,
-    loanMonthlyPayment: financed
-      ? getMonthlyPayment(loanAmount, state.interestRate, LOAN_MONTHS)
-      : 0,
+    loanMonthlyPayment: monthlyPayment,
     interestRate: financed ? state.interestRate : 0,
     // Nothing flows until the line is energised, which is years away
     currentFlowW: 0,
@@ -2406,22 +2409,20 @@ function applyUpgradeTransmissionLine(
   );
   if (!quote) return false;
   const financed = !!payload.financed;
-  const amountDue = financed
-    ? quote.buildCost * DOWNPAYMENT_PERCENT
-    : quote.buildCost;
+  // One line, one loan. Rolling the new borrowing into the existing balance at the current
+  // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
+  // needing a second schedule of its own.
+  const { amountDue, loanAmount, monthlyPayment } = purchaseTerms(
+    quote.buildCost,
+    financed,
+    state.interestRate,
+    line.loanAmountLeft,
+  );
   if (now.cash < amountDue) return false;
   now.cash -= amountDue;
-  const loanAmount = financed ? quote.buildCost - amountDue : 0;
   if (financed) {
-    // One line, one loan. Rolling the new borrowing into the existing balance at the current
-    // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
-    // needing a second schedule of its own.
     line.loanAmountLeft += loanAmount;
-    line.loanMonthlyPayment = getMonthlyPayment(
-      line.loanAmountLeft,
-      state.interestRate,
-      LOAN_MONTHS,
-    );
+    line.loanMonthlyPayment = monthlyPayment;
     line.interestRate = state.interestRate;
     line.financed = true;
   }
@@ -3737,29 +3738,24 @@ function updateSupplyFacilitiesFinances(
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
-    // Only read or written behind hasMinimumStableOutput, which storage never has
-    const generator = g as GeneratorOperatingType;
-    const hasMinimumStableOutput = (g.minimumStableOutput || 0) > 0;
+    // Commitment is only read or written behind hasMinimumStableOutput, which storage never has
+    const generator = isStorage(g) ? undefined : g;
+    const hasMinimumStableOutput =
+      generator !== undefined && (generator.minimumStableOutput || 0) > 0;
     const previouslyCommitted = simulated
-      ? (generator.committed ?? previousW > 0)
-      : (generator.generatingLastRealTick ??
-        generator.committed ??
+      ? (generator?.committed ?? previousW > 0)
+      : (generator?.generatingLastRealTick ??
+        generator?.committed ??
         previousW > 0);
-    const generatorFuel = g.fuel;
-    const fuelOutputMultiplier = generatorFuel
-      ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
-      : 1;
     // A retrofit holds the plant offline until it completes.
-    const facilityOutputMultiplier = isUpgradingAt(g, now.minute)
+    const availablePeakW = isUpgradingAt(g, now.minute)
       ? 0
-      : (tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1);
-    const availablePeakW =
-      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
+      : g.peakW * storyOutputMultiplier(g, tickStoryEffects);
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
-    const storage = !!g.peakWh && g.yearsToBuildLeft === 0;
+    const storage = isStorage(g) && g.yearsToBuildLeft === 0;
     if (hydro && g.yearsToBuildLeft === 0) {
       const capacityWh = g.reservoirCapacityWh || 0;
       const inflowWh =
@@ -4698,23 +4694,17 @@ function buildFacilityHelper(
     };
     if (newGame) {
       // Don't charge anything for initial builds
-    } else if (financed) {
-      const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
-      now.cash -= downpayment;
-      const loanAmount = g.buildCost - downpayment;
-      financing = {
-        loanAmountTotal: loanAmount,
-        loanAmountLeft: loanAmount,
-        loanMonthlyPayment: getMonthlyPayment(
-          loanAmount,
-          state.interestRate,
-          LOAN_MONTHS,
-        ),
-        interestRate: state.interestRate,
-      };
     } else {
-      // purchased in cash
-      now.cash -= g.buildCost;
+      const terms = purchaseTerms(g.buildCost, financed, state.interestRate);
+      now.cash -= terms.amountDue;
+      if (financed) {
+        financing = {
+          loanAmountTotal: terms.loanAmount,
+          loanAmountLeft: terms.loanAmount,
+          loanMonthlyPayment: terms.monthlyPayment,
+          interestRate: state.interestRate,
+        };
+      }
     }
     // Site availability belongs to the current fleet quote, not the facility bought from it. A
     // saved operating asset must not retain a permanently stale "remaining" count.
