@@ -250,6 +250,27 @@ No additional facility type is added in this pass:
 - Fixed-bottom offshore wind is already represented by the separately researched Offshore Wind
   facility, so it is retained rather than duplicated here.
 
+## Money vintages, fuel prices and retail rates
+
+Everything a run pays or earns is in the same nominal dollars:
+
+- **Capital and O&M tables** are 2023 dollars. A run starting before 2023 deflates them into its
+  starting year's dollars with recorded annual CPI-U (`getCostTableDeflator`), then the game's
+  inflation index carries them forward. A 1980 start pays 27% of the table value, a 2006 start
+  66%; 2023 and later starts pay the table.
+- **Fuel** is the monthly U.S. cost delivered to electric generating plants (EIA Monthly Energy
+  Review Table 9.9) for coal, natural gas and, from 2001, distillate oil. Pre-2001 oil is the
+  earlier imported-crude record times the measured 1.415 distillate/crude ratio. Uranium is
+  reactor fuel (ore at ~177 MMBtu per lb U3O8 plus $0.40/MMBtu of conversion, enrichment and
+  fabrication), about $6.6/MWh in 2019. Regional multipliers in `LocationProfiles.tsx` are
+  ratios to this U.S. delivered series.
+- **Opening retail rates** for U.S. scenarios are 60% of the EIA average retail price for that
+  state and year (all sectors, `avgprice_annual.xlsx`), falling back to the national MER Table 9.8
+  value scaled by the state's 1990 ratio. The game carries no distribution network costs, so the
+  rate is the generation-plus-transmission share: EIA's energy-only providers charged 59% of full
+  retail nationally in 2020. Tutorials keep their authored teaching rates, and non-U.S. scenarios
+  keep their researched local rates.
+
 ## Simulation and teaching boundaries
 
 Purchase reviews lead with down payment, monthly payment and estimated upkeep; detailed plant

@@ -1,4 +1,5 @@
 import {
+  getCostTableDeflator,
   getInflationIndex,
   hasEconomy,
   initEconomy,
@@ -234,5 +235,17 @@ describe("initEconomy", () => {
       .mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
     const failure = await new Promise((resolve) => initEconomy(resolve));
     expect(failure).toMatch(/offline/);
+  });
+});
+
+describe("getCostTableDeflator", () => {
+  it("converts 2023-dollar tables into a historical start's own dollars", () => {
+    expect(getCostTableDeflator(1980)).toBeCloseTo(82.4 / 304.702);
+    expect(getCostTableDeflator(2006)).toBeCloseTo(201.6 / 304.702);
+  });
+
+  it("leaves 2023 and later starts at table value", () => {
+    expect(getCostTableDeflator(2023)).toBe(1);
+    expect(getCostTableDeflator(2080)).toBe(1);
   });
 });
