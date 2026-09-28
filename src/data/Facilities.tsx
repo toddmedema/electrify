@@ -45,11 +45,15 @@ function getCostInflation(state: GameType): number {
 // moved into deeper water and farther from shore, taking European capex from about EUR1.5m/MW in
 // 2000 to EUR4m/MW in 2010. IRENA's global average then fell from $5,409/kW in 2010 to $2,800/kW
 // in 2023. Peak the curve in 2010 and floor its early side so tiny first-generation farms do not
-// become a historical bargain.
+// become a historical bargain. Like onshore wind and solar, learning stops at the edge of the
+// outlook rather than halving forever: 2030 lands ~28% below 2023, in line with IRENA and NREL ATB
+// moderate fixed-bottom projections of a 25-30% decline by 2030-2035.
+const OFFSHORE_LEARNING_END_YEAR = 2030;
 function offshoreEraMultiple(year: number): number {
   return year <= 2010
     ? Math.max(1.64, 1.82 * Math.pow(2, (year - 2010) / 9))
-    : 1.82 * Math.pow(2, (2010 - year) / 15);
+    : 1.82 *
+        Math.pow(2, (2010 - Math.min(year, OFFSHORE_LEARNING_END_YEAR)) / 15);
 }
 
 // EIA's 2020 capital-cost study is in 2019 dollars and its AEO 2025 study is in 2023

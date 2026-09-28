@@ -315,6 +315,32 @@ describe("offshore wind", () => {
     expect(cost2010).toBeGreaterThan(cost2000);
     expect(cost2010).toBeGreaterThan(cost2023);
   });
+
+  it("stops learning at the 2030 outlook instead of undercutting onshore wind", () => {
+    expect(generatorAt(newYork, 2100)?.buildCost).toBe(
+      generatorAt(newYork, 2030)?.buildCost,
+    );
+    const offshore = generatorAt(newYork, 2100, 1500000000)?.buildCost;
+    const onshore = GENERATORS(stateAt(newYork, 2100), 1500000000, [], []).find(
+      (generator) => generator.name === "Wind",
+    )?.buildCost;
+    expect(offshore).toBeGreaterThan(2 * (onshore as number));
+  });
+
+  it("prices a first-generation 5MW farm near its real per-watt cost", () => {
+    // Vindeby and Middelgrunden cost about $1.2-2.5k/kW in their own dollars
+    const perW =
+      (generatorAt(newYork, 2000, 5000000)?.buildCost as number) / 5e6;
+    expect(perW).toBeLessThan(15);
+  });
+});
+
+describe("economies of scale", () => {
+  it("keeps a 10MW solar farm within LBNL's small-project premium", () => {
+    const perW = (peakW: number) =>
+      (generatorAt(2024, "Solar", peakW)?.buildCost as number) / peakW;
+    expect(perW(10000000) / perW(150000000)).toBeLessThan(1.2);
+  });
 });
 
 describe("airborne wind", () => {
