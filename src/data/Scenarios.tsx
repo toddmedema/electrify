@@ -1030,7 +1030,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
-      objective: "Replace high-emission power while keeping the lights on.",
+      objective:
+        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
@@ -1054,7 +1055,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
-      objective: "Grow with cheaper gas without relying on it alone.",
+      objective:
+        "Stay solvent for 20 years through a gas boom and whatever follows.",
       threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
@@ -1075,7 +1077,7 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
-      objective: "Use less costly oil while meeting changing demand.",
+      objective: "Keep the island supplied and solvent as oil prices swing.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
@@ -1100,7 +1102,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
-      objective: "Replace aging oil plants with cleaner options.",
+      objective:
+        "Stay solvent and keep up with demand as clean technology gets cheaper.",
       threat:
         "Invest too early and overpay; wait too long and demand may exceed supply.",
     },
@@ -1267,7 +1270,7 @@ export const SCENARIOS: ScenarioType[] = [
     reliabilityObjective: {
       year: 2021,
       month: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "February 2021 freeze",
     },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
@@ -1323,7 +1326,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2026 heatwave and drought",
     },
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
@@ -1386,7 +1389,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 7,
       durationMonths: 18,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "possible nuclear shutdown period and recovery",
     },
     facilities: [
@@ -1436,7 +1439,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2025,
       month: 1,
       durationMonths: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "January and February 2025 wildfire emergency",
     },
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
@@ -1505,7 +1508,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2022,
       month: 1,
       durationMonths: 12,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2022, the worst year of the shortage",
     },
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
@@ -1675,7 +1678,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2024,
       month: 5,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "the record summer of 2024",
     },
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,

@@ -56,6 +56,8 @@ beforeAll(() => {
         scenarioId: CUSTOM_SCENARIO_ID,
         seed,
         months: MONTHS,
+        // A hazard check with no operating plan, not a test of the decision gate
+        waiveDecisionGate: true,
       }),
     );
   });

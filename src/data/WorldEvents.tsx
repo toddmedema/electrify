@@ -14,6 +14,7 @@ import {
   WorldEventEffectsType,
 } from "../Types";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 
 export interface StoryContextType {
@@ -801,13 +802,15 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "outlook",
-      schedule: { atMonth: 96 },
+      // Landfall is seeded in months 101-106. Warning at month 60 leaves more than the CEO build
+      // time of the reference gas plant, so the forecast can be answered with construction.
+      schedule: { atMonth: 60 },
       preview: () => null,
       describe: ({ difficulty }) => {
         const balance = HURRICANE_BALANCE[difficulty];
         return {
-          title: "2008 hurricane forecast",
-          message: `A ${balance.severity.toLowerCase()} hurricane may cut output at several plants for ${balance.durationMonths} months and raise oil prices ${Math.round((balance.oilMultiplier - 1) * 100)}%, so add backup power and storage.`,
+          title: "2008 hurricane outlook",
+          message: `Forecasters expect a ${balance.severity.toLowerCase()} hurricane in 2008 that may cut output at several plants for ${balance.durationMonths} months and raise oil prices ${Math.round((balance.oilMultiplier - 1) * 100)}%, so add backup power and storage. ${buildLeadTimeHint(difficulty)}`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1236,12 +1239,12 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "seasonal-warning",
-      schedule: { atMonth: 24 },
+      // 23 months before the heat: time enough for a battery at any difficulty
+      schedule: { atMonth: 6 },
       preview: () => null,
-      describe: () => ({
+      describe: ({ difficulty }) => ({
         title: "A hot, dry summer ahead",
-        message:
-          "June–August 2026 heat will raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage.",
+        message: `Forecasters expect June–August 2026 heat to raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1500,12 +1503,12 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "contingency-review",
-      schedule: { atMonth: 24 },
+      // The trip is seeded in months 30-36; reviewing in the first month leaves time to build
+      schedule: { atMonth: 1 },
       preview: () => null,
-      describe: () => ({
+      describe: ({ difficulty }) => ({
         title: "Backup-power review",
-        message:
-          "The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator?",
+        message: `The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator? ${buildLeadTimeHint(difficulty)}`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",

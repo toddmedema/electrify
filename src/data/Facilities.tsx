@@ -1,4 +1,8 @@
 import { getHydroAvailability } from "./HydroSites";
+import {
+  batteryYearsToBuild,
+  naturalGasYearsToBuild,
+} from "../helpers/BuildLeadTime";
 import { LCWH } from "../helpers/Financials";
 import { buildStorySnapshot } from "../helpers/Story";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
@@ -374,7 +378,7 @@ export function GENERATORS(
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
       // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
       costPerStart: 23100 * (peakW / 419000000),
-      yearsToBuild: 2.46 + magnitude / 3,
+      yearsToBuild: naturalGasYearsToBuild(peakW),
       constructionKgco2ePerW: 0.06,
       capacityFactor: 0.45,
       // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
@@ -722,7 +726,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       hourlyLoss: 0.0001,
       annualOperatingCost: 0.01 * peakWh,
       // EIA's $10/kWh-year includes augmentation for about 1.5% annual degradation.
-      yearsToBuild: 0.57 + magnitude / 3,
+      yearsToBuild: batteryYearsToBuild(peakWh),
       // EIA reference total lead time is 18 months for 600MWh.
       spinMinutes: 1,
     },

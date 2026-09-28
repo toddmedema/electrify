@@ -151,22 +151,40 @@ test("survival is chronological completed evidence and ignores current partial h
   ).toBe("unknown");
 });
 
-test("retention shows current customers against final target and remains recoverable", () => {
+test("retention shows current customers against final target while recoverable", () => {
   const scenario = SCENARIOS.find(
     (s) => s.minimumCustomerRetention !== undefined,
   )!;
   const game = createGame({ scenarioId: scenario.id });
+  const threshold =
+    scenario.startingCustomers! * scenario.minimumCustomerRetention!;
+  // Below target now, but organic growth over the whole term can still recover it
+  const recoverable = Math.ceil(threshold * 0.95);
   const low = createNextState(game, (g) => {
-    g.timeline[0].customers = 1;
+    g.timeline[0].customers = recoverable;
   });
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
-    /^Customers ≥ .* \(1\)$/,
+    new RegExp(`^Customers ≥ .* \\(${recoverable.toLocaleString()}\\)$`),
   );
   expect(requirement(low, "retention").target).toContain("customers");
   expect(requirement(low, "retention").timing).toContain(
     "Required at term end",
+  );
+});
+
+test("retention reads as failed once best-case growth cannot recover it", () => {
+  const scenario = SCENARIOS.find(
+    (s) => s.minimumCustomerRetention !== undefined,
+  )!;
+  const game = createGame({ scenarioId: scenario.id });
+  const lost = createNextState(game, (g) => {
+    g.timeline[0].customers = 1;
+  });
+  expect(requirement(lost, "retention").status).toBe("failed");
+  expect(requirement(lost, "retention").timing).toMatch(
+    /^No longer reachable: at most 1 customers by term end$/,
   );
 });
 

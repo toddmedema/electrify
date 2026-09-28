@@ -63,6 +63,7 @@ import {
   customerMarketSizeAt,
   getMarketRate,
   projectCustomerChange,
+  publicRateCap,
 } from "../../helpers/Customers";
 import { getInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
@@ -1229,7 +1230,16 @@ export default class Insights extends React.Component<Props, State> {
     const targetRate = scenario.dollarsPerkWh * inflationIndex;
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
-      : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
+      : // A public board caps the rate at twice its target in today's dollars; the reducer enforces it
+        Math.max(
+          publicRateCap(
+            scenario.dollarsPerkWh,
+            game.date,
+            game.startingYear,
+            game.seed,
+          ),
+          game.dollarsPerkWh,
+        );
     // The final score decomposes exactly into a supply-weighted sum over the years played, so
     // what a rate is worth is the coming year's own term of that sum: the distance from the
     // target, times how much of the lifetime energy the coming year makes up. Always a full
@@ -1284,8 +1294,8 @@ export default class Insights extends React.Component<Props, State> {
             value: max,
             label: rateMarkLabel(
               max,
-              formatMoneyConcise(max),
-              formatRateCompact(max),
+              `${formatMoneyConcise(max)} board cap`,
+              `cap ${formatRateCompact(max)}`,
             ),
           },
         ];

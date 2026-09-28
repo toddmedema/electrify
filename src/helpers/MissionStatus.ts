@@ -9,9 +9,13 @@ import { getTimeFromTimeline, MINUTES_PER_MONTH } from "./DateTime";
 import {
   absoluteMonth,
   demandServed,
+  formatRequiredShare,
   reliabilityMonths,
   hasChronicBlackouts,
+  retentionBaseline,
+  retentionUnreachable,
 } from "./ObjectiveRules";
+import { customerMarketSizeAt } from "./Customers";
 import {
   meaningfulDecisionCategoryCount,
   meaningfulDecisionRequirement,
@@ -80,7 +84,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
@@ -88,8 +92,8 @@ export function getMissionStatus(game: GameType) {
         (missing || (monthsRemaining === 0 && observed < count)
           ? " · history incomplete, not verifiable"
           : ""),
-      target: `Every required month needs ${Math.round(objective.minimumDemandServed * 100)}% served`,
-      timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; checked at term end`,
+      target: `Every required month needs ${formatRequiredShare(objective.minimumDemandServed)} served`,
+      timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; a month below target ends the run`,
       status: missing
         ? "unknown"
         : failed
@@ -104,12 +108,23 @@ export function getMissionStatus(game: GameType) {
       deadline: first + count,
     });
   }
+  const retentionStart = scenario
+    ? retentionBaseline(scenario, game.customerMarketSize)
+    : undefined;
   if (
     scenario?.minimumCustomerRetention !== undefined &&
-    scenario.startingCustomers !== undefined
+    retentionStart !== undefined
   ) {
-    const threshold =
-      scenario.startingCustomers * scenario.minimumCustomerRetention;
+    const threshold = retentionStart * scenario.minimumCustomerRetention;
+    // Honest about recovery: once even best-case growth in the time left cannot reach the
+    // threshold, the requirement has failed rather than being something that can still change
+    const unreachable = now
+      ? retentionUnreachable(scenario, now.customers, {
+          startingCustomers: retentionStart,
+          monthsRemaining,
+          marketSize: customerMarketSizeAt(game.customerMarketSize, now.minute),
+        })
+      : undefined;
     requirements.push({
       id: "retention",
       label: "Retain the community",
@@ -118,8 +133,12 @@ export function getMissionStatus(game: GameType) {
         ? `${formatCount(now.customers)} current customers`
         : "Current customers unavailable",
       target: `Keep ${formatCount(Math.ceil(threshold))} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
-      timing: "Required at term end; current customers can still change",
-      status: now ? "in-progress" : "unknown",
+      timing: unreachable
+        ? `No longer reachable: at most ${formatCount(unreachable.bestCase)} customers by term end`
+        : scenario.ownership === "Public"
+          ? "Required at term end; public customers grow slowly and cannot be won back with price"
+          : "Required at term end; a lower rate wins customers back",
+      status: unreachable ? "failed" : now ? "in-progress" : "unknown",
       deadline: end,
     });
   }

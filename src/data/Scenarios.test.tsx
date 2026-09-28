@@ -323,7 +323,7 @@ describe("authored starting fleets", () => {
       reliabilityObjective: {
         year: 2021,
         month: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
         label: "February 2021 freeze",
       },
     });
@@ -369,7 +369,7 @@ describe("authored starting fleets", () => {
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
     });
     expect(heatwave).toMatchObject({
       name: "Heatwave + Drought",
@@ -412,7 +412,7 @@ describe("authored starting fleets", () => {
         year: 2025,
         month: 1,
         durationMonths: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
       },
     });
     expect(wildfire.briefing?.threat).toMatch(
@@ -438,6 +438,21 @@ describe("authored starting fleets", () => {
 
     endOfEra.facilities.forEach((facility) => {
       expect(facility.initialAgeYears).toBeGreaterThanOrEqual(20);
+    });
+  });
+});
+
+describe("briefing objectives", () => {
+  // A briefing objective is what the player optimises for, so it must not promise a check the
+  // game never makes. The classics that name a clean-up goal are won by surviving the term.
+  it("describe the real win condition in the classic scenarios", () => {
+    [100, 101, 103, 105].forEach((id) => {
+      const scenario = getScenario(id)!;
+      expect(scenario.reliabilityObjective).toBeUndefined();
+      expect([scenario.name, scenario.briefing!.objective]).toEqual([
+        scenario.name,
+        expect.stringMatching(/solvent/),
+      ]);
     });
   });
 });

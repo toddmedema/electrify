@@ -86,18 +86,18 @@ it("makes the CEO meaningful-decision gate visible with live progress", () => {
   );
 });
 
-it("does not add the CEO gate to lower difficulties", () => {
+it("asks lower difficulties for a smaller plan than CEO", () => {
   render(
     <VictoryConditions
       ownership="Public"
       dollarsPerkWh={0.1}
       difficulty="VP"
-      meaningfulDecisions={decisions}
+      meaningfulDecisions={[]}
     />,
   );
-  expect(
-    screen.queryByTestId("meaningful-decision-progress"),
-  ).not.toBeInTheDocument();
+  expect(screen.getByTestId("meaningful-decision-progress")).toHaveTextContent(
+    "Progress: 0 of 4",
+  );
 });
 
 it("shows the one-decision Intern objective and legacy waiver", () => {

@@ -16,7 +16,13 @@ import {
 } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
 import {
+  generatorsAboveDemandFloor,
+  mothballAdvice,
+} from "../helpers/Mothball";
+import {
+  decidedObjectiveFailure,
   hasChronicBlackouts,
+  retentionBaseline,
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
@@ -80,6 +86,7 @@ import {
   customerMarketSizeAt,
   getMarketRate,
   nextCustomerCount,
+  publicRateCap,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1526,7 +1533,10 @@ export const gameSlice = createSlice({
       ) {
         state.runIdentity = undefined;
       }
-      const recorded = recordedDelta(action.payload);
+      if (typeof payload.dollarsPerkWh === "number") {
+        payload.dollarsPerkWh = capRateForScenario(state, payload);
+      }
+      const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
       if (recorded && recorded.dollarsPerkWh !== rateBefore) {
@@ -2796,7 +2806,11 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     }
     case "delta": {
-      const recorded = recordedDelta((payload || {}) as Partial<GameType>);
+      const requested = { ...((payload || {}) as Partial<GameType>) };
+      if (typeof requested.dollarsPerkWh === "number") {
+        requested.dollarsPerkWh = capRateForScenario(state, requested);
+      }
+      const recorded = recordedDelta(requested);
       if (
         recorded?.dollarsPerkWh !== undefined &&
         recorded.dollarsPerkWh !== state.dollarsPerkWh
@@ -2816,6 +2830,37 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     default:
       break;
   }
+}
+
+/**
+ * A public utility's board caps its rate (see publicRateCap); investors are left to competition.
+ * Deltas that also pick the scenario are setup, not a player's rate choice, and pass unchanged.
+ */
+function capRateForScenario(
+  state: GameType,
+  payload: Partial<GameType>,
+): number {
+  const rate = payload.dollarsPerkWh as number;
+  if (
+    !Number.isFinite(rate) ||
+    "scenarioId" in payload ||
+    "customScenario" in payload
+  ) {
+    return rate;
+  }
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (!scenario || scenario.ownership !== "Public" || scenario.tutorialSteps) {
+    return rate;
+  }
+  return Math.min(
+    rate,
+    publicRateCap(
+      scenario.dollarsPerkWh,
+      state.date,
+      state.startingYear,
+      state.seed,
+    ),
+  );
 }
 
 /**
@@ -3032,6 +3077,17 @@ export function tickState(state: GameType) {
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
+      // Advised once per plant: a paused-and-resumed plant is the player's informed choice
+      generatorsAboveDemandFloor(state.facilities, history[0]).forEach(
+        (generator) =>
+          logGameEvent(state, "WORLD_EVENT", mothballAdvice(generator), {
+            title: "Plant running above demand",
+            concept: "fuel",
+            importance: "NOTABLE",
+            actionTarget: { card: "FACILITIES", view: "FLEET" },
+            reportedKey: `above-demand-floor:${generator.id}`,
+          }),
+      );
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
@@ -3161,16 +3217,32 @@ export function tickState(state: GameType) {
       };
 
       const chronicBlackouts = hasChronicBlackouts(history);
+      const termMonths = scenario.durationMonths || 12 * 20;
+      const retentionStart = retentionBaseline(
+        scenario,
+        state.customerMarketSize,
+      );
+      // Objectives are judged in full at term end; before that, only once already decided
       const objectiveFailure =
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20)
+        state.date.monthsElapsed === termMonths
           ? scenarioObjectiveFailure(
               scenario,
               history,
               state.difficulty,
               state.meaningfulDecisions,
               !!state.meaningfulDecisionGateWaived,
+              retentionStart,
             )
-          : undefined;
+          : state.date.monthsElapsed < termMonths && !isTutorial
+            ? decidedObjectiveFailure(scenario, history, {
+                startingCustomers: retentionStart,
+                monthsRemaining: termMonths - state.date.monthsElapsed,
+                marketSize: customerMarketSizeAt(
+                  state.customerMarketSize,
+                  now.minute,
+                ),
+              })
+            : undefined;
       const failure =
         now.cash < 0
           ? ({

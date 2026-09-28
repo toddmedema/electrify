@@ -65,18 +65,30 @@ export function meaningfulDecisionCategoryCount(
   return new Set(decisions.map(({ kind }) => kind)).size;
 }
 
+/**
+ * The operating plan each difficulty asks for at term end. It never falls as difficulty rises, so no middle
+ * difficulty is easier to pass idle than the one below it (Employee, Manager and VP used to
+ * require nothing while Intern required one decision).
+ */
+export const MEANINGFUL_DECISION_REQUIREMENTS: Record<
+  DifficultyType,
+  { count: number; categories: number }
+> = {
+  Intern: { count: INTERN_MEANINGFUL_DECISIONS_REQUIRED, categories: 1 },
+  Employee: { count: 1, categories: 1 },
+  Manager: { count: 2, categories: 1 },
+  VP: { count: 4, categories: 2 },
+  CEO: {
+    count: CEO_MEANINGFUL_DECISIONS_REQUIRED,
+    categories: CEO_MEANINGFUL_CATEGORIES_REQUIRED,
+  },
+};
+
 export function meaningfulDecisionRequirement(difficulty: DifficultyType): {
   count: number;
   categories: number;
 } | null {
-  if (difficulty === "Intern")
-    return { count: INTERN_MEANINGFUL_DECISIONS_REQUIRED, categories: 1 };
-  if (difficulty === "CEO")
-    return {
-      count: CEO_MEANINGFUL_DECISIONS_REQUIRED,
-      categories: CEO_MEANINGFUL_CATEGORIES_REQUIRED,
-    };
-  return null;
+  return MEANINGFUL_DECISION_REQUIREMENTS[difficulty] ?? null;
 }
 
 /** One percent of current peak demand, with a 1 MW floor, is a material grid commitment. */

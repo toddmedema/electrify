@@ -7,6 +7,7 @@ import {
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreRuleText } from "../../helpers/Scoring";
+import { formatRequiredShare } from "../../helpers/ObjectiveRules";
 import {
   meaningfulDecisionCategoryCount,
   meaningfulDecisionRequirement,
@@ -94,11 +95,12 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
       {reliabilityObjective !== undefined && (
         <p>
           Required: serve at least{" "}
-          {Math.round(reliabilityObjective.minimumDemandServed * 100)}% of
+          {formatRequiredShare(reliabilityObjective.minimumDemandServed)} of
           demand during the {reliabilityObjective.label}
           {(reliabilityObjective.durationMonths || 1) > 1
             ? " in every event month"
             : ""}
+          . A month below target ends the run.
         </p>
       )}
       {minimumCustomerRetention !== undefined && (

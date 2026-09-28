@@ -32,6 +32,29 @@ export function getMarketRate(
   return startingRate * getInflationIndex(date, startingYear, seed);
 }
 
+/**
+ * A public utility's customers cannot switch away, so its board caps the rate instead: at most
+ * this multiple of the authored target rate, carried forward by the same inflation index the
+ * score deflates by. Investors face the competitor benchmark rather than a cap.
+ */
+export const PUBLIC_RATE_CAP_MULTIPLE = 2;
+/** The cap never falls below a nickel, so tiny authored targets still leave a usable slider. */
+export const PUBLIC_RATE_CAP_FLOOR = 0.05;
+
+export function publicRateCap(
+  targetRate: number,
+  date: Pick<DateType, "year" | "monthNumber">,
+  startingYear: number,
+  seed: number,
+): number {
+  const cap =
+    targetRate *
+    PUBLIC_RATE_CAP_MULTIPLE *
+    getInflationIndex(date, startingYear, seed);
+  // Rounded up to whole cents so the slider ends on a clean mark and never below the exact cap
+  return Math.max(PUBLIC_RATE_CAP_FLOOR, Math.ceil(cap * 100 - 1e-9) / 100);
+}
+
 export interface CustomerTickInputType {
   customers: number;
   customerRate: number;
@@ -109,6 +132,36 @@ export function customerMarketSizeAt(
 ): number {
   const elapsedYears = minute / TICK_MINUTES / TICKS_PER_YEAR;
   return startingMarketSize * pow(1 + ORGANIC_GROWTH_MAX_ANNUAL, elapsedYears);
+}
+
+/**
+ * The most customers a utility could have after `months`, assuming the best case every month:
+ * full organic growth and, for an investor, winning the maximum switching share of the unserved
+ * market. Public utilities have captive territories, so organic growth is their only path back.
+ * Used to tell when a retention objective can no longer be met.
+ */
+export function bestReachableCustomers(
+  customers: number,
+  months: number,
+  ownership: "Investor" | "Public",
+  marketSize = customers,
+): number {
+  // exp/log rather than a computed power: the twelfth root of the annual growth factor
+  const monthlyGrowth = Math.exp(Math.log1p(ORGANIC_GROWTH_MAX_ANNUAL) / 12);
+  let best = customers;
+  let market = marketSize;
+  for (let month = 0; month < months; month++) {
+    best *= monthlyGrowth;
+    market *= monthlyGrowth;
+    if (ownership === "Investor") {
+      best = Math.min(
+        market,
+        best +
+          (Math.max(0, market - best) * CUSTOMER_SWITCHING_MAX_ANNUAL) / 12,
+      );
+    }
+  }
+  return best;
 }
 
 export interface CustomerProjectionInputType {
