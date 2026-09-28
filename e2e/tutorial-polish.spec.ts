@@ -37,7 +37,10 @@ for (const theme of ["light", "dark"]) {
         page.getByRole("button", { name: `Show ${name} details` }),
       ).toBeVisible();
     }
-    await expect(page.getByText("On demand", { exact: true })).toBeVisible();
+    // Both gas plants run on demand
+    await expect(
+      page.getByText("On demand", { exact: true }).first(),
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath(`choices-${theme}.png`),
     });

@@ -41,9 +41,9 @@ test("generator capstone completes immediately after a different second purchase
     "Order a second generator of a different type",
   );
   await page.getByRole("button", { name: "pause", exact: true }).click();
+  // A new peaker dispatches after the starting coal plant, so Coal is the first row
   await page
-    .locator(".facilityRow")
-    .last()
+    .locator('.facilityRow[data-facility="Coal"]')
     .getByRole("button", { name: "Inspect Coal", exact: true })
     .click();
   await expect(page.locator(".facilityDetails")).toBeVisible();
@@ -57,7 +57,9 @@ test("generator capstone completes immediately after a different second purchase
   ).toBeVisible();
   if (testInfo.project.name === "desktop-chromium") {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await page.locator(".facilityRow").last().scrollIntoViewIfNeeded();
+    await page
+      .locator('.facilityRow[data-facility="Coal"]')
+      .scrollIntoViewIfNeeded();
   }
   await page.screenshot({
     path: testInfo.outputPath("capstone-details.png"),
