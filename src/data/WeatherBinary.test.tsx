@@ -225,6 +225,7 @@ describe("the shipped weather files", () => {
     "Chittagong",
     "Colombo",
     "Durban",
+    "Fukuoka",
     "Seville",
     "Lisbon",
     "Porto",
@@ -233,11 +234,14 @@ describe("the shipped weather files", () => {
     "Mumbai",
     "Karachi",
     "Male",
+    "Nagoya",
     "Osaka",
     "PortLouis",
     "Pune",
     "Reykjavik",
     "Sapporo",
+    "Seoul",
+    "Busan",
     "Tokyo",
   ];
   const ids = fs
