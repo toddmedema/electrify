@@ -514,6 +514,8 @@ export interface FuelType {
   // costPerBtu: number; // Measured from raw stock / before generator efficiency loss
   // all costs should be in that year's $ / not account for inflation when possible
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
+  // Counted towards emissions and the score, but not charged the carbon fee (biogenic CO2)
+  feeExempt?: boolean;
 }
 
 /**

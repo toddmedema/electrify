@@ -1,4 +1,8 @@
-import { DAYS_PER_YEAR, FUELS, HOURS_PER_YEAR_REAL } from "../Constants";
+import {
+  DAYS_PER_YEAR,
+  feeableKgCO2ePerBtu,
+  HOURS_PER_YEAR_REAL,
+} from "../Constants";
 import {
   DateType,
   FacilityOperatingType,
@@ -164,7 +168,7 @@ export function LCWH(
   feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
   discountRate = 0,
 ) {
-  const kgCO2ePerBtu = FUELS[g.fuel]?.kgCO2ePerBtu ?? 0;
+  const kgCO2ePerBtu = feeableKgCO2ePerBtu(g.fuel);
   const fuelCostPerWh =
     ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
     1000000;

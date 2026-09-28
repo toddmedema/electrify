@@ -208,6 +208,7 @@ import {
   DIFFICULTIES,
   DOWNPAYMENT_PERCENT,
   FUELS,
+  feeableKgCO2ePerBtu,
   GAME_TO_REAL_YEARS,
   INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
@@ -505,7 +506,7 @@ function generatorCostPerMWh(
   const carbonCost =
     generator.btuPerWh *
     WH_PER_MWH *
-    (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
+    feeableKgCO2ePerBtu(generator.fuel) *
     feePerKgCO2e;
   return (
     (estimatedAnnualOperatingCost(generator) * operatingCostMultiplier) /
@@ -3561,7 +3562,9 @@ function minimumStableOperatingCost(
     GAME_TO_REAL_YEARS;
   const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
   const carbonCost =
-    fuelBtu * fuel.kgCO2ePerBtu * effectiveCarbonFee(tickDate, state);
+    fuelBtu *
+    feeableKgCO2ePerBtu(generator.fuel) *
+    effectiveCarbonFee(tickDate, state);
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -4214,6 +4217,8 @@ function updateSupplyFacilitiesFinances(
 
   // Facilities expenses
   let kgco2e = 0;
+  // The part of kgco2e the carbon fee is charged on: biogenic combustion is exempt
+  let feeableKgco2e = 0;
   // Some authored emergencies carry company-level response costs that do not belong to a single
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
@@ -4294,10 +4299,13 @@ function updateSupplyFacilitiesFinances(
         // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
         const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
         const facilityKgco2e = fuelBtu * fuel.kgCO2ePerBtu;
+        const facilityFeeableKgco2e = fuelBtu * feeableKgCO2ePerBtu(g.fuel);
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
+        feeableKgco2e += facilityFeeableKgco2e;
         facilityExpenses +=
-          facilityFuel + effectiveCarbonFee(tickDate, state) * facilityKgco2e;
+          facilityFuel +
+          effectiveCarbonFee(tickDate, state) * facilityFeeableKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -4395,7 +4403,7 @@ function updateSupplyFacilitiesFinances(
     transmissionPrincipalRepayment += paymentPrincipal;
     line.loanAmountLeft -= paymentPrincipal;
   });
-  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * kgco2e;
+  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * feeableKgco2e;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough

@@ -263,6 +263,10 @@ export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
     // net biogenic emissions depend on the feedstock and regrowth and cannot be assumed zero.
     // https://www.eia.gov/outlooks/capitalcost/pdf/updated_capcost.pdf
     kgCO2ePerBtu: 0.000088451,
+    // Carbon-pricing schemes exempt biogenic combustion CO2: EU ETS zero-rates sustainable
+    // biomass, and RGGI, UK ETS and Canada's fuel charge and OBPS all exclude it. It still
+    // counts towards the company's emissions and score.
+    feeExempt: true,
   },
   "Natural Gas": {
     kgCO2ePerBtu: 0.00005291, // Natural gas: 52.91 kg CO2/MMBtu.
@@ -282,6 +286,12 @@ export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
     kgCO2ePerBtu: 0,
   },
 };
+
+/** The CO2 per Btu a carbon fee is charged on, which excludes fee-exempt biogenic fuels. */
+export function feeableKgCO2ePerBtu(fuel: FuelNameType): number {
+  const entry = FUELS[fuel];
+  return !entry || entry.feeExempt ? 0 : entry.kgCO2ePerBtu;
+}
 
 export const PRICED_FUELS: readonly PricedFuelNameType[] = [
   "Biomass",

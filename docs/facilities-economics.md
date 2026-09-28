@@ -293,7 +293,7 @@ regrowth credit. Geothermal assumes binary generation with no venting for emissi
 some cost/lifetime references describe dual-flash technology. This is a coarse technology model,
 not a harmonized plant engineering specification. Imported electricity uses separately sourced
 fixed generation proxies in `ImportEmissions.ts` (mostly CO2; Québec reports GHG CO2e). Both local
-and imported amounts affect score, while carbon fees charge only local generation. Construction,
+and imported amounts affect score, while carbon fees charge only local fossil generation: biogenic biomass CO2 counts towards the score but, as under EU ETS, RGGI, UK ETS and Canada's carbon pricing, pays no fee. Construction,
 upstream supply chains and land-use emissions are omitted; zero operating emissions is not zero
 lifecycle impact.
 

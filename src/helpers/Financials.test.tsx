@@ -208,6 +208,15 @@ describe("LCWH", () => {
     );
   });
 
+  it("charges no carbon fee on biogenic biomass combustion", () => {
+    const biomass = {
+      ...generator,
+      fuel: "Biomass",
+      btuPerWh: 13.3,
+    } as GeneratorShoppingType;
+    expect(LCWH(biomass, date, 0.1, SEED)).toBe(LCWH(biomass, date, 0, SEED));
+  });
+
   it("prices distillate oil carbon above gas for equal fuel energy", () => {
     const oil = {
       ...generator,
