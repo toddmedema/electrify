@@ -1,3 +1,4 @@
+import { pow } from "./Pow";
 // http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
 export function getIntersectionX(
   line1StartX: number,
@@ -157,6 +158,6 @@ export function costBetween(
   const boundedYear = Math.max(fromYear, Math.min(toYear, year));
   return (
     fromCost *
-    Math.pow(toCost / fromCost, (boundedYear - fromYear) / (toYear - fromYear))
+    pow(toCost / fromCost, (boundedYear - fromYear) / (toYear - fromYear))
   );
 }

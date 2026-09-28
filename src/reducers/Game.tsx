@@ -272,6 +272,7 @@ import {
   WorldEventEffectsType,
   isStorage,
 } from "../Types";
+import { pow } from "../helpers/Pow";
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -3362,13 +3363,13 @@ function getDemandW(
             sun.sunset - date.minuteOfDay,
           ) / 420;
   const minutesFromDarkLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
+    1 / (1 + pow(Math.E, -minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
   const minutesFrom9amLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFrom9amNormalized * 2));
+    1 / (1 + pow(Math.E, -minutesFrom9amNormalized * 2));
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
   const minutesFrom5pmLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
+    1 / (1 + pow(Math.E, -minutesFrom5pmNormalized * 2));
   const temperatureDemandW = temperatureDemandWattsPerCustomer(
     now.temperatureC,
     game.location,
@@ -3808,7 +3809,7 @@ function updateSupplyFacilitiesFinances(
       // Storage leaks even while paused: pausing controls grid dispatch, not battery
       // self-discharge or water evaporating from a pumped-hydro upper reservoir.
       const lossWh =
-        g.currentWh * (1 - Math.pow(1 - g.hourlyLoss, 1 / ticksPerHour));
+        g.currentWh * (1 - pow(1 - g.hourlyLoss, 1 / ticksPerHour));
       g.currentWh = Math.max(0, g.currentWh - lossWh);
       storageLossWh += lossWh;
     }

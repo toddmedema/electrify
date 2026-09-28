@@ -14,6 +14,7 @@ import {
   EMPTY_HISTORY,
   reduceHistories,
 } from "./DateTime";
+import { pow } from "./Pow";
 
 // Get the monthly payment amount for a new loan
 // https://codepen.io/joeymack47/pen/fHwvd?editors=1010
@@ -30,7 +31,7 @@ export function getMonthlyPayment(
   if (monthlyRate === 0) {
     return months > 0 ? principal / months : principal;
   }
-  return principal * (monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
+  return principal * (monthlyRate / (1 - pow(1 + monthlyRate, -months)));
 }
 
 // Of a month's payment on an amortizing loan, how many $'s go towards interest
@@ -159,7 +160,7 @@ export function LCWH(
     const retention = Math.max(0, 1 - (g.annualOutputDegradation || 0));
     for (let year = 0; year < Math.ceil(g.lifespanYears); year++) {
       const fraction = Math.min(1, g.lifespanYears - year);
-      const yearWeight = Math.pow(retention, year) * fraction;
+      const yearWeight = pow(retention, year) * fraction;
       weightedFee +=
         feePerKgCO2eAtYear(g.yearsToBuild + year + fraction / 2) * yearWeight;
       weight += yearWeight;
@@ -243,7 +244,7 @@ export function degradedLifetimeYears(
     return 0;
   }
   const retention = 1 - annualOutputDegradation;
-  return (Math.pow(retention, lifespanYears) - 1) / Math.log(retention);
+  return (pow(retention, lifespanYears) - 1) / Math.log(retention);
 }
 
 /**
@@ -308,7 +309,7 @@ export function facilityOutputFactor(
   if (annualDegradation <= 0) {
     return 1;
   }
-  return Math.pow(
+  return pow(
     Math.max(0, 1 - annualDegradation),
     facilityAgeYears(g, currentMinute),
   );

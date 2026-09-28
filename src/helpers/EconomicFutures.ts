@@ -1,5 +1,6 @@
 import { getInflationRate, getPrimeRate, MonthRefType } from "../data/Economy";
 import { TREND_ESCALATION_YEARLY } from "../data/FuelPrices";
+import { pow } from "./Pow";
 
 export const ECONOMIC_FUTURES = [
   {
@@ -68,7 +69,7 @@ export function compareEconomicFutures({
     label: assumption.label,
     annualFuelExpense:
       Math.max(0, annualFuelExpense) *
-      Math.pow(1 + assumption.annualFuelGrowth, horizon),
+      pow(1 + assumption.annualFuelGrowth, horizon),
     annualFuelGrowth: assumption.annualFuelGrowth,
     primeRate: Math.max(
       0,

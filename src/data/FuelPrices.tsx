@@ -7,6 +7,7 @@ import {
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
+import { pow } from "../helpers/Pow";
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
 // Sources: (all prices real / in that year's $'s, per million BTU)
@@ -234,23 +235,20 @@ function measureDeparture(prices: number[]): DepartureType {
   let variance = 0;
   for (let i = 0; i < n; i++) {
     covariance += (i - meanIndex) * (logs[i] - meanLog);
-    variance += Math.pow(i - meanIndex, 2);
+    variance += pow(i - meanIndex, 2);
   }
   const slope = covariance / variance;
 
   let departureSquares = 0;
   for (let i = 0; i < n; i++) {
-    departureSquares += Math.pow(
-      logs[i] - (meanLog + slope * (i - meanIndex)),
-      2,
-    );
+    departureSquares += pow(logs[i] - (meanLog + slope * (i - meanIndex)), 2);
   }
   const departureSd = Math.sqrt(departureSquares / n);
 
   // The month to month step, with the trend's own slope taken out of it
   let stepSquares = 0;
   for (let i = 1; i < n; i++) {
-    stepSquares += Math.pow(logs[i] - logs[i - 1] - slope, 2);
+    stepSquares += pow(logs[i] - logs[i - 1] - slope, 2);
   }
   const stepSd = Math.sqrt(stepSquares / (n - 1));
   if (departureSd <= 0 || stepSd <= 0) {
@@ -259,17 +257,14 @@ function measureDeparture(prices: number[]): DepartureType {
 
   const persistence = Math.min(
     MAX_PERSISTENCE,
-    Math.max(
-      MIN_PERSISTENCE,
-      1 - Math.pow(stepSd, 2) / (2 * Math.pow(departureSd, 2)),
-    ),
+    Math.max(MIN_PERSISTENCE, 1 - pow(stepSd, 2) / (2 * pow(departureSd, 2))),
   );
   return {
     persistence,
     departureSd,
     // Sized so the departure settles at exactly the spread the record shows rather than growing
     // with the horizon -- the same relationship the weather's anomaly walk uses
-    shockSd: departureSd * Math.sqrt(1 - Math.pow(persistence, 2)),
+    shockSd: departureSd * Math.sqrt(1 - pow(persistence, 2)),
   };
 }
 
@@ -315,10 +310,7 @@ function buildFuelTrends() {
  * which is what inEraMoney below does for the cash, rate and fee a run opens with.
  */
 export function getFuelEscalation(year: number): number {
-  return Math.pow(
-    1 + TREND_ESCALATION_YEARLY,
-    Math.max(0, year - LATEST_DATA_YEAR),
-  );
+  return pow(1 + TREND_ESCALATION_YEARLY, Math.max(0, year - LATEST_DATA_YEAR));
 }
 
 // Custom-game option amounts are written in this era.
@@ -349,7 +341,7 @@ export function inEraMoney(
 function anchorPrice(trend: FuelTrendType, month: number): number {
   return (
     trend.baseline *
-    Math.pow(1 + TREND_ESCALATION_YEARLY, (month - anchorMonth) / 12)
+    pow(1 + TREND_ESCALATION_YEARLY, (month - anchorMonth) / 12)
   );
 }
 
