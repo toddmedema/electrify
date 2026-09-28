@@ -75,6 +75,7 @@ import {
   estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
 import {
+  getCostTableDeflator,
   getInflationIndex,
   getInflationRate,
   getPrimeRate,
@@ -4370,8 +4371,15 @@ function updateSupplyFacilitiesFinances(
     }
   });
   let transmissionPrincipalRepayment = 0;
+  // Intertie O&M is authored in the same 2023 dollars as the facility tables, so it is carried
+  // into the run's money the same way: deflated to the starting year, then escalated with the
+  // game's inflation. Line capex is still charged at the authored quote, because saves validate
+  // a line's investment by rebuilding those quotes exactly.
+  const transmissionCostIndex =
+    getCostTableDeflator(state.startingYear) * costIndexNow;
   operatingLines.forEach((line) => {
-    expensesOM += line.annualOperatingCost / ticksPerYear;
+    expensesOM +=
+      (line.annualOperatingCost * transmissionCostIndex) / ticksPerYear;
   });
   transmission.lines.forEach((line) => {
     if (line.loanAmountLeft <= 0) return;
