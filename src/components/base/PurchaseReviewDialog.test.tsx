@@ -24,7 +24,7 @@ function renderDialog(
     />,
   );
   const button = (label: string) =>
-    screen.getByText(label).closest("button") as HTMLButtonElement;
+    screen.getByText(label, { selector: "button" });
   return { onPurchase, button };
 }
 
