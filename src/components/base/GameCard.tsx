@@ -1,6 +1,6 @@
+import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Toolbar, Typography } from "@mui/material";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { isPaneLayout } from "../../Globals";
 import { AppStateType, GameType } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
@@ -30,7 +30,7 @@ export interface Props extends GameCardProps {}
 
 export function GameCard(props: Props) {
   const { game } = props;
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
 
   if (!game.inGame || !now) {
     return <span />;

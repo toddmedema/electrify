@@ -1,4 +1,4 @@
-import { getScenario } from "../../data/Scenarios";
+import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import {
   accessContextForGame,
   corridorsForGame,
@@ -46,7 +46,6 @@ import {
   corridorAvailableFromYear,
   corridorOpenInYear,
 } from "../../data/IntertieTrends";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   formatMoneyConcise,
   formatSignedWattsOfPeak,
@@ -131,7 +130,7 @@ function useIntertieForecast(
   return useAfterPaintValue(
     enabled ? intertieForecastKey(game) : undefined,
     () => {
-      const now = getTimeFromTimeline(game.date.minute, game.timeline);
+      const now = currentTick(game);
       return now
         ? generateNewTimeline(
             {
@@ -549,7 +548,7 @@ function tradingFlowText(game: GameType): string | null {
   if (lines.every((line) => line.yearsToBuildLeft > 0)) {
     return "Not connected yet";
   }
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const importedW = now?.importedW || 0;
   const exportedW = now?.exportedW || 0;
   if (importedW > 0) return "Importing " + formatWatts(importedW);
@@ -610,7 +609,7 @@ export default function TransmissionPanel({
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const readOnly = !!game.replayPlayback;
   const intertieContext = intertieContextForGame(game);
   const forecast = useIntertieForecast(
@@ -1084,8 +1083,7 @@ export default function TransmissionPanel({
                 {Math.round(review.yearsToBuild * 12)} months
               </Typography>
               {game.date.monthsElapsed + review.yearsToBuild * 12 >=
-                (getScenario(game.scenarioId, game.customScenario)
-                  ?.durationMonths ?? Infinity) && (
+                (activeScenario(game)?.durationMonths ?? Infinity) && (
                 <Typography variant="body2" color="warning.main">
                   Won’t open before this mission ends.
                 </Typography>

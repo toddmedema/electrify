@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   collection,
@@ -19,20 +20,15 @@ import {
   TableRow,
   Toolbar,
   Typography,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
-import VictoryConditions from "../base/VictoryConditions";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -40,7 +36,6 @@ import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
   ChallengeInvitationV1,
-  DifficultyType,
   GameType,
   LocationType,
   ReplayType,
@@ -48,15 +43,7 @@ import {
   ScoreType,
 } from "../../Types";
 
-import numbro from "numbro";
-
-function formatScore(score: number): string {
-  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
-}
-
-function formatDifficulty(difficulty: string): string {
-  return DIFFICULTY_LABELS[difficulty] || difficulty;
-}
+import { formatScore } from "../../helpers/Format";
 
 export interface StateProps {
   challenge?: ChallengeInvitationV1;
@@ -116,8 +103,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    const scenario =
-      getScenario(props.game.scenarioId, props.game.customScenario) || null;
+    const scenario = activeScenario(props.game) || null;
     this.state = {
       scenario,
       location: getScenarioLocation(scenario) || null,
@@ -450,38 +436,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   </div>
                 ) : (
                   <div className="difficultyPicker">
-                    <ToggleButtonGroup
-                      exclusive
+                    <DifficultyPicker
+                      variant="toggle"
+                      showDescription
                       value={game.difficulty}
-                      size="small"
-                      color="primary"
-                      aria-label="Difficulty"
-                      onChange={(_event, difficulty: DifficultyType | null) => {
-                        if (difficulty) {
-                          onDelta({ difficulty });
-                        }
-                      }}
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => (
-                          <ToggleButton
-                            value={d}
-                            key={d}
-                            title={DIFFICULTIES[d].description}
-                            aria-label={DIFFICULTY_LABELS[d]}
-                          >
-                            {DIFFICULTY_LABELS[d]}
-                          </ToggleButton>
-                        ),
-                      )}
-                    </ToggleButtonGroup>
-                    <Typography
-                      className="difficultyDescription"
-                      variant="body2"
-                      color="textSecondary"
-                    >
-                      {DIFFICULTIES[game.difficulty].description}
-                    </Typography>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </div>
                 )}
                 <Button
@@ -502,36 +462,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </div>
           </section>
 
-          <Dialog
+          <VictoryConditionsDialog
             open={victoryDialogOpen || false}
-            onClose={toggleVictoryDialog}
-          >
-            <ClosableDialogTitle onClose={toggleVictoryDialog}>
-              What counts as a win
-            </ClosableDialogTitle>
-            <DialogContent>
-              <VictoryConditions
-                ownership={scenario.ownership}
-                dollarsPerkWh={scenario.dollarsPerkWh}
-                startingCustomers={scenario.startingCustomers}
-                minimumCustomerRetention={scenario.minimumCustomerRetention}
-                reliabilityObjective={scenario.reliabilityObjective}
-                difficulty={game.difficulty}
-                meaningfulDecisions={[]}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button
-                color="primary"
-                variant="contained"
-                onClick={(e: React.MouseEvent<HTMLElement>) => {
-                  toggleVictoryDialog(e);
-                }}
-              >
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
+            onClose={() => this.setState({ victoryDialogOpen: false })}
+            title="What counts as a win"
+            scenario={scenario}
+            difficulty={game.difficulty}
+            meaningfulDecisions={[]}
+          />
 
           {!challenge && (
             <div className="leaderboard">
@@ -564,7 +502,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       <TableCell>{formatScore(myTopScore.score)}</TableCell>
                       {leaderboardExpanded && (
                         <TableCell>
-                          {formatDifficulty(myTopScore.difficulty)}
+                          {difficultyLabel(myTopScore.difficulty)}
                         </TableCell>
                       )}
                       {this.renderReplayCell(myTopScore)}
@@ -613,7 +551,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           <TableCell>{formatScore(score.score)}</TableCell>
                           {leaderboardExpanded && (
                             <TableCell>
-                              {formatDifficulty(score.difficulty)}
+                              {difficultyLabel(score.difficulty)}
                             </TableCell>
                           )}
                           {this.renderReplayCell(score)}

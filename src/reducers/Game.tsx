@@ -2891,6 +2891,7 @@ export function tutorialCompleteDialog({
     open: true,
     // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
     notCancellable: true,
+    offerInstall: true,
     secondaryLabel: "Back to main menu",
     secondaryAction: () => getStore().dispatch(quit()),
     actionLabel: nextTutorial ? "Next tutorial" : undefined,

@@ -1,15 +1,9 @@
+import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { Button, DialogContentText, Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
   facilityEquivalentCycles,
@@ -17,13 +11,15 @@ import {
   facilityOutputFactor,
 } from "../../helpers/Financials";
 import {
+  formatPercent,
   formatMoneyConcise,
   formatWattHours,
   formatWattHoursOfPeak,
   formatWatts,
+  formatCount,
+  formatPricePerMWh,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   facilityHazardStatus,
   facilityResilienceSummary,
@@ -103,8 +99,6 @@ function Stat(props: StatProps): React.JSX.Element {
   );
 }
 
-const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
-
 /**
  * The last year of this fuel's price, oldest first. Empty when the game hasn't been running long
  * enough for a trend, or when the price table isn't loaded - which is every render outside a real
@@ -171,7 +165,7 @@ function WeatherResilienceSection(props: {
   }, [focusHeading]);
   const hail = summary.upgrade === "hailResistant";
   const cost = summary.retrofitCost;
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const cash = currentCash(game);
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
   const shortfallText = `${formatMoneyConcise(shortfall)} more cash needed`;
   const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;
@@ -262,61 +256,47 @@ function WeatherResilienceSection(props: {
         </div>
       )}
       {canOffer && confirming && (
-        <Dialog
+        <ConfirmDialog
           open
-          onClose={() => setConfirming(false)}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          isolateClicks
+          title={`${actionLabel} to ${facility.name}?`}
+          contentClassName="facilityRetrofitDialog"
+          confirmLabel={`Pay ${formatMoneyConcise(cost)}`}
+          confirmDisabled={shortfall > 0}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            onRetrofit?.({
+              facilityId: facility.id,
+              upgrade: summary.upgrade,
+            });
+            setConfirming(false);
+            setFocusHeading((count) => count + 1);
+          }}
         >
-          <DialogTitle>
-            {actionLabel} to {facility.name}?
-          </DialogTitle>
-          <DialogContent className="facilityRetrofitDialog">
-            <DialogContentText>
-              {hail
-                ? "Less damage from future hail."
-                : coldPackageEffect(
-                    retrofitted?.designMinTempC ?? designMinTempC,
-                    designMinTempC,
-                    units,
-                  )}
+          <DialogContentText>
+            {hail
+              ? "Less damage from future hail."
+              : coldPackageEffect(
+                  retrofitted?.designMinTempC ?? designMinTempC,
+                  designMinTempC,
+                  units,
+                )}
+          </DialogContentText>
+          <DialogContentText>
+            {facility.name} goes offline for a month while it&apos;s installed.
+            Adding it now costs{" "}
+            {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
+            building it in. Cancel before it&apos;s done for a full refund.
+          </DialogContentText>
+          {activeOutage && (
+            <DialogContentText>{activeOutage}</DialogContentText>
+          )}
+          {shortfall > 0 && (
+            <DialogContentText className="facilityRetrofitShortfall">
+              {shortfallText}.
             </DialogContentText>
-            <DialogContentText>
-              {facility.name} goes offline for a month while it&apos;s
-              installed. Adding it now costs{" "}
-              {Math.round((RETROFIT_COST_MULTIPLIER - 1) * 100)}% more than
-              building it in. Cancel before it&apos;s done for a full refund.
-            </DialogContentText>
-            {activeOutage && (
-              <DialogContentText>{activeOutage}</DialogContentText>
-            )}
-            {shortfall > 0 && (
-              <DialogContentText className="facilityRetrofitShortfall">
-                {shortfallText}.
-              </DialogContentText>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setConfirming(false)} color="primary">
-              Cancel
-            </Button>
-            <Button
-              color="primary"
-              variant="contained"
-              autoFocus
-              disabled={shortfall > 0}
-              onClick={() => {
-                onRetrofit?.({
-                  facilityId: facility.id,
-                  upgrade: summary.upgrade,
-                });
-                setConfirming(false);
-                setFocusHeading((count) => count + 1);
-              }}
-            >
-              Pay {formatMoneyConcise(cost)}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          )}
+        </ConfirmDialog>
       )}
     </section>
   );
@@ -401,7 +381,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 value={
                   lifetime.capacityFactor === undefined
                     ? "—"
-                    : percent(lifetime.capacityFactor)
+                    : formatPercent(lifetime.capacityFactor)
                 }
               />
             </>
@@ -416,25 +396,25 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           {facility.name === "Battery" && equivalentCycles !== undefined && (
             <Stat
               label="Cycles"
-              value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+              value={`${formatCount(equivalentCycles)} / 7,300`}
             />
           )}
           {minimumStableOutput !== undefined && (
             <Stat
               label="Minimum stable output"
-              value={`${percent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
+              value={`${formatPercent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
             />
           )}
           {facility.tracksStarts && (
             <Stat
               label="Starts"
-              value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
+              value={formatCount(facility.lifetimeStarts || 0)}
             />
           )}
           {storage && (
             <Stat
               label="Round-trip efficiency"
-              value={percent(storage.roundTripEfficiency)}
+              value={formatPercent(storage.roundTripEfficiency)}
             />
           )}
           {hazard && (
@@ -442,7 +422,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               label={hazard.label}
               value={
                 <span className="facilityStatWarning">
-                  {percent(hazard.availableFraction)} available
+                  {formatPercent(hazard.availableFraction)} available
                   <span className="facilityStatNote">
                     {hazard.daysLeft !== undefined
                       ? `${dayCount(hazard.daysLeft)} to repair`
@@ -459,7 +439,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                 <>
                   {formatWatts(facility.peakW * maxOutputFactor)}
                   <span className="facilityStatNote">
-                    {`Limited to ${percent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
+                    {`Limited to ${formatPercent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
                   </span>
                 </>
               }
@@ -480,7 +460,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={
               lifetime.costPerMWh === undefined
                 ? "—"
-                : `${formatMoneyConcise(lifetime.costPerMWh)}/MWh`
+                : formatPricePerMWh(lifetime.costPerMWh)
             }
           />
           <Stat
@@ -488,7 +468,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={
               lifetime.revenuePerMWh === undefined
                 ? "—"
-                : `${formatMoneyConcise(lifetime.revenuePerMWh)}/MWh`
+                : formatPricePerMWh(lifetime.revenuePerMWh)
             }
           />
           <Stat

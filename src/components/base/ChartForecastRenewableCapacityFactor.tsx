@@ -1,4 +1,5 @@
 import * as React from "react";
+import { formatPercent } from "../../helpers/Format";
 import uPlot from "uplot";
 import { GENERATORS } from "../../data/Facilities";
 import {
@@ -76,10 +77,6 @@ export function availableWeatherRenewables(
   );
 }
 
-function percent(fraction: number): string {
-  return `${Math.round(fraction * 100)}%`;
-}
-
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0,
@@ -120,7 +117,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       yAxis(scale, {
         grid: true,
         size: FORECAST_AXIS_LEFT,
-        values: (_u, splits) => splits.map(percent),
+        values: (_u, splits) => splits.map((split) => formatPercent(split)),
       }),
     ],
     series: [
@@ -141,7 +138,7 @@ function tooltip(idx: number, state: State): string {
   return `${header}\n${state.technologies
     .map(
       (technology) =>
-        `${technology.name}: ${percent(point.factors[technology.name])}`,
+        `${technology.name}: ${formatPercent(point.factors[technology.name])}`,
     )
     .join("\n")}`;
 }

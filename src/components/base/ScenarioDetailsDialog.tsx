@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   Box,
@@ -10,8 +11,8 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { GameType } from "../../Types";
-import { getScenario } from "../../data/Scenarios";
+import { GameType, ScoreCategoryType } from "../../Types";
+import { DIFFICULTY_LABELS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   deriveExpandedSummary,
@@ -19,14 +20,15 @@ import {
 } from "../../helpers/DateTime";
 import {
   computeScoreBreakdown,
+  scoreLabel,
+  scoreRuleText,
   startingDollarRevenue,
   totalScore,
 } from "../../helpers/Scoring";
-import { scoreRules } from "./VictoryConditions";
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
-import { formatScore, SCORE_LABELS } from "./VictoryDialog";
+import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import type { MissionRequirement } from "../../helpers/MissionStatus";
 
@@ -53,7 +55,7 @@ function statusLabel(status: MissionRequirement["status"]): string {
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
   const units = useUnits();
-  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const scenario = activeScenario(game);
   if (!scenario) {
     return <Dialog open={false} />;
   }
@@ -71,7 +73,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
         startingDollarRevenue(history, game.startingYear, game.seed),
       )
     : null;
-  const rules = scoreRules(
+  const rules = scoreRuleText(
     scenario.ownership,
     scenario.dollarsPerkWh,
     formatLargeMassApprox(KG_PER_MEGATONNE, units),
@@ -79,10 +81,10 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const facts = [
     {
       label: "Timeframe",
-      value: `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
+      value: `${scenario.startingYear}â€“${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
     },
     ...(location ? [{ label: "Location", value: location.name }] : []),
-    { label: "Difficulty", value: game.difficulty },
+    { label: "Difficulty", value: DIFFICULTY_LABELS[game.difficulty] },
     { label: "Ownership", value: `${scenario.ownership}-owned` },
   ];
 
@@ -269,7 +271,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                   </Box>
                 </Typography>
                 <Box component="dl" sx={{ m: 0, mt: 2 }}>
-                  {Object.entries(breakdown).map(([category, score]) => (
+                  {Object.entries(breakdown).map(([category, score = 0]) => (
                     <Box
                       key={category}
                       sx={{
@@ -290,9 +292,9 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                             "&::first-letter": { textTransform: "uppercase" },
                           }}
                         >
-                          {SCORE_LABELS[category] || category}
+                          {scoreLabel(category)}
                         </Box>
-                        {rules[category] && (
+                        {rules[category as ScoreCategoryType] && (
                           <Box
                             component="dd"
                             sx={{
@@ -301,7 +303,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                               typography: "caption",
                             }}
                           >
-                            {rules[category]}
+                            {rules[category as ScoreCategoryType]}
                           </Box>
                         )}
                       </Box>

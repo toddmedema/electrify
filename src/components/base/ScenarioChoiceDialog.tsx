@@ -1,3 +1,4 @@
+import { currentCash } from "../../helpers/GameSelectors";
 import {
   Box,
   Button,
@@ -11,7 +12,6 @@ import {
   pendingScenarioChoice,
   scenarioChoiceDescription,
 } from "../../helpers/ScenarioChoices";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { chooseScenarioResponse } from "../../reducers/GameActions";
 import { formatMoneyConcise } from "../../helpers/Format";
 import ConceptIcon from "./ConceptIcon";
@@ -24,7 +24,7 @@ export default function ScenarioChoiceDialog() {
       ? pendingScenarioChoice(game)
       : undefined;
   if (!decision) return null;
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const cash = currentCash(game);
   return (
     <Dialog
       open

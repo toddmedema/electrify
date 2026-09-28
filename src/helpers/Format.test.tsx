@@ -9,7 +9,59 @@ import {
   formatWattsAxis,
   formatSignedWattsOfPeak,
   formatWattsOfPeak,
+  formatPercent,
+  formatCount,
+  formatPricePerMWh,
+  formatFacilitySize,
+  formatBuildMonths,
+  formatScore,
 } from "./Format";
+
+describe("formatPercent", () => {
+  it("rounds a fraction to a whole percentage by default", () => {
+    expect(formatPercent(0.456)).toBe("46%");
+    expect(formatPercent(1)).toBe("100%");
+    expect(formatPercent(0)).toBe("0%");
+  });
+
+  it("keeps the requested decimals", () => {
+    expect(formatPercent(0.4567, 1)).toBe("45.7%");
+  });
+});
+
+describe("formatCount", () => {
+  it("rounds and separates thousands in every locale", () => {
+    expect(formatCount(1234567.4)).toBe("1,234,567");
+    expect(formatCount(7)).toBe("7");
+  });
+});
+
+describe("formatPricePerMWh", () => {
+  it("uses the concise money style", () => {
+    expect(formatPricePerMWh(42.5)).toBe("$42.5/MWh");
+    expect(formatPricePerMWh(Infinity)).toBe("—/MWh");
+  });
+});
+
+describe("formatFacilitySize", () => {
+  it("shows energy for storage and power for generators", () => {
+    expect(formatFacilitySize({ peakW: 100e6, peakWh: 400e6 })).toBe("400MWh");
+    expect(formatFacilitySize({ peakW: 100e6 })).toBe("100MW");
+  });
+});
+
+describe("formatBuildMonths", () => {
+  it("rounds to whole months in either style", () => {
+    expect(formatBuildMonths(1.5)).toBe("18 mo");
+    expect(formatBuildMonths(0.26, "long")).toBe("3 months");
+  });
+});
+
+describe("formatScore", () => {
+  it("rounds and separates thousands", () => {
+    expect(formatScore(12345.6)).toBe("12,346");
+  });
+});
 
 describe("formatWatts", () => {
   it("chooses the appropriate SI unit", () => {

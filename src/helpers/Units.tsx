@@ -1,5 +1,6 @@
 import numbro from "numbro";
 import { UnitSystemType } from "../Types";
+import { formatCount } from "./Format";
 
 /**
  * Everything the player reads is converted from metric at the last moment; nothing upstream of
@@ -75,7 +76,7 @@ export function toDisplayMass(kg: number, units: UnitSystemType): number {
 }
 
 export function formatMass(kg: number, units: UnitSystemType): string {
-  return `${Math.round(toDisplayMass(kg, units)).toLocaleString()}${massUnit(units)}`;
+  return `${formatCount(toDisplayMass(kg, units))}${massUnit(units)}`;
 }
 
 /**

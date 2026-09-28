@@ -1,9 +1,9 @@
+import { activeScenario } from "../helpers/GameSelectors";
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
 import { delta, quit } from "../reducers/Game";
 import { changeTutorialStep, recordTutorialExited } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
-import { getScenario } from "../data/Scenarios";
 import {
   AppStateType,
   ScenarioType,
@@ -39,10 +39,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     transition,
     scenarioId: state.game.scenarioId,
     tutorialStep: state.game.tutorialStep,
-    tutorialSteps: (
-      getScenario(state.game.scenarioId, state.game.customScenario) ||
-      ({} as Partial<ScenarioType>)
-    ).tutorialSteps,
+    tutorialSteps: (activeScenario(state.game) || ({} as Partial<ScenarioType>))
+      .tutorialSteps,
   };
 };
 

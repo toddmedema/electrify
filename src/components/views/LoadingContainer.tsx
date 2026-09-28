@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import type { Dispatch, UnknownAction } from "@reduxjs/toolkit";
 import type { AppDispatch, AppThunk } from "../../Store";
 import { connect } from "react-redux";
@@ -7,7 +8,6 @@ import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getScenarioLocation } from "../../helpers/Locations";
-import { getScenario } from "../../data/Scenarios";
 import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
@@ -95,7 +95,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           resumed,
         });
       }
-      const scenario = getScenario(game.scenarioId, game.customScenario);
+      const scenario = activeScenario(game);
       if (!scenario) {
         reportError("Mission not found. Choose another from the mission list.");
         loadInProgress = false;

@@ -8,10 +8,6 @@ import {
   Button,
   Card,
   CardHeader,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   MenuItem,
   Select,
@@ -23,20 +19,19 @@ import {
   TableRow,
   TextField,
   Toolbar,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
-import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import InfoDialog from "../base/InfoDialog";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
@@ -61,6 +56,8 @@ import {
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
+  formatCount,
+  formatFacilitySize,
 } from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
@@ -203,9 +200,10 @@ function facilityName(facility: Partial<FacilityShoppingType>): string {
 }
 
 function facilitySize(facility: Partial<FacilityShoppingType>): string {
-  return facility.peakWh
-    ? formatWattHours(facility.peakWh)
-    : formatWatts(facility.peakW || 0);
+  return formatFacilitySize({
+    peakW: facility.peakW || 0,
+    peakWh: facility.peakWh,
+  });
 }
 
 function demandServedLabel(outlook: YearOneOutlook): string {
@@ -534,9 +532,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         getStartingCustomers(getScenarioLocation(scenario))
                       }
                       valueLabelDisplay="auto"
-                      valueLabelFormat={(value: number) =>
-                        value.toLocaleString()
-                      }
+                      valueLabelFormat={(value: number) => formatCount(value)}
                       onChange={(_event: Event, value: number | number[]) =>
                         changeStartingCustomers(
                           Array.isArray(value) ? value[0] : value,
@@ -544,10 +540,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       }
                     />
                     <Typography variant="caption" color="textSecondary">
-                      {(
+                      {formatCount(
                         scenario.startingCustomers ||
-                        getStartingCustomers(getScenarioLocation(scenario))
-                      ).toLocaleString()}
+                          getStartingCustomers(getScenarioLocation(scenario)),
+                      )}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -706,33 +702,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   <TableCell>
                     {/* Difficulty lives on the game rather than the scenario, the same way it does
                     on the scenario details screen */}
-                    <Select
+                    <DifficultyPicker
                       id="difficulty"
-                      inputProps={{ "aria-label": "Difficulty" }}
+                      variant="select"
                       value={game.difficulty}
-                      onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                        onDelta({
-                          difficulty: e.target.value as DifficultyType,
-                        })
-                      }
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => {
-                          return (
-                            <MenuItem value={d} key={d}>
-                              <Tooltip
-                                title={DIFFICULTIES[d].description}
-                                placement="right"
-                              >
-                                <span>
-                                  {DIFFICULTY_LABELS[d as DifficultyType]}
-                                </span>
-                              </Tooltip>
-                            </MenuItem>
-                          );
-                        },
-                      )}
-                    </Select>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -986,53 +961,25 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </div>
       </div>
 
-      <Dialog
+      <VictoryConditionsDialog
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
-      >
-        <ClosableDialogTitle onClose={() => setVictoryDialogOpen(false)}>
-          Victory Conditions: {scenario.ownership}-Owned
-        </ClosableDialogTitle>
-        <DialogContent>
-          <VictoryConditions
-            ownership={scenario.ownership}
-            dollarsPerkWh={scenario.dollarsPerkWh}
-            startingCustomers={scenario.startingCustomers}
-            minimumCustomerRetention={scenario.minimumCustomerRetention}
-            reliabilityObjective={scenario.reliabilityObjective}
-            difficulty={game.difficulty}
-            meaningfulDecisions={game.meaningfulDecisions}
-            meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setVictoryDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={`Victory Conditions: ${scenario.ownership}-Owned`}
+        scenario={scenario}
+        difficulty={game.difficulty}
+        meaningfulDecisions={game.meaningfulDecisions}
+        meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
+      />
 
-      <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)}>
-        <DialogTitle>Carbon fee</DialogTitle>
-        <DialogContent>
-          A carbon fee charges for greenhouse gas emissions. The game measures
-          them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
-          common unit for comparing different greenhouse gases.
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setFeeDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <InfoDialog
+        open={feeDialogOpen}
+        onClose={() => setFeeDialogOpen(false)}
+        title="Carbon fee"
+      >
+        A carbon fee charges for greenhouse gas emissions. The game measures
+        them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
+        common unit for comparing different greenhouse gases.
+      </InfoDialog>
     </div>
   );
 }
