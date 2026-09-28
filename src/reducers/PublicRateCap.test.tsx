@@ -20,7 +20,7 @@ describe("public utility board rate cap", () => {
     // Hurricane Season is a public utility
     const game = createGame({ scenarioId: 104 });
     const cap = publicRateCap(
-      getScenario(104).dollarsPerkWh,
+      getScenario(104)?.dollarsPerkWh ?? NaN,
       game.date,
       game.startingYear,
       game.seed,
@@ -47,7 +47,7 @@ describe("public utility board rate cap", () => {
   it("stops a passive public utility from banking a fortune at an extreme rate", () => {
     const game = createGame({ scenarioId: 104, difficulty: "Employee" });
     const cap = publicRateCap(
-      getScenario(104).dollarsPerkWh,
+      getScenario(104)?.dollarsPerkWh ?? NaN,
       game.date,
       game.startingYear,
       game.seed,
