@@ -13,9 +13,7 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import { ChevronDownGlyph, ChevronUpGlyph } from "../base/Glyphs";
 import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import {
   Avatar,
@@ -103,7 +101,6 @@ import Sparkline from "../base/Sparkline";
 import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
-import { chartPalette } from "../../Theme";
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -353,7 +350,7 @@ function IntertieBuildItem(props: {
           size="small"
           aria-label={`${expanded ? "Hide" : "Show"} ${name} details`}
           aria-expanded={expanded}
-          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+          endIcon={expanded ? <ChevronUpGlyph /> : <ChevronDownGlyph />}
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? "Hide details" : "Show details"}
@@ -823,12 +820,7 @@ export default function TransmissionPanel({
                     setSelectedLine(selectedLine === line.id ? null : line.id)
                   }
                 >
-                  {!building && (
-                    <FlowBar
-                      fraction={flowFraction}
-                      color={chartPalette().intertie}
-                    />
-                  )}
+                  {!building && <FlowBar fraction={flowFraction} />}
                   <img
                     className="transmissionListIcon"
                     src="/images/transmission.svg"
@@ -858,10 +850,7 @@ export default function TransmissionPanel({
                       )}
                     </Typography>
                   </span>
-                  <KeyboardArrowDownIcon
-                    className="facilityChevron"
-                    aria-hidden
-                  />
+                  <ChevronDownGlyph className="facilityChevron" aria-hidden />
                 </button>
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
