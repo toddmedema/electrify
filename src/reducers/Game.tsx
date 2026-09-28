@@ -16,6 +16,10 @@ import {
 } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
 import {
+  generatorsAboveDemandFloor,
+  mothballAdvice,
+} from "../helpers/Mothball";
+import {
   decidedObjectiveFailure,
   hasChronicBlackouts,
   retentionBaseline,
@@ -3070,6 +3074,17 @@ export function tickState(state: GameType) {
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
+      // Advised once per plant: a paused-and-resumed plant is the player's informed choice
+      generatorsAboveDemandFloor(state.facilities, history[0]).forEach(
+        (generator) =>
+          logGameEvent(state, "WORLD_EVENT", mothballAdvice(generator), {
+            title: "Plant running above demand",
+            concept: "fuel",
+            importance: "NOTABLE",
+            actionTarget: { card: "FACILITIES", view: "FLEET" },
+            reportedKey: `above-demand-floor:${generator.id}`,
+          }),
+      );
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
