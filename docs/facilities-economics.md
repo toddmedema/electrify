@@ -54,10 +54,12 @@ detailed design is used for duration, life, construction time, and augmentation 
 
 ## Operating and performance logic
 
-Most generator records retain one annual non-fuel O&M field: where a source separates fixed O&M
-in $/kW-year and variable O&M in $/MWh, the variable amount remains annualized at the modeled
-capacity factor for those technologies. Oil is the explicit exception described below. Actual fuel
-and carbon expenses remain separate for every generator.
+Where a source separates fixed O&M in $/kW-year from variable O&M in $/MWh, the fixed part is
+charged on standing capacity and the variable part on energy actually generated: coal $6.40, nuclear
+$2.52, natural gas $1.24 and biomass $5.61 per MWh (2023$), plus oil as described below. An idle or
+paused plant therefore pays no variable O&M, and the keep-online versus restart decision counts it.
+Build quotes still annualize it at the modeled capacity factor. Actual fuel and carbon expenses
+remain separate for every generator.
 
 The EIA AEO2025 reference designs also update:
 

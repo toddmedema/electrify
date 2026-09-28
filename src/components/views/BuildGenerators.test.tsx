@@ -173,7 +173,12 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
   expect(
     screen.getByRole("row", {
-      name: /Base O&M.*\$4\.93M/,
+      name: /Fixed O&M.*\$2\.88M/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Variable O&M.*\$1\.24\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(

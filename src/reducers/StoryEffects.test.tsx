@@ -70,6 +70,9 @@ describe("story effects in dispatch", () => {
     const game = createGame({ scenarioId: 102, difficulty: "Manager" });
     game.date = getDateFromMinute(180 * MINUTES_PER_MONTH, game.startingYear);
     game.facilities = [game.facilities[0]];
+    // Fixed O&M only: output-driven O&M would also shift dispatch, and with it the output the
+    // multiplier is applied to.
+    game.facilities[0].variableOperatingCostPerMWh = undefined;
     const baselineGame = cloneDeep(game);
     baselineGame.storyEffectsDisabled = true;
     const story = generateNewTimeline(

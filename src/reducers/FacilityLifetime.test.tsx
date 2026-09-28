@@ -109,6 +109,7 @@ describe("per-facility lifetime totals", () => {
     coal.committed = false;
     coal.generatingLastRealTick = false;
     coal.annualOperatingCost = 0;
+    coal.variableOperatingCostPerMWh = undefined;
     coal.btuPerWh = 0;
     const before = state.facilities.map(totals);
 
@@ -151,6 +152,7 @@ describe("per-facility lifetime totals", () => {
     ) as FacilityOperatingType;
     state.facilities.forEach((facility: FacilityOperatingType) => {
       facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
       facility.btuPerWh = 0;
       facility.currentW = 0;
       facility.committed = false;
@@ -209,6 +211,7 @@ describe("per-facility lifetime totals", () => {
     ) as FacilityOperatingType;
     state.facilities.forEach((facility: FacilityOperatingType) => {
       facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
       facility.btuPerWh = 0;
       facility.paused = facility.id !== coal.id;
     });
@@ -375,6 +378,7 @@ describe("per-facility lifetime totals", () => {
         const coal = state.facilities[0];
         state.facilities.forEach((facility: FacilityOperatingType) => {
           facility.annualOperatingCost = 0;
+          facility.variableOperatingCostPerMWh = undefined;
           facility.btuPerWh = 0;
           facility.currentW = 0;
           facility.committed = false;

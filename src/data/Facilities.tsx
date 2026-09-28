@@ -171,16 +171,16 @@ function enhancedGeothermalConstructionKgco2ePerW(year: number): number {
   return constructionKgco2eCurve(year, 1.0, 2025, 0.12, 0.38);
 }
 
-/** Fold variable non-fuel O&M into the annual expense the simulation knows how to charge. */
-function annualOperatingCost(
+/**
+ * Fixed non-fuel O&M for standing capacity. Variable O&M is a separate per-MWh field charged on
+ * actual output, so an idle or paused plant does not pay it and the keep-online versus restart
+ * decision sees it.
+ */
+function fixedOperatingCost(
   peakW: number,
-  capacityFactor: number,
   fixedDollarsPerKWYear: number,
-  variableDollarsPerMWh: number,
 ): number {
-  const dollarsPerKWYear =
-    fixedDollarsPerKWYear + variableDollarsPerMWh * 8.76 * capacityFactor;
-  return (dollarsPerKWYear / 1000) * peakW;
+  return (fixedDollarsPerKWYear / 1000) * peakW;
 }
 
 function windCostPerW2024(year: number): number {
@@ -359,7 +359,8 @@ export function GENERATORS(
       spinMinutes: 360,
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: annualOperatingCost(peakW, 0.68, 61.6, 6.4),
+      annualOperatingCost: fixedOperatingCost(peakW, 61.6),
+      variableOperatingCostPerMWh: 6.4,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Coal,
       tracksStarts: true,
       // NREL's conservative hot-start case, normalized from 2011$ to 2023$ with annual-average
@@ -395,7 +396,8 @@ export function GENERATORS(
       // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
       btuPerWh: 10.608,
       spinMinutes: 600,
-      annualOperatingCost: annualOperatingCost(peakW, 0.93, 156.2, 2.52),
+      annualOperatingCost: fixedOperatingCost(peakW, 156.2),
+      variableOperatingCostPerMWh: 2.52,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Nuclear,
       tracksStarts: true,
       yearsToBuild: 6 + magnitude / 3,
@@ -425,7 +427,8 @@ export function GENERATORS(
       // ~6GW, build in the late 80's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 9.142,
       spinMinutes: 10,
-      annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      annualOperatingCost: fixedOperatingCost(peakW, 6.87),
+      variableOperatingCostPerMWh: 1.24,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas"],
       tracksStarts: true,
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
@@ -497,12 +500,8 @@ export function GENERATORS(
       // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars, which are
       // $146.0 and $5.61 in 2023 dollars. Variable O&M is annualized at the observed 60.2%
       // capacity factor.
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        0.602,
-        154.26 * CPI_2025_TO_2023,
-        5.93 * CPI_2025_TO_2023,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 154.26 * CPI_2025_TO_2023),
+      variableOperatingCostPerMWh: 5.93 * CPI_2025_TO_2023,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Biomass,
       tracksStarts: true,
       yearsToBuild: 5,
@@ -544,12 +543,7 @@ export function GENERATORS(
       maxPeakW: 1500000000,
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        windCapacityFactor,
-        33.06,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 33.06),
       // The location's weather record determines the capacity factor below.
       yearsToBuild: 1 + magnitude / 3,
       // EIA AEO2025 reference lead time is 21 months for a 200MW plant.
@@ -642,12 +636,7 @@ export function GENERATORS(
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        solarCapacityFactor,
-        20.23,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 20.23),
       // Latitude, daylight and the location's cloud record determine the capacity factor below.
       yearsToBuild: 2.27 + magnitude / 3,
       // EIA AEO2025 reference lead time is 36 months for a 150MW plant.
@@ -680,12 +669,7 @@ export function GENERATORS(
       maxPeakW: hydroAvailability.largest?.maxPeakW || 0,
       btuPerWh: 0,
       spinMinutes: 1,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        HYDRO_TARGET_CAPACITY_FACTOR,
-        33.54,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 33.54),
       yearsToBuild: 5 + magnitude / 2,
       constructionKgco2ePerW: 2,
       capacityFactor: HYDRO_TARGET_CAPACITY_FACTOR,
@@ -711,7 +695,7 @@ export function GENERATORS(
       maxPeakW: 800000000,
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(peakW, 0.88, 150.6, 0),
+      annualOperatingCost: fixedOperatingCost(peakW, 150.6),
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Geothermal,
       tracksStarts: true,
       yearsToBuild: 3,
