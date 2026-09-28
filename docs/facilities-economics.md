@@ -83,8 +83,9 @@ The EIA AEO2025 reference designs also update:
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
 - Solar: $20.23/kW-year fixed O&M, 36-month reference lead time, and 35-year life.
-- Hydro: $33.54/kW-year fixed O&M, 72-month reference lead time, 48% global capacity factor, and
-  50-year life.
+- Hydro: $33.54/kW-year fixed O&M, 72-month reference lead time, a 40% target capacity factor
+  (`HYDRO_TARGET_CAPACITY_FACTOR`, used for sizing, the quote and LCOE; IRENA's global fleet
+  average is nearer 48%, but individual sites are sized against their own river), and 50-year life.
 - Conventional geothermal: $150.60/kW-year fixed O&M, 36-month lead time, 88% global capacity
   factor, and 40-year life.
 
