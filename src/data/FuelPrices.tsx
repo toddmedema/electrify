@@ -7,6 +7,7 @@ import {
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
+import { BASE_INFLATION } from "./Economy";
 
 // Sources: every column is nominal (that month's own dollars) per million Btu delivered to the
 // generator, so a fuel's price times a plant's heat rate is its fuel cost per MWh.
@@ -113,10 +114,18 @@ const BIOMASS_PRICES_PER_MBTU: Record<number, number> = {
   2019: 2.28,
 };
 
-// Authored nominal-price trend for the reference game future, not an economic prediction.
-// Its 4%/year assumption is exposed alongside 2% and 6% price-only sensitivities in Insights.
-// Historical observations remain unchanged; inflation and fuel prices are separate models.
-export const TREND_ESCALATION_YEARLY = 0.04;
+// Real fuel price growth beyond general inflation in the reference future. EIA's Annual Energy
+// Outlook reference cases project roughly flat real coal and gas prices, and a real premium
+// compounds absurdly over a century-long sandbox (a 1.5% premium is 4.4x by 2120).
+export const REAL_FUEL_ESCALATION_YEARLY = 0;
+
+// Authored nominal-price trend for the reference game future, not an economic prediction: the
+// projected economy's long-run inflation plus the real escalation above, so fuel, interties and
+// future-era retail rates move with the same money as capital costs and the market's rate. It is
+// exposed alongside 0.5% and 4.5% price-only sensitivities in Insights. Historical observations
+// remain unchanged.
+export const TREND_ESCALATION_YEARLY =
+  BASE_INFLATION + REAL_FUEL_ESCALATION_YEARLY;
 
 // How much of last month's departure from that trend carries into this month's, and how far it is
 // allowed to sit from the trend. Both are measured off the record rather than written down here;

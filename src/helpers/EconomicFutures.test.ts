@@ -53,8 +53,11 @@ it("compares three stated fuel-price assumptions with fixed fuel use", () => {
     date: { year: 2020, monthNumber: 1 },
     seed: 42,
   });
-  expect(rows.map((row) => row.annualFuelExpense)).toEqual(
-    [1.02, 1.04, 1.06].map((growth) => 1_000_000 * growth ** 5),
+  // 0.5%, 2.5% (projected inflation with flat real fuel prices) and 4.5% for five years
+  [1.0252512531281244, 1.1314082128906247, 1.2461819376531247].forEach(
+    (factor, i) => {
+      expect(rows[i].annualFuelExpense).toBeCloseTo(1_000_000 * factor, 4);
+    },
   );
   expect(rows[0].primeRate).toBeLessThan(rows[1].primeRate);
   expect(rows[2].primeRate).toBeGreaterThan(rows[1].primeRate);

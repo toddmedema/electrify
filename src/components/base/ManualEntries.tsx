@@ -520,9 +520,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Fuel Prices:</strong> Historical prices and future estimates.{" "}
-          <strong>Compare possible costs in five years</strong> applies 2%, 4%
-          or 6% yearly growth to this month's fuel bill multiplied by 12. It
-          holds fuel use and facilities fixed, assigns no probabilities and
+          <strong>Compare possible costs in five years</strong> applies 0.5%,
+          2.5% or 4.5% yearly growth to this month's fuel bill multiplied by 12.
+          It holds fuel use and facilities fixed, assigns no probabilities and
           changes no loans or settings.
         </p>
         <p>

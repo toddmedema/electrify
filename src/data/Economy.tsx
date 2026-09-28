@@ -41,7 +41,8 @@ const EARLIEST_DATA_YEAR = 1975;
 const BASE_PRIME = 0.05;
 const MIN_PRIME = 0.0325;
 const MAX_PRIME = 0.15;
-const BASE_INFLATION = 0.025;
+// Exported as the long-run price level the fuel trend escalates with (TREND_ESCALATION_YEARLY)
+export const BASE_INFLATION = 0.025;
 const MIN_INFLATION = -0.01;
 const MAX_INFLATION = 0.14;
 

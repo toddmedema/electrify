@@ -156,12 +156,12 @@ export const TICK_MS = {
   ULTRA: 1000 / 120,
 };
 
-// Fallbacks for the screens that run before any economic data has been loaded, and the anchor
-// the projected cycles rest near. The played game reads its rates from data/Economy instead.
-export const INFLATION = 0.03;
+// Inflation and interest rates live in data/Economy (BASE_INFLATION, BASE_PRIME), which the fuel
+// trend in data/FuelPrices also escalates with.
 export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const DOWNPAYMENT_PERCENT = 0.2;
-export const INTEREST_RATE_YEARLY = 0.04;
+// The reducer's initial rate before a run sets its own; matches data/Economy's BASE_PRIME
+export const INTEREST_RATE_YEARLY = 0.05;
 export const LOAN_MONTHS = 30 * 12;
 
 // Embodied emissions from building one watt of interconnector, for a corridor priced like the

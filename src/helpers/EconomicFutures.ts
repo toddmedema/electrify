@@ -5,7 +5,7 @@ export const ECONOMIC_FUTURES = [
   {
     id: "lower",
     label: "Lower cost assumption",
-    annualFuelGrowth: 0.02,
+    annualFuelGrowth: TREND_ESCALATION_YEARLY - 0.02,
     primeShift: -0.02,
     inflationShift: -0.01,
   },
@@ -19,7 +19,7 @@ export const ECONOMIC_FUTURES = [
   {
     id: "higher",
     label: "Higher cost assumption",
-    annualFuelGrowth: 0.06,
+    annualFuelGrowth: TREND_ESCALATION_YEARLY + 0.02,
     primeShift: 0.02,
     inflationShift: 0.01,
   },

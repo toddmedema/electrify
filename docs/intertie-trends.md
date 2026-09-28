@@ -20,7 +20,7 @@ fallback most neighbours used) from `ImportEmissions.ts`.
   real 2024 USD for 2030+. `intertiePriceIndex` turns it into a multiplier on the market's
   `basePricePerMWh`: the researched price that year over its 2019–2024 average. Before the
   first anchor the record is deflated, and after 2024 the real projection is escalated, both
-  at the game's `TREND_ESCALATION_YEARLY` (4%/yr), so intertie prices share the money of the
+  at the game's `TREND_ESCALATION_YEARLY` (2.5%/yr: projected inflation with flat real fuel prices), so intertie prices share the money of the
   fuel prices they compete with.
 - **Base prices** — `basePricePerMWh` in `TransmissionProfiles.ts` was reset to the researched
   2019–2024 average, so the price a run sees in a given year is the researched price for that
