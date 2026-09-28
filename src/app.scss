@@ -6708,3 +6708,16 @@ $programs_column: 800px;
   max-width: 760px;
   margin-inline: auto;
 }
+
+// The collapsed summary paints its own opaque background (it pins while scrolling), so the
+// group's bottom corners have to be rounded on it too, not only on the entry's border
+.base_main #manual {
+  .manual-entry:has(+ :not(.manual-entry)):not(.Mui-expanded),
+  .manual-entry:last-child:not(.Mui-expanded) {
+    .MuiAccordion-heading,
+    .MuiAccordionSummary-root {
+      border-bottom-left-radius: var(--radius-lg);
+      border-bottom-right-radius: var(--radius-lg);
+    }
+  }
+}
