@@ -17,7 +17,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  Toolbar,
   Typography,
   Dialog,
   DialogContent,
@@ -25,8 +24,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ClosableDialogTitle from "../base/ClosableDialogTitle";
+import ScreenHeader from "../base/ScreenHeader";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -348,16 +347,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     if (!scenario || !location) {
       return (
         <div>
-          <IconButton
-            onClick={onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ArrowBackIosIcon />
-          </IconButton>
-          UNKNOWN SCENARIO OR LOCATION
+          <ScreenHeader title="Unknown scenario or location" onBack={onBack} />
         </div>
       );
     }
@@ -377,22 +367,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
     return (
       <div id="listCard" className="flexContainer">
-        <div id="topbar">
-          <Toolbar>
-            <IconButton
-              onClick={onBack}
-              aria-label="back"
-              edge="start"
-              color="primary"
-              size="large"
-            >
-              <ArrowBackIosIcon />
-            </IconButton>
-            <Typography component="div" variant="h6">
-              {challenge ? "Friend challenge" : "Game details"}
-            </Typography>
-          </Toolbar>
-        </div>
+        <ScreenHeader
+          title={challenge ? "Friend challenge" : "Game details"}
+          titleComponent="div"
+          onBack={onBack}
+        />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
             <img
@@ -405,12 +384,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 id="scenario-title"
                 variant="h6"
                 component="h1"
-                sx={{ fontWeight: 800, lineHeight: 1.2 }}
+                sx={{ fontWeight: 600, lineHeight: 1.2 }}
               >
                 {scenario.name}
               </Typography>
               <Typography variant="overline" component="div">
-                {location.name} · {scenario.startingYear}-{endYear}
+                {location.name} · {scenario.startingYear}–{endYear}
               </Typography>
               <Typography variant="body1" color="textSecondary">
                 {briefing.fantasy}
@@ -490,7 +469,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   variant="contained"
                   color="primary"
                   onClick={() => onStart(scenario.id)}
-                  autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
                   {challenge ? "Start challenge" : "Start game"}
@@ -557,7 +535,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 <TableBody>
                   {myTopScore && (
                     <TableRow
-                      sx={{ fontWeight: "bold", bgcolor: "action.selected" }}
+                      sx={{ fontWeight: 600, bgcolor: "action.selected" }}
                     >
                       <TableCell className="rank" />
                       <TableCell>Your best</TableCell>
@@ -599,7 +577,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           sx={
                             mine
                               ? {
-                                  fontWeight: "bold",
+                                  fontWeight: 600,
                                   bgcolor: "action.selected",
                                 }
                               : undefined

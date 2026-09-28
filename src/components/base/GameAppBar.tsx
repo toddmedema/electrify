@@ -384,7 +384,7 @@ export function GameAppBar(props: Props) {
               <strong className="statusLabel">{gridHealth.label}</strong>
             </span>
             <span className="gridHealthSeparator" aria-hidden="true">
-              |
+              ·
             </span>
             <strong className="gridHealthMetric">{gridHealth.metric}</strong>
           </div>

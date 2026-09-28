@@ -9,13 +9,12 @@ import {
   InputBase,
   List,
   ListSubheader,
-  Toolbar,
   Typography,
 } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ClearIcon from "@mui/icons-material/Clear";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { ChevronDownGlyph } from "../base/Glyphs";
 import SearchIcon from "@mui/icons-material/Search";
+import ScreenHeader from "../base/ScreenHeader";
 import {
   MANUAL_ENTRIES,
   MANUAL_GROUPS,
@@ -183,7 +182,7 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
       slotProps={{ transition: { unmountOnExit: true } }}
     >
       <AccordionSummary
-        expandIcon={<ExpandMoreIcon color="primary" />}
+        expandIcon={<ChevronDownGlyph className="rowChevron" />}
         aria-controls={`${id}-content`}
         id={`${id}-header`}
       >
@@ -325,18 +324,10 @@ export default function Manual(props: Props): React.JSX.Element {
 
   return (
     <div className="flexContainer screenManual" id="gameCard">
-      <div id="topbar">
-        <Toolbar>
-          <IconButton
-            onClick={onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <Typography variant="h6">Manual</Typography>
+      <ScreenHeader
+        title="Manual"
+        onBack={onBack}
+        trailing={
           <InputBase
             className="manual-search"
             placeholder="Search..."
@@ -365,8 +356,8 @@ export default function Manual(props: Props): React.JSX.Element {
               ) : null
             }
           />
-        </Toolbar>
-      </div>
+        }
+      />
       <List
         dense
         component="div"

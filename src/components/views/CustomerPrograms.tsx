@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CloseIcon from "@mui/icons-material/Close";
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import { ChevronRightGlyph } from "../base/Glyphs";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -707,7 +707,7 @@ function ProgramsScreen({
               <span id={`program-description-${id}`}>{description}</span>
             )
           }
-          action={<ArrowRightIcon color="primary" aria-hidden />}
+          action={<ChevronRightGlyph className="rowChevron" aria-hidden />}
         />
       </CardActionArea>
     </Card>
@@ -1161,10 +1161,11 @@ export default function CustomerPrograms({
             : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
-        variant="contained"
+        variant="outlined"
+        startIcon={<GroupsIcon />}
         onClick={() => setOpen(true)}
       >
-        <GroupsIcon />
+        Programs
       </Button>
       {open && (
         <ProgramsScreen
