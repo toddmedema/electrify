@@ -87,6 +87,7 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "transmissionCapacityW",
   "marketPricePerMWh",
   "revenueExports",
+  "revenueGrants",
   "expensesImports",
 ];
 
@@ -120,6 +121,7 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "transmissionCapacityW",
   "marketPricePerMWh",
   "revenueExports",
+  "revenueGrants",
   "expensesImports",
 ];
 
@@ -138,6 +140,7 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "interestRate",
   "inflationRate",
   "revenueExports",
+  "revenueGrants",
   "expensesImports",
 ];
 

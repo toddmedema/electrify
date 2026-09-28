@@ -4,7 +4,7 @@ import { getScenarioLocation } from "./Locations";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { isValidDifficulty } from "./Difficulty";
 import {
-  AuthoredRunReferenceV1,
+  AuthoredRunReference,
   RunIdentity,
   ScenarioType,
   DifficultyType,
@@ -31,10 +31,8 @@ export function captureRunIdentity(
 ): RunIdentity {
   const location = getScenarioLocation(scenario)!;
   return {
-    identitySchemaVersion: 1,
     scenarioId: scenario.id,
     // The manifest includes complete authored definitions, including function-valued rules.
-    scenarioRevision: manifest.compatibilityId,
     compatibilityId: manifest.compatibilityId,
     seed,
     difficulty,
@@ -63,24 +61,11 @@ export function expandAuthoredRunReference(
   raw: unknown,
 ): RunIdentity | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
-  const r = raw as AuthoredRunReferenceV1;
+  const r = raw as AuthoredRunReference;
   if (
     Object.keys(r).sort().join() !==
-      [
-        "identitySchemaVersion",
-        "scenarioId",
-        "scenarioRevision",
-        "seed",
-        "difficulty",
-        "compatibilityId",
-        "optionsProfile",
-      ]
-        .sort()
-        .join() ||
-    r.identitySchemaVersion !== 1 ||
-    r.optionsProfile !== "canonical-v1" ||
+      ["scenarioId", "seed", "difficulty", "compatibilityId"].sort().join() ||
     r.compatibilityId !== manifest.compatibilityId ||
-    r.scenarioRevision !== manifest.compatibilityId ||
     !Number.isInteger(r.seed) ||
     r.seed < 0 ||
     r.seed > 0xffffffff ||
@@ -100,30 +85,20 @@ export function expandAuthoredRunReference(
 }
 export function projectAuthoredRunReference(
   identity: RunIdentity | undefined,
-): AuthoredRunReferenceV1 | undefined {
+): AuthoredRunReference | undefined {
   if (!identity || identity.origin !== "authored") return;
-  const {
-    identitySchemaVersion,
+  const { scenarioId, seed, difficulty, compatibilityId } = identity;
+  const reference: AuthoredRunReference = {
     scenarioId,
-    scenarioRevision,
     seed,
     difficulty,
     compatibilityId,
-  } = identity;
-  const reference: AuthoredRunReferenceV1 = {
-    identitySchemaVersion,
-    scenarioId,
-    scenarioRevision,
-    seed,
-    difficulty,
-    compatibilityId,
-    optionsProfile: "canonical-v1",
   };
   return sameRunIdentity(identity, expandAuthoredRunReference(reference))
     ? reference
     : undefined;
 }
-/** Optional legacy metadata is absent, never inferred from current progress. */
+/** Only canonical authored runs carry a shareable identity. */
 export function validRunIdentity(raw: unknown): raw is RunIdentity {
   if (!raw || typeof raw !== "object") return false;
   return !!projectAuthoredRunReference(raw as RunIdentity);

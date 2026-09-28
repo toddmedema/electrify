@@ -31,8 +31,9 @@ is incompatible. No historical simulation runtime or migration is provided.
 When changing simulation behavior outside these directories, add the source to
 the generator's inputs, or bump `rulesRevision` in the generator.
 Changes to the digest algorithm or input-selection policy also require a rules
-revision bump. Authored references additionally carry a scenario revision, derived
-from their canonical scenario configuration by the shared identity helpers.
+revision bump. Authored references carry the scenario, seed, difficulty and this
+single compatibility digest. There are no schema versions or historical format
+adapters: only the current reference and invitation shapes are accepted.
 
 The manifest also includes per-file fetch integrity metadata. Browser CSV and
 weather loads verify the actual response bytes, including offline-cache responses,

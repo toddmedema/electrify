@@ -1,11 +1,6 @@
 import * as React from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-} from "@mui/material";
+import { Button } from "@mui/material";
+import DecisionDialog from "./DecisionDialog";
 
 export interface InfoDialogProps {
   open: boolean;
@@ -27,16 +22,20 @@ export default function InfoDialog({
   titleId,
 }: InfoDialogProps): React.JSX.Element {
   return (
-    <Dialog open={open} onClose={onClose} aria-labelledby={titleId}>
-      <DialogTitle id={titleId}>{title}</DialogTitle>
-      <DialogContent>{children}</DialogContent>
-      <DialogActions>
-        {actions ?? (
+    <DecisionDialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      titleId={titleId}
+      actions={
+        actions ?? (
           <Button color="primary" variant="contained" onClick={onClose}>
             Close
           </Button>
-        )}
-      </DialogActions>
-    </Dialog>
+        )
+      }
+    >
+      {children}
+    </DecisionDialog>
   );
 }

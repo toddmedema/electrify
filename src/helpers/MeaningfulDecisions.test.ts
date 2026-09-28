@@ -125,7 +125,7 @@ describe("meaningful decisions", () => {
     expect(validMeaningfulDecisions([{ hepo: "bad" }], 5)).toBe(false);
   });
 
-  it("makes the Intern and diverse CEO objectives explicit, with a legacy waiver", () => {
+  it("makes the Intern and diverse CEO objectives explicit, with a simulation waiver", () => {
     const scenario = {
       ...SCENARIOS.find(({ id }) => id === 100)!,
     };

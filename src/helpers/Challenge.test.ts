@@ -15,12 +15,11 @@ import {
   challengeComparison,
   MAX_CHALLENGE_URL,
 } from "./Challenge";
-import { ChallengeInvitationV1, VictoryType } from "../Types";
+import { ChallengeInvitation, VictoryType } from "../Types";
 const scenario = SCENARIOS.find((s) => s.id === 101)!;
 const identity = captureRunIdentity(scenario, 42, "CEO");
 const run = projectAuthoredRunReference(identity)!;
-const invitation: ChallengeInvitationV1 = {
-  invitationSchemaVersion: 1,
+const invitation: ChallengeInvitation = {
   run,
   target: 12400,
 };
@@ -110,7 +109,7 @@ it("rejects overrides, waived gates, changed inputs, and custom/replay/tutorial 
   expect(sameRunIdentity(identity, undefined)).toBe(false);
   expect(validRunIdentity(null)).toBe(false);
 });
-it("rejects transport ambiguity, malformed payload and unknown schemas without a fallback challenge", () => {
+it("rejects transport ambiguity, malformed payload and obsolete fields without a fallback challenge", () => {
   expect(
     parseChallengeUrl("https://electrifygame.com/?scenario=101"),
   ).toBeUndefined();

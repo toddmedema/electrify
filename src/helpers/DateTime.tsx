@@ -46,6 +46,7 @@ export const EMPTY_HISTORY: MonthlyHistoryType = {
   expensesPolicy: 0,
   expensesImports: 0,
   revenueExports: 0,
+  revenueGrants: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
@@ -94,6 +95,7 @@ export function reduceHistories(
   acc.expensesPolicy = (acc.expensesPolicy || 0) + (t.expensesPolicy || 0);
   acc.expensesImports = (acc.expensesImports || 0) + (t.expensesImports || 0);
   acc.revenueExports = (acc.revenueExports || 0) + (t.revenueExports || 0);
+  acc.revenueGrants = (acc.revenueGrants || 0) + (t.revenueGrants || 0);
   acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
@@ -260,6 +262,7 @@ function accumulateTick(
     (summary.expensesImports || 0) + (t.expensesImports || 0);
   summary.revenueExports =
     (summary.revenueExports || 0) + (t.revenueExports || 0);
+  summary.revenueGrants = (summary.revenueGrants || 0) + (t.revenueGrants || 0);
   summary.cash = t.cash;
   summary.customers = t.customers;
   summary.netWorth = t.netWorth;

@@ -19,6 +19,9 @@ describe("ConfirmDialog", () => {
       </ConfirmDialog>,
     );
     expect(screen.getByText("You will receive $1M.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Sell it?" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
     const confirm = screen.getByText("Sell");
@@ -59,6 +62,20 @@ describe("ConfirmDialog", () => {
     );
     expect(screen.getByText("Pay $5M")).toBeDisabled();
   });
+
+  it("focuses the safe action for a destructive decision", () => {
+    render(
+      <ConfirmDialog
+        open
+        destructive
+        title="Delete run?"
+        confirmLabel="Delete"
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+  });
 });
 
 describe("InfoDialog", () => {
@@ -70,6 +87,9 @@ describe("InfoDialog", () => {
       </InfoDialog>,
     );
     expect(screen.getByText("Carbon fee")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Carbon fee" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Close"));
     expect(onClose).toHaveBeenCalledTimes(1);
   });

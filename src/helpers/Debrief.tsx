@@ -8,6 +8,7 @@ import {
   VictoryFleetCapacityType,
 } from "../Types";
 import { formatWatts, formatWattHours } from "./Format";
+import { customerSalesRevenue } from "./Scoring";
 
 type FleetAssetType = Partial<FacilityShoppingType> & {
   yearsToBuildLeft?: number;
@@ -110,7 +111,7 @@ function effectiveRate(
   month: MonthlyHistoryType | undefined,
 ): number | undefined {
   return month && month.supplyWh > 0
-    ? month.revenue / (month.supplyWh / 1000)
+    ? customerSalesRevenue(month) / (month.supplyWh / 1000)
     : undefined;
 }
 

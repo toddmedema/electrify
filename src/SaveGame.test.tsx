@@ -249,12 +249,12 @@ describe("SaveGame", () => {
     expect(parseSave(noOp)).toBeNull();
   });
 
-  it("does not invent transmission when an older tutorial is restored", () => {
+  it("rejects transmission state in a tutorial without intertie access", () => {
     const tutorial = createGame({ scenarioId: 0, seed: 249001 });
     const save = JSON.parse(JSON.stringify(serializeSave(tutorial)));
     save.game.transmission = { tradingPolicy: "BALANCED", lines: [] };
 
-    expect(parseSave(save)?.game.transmission).toBeUndefined();
+    expect(parseSave(save)).toBeNull();
 
     save.game.transmission.lines.push({
       id: 1,
@@ -271,6 +271,46 @@ describe("SaveGame", () => {
       interestRate: 0,
     });
     expect(parseSave(save)).toBeNull();
+  });
+
+  it("rejects missing current transmission and decision settings", () => {
+    for (const field of ["transmission", "meaningfulDecisionGateWaived"]) {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      delete raw.game[field];
+      expect(parseSave(raw)).toBeNull();
+    }
+  });
+
+  it.each([
+    "constructionKgco2e",
+    "expensesPolicy",
+    "expensesImports",
+    "revenueExports",
+    "revenueGrants",
+  ])("rejects missing or corrupt current accounting field %s", (field) => {
+    const recorded = {
+      ...game,
+      date: { ...game.date, minute: 1440 },
+      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
+    };
+    for (const collection of ["timeline", "monthlyHistory"]) {
+      for (const value of [undefined, null, "0", -1, Infinity]) {
+        const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
+        raw.game[collection][0][field] = value;
+        expect(parseSave(raw)).toBeNull();
+      }
+    }
+  });
+
+  it.each([
+    "importedW",
+    "exportedW",
+    "transmissionCapacityW",
+    "marketPricePerMWh",
+  ])("rejects missing current trade field %s", (field) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete raw.game.timeline[0][field];
+    expect(parseSave(raw)).toBeNull();
   });
 
   it("rejects corrupt or impossible intertie financial state", () => {

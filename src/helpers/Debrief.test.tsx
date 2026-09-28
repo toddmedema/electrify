@@ -109,7 +109,11 @@ it("surfaces the researched Uri outcome metrics", () => {
     [],
     [],
     [
-      month(3, { revenue: 100_000 }),
+      month(3, {
+        revenue: 160_000,
+        revenueExports: 10_000,
+        revenueGrants: 50_000,
+      }),
       month(2, {
         supplyWh: 900_000_000,
         demandWh: 1_000_000_000,

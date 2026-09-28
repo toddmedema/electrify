@@ -5,7 +5,7 @@ import { launchRun } from "./GameActions";
 import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { SCENARIOS } from "../data/Scenarios";
-import { GameType, ChallengeInvitationV1 } from "../Types";
+import { GameType, ChallengeInvitation } from "../Types";
 import {
   projectAuthoredRunReference,
   expandAuthoredRunReference,
@@ -33,8 +33,7 @@ it.each([
     const reference = projectAuthoredRunReference(original.runIdentity)!;
     expect(reference).toBeDefined();
     const identity = expandAuthoredRunReference(reference)!;
-    const challenge: ChallengeInvitationV1 = {
-      invitationSchemaVersion: 1,
+    const challenge: ChallengeInvitation = {
       run: reference,
       target: 0,
     };
@@ -103,10 +102,10 @@ it.each([
     expect(restored.runIdentity).toEqual(right.runIdentity);
   },
 );
-it("preserves legacy saves without manufacturing identity and rejects contradictory new metadata", () => {
+it("preserves unranked saves without manufacturing identity and rejects contradictory metadata", () => {
   const game = createGame({ scenarioId: 101, seed: 42 });
-  const legacy = { ...game, runIdentity: undefined };
-  expect(parseSave(serializeSave(legacy))!.game.runIdentity).toBeUndefined();
+  const unranked = { ...game, runIdentity: undefined };
+  expect(parseSave(serializeSave(unranked))!.game.runIdentity).toBeUndefined();
   expect(
     parseSave(
       serializeSave({
@@ -120,7 +119,6 @@ it("preserves legacy saves without manufacturing identity and rejects contradict
       serializeSave({
         ...game,
         challenge: {
-          invitationSchemaVersion: 1,
           run: projectAuthoredRunReference(game.runIdentity)!,
           target: 0.5,
         },

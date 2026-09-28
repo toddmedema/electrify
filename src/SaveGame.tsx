@@ -53,7 +53,6 @@ import {
 } from "./Types";
 import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
 import {
-  emptyTransmissionState,
   intertiesEnabledForScenario,
   corridorsForLocation,
 } from "./data/AdjacentMarkets";
@@ -69,10 +68,8 @@ import { pow } from "./helpers/Pow";
  * caches -- which live outside Redux -- rebuild themselves identically from state.seed on the other
  * side of a reload. Nothing sequential has to be carried in the save.
  *
- * This module deliberately imports almost nothing: reducers/Game reaches back here for
- * clearSaveFor, and data/Scenarios imports reducers/Game, so importing the scenarios from here
- * would close the cycle that reducers/ImportOrder.test.tsx guards against. Callers that need to
- * know about scenarios (whether one is a tutorial, what it's called) pass that in.
+ * Keep reducer dependencies indirect: reducers/Game reaches back here for clearSaveFor.
+ * reducers/ImportOrder.test.tsx guards startup against dependency cycles.
  */
 
 export const SAVE_KEY = "savedGame";
@@ -254,11 +251,10 @@ function validTransmissionLine(
     line.loanMonthlyPayment! <= corridor.buildCost &&
     // Derived display state rather than a decision: the next real tick overwrites it, but it
     // is rendered before that tick lands, so an imported save cannot claim a line is moving
-    // more power than it is rated for. Saves written before this field existed omit it.
-    (line.currentFlowW === undefined ||
-      (typeof line.currentFlowW === "number" &&
-        Number.isFinite(line.currentFlowW) &&
-        Math.abs(line.currentFlowW) <= line.capacityW!)) &&
+    // more power than it is rated for.
+    typeof line.currentFlowW === "number" &&
+    Number.isFinite(line.currentFlowW) &&
+    Math.abs(line.currentFlowW) <= line.capacityW! &&
     typeof line.financed === "boolean" &&
     (line.financed
       ? line.loanMonthlyPayment! > 0
@@ -277,22 +273,23 @@ function validEmissions(raw: unknown): boolean {
     constructionKgco2e?: number;
   };
   if (
-    ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
+    ![
+      record.kgco2e,
+      record.localKgco2e,
+      record.importedKgco2e,
+      record.constructionKgco2e,
+    ].every(
       (value) =>
         typeof value === "number" && Number.isFinite(value) && value >= 0,
     )
   )
     return false;
-  // Saves written before construction emissions existed have two components rather than three,
-  // and their total is still the sum of what they do carry.
-  const construction = record.constructionKgco2e ?? 0;
-  if (!Number.isFinite(construction) || construction < 0) return false;
   return (
     Math.abs(
       record.kgco2e! -
         record.localKgco2e! -
         record.importedKgco2e! -
-        construction,
+        record.constructionKgco2e!,
     ) <=
     Math.max(1, record.kgco2e!) * 1e-9
   );
@@ -459,6 +456,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
           tick.storageChargeW,
           tick.storageDischargeW,
           tick.importKgco2ePerMWh,
+          tick.importedW,
+          tick.exportedW,
+          tick.transmissionCapacityW,
+          tick.marketPricePerMWh,
         ].some(
           (value) =>
             typeof value !== "number" || !Number.isFinite(value) || value < 0,
@@ -524,8 +525,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
   if (
     !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth) ||
-    (game.meaningfulDecisionGateWaived !== undefined &&
-      typeof game.meaningfulDecisionGateWaived !== "boolean")
+    typeof game.meaningfulDecisionGateWaived !== "boolean"
   )
     return null;
   const worldEvents = game.worldEvents as
@@ -585,6 +585,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const transmissionEnabled = !!(
     scenario && intertiesEnabledForScenario(scenario, game.location)
   );
+  if (transmissionEnabled !== (transmission !== undefined)) return null;
   if (
     transmission !== undefined &&
     (typeof transmission !== "object" ||
@@ -637,10 +638,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   if (
-    [...game.timeline, ...game.monthlyHistory].some(
-      (t) =>
-        t.expensesPolicy !== undefined &&
-        (!Number.isFinite(t.expensesPolicy) || t.expensesPolicy < 0),
+    [...game.timeline, ...game.monthlyHistory].some((t) =>
+      [
+        t.expensesPolicy,
+        t.expensesImports,
+        t.revenueExports,
+        t.revenueGrants,
+      ].some(
+        (value) =>
+          typeof value !== "number" || !Number.isFinite(value) || value < 0,
+      ),
     )
   )
     return null;
@@ -648,27 +655,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
-    transmission: transmissionEnabled
-      ? (game.transmission ?? emptyTransmissionState())
-      : undefined,
-    meaningfulDecisions: game.meaningfulDecisions!,
-    meaningfulDecisionGateWaived: game.meaningfulDecisionGateWaived ?? false,
-    timeline: (game as GameType).timeline.map((t) => ({
-      ...t,
-      expensesPolicy: t.expensesPolicy ?? 0,
-      expensesImports: t.expensesImports ?? 0,
-      revenueExports: t.revenueExports ?? 0,
-      importedW: t.importedW ?? 0,
-      exportedW: t.exportedW ?? 0,
-      transmissionCapacityW: t.transmissionCapacityW ?? 0,
-      marketPricePerMWh: t.marketPricePerMWh ?? 0,
-    })),
-    monthlyHistory: game.monthlyHistory.map((t) => ({
-      ...t,
-      expensesPolicy: t.expensesPolicy ?? 0,
-      expensesImports: t.expensesImports ?? 0,
-      revenueExports: t.revenueExports ?? 0,
-    })),
+    timeline: game.timeline.map((t) => ({ ...t })),
   };
   if (
     normalized.runIdentity &&
@@ -763,7 +750,7 @@ export function isResumedGame(game: GameType): boolean {
  * infrequent enough that it doesn't need throttling, and unthrottled means every year boundary
  * actually lands rather than being collapsed into a later one.
  *
- * isSaveableScenario is injected rather than looked up here (see the note at the top of the file);
+ * isSaveableScenario is injected rather than looked up here;
  * pass a predicate that rejects tutorials, which are short enough not to be worth saving and would
  * otherwise need their short-lived objective state restored too.
  */

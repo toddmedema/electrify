@@ -1,11 +1,11 @@
 import * as React from "react";
-import { Button, Dialog, DialogActions, DialogContent } from "@mui/material";
+import { Button } from "@mui/material";
 import {
   DifficultyType,
   MeaningfulDecisionType,
   ScenarioType,
 } from "../../Types";
-import ClosableDialogTitle from "./ClosableDialogTitle";
+import DecisionDialog from "./DecisionDialog";
 import VictoryConditions from "./VictoryConditions";
 
 export interface VictoryConditionsDialogProps {
@@ -29,25 +29,27 @@ export default function VictoryConditionsDialog({
   meaningfulDecisionGateWaived,
 }: VictoryConditionsDialogProps): React.JSX.Element {
   return (
-    <Dialog open={open} onClose={onClose}>
-      <ClosableDialogTitle onClose={onClose}>{title}</ClosableDialogTitle>
-      <DialogContent>
-        <VictoryConditions
-          ownership={scenario.ownership}
-          dollarsPerkWh={scenario.dollarsPerkWh}
-          startingCustomers={scenario.startingCustomers}
-          minimumCustomerRetention={scenario.minimumCustomerRetention}
-          reliabilityObjective={scenario.reliabilityObjective}
-          difficulty={difficulty}
-          meaningfulDecisions={meaningfulDecisions}
-          meaningfulDecisionGateWaived={meaningfulDecisionGateWaived}
-        />
-      </DialogContent>
-      <DialogActions>
+    <DecisionDialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      closable
+      actions={
         <Button color="primary" variant="contained" onClick={onClose}>
           Close
         </Button>
-      </DialogActions>
-    </Dialog>
+      }
+    >
+      <VictoryConditions
+        ownership={scenario.ownership}
+        dollarsPerkWh={scenario.dollarsPerkWh}
+        startingCustomers={scenario.startingCustomers}
+        minimumCustomerRetention={scenario.minimumCustomerRetention}
+        reliabilityObjective={scenario.reliabilityObjective}
+        difficulty={difficulty}
+        meaningfulDecisions={meaningfulDecisions}
+        meaningfulDecisionGateWaived={meaningfulDecisionGateWaived}
+      />
+    </DecisionDialog>
   );
 }

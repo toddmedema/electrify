@@ -170,7 +170,6 @@ describe("ending a scenario from inside the reducer", () => {
     ) as ScenarioType;
     const state = createGame({ scenarioId: scenario.id });
     state.challenge = {
-      invitationSchemaVersion: 1,
       run: projectAuthoredRunReference(state.runIdentity)!,
       target: -25,
     };
@@ -217,6 +216,10 @@ describe("ending a scenario from inside the reducer", () => {
       tickState(state);
     }
     const blackoutMonth: MonthlyHistoryType = {
+      expensesPolicy: 0,
+      expensesImports: 0,
+      revenueExports: 0,
+      revenueGrants: 0,
       year: scenario.startingYear,
       month: 0,
       supplyWh: 1,

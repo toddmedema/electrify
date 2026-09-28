@@ -1,4 +1,4 @@
-import type { RunIdentity, ChallengeInvitationV1 } from "../Types";
+import type { RunIdentity, ChallengeInvitation } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
 import type { GameType, ReplayType, PolicyChangeType } from "../Types";
 
@@ -28,7 +28,7 @@ export const closePolicyDecision = createAction<string>(
  */
 export const launchRun = createAction<{
   identity: RunIdentity;
-  challenge?: ChallengeInvitationV1;
+  challenge?: ChallengeInvitation;
 }>("game/launchRun");
 export const start = createAction<number>("game/start");
 export const loaded = createAction("game/loaded");

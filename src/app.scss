@@ -5755,7 +5755,7 @@ $programs_column: 800px;
 }
 .customerProgramFacts {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   column-gap: $space-4;
   row-gap: $space-1;
   margin: 0;
@@ -5769,6 +5769,16 @@ $programs_column: 800px;
   }
 }
 @media screen and (max-width: 599px) {
+  .customerProgramFacts {
+    grid-template-columns: minmax(0, 1fr);
+
+    dd + dt {
+      margin-top: $space-2;
+    }
+  }
+  .customerProgramsActions > .MuiButton-contained {
+    flex: 1 1 100%;
+  }
   .programsTitleLong {
     display: none;
   }

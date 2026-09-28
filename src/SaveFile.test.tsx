@@ -11,11 +11,16 @@ import {
 } from "./SaveFile";
 import { clearSave, serializeSave, writeSave } from "./SaveGame";
 import { GameType, ScenarioType } from "./Types";
+import {
+  emptyTransmissionState,
+  intertiesEnabledForScenario,
+} from "./data/AdjacentMarkets";
+import { getScenario } from "./data/Scenarios";
 
 // Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
 // crash on, not the whole of GameType, and building a real game here would cost a minute of setup
 function fakeGame(overrides: Partial<GameType> = {}): GameType {
-  return {
+  const game = {
     scenarioId: 101, // Rise of Renewables
     difficulty: "Employee",
     seed: 31337,
@@ -38,6 +43,11 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     meaningfulDecisionGateWaived: false,
     ...overrides,
   } as unknown as GameType;
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (scenario && intertiesEnabledForScenario(scenario, game.location)) {
+    game.transmission = emptyTransmissionState();
+  }
+  return game;
 }
 
 function saveFile(contents: unknown, name = "save.json"): File {

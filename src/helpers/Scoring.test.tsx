@@ -34,6 +34,10 @@ it("gives a public utility that supplied no electricity a finite score", () => {
     (candidate: ScenarioType) => candidate.ownership === "Public",
   ) as ScenarioType;
   const summary: MonthlyHistoryType = {
+    expensesPolicy: 0,
+    expensesImports: 0,
+    revenueExports: 0,
+    revenueGrants: 0,
     year: scenario.startingYear,
     month: 1,
     supplyWh: 0,
@@ -127,6 +131,23 @@ describe("inflation and the public rate target", () => {
     expect(
       computeScoreBreakdown(scenario, summary, summary.revenue).rate,
     ).toBeLessThan(-100);
+  });
+
+  it("does not treat export sales or scenario grants as higher customer bills", () => {
+    const withOtherIncome = history.map((month) => ({
+      ...month,
+      revenue: month.revenue + 250 + 1000,
+      revenueExports: 250,
+      revenueGrants: 1000,
+    }));
+    const customerRevenue = startingDollarRevenue(withOtherIncome, 2020, 1);
+    expect(customerRevenue).toBeCloseTo(
+      startingDollarRevenue(history, 2020, 1),
+      6,
+    );
+    expect(computeScoreBreakdown(scenario, summary, customerRevenue).rate).toBe(
+      0,
+    );
   });
 
   it("compares the coming year's rate to the target in today's dollars", () => {

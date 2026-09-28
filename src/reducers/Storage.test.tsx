@@ -179,6 +179,7 @@ describe("storage dispatch energy accounting", () => {
           id: 10,
           corridorId: "california-north",
           name: "Test intertie",
+          currentFlowW: 0,
           capacityW: 1000,
           buildCost: 0,
           annualOperatingCost: 0,
