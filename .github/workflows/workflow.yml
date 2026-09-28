@@ -86,6 +86,11 @@ jobs:
         if: "!cancelled() && steps.browser.outcome == 'success'"
         run: npm run test:e2e -- build-options.spec.ts tutorial-exit.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
 
+      # Text can spill into adjacent columns without making the page horizontally scroll.
+      - name: Mobile and desktop text layout
+        if: "!cancelled() && steps.browser.outcome == 'success'"
+        run: npm run test:e2e -- multiline-text.spec.ts --project=desktop-chromium --project=mobile-390px --project=mobile-320px --workers=2 --output=test-results/text-layout
+
       - name: Preserve browser failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v7

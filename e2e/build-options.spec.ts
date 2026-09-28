@@ -142,6 +142,10 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         detailCard.getByText("Construction emissions", { exact: true }),
       ).toBeVisible();
+      // Wait for the disclosure to finish growing before scrolling its last row.
+      await expect(detailCard.locator(".MuiCollapse-root")).toHaveClass(
+        /MuiCollapse-entered/,
+      );
       await detailCard
         .getByText("Construction emissions", { exact: true })
         .scrollIntoViewIfNeeded();

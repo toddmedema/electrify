@@ -2018,10 +2018,6 @@ $pane_header_height: 48px;
     // The checkbox's 42px hit area less MUI's -11px start margin
     padding-left: 31px;
   }
-
-  .resilienceBuildOptionNoWrap {
-    white-space: nowrap;
-  }
 }
 
 .resilienceBuildOption .resilienceBuildOptionWarning {
@@ -5962,6 +5958,12 @@ $programs_column: 800px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+}
+@media (max-width: 599px) {
+  .generatorDetails .generatorDetailLabel {
+    // Leave enough room for complete cost/unit values beside the help target.
+    width: 44%;
   }
 }
 @media (pointer: coarse) {

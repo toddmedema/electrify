@@ -728,9 +728,7 @@ export function GeneratorBuildItem(
                           className={
                             line.warning
                               ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
-                              : option.upgrade === "solarTrackers"
-                                ? "resilienceBuildOptionDetail resilienceBuildOptionNoWrap"
-                                : "resilienceBuildOptionDetail"
+                              : "resilienceBuildOptionDetail"
                           }
                         >
                           {line.text}
