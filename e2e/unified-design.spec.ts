@@ -32,8 +32,9 @@ for (const theme of ["light", "dark"]) {
           .locator(".unifiedFacilitiesList")
           .evaluate((element) => getComputedStyle(element).overflowY),
       ).toBe("visible");
-      await pane.locator(".transmissionFleet").scrollIntoViewIfNeeded();
-      await expect(pane.locator(".transmissionFleet")).toBeInViewport();
+      // This scenario starts with no interties, so the last plant row ends the fleet
+      await rows.last().scrollIntoViewIfNeeded();
+      await expect(rows.last()).toBeInViewport();
       await chart.scrollIntoViewIfNeeded();
       await expect(chart).toBeInViewport();
     }

@@ -33,7 +33,10 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
     await expect(card).toContainText("Neighbor’s max spare capacity");
-    await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
+    // One market summary; the emissions source note shares its caption style
+    await expect(
+      card.locator(".buildOptionDescription:not(.intertieEmissionsNote)"),
+    ).toHaveCount(1);
     expect(
       await card.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

@@ -5,7 +5,8 @@ for (const scenario of [106, 107]) {
     test(`scenario ${scenario} requires a clear, persistent choice in ${theme}`, async ({
       page,
     }, testInfo) => {
-      test.setTimeout(90000);
+      // The data-center choice comes due 48 game months in, about a minute at fast speed
+      test.setTimeout(180000);
       await page.addInitScript((mode) => {
         if (!sessionStorage.getItem("choice-test-started")) {
           localStorage.clear();
@@ -29,21 +30,21 @@ for (const scenario of [106, 107]) {
             ? "Negotiate the data-center connection"
             : "Prepare for the deep freeze",
       });
-      await expect(dialog).toBeVisible({ timeout: 60000 });
+      await expect(dialog).toBeVisible({ timeout: 120000 });
       await expect(dialog).toContainText("Paused");
       await expect(dialog.getByRole("button")).toHaveCount(2);
       if (scenario === 106) {
         await expect(dialog).toContainText(
-          "Receive $15M in exchange for the full 100 MW coming online in January 2026.",
+          "Receive $15M to connect all 100 MW in January 2026.",
         );
         await expect(dialog).toContainText("2026");
         await expect(dialog).toContainText("2028");
       } else {
-        await expect(dialog).toContainText("Spend $90M");
+        await expect(dialog).toContainText("Fund winterization ($90M)");
         await expect(dialog).toContainText(/gas.price/i);
       }
       await expect(dialog).toContainText(
-        scenario === 106 ? "Forgo funding" : "Keep your cash",
+        scenario === 106 ? "Forgo funding" : "Keep construction budget",
       );
       const paused = await page.locator("#appbar:visible").first().innerText();
       await page.keyboard.press("Escape");

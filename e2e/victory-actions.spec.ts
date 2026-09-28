@@ -19,6 +19,18 @@ for (const theme of ["light", "dark"]) {
       save.game.date.minute += offset;
       save.game.date.monthsElapsed = 143;
       for (const tick of save.game.timeline) tick.minute += offset;
+      // Every difficulty now requires at least one meaningful decision to win.
+      save.game.meaningfulDecisions = [
+        {
+          key: "rate",
+          lever: "rate",
+          label: "Changed the retail rate",
+          month: 1,
+          kind: "rate",
+          before: "$0.10/kWh",
+          after: "$0.11/kWh",
+        },
+      ];
       localStorage.setItem("savedGame", JSON.stringify(save));
     });
     await page.reload();

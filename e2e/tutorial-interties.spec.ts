@@ -60,12 +60,14 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
       name: "Review purchase of Pacific Northwest intertie",
     }),
   ).toBeVisible();
-  await expect(page.getByText("Pay $36M now · finance $144M")).toBeVisible();
   await page
     .getByRole("button", {
       name: "Review purchase of Pacific Northwest intertie",
     })
     .click();
+  // The shared purchase review states the financing the tutorial asks for
+  await expect(page.getByRole("dialog")).toContainText("Loan option");
+  await expect(page.getByRole("dialog")).toContainText("$36M now");
   // The open dialog aria-hides the rest of the app, so role queries cannot see the HUD while
   // it is up; read the counter's spoken text directly instead.
   await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText(

@@ -28,7 +28,8 @@ for (const theme of ["light", "dark"] as const) {
     const slider = page.getByRole("slider");
     const before = await slider.getAttribute("aria-valuenow");
     await hydro.getByRole("button", { name: "Use site maximum" }).click();
-    await expect(slider).toHaveAttribute("aria-valuenow", before!);
+    // The shortcut sizes the catalog to the largest open site, which is below the default
+    await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
     const reviewBounds = (await hydro
       .getByRole("button", { name: "Review purchase of Hydro" })
       .boundingBox())!;
