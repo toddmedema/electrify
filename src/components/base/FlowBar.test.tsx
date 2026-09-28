@@ -3,18 +3,19 @@ import { render } from "@testing-library/react";
 import FlowBar from "./FlowBar";
 
 /* eslint-disable testing-library/no-node-access, testing-library/no-container */
-function bar(fraction: number, color = "#ac4e13"): HTMLElement {
-  const { container } = render(<FlowBar fraction={fraction} color={color} />);
+function bar(fraction: number): HTMLElement {
+  const { container } = render(<FlowBar fraction={fraction} />);
   return container.querySelector(".outputProgressBar") as HTMLElement;
 }
 
 describe("FlowBar", () => {
-  it("scales forward flow from the left edge in the row's own accent", () => {
+  it("scales forward flow from the left edge in the shared neutral tint", () => {
     const element = bar(0.4);
     expect(element).not.toHaveClass("reverseFlow");
     expect(element.style.transform).toBe("scaleX(0.4)");
     expect(element.style.width).toBe("");
-    expect(element.style.backgroundColor).toBe("rgba(172, 78, 19, 0.18)");
+    // No inline tint: the stylesheet's neutral --flow-fill paints every forward row
+    expect(element.style.backgroundColor).toBe("");
   });
 
   it("gives reverse flow its own class, colour and magnitude", () => {
@@ -23,7 +24,7 @@ describe("FlowBar", () => {
     // Sized by width rather than scaleX, so the stylesheet's hatch isn't squashed with the fill
     expect(element.style.width).toBe("40%");
     expect(element.style.transform).toBe("");
-    expect(element.style.backgroundColor).not.toBe("rgba(172, 78, 19, 0.18)");
+    expect(element.style.backgroundColor).not.toBe("");
   });
 
   it("keeps full reverse flow distinguishable from full forward flow", () => {

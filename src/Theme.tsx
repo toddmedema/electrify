@@ -221,7 +221,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     tick: "rgba(148, 163, 184, 0.34)",
     legendText: "#dce6f0",
     interactive: LOGO_BLUE.dark,
-    background: "#0f161f",
+    background: "#0b1016", // --bg-primary: charts sit flush on the page
   },
 };
 
@@ -382,7 +382,8 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiDialog: {
         styleOverrides: {
           paper: {
-            borderRadius: 8,
+            // --radius-lg in app.scss: dialogs and sheets share the grouped-list corner
+            borderRadius: 12,
             "@media (max-width:599px)": {
               margin: 12,
               width: "calc(100% - 24px)",

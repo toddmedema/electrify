@@ -215,7 +215,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
               aria-hidden
             />
           )}
-          <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>
+          <Typography variant="h5" component="span" sx={{ fontWeight: 600 }}>
             {displayTitle}
           </Typography>
         </Stack>

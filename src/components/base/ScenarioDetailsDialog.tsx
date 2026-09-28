@@ -148,7 +148,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             "&&": { p: 0 },
             mb: 2,
             fontSize: { xs: 24, sm: 28 },
-            fontWeight: 700,
+            fontWeight: 600,
             lineHeight: 1.2,
             overflowWrap: "anywhere",
           }}
@@ -204,7 +204,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               id="scenario-rules-title"
               variant="h6"
               component="h3"
-              sx={{ fontWeight: 700 }}
+              sx={{ fontWeight: 600 }}
             >
               Victory conditions
             </Typography>
@@ -215,7 +215,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             <Box component="dl" className="missionRequirements">
               {mission.requirements.map((requirement) => (
                 <React.Fragment key={requirement.id}>
-                  <Typography component="dt" sx={{ mt: 2, fontWeight: 700 }}>
+                  <Typography component="dt" sx={{ mt: 2, fontWeight: 600 }}>
                     {requirement.label}{" "}
                     <span
                       className="missionRequirementStatus"
@@ -243,14 +243,14 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               bgcolor: "var(--bg-raised)",
               border: "1px solid",
               borderColor: "divider",
-              borderRadius: 2,
+              borderRadius: "var(--radius-lg)",
             }}
           >
             <Typography
               id="scenario-score-title"
               variant="h6"
               component="h3"
-              sx={{ fontWeight: 700 }}
+              sx={{ fontWeight: 600 }}
             >
               Current score
             </Typography>

@@ -18,13 +18,12 @@ import {
   TableCell,
   TableRow,
   TextField,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
+import ScreenHeader from "../base/ScreenHeader";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -477,20 +476,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   return (
     <div id="listCard" className="flexContainer screenCustom">
-      <div id="topbar">
-        <Toolbar>
-          <IconButton
-            onClick={onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ArrowBackIosIcon />
-          </IconButton>
-          <Typography variant="h6">Custom setup</Typography>
-        </Toolbar>
-      </div>
+      <ScreenHeader title="Custom setup" onBack={onBack} />
 
       <div className="scrollable">
         <LocationPicker

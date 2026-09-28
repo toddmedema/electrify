@@ -13,19 +13,20 @@ import {
   ListSubheader,
   Menu,
   MenuItem,
-  Toolbar,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import {
+  ChevronDownGlyph,
+  ChevronRightGlyph,
+  ChevronUpGlyph,
+} from "../base/Glyphs";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import SortIcon from "@mui/icons-material/Sort";
 import NavigableCardRow from "../base/NavigableCardRow";
+import ScreenHeader from "../base/ScreenHeader";
 import { getScenarioPlayCounts } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -96,7 +97,7 @@ function MissionSectionHeader(
 ): React.JSX.Element {
   return (
     <ListSubheader disableSticky className="missionSectionHeader">
-      <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 700 }}>
+      <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 600 }}>
         {props.children}
       </Typography>
       {props.action}
@@ -189,7 +190,7 @@ function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
       data-testid={`tutorial-spotlight-${tutorial.id}`}
       className="tutorialSpotlight"
     >
-      <CardActionArea onClick={onSelect} autoFocus aria-label={`Start ${name}`}>
+      <CardActionArea onClick={onSelect} aria-label={`Start ${name}`}>
         <CardHeader
           avatar={
             <Avatar
@@ -201,7 +202,7 @@ function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
           subheader={tutorial.summary}
           action={
             <span className="tutorialSpotlightAction" aria-hidden>
-              Start lesson <ArrowRightIcon fontSize="small" />
+              Start lesson <ChevronRightGlyph fontSize="small" />
             </span>
           }
         />
@@ -302,24 +303,14 @@ export default function NewGame(props: Props): React.JSX.Element {
 
   return (
     <div id="listCard" className="flexContainer screenCatalog">
-      <div id="topbar">
-        <Toolbar>
-          <IconButton
-            onClick={props.onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ArrowBackIosIcon />
-          </IconButton>
-          <Typography component="h1" variant="h6">
-            Choose a game
-          </Typography>
-          {/* Otherwise the Manual is only reachable from the title screen and the in-game
-              overflow menu, so players who stop partway through never find out it exists.
-              Auto margin rather than absolute positioning, so it can't sit on top of the
-              title on narrow screens */}
+      <ScreenHeader
+        title="Choose a game"
+        onBack={props.onBack}
+        trailing={
+          // Otherwise the Manual is only reachable from the title screen and the in-game
+          // overflow menu, so players who stop partway through never find out it exists.
+          // Auto margin rather than absolute positioning, so it can't sit on top of the
+          // title on narrow screens
           <IconButton
             sx={{ marginLeft: "auto" }}
             onClick={props.onManual}
@@ -329,8 +320,8 @@ export default function NewGame(props: Props): React.JSX.Element {
           >
             <HelpOutlineIcon />
           </IconButton>
-        </Toolbar>
-      </div>
+        }
+      />
       <List
         dense
         className="scrollable cardList missionList"
@@ -344,7 +335,7 @@ export default function NewGame(props: Props): React.JSX.Element {
               aria-expanded={showAllTutorials}
               aria-controls="tutorial-catalog"
               endIcon={
-                showAllTutorials ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                showAllTutorials ? <ChevronUpGlyph /> : <ChevronDownGlyph />
               }
             >
               {showAllTutorials
@@ -379,7 +370,7 @@ export default function NewGame(props: Props): React.JSX.Element {
         {showAllTutorials && (
           <div
             id="tutorial-catalog"
-            className="tutorialCatalog"
+            className="tutorialCatalog groupedList"
             role="group"
             aria-label="All tutorials"
           >
@@ -398,7 +389,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             <Button
               size="small"
               startIcon={<SortIcon />}
-              endIcon={<ExpandMoreIcon />}
+              endIcon={<ChevronDownGlyph />}
               onClick={(event) => setChallengeSortAnchor(event.currentTarget)}
               aria-haspopup="menu"
               aria-controls={
@@ -455,7 +446,11 @@ export default function NewGame(props: Props): React.JSX.Element {
             </ToggleButton>
           ))}
         </ToggleButtonGroup>
-        <div id="challenge-catalog" data-testid="challenge-list">
+        <div
+          id="challenge-catalog"
+          className="groupedList"
+          data-testid="challenge-list"
+        >
           {visibleScenarios.map((s) => (
             <MissionListItem
               key={s.id}
@@ -467,12 +462,14 @@ export default function NewGame(props: Props): React.JSX.Element {
           ))}
         </div>
         <MissionSectionHeader>Custom game</MissionSectionHeader>
-        <MissionListItem
-          key={CUSTOM_SCENARIO_ID}
-          s={DEFAULT_CUSTOM_SCENARIO}
-          completed={false}
-          onSelect={props.onCustomGame}
-        />
+        <div className="groupedList">
+          <MissionListItem
+            key={CUSTOM_SCENARIO_ID}
+            s={DEFAULT_CUSTOM_SCENARIO}
+            completed={false}
+            onSelect={props.onCustomGame}
+          />
+        </div>
       </List>
     </div>
   );

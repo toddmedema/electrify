@@ -18,8 +18,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { ChevronDownGlyph, ChevronUpGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
   Draggable,
@@ -285,7 +284,7 @@ function FacilityActions(props: {
       {listLength > 1 && (
         <>
           <Button
-            startIcon={<KeyboardArrowUpIcon />}
+            startIcon={<ChevronUpGlyph />}
             aria-label={
               "Move " + facility.name + " earlier in the dispatch order"
             }
@@ -295,7 +294,7 @@ function FacilityActions(props: {
             <span className="facilityActionLabel">Move up</span>
           </Button>
           <Button
-            startIcon={<KeyboardArrowDownIcon />}
+            startIcon={<ChevronDownGlyph />}
             aria-label={
               "Move " + facility.name + " later in the dispatch order"
             }
@@ -511,9 +510,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
-            {!offlineForWork && (
-              <FlowBar fraction={outputFraction} color={accentColor} />
-            )}
+            {!offlineForWork && <FlowBar fraction={outputFraction} />}
             {!readOnly && (
               <button
                 type="button"
@@ -645,10 +642,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </span>
                   )}
                 </span>
-                <KeyboardArrowDownIcon
-                  className="facilityChevron"
-                  aria-hidden
-                />
+                <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
           </div>

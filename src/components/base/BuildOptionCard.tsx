@@ -9,8 +9,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import { ChevronDownGlyph, ChevronUpGlyph } from "./Glyphs";
 import ConceptIcon from "./ConceptIcon";
 
 export interface BuildOptionCardProps {
@@ -142,9 +141,7 @@ export default function BuildOptionCard(
                   size="small"
                   aria-label={`${expanded ? "Hide" : "Show"} ${name} details`}
                   aria-expanded={expanded}
-                  endIcon={
-                    expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
-                  }
+                  endIcon={expanded ? <ChevronUpGlyph /> : <ChevronDownGlyph />}
                   onClick={(event) => {
                     event.stopPropagation();
                     setExpanded(!expanded);

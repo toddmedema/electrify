@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Card, CardActionArea, CardHeader } from "@mui/material";
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import { ChevronRightGlyph } from "./Glyphs";
 
 export interface NavigableCardRowProps {
   avatar: React.ReactNode;
@@ -55,7 +55,11 @@ export default function NavigableCardRow({
           avatar={avatar}
           title={title}
           subheader={description}
-          action={showChevron && <ArrowRightIcon color="primary" aria-hidden />}
+          action={
+            showChevron && (
+              <ChevronRightGlyph className="rowChevron" aria-hidden />
+            )
+          }
         />
       </CardActionArea>
     </Card>

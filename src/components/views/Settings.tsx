@@ -6,22 +6,20 @@ import {
   Box,
   Button,
   Divider,
-  IconButton,
   Paper,
   Slider,
   Stack,
   Switch,
-  Toolbar,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { ChevronDownGlyph } from "../base/Glyphs";
 import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
+import ScreenHeader from "../base/ScreenHeader";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
@@ -68,12 +66,11 @@ function SettingsGroup({
         id={id}
         component="h2"
         variant="overline"
-        color="text.secondary"
-        sx={{ display: "block", mb: 0.75, px: 0.5, fontWeight: 700 }}
+        className="sectionLabel"
       >
         {title}
       </Typography>
-      <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden" }}>
+      <Paper variant="outlined" className="groupedList">
         {children}
       </Paper>
     </Box>
@@ -155,7 +152,7 @@ function VolumeSlider(props: {
         px: 2,
       }}
     >
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
         {props.label}
       </Typography>
       <Slider
@@ -203,32 +200,7 @@ export default function Settings(props: Props): React.JSX.Element {
 
   return (
     <div className="flexContainer" id="gameCard">
-      <div id="topbar">
-        <Toolbar
-          sx={{ position: "relative", borderBottom: 1, borderColor: "divider" }}
-        >
-          <IconButton
-            onClick={onBack}
-            aria-label="Back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <Typography
-            component="h1"
-            variant="h6"
-            sx={{
-              position: { xs: "absolute", sm: "static" },
-              left: { xs: "50%", sm: "auto" },
-              transform: { xs: "translateX(-50%)", sm: "none" },
-            }}
-          >
-            Settings
-          </Typography>
-        </Toolbar>
-      </div>
+      <ScreenHeader title="Settings" onBack={onBack} />
       <Box
         className="scrollable"
         sx={{
@@ -462,7 +434,7 @@ export default function Settings(props: Props): React.JSX.Element {
               }}
             >
               <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
+                expandIcon={<ChevronDownGlyph className="rowChevron" />}
                 aria-controls="keyboard-shortcuts-content"
                 id="keyboard-shortcuts-summary"
                 sx={{ minHeight: 56, px: 2 }}

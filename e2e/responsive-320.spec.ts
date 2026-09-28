@@ -53,9 +53,11 @@ test("custom setup and settings stay usable on a 320px phone", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  // A touch-only phone has no keyboard to take shortcuts from
   await expect(
     page.getByRole("heading", { name: "Keyboard shortcuts" }),
-  ).toBeVisible();
+  ).toBeHidden();
   const settingsOverflow = await page
     .locator(".scrollable")
     .evaluate((element) =>

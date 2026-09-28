@@ -1113,10 +1113,11 @@ export default function CustomerPrograms({
             : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
-        variant="contained"
+        variant="outlined"
+        startIcon={<GroupsIcon />}
         onClick={() => setOpen(true)}
       >
-        <GroupsIcon />
+        Programs
       </Button>
       {open && (
         <ProgramsScreen

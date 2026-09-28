@@ -130,7 +130,8 @@ for (const theme of ["light", "dark"]) {
             document.querySelector(selector)!.getBoundingClientRect().height,
         ),
       );
-      expect(heights).toEqual([56, 56, 56]);
+      // Grid health and the mission share one 44px status row under the 56px app bar
+      expect(heights).toEqual([56, 44, 44]);
     }
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
