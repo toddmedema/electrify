@@ -69,7 +69,9 @@ The EIA AEO2025 reference designs also update:
   equivalent start for the 419 MW reference plant, scaled linearly for the player's chosen size.
   The build quote adds one start per day ($8.432 million/year for the reference plant) to make the
   tradeoff legible, while live play charges only on actual off-to-on edges. Because one simulated
-  day represents a month, each visible edge represents 365/12 equivalent starts.
+  day represents a month, each visible edge represents 365/12 equivalent starts. Coal's quote
+  assumes 20 starts a year instead, within the 10-50 that NREL's cycling-cost and WWSIS Phase 2
+  studies report for large coal units; a daily start had added ~$5/MWh to its quoted LCOE.
 - Oil: the matched EIA commercial Oil reciprocating-engine case reports $24/kW-year fixed O&M and
   $20/MWh variable O&M in 2015 dollars. Annual-average CPI-U (`304.702 / 237.017`) converts these
   to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and

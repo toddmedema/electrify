@@ -365,6 +365,9 @@ export function GENERATORS(
       // NREL's conservative hot-start case, normalized from 2011$ to 2023$ with annual-average
       // CPI-U and scaled by nameplate MW. Fuel input and EFOR effects are deliberately excluded.
       costPerStart: COAL_START_COST_PER_MW_2023 * (peakW / 1000000),
+      // Large coal units start about 10-50 times a year (NREL Power Plant Cycling Costs; Western
+      // Wind and Solar Integration Study Phase 2), not daily like a peaker.
+      assumedStartsPerYear: 20,
       yearsToBuild: 4 + magnitude / 3,
       // AEO2025 reference lead time is 60 months and operating life is 40 years.
       constructionKgco2ePerW: 0.32,

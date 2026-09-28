@@ -173,6 +173,16 @@ describe("LCWH", () => {
     );
   });
 
+  it("quotes a technology's own typical start count when it has one", () => {
+    const coal = {
+      ...generator,
+      annualOperatingCost: 0,
+      costPerStart: 52662,
+      assumedStartsPerYear: 20,
+    };
+    expect(estimatedAnnualOperatingCost(coal)).toBeCloseTo(52662 * 20, 6);
+  });
+
   it("quotes start maintenance at one start per day", () => {
     const peaker = {
       ...generator,

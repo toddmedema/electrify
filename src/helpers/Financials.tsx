@@ -229,12 +229,19 @@ export function LCWH(
 // The build quote needs one legible operating pattern. A daily start matches a peaking turbine
 // that shuts down overnight, and turns EIA's per-start maintenance value into an annual estimate;
 // live play still charges only when the facility actually crosses from off to generating.
+// Technologies with a different typical duty set assumedStartsPerYear instead.
 export const ASSUMED_STARTS_PER_YEAR = 365;
 
 export function estimatedAnnualStartCost(
-  generator: Pick<GeneratorShoppingType, "costPerStart">,
+  generator: Pick<
+    GeneratorShoppingType,
+    "costPerStart" | "assumedStartsPerYear"
+  >,
 ): number {
-  return (generator.costPerStart || 0) * ASSUMED_STARTS_PER_YEAR;
+  return (
+    (generator.costPerStart || 0) *
+    (generator.assumedStartsPerYear ?? ASSUMED_STARTS_PER_YEAR)
+  );
 }
 
 export function estimatedAnnualVariableOperatingCost(
@@ -255,6 +262,7 @@ export function estimatedAnnualOperatingCost(
   generator: Pick<
     GeneratorShoppingType,
     | "annualOperatingCost"
+    | "assumedStartsPerYear"
     | "capacityFactor"
     | "costPerStart"
     | "peakW"

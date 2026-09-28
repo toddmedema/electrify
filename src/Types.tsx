@@ -654,6 +654,10 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Non-fuel expense charged for one physical start. Only present when the technology's source
   // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
+  // How many starts a year the build quote assumes when annualizing costPerStart. Absent means
+  // one a day (ASSUMED_STARTS_PER_YEAR), the peaking turbine's duty; live play charges actual
+  // starts either way.
+  assumedStartsPerYear?: number;
   // Non-fuel O&M charged against actual generation. Technologies without a separately sourced
   // variable component annualize all non-fuel operating expense into annualOperatingCost.
   variableOperatingCostPerMWh?: number;
