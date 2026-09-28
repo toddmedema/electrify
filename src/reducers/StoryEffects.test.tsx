@@ -123,7 +123,9 @@ describe("story effects in dispatch", () => {
     while (game.date.monthsElapsed < 95) {
       tickState(game);
     }
-    expect(game.speed).toBe("NORMAL");
+    // The recorded 2013 gas price crosses coal's cost here, and a fuel crossover deliberately
+    // pauses. Resume so that only the freeze itself can pause the game below.
+    game.speed = "NORMAL";
 
     while (game.date.monthsElapsed < 96) {
       tickState(game);

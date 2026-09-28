@@ -4346,8 +4346,21 @@ function updateSupplyFacilitiesFinances(
         }
       }
     } else {
-      facilityExpenses =
-        getPaymentInterest(g.loanAmountLeft, g.interestRate) / ticksPerMonth;
+      // Full amortizing payments start with the loan, as the purchase screen quotes and as
+      // interties already do: construction is not an interest-only holiday.
+      const paymentInterest = getPaymentInterest(
+        g.loanAmountLeft,
+        g.interestRate,
+      );
+      if (g.loanAmountLeft > 0) {
+        const paymentPrincipal = Math.min(
+          (g.loanMonthlyPayment - paymentInterest) / ticksPerMonth,
+          g.loanAmountLeft,
+        );
+        principalRepayment += paymentPrincipal;
+        g.loanAmountLeft -= paymentPrincipal;
+      }
+      facilityExpenses = paymentInterest / ticksPerMonth;
       expensesInterest += facilityExpenses;
       // A half-built plant is already costing interest, and a row that only started counting on
       // the day it switched on would hide the cheapest place to notice that

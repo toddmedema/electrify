@@ -46,6 +46,29 @@ describe("buildFacility", () => {
     }
   });
 
+  it("amortizes a build loan during construction, as quoted", () => {
+    const before = createGame({ scenarioId: 103 });
+    const generator = aGeneratorToBuild(before);
+    const state = cloneDeep(
+      gameReducer(
+        before,
+        buildFacility({ facility: generator, financed: true }),
+      ),
+    );
+    const built = state.facilities.find((f) => f.yearsToBuildLeft > 0)!;
+    const borrowed = built.loanAmountLeft;
+    for (let i = 0; i < TICKS_PER_MONTH; i++) {
+      tickState(state);
+    }
+    expect(built.yearsToBuildLeft).toBeGreaterThan(0);
+    // About one month's full payment minus its interest comes off the principal (the month
+    // boundary's pre-roll frames make it slightly more than exactly one)
+    const interest = borrowed * (built.interestRate / 12);
+    const repaid = borrowed - built.loanAmountLeft;
+    expect(repaid / (built.loanMonthlyPayment - interest)).toBeGreaterThan(0.9);
+    expect(repaid / (built.loanMonthlyPayment - interest)).toBeLessThan(1.1);
+  });
+
   it.each([false, true])(
     "preserves project equity during construction (financed: %s)",
     (financed) => {
