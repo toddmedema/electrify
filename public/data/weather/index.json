@@ -2880,6 +2880,57 @@
       "elevation": 47,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Shanghai": {
+      "id": "Shanghai",
+      "name": "Shanghai, China",
+      "region": "East Asia",
+      "country": "China",
+      "lat": 31.2304,
+      "long": 121.4737,
+      "timeZone": "Asia/Shanghai",
+      "elevation": 5,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Guangzhou": {
+      "id": "Guangzhou",
+      "name": "Guangzhou, China",
+      "region": "East Asia",
+      "country": "China",
+      "lat": 23.1291,
+      "long": 113.2644,
+      "timeZone": "Asia/Shanghai",
+      "elevation": 17,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Shenzhen": {
+      "id": "Shenzhen",
+      "name": "Shenzhen, China",
+      "region": "East Asia",
+      "country": "China",
+      "lat": 22.5431,
+      "long": 114.0579,
+      "timeZone": "Asia/Shanghai",
+      "elevation": 13,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Chengdu": {
+      "id": "Chengdu",
+      "name": "Chengdu, China",
+      "region": "East Asia",
+      "country": "China",
+      "lat": 30.5728,
+      "long": 104.0668,
+      "timeZone": "Asia/Shanghai",
+      "elevation": 485,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }

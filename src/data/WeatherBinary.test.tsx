@@ -224,6 +224,7 @@ describe("the shipped weather files", () => {
     "Chennai",
     "Chittagong",
     "Colombo",
+    "Guangzhou",
     "Durban",
     "Fukuoka",
     "Seville",
@@ -241,6 +242,8 @@ describe("the shipped weather files", () => {
     "Reykjavik",
     "Sapporo",
     "Seoul",
+    "Shanghai",
+    "Shenzhen",
     "Busan",
     "Tokyo",
   ];
