@@ -302,8 +302,11 @@ describe("hail damage", () => {
     const continued = cloneDeep(state);
     const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
     expect(saved).not.toBeNull();
-    const restored = cloneDeep(gameReducer(undefined, resume(saved!.game)));
+    // Play each game to the end before starting the other: the reducer's month-to-month fuel
+    // price log is module state that a resume resets, so interleaving the two would compare
+    // the restored game's first month against the continued game's last.
     tickToMonth(continued, HAIL.month + 3);
+    const restored = cloneDeep(gameReducer(undefined, resume(saved!.game)));
     tickToMonth(restored, HAIL.month + 3);
     expect(restored.worldEvents.occurrences).toEqual(
       continued.worldEvents.occurrences,

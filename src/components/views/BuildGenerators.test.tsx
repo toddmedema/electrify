@@ -141,8 +141,9 @@ describe("the three-year build forecast", () => {
   });
 });
 
+// The O&M tests below use a 2024 start, which prices at the tables' published 2023 dollars.
 it("shows natural-gas base, per-start, and daily-start estimated O&M", async () => {
-  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const game = createGame({ scenarioId: 111, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
     (candidate) => candidate.name === "Natural Gas",
   );
@@ -172,7 +173,12 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
   expect(
     screen.getByRole("row", {
-      name: /Base O&M.*\$4\.93M/,
+      name: /Fixed O&M.*\$2\.88M/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Variable O&M.*\$1\.24\/MWh/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -214,7 +220,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 }, 15000);
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
-  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const game = createGame({ scenarioId: 111, difficulty: "CEO" });
   const generator = GENERATORS(game, 650000000, [], []).find(
     (candidate) => candidate.name === "Coal",
   );
@@ -242,7 +248,7 @@ it("shows Coal's start charge without the representative-day breakdown", () => {
 });
 
 it("shows Oil's fixed, variable, and expected-output O&M", () => {
-  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const game = createGame({ scenarioId: 111, difficulty: "CEO" });
   const generator = GENERATORS(game, 100000000, [], []).find(
     (candidate) => candidate.name === "Oil",
   );

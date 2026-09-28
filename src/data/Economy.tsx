@@ -42,7 +42,8 @@ const EARLIEST_DATA_YEAR = 1975;
 const BASE_PRIME = 0.05;
 const MIN_PRIME = 0.0325;
 const MAX_PRIME = 0.15;
-const BASE_INFLATION = 0.025;
+// Exported as the long-run price level the fuel trend escalates with (TREND_ESCALATION_YEARLY)
+export const BASE_INFLATION = 0.025;
 const MIN_INFLATION = -0.01;
 const MAX_INFLATION = 0.14;
 
@@ -400,4 +401,78 @@ export function getInflationIndex(
     index *= 1 + getInflationRate({ year: y, monthNumber }, seed) / 12;
   }
   return inflationIndex[year][date.monthNumber];
+}
+
+// Annual-average U.S. CPI-U (1982-84 = 100), BLS series CUUR0000SA0:
+// https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm
+const CPI_U_ANNUAL_AVERAGE: Record<number, number> = {
+  1975: 53.8,
+  1976: 56.9,
+  1977: 60.6,
+  1978: 65.2,
+  1979: 72.6,
+  1980: 82.4,
+  1981: 90.9,
+  1982: 96.5,
+  1983: 99.6,
+  1984: 103.9,
+  1985: 107.6,
+  1986: 109.6,
+  1987: 113.6,
+  1988: 118.3,
+  1989: 124.0,
+  1990: 130.7,
+  1991: 136.2,
+  1992: 140.3,
+  1993: 144.5,
+  1994: 148.2,
+  1995: 152.4,
+  1996: 156.9,
+  1997: 160.5,
+  1998: 163.0,
+  1999: 166.6,
+  2000: 172.2,
+  2001: 177.1,
+  2002: 179.9,
+  2003: 184.0,
+  2004: 188.9,
+  2005: 195.3,
+  2006: 201.6,
+  2007: 207.342,
+  2008: 215.303,
+  2009: 214.537,
+  2010: 218.056,
+  2011: 224.939,
+  2012: 229.594,
+  2013: 232.957,
+  2014: 236.736,
+  2015: 237.017,
+  2016: 240.007,
+  2017: 245.12,
+  2018: 251.107,
+  2019: 255.657,
+  2020: 258.811,
+  2021: 270.97,
+  2022: 292.655,
+  2023: 304.702,
+};
+
+/** The dollar year the facility cost tables are written in. */
+export const COST_TABLE_DOLLAR_YEAR = 2023;
+
+/**
+ * Converts a 2023-dollar cost into a starting year's own dollars, using recorded CPI-U. Fuel and
+ * retail rates are nominal in every historical year, so capital and O&M have to be too: a 1980
+ * run paying 2023-dollar capex against 1980 fuel and tariffs would face plants ~3.7x too dear.
+ * Starts from 2023 on are already in (or beyond) the tables' money and hold at 1; the game's own
+ * inflation index carries costs forward from there.
+ */
+export function getCostTableDeflator(startingYear: number): number {
+  if (startingYear >= COST_TABLE_DOLLAR_YEAR) {
+    return 1;
+  }
+  const year = Math.max(startingYear, 1975);
+  return (
+    CPI_U_ANNUAL_AVERAGE[year] / CPI_U_ANNUAL_AVERAGE[COST_TABLE_DOLLAR_YEAR]
+  );
 }

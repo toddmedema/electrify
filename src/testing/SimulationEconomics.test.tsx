@@ -88,7 +88,7 @@ describe("simulation economics", () => {
     const shortcut = runSimulation({
       scenarioId: 104,
       difficulty: "CEO",
-      dollarsPerkWh: 0.08,
+      dollarsPerkWh: 0.12,
     });
     expectNoViolations(shortcut);
     expect(shortcut.actionCount).toBe(1);

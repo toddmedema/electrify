@@ -19,6 +19,7 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
   estimatedAnnualVariableOperatingCost,
+  facilityLoanMonths,
   purchaseTerms,
 } from "../../helpers/Financials";
 import {
@@ -663,6 +664,7 @@ export function GeneratorBuildItem(
         cash={cash}
         buildCost={quote.buildCost}
         interestRate={props.interestRate}
+        loanMonths={facilityLoanMonths(quote.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
         upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}

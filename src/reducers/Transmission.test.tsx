@@ -31,6 +31,7 @@ import {
   TickPresentFutureType,
 } from "../Types";
 import { getScenario } from "../data/Scenarios";
+import { getCostTableDeflator } from "../data/Economy";
 import {
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
@@ -289,7 +290,11 @@ describe("transmission actions", () => {
       tickMWh(now.importedW!) * offer.pricePerMWh,
       6,
     );
-    expect(now.expensesOM).toBeCloseTo(1080000 / TICKS_PER_YEAR, 5);
+    // Authored 2023-dollar O&M, deflated into the scenario's 2020 opening dollars
+    expect(now.expensesOM).toBeCloseTo(
+      (1080000 * getCostTableDeflator(state.startingYear)) / TICKS_PER_YEAR,
+      5,
+    );
     expect(now.expensesInterest).toBeGreaterThan(0);
     expect(line.loanAmountLeft).toBeLessThan(debtBefore);
     expect(now.cash).toBe(

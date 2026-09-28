@@ -1,7 +1,7 @@
 import {
   DAYS_PER_YEAR,
   DOWNPAYMENT_PERCENT,
-  FUELS,
+  feeableKgCO2ePerBtu,
   HOURS_PER_YEAR_REAL,
   LOAN_MONTHS,
 } from "../Constants";
@@ -21,6 +21,22 @@ import {
   reduceHistories,
 } from "./DateTime";
 import { pow } from "./Pow";
+
+// Project finance tenors run shorter than the asset: about 15-20 years for renewables and storage.
+const LOAN_TENOR_SHARE_OF_LIFE = 0.8;
+
+/**
+ * A facility build loan's term: the standard LOAN_MONTHS, but never beyond 80% of the asset's
+ * life, so a 20-year battery or 25-year wind farm is not still amortizing debt after its resale
+ * value has reached zero.
+ */
+export function facilityLoanMonths(lifespanYears: number): number {
+  if (!(lifespanYears > 0)) return LOAN_MONTHS;
+  return Math.min(
+    LOAN_MONTHS,
+    Math.round(lifespanYears * 12 * LOAN_TENOR_SHARE_OF_LIFE),
+  );
+}
 
 // Get the monthly payment amount for a new loan
 // https://codepen.io/joeymack47/pen/fHwvd?editors=1010
@@ -54,13 +70,15 @@ export interface PurchaseTermsType {
 /**
  * The one place the cash-or-loan arithmetic lives, shared by the reducer (which books it) and the
  * purchase dialogs (which quote it). `refinancedBalance` is an existing loan rolled into the new
- * one at today's rate and the standard term, as an intertie upgrade does.
+ * one at today's rate and the standard term, as an intertie upgrade does. `loanMonths` is the
+ * loan's term; facilities pass facilityLoanMonths so the debt never outlives most of the asset.
  */
 export function purchaseTerms(
   buildCost: number,
   financed: boolean,
   interestRate: number,
   refinancedBalance = 0,
+  loanMonths = LOAN_MONTHS,
 ): PurchaseTermsType {
   if (!financed) {
     return {
@@ -79,7 +97,7 @@ export function purchaseTerms(
     monthlyPayment: getMonthlyPayment(
       refinancedBalance + loanAmount,
       interestRate,
-      LOAN_MONTHS,
+      loanMonths,
     ),
   };
 }
@@ -195,7 +213,22 @@ export function getCreditInputs(
   };
 }
 
-// Fuel prices stay at the current forecast value across the quoted lifetime.
+/** Annual payment per dollar of capital that repays it over `years` at `rate`. */
+export function capitalRecoveryFactor(rate: number, years: number): number {
+  if (!(years > 0)) return 1;
+  // exp/log1p rather than a power: V8 evaluates those with its own fdlibm port, so the result is
+  // the same on every platform (see helpers/Pow on the coordinator branch)
+  return rate > 0
+    ? rate / (1 - Math.exp(-years * Math.log1p(rate)))
+    : 1 / years;
+}
+
+/**
+ * Levelized cost per Wh. Capital is annualized with a capital recovery factor at
+ * `discountRate` (the company's borrowing rate in play), as NREL ATB, Lazard and EIA levelize:
+ * an undiscounted average made capital-heavy, long-lived plants look 2-3x cheaper than any
+ * published LCOE. Fuel prices stay at the current forecast value across the quoted lifetime.
+ */
 export function LCWH(
   g: GeneratorShoppingType,
   date: DateType,
@@ -203,8 +236,9 @@ export function LCWH(
   seed: number,
   location?: LocationType,
   feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
+  discountRate = 0,
 ) {
-  const kgCO2ePerBtu = FUELS[g.fuel]?.kgCO2ePerBtu ?? 0;
+  const kgCO2ePerBtu = feeableKgCO2ePerBtu(g.fuel);
   const fuelCostPerWh =
     ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
     1000000;
@@ -233,23 +267,34 @@ export function LCWH(
   );
   const totalWh =
     g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
-  const costPerWh =
-    (g.buildCost +
-      estimatedAnnualOperatingCost(g) * g.lifespanYears +
-      (fuelCostPerWh + carbonCostPerWh) * totalWh) /
-    totalWh;
-  return costPerWh;
+  // Averaged over the design life; with no discounting this is exactly
+  // (build + O&M x life + fuel and carbon x lifetime Wh) / lifetime Wh
+  const annualWh = totalWh / g.lifespanYears;
+  return (
+    (g.buildCost * capitalRecoveryFactor(discountRate, g.lifespanYears) +
+      estimatedAnnualOperatingCost(g)) /
+      annualWh +
+    fuelCostPerWh +
+    carbonCostPerWh
+  );
 }
 
 // The build quote needs one legible operating pattern. A daily start matches a peaking turbine
 // that shuts down overnight, and turns EIA's per-start maintenance value into an annual estimate;
 // live play still charges only when the facility actually crosses from off to generating.
+// Technologies with a different typical duty set assumedStartsPerYear instead.
 export const ASSUMED_STARTS_PER_YEAR = 365;
 
 export function estimatedAnnualStartCost(
-  generator: Pick<GeneratorShoppingType, "costPerStart">,
+  generator: Pick<
+    GeneratorShoppingType,
+    "costPerStart" | "assumedStartsPerYear"
+  >,
 ): number {
-  return (generator.costPerStart || 0) * ASSUMED_STARTS_PER_YEAR;
+  return (
+    (generator.costPerStart || 0) *
+    (generator.assumedStartsPerYear ?? ASSUMED_STARTS_PER_YEAR)
+  );
 }
 
 export function estimatedAnnualVariableOperatingCost(
@@ -270,6 +315,7 @@ export function estimatedAnnualOperatingCost(
   generator: Pick<
     GeneratorShoppingType,
     | "annualOperatingCost"
+    | "assumedStartsPerYear"
     | "capacityFactor"
     | "costPerStart"
     | "peakW"

@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { purchaseTerms } from "../../helpers/Financials";
+import { facilityLoanMonths, purchaseTerms } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
   formatMoneyConcise,
@@ -198,6 +198,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         cash={cash}
         buildCost={storage.buildCost}
         interestRate={props.interestRate}
+        loanMonths={facilityLoanMonths(storage.lifespanYears)}
         cashDisabled={!buildable}
         loanDisabled={!buildable}
         upkeepPerMonth={storage.annualOperatingCost / 12}

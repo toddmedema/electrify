@@ -1038,7 +1038,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2020,
     cash: 330000000,
     feePerKgCO2e: 50 / 1000,
-    dollarsPerkWh: 0.05,
+    dollarsPerkWh: 0.11, // 0.6 x EIA 2020 CA average retail, 18.0 cents
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
@@ -1063,7 +1063,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2006,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.03,
+    dollarsPerkWh: 0.05, // 0.6 x EIA 2006 PA average retail, 8.68 cents
     durationMonths: 12 * 20,
     facilities: [{ fuel: "Coal", peakW: 500000000, initialAgeYears: 25 }],
   },
@@ -1084,7 +1084,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2004,
     cash: 275000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.094, // 0.6 x EIA 2004 HI average retail, 15.7 cents
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
@@ -1111,7 +1111,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2002,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.02,
+    dollarsPerkWh: 0.07, // 0.6 x EIA 2002 CA average retail, 12.19 cents
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Uranium", peakW: 400000000, initialAgeYears: 15 },
@@ -1136,7 +1136,9 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2000,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.05,
+    // About 0.6 x PREPA's oil-indexed tariff, which ran roughly twice the 2000 U.S. average
+    // (6.81 cents): an island burning distillate cannot sell generation at mainland prices.
+    dollarsPerkWh: 0.08,
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },
@@ -1163,7 +1165,7 @@ export const SCENARIOS: ScenarioType[] = [
     // CEO balance gate intact: a passive fleet still runs out of runway before year twenty.
     cash: 160000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.025,
+    dollarsPerkWh: 0.033, // 0.6 x 1980 US retail scaled by PA/US in 1990 (7.65 / 6.57)
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Coal", peakW: 200000000, initialAgeYears: 35 },
@@ -1205,6 +1207,9 @@ export const SCENARIOS: ScenarioType[] = [
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
     minimumCustomerRetention: 0.9,
+    // Manassas City Utilities' researched average tariff. The two researched public-utility
+    // scenarios keep their calibrated full tariffs rather than the 60% generation-share convention
+    // (docs/facilities-economics.md): their demand, fleet and choice balance are fitted to them.
     dollarsPerkWh: 0.1,
     cash: 25000000,
     feePerKgCO2e: 0,
@@ -1264,6 +1269,7 @@ export const SCENARIOS: ScenarioType[] = [
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
     // Calibrated without utility-emissions weather forcing; representative days remain approximate.
     startingDemandScale: 7.75,
+    // Austin Energy's researched average tariff; see the Manassas note above.
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,

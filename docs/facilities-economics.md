@@ -7,8 +7,11 @@ estimates and 2024 for IRENA's global deployment data.
 
 The previous model mixed figures from several dollar years. This refresh separates two effects:
 
-1. Published observations are converted to the newer report's dollars with annual-average U.S.
-   CPI-U (2019: 255.657; 2020: 258.811; 2023: 304.702; 2024: 313.689).
+1. Published observations are converted to one vintage, 2023 dollars, with annual-average U.S.
+   CPI-U (2019: 255.657; 2020: 258.811; 2023: 304.702; 2024: 313.689; 2025: 321.943). The
+   IRENA and NREL 2024-dollar curves (wind, solar, hydro, geothermal, battery) are multiplied by
+   `304.702 / 313.689`, and EIA's 2025-dollar biomass plant by `304.702 / 321.943`. The table
+   below quotes each source in its own dollars.
 2. The remaining change is treated as a real technology-cost trend. The game's own inflation
    multiplier is still applied later, so inflation is not counted twice.
 
@@ -16,12 +19,18 @@ Capital costs use exponential interpolation between observations. Costs are held
 observation before the comparison window and at the latest observation afterward, except for wind
 and solar: IRENA publishes five-year outlook values for those technologies, so they continue to
 those values through 2029 and then stop. Pre-2020 wind and solar retain the game's historical
-learning curves, re-anchored to the inflation-normalized 2020 observation.
+learning curves, re-anchored to the inflation-normalized 2020 observation. Pre-2020 batteries
+double in cost every 4.5 years back from 2020 (about $2/Wh in 2010, consistent with BNEF pack prices
+of $1,100-1,400/kWh then plus balance of system) instead of being held at the 2020 price.
 
 Published costs are for reference projects, while the player can choose almost any plant size. The
-model therefore treats 25% of the reference project as fixed and 75% as capacity-proportional. This
-preserves the existing economies-of-scale mechanic and makes every reference-sized facility equal
-the cited total installed cost.
+model therefore treats a technology-specific share of the reference project as fixed and the rest
+as capacity-proportional, so every reference-sized facility equals the cited total installed cost.
+The shares follow how much scale actually matters: solar 1%, onshore wind 2%, offshore wind 3% and
+airborne wind 5% (LBNL's utility-scale solar and land-based wind reports put 5-20 MW projects only
+~10-40% above 100 MW-plus ones); coal, nuclear and gas 12%; hydro and geothermal 15%; biomass and
+oil keep 25%. A flat 25% had made a 10 MW solar farm cost 4.5x its reference price per watt and an
+early 5 MW offshore farm over $30/W.
 
 ## What changed in real terms
 
@@ -45,10 +54,12 @@ detailed design is used for duration, life, construction time, and augmentation 
 
 ## Operating and performance logic
 
-Most generator records retain one annual non-fuel O&M field: where a source separates fixed O&M
-in $/kW-year and variable O&M in $/MWh, the variable amount remains annualized at the modeled
-capacity factor for those technologies. Oil is the explicit exception described below. Actual fuel
-and carbon expenses remain separate for every generator.
+Where a source separates fixed O&M in $/kW-year from variable O&M in $/MWh, the fixed part is
+charged on standing capacity and the variable part on energy actually generated: coal $6.40, nuclear
+$2.52, natural gas $1.24 and biomass $5.61 per MWh (2023$), plus oil as described below. An idle or
+paused plant therefore pays no variable O&M, and the keep-online versus restart decision counts it.
+Build quotes still annualize it at the modeled capacity factor. Actual fuel and carbon expenses
+remain separate for every generator.
 
 The EIA AEO2025 reference designs also update:
 
@@ -60,20 +71,23 @@ The EIA AEO2025 reference designs also update:
   equivalent start for the 419 MW reference plant, scaled linearly for the player's chosen size.
   The build quote adds one start per day ($8.432 million/year for the reference plant) to make the
   tradeoff legible, while live play charges only on actual off-to-on edges. Because one simulated
-  day represents a month, each visible edge represents 365/12 equivalent starts.
+  day represents a month, each visible edge represents 365/12 equivalent starts. Coal's quote
+  assumes 20 starts a year instead, within the 10-50 that NREL's cycling-cost and WWSIS Phase 2
+  studies report for large coal units; a daily start had added ~$5/MWh to its quoted LCOE.
 - Oil: the matched EIA commercial Oil reciprocating-engine case reports $24/kW-year fixed O&M and
   $20/MWh variable O&M in 2015 dollars. Annual-average CPI-U (`304.702 / 237.017`) converts these
   to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and
   variable O&M is charged against actual representative-month generation. A 100 MW build at the
   modeled 20% capacity factor therefore quotes $3.085 million/year fixed plus $4.505 million/year
-  variable, or $7.590 million/year before difficulty and later game inflation. Those multipliers
-  are persisted at construction.
+  variable, or $7.590 million/year before difficulty and later game inflation. Difficulty is
+  persisted at construction; the quote then escalates with game inflation from the purchase month.
 - Onshore wind: $33.06/kW-year fixed O&M, 21-month reference lead time, and 25-year life.
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
 - Solar: $20.23/kW-year fixed O&M, 36-month reference lead time, and 35-year life.
-- Hydro: $33.54/kW-year fixed O&M, 72-month reference lead time, 48% global capacity factor, and
-  50-year life.
+- Hydro: $33.54/kW-year fixed O&M, 72-month reference lead time, a 40% target capacity factor
+  (`HYDRO_TARGET_CAPACITY_FACTOR`, used for sizing, the quote and LCOE; IRENA's global fleet
+  average is nearer 48%, but individual sites are sized against their own river), and 50-year life.
 - Conventional geothermal: $150.60/kW-year fixed O&M, 36-month lead time, 88% global capacity
   factor, and 40-year life.
 
@@ -176,7 +190,7 @@ The simulation now distinguishes three aging effects that were previously easy t
 At 0.5% annual degradation, solar retains `0.995^20 = 90.5%` of its original output after 20
 years—about a 9.5% loss, not 20%. Weather and curtailment still vary actual production around that
 aged maximum. The build screen's lifetime cost integrates the same compounding output curve. Fixed
-annual O&M remains flat; Oil variable O&M, fuel, and carbon costs scale only with energy actually
+annual O&M does not fall with output but escalates with inflation from purchase; Oil variable O&M, fuel, and carbon costs scale only with energy actually
 produced.
 
 Scenario starting ages are deliberately authored rather than inferred from technology or scenario
@@ -227,8 +241,8 @@ Coal uses NREL's conservative hot-start values for 500-1,300 MW supercritical un
 of capitalized cycling and maintenance plus $5.81/MW-start of auxiliary operations, chemicals,
 water, and additives. Converting 2011 dollars with CPI-U (`304.702 / 224.939`) gives
 $81.0185278/MW-start in 2023 dollars, or $52,662.04 for the game's 650 MW reference plant before
-difficulty and game inflation. The resulting cost is fixed when the facility is created and is not
-repriced each month. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
+difficulty and game inflation. The resulting cost is quoted when the facility is created and then escalates with game
+inflation, like every other non-fuel operating cost. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
 
 Natural Gas alone shows the 900-start hot-gas-path and 1,800-start major-inspection context. Those
 intervals do not trigger a second refurbishment bill: EIA's per-start value is already the
@@ -250,11 +264,35 @@ No additional facility type is added in this pass:
 - Fixed-bottom offshore wind is already represented by the separately researched Offshore Wind
   facility, so it is retained rather than duplicated here.
 
+## Money vintages, fuel prices and retail rates
+
+Everything a run pays or earns is in the same nominal dollars:
+
+- **Capital and O&M tables** are 2023 dollars. A run starting before 2023 deflates them into its
+  starting year's dollars with recorded annual CPI-U (`getCostTableDeflator`), then the game's
+  inflation index carries them forward. A 1980 start pays 27% of the table value, a 2006 start
+  66%; 2023 and later starts pay the table.
+- **Fuel** is the monthly U.S. cost delivered to electric generating plants (EIA Monthly Energy
+  Review Table 9.9) for coal, natural gas and, from 2001, distillate oil. Pre-2001 oil is the
+  earlier imported-crude record times the measured 1.415 distillate/crude ratio. Uranium is
+  reactor fuel (ore at ~177 MMBtu per lb U3O8 plus $0.40/MMBtu of conversion, enrichment and
+  fabrication), about $6.6/MWh in 2019. Regional multipliers in `LocationProfiles.tsx` are
+  ratios to this U.S. delivered series.
+- **Opening retail rates** for U.S. scenarios are 60% of the EIA average retail price for that
+  state and year (all sectors, `avgprice_annual.xlsx`), falling back to the national MER Table 9.8
+  value scaled by the state's 1990 ratio. The game carries no distribution network costs, so the
+  rate is the generation-plus-transmission share: EIA's energy-only providers charged 59% of full
+  retail nationally in 2020. Tutorials keep their authored teaching rates, and non-U.S. scenarios
+  keep their researched local rates. The two researched U.S. public utilities (Data Center Boom,
+  Deep Freeze) also keep their utilities' own average tariffs for now, because their demand,
+  fleets and choice balance are calibrated to them; moving them to the generation share needs its
+  own rebalance of those calibrations.
+
 ## Simulation and teaching boundaries
 
 Purchase reviews lead with down payment, monthly payment and estimated upkeep; detailed plant
 operation and loan terms are optional. Starts, ramps, water releases and underwriting remain
-automatic. Loan payments begin during construction. LCOE excludes loan interest and holds quoted
+automatic. Loan payments begin during construction, and a build loan runs 30 years or 80% of the asset's life, whichever is shorter (16 years for a battery, 20 for wind). LCOE annualizes capital with a capital recovery factor at the company's borrowing rate (7% before a rate exists) and holds quoted
 fuel-price assumptions; neither it nor the five-year fixed-use economic comparison guarantees
 future costs. Site counts are projects available in this game, not a site survey. Displayed
 accounting life controls depreciation and estimates, not automatic retirement.
@@ -265,7 +303,7 @@ regrowth credit. Geothermal assumes binary generation with no venting for emissi
 some cost/lifetime references describe dual-flash technology. This is a coarse technology model,
 not a harmonized plant engineering specification. Imported electricity uses separately sourced
 fixed generation proxies in `ImportEmissions.ts` (mostly CO2; Québec reports GHG CO2e). Both local
-and imported amounts affect score, while carbon fees charge only local generation. Construction,
+and imported amounts affect score, while carbon fees charge only local fossil generation: biogenic biomass CO2 counts towards the score but, as under EU ETS, RGGI, UK ETS and Canada's carbon pricing, pays no fee. Construction,
 upstream supply chains and land-use emissions are omitted; zero operating emissions is not zero
 lifecycle impact.
 

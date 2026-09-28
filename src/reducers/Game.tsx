@@ -76,11 +76,18 @@ import {
   getCreditInputs,
   getCreditPremium,
   purchaseTerms,
+  facilityLoanMonths,
   getPaymentInterest,
   facilityOutputFactor,
   estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
-import { getInflationRate, getPrimeRate } from "../data/Economy";
+import {
+  getCostTableDeflator,
+  getInflationIndex,
+  getInflationRate,
+  getPrimeRate,
+  hasEconomy,
+} from "../data/Economy";
 import {
   CUSTOMER_MARKET_MULTIPLIER,
   customerMarketSizeAt,
@@ -212,6 +219,7 @@ import {
   DAYS_PER_YEAR,
   DIFFICULTIES,
   FUELS,
+  feeableKgCO2ePerBtu,
   GAME_TO_REAL_YEARS,
   INTEREST_RATE_YEARLY,
   ORGANIC_GROWTH_MAX_ANNUAL,
@@ -509,7 +517,7 @@ function generatorCostPerMWh(
   const carbonCost =
     generator.btuPerWh *
     WH_PER_MWH *
-    (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
+    feeableKgCO2ePerBtu(generator.fuel) *
     feePerKgCO2e;
   return (
     (estimatedAnnualOperatingCost(generator) * operatingCostMultiplier) /
@@ -3585,6 +3593,22 @@ function reforecastDemand(
   });
 }
 
+/**
+ * How far a facility's non-fuel operating costs have escalated since it was bought. Its O&M,
+ * variable O&M and start costs are quoted in purchase-month dollars; labour and parts rise with
+ * inflation afterwards, just as fuel and the market's rate do.
+ */
+function operatingCostEscalation(
+  state: GameType,
+  facility: { costIndexAtBuild?: number },
+  date: { year: number; monthNumber: number },
+): number {
+  return (
+    getInflationIndex(date, state.startingYear, state.seed) /
+    (facility.costIndexAtBuild || 1)
+  );
+}
+
 /** Variable cost of holding one generator at its minimum stable output for one game tick. */
 function minimumStableOperatingCost(
   state: GameType,
@@ -3603,7 +3627,8 @@ function minimumStableOperatingCost(
   const variableOM =
     (generatedWh / 1000000) *
     (generator.variableOperatingCostPerMWh || 0) *
-    operatingCostMultiplier;
+    operatingCostMultiplier *
+    operatingCostEscalation(state, generator, tickDate);
   const fuel = FUELS[generator.fuel];
   if (!fuel) {
     return variableOM;
@@ -3613,7 +3638,9 @@ function minimumStableOperatingCost(
     GAME_TO_REAL_YEARS;
   const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
   const carbonCost =
-    fuelBtu * fuel.kgCO2ePerBtu * effectiveCarbonFee(tickDate, state);
+    fuelBtu *
+    feeableKgCO2ePerBtu(generator.fuel) *
+    effectiveCarbonFee(tickDate, state);
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -3964,6 +3991,7 @@ function updateSupplyFacilitiesFinances(
                     startCost:
                       (generator.costPerStart || 0) *
                       GAME_TO_REAL_YEARS *
+                      operatingCostEscalation(state, generator, tickDate) *
                       (tickStoryEffects.operatingCostMultipliersByFuel?.[
                         generator.fuel
                       ] || 1),
@@ -4260,6 +4288,8 @@ function updateSupplyFacilitiesFinances(
 
   // Facilities expenses
   let kgco2e = 0;
+  // The part of kgco2e the carbon fee is charged on: biogenic combustion is exempt
+  let feeableKgco2e = 0;
   // Some authored emergencies carry company-level response costs that do not belong to a single
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
@@ -4289,6 +4319,13 @@ function updateSupplyFacilitiesFinances(
   const revenueBasisW = grossLocalSupplyW + importedW;
   const revenuePerSuppliedW =
     revenueBasisW > 0 ? (customerRevenue + revenueExports) / revenueBasisW : 0;
+  // Non-fuel operating costs were quoted in each facility's purchase-month dollars and escalate
+  // with inflation from there (see operatingCostEscalation)
+  const costIndexNow = getInflationIndex(
+    tickDate,
+    state.startingYear,
+    state.seed,
+  );
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
@@ -4315,14 +4352,18 @@ function updateSupplyFacilitiesFinances(
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
       facilityOM *=
-        (g.fuel && tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
-        1;
+        ((g.fuel &&
+          tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
+          1) *
+        (costIndexNow / (g.costIndexAtBuild || 1));
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
       if (fuel) {
+        // Burned for delivered output only: a paused plant still winding down internally sells
+        // nothing, so it buys no fuel and emits nothing, like its variable O&M above.
         const fuelBtu =
-          ((g.currentW * (g.btuPerWh || 0)) / ticksPerHour) *
+          ((deliveredW * (g.btuPerWh || 0)) / ticksPerHour) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         // Hydro and geothermal carry a zero-emission FUELS entry so carbon accounting can name
         // them, but they do not buy a fuel and therefore have no entry in the price table. In
@@ -4331,10 +4372,13 @@ function updateSupplyFacilitiesFinances(
         // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
         const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
         const facilityKgco2e = fuelBtu * fuel.kgCO2ePerBtu;
+        const facilityFeeableKgco2e = fuelBtu * feeableKgCO2ePerBtu(g.fuel);
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
+        feeableKgco2e += facilityFeeableKgco2e;
         facilityExpenses +=
-          facilityFuel + effectiveCarbonFee(tickDate, state) * facilityKgco2e;
+          facilityFuel +
+          effectiveCarbonFee(tickDate, state) * facilityFeeableKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -4384,8 +4428,21 @@ function updateSupplyFacilitiesFinances(
         }
       }
     } else {
-      facilityExpenses =
-        getPaymentInterest(g.loanAmountLeft, g.interestRate) / ticksPerMonth;
+      // Full amortizing payments start with the loan, as the purchase screen quotes and as
+      // interties already do: construction is not an interest-only holiday.
+      const paymentInterest = getPaymentInterest(
+        g.loanAmountLeft,
+        g.interestRate,
+      );
+      if (g.loanAmountLeft > 0) {
+        const paymentPrincipal = Math.min(
+          (g.loanMonthlyPayment - paymentInterest) / ticksPerMonth,
+          g.loanAmountLeft,
+        );
+        principalRepayment += paymentPrincipal;
+        g.loanAmountLeft -= paymentPrincipal;
+      }
+      facilityExpenses = paymentInterest / ticksPerMonth;
       expensesInterest += facilityExpenses;
       // A half-built plant is already costing interest, and a row that only started counting on
       // the day it switched on would hide the cheapest place to notice that
@@ -4395,8 +4452,15 @@ function updateSupplyFacilitiesFinances(
     }
   });
   let transmissionPrincipalRepayment = 0;
+  // Intertie O&M is authored in the same 2023 dollars as the facility tables, so it is carried
+  // into the run's money the same way: deflated to the starting year, then escalated with the
+  // game's inflation. Line capex is still charged at the authored quote, because saves validate
+  // a line's investment by rebuilding those quotes exactly.
+  const transmissionCostIndex =
+    getCostTableDeflator(state.startingYear) * costIndexNow;
   operatingLines.forEach((line) => {
-    expensesOM += line.annualOperatingCost / ticksPerYear;
+    expensesOM +=
+      (line.annualOperatingCost * transmissionCostIndex) / ticksPerYear;
   });
   transmission.lines.forEach((line) => {
     if (line.loanAmountLeft <= 0) return;
@@ -4412,7 +4476,7 @@ function updateSupplyFacilitiesFinances(
     transmissionPrincipalRepayment += paymentPrincipal;
     line.loanAmountLeft -= paymentPrincipal;
   });
-  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * kgco2e;
+  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * feeableKgco2e;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough
@@ -4768,7 +4832,13 @@ function buildFacilityHelper(
     if (newGame) {
       // Don't charge anything for initial builds
     } else {
-      const terms = purchaseTerms(g.buildCost, financed, state.interestRate);
+      const terms = purchaseTerms(
+        g.buildCost,
+        financed,
+        state.interestRate,
+        0,
+        facilityLoanMonths(g.lifespanYears),
+      );
       now.cash -= terms.amountDue;
       if (financed) {
         financing = {
@@ -4800,6 +4870,17 @@ function buildFacilityHelper(
           }
         : {}),
       ...financing,
+      // The quote's O&M is in this month's dollars; escalation is measured from here. The
+      // starting fleet is quoted on the opening day, where the index is 1.
+      ...(!newGame && hasEconomy()
+        ? {
+            costIndexAtBuild: getInflationIndex(
+              state.date,
+              state.startingYear,
+              state.seed,
+            ),
+          }
+        : {}),
       lifetimeWh: 0,
       lifetimePotentialWh: 0,
       lifetimeRevenue: 0,

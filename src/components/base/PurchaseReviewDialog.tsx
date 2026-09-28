@@ -31,6 +31,8 @@ export interface PurchaseReviewDialogProps {
   interestRate: number;
   /** An existing loan balance rolled into the new one, as an intertie upgrade does */
   refinancedBalance?: number;
+  /** The loan's term; facilities pass facilityLoanMonths, interties keep the standard term */
+  loanMonths?: number;
   /** Gating beyond affordability (replay, an invalid quote); affordability is checked here */
   cashDisabled?: boolean;
   loanDisabled?: boolean;
@@ -68,6 +70,7 @@ export default function PurchaseReviewDialog(
     buildCost,
     interestRate,
     refinancedBalance = 0,
+    loanMonths = LOAN_MONTHS,
     onClose,
     onPurchase,
   } = props;
@@ -81,7 +84,13 @@ export default function PurchaseReviewDialog(
       purchaseSubmitted.current = false;
     }
   }, [open]);
-  const loan = purchaseTerms(buildCost, true, interestRate, refinancedBalance);
+  const loan = purchaseTerms(
+    buildCost,
+    true,
+    interestRate,
+    refinancedBalance,
+    loanMonths,
+  );
   const cashDisabled = !!props.cashDisabled || cash < buildCost;
   const loanDisabled = !!props.loanDisabled || cash < loan.downpayment;
 
@@ -104,7 +113,7 @@ export default function PurchaseReviewDialog(
     {
       concept: "finances",
       label: "Loan option",
-      value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
+      value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
       detail: `Payments start now.${
         refinancedBalance > 0
           ? ` Includes refinancing the existing ${formatMoneyConcise(refinancedBalance)} balance at this rate and term.`

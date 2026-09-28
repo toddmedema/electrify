@@ -7,7 +7,7 @@ import { LCWH } from "../helpers/Financials";
 import { buildStorySnapshot } from "../helpers/Story";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { hasFuelPrices } from "./FuelPrices";
-import { getInflationIndex, hasEconomy } from "./Economy";
+import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
@@ -28,33 +28,36 @@ import { applyDefaultResilience } from "../helpers/Hazards";
 import { pow } from "../helpers/Pow";
 
 /**
- * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
- * here is quoted in real terms - the exponents that remain are technology trends, not price
- * levels - so inflation is what carries them forward from the day the run opens.
- *
- * The index is anchored on the game's own starting year, so the opening month always costs
- * exactly what the table says whether the scenario begins in 1980 or 2020. Anchoring it on a
- * fixed year instead would hand a 1980 run 1980 dollar costs against a nominal retail rate and
- * make it trivially profitable.
+ * What a dollar in the tables below is worth by the time the game reaches this month. The tables
+ * are in 2023 dollars (COST_TABLE_DOLLAR_YEAR); the exponents that remain are technology trends,
+ * not price levels. A run that opens before 2023 has them deflated into its starting year's own
+ * dollars with recorded CPI-U, because its fuel prices and retail rates are that year's nominal
+ * values too. From there the game's own inflation index carries them forward.
  *
  * The custom game screen asks what can be built before any game has loaded the economic data,
  * so an unloaded index is 1 rather than a thrown error - the same reason hasFuelPrices exists.
  */
 function getCostInflation(state: GameType): number {
-  return hasEconomy()
-    ? getInflationIndex(state.date, state.startingYear, state.seed)
-    : 1;
+  return (
+    getCostTableDeflator(state.startingYear) *
+    (hasEconomy()
+      ? getInflationIndex(state.date, state.startingYear, state.seed)
+      : 1)
+  );
 }
 
 // Offshore wind is the only technology here whose real costs rose before learning won: projects
 // moved into deeper water and farther from shore, taking European capex from about EUR1.5m/MW in
 // 2000 to EUR4m/MW in 2010. IRENA's global average then fell from $5,409/kW in 2010 to $2,800/kW
 // in 2023. Peak the curve in 2010 and floor its early side so tiny first-generation farms do not
-// become a historical bargain.
+// become a historical bargain. Like onshore wind and solar, learning stops at the edge of the
+// outlook rather than halving forever: 2030 lands ~28% below 2023, in line with IRENA and NREL ATB
+// moderate fixed-bottom projections of a 25-30% decline by 2030-2035.
+const OFFSHORE_LEARNING_END_YEAR = 2030;
 function offshoreEraMultiple(year: number): number {
   return year <= 2010
     ? Math.max(1.64, 1.82 * pow(2, (year - 2010) / 9))
-    : 1.82 * pow(2, (2010 - year) / 15);
+    : 1.82 * pow(2, (2010 - Math.min(year, OFFSHORE_LEARNING_END_YEAR)) / 15);
 }
 
 // EIA's 2020 capital-cost study is in 2019 dollars and its AEO 2025 study is in 2023
@@ -64,6 +67,7 @@ function offshoreEraMultiple(year: number): number {
 const CPI_2019_TO_2023 = 304.702 / 255.657;
 const CPI_2020_TO_2024 = 313.689 / 258.811;
 const CPI_2015_TO_2023 = 304.702 / 237.017;
+const CPI_2025_TO_2023 = 304.702 / 321.943;
 // NREL's 500-1,300 MW supercritical-coal class reports $54/MW-start of capitalized
 // cycling/maintenance plus $5.81/MW-start of other startup operations, in 2011 dollars.
 const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
@@ -93,16 +97,35 @@ export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
 };
 
 /**
- * Preserve the game's useful economies of scale while making the cited reference plant land on
- * its published overnight cost. A quarter fixed / three-quarters variable is also how the old
- * facility estimates were decomposed, but this makes that assumption explicit and consistent.
+ * Preserve economies of scale while making the cited reference plant land on its published
+ * overnight cost. The fixed share of the reference project is per technology, because scale
+ * economies are: modular solar and wind barely have any (LBNL's utility-scale solar and land-
+ * based wind reports put 5-20 MW projects only ~10-40% above 100+ MW ones), large thermal and
+ * hydro sites far more. The old flat 25% made a 10 MW solar farm cost 4.5x its reference per W.
  */
+// Levelized costs discount capital at the company's own borrowing rate; this stands in only
+// where no rate is known yet (a quote made before the game has one).
+const DEFAULT_LCOE_DISCOUNT_RATE = 0.07;
+
+export const BUILD_COST_FIXED_SHARE = {
+  solar: 0.01,
+  wind: 0.02,
+  offshoreWind: 0.03,
+  airborneWind: 0.05,
+  thermal: 0.12, // Coal, nuclear and gas
+  hydroGeothermal: 0.15,
+  // Biomass and oil keep the older quarter: small biomass plants have notoriously poor scale
+  // economies, and the oil reference is already a 3 MW engine plant.
+  default: 0.25,
+};
+
 function scaledBuildCost(
   costPerW: number,
   referencePeakW: number,
   peakW: number,
+  fixedShare = BUILD_COST_FIXED_SHARE.default,
 ): number {
-  return costPerW * (0.25 * referencePeakW + 0.75 * peakW);
+  return costPerW * (fixedShare * referencePeakW + (1 - fixedShare) * peakW);
 }
 
 /**
@@ -152,19 +175,19 @@ function enhancedGeothermalConstructionKgco2ePerW(year: number): number {
   return constructionKgco2eCurve(year, 1.0, 2025, 0.12, 0.38);
 }
 
-/** Fold variable non-fuel O&M into the annual expense the simulation knows how to charge. */
-function annualOperatingCost(
+/**
+ * Fixed non-fuel O&M for standing capacity. Variable O&M is a separate per-MWh field charged on
+ * actual output, so an idle or paused plant does not pay it and the keep-online versus restart
+ * decision sees it.
+ */
+function fixedOperatingCost(
   peakW: number,
-  capacityFactor: number,
   fixedDollarsPerKWYear: number,
-  variableDollarsPerMWh: number,
 ): number {
-  const dollarsPerKWYear =
-    fixedDollarsPerKWYear + variableDollarsPerMWh * 8.76 * capacityFactor;
-  return (dollarsPerKWYear / 1000) * peakW;
+  return (fixedDollarsPerKWYear / 1000) * peakW;
 }
 
-function windCostPerW(year: number): number {
+function windCostPerW2024(year: number): number {
   const cost2020 = 1.355 * CPI_2020_TO_2024;
   if (year < 2020) {
     // Preserve the established long-run historical learning curve, but anchor it to IRENA's
@@ -179,7 +202,7 @@ function windCostPerW(year: number): number {
   return costBetween(year, 2024, 1.041, 2029, 0.861);
 }
 
-function solarCostPerW(year: number): number {
+function solarCostPerW2024(year: number): number {
   const cost2020 = 0.883 * CPI_2020_TO_2024;
   if (year < 2020) {
     return cost2020 * pow(2, (2020 - year) / 8);
@@ -191,17 +214,45 @@ function solarCostPerW(year: number): number {
   return costBetween(year, 2024, 0.691, 2029, 0.388);
 }
 
-function hydroCostPerW(year: number): number {
+function hydroCostPerW2024(year: number): number {
   return costBetween(year, 2020, 1.87 * CPI_2020_TO_2024, 2024, 2.267);
 }
 
-function geothermalCostPerW(year: number): number {
+function geothermalCostPerW2024(year: number): number {
   return costBetween(year, 2020, 4.468 * CPI_2020_TO_2024, 2024, 4.015);
 }
 
-function batteryCostPerWh(year: number): number {
-  return costBetween(year, 2020, 0.345 * CPI_2020_TO_2024, 2024, 0.192);
+// Before 2020, installed cost doubles every 4.5 years back in time: about $2/Wh in 2010, in line
+// with BNEF's ~$1,100-1,400/kWh pack prices then (real) plus balance of system. Clamping to the
+// 2020 cost handed the 2000s scenarios modern storage at a quarter of its price.
+const BATTERY_PRE_2020_DOUBLING_YEARS = 4.5;
+
+function batteryCostPerWh2024(year: number): number {
+  const cost2020 = 0.345 * CPI_2020_TO_2024;
+  if (year < 2020) {
+    // exp rather than a power: V8's exp is platform-independent (fdlibm)
+    return (
+      cost2020 *
+      Math.exp(((2020 - year) / BATTERY_PRE_2020_DOUBLING_YEARS) * Math.LN2)
+    );
+  }
+  return costBetween(year, 2020, cost2020, 2024, 0.192);
 }
+
+// The curves above are anchored on IRENA's (and NREL's) 2024-dollar observations. Every table
+// here is priced in 2023 dollars, the EIA AEO2025 vintage the thermal plants use, so they are
+// brought back one year with CPI-U before getCostInflation re-dates the whole table.
+const CPI_2024_TO_2023 = 304.702 / 313.689;
+const windCostPerW = (year: number) =>
+  windCostPerW2024(year) * CPI_2024_TO_2023;
+const solarCostPerW = (year: number) =>
+  solarCostPerW2024(year) * CPI_2024_TO_2023;
+const hydroCostPerW = (year: number) =>
+  hydroCostPerW2024(year) * CPI_2024_TO_2023;
+const geothermalCostPerW = (year: number) =>
+  geothermalCostPerW2024(year) * CPI_2024_TO_2023;
+const batteryCostPerWh = (year: number) =>
+  batteryCostPerWh2024(year) * CPI_2024_TO_2023;
 
 /**
  * Early-commercial Airborne Wind estimate, held flat outside the evidence window.
@@ -299,6 +350,7 @@ export function GENERATORS(
         costBetween(year, 2019, 3.676 * CPI_2019_TO_2023, 2023, 4.103),
         650000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // EIA AEO2025 reference: 650MW ultra-supercritical coal, $4,103/kW in 2023$.
       // The inflation-normalized AEO2020 equivalent was $4,381/kW, a 6% real decline.
@@ -311,12 +363,16 @@ export function GENERATORS(
       spinMinutes: 360,
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: annualOperatingCost(peakW, 0.68, 61.6, 6.4),
+      annualOperatingCost: fixedOperatingCost(peakW, 61.6),
+      variableOperatingCostPerMWh: 6.4,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Coal,
       tracksStarts: true,
       // NREL's conservative hot-start case, normalized from 2011$ to 2023$ with annual-average
       // CPI-U and scaled by nameplate MW. Fuel input and EFOR effects are deliberately excluded.
       costPerStart: COAL_START_COST_PER_MW_2023 * (peakW / 1000000),
+      // Large coal units start about 10-50 times a year (NREL Power Plant Cycling Costs; Western
+      // Wind and Solar Integration Study Phase 2), not daily like a peaker.
+      assumedStartsPerYear: 20,
       yearsToBuild: 4 + magnitude / 3,
       // AEO2025 reference lead time is 60 months and operating life is 40 years.
       constructionKgco2ePerW: 0.32,
@@ -335,6 +391,7 @@ export function GENERATORS(
         costBetween(year, 2019, 6.041 * CPI_2019_TO_2023, 2023, 7.861),
         2156000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // EIA AEO2025 reference: two brownfield AP1000s, $7,861/kW in 2023$,
       // 9% above the inflation-normalized AEO2020 estimate.
@@ -343,7 +400,8 @@ export function GENERATORS(
       // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
       btuPerWh: 10.608,
       spinMinutes: 600,
-      annualOperatingCost: annualOperatingCost(peakW, 0.93, 156.2, 2.52),
+      annualOperatingCost: fixedOperatingCost(peakW, 156.2),
+      variableOperatingCostPerMWh: 2.52,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Nuclear,
       tracksStarts: true,
       yearsToBuild: 6 + magnitude / 3,
@@ -364,6 +422,7 @@ export function GENERATORS(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
         419000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // H-class simple-cycle gas best matches this facility's fast-start gameplay role. EIA's
       // AEO2025 reference is $836/kW, nearly flat in real terms from AEO2020.
@@ -372,7 +431,8 @@ export function GENERATORS(
       // ~6GW, build in the late 80's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 9.142,
       spinMinutes: 10,
-      annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      annualOperatingCost: fixedOperatingCost(peakW, 6.87),
+      variableOperatingCostPerMWh: 1.24,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas"],
       tracksStarts: true,
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
@@ -428,12 +488,12 @@ export function GENERATORS(
         "Runs on demand using renewable fuel, with large fuel volumes and direct CO2 emissions",
       available: true,
       // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
-      // to the table's 2018 base with CPI-U (251.107 / 321.943), then split into the same
-      // one-quarter fixed / three-quarter variable shape used by the other thermal plants, so
-      // small biomass plants retain the real technology's poor economies of scale.
+      // to the table's 2023 base with CPI-U (304.702 / 321.943 = 0.94645), then split into the
+      // same one-quarter fixed / three-quarter variable shape used by the other thermal plants,
+      // so small biomass plants retain the real technology's poor economies of scale.
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/EMM_Assumptions.pdf
       // https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm
-      buildCost: 47217644 + 2.833059 * peakW,
+      buildCost: scaledBuildCost(4.843 * CPI_2025_TO_2023, 50000000, peakW),
       peakW,
       // DOE's project-screening guidance describes 10-50 MW as the economic range; larger
       // fleets can still be assembled as several plants with separate feedstock logistics.
@@ -441,10 +501,11 @@ export function GENERATORS(
       maxPeakW: 50000000,
       btuPerWh: 13.3,
       spinMinutes: 240,
-      // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars. The engine
-      // has one annual O&M field, so both are converted to 2018 dollars and variable O&M is
-      // annualized at the observed 60.2% capacity factor.
-      annualOperatingCost: 0.14471 * peakW,
+      // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars, which are
+      // $146.0 and $5.61 in 2023 dollars. Variable O&M is annualized at the observed 60.2%
+      // capacity factor.
+      annualOperatingCost: fixedOperatingCost(peakW, 154.26 * CPI_2025_TO_2023),
+      variableOperatingCostPerMWh: 5.93 * CPI_2025_TO_2023,
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Biomass,
       tracksStarts: true,
       yearsToBuild: 5,
@@ -461,7 +522,12 @@ export function GENERATORS(
       description:
         "Output changes with local wind and is often strongest in spring and fall",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
-      buildCost: scaledBuildCost(windCostPerW(year), 200000000, peakW),
+      buildCost: scaledBuildCost(
+        windCostPerW(year),
+        200000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.wind,
+      ),
       // IRENA global installed cost fell from inflation-normalized $1,642/kW in 2020 to
       // $1,041/kW in 2024. Its outlook reaches $861/kW in 2029.
       // https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024
@@ -469,12 +535,7 @@ export function GENERATORS(
       maxPeakW: 1500000000,
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        windCapacityFactor,
-        33.06,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 33.06),
       // The location's weather record determines the capacity factor below.
       yearsToBuild: 1 + magnitude / 3,
       // EIA AEO2025 reference lead time is 21 months for a 200MW plant.
@@ -496,9 +557,15 @@ export function GENERATORS(
       available: year > 1991 && hasOffshoreWind(state.location),
       // Vindeby, Denmark, was the first offshore wind farm, at 4.95MW in 1991:
       // https://en.wikipedia.org/wiki/Vindeby_Offshore_Wind_Farm
-      buildCost: 830000000 + 2.77 * peakW * offshoreEraMultiple(year),
-      // EIA/Sargent & Lundy's 2023 fixed-bottom reference is $3,689/kW for 900MW. One
-      // quarter fixed and three quarters variable makes small farms appropriately expensive.
+      buildCost:
+        BUILD_COST_FIXED_SHARE.offshoreWind * 3.689 * 900000000 +
+        (1 - BUILD_COST_FIXED_SHARE.offshoreWind) *
+          3.689 *
+          peakW *
+          offshoreEraMultiple(year),
+      // EIA/Sargent & Lundy's 2023 fixed-bottom reference is $3,689/kW for 900MW. A 3% fixed
+      // share keeps the early 5-30 MW farms (Vindeby, Middelgrunden: about $1.2-2.5k/kW) near
+      // their real per-watt cost; the era multiple carries the variable part.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
       peakW,
       maxPeakW: Math.min(1500000000, 5000000 * pow(2, (year - 1991) / 3.5)),
@@ -520,7 +587,12 @@ export function GENERATORS(
         "Uses steadier high-altitude wind; new technology with frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
       available: year >= 2030,
-      buildCost: scaledBuildCost(airborneWindCostPerW(year), 1200000, peakW),
+      buildCost: scaledBuildCost(
+        airborneWindCostPerW(year),
+        1200000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.airborneWind,
+      ),
       // The 1.2MW NAWEP array is the source anchor. Doubling every two years and the 500MW
       // ceiling are deliberately conservative gameplay assumptions until fleet data exists.
       peakW,
@@ -540,7 +612,12 @@ export function GENERATORS(
       description:
         "Produces only in daylight and usually peaks near sunny midday",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
-      buildCost: scaledBuildCost(solarCostPerW(year), 150000000, peakW),
+      buildCost: scaledBuildCost(
+        solarCostPerW(year),
+        150000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.solar,
+      ),
       // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
       // $691/kW in 2024. Its outlook reaches $388/kW in 2029.
       peakW,
@@ -548,12 +625,7 @@ export function GENERATORS(
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        solarCapacityFactor,
-        20.23,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 20.23),
       // Latitude, daylight and the location's cloud record determine the capacity factor below.
       yearsToBuild: 2.27 + magnitude / 3,
       // EIA AEO2025 reference lead time is 36 months for a 150MW plant.
@@ -573,7 +645,12 @@ export function GENERATORS(
       description:
         "Low direct emissions and controllable output, but limited by water and suitable sites",
       available: year > 1882 && hydroAvailability.status === "available",
-      buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
+      buildCost: scaledBuildCost(
+        hydroCostPerW(year),
+        100000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
       // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
@@ -581,12 +658,7 @@ export function GENERATORS(
       maxPeakW: hydroAvailability.largest?.maxPeakW || 0,
       btuPerWh: 0,
       spinMinutes: 1,
-      annualOperatingCost: annualOperatingCost(
-        peakW,
-        HYDRO_TARGET_CAPACITY_FACTOR,
-        33.54,
-        0,
-      ),
+      annualOperatingCost: fixedOperatingCost(peakW, 33.54),
       yearsToBuild: 5 + magnitude / 2,
       constructionKgco2ePerW: 2,
       capacityFactor: HYDRO_TARGET_CAPACITY_FACTOR,
@@ -599,7 +671,12 @@ export function GENERATORS(
       description:
         "Steady low-carbon output, but only at suitable underground heat sources",
       available: (geothermalLocations || 0) > 0,
-      buildCost: scaledBuildCost(geothermalCostPerW(year), 50000000, peakW),
+      buildCost: scaledBuildCost(
+        geothermalCostPerW(year),
+        50000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
       // IRENA global installed cost fell from inflation-normalized $5,415/kW in 2020 to
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
@@ -607,7 +684,7 @@ export function GENERATORS(
       maxPeakW: 800000000,
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
-      annualOperatingCost: annualOperatingCost(peakW, 0.88, 150.6, 0),
+      annualOperatingCost: fixedOperatingCost(peakW, 150.6),
       minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Geothermal,
       tracksStarts: true,
       yearsToBuild: 3,
@@ -623,9 +700,16 @@ export function GENERATORS(
       description:
         "Steady low-carbon output in more locations than conventional geothermal",
       available: year >= 2030,
-      buildCost: enhancedGeothermalCostPerW * peakW,
-      // Fervo's $5.5/W Phase II estimate in 2028 declines to its $3/W long-term target
-      // in 2035, then stays at that floor.
+      buildCost: scaledBuildCost(
+        Math.max(enhancedGeothermalCostPerW, 1.15 * geothermalCostPerW(year)),
+        50000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
+      // Fervo's $5.5/W Phase II estimate in 2028 declines toward its $3/W long-term target,
+      // but never below 115% of conventional hydrothermal: NREL ATB 2024 keeps EGS above flash
+      // and binary plants in every scenario, because stimulation and deeper wells add cost. The
+      // $3/W figure is an aspiration, and EGS has no site limit to ration it.
       peakW,
       maxPeakW: 500000000,
       btuPerWh: 0,
@@ -671,6 +755,9 @@ export function GENERATORS(
           state.seed,
           state.location,
           carbonFeeAtYear,
+          Number.isFinite(state.interestRate)
+            ? state.interestRate
+            : DEFAULT_LCOE_DISCOUNT_RATE,
         )
       : Infinity;
     return g.available || (g.name === "Hydro" && year > 1882);
@@ -750,7 +837,11 @@ export function STORAGE(state: GameType, peakWh: number) {
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       roundTripEfficiency: 0.8,
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
-      hourlyLoss: 0.001,
+      // Evaporation and seepage only: about 0.012%/day, within the 0-0.02%/day that published
+      // storage comparisons give (Luo et al. 2015, Applied Energy 137:511, Table 5). The former
+      // 0.1%/h lost half an upper reservoir in a month, penalizing the multi-day holding pumped
+      // hydro exists for.
+      hourlyLoss: 0.000005,
       annualOperatingCost: 0.0019 * peakWh,
       // NREL 2024 ATB fixed O&M is $19/kW-year, or $1.90/kWh-year at ten hours.
       yearsToBuild: 6 + magnitude,

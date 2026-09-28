@@ -178,8 +178,9 @@ describe("ending a scenario from inside the reducer", () => {
     const invitation = JSON.parse(JSON.stringify(state.challenge));
     // Start the month already overdrawn so this test reaches the bankruptcy path without relying
     // on the removed marketing expense as an artificial cash drain.
+    // Deep enough that a profitable month cannot climb back out of it.
     state.timeline.forEach((tick) => {
-      tick.cash = -1;
+      tick.cash = -1e10;
     });
 
     playOutOnTheStore(state, 1);

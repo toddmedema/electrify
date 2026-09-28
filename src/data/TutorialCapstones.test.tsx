@@ -179,7 +179,7 @@ describe("authored tutorial capstones", () => {
   it("rewards profitable customer growth and rejects an unsustainable discount", () => {
     const objective = capstone(3);
     const balanced = createGame({ scenarioId: 3, dollarsPerkWh: 0.06 });
-    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0.03 });
+    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0.02 });
 
     expect(tickUntil(balanced, objective.success, 700)).toBe(true);
     expect(tickUntil(tooCheap, objective.failure!, 700)).toBe(true);

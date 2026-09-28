@@ -69,6 +69,8 @@ export interface TransmissionLineOperatingType {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
   interestRate: number;
+  // Inflation index when ordered; annual O&M escalates from it. Absent (1) at the run's start.
+  costIndexAtBuild?: number;
   /**
    * Net power over this line in the current tick: positive importing, negative selling.
    * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
@@ -514,6 +516,8 @@ export interface FuelType {
   // costPerBtu: number; // Measured from raw stock / before generator efficiency loss
   // all costs should be in that year's $ / not account for inflation when possible
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
+  // Counted towards emissions and the score, but not charged the carbon fee (biogenic CO2)
+  feeExempt?: boolean;
 }
 
 /**
@@ -546,6 +550,10 @@ interface SharedOperatingType
   minuteOperational?: number;
   // Absent until the player first toggles it
   paused?: boolean;
+  // The game's inflation index on the day it was bought, which its quoted O&M, variable O&M and
+  // start costs are denominated in. Operating costs escalate from here with the index rather
+  // than staying frozen in purchase-year dollars. Absent (1) for the starting fleet.
+  costIndexAtBuild?: number;
 }
 
 export interface GeneratorOperatingType
@@ -648,6 +656,10 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Non-fuel expense charged for one physical start. Only present when the technology's source
   // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
+  // How many starts a year the build quote assumes when annualizing costPerStart. Absent means
+  // one a day (ASSUMED_STARTS_PER_YEAR), the peaking turbine's duty; live play charges actual
+  // starts either way.
+  assumedStartsPerYear?: number;
   // Non-fuel O&M charged against actual generation. Technologies without a separately sourced
   // variable component annualize all non-fuel operating expense into annualOperatingCost.
   variableOperatingCostPerMWh?: number;
