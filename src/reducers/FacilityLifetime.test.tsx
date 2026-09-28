@@ -181,6 +181,26 @@ describe("per-facility lifetime totals", () => {
     });
   });
 
+  it("buys no fuel for a paused plant that is still winding down", () => {
+    const state = createGame({ scenarioId: 103, difficulty: "CEO" });
+    tickState(state);
+    const coal = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Coal",
+    ) as FacilityOperatingType;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      if (facility.id !== coal.id) facility.btuPerWh = 0;
+    });
+    coal.currentW = coal.peakW;
+    coal.paused = true;
+
+    tickState(state);
+
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(coal.currentW).toBeGreaterThan(0);
+    expect(now.expensesFuel).toBe(0);
+    expect(now.localKgco2e).toBe(0);
+  });
+
   it("escalates O&M quoted in purchase-month dollars with inflation since", () => {
     const state = createGame({ scenarioId: 103, difficulty: "CEO" });
     tickState(state);

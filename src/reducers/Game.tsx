@@ -4289,8 +4289,10 @@ function updateSupplyFacilitiesFinances(
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
       if (fuel) {
+        // Burned for delivered output only: a paused plant still winding down internally sells
+        // nothing, so it buys no fuel and emits nothing, like its variable O&M above.
         const fuelBtu =
-          ((g.currentW * (g.btuPerWh || 0)) / ticksPerHour) *
+          ((deliveredW * (g.btuPerWh || 0)) / ticksPerHour) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         // Hydro and geothermal carry a zero-emission FUELS entry so carbon accounting can name
         // them, but they do not buy a fuel and therefore have no entry in the price table. In
