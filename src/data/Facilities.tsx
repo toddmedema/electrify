@@ -727,9 +727,16 @@ export function GENERATORS(
       description:
         "Steady low-carbon output in more locations than conventional geothermal",
       available: year >= 2030,
-      buildCost: enhancedGeothermalCostPerW * peakW,
-      // Fervo's $5.5/W Phase II estimate in 2028 declines to its $3/W long-term target
-      // in 2035, then stays at that floor.
+      buildCost: scaledBuildCost(
+        Math.max(enhancedGeothermalCostPerW, 1.15 * geothermalCostPerW(year)),
+        50000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
+      // Fervo's $5.5/W Phase II estimate in 2028 declines toward its $3/W long-term target,
+      // but never below 115% of conventional hydrothermal: NREL ATB 2024 keeps EGS above flash
+      // and binary plants in every scenario, because stimulation and deeper wells add cost. The
+      // $3/W figure is an aspiration, and EGS has no site limit to ration it.
       peakW,
       maxPeakW: 500000000,
       btuPerWh: 0,

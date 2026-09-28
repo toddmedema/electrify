@@ -276,6 +276,14 @@ describe("enhanced geothermal", () => {
     expect(withExistingEnhanced?.buildCost).toBe(baseline?.buildCost);
   });
 
+  it("never undercuts conventional hydrothermal geothermal", () => {
+    for (const year of [2030, 2040, 2080]) {
+      expect(
+        generatorAt(iceland, year, "Enhanced Geothermal")!.buildCost,
+      ).toBeGreaterThan(generatorAt(iceland, year, "Geothermal")!.buildCost);
+    }
+  });
+
   it("only counts conventional plants against conventional geothermal sites", () => {
     const baseline = generatorAt(iceland, 2030, "Geothermal");
     const withEnhanced = generatorAt(iceland, 2030, "Geothermal", [
