@@ -22,20 +22,9 @@ import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
 import ConceptIcon from "./ConceptIcon";
 import { formatMoneyConcise, formatScore } from "../../helpers/Format";
+import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
-
-// What each scored category is called on the score screen. The breakdown's keys differ by
-// ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
-// with new categories shows up here as soon as it scores them, in the order they were scored.
-export const SCORE_LABELS: { [key: string]: string } = {
-  supply: "electricity supplied",
-  netWorth: "final net worth",
-  customers: "final customers",
-  rate: "electric rates",
-  emissions: "emissions",
-  blackouts: "blackouts",
-};
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -161,12 +150,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       : endTitle;
   // Gains carry an explicit "+" so the line reads as pluses and minuses at a glance; losses
   // already print their "-" and zero stays bare
-  const breakdownSummary = Object.keys(breakdown)
-    .map((category) => {
-      const points = breakdown[category];
-      return `${points > 0 ? "+" : ""}${formatScore(points)} ${
-        SCORE_LABELS[category] || category
-      }`;
+  const breakdownSummary = Object.entries(breakdown)
+    .map(([category, points = 0]) => {
+      return `${points > 0 ? "+" : ""}${formatScore(points)} ${scoreLabel(
+        category,
+      )}`;
     })
     .join(" · ");
 

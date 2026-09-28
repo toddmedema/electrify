@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { GameType } from "../../Types";
+import { GameType, ScoreCategoryType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -19,14 +19,14 @@ import {
 } from "../../helpers/DateTime";
 import {
   computeScoreBreakdown,
+  scoreLabel,
+  scoreRuleText,
   startingDollarRevenue,
   totalScore,
 } from "../../helpers/Scoring";
-import { scoreRules } from "./VictoryConditions";
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
-import { SCORE_LABELS } from "./VictoryDialog";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import type { MissionRequirement } from "../../helpers/MissionStatus";
@@ -72,7 +72,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
         startingDollarRevenue(history, game.startingYear, game.seed),
       )
     : null;
-  const rules = scoreRules(
+  const rules = scoreRuleText(
     scenario.ownership,
     scenario.dollarsPerkWh,
     formatLargeMassApprox(KG_PER_MEGATONNE, units),
@@ -80,7 +80,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const facts = [
     {
       label: "Timeframe",
-      value: `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
+      value: `${scenario.startingYear}â€“${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
     },
     ...(location ? [{ label: "Location", value: location.name }] : []),
     { label: "Difficulty", value: game.difficulty },
@@ -270,7 +270,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                   </Box>
                 </Typography>
                 <Box component="dl" sx={{ m: 0, mt: 2 }}>
-                  {Object.entries(breakdown).map(([category, score]) => (
+                  {Object.entries(breakdown).map(([category, score = 0]) => (
                     <Box
                       key={category}
                       sx={{
@@ -291,9 +291,9 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                             "&::first-letter": { textTransform: "uppercase" },
                           }}
                         >
-                          {SCORE_LABELS[category] || category}
+                          {scoreLabel(category)}
                         </Box>
-                        {rules[category] && (
+                        {rules[category as ScoreCategoryType] && (
                           <Box
                             component="dd"
                             sx={{
@@ -302,7 +302,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                               typography: "caption",
                             }}
                           >
-                            {rules[category]}
+                            {rules[category as ScoreCategoryType]}
                           </Box>
                         )}
                       </Box>

@@ -271,9 +271,14 @@ export interface CardType {
   storyTarget?: StoryActionTargetType;
 }
 
+// Every category a run can be scored on. Which ones apply depends on ownership; the rules
+// themselves live in helpers/Scoring `SCORE_RULES`.
+export type ScoreCategoryType =
+  "supply" | "netWorth" | "customers" | "rate" | "emissions" | "blackouts";
+
 // The per-category points that sum to `score`. Investor and public-ownership scenarios are
-// scored on different categories (see reducers/Game), so the keys vary by scenario.
-export type ScoreBreakdownType = Record<string, number>;
+// scored on different categories (see helpers/Scoring), so the keys vary by scenario.
+export type ScoreBreakdownType = Partial<Record<ScoreCategoryType, number>>;
 
 export interface ScoreType {
   scenarioId: number;
