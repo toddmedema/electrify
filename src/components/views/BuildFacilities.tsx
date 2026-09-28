@@ -120,8 +120,8 @@ export default function BuildFacilities(): React.JSX.Element {
         aria-label={introductoryChoices ? "Generators" : undefined}
         className="constructionPanel"
       >
-        {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer embedded />}
-        {active === "BUILD_STORAGE" && <BuildStorageContainer embedded />}
+        {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer />}
+        {active === "BUILD_STORAGE" && <BuildStorageContainer />}
         {active === "BUILD_INTERTIES" && (
           <div className="scrollable constructionInterties">
             <TransmissionPanel

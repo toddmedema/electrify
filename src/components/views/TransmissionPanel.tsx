@@ -14,16 +14,10 @@ import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import {
-  Avatar,
   Box,
   Button,
-  Card,
-  CardHeader,
   Chip,
-  Collapse,
   FormControl,
   InputLabel,
   Link,
@@ -92,6 +86,7 @@ import {
 } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
+import BuildOptionCard from "../base/BuildOptionCard";
 import PurchaseReviewDialog, {
   financingShortfallText,
 } from "../base/PurchaseReviewDialog";
@@ -247,7 +242,6 @@ function IntertieBuildItem(props: {
   renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
-  const [expanded, setExpanded] = React.useState(false);
   const market = adjacentMarketForCorridor(corridor.id);
   const name = market?.name || corridor.name;
   const loan = purchaseTerms(corridor.buildCost, true, props.interestRate);
@@ -255,156 +249,139 @@ function IntertieBuildItem(props: {
   // decision at all. Cash purchase is still offered in the review dialog when it's affordable.
   const buildable = cash !== undefined && cash >= loan.downpayment;
   return (
-    <Card
-      className="build-list-item buildOption transmissionProject"
-      data-corridor-id={corridor.id}
-      data-testid={`transmission-project-${corridor.id}`}
-    >
-      <CardHeader
-        avatar={<Avatar alt="" src="/images/transmission.svg" />}
-        action={
-          readOnly ? undefined : (
-            <Button
-              id={`review-intertie-${corridor.id}`}
-              aria-label={`Review purchase of ${name} intertie`}
-              size="small"
-              variant="outlined"
-              color="primary"
-              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-              disabled={!buildable}
-              onClick={props.onReview}
-            >
-              Review
-            </Button>
-          )
-        }
-        // These corridor names were headings before the card layout, and a list of purchase
-        // options is exactly what heading navigation is for. MUI's default span would take
-        // that away for no visual difference. h6 is what the old `variant="subtitle1"` emitted
-        // and what the dialog's own "Build..." title is, so the list stays navigable without
-        // jumping back up a level underneath it.
-        slotProps={{ title: { component: "h6" } }}
-        title={name}
-      />
-      <Typography className="buildOptionContext" variant="body2">
-        <span className="nowrap">
-          {corridor.routeType === "EXISTING"
-            ? "Existing corridor"
-            : "New corridor"}
-        </span>
-        {market && (
-          <>
-            {" · "}
-            <span className="nowrap">
-              {INTERTIE_ARCHETYPES[market.archetype].label}
-            </span>
-          </>
-        )}
-      </Typography>
-      {!readOnly && !buildable && (
-        <Typography
-          component="div"
-          className="buildOptionWarning"
-          color="textSecondary"
-        >
-          {financingShortfallText(cash || 0, loan.downpayment)}
-        </Typography>
-      )}
-      <Box className="buildOptionMetrics">
-        <BuildMetric
-          label="Connection bandwidth"
-          value={formatWatts(corridor.capacityW)}
-        />
-        <BuildMetric
-          label="Build time"
-          value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
-        />
-        <BuildMetric
-          label="Total cost"
-          value={formatMoneyConcise(corridor.buildCost)}
-        />
-        <BuildMetric
-          label="Loan payment"
-          value={`${formatMoneyConcise(loan.monthlyPayment)}/mo`}
-        />
-        {market && (
+    <BuildOptionCard
+      name={name}
+      iconSrc="/images/transmission.svg"
+      iconAlt=""
+      className="transmissionProject"
+      cardProps={{
+        "data-corridor-id": corridor.id,
+        "data-testid": `transmission-project-${corridor.id}`,
+      }}
+      // These corridor names were headings before the card layout, and a list of purchase
+      // options is exactly what heading navigation is for. MUI's default span would take that
+      // away for no visual difference. h6 is what the old `variant="subtitle1"` emitted and
+      // what the dialog's own "Build..." title is, so the list stays navigable without jumping
+      // back up a level underneath it.
+      titleComponent="h6"
+      review={
+        readOnly
+          ? undefined
+          : {
+              id: `review-intertie-${corridor.id}`,
+              ariaLabel: `Review purchase of ${name} intertie`,
+              disabled: !buildable,
+              onClick: props.onReview,
+            }
+      }
+      context={
+        <>
+          <span className="nowrap">
+            {corridor.routeType === "EXISTING"
+              ? "Existing corridor"
+              : "New corridor"}
+          </span>
+          {market && (
+            <>
+              {" · "}
+              <span className="nowrap">
+                {INTERTIE_ARCHETYPES[market.archetype].label}
+              </span>
+            </>
+          )}
+        </>
+      }
+      warning={
+        !readOnly && !buildable
+          ? financingShortfallText(cash || 0, loan.downpayment)
+          : undefined
+      }
+      metrics={
+        <>
           <BuildMetric
-            label="Emissions"
-            value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
+            label="Connection bandwidth"
+            value={formatWatts(corridor.capacityW)}
           />
-        )}
-        <BuildMetric
-          label="Neighbor’s max spare capacity"
-          value={formatWatts(props.spareCapacityW)}
-        />
-      </Box>
-      <Box className="buildOptionFooter">
-        <Button
-          color="primary"
-          className="expand-details"
-          size="small"
-          aria-label={`${expanded ? "Hide" : "Show"} ${name} details`}
-          aria-expanded={expanded}
-          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? "Hide details" : "Show details"}
-        </Button>
-      </Box>
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        {market && (
-          <Typography
-            className="buildOptionDescription"
-            variant="body2"
-            color="textSecondary"
-          >
-            {INTERTIE_ARCHETYPES[market.archetype].summary}
-          </Typography>
-        )}
-        {market && <ImportEmissionsNote marketId={market.id} />}
-        <Box className="buildOptionDetailBody">
-          <dl className="transmissionMetrics">
-            <div>
-              <dt>Regional corridor capacity</dt>
-              <dd>
-                {formatWatts(
-                  corridorById(corridor.id)?.capacityW || corridor.capacityW,
-                )}
-              </dd>
-            </div>
-
-            <div>
-              <dt>Down payment</dt>
-              <dd>{formatMoneyConcise(loan.downpayment)}</dd>
-            </div>
-            <div>
-              <dt>Amount financed</dt>
-              <dd>{formatMoneyConcise(loan.loanAmount)}</dd>
-            </div>
-          </dl>
-        </Box>
-        <Box className="buildOptionDetailBody">
-          <ConstructionEmissionsMetric
-            kgco2eTotal={props.constructionKgco2eTotal}
-            yearsToBuild={corridor.yearsToBuild}
-            units={units}
+          <BuildMetric
+            label="Build time"
+            value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
           />
-        </Box>
-        {expanded && props.renderPortfolio()}
-        {outlook && (
+          <BuildMetric
+            label="Total cost"
+            value={formatMoneyConcise(corridor.buildCost)}
+          />
+          <BuildMetric
+            label="Loan payment"
+            value={`${formatMoneyConcise(loan.monthlyPayment)}/mo`}
+          />
+          {market && (
+            <BuildMetric
+              label="Emissions"
+              value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
+            />
+          )}
+          <BuildMetric
+            label="Neighbor’s max spare capacity"
+            value={formatWatts(props.spareCapacityW)}
+          />
+        </>
+      }
+      details={(expanded) => (
+        <>
+          {market && (
+            <Typography
+              className="buildOptionDescription"
+              variant="body2"
+              color="textSecondary"
+            >
+              {INTERTIE_ARCHETYPES[market.archetype].summary}
+            </Typography>
+          )}
+          {market && <ImportEmissionsNote marketId={market.id} />}
           <Box className="buildOptionDetailBody">
             <dl className="transmissionMetrics">
               <div>
-                <dt>At your peak</dt>
-                <dd>~{percent(outlook.atPeak)} of line</dd>
+                <dt>Regional corridor capacity</dt>
+                <dd>
+                  {formatWatts(
+                    corridorById(corridor.id)?.capacityW || corridor.capacityW,
+                  )}
+                </dd>
               </div>
-              <PriceMetric outlook={outlook} />
+
+              <div>
+                <dt>Down payment</dt>
+                <dd>{formatMoneyConcise(loan.downpayment)}</dd>
+              </div>
+              <div>
+                <dt>Amount financed</dt>
+                <dd>{formatMoneyConcise(loan.loanAmount)}</dd>
+              </div>
             </dl>
-            <IntertieYear outlook={outlook} />
           </Box>
-        )}
-      </Collapse>
-    </Card>
+          <Box className="buildOptionDetailBody">
+            <ConstructionEmissionsMetric
+              kgco2eTotal={props.constructionKgco2eTotal}
+              yearsToBuild={corridor.yearsToBuild}
+              units={units}
+            />
+          </Box>
+          {expanded && props.renderPortfolio()}
+          {outlook && (
+            <Box className="buildOptionDetailBody">
+              <dl className="transmissionMetrics">
+                <div>
+                  <dt>At your peak</dt>
+                  <dd>~{percent(outlook.atPeak)} of line</dd>
+                </div>
+                <PriceMetric outlook={outlook} />
+              </dl>
+              <IntertieYear outlook={outlook} />
+            </Box>
+          )}
+        </>
+      )}
+    />
   );
 }
 
