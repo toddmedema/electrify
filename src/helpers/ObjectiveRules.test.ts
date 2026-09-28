@@ -34,7 +34,7 @@ describe("best reachable customers", () => {
   it("lets an investor win back the unserved market, up to its size", () => {
     const recovered = bestReachableCustomers(100, 24, "Investor", 2000);
     expect(recovered).toBeGreaterThan(900);
-    expect(recovered).toBeLessThan(2000 * 1.015 ** 2);
+    expect(recovered).toBeLessThan(2000 * 1.015 * 1.015);
   });
 });
 
@@ -60,7 +60,8 @@ describe("decided objectives", () => {
     const start = dataCenters.startingCustomers!;
     const threshold = start * dataCenters.minimumCustomerRetention!;
     const progress = { startingCustomers: start, monthsRemaining: 84 };
-    const unreachable = Math.floor(threshold / 1.015 ** 7) - 10;
+    const sevenYears = bestReachableCustomers(1, 84, "Public");
+    const unreachable = Math.floor(threshold / sevenYears) - 10;
     expect(
       decidedObjectiveFailure(
         dataCenters,
@@ -68,7 +69,7 @@ describe("decided objectives", () => {
         progress,
       ),
     ).toMatch(/Even the fastest possible growth/);
-    const recoverable = Math.ceil(threshold / 1.015 ** 7) + 10;
+    const recoverable = Math.ceil(threshold / sevenYears) + 10;
     expect(
       decidedObjectiveFailure(
         dataCenters,

@@ -147,7 +147,8 @@ export function bestReachableCustomers(
   ownership: "Investor" | "Public",
   marketSize = customers,
 ): number {
-  const monthlyGrowth = Math.pow(1 + ORGANIC_GROWTH_MAX_ANNUAL, 1 / 12);
+  // exp/log rather than a computed power: the twelfth root of the annual growth factor
+  const monthlyGrowth = Math.exp(Math.log1p(ORGANIC_GROWTH_MAX_ANNUAL) / 12);
   let best = customers;
   let market = marketSize;
   for (let month = 0; month < months; month++) {
