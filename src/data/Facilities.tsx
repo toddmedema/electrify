@@ -89,16 +89,31 @@ export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
 };
 
 /**
- * Preserve the game's useful economies of scale while making the cited reference plant land on
- * its published overnight cost. A quarter fixed / three-quarters variable is also how the old
- * facility estimates were decomposed, but this makes that assumption explicit and consistent.
+ * Preserve economies of scale while making the cited reference plant land on its published
+ * overnight cost. The fixed share of the reference project is per technology, because scale
+ * economies are: modular solar and wind barely have any (LBNL's utility-scale solar and land-
+ * based wind reports put 5-20 MW projects only ~10-40% above 100+ MW ones), large thermal and
+ * hydro sites far more. The old flat 25% made a 10 MW solar farm cost 4.5x its reference per W.
  */
+export const BUILD_COST_FIXED_SHARE = {
+  solar: 0.01,
+  wind: 0.02,
+  offshoreWind: 0.03,
+  airborneWind: 0.05,
+  thermal: 0.12, // Coal, nuclear and gas
+  hydroGeothermal: 0.15,
+  // Biomass and oil keep the older quarter: small biomass plants have notoriously poor scale
+  // economies, and the oil reference is already a 3 MW engine plant.
+  default: 0.25,
+};
+
 function scaledBuildCost(
   costPerW: number,
   referencePeakW: number,
   peakW: number,
+  fixedShare = BUILD_COST_FIXED_SHARE.default,
 ): number {
-  return costPerW * (0.25 * referencePeakW + 0.75 * peakW);
+  return costPerW * (fixedShare * referencePeakW + (1 - fixedShare) * peakW);
 }
 
 /**
@@ -310,6 +325,7 @@ export function GENERATORS(
         costBetween(year, 2019, 3.676 * CPI_2019_TO_2023, 2023, 4.103),
         650000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // EIA AEO2025 reference: 650MW ultra-supercritical coal, $4,103/kW in 2023$.
       // The inflation-normalized AEO2020 equivalent was $4,381/kW, a 6% real decline.
@@ -346,6 +362,7 @@ export function GENERATORS(
         costBetween(year, 2019, 6.041 * CPI_2019_TO_2023, 2023, 7.861),
         2156000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // EIA AEO2025 reference: two brownfield AP1000s, $7,861/kW in 2023$,
       // 9% above the inflation-normalized AEO2020 estimate.
@@ -375,6 +392,7 @@ export function GENERATORS(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
         419000000,
         peakW,
+        BUILD_COST_FIXED_SHARE.thermal,
       ),
       // H-class simple-cycle gas best matches this facility's fast-start gameplay role. EIA's
       // AEO2025 reference is $836/kW, nearly flat in real terms from AEO2020.
@@ -489,7 +507,12 @@ export function GENERATORS(
       description:
         "Output changes with local wind and is often strongest in spring and fall",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
-      buildCost: scaledBuildCost(windCostPerW(year), 200000000, peakW),
+      buildCost: scaledBuildCost(
+        windCostPerW(year),
+        200000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.wind,
+      ),
       // IRENA global installed cost fell from inflation-normalized $1,642/kW in 2020 to
       // $1,041/kW in 2024. Its outlook reaches $861/kW in 2029.
       // https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024
@@ -524,9 +547,15 @@ export function GENERATORS(
       available: year > 1991 && hasOffshoreWind(state.location),
       // Vindeby, Denmark, was the first offshore wind farm, at 4.95MW in 1991:
       // https://en.wikipedia.org/wiki/Vindeby_Offshore_Wind_Farm
-      buildCost: 830000000 + 2.77 * peakW * offshoreEraMultiple(year),
-      // EIA/Sargent & Lundy's 2023 fixed-bottom reference is $3,689/kW for 900MW. One
-      // quarter fixed and three quarters variable makes small farms appropriately expensive.
+      buildCost:
+        BUILD_COST_FIXED_SHARE.offshoreWind * 3.689 * 900000000 +
+        (1 - BUILD_COST_FIXED_SHARE.offshoreWind) *
+          3.689 *
+          peakW *
+          offshoreEraMultiple(year),
+      // EIA/Sargent & Lundy's 2023 fixed-bottom reference is $3,689/kW for 900MW. A 3% fixed
+      // share keeps the early 5-30 MW farms (Vindeby, Middelgrunden: about $1.2-2.5k/kW) near
+      // their real per-watt cost; the era multiple carries the variable part.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
       peakW,
       maxPeakW: Math.min(
@@ -551,7 +580,12 @@ export function GENERATORS(
         "Uses steadier high-altitude wind; new technology with frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
       available: year >= 2030,
-      buildCost: scaledBuildCost(airborneWindCostPerW(year), 1200000, peakW),
+      buildCost: scaledBuildCost(
+        airborneWindCostPerW(year),
+        1200000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.airborneWind,
+      ),
       // The 1.2MW NAWEP array is the source anchor. Doubling every two years and the 500MW
       // ceiling are deliberately conservative gameplay assumptions until fleet data exists.
       peakW,
@@ -571,7 +605,12 @@ export function GENERATORS(
       description:
         "Produces only in daylight and usually peaks near sunny midday",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
-      buildCost: scaledBuildCost(solarCostPerW(year), 150000000, peakW),
+      buildCost: scaledBuildCost(
+        solarCostPerW(year),
+        150000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.solar,
+      ),
       // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
       // $691/kW in 2024. Its outlook reaches $388/kW in 2029.
       peakW,
@@ -604,7 +643,12 @@ export function GENERATORS(
       description:
         "Low direct emissions and controllable output, but limited by water and suitable sites",
       available: year > 1882 && hydroAvailability.status === "available",
-      buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
+      buildCost: scaledBuildCost(
+        hydroCostPerW(year),
+        100000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
       // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
@@ -630,7 +674,12 @@ export function GENERATORS(
       description:
         "Steady low-carbon output, but only at suitable underground heat sources",
       available: (geothermalLocations || 0) > 0,
-      buildCost: scaledBuildCost(geothermalCostPerW(year), 50000000, peakW),
+      buildCost: scaledBuildCost(
+        geothermalCostPerW(year),
+        50000000,
+        peakW,
+        BUILD_COST_FIXED_SHARE.hydroGeothermal,
+      ),
       // IRENA global installed cost fell from inflation-normalized $5,415/kW in 2020 to
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,

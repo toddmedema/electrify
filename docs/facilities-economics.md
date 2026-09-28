@@ -22,9 +22,13 @@ those values through 2029 and then stop. Pre-2020 wind and solar retain the game
 learning curves, re-anchored to the inflation-normalized 2020 observation.
 
 Published costs are for reference projects, while the player can choose almost any plant size. The
-model therefore treats 25% of the reference project as fixed and 75% as capacity-proportional. This
-preserves the existing economies-of-scale mechanic and makes every reference-sized facility equal
-the cited total installed cost.
+model therefore treats a technology-specific share of the reference project as fixed and the rest
+as capacity-proportional, so every reference-sized facility equals the cited total installed cost.
+The shares follow how much scale actually matters: solar 1%, onshore wind 2%, offshore wind 3% and
+airborne wind 5% (LBNL's utility-scale solar and land-based wind reports put 5-20 MW projects only
+~10-40% above 100 MW-plus ones); coal, nuclear and gas 12%; hydro and geothermal 15%; biomass and
+oil keep 25%. A flat 25% had made a 10 MW solar farm cost 4.5x its reference price per watt and an
+early 5 MW offshore farm over $30/W.
 
 ## What changed in real terms
 
