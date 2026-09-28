@@ -30,12 +30,12 @@ const row = (
     customers,
   }) as MonthlyHistoryType;
 
-it("requires both retention and a grid investment for investor classics", () => {
-  const investment: MeaningfulDecisionType = {
-    key: "asset:3",
-    lever: "asset:3",
-    kind: "asset",
-    label: "Build gas",
+it("requires 80% retention without requiring a grid investment", () => {
+  const rate: MeaningfulDecisionType = {
+    key: "rate",
+    lever: "rate",
+    kind: "rate",
+    label: "Change rate",
     before: "0",
     after: "1",
     month: 0,
@@ -45,7 +45,7 @@ it("requires both retention and a grid investment for investor classics", () => 
       scenario(100),
       [row(2031, 12, 1, 799)],
       "Employee",
-      [investment],
+      [rate],
       false,
       1000,
     ),
@@ -55,7 +55,7 @@ it("requires both retention and a grid investment for investor classics", () => 
       scenario(100),
       [row(2031, 12, 1, 800)],
       "Employee",
-      [investment],
+      [rate],
       false,
       1000,
     ),
@@ -69,7 +69,7 @@ it("requires both retention and a grid investment for investor classics", () => 
       true,
       1000,
     ),
-  ).toMatch(/Build or upgrade/);
+  ).toBeUndefined();
 });
 
 describe("best reachable customers", () => {

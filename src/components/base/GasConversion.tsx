@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, DialogContentText, Typography } from "@mui/material";
+import { Button, Typography } from "@mui/material";
 import {
   FacilityOperatingType,
   GameType,
@@ -7,8 +7,10 @@ import {
 } from "../../Types";
 import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatPercent } from "../../helpers/Format";
 import ConfirmDialog from "./ConfirmDialog";
+import DecisionImpactPreview from "./DecisionImpactPreview";
+import { getInflationIndex } from "../../data/Economy";
 
 export default function GasConversion(props: {
   facility: FacilityOperatingType;
@@ -18,7 +20,14 @@ export default function GasConversion(props: {
   const [confirming, setConfirming] = React.useState(false);
   const quote = gasConversionQuote(props.facility, props.game);
   if (!quote || !props.onRetrofit) return null;
-  const shortfall = Math.max(0, quote.cost - currentCash(props.game));
+  const { facility, game } = props;
+  const cash = currentCash(game);
+  const shortfall = Math.max(0, quote.cost - cash);
+  const escalation =
+    getInflationIndex(game.date, game.startingYear, game.seed) /
+    (facility.costIndexAtBuild || 1);
+  const costChange = (before: number, after: number, unit: string) =>
+    `${formatMoneyConcise(before * escalation)} → ${formatMoneyConcise(after)}/${unit}`;
   return (
     <section
       className="facilityDetailSection"
@@ -47,6 +56,7 @@ export default function GasConversion(props: {
         <ConfirmDialog
           open
           isolateClicks
+          contentClassName="noPadding"
           title={`Convert ${props.facility.name} to combined cycle?`}
           confirmLabel={`Pay ${formatMoneyConcise(quote.cost)}`}
           confirmDisabled={shortfall > 0}
@@ -59,25 +69,67 @@ export default function GasConversion(props: {
             setConfirming(false);
           }}
         >
-          <DialogContentText>
-            The plant will be offline for six months. Fuel use becomes 6,266
-            Btu/kWh, start time becomes 90 minutes, and minimum output becomes
-            45%. Fixed upkeep, variable upkeep and start costs change to
-            combined-cycle costs.
-          </DialogContentText>
-          <DialogContentText>
-            At today's prices:{" "}
-            {formatMoneyConcise(quote.target.annualOperatingCost)}
-            /year fixed upkeep,{" "}
-            {formatMoneyConcise(quote.target.variableOperatingCostPerMWh ?? 0)}
-            /MWh variable upkeep, and{" "}
-            {formatMoneyConcise(quote.target.costPerStart ?? 0)}
-            /start. Operating costs follow inflation.
-          </DialogContentText>
-          <DialogContentText>
-            Paid in cash. Existing loans remain payable. Cancel before
-            completion for a full refund.
-          </DialogContentText>
+          <DecisionImpactPreview
+            facts={[
+              {
+                concept: "money",
+                label: "Cash purchase",
+                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - quote.cost)}`,
+                detail:
+                  "Existing loans stay payable. Cancel before completion for a full refund.",
+              },
+              {
+                concept: "time",
+                label: "Offline for",
+                value: "6 months",
+                detail: "Capacity and remaining life stay the same.",
+              },
+              {
+                concept: "fuel",
+                label: "Fuel use",
+                value: `${((facility.btuPerWh ?? 0) * 1000).toLocaleString("en-US")} → ${((quote.target.btuPerWh ?? 0) * 1000).toLocaleString("en-US")} Btu/kWh`,
+              },
+              {
+                concept: "time",
+                label: "Start time",
+                value: `${facility.spinMinutes} → ${quote.target.spinMinutes} minutes`,
+              },
+              {
+                concept: "supply",
+                label: "Minimum output",
+                value: `${formatPercent(facility.minimumStableOutput ?? 0)} → ${formatPercent(quote.target.minimumStableOutput ?? 0)}`,
+              },
+              {
+                concept: "money",
+                label: "Fixed upkeep",
+                value: costChange(
+                  facility.annualOperatingCost,
+                  quote.target.annualOperatingCost,
+                  "year",
+                ),
+                detail:
+                  "Operating costs are at today's prices and follow inflation.",
+              },
+              {
+                concept: "money",
+                label: "Variable upkeep",
+                value: costChange(
+                  facility.variableOperatingCostPerMWh ?? 0,
+                  quote.target.variableOperatingCostPerMWh ?? 0,
+                  "MWh",
+                ),
+              },
+              {
+                concept: "money",
+                label: "Start cost",
+                value: costChange(
+                  facility.costPerStart ?? 0,
+                  quote.target.costPerStart ?? 0,
+                  "start",
+                ),
+              },
+            ]}
+          />
         </ConfirmDialog>
       )}
     </section>

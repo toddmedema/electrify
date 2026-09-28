@@ -872,7 +872,6 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
-  requiresGridInvestment?: boolean;
   /** Optional requirement to serve a specific month without falling below a reliability target. */
   reliabilityObjective?: {
     year: number;

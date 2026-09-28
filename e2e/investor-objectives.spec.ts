@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { expectDialogToFit } from "./dialog-layout";
 
 for (const theme of ["light", "dark"]) {
-  test(`investor requirements explain retention and investment in ${theme}`, async ({
+  test(`investor requirements explain customer retention in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -18,7 +18,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText(
       "retain at least 80% of starting customers",
     );
-    await expect(dialog).toContainText("build or upgrade the grid");
+    await expect(dialog).not.toContainText("build or upgrade the grid");
     await expectDialogToFit(dialog);
     await page.screenshot({
       path: info.outputPath("investor-requirements.png"),
@@ -29,8 +29,8 @@ for (const theme of ["light", "dark"]) {
     await page
       .getByRole("button", { name: "All requirements", exact: true })
       .click();
-    await expect(page.getByRole("dialog")).toContainText(
-      "No grid investment yet",
+    await expect(page.getByRole("dialog")).not.toContainText(
+      "Invest in the grid",
     );
     await expect(page.getByRole("dialog")).toContainText(
       "80% of where you started",

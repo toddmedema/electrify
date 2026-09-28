@@ -108,23 +108,6 @@ export function getMissionStatus(game: GameType) {
       deadline: first + count,
     });
   }
-  if (scenario?.requiresGridInvestment) {
-    const invested = game.meaningfulDecisions.some((d) => d.kind === "asset");
-    requirements.push({
-      id: "investment",
-      label: "Invest in the grid",
-      current: invested ? "Grid investment made" : "No grid investment yet",
-      target: "Build or upgrade the grid",
-      compact: invested ? "Grid investment made" : "Build or upgrade the grid",
-      timing: "Required at term end",
-      status: invested
-        ? "completed"
-        : monthsRemaining === 0
-          ? "failed"
-          : "pending",
-      deadline: end,
-    });
-  }
   const retentionStart = scenario
     ? retentionBaseline(scenario, game.customerMarketSize)
     : undefined;
