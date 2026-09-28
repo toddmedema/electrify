@@ -1,3 +1,4 @@
+import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
 import { Button, DialogContentText, Typography } from "@mui/material";
@@ -19,7 +20,6 @@ import {
   formatPricePerMWh,
 } from "../../helpers/Format";
 import { facilityColor } from "../../Theme";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   facilityHazardStatus,
   facilityResilienceSummary,
@@ -165,7 +165,7 @@ function WeatherResilienceSection(props: {
   }, [focusHeading]);
   const hail = summary.upgrade === "hailResistant";
   const cost = summary.retrofitCost;
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const cash = currentCash(game);
   const shortfall = cost === undefined ? 0 : Math.max(0, cost - cash);
   const shortfallText = `${formatMoneyConcise(shortfall)} more cash needed`;
   const canOffer = !props.readOnly && !!onRetrofit && cost !== undefined;

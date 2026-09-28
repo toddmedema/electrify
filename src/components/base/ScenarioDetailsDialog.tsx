@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   Box,
@@ -12,7 +13,6 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { GameType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS } from "../../Constants";
-import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   deriveExpandedSummary,
@@ -55,7 +55,7 @@ function statusLabel(status: MissionRequirement["status"]): string {
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
   const units = useUnits();
-  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const scenario = activeScenario(game);
   if (!scenario) {
     return <Dialog open={false} />;
   }

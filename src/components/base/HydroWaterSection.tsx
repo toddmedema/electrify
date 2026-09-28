@@ -1,8 +1,8 @@
+import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { MONTH_NAMES, MONTHS, TICKS_PER_YEAR } from "../../Constants";
 import { MANUAL_ENTRY } from "./ManualEntries";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   formatPercent,
   formatWattHours,
@@ -36,7 +36,7 @@ function useReservoirOutlook(
       .join(","),
   ].join("|");
   return useAfterPaintValue(key, () => {
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    const now = currentTick(game);
     return now
       ? reservoirOutlook(
           now,
@@ -67,7 +67,7 @@ export default function HydroWaterSection(props: {
 }): React.JSX.Element {
   const { facility, game } = props;
   const outlook = useReservoirOutlook(game);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const capacityWh = facility.reservoirCapacityWh || 0;
   const heading = (
     <Typography component="h3" className="facilityDetailHeading">

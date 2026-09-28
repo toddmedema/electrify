@@ -1,3 +1,4 @@
+import { activeScenario, currentCash } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   Alert,
@@ -52,7 +53,6 @@ import {
   policyTotalCost,
   isOperatingPolicy,
 } from "../../helpers/Policies";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   formatPercent,
   formatMoneyConcise,
@@ -60,7 +60,6 @@ import {
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
-import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
 import {
   PolicyPreviewResult,
@@ -845,10 +844,9 @@ function ProgramsScreen({
   const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
   const preparedness = wildfirePreparedness(game);
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const cash = currentCash(game);
   const effective = game.date.monthsElapsed + 1;
-  const end =
-    getScenario(game.scenarioId, game.customScenario)?.durationMonths ?? 0;
+  const end = activeScenario(game)?.durationMonths ?? 0;
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   const policy = selected && selected !== "wildfire" ? selected : undefined;
   const current = policy ? programs[policy] : undefined;

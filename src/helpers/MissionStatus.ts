@@ -1,10 +1,10 @@
+import { activeScenario, currentTick } from "./GameSelectors";
 import {
   EvidenceTargetType,
   GameType,
   MonthlyHistoryType,
   TickPresentFutureType,
 } from "../Types";
-import { getScenario } from "../data/Scenarios";
 import { getTimeFromTimeline, MINUTES_PER_MONTH } from "./DateTime";
 import {
   absoluteMonth,
@@ -53,13 +53,13 @@ export function completedMissionHistory(game: GameType): MonthlyHistoryType[] {
 
 /** Presentation only: missing evidence never changes the canonical end-of-term evaluator. */
 export function getMissionStatus(game: GameType) {
-  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
   const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
   const end = game.startingYear * 12 + duration;
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const requirements: MissionRequirement[] = [];
   const objective = scenario?.reliabilityObjective;
   if (objective) {
@@ -256,7 +256,7 @@ export function projectedShortfall(
  * carried along; ordinary operating cash flow is already included in the projected balances.
  */
 export function cashRunwayMonths(game: GameType): number | undefined {
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
   const projection = selectProjection(game, now);
@@ -276,7 +276,7 @@ export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
 ): MissionRisk | undefined {
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   if (
     now &&
     now.minute <= game.date.minute &&

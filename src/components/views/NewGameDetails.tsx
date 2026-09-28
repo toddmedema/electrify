@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   collection,
@@ -102,8 +103,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    const scenario =
-      getScenario(props.game.scenarioId, props.game.customScenario) || null;
+    const scenario = activeScenario(props.game) || null;
     this.state = {
       scenario,
       location: getScenarioLocation(scenario) || null,

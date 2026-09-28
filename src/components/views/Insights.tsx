@@ -1,3 +1,8 @@
+import {
+  activeScenario,
+  activeScenarioOrDefault,
+  currentTick,
+} from "../../helpers/GameSelectors";
 import * as React from "react";
 import CustomerPrograms from "./CustomerPrograms";
 import {
@@ -50,7 +55,6 @@ import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
   getDateFromMinute,
-  getTimeFromTimeline,
   MINUTES_PER_MONTH,
   reduceHistories,
   summarizeHistory,
@@ -88,7 +92,6 @@ import {
   signature as projectionSignature,
   subscribeProjection,
 } from "../base/DeferredProjection";
-import { getScenario, SCENARIOS } from "../../data/Scenarios";
 import {
   chartPalette,
   demandTypeColors,
@@ -348,10 +351,7 @@ const VIEWPORT_ZOOM_FACTOR = 0.5;
 const VIEWPORT_PAN_FRACTION = 0.25;
 
 function scenarioEndMinute(game: GameType): number | undefined {
-  const months = getScenario(
-    game.scenarioId,
-    game.customScenario,
-  )?.durationMonths;
+  const months = activeScenario(game)?.durationMonths;
   return months ? months * MINUTES_PER_MONTH : undefined;
 }
 
@@ -1182,7 +1182,7 @@ export default class Insights extends React.Component<Props, State> {
   private requestStaleProjection() {
     const { game } = this.props;
     if (projectionReady(game)) return;
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    const now = currentTick(game);
     if (now) requestProjection(game, now);
   }
 
@@ -1201,8 +1201,7 @@ export default class Insights extends React.Component<Props, State> {
 
   private renderLevers(now: TickPresentFutureType) {
     const { game, onDelta } = this.props;
-    const scenario =
-      getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+    const scenario = activeScenarioOrDefault(game);
     const marketRate = getMarketRate(
       scenario.dollarsPerkWh,
       game.date,
@@ -1537,8 +1536,7 @@ export default class Insights extends React.Component<Props, State> {
             {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
               const value =
                 key === "interestRate"
-                  ? getTimeFromTimeline(game.date.minute, game.timeline)!
-                      .interestRate
+                  ? currentTick(game)!.interestRate
                   : summary[key as DerivedHistoryKeysType];
               return (
                 <TableRow key={key}>
@@ -1835,12 +1833,7 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         case "powerExchange":
-          body = (
-            <PowerExchangeSummary
-              game={game}
-              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
-            />
-          );
+          body = <PowerExchangeSummary game={game} now={currentTick(game)!} />;
           break;
         case "demandByType": {
           const demandTypes = demandTypesBySizeAtStart(
@@ -2177,7 +2170,7 @@ export default class Insights extends React.Component<Props, State> {
 
   public render() {
     const { game } = this.props;
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    const now = currentTick(game);
     if (!now) {
       return <span />;
     }
