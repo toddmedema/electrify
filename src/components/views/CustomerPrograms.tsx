@@ -9,17 +9,14 @@ import {
   CardHeader,
   Dialog,
   FormControlLabel,
-  IconButton,
   LinearProgress,
   Radio,
   RadioGroup,
   Skeleton,
   TextField,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
-import CloseIcon from "@mui/icons-material/Close";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
@@ -34,7 +31,6 @@ import {
   openPolicyDecision,
   schedulePolicy,
 } from "../../reducers/GameActions";
-import { setSpeed } from "../../reducers/Game";
 import {
   GameType,
   PolicyChangeType,
@@ -83,8 +79,7 @@ import {
   wildfireSeasonOdds,
   WildfirePreparednessType,
 } from "../../helpers/Wildfire";
-import { isDesktopScreen } from "../../Globals";
-import { buildSpeedOptions } from "../base/GameAppBar";
+import CatalogTitleBar from "../base/CatalogTitleBar";
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
@@ -756,47 +751,23 @@ function ProgramsScreen({
       className="customerProgramsScreen"
     >
       <header className="constructionHeader">
-        <Toolbar className="constructionTitleBar" disableGutters>
-          <IconButton
-            color="primary"
-            onClick={onClose}
-            aria-label="Close customer programs"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-          <Typography
-            variant="h6"
-            component="h1"
-            id="program-title"
-            className="constructionTitle"
-          >
-            <span className="iconLabel">
-              <GroupsIcon fontSize="small" aria-hidden />
-              {/* Phones abbreviate the title so it still shares a line with close */}
+        <CatalogTitleBar
+          disableGutters
+          icon={<GroupsIcon fontSize="small" aria-hidden />}
+          title={
+            // Phones abbreviate the title so it still shares a line with close
+            <>
               <span className="programsTitleLong">Customer programs</span>
               <span className="programsTitleShort">Programs</span>
-            </span>
-            <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
-            <span
-              className="weak constructionCash"
-              aria-label={`Available cash ${formatMoneyStable(cash)}`}
-            >
-              {formatMoneyStable(cash)} cash
-            </span>
-          </Typography>
-          {/* Like the build screen, the programs screen covers the game bar, so the speed
-              control lives here. The clock opened paused; another speed is kept on close */}
-          {game.inGame && (
-            <div className="constructionSpeed">
-              {buildSpeedOptions({
-                speed: game.speed,
-                onSpeedChange: (speed) => dispatch(setSpeed(speed)),
-                desktop: isDesktopScreen(),
-              })}
-            </div>
-          )}
-        </Toolbar>
+            </>
+          }
+          titleAdornment={<ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />}
+          titleComponent="h1"
+          titleId="program-title"
+          cash={cash}
+          onClose={onClose}
+          closeLabel="Close customer programs"
+        />
       </header>
       <div
         className="customerProgramsBody"

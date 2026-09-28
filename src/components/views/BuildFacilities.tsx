@@ -1,11 +1,9 @@
 import * as React from "react";
-import { IconButton, Tab, Tabs, Toolbar, Typography } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Tab, Tabs } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import {
   buildTransmissionLine,
-  setSpeed,
   setTradingPolicy,
   upgradeTransmissionLine,
 } from "../../reducers/Game";
@@ -14,10 +12,8 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatMoneyStable } from "../../helpers/Format";
-import { isDesktopScreen } from "../../Globals";
 import ConceptIcon from "../base/ConceptIcon";
-import { buildSpeedOptions } from "../base/GameAppBar";
+import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
@@ -49,40 +45,15 @@ export default function BuildFacilities(): React.JSX.Element {
   return (
     <div id="topbar" className="flexContainer screenCatalog buildFacilities">
       <header className="constructionHeader">
-        <Toolbar className="constructionTitleBar">
-          <IconButton
-            id="close-button"
-            color="primary"
-            onClick={close}
-            aria-label="close"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-          <Typography variant="h6" className="constructionTitle">
-            <span className="iconLabel">
-              <ConceptIcon concept="build" fontSize="small" />
-              Build
-            </span>
-            <span
-              className="weak constructionCash"
-              aria-label={`Available cash ${formatMoneyStable(cash)}`}
-            >
-              {formatMoneyStable(cash)} cash
-            </span>
-          </Typography>
-          {/* The build screen carries no game bar, so the speed control lives here. The clock
-              opened paused; picking another speed is kept when the screen closes */}
-          {game.inGame && (
-            <div id="speedChangeButtons">
-              {buildSpeedOptions({
-                speed: game.speed,
-                onSpeedChange: (speed) => dispatch(setSpeed(speed)),
-                desktop: isDesktopScreen(),
-              })}
-            </div>
-          )}
-        </Toolbar>
+        <CatalogTitleBar
+          icon={<ConceptIcon concept="build" fontSize="small" />}
+          title="Build"
+          cash={cash}
+          onClose={close}
+          closeButtonId="close-button"
+          // The build screen stands in for the game bar, so tutorials find its speeds here
+          speedControlId="speedChangeButtons"
+        />
         {!introductoryChoices && (
           <Tabs
             className="constructionTabs"
