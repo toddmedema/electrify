@@ -115,6 +115,19 @@ describe("ending a run once its objective is decided", () => {
   }, 120000);
 });
 
+describe("tolerant full-demand objectives", () => {
+  it("accepts a hair's shortfall but not a real one", () => {
+    const heatwave = scenario(108);
+    expect(heatwave.reliabilityObjective?.minimumDemandServed).toBe(0.995);
+    expect(
+      scenarioObjectiveFailure(heatwave, [row(2026, 7, 0.9996)]),
+    ).toBeUndefined();
+    expect(scenarioObjectiveFailure(heatwave, [row(2026, 7, 0.99)])).toMatch(
+      /served 99\.00% .* requires 99\.5%\.$/,
+    );
+  });
+});
+
 describe("required share formatting", () => {
   it("keeps a decimal only when the requirement has one", () => {
     expect(formatRequiredShare(1)).toBe("100%");

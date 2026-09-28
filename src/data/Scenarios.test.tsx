@@ -323,7 +323,7 @@ describe("authored starting fleets", () => {
       reliabilityObjective: {
         year: 2021,
         month: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
         label: "February 2021 freeze",
       },
     });
@@ -369,7 +369,7 @@ describe("authored starting fleets", () => {
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
     });
     expect(heatwave).toMatchObject({
       name: "Heatwave + Drought",
@@ -412,7 +412,7 @@ describe("authored starting fleets", () => {
         year: 2025,
         month: 1,
         durationMonths: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
       },
     });
     expect(wildfire.briefing?.threat).toMatch(

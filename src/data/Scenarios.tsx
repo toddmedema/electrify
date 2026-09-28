@@ -1267,7 +1267,7 @@ export const SCENARIOS: ScenarioType[] = [
     reliabilityObjective: {
       year: 2021,
       month: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "February 2021 freeze",
     },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
@@ -1323,7 +1323,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2026 heatwave and drought",
     },
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
@@ -1386,7 +1386,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 7,
       durationMonths: 18,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "possible nuclear shutdown period and recovery",
     },
     facilities: [
@@ -1436,7 +1436,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2025,
       month: 1,
       durationMonths: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "January and February 2025 wildfire emergency",
     },
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
@@ -1505,7 +1505,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2022,
       month: 1,
       durationMonths: 12,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2022, the worst year of the shortage",
     },
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
@@ -1675,7 +1675,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2024,
       month: 5,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "the record summer of 2024",
     },
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,

@@ -84,7 +84,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
