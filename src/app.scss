@@ -59,6 +59,9 @@
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-contrast: #f5f5f5;
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
+  /* blue800, primaryDarkColor in Theme.tsx: a fill that carries small label text, 5.3:1 under
+     --interactive-contrast where the logo blue manages only 3.4:1 */
+  --interactive-strong: #1565c0;
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
@@ -116,6 +119,7 @@
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
   --interactive-blue: #629be1;
+  --interactive-strong: var(--interactive-blue);
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
   --spark-baseline: rgba(148, 163, 184, 0.34);
@@ -2770,9 +2774,11 @@ $pane_header_height: 48px;
     }
 
     @media (prefers-reduced-motion: reduce) {
+      // Named as specifically as the circle's growth rule, or that one still wins
       .homeEnergyPulse,
       .homeSmokePuff,
-      .homeSmokePuff * {
+      .homeSmokePuff *,
+      .homeSmokePuff circle {
         animation: none;
       }
 
@@ -3231,6 +3237,12 @@ $pane_header_height: 48px;
     font: inherit;
     font-size: var(--font-size-caption-sm);
     font-weight: 600;
+
+    // A cluster's count is small text on the fill, so it takes the stronger blue
+    &.cluster {
+      background: var(--interactive-strong);
+      background-clip: padding-box;
+    }
 
     &.marker {
       background: transparent;
