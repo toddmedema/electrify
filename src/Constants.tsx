@@ -56,13 +56,33 @@ export const DIFFICULTIES = {
   },
 } satisfies Record<DifficultyType, DifficultyMultipliersType>;
 
-export const DIFFICULTY_LABELS: Record<string, string> = {
+// Every difficulty, easiest first, which is the order the pickers offer them in
+export const DIFFICULTY_IDS: readonly DifficultyType[] = [
+  "Intern",
+  "Employee",
+  "Manager",
+  "VP",
+  "CEO",
+];
+
+// What players see: the IDs are job titles kept for saves and the leaderboard
+export const DIFFICULTY_LABELS: Record<DifficultyType, string> = {
   Intern: "Beginner",
   Employee: "Easy",
   Manager: "Medium",
   VP: "Hard",
   CEO: "Expert",
 };
+
+/**
+ * The label for a difficulty ID that may have come from outside the game, such as a leaderboard
+ * row, falling back to the raw ID rather than rendering blank.
+ */
+export function difficultyLabel(difficulty: string): string {
+  return (
+    (DIFFICULTY_LABELS as Record<string, string>)[difficulty] || difficulty
+  );
+}
 
 export const LOCATIONS = {
   PIT: {
@@ -156,12 +176,12 @@ export const TICK_MS = {
   ULTRA: 1000 / 120,
 };
 
-// Fallbacks for the screens that run before any economic data has been loaded, and the anchor
-// the projected cycles rest near. The played game reads its rates from data/Economy instead.
-export const INFLATION = 0.03;
+// Inflation and interest rates live in data/Economy (BASE_INFLATION, BASE_PRIME), which the fuel
+// trend in data/FuelPrices also escalates with.
 export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const DOWNPAYMENT_PERCENT = 0.2;
-export const INTEREST_RATE_YEARLY = 0.04;
+// The reducer's initial rate before a run sets its own; matches data/Economy's BASE_PRIME
+export const INTEREST_RATE_YEARLY = 0.05;
 export const LOAN_MONTHS = 30 * 12;
 
 // Embodied emissions from building one watt of interconnector, for a corridor priced like the
@@ -263,6 +283,10 @@ export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
     // net biogenic emissions depend on the feedstock and regrowth and cannot be assumed zero.
     // https://www.eia.gov/outlooks/capitalcost/pdf/updated_capcost.pdf
     kgCO2ePerBtu: 0.000088451,
+    // Carbon-pricing schemes exempt biogenic combustion CO2: EU ETS zero-rates sustainable
+    // biomass, and RGGI, UK ETS and Canada's fuel charge and OBPS all exclude it. It still
+    // counts towards the company's emissions and score.
+    feeExempt: true,
   },
   "Natural Gas": {
     kgCO2ePerBtu: 0.00005291, // Natural gas: 52.91 kg CO2/MMBtu.
@@ -282,6 +306,12 @@ export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
     kgCO2ePerBtu: 0,
   },
 };
+
+/** The CO2 per Btu a carbon fee is charged on, which excludes fee-exempt biogenic fuels. */
+export function feeableKgCO2ePerBtu(fuel: FuelNameType): number {
+  const entry = FUELS[fuel];
+  return !entry || entry.feeExempt ? 0 : entry.kgCO2ePerBtu;
+}
 
 export const PRICED_FUELS: readonly PricedFuelNameType[] = [
   "Biomass",
@@ -303,8 +333,6 @@ export const WEATHER_DEPENDENT_FUELS: readonly FuelNameType[] = [
 export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
-export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click
-export const AUDIO_COMMAND_DEBOUNCE_MS = 300;
 export const MUSIC_INTENSITY_MAX = 10;
 
 export interface MusicDefinition {

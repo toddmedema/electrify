@@ -2,6 +2,9 @@ import { SCENARIOS } from "../data/Scenarios";
 import { MonthlyHistoryType, ScenarioType } from "../Types";
 import {
   computeScoreBreakdown,
+  PUBLIC_RATE_POINTS_PER_CENT,
+  scoreLabel,
+  scoreRuleText,
   publicRateScoreChange,
   publicRateScore,
   publicRateYearContribution,
@@ -233,5 +236,80 @@ describe("publicRateYearContribution", () => {
     expect(
       publicRateYearContribution(0.1, { supplyWh: 0 }, { supplyWh: 0 }, 0.2),
     ).toBe(0);
+  });
+});
+
+describe("SCORE_RULES", () => {
+  const summary: MonthlyHistoryType = {
+    ...EMPTY_HISTORY,
+    supplyWh: 12.4e12,
+    demandWh: 13.4e12,
+    netWorth: 2.5e9,
+    customers: 350000,
+    kgco2e: 3e9,
+    revenue: 1.2e9,
+  };
+
+  it("scores an investor-owned run in the historical order and weights", () => {
+    const scenario = SCENARIOS.find((s) => s.ownership === "Investor")!;
+    const breakdown = computeScoreBreakdown(scenario, summary, 0);
+    expect(Object.keys(breakdown)).toEqual([
+      "supply",
+      "netWorth",
+      "customers",
+      "emissions",
+      "blackouts",
+    ]);
+    expect(breakdown).toEqual({
+      supply: 12,
+      netWorth: 100,
+      customers: 7,
+      emissions: -6,
+      blackouts: -8,
+    });
+  });
+
+  it("scores a public run on rates rather than net worth", () => {
+    const scenario = SCENARIOS.find((s) => s.ownership === "Public")!;
+    const breakdown = computeScoreBreakdown(scenario, summary, 0);
+    expect(Object.keys(breakdown)).toEqual([
+      "rate",
+      "supply",
+      "emissions",
+      "blackouts",
+    ]);
+    expect(breakdown.supply).toBe(124);
+    expect(breakdown.emissions).toBe(-15);
+    expect(breakdown.blackouts).toBe(-10);
+  });
+
+  it("writes rule text from the same weights", () => {
+    const investor = scoreRuleText("Investor", 0.1, "1 Mt");
+    expect(Object.keys(investor)).toEqual([
+      "netWorth",
+      "customers",
+      "supply",
+      "emissions",
+      "blackouts",
+    ]);
+    expect(investor.supply).toBe(
+      "Earn 1 point per terawatt-hour (TWh) of electricity supplied.",
+    );
+    expect(investor.emissions).toBe(
+      "Lose 2 points per 1 Mt of greenhouse gas emissions.",
+    );
+    const publicText = scoreRuleText("Public", 0.12, "1 Mt");
+    expect(publicText.rate).toContain(
+      `Earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each $0.01/kWh`,
+    );
+    expect(publicText.rate).toContain("$0.12/kWh target");
+    expect(publicText.blackouts).toBe(
+      "Lose 10 points per TWh of customer demand not served.",
+    );
+  });
+
+  it("labels known categories and passes unknown ones through", () => {
+    expect(scoreLabel("netWorth")).toBe("final net worth");
+    expect(scoreLabel("legacyKey")).toBe("legacyKey");
   });
 });

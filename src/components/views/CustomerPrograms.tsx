@@ -1,32 +1,27 @@
+import { activeScenario, currentCash } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   Alert,
   Avatar,
   Box,
   Button,
-  Card,
-  CardActionArea,
-  CardHeader,
   Dialog,
   FormControlLabel,
-  IconButton,
   LinearProgress,
   Radio,
   RadioGroup,
   Skeleton,
   TextField,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import GroupsIcon from "@mui/icons-material/Groups";
-import CloseIcon from "@mui/icons-material/Close";
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import FactoryIcon from "@mui/icons-material/Factory";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import NavigableCardRow from "../base/NavigableCardRow";
 import {
   cancelPolicy,
   chooseScenarioResponse,
@@ -34,7 +29,6 @@ import {
   openPolicyDecision,
   schedulePolicy,
 } from "../../reducers/GameActions";
-import { setSpeed } from "../../reducers/Game";
 import {
   GameType,
   PolicyChangeType,
@@ -53,22 +47,17 @@ import {
   policyAvailable,
   policyBudget,
   policyTotalCost,
-  programCustomers,
   isOperatingPolicy,
 } from "../../helpers/Policies";
 import {
-  getDateFromMinute,
-  getTimeFromTimeline,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
-import {
+  formatPercent,
   formatMoneyConcise,
   formatMoneyStable,
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
-import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
+import { useWorkerRequest } from "../base/useWorkerRequest";
 import {
   PolicyPreviewResult,
   previewPolicy,
@@ -83,8 +72,14 @@ import {
   wildfireSeasonOdds,
   WildfirePreparednessType,
 } from "../../helpers/Wildfire";
-import { isDesktopScreen } from "../../Globals";
-import { buildSpeedOptions } from "../base/GameAppBar";
+import CatalogTitleBar from "../base/CatalogTitleBar";
+import {
+  buildoutImpact,
+  choiceStatus,
+  labelMonth,
+  programStatus,
+  pendingLabel,
+} from "../../helpers/PolicyStatus";
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
@@ -98,15 +93,6 @@ import {
 // it appears keeps the dialog from changing height when an estimate arrives.
 const NOTE_SLOT = { minHeight: "2lh" };
 
-// A fire season can open before the run did, so months may be negative.
-const labelMonth = (game: GameType, month: number) => {
-  const d = getDateFromMinute(
-    (((month % 12) + 12) % 12) * MINUTES_PER_MONTH,
-    game.startingYear + Math.floor(month / 12),
-  );
-  return `${d.month} ${d.year}`;
-};
-
 const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   efficiency: EnergySavingsLeafIcon,
   solar: SolarPowerIcon,
@@ -119,58 +105,6 @@ const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
   efficiency: "Efficiency",
   solar: "Rooftop solar",
 };
-
-/** Build-out programs read as projects; operating offers are simply on or off. */
-function programStatus(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  if (isOperatingPolicy(id)) return program.tier;
-  const buildout = id as BuildoutPolicyId;
-  if (buildoutComplete(program.adoption))
-    return program.completedMonth === undefined
-      ? "Completed"
-      : `Completed ${labelMonth(game, program.completedMonth)}`;
-  if (program.tier === "On")
-    return `In progress · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
-  if (program.adoption > 0)
-    return `Paused · month ${buildoutMonthsDone(buildout, program.adoption)} of ${buildoutMonths(buildout)}`;
-  return "Not started";
-}
-
-function pendingLabel(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  const pending = program.pending!;
-  const when = labelMonth(game, pending.month);
-  if (isOperatingPolicy(id))
-    return pending.tier === "Off"
-      ? `Turns off ${when}`
-      : `${program.tier === "On" ? "Window moves" : "Turns on"} ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;
-  if (pending.tier === "Off") return `Pauses ${when}`;
-  return program.adoption > 0 ? `Resumes ${when}` : `Starts ${when}`;
-}
-
-/** The list's status line: the current state, then any change scheduled for next month. */
-function choiceStatus(
-  game: GameType,
-  id: PolicyId,
-  program: PolicyProgramType,
-): string {
-  const status = programStatus(game, id, program);
-  if (!program.pending) return status;
-  const pending = pendingLabel(game, id, program);
-  return `${status} · ${pending[0].toLowerCase()}${pending.slice(1)}`;
-}
-
-function buildoutImpact(game: GameType, id: BuildoutPolicyId): string {
-  return id === "solar"
-    ? `${formatWatts(POLICIES.solar.cap * programCustomers(game))} of rooftop panels`
-    : `Home and business use ${Math.round(POLICIES.efficiency.applianceSaving * 100)}% lower, heating and cooling ${Math.round(POLICIES.efficiency.weatherSaving * 100)}% lower`;
-}
 
 /** Project facts and progress for a finite rebate build-out. */
 function BuildoutSummary({
@@ -287,80 +221,44 @@ interface EstimateRequest<T> {
 
 /**
  * Runs one estimate in the preview worker. A result only counts for the request and snapshot it
- * answers, so a stale reply can never enable an action.
+ * answers, so a stale reply can never enable an action. The worker reloads its data over the
+ * network, which fails offline; the page already has that data loaded, so a failed worker falls
+ * back to estimating here.
  */
 function useEstimate<T>(
   request: EstimateRequest<T> | undefined,
   snapshot: GameType,
 ): { result?: T; error?: string } {
-  const [preview, setPreview] = React.useState<{
-    key: string;
-    snapshot: GameType;
-    result?: T;
-    error?: string;
-  }>();
-  const latest = React.useRef(request);
-  latest.current = request;
-  const key = request?.key;
-  React.useEffect(() => {
-    const current = latest.current;
-    if (!key || !current) return;
-    let worker: Worker | undefined;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      try {
-        worker = createPolicyPreviewWorker();
-        // The worker reloads its data over the network, which fails offline. The page already
-        // has that data loaded, so fall back to estimating here.
-        const estimateHere = () => {
-          if (cancelled) return;
-          try {
-            setPreview({ key, snapshot, result: current.estimate() });
-          } catch (_error) {
-            setPreview({
-              key,
-              snapshot,
-              error:
-                "Could not estimate this change. Reopen the program to retry.",
-            });
-          }
-        };
-        worker.onmessage = (event) => {
-          if (event.data?.error) estimateHere();
-          else if (!cancelled) setPreview({ key, snapshot, ...event.data });
-        };
-        worker.onerror = (event: ErrorEvent) => {
-          // An unhandled worker error is re-raised on the window. The preview falls back to
-          // the page itself, so it must not also be reported as an uncaught runtime error.
-          event.preventDefault();
-          estimateHere();
-        };
-        worker.postMessage(current.message);
-      } catch (_error) {
-        setPreview({
-          key,
-          snapshot,
-          error: "Could not start the preview. Reopen the program to retry.",
-        });
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      worker?.terminate();
+  const state = useWorkerRequest(
+    request && {
+      key: request.key,
+      scope: snapshot,
+      message: () => request.message,
+      fallback: request.estimate,
+    },
+    {
+      createWorker: () => createPolicyPreviewWorker(),
+      debounceMs: 250,
+      read: (data: { result?: T; error?: string } | undefined) =>
+        data && !data.error ? { result: data.result as T } : undefined,
+    },
+  );
+  if (state.status === "ready") return { result: state.result };
+  if (state.status === "error") {
+    return {
+      error:
+        state.reason === "startup"
+          ? "Could not start the preview. Reopen the program to retry."
+          : "Could not estimate this change. Reopen the program to retry.",
     };
-  }, [key, snapshot]);
-  const settled =
-    !!key && preview?.key === key && preview.snapshot === snapshot;
-  return settled ? { result: preview.result, error: preview.error } : {};
+  }
+  return {};
 }
 
 /** Keep the standing program's status and yearly budget visible in the list. */
 function preparednessStatus(preparedness: WildfirePreparednessType): string {
-  return `${preparedness.active ? "On" : "Off"} · ${percent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
+  return `${preparedness.active ? "On" : "Off"} · ${formatPercent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
 }
-
-const percent = (share: number) => `${Math.round(share * 100)}%`;
 
 /** Season facts and a simulated typical wildfire, met with and without funded crews. */
 function WildfireDetails({
@@ -422,13 +320,13 @@ function WildfireDetails({
         sx={{ display: "grid", gap: 1.5 }}
       >
         <Typography variant="subtitle2">
-          {percent(effectiveness)} effective
+          {formatPercent(effectiveness)} effective
         </Typography>
         <LinearProgress
           variant="determinate"
           value={effectiveness * 100}
           aria-label="Wildfire preparedness effectiveness"
-          aria-valuetext={`${percent(effectiveness)} effective · ${progress}`}
+          aria-valuetext={`${formatPercent(effectiveness)} effective · ${progress}`}
           color={effectiveness >= 1 ? "success" : "primary"}
           sx={{ height: 8, borderRadius: 1 }}
         />
@@ -495,19 +393,19 @@ function WildfireDetails({
               <Box role="status">
                 <Typography>
                   Effectiveness at this fire: {offLabel}{" "}
-                  {percent(result.standardEffectiveness)} → {onLabel}{" "}
-                  {percent(result.preparedEffectiveness)}
+                  {formatPercent(result.standardEffectiveness)} → {onLabel}{" "}
+                  {formatPercent(result.preparedEffectiveness)}
                 </Typography>
                 <Typography>
                   Customer load disconnected:{" "}
-                  {percent(standard.disconnectedDemand)} →{" "}
-                  {percent(prepared.disconnectedDemand)}
+                  {formatPercent(standard.disconnectedDemand)} →{" "}
+                  {formatPercent(prepared.disconnectedDemand)}
                 </Typography>
                 {standard.selectedFacilityNames.length > 0 && (
                   <Typography>
                     {standard.selectedFacilityNames.join(", ")} limited to{" "}
-                    {percent(standard.outputMultiplier)} →{" "}
-                    {percent(prepared.outputMultiplier)} output
+                    {formatPercent(standard.outputMultiplier)} →{" "}
+                    {formatPercent(prepared.outputMultiplier)} output
                   </Typography>
                 )}
                 <Typography>
@@ -536,6 +434,339 @@ function WildfireDetails({
         </>
       )}
     </Box>
+  );
+}
+
+/** The catalog of programs, grouped by what kind of commitment each one is. */
+function ProgramList({
+  game,
+  programs,
+  policiesOn,
+  preparedness,
+  onOpen,
+  onOpenWildfire,
+}: {
+  game: GameType;
+  programs: Record<PolicyId, PolicyProgramType>;
+  policiesOn: boolean;
+  preparedness: WildfirePreparednessType | undefined;
+  onOpen: (id: PolicyId) => void;
+  onOpenWildfire: () => void;
+}) {
+  const finished = (id: PolicyId) =>
+    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
+  // Rows share the scenario pick list's card, so both catalogs scan the same way.
+  const row = ({
+    id,
+    name,
+    status,
+    description,
+    Icon,
+    done,
+    active,
+    onOpen: open,
+  }: {
+    id: string;
+    name: string;
+    status: string;
+    description?: string;
+    Icon: typeof ScheduleIcon;
+    done?: boolean;
+    active?: boolean;
+    onOpen: () => void;
+  }) => (
+    <NavigableCardRow
+      key={id}
+      className="customerProgramItem"
+      done={done}
+      active={active}
+      ariaLabel={`${name} · ${status}`}
+      ariaDescribedBy={description ? `program-description-${id}` : undefined}
+      onOpen={open}
+      avatar={
+        <Avatar className="customerProgramIcon">
+          <Icon aria-hidden />
+        </Avatar>
+      }
+      title={
+        <span className="customerProgramTitle">
+          <span>{name}</span>
+          <span className="customerProgramStatus">{status}</span>
+        </span>
+      }
+      description={
+        description && (
+          <span id={`program-description-${id}`}>{description}</span>
+        )
+      }
+    />
+  );
+  const choice = (id: PolicyId) => {
+    const done = finished(id);
+    return row({
+      id,
+      name: POLICIES[id].name,
+      status: choiceStatus(game, id, programs[id]),
+      description: done ? undefined : POLICIES[id].description,
+      Icon: PROGRAM_ICONS[id],
+      done,
+      active: !done && (programs[id].tier === "On" || !!programs[id].pending),
+      onOpen: () => onOpen(id),
+    });
+  };
+  const section = (title: string, rows: React.ReactNode[]) =>
+    rows.length > 0 && (
+      <Box
+        component="section"
+        aria-label={title}
+        className="customerProgramSection"
+      >
+        <Typography component="h3" variant="subtitle2">
+          {title}
+        </Typography>
+        {rows}
+      </Box>
+    );
+  return (
+    <Box className="customerProgramList">
+      <Typography variant="body2" color="textSecondary">
+        {preparedness
+          ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
+          : "Changes start next month."}
+      </Typography>
+      {policiesOn &&
+        section(
+          "Rebate projects",
+          BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
+        )}
+      {policiesOn &&
+        section(
+          "Rates and contracts",
+          POLICY_IDS.filter(isOperatingPolicy).map(choice),
+        )}
+      {preparedness &&
+        section("Hazard readiness", [
+          row({
+            id: "wildfire",
+            name: "Wildfire preparedness",
+            status: preparednessStatus(preparedness),
+            description:
+              "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
+            Icon: LocalFireDepartmentIcon,
+            active: preparedness.active,
+            onOpen: onOpenWildfire,
+          }),
+        ])}
+      {policiesOn &&
+        section("Completed", POLICY_IDS.filter(finished).map(choice))}
+    </Box>
+  );
+}
+
+/** One demand program: what it does, its settings, and an estimate of the change. */
+function PolicyProgramDetail({
+  game,
+  selected,
+  current,
+  buildout,
+  complete,
+  cancelling,
+  operating,
+  effective,
+  end,
+  month,
+  tier,
+  onTierChange,
+  startHour,
+  onStartHourChange,
+  result,
+  error,
+  onClose,
+  onViewDemand,
+}: {
+  game: GameType;
+  selected: PolicyId;
+  current: PolicyProgramType;
+  buildout: BuildoutPolicyId | undefined;
+  complete: boolean;
+  cancelling: boolean;
+  operating: boolean;
+  effective: number;
+  end: number;
+  month: number;
+  tier: PolicyTier;
+  onTierChange: (tier: PolicyTier) => void;
+  startHour: number;
+  onStartHourChange: (hour: number) => void;
+  result: PolicyPreviewResult | undefined;
+  error: string | undefined;
+  onClose: () => void;
+  onViewDemand: () => void;
+}) {
+  const peakBefore = result ? Math.max(...result.current) : 0;
+  const peakAfter = result ? Math.max(...result.changed) : 0;
+  return (
+    <>
+      <Typography>
+        {complete
+          ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
+          : POLICIES[selected].description}
+      </Typography>
+      {!complete && (
+        <details className="customerProgramHowItWorks">
+          <summary>How it works</summary>
+          <Typography sx={{ mt: 1 }}>{POLICIES[selected].mechanism}</Typography>
+        </details>
+      )}
+      {current.pending && (
+        // A standing notice, not an interruption: it is already true when the card opens.
+        <Alert severity="info" role="status">
+          {pendingLabel(game, selected, current)}
+        </Alert>
+      )}
+      {buildout ? (
+        <BuildoutSummary
+          game={game}
+          id={buildout}
+          program={current}
+          effective={effective}
+          end={end}
+        />
+      ) : (
+        <>
+          <RadioGroup
+            row
+            aria-label="Program status"
+            value={tier}
+            onChange={(e) => {
+              const next = POLICY_TIERS.find((t) => t === e.target.value);
+              if (next) onTierChange(next);
+            }}
+          >
+            {POLICY_TIERS.map((choice) => (
+              <FormControlLabel
+                key={choice}
+                value={choice}
+                control={<Radio />}
+                sx={{ minHeight: 44, m: 0, flex: 1 }}
+                label={choice}
+              />
+            ))}
+          </RadioGroup>
+          {tier !== "Off" && (
+            <TextField
+              select
+              fullWidth
+              label="Daily window"
+              value={startHour}
+              onChange={(event) =>
+                onStartHourChange(Number(event.target.value))
+              }
+              slotProps={{
+                select: { native: true },
+                htmlInput: { style: { minHeight: 24 } },
+              }}
+              helperText={
+                selected === "timeOfUse"
+                  ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                  : undefined
+              }
+            >
+              {Array.from({ length: 24 }, (_, hour) => (
+                <option key={hour} value={hour}>
+                  {policyWindowLabel(hour)}
+                </option>
+              ))}
+            </TextField>
+          )}
+        </>
+      )}
+      {complete || cancelling ? null : effective >= end ? (
+        <Alert severity="info">
+          This run ends before another program change could take effect.
+        </Alert>
+      ) : (
+        <>
+          <Typography component="h3" variant="subtitle1">
+            Estimated utility demand · {labelMonth(game, month)}
+          </Typography>
+          {error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : !result ? (
+            // Mirrors the loaded layout line for line so the dialog keeps its height
+            // when the estimate arrives instead of jumping under the player's pointer
+            <>
+              <Typography variant="body2">
+                Current plan ━ · With this change ┄
+              </Typography>
+              <PolicyDemandChartPlaceholder />
+              <Box aria-hidden>
+                {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
+                  <Typography key={i}>
+                    <Skeleton width={i % 2 ? "60%" : "80%"} />
+                  </Typography>
+                ))}
+                <Typography variant="body2" sx={NOTE_SLOT}>
+                  &nbsp;
+                </Typography>
+              </Box>
+            </>
+          ) : (
+            <>
+              <Typography variant="body2">
+                Current plan ━ · With this change ┄
+              </Typography>
+              <PolicyDemandChart
+                current={result.current}
+                changed={result.changed}
+              />
+              <Box role="status">
+                <Typography>
+                  Peak demand: {formatWatts(peakBefore)} →{" "}
+                  {formatWatts(peakAfter)}
+                </Typography>
+                {!operating && (
+                  <Typography>
+                    Electricity supplied:{" "}
+                    {formatWattHours(result.before.supplyWh)} →{" "}
+                    {formatWattHours(result.after.supplyWh)}
+                  </Typography>
+                )}
+
+                {formatWatts(peakBefore) === formatWatts(peakAfter) ||
+                Math.abs(peakAfter - peakBefore) < peakBefore * 0.001 ? (
+                  <Typography variant="body2" sx={NOTE_SLOT}>
+                    Little change in peak demand.{" "}
+                    {operating
+                      ? "Only eligible loads respond. Try a different daily window to target your peak."
+                      : selected === "solar"
+                        ? "Daylight savings may leave the evening peak unchanged."
+                        : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" sx={NOTE_SLOT} aria-hidden>
+                    &nbsp;
+                  </Typography>
+                )}
+              </Box>
+              {result.after.cash < 0 && (
+                <Alert severity="warning">
+                  Projected cash is negative. Existing debt rules still apply.
+                </Alert>
+              )}
+            </>
+          )}
+        </>
+      )}
+      <Button
+        onClick={() => {
+          onClose();
+          onViewDemand();
+        }}
+      >
+        View demand
+      </Button>
+    </>
   );
 }
 
@@ -575,10 +806,9 @@ function ProgramsScreen({
   const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
   const preparedness = wildfirePreparedness(game);
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash ?? 0;
+  const cash = currentCash(game);
   const effective = game.date.monthsElapsed + 1;
-  const end =
-    getScenario(game.scenarioId, game.customScenario)?.durationMonths ?? 0;
+  const end = activeScenario(game)?.durationMonths ?? 0;
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   const policy = selected && selected !== "wildfire" ? selected : undefined;
   const current = policy ? programs[policy] : undefined;
@@ -638,8 +868,6 @@ function ProgramsScreen({
     (!operating ||
       tier === "Off" ||
       startHour === (current?.pending?.startHour ?? current?.startHour ?? 17));
-  const finished = (id: PolicyId) =>
-    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
   const open = (id: PolicyId) => {
     const program = programs[id];
     setSelected(id);
@@ -659,87 +887,6 @@ function ProgramsScreen({
         (program.tier !== "Off" ? 17 : suggestedPolicyStartHour(game)),
     );
   };
-  // Rows share the scenario pick list's card, so both catalogs scan the same way.
-  const row = ({
-    id,
-    name,
-    status,
-    description,
-    Icon,
-    done,
-    active,
-    onOpen,
-  }: {
-    id: string;
-    name: string;
-    status: string;
-    description?: string;
-    Icon: typeof ScheduleIcon;
-    done?: boolean;
-    active?: boolean;
-    onOpen: () => void;
-  }) => (
-    <Card
-      key={id}
-      className="build-list-item missionItem customerProgramItem"
-      data-completed={done || undefined}
-      data-active={active || undefined}
-    >
-      <CardActionArea
-        aria-label={`${name} · ${status}`}
-        aria-describedby={description ? `program-description-${id}` : undefined}
-        onClick={onOpen}
-      >
-        <CardHeader
-          avatar={
-            <Avatar className="customerProgramIcon">
-              <Icon aria-hidden />
-            </Avatar>
-          }
-          title={
-            <span className="customerProgramTitle">
-              <span>{name}</span>
-              <span className="customerProgramStatus">{status}</span>
-            </span>
-          }
-          subheader={
-            description && (
-              <span id={`program-description-${id}`}>{description}</span>
-            )
-          }
-          action={<ArrowRightIcon color="primary" aria-hidden />}
-        />
-      </CardActionArea>
-    </Card>
-  );
-  const choice = (id: PolicyId) => {
-    const done = finished(id);
-    return row({
-      id,
-      name: POLICIES[id].name,
-      status: choiceStatus(game, id, programs[id]),
-      description: done ? undefined : POLICIES[id].description,
-      Icon: PROGRAM_ICONS[id],
-      done,
-      active: !done && (programs[id].tier === "On" || !!programs[id].pending),
-      onOpen: () => open(id),
-    });
-  };
-  const section = (title: string, rows: React.ReactNode[]) =>
-    rows.length > 0 && (
-      <Box
-        component="section"
-        aria-label={title}
-        className="customerProgramSection"
-      >
-        <Typography component="h3" variant="subtitle2">
-          {title}
-        </Typography>
-        {rows}
-      </Box>
-    );
-  const peakBefore = result ? Math.max(...result.current) : 0;
-  const peakAfter = result ? Math.max(...result.changed) : 0;
   const canChangePreparedness = !!preparedness && !game.replayPlayback;
   const title = selected
     ? selected === "wildfire"
@@ -756,47 +903,23 @@ function ProgramsScreen({
       className="customerProgramsScreen"
     >
       <header className="constructionHeader">
-        <Toolbar className="constructionTitleBar" disableGutters>
-          <IconButton
-            color="primary"
-            onClick={onClose}
-            aria-label="Close customer programs"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-          <Typography
-            variant="h6"
-            component="h1"
-            id="program-title"
-            className="constructionTitle"
-          >
-            <span className="iconLabel">
-              <GroupsIcon fontSize="small" aria-hidden />
-              {/* Phones abbreviate the title so it still shares a line with close */}
+        <CatalogTitleBar
+          disableGutters
+          icon={<GroupsIcon fontSize="small" aria-hidden />}
+          title={
+            // Phones abbreviate the title so it still shares a line with close
+            <>
               <span className="programsTitleLong">Customer programs</span>
               <span className="programsTitleShort">Programs</span>
-            </span>
-            <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
-            <span
-              className="weak constructionCash"
-              aria-label={`Available cash ${formatMoneyStable(cash)}`}
-            >
-              {formatMoneyStable(cash)} cash
-            </span>
-          </Typography>
-          {/* Like the build screen, the programs screen covers the game bar, so the speed
-              control lives here. The clock opened paused; another speed is kept on close */}
-          {game.inGame && (
-            <div className="constructionSpeed">
-              {buildSpeedOptions({
-                speed: game.speed,
-                onSpeedChange: (speed) => dispatch(setSpeed(speed)),
-                desktop: isDesktopScreen(),
-              })}
-            </div>
-          )}
-        </Toolbar>
+            </>
+          }
+          titleAdornment={<ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />}
+          titleComponent="h1"
+          titleId="program-title"
+          cash={cash}
+          onClose={onClose}
+          closeLabel="Close customer programs"
+        />
       </header>
       <div
         className="customerProgramsBody"
@@ -811,38 +934,14 @@ function ProgramsScreen({
           <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
         </div>
         {!selected ? (
-          <Box className="customerProgramList">
-            <Typography variant="body2" color="textSecondary">
-              {preparedness
-                ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
-                : "Changes start next month."}
-            </Typography>
-            {policiesOn &&
-              section(
-                "Rebate projects",
-                BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
-              )}
-            {policiesOn &&
-              section(
-                "Rates and contracts",
-                POLICY_IDS.filter(isOperatingPolicy).map(choice),
-              )}
-            {preparedness &&
-              section("Hazard readiness", [
-                row({
-                  id: "wildfire",
-                  name: "Wildfire preparedness",
-                  status: preparednessStatus(preparedness),
-                  description:
-                    "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
-                  Icon: LocalFireDepartmentIcon,
-                  active: preparedness.active,
-                  onOpen: () => setSelected("wildfire"),
-                }),
-              ])}
-            {policiesOn &&
-              section("Completed", POLICY_IDS.filter(finished).map(choice))}
-          </Box>
+          <ProgramList
+            game={game}
+            programs={programs}
+            policiesOn={policiesOn}
+            preparedness={preparedness}
+            onOpen={open}
+            onOpenWildfire={() => setSelected("wildfire")}
+          />
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
             <Typography component="h2" variant="h6">
@@ -859,173 +958,26 @@ function ProgramsScreen({
                 />
               )
             ) : (
-              <>
-                <Typography>
-                  {complete
-                    ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
-                    : POLICIES[selected].description}
-                </Typography>
-                {!complete && (
-                  <details className="customerProgramHowItWorks">
-                    <summary>How it works</summary>
-                    <Typography sx={{ mt: 1 }}>
-                      {POLICIES[selected].mechanism}
-                    </Typography>
-                  </details>
-                )}
-                {current!.pending && (
-                  // A standing notice, not an interruption: it is already true when the card opens.
-                  <Alert severity="info" role="status">
-                    {pendingLabel(game, selected, current!)}
-                  </Alert>
-                )}
-                {buildout ? (
-                  <BuildoutSummary
-                    game={game}
-                    id={buildout}
-                    program={current!}
-                    effective={effective}
-                    end={end}
-                  />
-                ) : (
-                  <>
-                    <RadioGroup
-                      row
-                      aria-label="Program status"
-                      value={tier}
-                      onChange={(e) => setTier(e.target.value as PolicyTier)}
-                    >
-                      {POLICY_TIERS.map((choice) => (
-                        <FormControlLabel
-                          key={choice}
-                          value={choice}
-                          control={<Radio />}
-                          sx={{ minHeight: 44, m: 0, flex: 1 }}
-                          label={choice}
-                        />
-                      ))}
-                    </RadioGroup>
-                    {tier !== "Off" && (
-                      <TextField
-                        select
-                        fullWidth
-                        label="Daily window"
-                        value={startHour}
-                        onChange={(event) =>
-                          setStartHour(Number(event.target.value))
-                        }
-                        slotProps={{
-                          select: { native: true },
-                          htmlInput: { style: { minHeight: 24 } },
-                        }}
-                        helperText={
-                          selected === "timeOfUse"
-                            ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
-                            : undefined
-                        }
-                      >
-                        {Array.from({ length: 24 }, (_, hour) => (
-                          <option key={hour} value={hour}>
-                            {policyWindowLabel(hour)}
-                          </option>
-                        ))}
-                      </TextField>
-                    )}
-                  </>
-                )}
-                {complete || cancelling ? null : effective >= end ? (
-                  <Alert severity="info">
-                    This run ends before another program change could take
-                    effect.
-                  </Alert>
-                ) : (
-                  <>
-                    <Typography component="h3" variant="subtitle1">
-                      Estimated utility demand · {labelMonth(game, month)}
-                    </Typography>
-                    {error ? (
-                      <Alert severity="error">{error}</Alert>
-                    ) : !result ? (
-                      // Mirrors the loaded layout line for line so the dialog keeps its height
-                      // when the estimate arrives instead of jumping under the player's pointer
-                      <>
-                        <Typography variant="body2">
-                          Current plan ━ · With this change ┄
-                        </Typography>
-                        <PolicyDemandChartPlaceholder />
-                        <Box aria-hidden>
-                          {Array.from({ length: operating ? 1 : 2 }, (_, i) => (
-                            <Typography key={i}>
-                              <Skeleton width={i % 2 ? "60%" : "80%"} />
-                            </Typography>
-                          ))}
-                          <Typography variant="body2" sx={NOTE_SLOT}>
-                            &nbsp;
-                          </Typography>
-                        </Box>
-                      </>
-                    ) : (
-                      <>
-                        <Typography variant="body2">
-                          Current plan ━ · With this change ┄
-                        </Typography>
-                        <PolicyDemandChart
-                          current={result.current}
-                          changed={result.changed}
-                        />
-                        <Box role="status">
-                          <Typography>
-                            Peak demand: {formatWatts(peakBefore)} →{" "}
-                            {formatWatts(peakAfter)}
-                          </Typography>
-                          {!operating && (
-                            <Typography>
-                              Electricity supplied:{" "}
-                              {formatWattHours(result.before.supplyWh)} →{" "}
-                              {formatWattHours(result.after.supplyWh)}
-                            </Typography>
-                          )}
-
-                          {formatWatts(peakBefore) === formatWatts(peakAfter) ||
-                          Math.abs(peakAfter - peakBefore) <
-                            peakBefore * 0.001 ? (
-                            <Typography variant="body2" sx={NOTE_SLOT}>
-                              Little change in peak demand.{" "}
-                              {operating
-                                ? "Only eligible loads respond. Try a different daily window to target your peak."
-                                : selected === "solar"
-                                  ? "Daylight savings may leave the evening peak unchanged."
-                                  : "Efficiency savings are largest for heating and cooling, so mild weather may leave the peak unchanged."}
-                            </Typography>
-                          ) : (
-                            <Typography
-                              variant="body2"
-                              sx={NOTE_SLOT}
-                              aria-hidden
-                            >
-                              &nbsp;
-                            </Typography>
-                          )}
-                        </Box>
-                        {result.after.cash < 0 && (
-                          <Alert severity="warning">
-                            Projected cash is negative. Existing debt rules
-                            still apply.
-                          </Alert>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                <Button
-                  onClick={() => {
-                    onClose();
-                    onViewDemand();
-                  }}
-                >
-                  View demand
-                </Button>
-              </>
+              <PolicyProgramDetail
+                game={game}
+                selected={selected}
+                current={current!}
+                buildout={buildout}
+                complete={complete}
+                cancelling={cancelling}
+                operating={operating}
+                effective={effective}
+                end={end}
+                month={month}
+                tier={tier}
+                onTierChange={setTier}
+                startHour={startHour}
+                onStartHourChange={setStartHour}
+                result={result}
+                error={error}
+                onClose={onClose}
+                onViewDemand={onViewDemand}
+              />
             )}
           </Box>
         )}
@@ -1161,10 +1113,11 @@ export default function CustomerPrograms({
             : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
-        variant="contained"
+        variant="outlined"
+        startIcon={<GroupsIcon />}
         onClick={() => setOpen(true)}
       >
-        <GroupsIcon />
+        Programs
       </Button>
       {open && (
         <ProgramsScreen

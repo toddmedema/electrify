@@ -1,3 +1,4 @@
+import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -13,14 +14,15 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game" }).click();
-    const menu = page
+    // The mission summary's info button is the way into the full requirements
+    const details = page
       .locator("#appbar:visible")
-      .getByRole("button", { name: "menu", exact: true })
+      .getByRole("button", { name: "All requirements" })
       .first();
-    await menu.click();
-    await page.getByRole("menuitem", { name: "Scenario details" }).click();
+    await details.click();
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });
     await expect(dialog).toBeVisible();
+    await expectDialogToFit(dialog);
     await expect(
       dialog.getByText(/Score appears after your first month/),
     ).toBeAttached();
@@ -55,7 +57,25 @@ for (const theme of ["light", "dark"] as const) {
     const preparedness = page.getByRole("dialog", {
       name: "Wildfire preparedness",
     });
-    await expect(preparedness).toBeVisible({ timeout: 30000 });
+    // Weather/news may pause before this choice. Resume those ordinary pauses only.
+    const fast = page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first();
+    await expect
+      .poll(
+        async () => {
+          if (await preparedness.isVisible()) return true;
+          if (
+            (await page.getByRole("dialog").count()) === 0 &&
+            (await fast.getAttribute("aria-pressed")) === "false"
+          )
+            await fast.click();
+          return preparedness.isVisible();
+        },
+        { timeout: 30000, intervals: [1000] },
+      )
+      .toBe(true);
     await preparedness.getByRole("button", { name: "Keep cash" }).click();
     await page
       .locator("#appbar:visible")
@@ -63,16 +83,19 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     // Wait for a real completed month, then stop the clock before inspecting its score.
+    // The status bar's event chip names the emergency too; wait on the ongoing event card.
     await expect(
-      page.getByText("Wildfire emergency", { exact: true }),
+      page
+        .locator(".ongoingEvents")
+        .getByText("Wildfire emergency", { exact: true })
+        .first(),
     ).toBeAttached({ timeout: 25000 });
     await page
       .locator("#appbar:visible")
       .getByRole("button", { name: "pause", exact: true })
       .first()
       .click();
-    await menu.click();
-    await page.getByRole("menuitem", { name: "Scenario details" }).click();
+    await details.click();
     await expect(dialog.getByText(/points per/).first()).toBeAttached();
     const content = dialog.locator(".MuiDialogContent-root");
     expect(

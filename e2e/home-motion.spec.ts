@@ -37,7 +37,9 @@ for (const theme of ["light", "dark"]) {
         });
       const before = bounds();
       const sample = (time: number) => {
-        animation.currentTime = time;
+        // Times are within the cycle; the first sweep waits out a start delay.
+        const delay = Number(animation.effect!.getTiming().delay ?? 0);
+        animation.currentTime = delay + time;
         const style = getComputedStyle(pulse);
         return { offset: style.strokeDashoffset, opacity: style.opacity };
       };

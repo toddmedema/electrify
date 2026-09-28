@@ -109,6 +109,7 @@ describe("per-facility lifetime totals", () => {
     coal.committed = false;
     coal.generatingLastRealTick = false;
     coal.annualOperatingCost = 0;
+    coal.variableOperatingCostPerMWh = undefined;
     coal.btuPerWh = 0;
     const before = state.facilities.map(totals);
 
@@ -151,6 +152,7 @@ describe("per-facility lifetime totals", () => {
     ) as FacilityOperatingType;
     state.facilities.forEach((facility: FacilityOperatingType) => {
       facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
       facility.btuPerWh = 0;
       facility.currentW = 0;
       facility.committed = false;
@@ -179,6 +181,50 @@ describe("per-facility lifetime totals", () => {
       expenses: afterStart.expenses,
       starts: afterStart.starts,
     });
+  });
+
+  it("buys no fuel for a paused plant that is still winding down", () => {
+    const state = createGame({ scenarioId: 103, difficulty: "CEO" });
+    tickState(state);
+    const coal = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Coal",
+    ) as FacilityOperatingType;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      if (facility.id !== coal.id) facility.btuPerWh = 0;
+    });
+    coal.currentW = coal.peakW;
+    coal.paused = true;
+
+    tickState(state);
+
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(coal.currentW).toBeGreaterThan(0);
+    expect(now.expensesFuel).toBe(0);
+    expect(now.localKgco2e).toBe(0);
+  });
+
+  it("escalates O&M quoted in purchase-month dollars with inflation since", () => {
+    const state = createGame({ scenarioId: 103, difficulty: "CEO" });
+    tickState(state);
+    const coal = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Coal",
+    ) as FacilityOperatingType;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
+      facility.btuPerWh = 0;
+      facility.paused = facility.id !== coal.id;
+    });
+    coal.annualOperatingCost = TICKS_PER_YEAR * 1000;
+    coal.costPerStart = 0;
+    // Bought when prices were half of today's: its O&M now costs twice the quote
+    coal.costIndexAtBuild = 0.5;
+
+    tickState(state);
+
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(2000, 6);
   });
 
   it("charges Oil fixed and actual-output O&M once to both sets of books", () => {
@@ -332,6 +378,7 @@ describe("per-facility lifetime totals", () => {
         const coal = state.facilities[0];
         state.facilities.forEach((facility: FacilityOperatingType) => {
           facility.annualOperatingCost = 0;
+          facility.variableOperatingCostPerMWh = undefined;
           facility.btuPerWh = 0;
           facility.currentW = 0;
           facility.committed = false;

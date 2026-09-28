@@ -185,14 +185,16 @@ describe("the fleet list", () => {
   });
 
   it("shows Oil fixed and variable O&M without turbine start details", () => {
+    // Rise of Renewables opens in 2002, so the 2023-dollar EIA figures are deflated by CPI-U
+    // (179.9 / 304.702): $3.09M/yr and $25.71/MWh become $1.82M/yr and $15.18/MWh.
     const oilGame = createGame({ scenarioId: 101, difficulty: "CEO" });
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
     expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
-    expect(screen.getByText("$3.09M/yr")).toBeInTheDocument();
+    expect(screen.getByText("$1.82M/yr")).toBeInTheDocument();
     expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
-    expect(screen.getByText("$25.71/MWh")).toBeInTheDocument();
+    expect(screen.getByText("$15.18/MWh")).toBeInTheDocument();
     expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
   });
@@ -690,7 +692,7 @@ describe("the interties view", () => {
     });
     await user.click(review);
     expect(onBuild).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("payments start now");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Payments start now");
     await user.click(screen.getByRole("button", { name: "close" }));
     expect(onBuild).not.toHaveBeenCalled();
     await user.click(review);
@@ -835,7 +837,7 @@ describe("the intertie upgrade control", () => {
     await user.click(upgrade);
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Interest rate:");
+    expect(dialog).toHaveTextContent(/for 30 years/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     await user.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(handleUpgrade).toHaveBeenCalledWith(line.corridorId, true);

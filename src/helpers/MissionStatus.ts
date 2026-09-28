@@ -1,24 +1,28 @@
+import { activeScenario, currentTick } from "./GameSelectors";
 import {
   EvidenceTargetType,
   GameType,
   MonthlyHistoryType,
   TickPresentFutureType,
 } from "../Types";
-import { getScenario } from "../data/Scenarios";
 import { getTimeFromTimeline, MINUTES_PER_MONTH } from "./DateTime";
 import {
   absoluteMonth,
   demandServed,
+  formatRequiredShare,
   reliabilityMonths,
   hasChronicBlackouts,
+  retentionBaseline,
+  retentionUnreachable,
 } from "./ObjectiveRules";
+import { customerMarketSizeAt } from "./Customers";
 import {
   meaningfulDecisionCategoryCount,
   meaningfulDecisionRequirement,
 } from "./MeaningfulDecisions";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
-import { formatMoneyConcise } from "./Format";
+import { formatMoneyConcise, formatCount } from "./Format";
 import { selectProjection } from "./Projection";
 
 export interface MissionRequirement {
@@ -53,13 +57,13 @@ export function completedMissionHistory(game: GameType): MonthlyHistoryType[] {
 
 /** Presentation only: missing evidence never changes the canonical end-of-term evaluator. */
 export function getMissionStatus(game: GameType) {
-  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const scenario = activeScenario(game);
   const duration = scenario?.durationMonths || 240;
   const monthsRemaining = Math.max(0, duration - game.date.monthsElapsed);
   const end = game.startingYear * 12 + duration;
   const currentMonth = absoluteMonth(game.date.year, game.date.monthNumber);
   const history = completedMissionHistory(game);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const requirements: MissionRequirement[] = [];
   const objective = scenario?.reliabilityObjective;
   if (objective) {
@@ -80,7 +84,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
@@ -88,8 +92,8 @@ export function getMissionStatus(game: GameType) {
         (missing || (monthsRemaining === 0 && observed < count)
           ? " · history incomplete, not verifiable"
           : ""),
-      target: `Every required month needs ${Math.round(objective.minimumDemandServed * 100)}% served`,
-      timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; checked at term end`,
+      target: `Every required month needs ${formatRequiredShare(objective.minimumDemandServed)} served`,
+      timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; a month below target ends the run`,
       status: missing
         ? "unknown"
         : failed
@@ -104,22 +108,37 @@ export function getMissionStatus(game: GameType) {
       deadline: first + count,
     });
   }
+  const retentionStart = scenario
+    ? retentionBaseline(scenario, game.customerMarketSize)
+    : undefined;
   if (
     scenario?.minimumCustomerRetention !== undefined &&
-    scenario.startingCustomers !== undefined
+    retentionStart !== undefined
   ) {
-    const threshold =
-      scenario.startingCustomers * scenario.minimumCustomerRetention;
+    const threshold = retentionStart * scenario.minimumCustomerRetention;
+    // Honest about recovery: once even best-case growth in the time left cannot reach the
+    // threshold, the requirement has failed rather than being something that can still change
+    const unreachable = now
+      ? retentionUnreachable(scenario, now.customers, {
+          startingCustomers: retentionStart,
+          monthsRemaining,
+          marketSize: customerMarketSizeAt(game.customerMarketSize, now.minute),
+        })
+      : undefined;
     requirements.push({
       id: "retention",
       label: "Retain the community",
-      compact: `Customers ≥ ${Math.ceil(threshold).toLocaleString()} (${now ? Math.round(now.customers).toLocaleString() : "unavailable"})`,
+      compact: `Customers ≥ ${formatCount(Math.ceil(threshold))} (${now ? formatCount(now.customers) : "unavailable"})`,
       current: now
-        ? `${Math.round(now.customers).toLocaleString()} current customers`
+        ? `${formatCount(now.customers)} current customers`
         : "Current customers unavailable",
-      target: `Keep ${Math.ceil(threshold).toLocaleString()} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
-      timing: "Required at term end; current customers can still change",
-      status: now ? "in-progress" : "unknown",
+      target: `Keep ${formatCount(Math.ceil(threshold))} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
+      timing: unreachable
+        ? `No longer reachable: at most ${formatCount(unreachable.bestCase)} customers by term end`
+        : scenario.ownership === "Public"
+          ? "Required at term end; public customers grow slowly and cannot be won back with price"
+          : "Required at term end; a lower rate wins customers back",
+      status: unreachable ? "failed" : now ? "in-progress" : "unknown",
       deadline: end,
     });
   }
@@ -141,7 +160,7 @@ export function getMissionStatus(game: GameType) {
     label: "Keep the utility solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
     current: now
-      ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
+      ? `$${formatCount(now.cash)} now (partial month)`
       : "Current cash unavailable",
     target: "Cash must be $0 or more at every month-end",
     timing:
@@ -256,7 +275,7 @@ export function projectedShortfall(
  * carried along; ordinary operating cash flow is already included in the projected balances.
  */
 export function cashRunwayMonths(game: GameType): number | undefined {
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   // Negative cash now has its own, more urgent warning; this one is about the months ahead
   if (!now || now.cash < 0) return undefined;
   const projection = selectProjection(game, now);
@@ -276,7 +295,7 @@ export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
 ): MissionRisk | undefined {
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   if (
     now &&
     now.minute <= game.date.minute &&

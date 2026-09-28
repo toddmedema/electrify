@@ -1,16 +1,9 @@
 import * as React from "react";
 import {
-  Avatar,
   Box,
   Button,
-  Card,
-  CardHeader,
   Checkbox,
   Chip,
-  Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
   FormControlLabel,
   List,
   Stack,
@@ -22,14 +15,12 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
   estimatedAnnualVariableOperatingCost,
-  getMonthlyPayment,
+  facilityLoanMonths,
+  purchaseTerms,
 } from "../../helpers/Financials";
 import {
   floorToTwoSignificantDigits,
@@ -38,9 +29,7 @@ import {
 } from "../../helpers/Format";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
-  DOWNPAYMENT_PERCENT,
   FUELS,
-  LOAN_MONTHS,
   MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
@@ -83,8 +72,15 @@ import {
 } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
-import ConceptIcon from "../base/ConceptIcon";
-import DecisionImpactPreview from "../base/DecisionImpactPreview";
+import BuildOptionCard from "../base/BuildOptionCard";
+import {
+  mostRecentBuiltSize,
+  sliderTickToW,
+  wToSliderTick,
+} from "../../helpers/BuildSizing";
+import PurchaseReviewDialog, {
+  financingShortfallText,
+} from "../base/PurchaseReviewDialog";
 import {
   getBuildAvailability,
   getSiteInventory,
@@ -242,7 +238,6 @@ export function GeneratorBuildItem(
     props.seed,
     props.location,
   );
-  const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const resilienceOptions = props.resilienceOptions ?? [];
   const hasOptions = resilienceOptions.length > 0 && !!props.withResilience;
@@ -252,12 +247,15 @@ export function GeneratorBuildItem(
     );
   const [resilienceSelection, setResilienceSelection] =
     React.useState<ResilienceSelectionType>(defaultSelection);
-  const purchaseSubmitted = React.useRef(false);
   // A default hardening option is only a default: the card stays buyable whenever the plant
   // without it is affordable, and the dialog lets the player clear it
   const cheapestQuote =
     hasOptions && props.withResilience ? props.withResilience({}) : generator;
-  const downpayment = DOWNPAYMENT_PERCENT * cheapestQuote.buildCost;
+  const { downpayment } = purchaseTerms(
+    cheapestQuote.buildCost,
+    true,
+    props.interestRate,
+  );
   const includedOptions = resilienceOptions.filter((option) => option.selected);
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const maxSizeW = floorToTwoSignificantDigits(generator.maxPeakW);
@@ -278,12 +276,9 @@ export function GeneratorBuildItem(
         props.location,
         generator.viableLocationsRemaining,
       );
-  const financingGap = Math.max(0, downpayment - cash);
-  const canBuild = buildable && financingGap === 0;
-  const buildSubtitle =
-    buildable && financingGap > 0
-      ? `${formatMoneyConcise(financingGap)} cash needed to afford loan downpayment`
-      : secondaryText;
+  const shortfall = financingShortfallText(cash, downpayment);
+  const canBuild = buildable && !shortfall;
+  const buildSubtitle = (buildable && shortfall) || secondaryText;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
@@ -306,34 +301,17 @@ export function GeneratorBuildItem(
         ]
       : WEATHER_DEPENDENT_FUELS.includes(generator.fuel)
         ? ["Weather-dependent supply", "Pair with backup or storage."]
-        : generator.spinMinutes > 60
-          ? ["Steady supply", "Best for demand that lasts for hours."]
-          : ["Fast response", "Can follow changing demand."];
-  const toggleExpand = () => {
-    setExpanded(!expanded);
-  };
-
-  const toggleOpen = (e: React.SyntheticEvent) => {
-    if (!open) {
-      purchaseSubmitted.current = false;
-      setResilienceSelection(defaultSelection());
-    }
-    setOpen(!open);
+        : generator.gasCycle === "simple"
+          ? ["Fast-start, costly per MWh", "Covers peaks and backup."]
+          : generator.gasCycle === "combined"
+            ? ["Efficient, slow to start", "Best run steadily for hours."]
+            : generator.spinMinutes > 60
+              ? ["Steady supply", "Best for demand that lasts for hours."]
+              : ["Fast response", "Can follow changing demand."];
+  const openReview = (e: React.SyntheticEvent) => {
+    setResilienceSelection(defaultSelection());
+    setOpen(true);
     e.stopPropagation();
-  };
-
-  const submitPurchase = (
-    financed: boolean,
-    e: React.MouseEvent<HTMLElement>,
-  ) => {
-    // A double-click dispatches two click events before the closing dialog has necessarily
-    // unmounted. The ref closes that tiny window synchronously.
-    if (purchaseSubmitted.current) {
-      return;
-    }
-    purchaseSubmitted.current = true;
-    props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
-    toggleOpen(e);
   };
 
   // The dialog prices the quote with the player's hardening choice; the card keeps the default
@@ -341,13 +319,10 @@ export function GeneratorBuildItem(
     hasOptions && props.withResilience
       ? props.withResilience(resilienceSelection)
       : generator;
-  const quoteDownpayment = DOWNPAYMENT_PERCENT * quote.buildCost;
-  const quoteMonthlyPayment = getMonthlyPayment(
-    quote.buildCost - quoteDownpayment,
-    props.interestRate,
-    LOAN_MONTHS,
-  );
-  const quoteCanBuild = buildable && quoteDownpayment <= cash;
+  const quoteCanBuild =
+    buildable &&
+    purchaseTerms(quote.buildCost, true, props.interestRate).downpayment <=
+      cash;
   const resilienceOptionId = React.useId();
   // Each line under an option says what it buys; a warning line says what it costs the player
   const optionDetails = (
@@ -442,448 +417,368 @@ export function GeneratorBuildItem(
     </>
   );
 
+  const iconSrc = `/images/${generator.name.toLowerCase()}.svg`;
   // Nothing left to build: keep the card as a quiet one-line entry rather than a full pitch
   if (props.hydroAvailability?.remaining.length === 0) {
     return (
-      <Card className="build-list-item buildOption">
-        <CardHeader
-          avatar={
-            <Avatar
-              alt={generator.name}
-              src={`/images/${generator.name.toLowerCase()}.svg`}
-            />
-          }
-          action={
-            <Button
-              className="buy-button"
-              size="small"
-              variant="outlined"
-              color="primary"
-              disabled
-              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-              aria-label={`Review purchase of ${generator.name}`}
-            >
-              Review
-            </Button>
-          }
-          title={generator.name}
-          subheader="No remaining buildable locations"
-        />
-      </Card>
+      <BuildOptionCard
+        name={generator.name}
+        iconSrc={iconSrc}
+        review={{
+          ariaLabel: `Review purchase of ${generator.name}`,
+          disabled: true,
+          onClick: () => undefined,
+        }}
+        context="No remaining buildable locations"
+      />
     );
   }
 
   return (
-    <Card
-      className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
-    >
-      <CardHeader
-        className={sizeAction ? "stackedActionsHeader" : undefined}
-        avatar={
-          <Avatar
-            alt={generator.name}
-            src={`/images/${generator.name.toLowerCase()}.svg`}
-          />
-        }
-        action={
-          <Box className="buildPurchaseActions">
-            <Stack direction="row" spacing={0.5}>
-              {wideLayout && compareAction}
-              <Button
-                className="buy-button"
-                size="small"
-                variant="outlined"
-                color="primary"
-                onClick={toggleOpen}
-                disabled={!canBuild}
-                startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-                aria-label={`Review purchase of ${generator.name}`}
-              >
-                Review
-              </Button>
-            </Stack>
-            {sizeAction}
-          </Box>
-        }
-        title={generator.name}
-        subheader={sizeAction ? context : undefined}
-      />
-      {!sizeAction && (
-        <Typography className="buildOptionContext" variant="body2">
-          {context}
-        </Typography>
-      )}
-      {props.hydroAvailability && (
-        <Box sx={{ px: 2, pb: 1 }}>
-          <Typography variant="body2">
-            {props.hydroAvailability.remaining.length} sites left ·{" "}
-            {props.hydroAvailability.eligible.length}{" "}
-            {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
-            {props.hydroAvailability.largest &&
-              ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
-          </Typography>
-          {props.hydroAvailability.selected && (
-            <Typography variant="body2">
-              Site: {props.hydroAvailability.selected.name} ·{" "}
-              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max
-            </Typography>
-          )}
-        </Box>
-      )}
-      {!canBuild && (
-        <Typography
-          component="div"
-          className="buildOptionWarning"
-          color="textSecondary"
-        >
-          {buildSubtitle}
-        </Typography>
-      )}
-      <Box className="buildOptionMetrics">
-        <BuildMetric
-          label="Build cost"
-          value={formatMoneyConcise(generator.buildCost)}
-          note={
-            includedOptions.length
-              ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
-              : undefined
-          }
-        />
-        <BuildMetric
-          label="Build time"
-          value={`${Math.round(generator.yearsToBuild * 12)} mo`}
-        />
-        <ExpectedOutputMetric
-          shape={outputShape}
-          ceiling={props.outputCeiling || 1}
-        />
-        {props.secondaryMetric === "lcWh" && (
-          <BuildMetric
-            label="Cost per MWh"
-            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
-          />
-        )}
-      </Box>
-      <Box className="buildOptionFooter">
-        <Button
-          color="primary"
-          className="expand-details"
-          size="small"
-          aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
-          aria-expanded={expanded}
-          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-          onClick={(event) => {
-            event.stopPropagation();
-            toggleExpand();
-          }}
-        >
-          {expanded ? "Hide details" : "Show details"}
-        </Button>
-
-        {!wideLayout && compareAction}
-      </Box>
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <Typography
-          className="buildOptionDescription"
-          variant="body2"
-          color="textSecondary"
-        >
-          {roleHint} {generator.description}
-        </Typography>
-        {(props.advantages || []).length > 0 && (
+    <BuildOptionCard
+      name={generator.name}
+      iconSrc={iconSrc}
+      compared={props.compared}
+      review={{
+        ariaLabel: `Review purchase of ${generator.name}`,
+        disabled: !canBuild,
+        onClick: openReview,
+      }}
+      headerActions={wideLayout && compareAction}
+      sizeAction={sizeAction}
+      context={context}
+      summary={
+        props.hydroAvailability && (
           <Box sx={{ px: 2, pb: 1 }}>
-            <Stack
-              direction="row"
-              spacing={0.75}
-              useFlexGap
-              sx={{ flexWrap: "wrap" }}
-              role="group"
-              aria-label="Generator advantages"
-            >
-              {(props.advantages || []).map((advantage) => (
-                <Chip key={advantage} size="small" label={advantage} />
-              ))}
-            </Stack>
-          </Box>
-        )}
-        <TableContainer>
-          <Table
-            size="small"
-            aria-label="generator properties"
-            className="generatorDetails"
-          >
-            <TableBody>
-              {props.secondaryMetric !== "lcWh" && (
-                <GeneratorDetailRow
-                  label="Lifetime cost"
-                  value={formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"}
-                  entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-                />
-              )}
-              <GeneratorDetailRow
-                // Lifetime cost still assumes average water years; this is the year ahead
-                label={
-                  waterShape
-                    ? "Capacity factor, this forecast"
-                    : "Expected capacity factor"
-                }
-                value={percent(capacityFactor)}
-                entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-              />
-              {generator.minimumStableOutput !== undefined && (
-                <GeneratorDetailRow
-                  label="Minimum stable output"
-                  value={
-                    percent(generator.minimumStableOutput) +
-                    " · " +
-                    formatWatts(generator.peakW * generator.minimumStableOutput)
-                  }
-                  entry={MANUAL_ENTRY.RAMP_RATE}
-                />
-              )}
-              <GeneratorDetailRow
-                label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
-                value={
-                  formatMoneyConcise(generator.annualOperatingCost) + "/yr"
-                }
-                entry={MANUAL_ENTRY.OPERATING_COSTS}
-              />
-              {hasVariableOM && (
-                <>
-                  <GeneratorDetailRow
-                    label="Variable O&M"
-                    value={
-                      "$" +
-                      (generator.variableOperatingCostPerMWh || 0).toFixed(2) +
-                      "/MWh"
-                    }
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                  <GeneratorDetailRow
-                    label="Expected variable O&M"
-                    value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
-                    entry={MANUAL_ENTRY.OPERATING_COSTS}
-                  />
-                </>
-              )}
-              {generator.costPerStart !== undefined && (
-                <GeneratorDetailRow
-                  label="Non-fuel start cost"
-                  value={formatMoneyConcise(generator.costPerStart) + "/start"}
-                  entry={MANUAL_ENTRY.OPERATING_COSTS}
-                />
-              )}
-              {(hasVariableOM || generator.costPerStart !== undefined) && (
-                <GeneratorDetailRow
-                  label="Estimated annual O&M"
-                  value={
-                    formatMoneyConcise(
-                      estimatedAnnualOperatingCost(generator),
-                    ) + "/yr"
-                  }
-                  entry={MANUAL_ENTRY.OPERATING_COSTS}
-                />
-              )}
-              {fuelPrices[generator.fuel] && (
-                <GeneratorDetailRow
-                  label="Fuel costs"
-                  value={
-                    formatMoneyConcise(
-                      generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
-                    ) + "/MWh"
-                  }
-                  entry={MANUAL_ENTRY.FUEL_COSTS}
-                />
-              )}
-              {generator.spinMinutes > 1 && (
-                <GeneratorDetailRow
-                  label="Ramp up/down time"
-                  value={generator.spinMinutes + " min"}
-                  entry={MANUAL_ENTRY.RAMP_RATE}
-                />
-              )}
-              <GeneratorDetailRow
-                label="Accounting lifetime"
-                value={generator.lifespanYears + " years"}
-                entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
-              />
-              {sites && (
-                <GeneratorDetailRow
-                  label="Sites left"
-                  value={`${sites.remaining} of ${sites.total}`}
-                  entry={MANUAL_ENTRY.PROJECT_SITES}
-                />
-              )}
-              <GeneratorDetailRow
-                label="Direct emissions"
-                value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
-                entry={MANUAL_ENTRY.EMISSIONS}
-              />
-              <GeneratorDetailRow
-                label="Construction emissions"
-                value={`${formatLargeMassValueConcise(
-                  constructionKgco2eTotal,
-                  units,
-                )} ${largeMassUnit(units)}`}
-                entry={MANUAL_ENTRY.EMISSIONS}
-              />
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Collapse>
-
-      <Dialog open={open} onClose={toggleOpen} fullWidth maxWidth="sm">
-        <ClosableDialogTitle onClose={toggleOpen}>
-          Build {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
-          {generator.name}?
-        </ClosableDialogTitle>
-        <DialogContent className="noPadding">
-          {props.hydroAvailability?.selected && (
-            <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
-              {props.hydroAvailability.selected.name} ·{" "}
-              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
-              Uses the whole site. Only cancelling before completion frees it.
+            <Typography variant="body2">
+              {props.hydroAvailability.remaining.length} sites left ·{" "}
+              {props.hydroAvailability.eligible.length}{" "}
+              {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
+              {props.hydroAvailability.largest &&
+                ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
             </Typography>
-          )}
-          {hasOptions &&
-            resilienceOptions.map((option, index) => {
-              const describedBy = `${resilienceOptionId}-${option.upgrade}`;
-              const lines = optionDetails(option);
-              if (
-                affordabilityWarning &&
-                index === resilienceOptions.length - 1
-              )
-                lines.push({ text: affordabilityWarning, warning: true });
-              return (
-                <Box className="resilienceBuildOption" key={option.upgrade}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={!!resilienceSelection[option.upgrade]}
-                        onChange={(event) =>
-                          setResilienceSelection((selection) => ({
-                            ...selection,
-                            [option.upgrade]: event.target.checked,
-                          }))
-                        }
-                        slotProps={{
-                          input: { "aria-describedby": describedBy },
-                        }}
-                      />
-                    }
-                    label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
-                  />
-                  <Box id={describedBy}>
-                    {lines.map((line) => (
-                      <Typography
-                        key={line.text}
-                        variant="body2"
-                        color={line.warning ? undefined : "textSecondary"}
-                        className={
-                          line.warning
-                            ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
-                            : option.upgrade === "solarTrackers"
-                              ? "resilienceBuildOptionDetail resilienceBuildOptionNoWrap"
-                              : "resilienceBuildOptionDetail"
-                        }
-                      >
-                        {line.text}
-                      </Typography>
-                    ))}
-                  </Box>
-                </Box>
-              );
-            })}
-          <DecisionImpactPreview
-            facts={[
-              {
-                concept: "money",
-                label: "Cash purchase",
-                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - quote.buildCost)}`,
-              },
-              {
-                concept: "finances",
-                label: "Loan option",
-                value: `${formatMoneyConcise(quoteDownpayment)} now + ${formatMoneyConcise(quoteMonthlyPayment)}/mo (${(props.interestRate * 100).toFixed(2)}% for ${LOAN_MONTHS / 12} years)`,
-                detail: "Payments start now.",
-              },
-              {
-                concept: "money",
-                label: "Estimated upkeep",
-                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(quote) / 12)}/mo`,
-                detail: fuelPrices[generator.fuel]
-                  ? "Plus fuel and loan payments."
-                  : "Plus loan payments.",
-              },
-              {
-                concept: "time",
-                label: "Online in",
-                value: `${Math.round(generator.yearsToBuild * 12)} months`,
-              },
-              {
-                concept: "supply",
-                label: "Typical output",
-                // The selected quote's trackers add their morning and evening energy
-                value: `+${formatWatts(
-                  typicalOutputW *
-                    (quote.resilience?.solarTrackers
-                      ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
-                      : 1),
-                )}`,
-                detail: waterShape
-                  ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
-                  : `${formatWatts(generator.peakW)} max; weather may limit it.`,
-              },
-              ...(sites
-                ? [
-                    {
-                      concept: "build" as const,
-                      label: "Project site",
-                      value:
-                        sites.remaining === 1
-                          ? "Uses your last site"
-                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
-                      detail: "Each project takes one site, whatever its size.",
-                    },
-                  ]
-                : []),
-              {
-                concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
-                label: "Direct emissions",
-                value:
-                  kgCO2ePerMWh > 0
-                    ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                    : "No direct emissions modeled",
-              },
-            ]}
+            {props.hydroAvailability.selected && (
+              <Typography variant="body2">
+                Site: {props.hydroAvailability.selected.name} ·{" "}
+                {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max
+              </Typography>
+            )}
+          </Box>
+        )
+      }
+      warning={canBuild ? undefined : buildSubtitle}
+      metrics={
+        <>
+          <BuildMetric
+            label="Build cost"
+            value={formatMoneyConcise(generator.buildCost)}
+            note={
+              includedOptions.length
+                ? `Incl. ${includedOptions.map((option) => option.label.toLowerCase()).join(", ")}`
+                : undefined
+            }
           />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            disabled={!quoteCanBuild || cash < quote.buildCost}
-            variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(false, e)
-            }
-            startIcon={<ConceptIcon concept="money" fontSize="small" />}
+          <BuildMetric
+            label="Build time"
+            value={`${Math.round(generator.yearsToBuild * 12)} mo`}
+          />
+          <ExpectedOutputMetric
+            shape={outputShape}
+            ceiling={props.outputCeiling || 1}
+          />
+          {props.secondaryMetric === "lcWh" && (
+            <BuildMetric
+              label="Cost per MWh"
+              value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
+            />
+          )}
+        </>
+      }
+      footerActions={!wideLayout && compareAction}
+      details={
+        <>
+          <Typography
+            className="buildOptionDescription"
+            variant="body2"
+            color="textSecondary"
           >
-            Pay cash
-          </Button>
-          <Button
-            color="primary"
-            variant="outlined"
-            disabled={!quoteCanBuild}
-            onClick={(e: React.MouseEvent<HTMLElement>) =>
-              submitPurchase(true, e)
-            }
-            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
-          >
-            Take loan
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Card>
+            {roleHint} {generator.description}
+          </Typography>
+          {(props.advantages || []).length > 0 && (
+            <Box sx={{ px: 2, pb: 1 }}>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                useFlexGap
+                sx={{ flexWrap: "wrap" }}
+                role="group"
+                aria-label="Generator advantages"
+              >
+                {(props.advantages || []).map((advantage) => (
+                  <Chip key={advantage} size="small" label={advantage} />
+                ))}
+              </Stack>
+            </Box>
+          )}
+          <TableContainer>
+            <Table
+              size="small"
+              aria-label="generator properties"
+              className="generatorDetails"
+            >
+              <TableBody>
+                {props.secondaryMetric !== "lcWh" && (
+                  <GeneratorDetailRow
+                    label="Lifetime cost"
+                    value={
+                      formatMoneyConcise(generator.lcWh * 1000000) + "/MWh"
+                    }
+                    entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+                  />
+                )}
+                <GeneratorDetailRow
+                  // Lifetime cost still assumes average water years; this is the year ahead
+                  label={
+                    waterShape
+                      ? "Capacity factor, this forecast"
+                      : "Expected capacity factor"
+                  }
+                  value={percent(capacityFactor)}
+                  entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+                />
+                {generator.minimumStableOutput !== undefined && (
+                  <GeneratorDetailRow
+                    label="Minimum stable output"
+                    value={
+                      percent(generator.minimumStableOutput) +
+                      " · " +
+                      formatWatts(
+                        generator.peakW * generator.minimumStableOutput,
+                      )
+                    }
+                    entry={MANUAL_ENTRY.RAMP_RATE}
+                  />
+                )}
+                <GeneratorDetailRow
+                  label={hasVariableOM ? "Fixed O&M" : "Base O&M"}
+                  value={
+                    formatMoneyConcise(generator.annualOperatingCost) + "/yr"
+                  }
+                  entry={MANUAL_ENTRY.OPERATING_COSTS}
+                />
+                {hasVariableOM && (
+                  <>
+                    <GeneratorDetailRow
+                      label="Variable O&M"
+                      value={
+                        "$" +
+                        (generator.variableOperatingCostPerMWh || 0).toFixed(
+                          2,
+                        ) +
+                        "/MWh"
+                      }
+                      entry={MANUAL_ENTRY.OPERATING_COSTS}
+                    />
+                    <GeneratorDetailRow
+                      label="Expected variable O&M"
+                      value={formatMoneyConcise(estimatedVariableOM) + "/yr"}
+                      entry={MANUAL_ENTRY.OPERATING_COSTS}
+                    />
+                  </>
+                )}
+                {generator.costPerStart !== undefined && (
+                  <GeneratorDetailRow
+                    label="Non-fuel start cost"
+                    value={
+                      formatMoneyConcise(generator.costPerStart) + "/start"
+                    }
+                    entry={MANUAL_ENTRY.OPERATING_COSTS}
+                  />
+                )}
+                {(hasVariableOM || generator.costPerStart !== undefined) && (
+                  <GeneratorDetailRow
+                    label="Estimated annual O&M"
+                    value={
+                      formatMoneyConcise(
+                        estimatedAnnualOperatingCost(generator),
+                      ) + "/yr"
+                    }
+                    entry={MANUAL_ENTRY.OPERATING_COSTS}
+                  />
+                )}
+                {fuelPrices[generator.fuel] && (
+                  <GeneratorDetailRow
+                    label="Fuel costs"
+                    value={
+                      formatMoneyConcise(
+                        generator.btuPerWh * (fuelPrices[generator.fuel] ?? 0),
+                      ) + "/MWh"
+                    }
+                    entry={MANUAL_ENTRY.FUEL_COSTS}
+                  />
+                )}
+                {generator.spinMinutes > 1 && (
+                  <GeneratorDetailRow
+                    label="Ramp up/down time"
+                    value={generator.spinMinutes + " min"}
+                    entry={MANUAL_ENTRY.RAMP_RATE}
+                  />
+                )}
+                <GeneratorDetailRow
+                  label="Accounting lifetime"
+                  value={generator.lifespanYears + " years"}
+                  entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
+                />
+                {sites && (
+                  <GeneratorDetailRow
+                    label="Sites left"
+                    value={`${sites.remaining} of ${sites.total}`}
+                    entry={MANUAL_ENTRY.PROJECT_SITES}
+                  />
+                )}
+                <GeneratorDetailRow
+                  label="Direct emissions"
+                  value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+                  entry={MANUAL_ENTRY.EMISSIONS}
+                />
+                <GeneratorDetailRow
+                  label="Construction emissions"
+                  value={`${formatLargeMassValueConcise(
+                    constructionKgco2eTotal,
+                    units,
+                  )} ${largeMassUnit(units)}`}
+                  entry={MANUAL_ENTRY.EMISSIONS}
+                />
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      }
+    >
+      <PurchaseReviewDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={
+          <>
+            Build{" "}
+            {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
+            {generator.name}?
+          </>
+        }
+        cash={cash}
+        buildCost={quote.buildCost}
+        interestRate={props.interestRate}
+        loanMonths={facilityLoanMonths(quote.lifespanYears)}
+        cashDisabled={!buildable}
+        loanDisabled={!buildable}
+        upkeepPerMonth={estimatedAnnualOperatingCost(quote) / 12}
+        upkeepDetail={
+          fuelPrices[generator.fuel]
+            ? "Plus fuel and loan payments."
+            : "Plus loan payments."
+        }
+        onlineInMonths={Math.round(generator.yearsToBuild * 12)}
+        onPurchase={(financed) => {
+          props.onBuild(financed, hasOptions ? resilienceSelection : undefined);
+          setOpen(false);
+        }}
+        preface={
+          <>
+            {props.hydroAvailability?.selected && (
+              <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
+                {props.hydroAvailability.selected.name} ·{" "}
+                {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
+                Uses the whole site. Only cancelling before completion frees it.
+              </Typography>
+            )}
+            {hasOptions &&
+              resilienceOptions.map((option, index) => {
+                const describedBy = `${resilienceOptionId}-${option.upgrade}`;
+                const lines = optionDetails(option);
+                if (
+                  affordabilityWarning &&
+                  index === resilienceOptions.length - 1
+                )
+                  lines.push({ text: affordabilityWarning, warning: true });
+                return (
+                  <Box className="resilienceBuildOption" key={option.upgrade}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={!!resilienceSelection[option.upgrade]}
+                          onChange={(event) =>
+                            setResilienceSelection((selection) => ({
+                              ...selection,
+                              [option.upgrade]: event.target.checked,
+                            }))
+                          }
+                          slotProps={{
+                            input: { "aria-describedby": describedBy },
+                          }}
+                        />
+                      }
+                      label={`${option.label} +${formatMoneyConcise(option.extraBuildCost)}`}
+                    />
+                    <Box id={describedBy}>
+                      {lines.map((line) => (
+                        <Typography
+                          key={line.text}
+                          variant="body2"
+                          color={line.warning ? undefined : "textSecondary"}
+                          className={
+                            line.warning
+                              ? "resilienceBuildOptionDetail resilienceBuildOptionWarning"
+                              : "resilienceBuildOptionDetail"
+                          }
+                        >
+                          {line.text}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                );
+              })}
+          </>
+        }
+        extraFacts={[
+          {
+            concept: "supply",
+            label: "Typical output",
+            // The selected quote's trackers add their morning and evening energy
+            value: `+${formatWatts(
+              typicalOutputW *
+                (quote.resilience?.solarTrackers
+                  ? TRACKER_ANNUAL_ENERGY_MULTIPLIER
+                  : 1),
+            )}`,
+            detail: waterShape
+              ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
+              : `${formatWatts(generator.peakW)} max; weather may limit it.`,
+          },
+          ...(sites
+            ? [
+                {
+                  concept: "build" as const,
+                  label: "Project site",
+                  value:
+                    sites.remaining === 1
+                      ? "Uses your last site"
+                      : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                  detail: "Each project takes one site, whatever its size.",
+                },
+              ]
+            : []),
+          {
+            concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
+            label: "Direct emissions",
+            value:
+              kgCO2ePerMWh > 0
+                ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+                : "No direct emissions modeled",
+          },
+        ]}
+      />
+    </BuildOptionCard>
   );
 }
 
@@ -945,21 +840,8 @@ const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
   ["lcWh", "Cost per MWh"],
 ];
 
-// Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2MW, 9->10 MW, 10->20MW)
-function getW(tick: number) {
-  const exponent = Math.floor(tick / 9) + 6;
-  const frontNumber = (tick % 9) + 1;
-  return frontNumber * Math.pow(10, exponent);
-}
-
-function getTickFromW(w: number) {
-  const exponent = Math.floor(Math.log10(w)) - 6;
-  const frontNumber = +w.toString().charAt(0);
-  return frontNumber + exponent * 9 - 1;
-}
-
 function valueLabelFormat(x: number) {
-  return formatWatts(getW(x));
+  return formatWatts(sliderTickToW(x));
 }
 
 interface BuildForecast {
@@ -1026,9 +908,7 @@ export interface DispatchProps {
   onBack: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {
-  embedded?: boolean;
-}
+export type Props = StateProps & DispatchProps;
 
 export default function BuildGenerators(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
@@ -1047,12 +927,8 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
-  const filtered = game.facilities.filter((f) => !f.peakWh);
-  const mostRecentId = filtered.reduce((id, f) => (id < f.id ? f.id : id), -1);
-  const mostRecentBuiltValue =
-    (filtered.find((f) => f.id === mostRecentId) || {}).peakW || 500000000;
-  const [sliderTick, setSliderTick] = React.useState<number>(
-    getTickFromW(mostRecentBuiltValue),
+  const [sliderTick, setSliderTick] = React.useState<number>(() =>
+    wToSliderTick(mostRecentBuiltSize(game.facilities, false)),
   );
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
   const [exactSizes, setExactSizes] = React.useState<Record<string, number>>(
@@ -1076,11 +952,11 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   } = getBuildForecast(game, now);
   const hydroAvailability = getHydroAvailability(
     game,
-    exactSizes.Hydro ?? getW(sliderTick),
+    exactSizes.Hydro ?? sliderTickToW(sliderTick),
   );
-  const generators = GENERATORS(
+  const shownGenerators = GENERATORS(
     game,
-    getW(sliderTick),
+    sliderTickToW(sliderTick),
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
@@ -1103,26 +979,40 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         game.scenarioId !== 1 ||
         game.tutorialStep !== 1 ||
         ["Natural Gas", "Sun", "Wind"].includes(generator.fuel),
-    )
-    .sort((a, b) => {
-      // Hydro with no sites left always sinks to the bottom
-      const spentA =
-        a.name === "Hydro" && hydroAvailability.remaining.length === 0;
-      const spentB =
-        b.name === "Hydro" && hydroAvailability.remaining.length === 0;
-      if (spentA !== spentB) {
-        return spentA ? 1 : -1;
+    );
+  // Technologies that burn the same fuel stay side by side, placed among the rest by their better
+  // member, so the gas peaker and combined cycle read as one choice of how to burn gas
+  const bestInFuel = new Map<string, number>();
+  shownGenerators.forEach((generator) =>
+    bestInFuel.set(
+      generator.fuel,
+      Math.min(bestInFuel.get(generator.fuel) ?? Infinity, generator[sort]),
+    ),
+  );
+  const generators = shownGenerators.sort((a, b) => {
+    // Hydro with no sites left always sinks to the bottom
+    const spentA =
+      a.name === "Hydro" && hydroAvailability.remaining.length === 0;
+    const spentB =
+      b.name === "Hydro" && hydroAvailability.remaining.length === 0;
+    if (spentA !== spentB) {
+      return spentA ? 1 : -1;
+    }
+    if (props.focusFuel && a.fuel !== b.fuel) {
+      if (a.fuel === props.focusFuel) {
+        return -1;
       }
-      if (props.focusFuel && a.fuel !== b.fuel) {
-        if (a.fuel === props.focusFuel) {
-          return -1;
-        }
-        if (b.fuel === props.focusFuel) {
-          return 1;
-        }
+      if (b.fuel === props.focusFuel) {
+        return 1;
       }
-      return a[sort] - b[sort];
-    });
+    }
+    const groupA = bestInFuel.get(a.fuel) as number;
+    const groupB = bestInFuel.get(b.fuel) as number;
+    if (a.fuel !== b.fuel && groupA !== groupB) {
+      return groupA - groupB;
+    }
+    return a[sort] - b[sort];
+  });
   const outputShapes = new Map(
     generators.map((generator) => [
       generator.name,
@@ -1171,7 +1061,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
 
   return (
     <div
-      id={props.embedded ? undefined : "topbar"}
       className="flexContainer screenCatalog"
       ref={evidenceAnchor}
       tabIndex={-1}
@@ -1187,17 +1076,12 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           </Typography>
         )}
       <ConstructionBuildHeader
-        hideTitle={props.embedded}
-        concept="generator"
-        title="Build Generator"
-        cash={cash}
         capacity={valueLabelFormat(sliderTick)}
         sliderValue={sliderTick}
         sliderMin={0}
         sliderMax={34}
         sort={sort}
         sortOptions={sortOptions}
-        onClose={onBack}
         onSliderChange={(value) => {
           setSliderTick(value);
           setExactSizes({});
@@ -1228,11 +1112,11 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                   g.name === "Hydro" ? hydroAvailability : undefined
                 }
                 onUseSiteMaximum={(peakW) => {
-                  setSliderTick(getTickFromW(peakW));
+                  setSliderTick(wToSliderTick(peakW));
                   setExactSizes((sizes) => ({ ...sizes, Hydro: peakW }));
                 }}
                 onUseMaxSize={(peakW) => {
-                  setSliderTick(Math.max(0, getTickFromW(peakW)));
+                  setSliderTick(Math.max(0, wToSliderTick(peakW)));
                   setExactSizes((sizes) => ({ ...sizes, [g.name]: peakW }));
                 }}
                 date={game.date}

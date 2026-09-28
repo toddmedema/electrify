@@ -1,4 +1,6 @@
 import {
+  capitalRecoveryFactor,
+  facilityLoanMonths,
   CreditInputsType,
   degradedLifetimeYears,
   facilityCashBack,
@@ -14,8 +16,15 @@ import {
   getTotalDebt,
   MAX_CREDIT_POINTS,
   LCWH,
+  maxLoanAmount,
+  purchaseTerms,
 } from "./Financials";
-import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL } from "../Constants";
+import {
+  DAYS_PER_YEAR,
+  DOWNPAYMENT_PERCENT,
+  HOURS_PER_YEAR_REAL,
+  LOAN_MONTHS,
+} from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -63,6 +72,42 @@ describe("getMonthlyPayment", () => {
     }
     // The last dollar of a ten year loan is where the rounding lands
     expect(balance).toBeCloseTo(0, 6);
+  });
+});
+
+describe("purchaseTerms", () => {
+  it("charges the whole price in cash and borrows nothing", () => {
+    expect(purchaseTerms(1000, false, 0.05)).toEqual({
+      amountDue: 1000,
+      downpayment: 1000,
+      loanAmount: 0,
+      monthlyPayment: 0,
+    });
+  });
+
+  it("takes the down payment now and amortizes the rest over the standard term", () => {
+    const terms = purchaseTerms(1000, true, 0.05);
+    expect(terms.amountDue).toBe(1000 * DOWNPAYMENT_PERCENT);
+    expect(terms.downpayment).toBe(terms.amountDue);
+    expect(terms.loanAmount).toBe(1000 - 1000 * DOWNPAYMENT_PERCENT);
+    expect(terms.monthlyPayment).toBe(
+      getMonthlyPayment(terms.loanAmount, 0.05, LOAN_MONTHS),
+    );
+  });
+
+  it("rolls a refinanced balance into the payment but not into the new borrowing", () => {
+    const terms = purchaseTerms(1000, true, 0.05, 500);
+    expect(terms.loanAmount).toBe(800);
+    expect(terms.monthlyPayment).toBe(
+      getMonthlyPayment(1300, 0.05, LOAN_MONTHS),
+    );
+    expect(purchaseTerms(1000, false, 0.05, 500).monthlyPayment).toBe(0);
+  });
+
+  it("bounds the borrowing an import may claim", () => {
+    expect(maxLoanAmount(1000)).toBeCloseTo(
+      purchaseTerms(1000, true, 0).loanAmount,
+    );
   });
 });
 
@@ -136,6 +181,23 @@ describe("LCWH", () => {
     );
   });
 
+  it("annualizes capital with a capital recovery factor at the discount rate", () => {
+    const annualWh = 100000000 * HOURS_PER_YEAR_REAL * 0.35;
+    // Standard annuity tables: 7% over 25 years recovers 8.5811% of the capital a year
+    const crf = 0.085810517;
+    expect(capitalRecoveryFactor(0.07, 25)).toBeCloseTo(crf, 8);
+    expect(capitalRecoveryFactor(0, 25)).toBe(1 / 25);
+    expect(
+      LCWH(generator, date, 0, SEED, undefined, undefined, 0.07),
+    ).toBeCloseTo(
+      (200000000 * capitalRecoveryFactor(0.07, 25) + 4000000) / annualWh,
+      12,
+    );
+    expect(
+      LCWH(generator, date, 0, SEED, undefined, undefined, 0.07),
+    ).toBeGreaterThan(LCWH(generator, date, 0, SEED));
+  });
+
   it("includes compounding output degradation in a lifetime quote", () => {
     const degrading = { ...generator, annualOutputDegradation: 0.005 };
     const productiveYears = degradedLifetimeYears(25, 0.005);
@@ -152,6 +214,16 @@ describe("LCWH", () => {
     expect(LCWH(degrading, date, 0, SEED)).toBeGreaterThan(
       LCWH(generator, date, 0, SEED),
     );
+  });
+
+  it("quotes a technology's own typical start count when it has one", () => {
+    const coal = {
+      ...generator,
+      annualOperatingCost: 0,
+      costPerStart: 52662,
+      assumedStartsPerYear: 20,
+    };
+    expect(estimatedAnnualOperatingCost(coal)).toBeCloseTo(52662 * 20, 6);
   });
 
   it("quotes start maintenance at one start per day", () => {
@@ -188,6 +260,15 @@ describe("LCWH", () => {
       (oil.buildCost + 7590006.65775 * oil.lifespanYears) / totalWh,
       12,
     );
+  });
+
+  it("charges no carbon fee on biogenic biomass combustion", () => {
+    const biomass = {
+      ...generator,
+      fuel: "Biomass",
+      btuPerWh: 13.3,
+    } as GeneratorShoppingType;
+    expect(LCWH(biomass, date, 0.1, SEED)).toBe(LCWH(biomass, date, 0, SEED));
   });
 
   it("prices distillate oil carbon above gas for equal fuel energy", () => {
@@ -439,5 +520,14 @@ describe("facility aging", () => {
     });
     expect(facilityEquivalentCycles(battery)).toBeCloseTo(2.5, 10);
     expect(facilityEquivalentCycles(aFacility())).toBeUndefined();
+  });
+});
+
+describe("facilityLoanMonths", () => {
+  it("never lends beyond 80% of the asset's life, up to 30 years", () => {
+    expect(facilityLoanMonths(20)).toBe(192);
+    expect(facilityLoanMonths(25)).toBe(240);
+    expect(facilityLoanMonths(40)).toBe(360);
+    expect(facilityLoanMonths(75)).toBe(360);
   });
 });

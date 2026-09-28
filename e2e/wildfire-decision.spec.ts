@@ -1,3 +1,4 @@
+import { expectDialogToFit } from "./dialog-layout";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
 for (const theme of ["light", "dark"]) {
@@ -17,6 +18,7 @@ for (const theme of ["light", "dark"]) {
     await fast.click();
     const region = page.getByRole("dialog", { name: /Wildfire preparedness/ });
     await expect(region).toBeVisible({ timeout: 30000 });
+    await expectDialogToFit(region);
     const fund = region.getByRole("button", {
       name: /^Fund preparedness \(\$2M\)$/,
     });

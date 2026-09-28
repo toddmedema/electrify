@@ -4,9 +4,6 @@ import type { Action } from "@reduxjs/toolkit";
 import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
-export interface AudioType {
-  paused: boolean;
-}
 
 export type MonthType =
   | "Jan"
@@ -72,6 +69,8 @@ export interface TransmissionLineOperatingType {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
   interestRate: number;
+  // Inflation index when ordered; annual O&M escalates from it. Absent (1) at the run's start.
+  costIndexAtBuild?: number;
   /**
    * Net power over this line in the current tick: positive importing, negative selling.
    * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
@@ -157,6 +156,8 @@ export type FuelNameType =
   | "Oil"
   | "Geothermal"
   | "Hydro";
+/** A simple-cycle peaking turbine, or a combined cycle that recovers its exhaust heat. */
+export type GasCycleType = "simple" | "combined";
 /** The fuels bought on a market. The rest are free once a plant is built. */
 export type PricedFuelNameType =
   "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
@@ -271,15 +272,20 @@ export interface CardType {
   storyTarget?: StoryActionTargetType;
 }
 
+// Every category a run can be scored on. Which ones apply depends on ownership; the rules
+// themselves live in helpers/Scoring `SCORE_RULES`.
+export type ScoreCategoryType =
+  "supply" | "netWorth" | "customers" | "rate" | "emissions" | "blackouts";
+
 // The per-category points that sum to `score`. Investor and public-ownership scenarios are
-// scored on different categories (see reducers/Game), so the keys vary by scenario.
-export type ScoreBreakdownType = Record<string, number>;
+// scored on different categories (see helpers/Scoring), so the keys vary by scenario.
+export type ScoreBreakdownType = Partial<Record<ScoreCategoryType, number>>;
 
 export interface ScoreType {
   scenarioId: number;
   score: number;
   scoreBreakdown: ScoreBreakdownType;
-  difficulty: string;
+  difficulty: DifficultyType;
   // A FieldValue on the way out (serverTimestamp() is resolved by Firestore, not by us) and a
   // Timestamp on the way back in
   date: Timestamp | FieldValue;
@@ -512,6 +518,8 @@ export interface FuelType {
   // costPerBtu: number; // Measured from raw stock / before generator efficiency loss
   // all costs should be in that year's $ / not account for inflation when possible
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
+  // Counted towards emissions and the score, but not charged the carbon fee (biogenic CO2)
+  feeExempt?: boolean;
 }
 
 /**
@@ -544,6 +552,10 @@ interface SharedOperatingType
   minuteOperational?: number;
   // Absent until the player first toggles it
   paused?: boolean;
+  // The game's inflation index on the day it was bought, which its quoted O&M, variable O&M and
+  // start costs are denominated in. Operating costs escalate from here with the index rather
+  // than staying frozen in purchase-year dollars. Absent (1) for the starting fleet.
+  costIndexAtBuild?: number;
 }
 
 export interface GeneratorOperatingType
@@ -640,12 +652,20 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
   // it transiently; an online unit otherwise produces at least this much.
   minimumStableOutput?: number;
+  // "Natural Gas" only: the turbine arrangement. Both burn the same fuel, so fuel-keyed rules
+  // (prices, cold snaps, charts) treat them alike; this names the technology without relying on
+  // the display name, so a later simple-to-combined conversion can change it in place.
+  gasCycle?: GasCycleType;
   // Explicit because neither purchased fuel nor a start charge identifies every thermal plant:
   // geothermal buys no fuel, while the Oil facility is an internal-combustion generator.
   tracksStarts?: boolean;
   // Non-fuel expense charged for one physical start. Only present when the technology's source
   // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
+  // How many starts a year the build quote assumes when annualizing costPerStart. Absent means
+  // one a day (ASSUMED_STARTS_PER_YEAR), the peaking turbine's duty; live play charges actual
+  // starts either way.
+  assumedStartsPerYear?: number;
   // Non-fuel O&M charged against actual generation. Technologies without a separately sourced
   // variable component annualize all non-fuel operating expense into annualOperatingCost.
   variableOperatingCostPerMWh?: number;
@@ -990,8 +1010,8 @@ export interface FacilityResilienceType {
   // "Sun" with trackers: the share of hail damage a tracked array still takes, fixed at build by
   // the stow angle the trackers of that year could reach.
   trackerHailDamageFactor?: number; // (0, 1]
-  coldWeatherPackage?: boolean; // "Natural Gas" only
-  // "Natural Gas" only: the coldest representative-day minimum the plant runs through without a
+  coldWeatherPackage?: boolean; // "Natural Gas" fuel only, either cycle
+  // "Natural Gas" fuel only: the coldest representative-day minimum the plant runs through without a
   // derate, resolved at build or retrofit from the location so it cannot drift afterwards.
   designMinTempC?: number; // [-60, 0]
 }
@@ -1248,6 +1268,8 @@ export interface DialogType {
   secondaryLabel?: string;
   notCancellable?: boolean;
   closeText?: string;
+  // A milestone worth celebrating, where offering to install the app lands well
+  offerInstall?: boolean;
   open: boolean;
 }
 

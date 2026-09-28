@@ -96,15 +96,23 @@ export const FORECAST_AXIS_RIGHT = 48;
  */
 export const FORECAST_RIGHT_PAD = 24;
 
+/** Tick labels: the app's small caption, whatever the chart's width. */
+export const CHART_TICK_PX = 11;
+/** Legends and annotations: one step up from the ticks. */
+export const CHART_LABEL_PX = 12;
+
 /**
- * A font string at the chart's current scale.
+ * A font string. Chart geometry scales with the pane, but chart text does not: a 700px pane
+ * would otherwise set "440MW" larger than the body copy around it. `pxRatio` is 1 for the
+ * axes (uPlot applies the device ratio itself) and uPlot.pxRatio for plugins that paint on the
+ * canvas directly.
  *
  * Whole pixels on purpose: uPlot rescales axis fonts for the device by rewriting the `<n>px` in
  * this string, and its pattern only matches digits, so a fractional size would leave it
  * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
  */
-export function chartFont(scale: number, sizePx = 12): string {
-  return `${Math.max(1, Math.round(sizePx * scale))}px ${CHART_FONT_FAMILY}`;
+export function chartFont(pxRatio = 1, sizePx = CHART_TICK_PX): string {
+  return `${Math.max(1, Math.round(sizePx * pxRatio))}px ${CHART_FONT_FAMILY}`;
 }
 
 /**
@@ -139,6 +147,11 @@ function textWidth(text: string, font: string, sizePx: number): number {
 export interface LegendItem {
   name: string;
   fill: string;
+  /**
+   * Draws a line sample in the series' own stroke instead of a dot, so series that share a hue
+   * family are still told apart by width and dash rather than by colour alone.
+   */
+  line?: { width: number; dash?: number[] };
 }
 
 interface AxisOptions {
@@ -189,7 +202,7 @@ function axisCommon(scale: number, o: AxisOptions) {
   const palette = chartPalette();
   return {
     stroke: o.stroke ?? palette.tickLabel,
-    font: chartFont(scale),
+    font: chartFont(),
     grid: o.grid
       ? {
           show: true,
@@ -208,7 +221,7 @@ function axisCommon(scale: number, o: AxisOptions) {
     },
     border: { show: true, stroke: palette.axis, width: 1 },
     label: o.label,
-    labelFont: chartFont(scale),
+    labelFont: chartFont(1, CHART_LABEL_PX),
     labelSize: o.label ? AXIS_LABEL_SIZE * scale : undefined,
     splits: o.splits,
     values: o.values,
@@ -272,8 +285,8 @@ export function forecastMonthAxis(
  * "$12" on the fuel chart, which is what gave the reserve away.
  */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
-  const font = chartFont(scale);
-  const fontSize = 12 * scale;
+  const font = chartFont();
+  const fontSize = CHART_TICK_PX;
   const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
@@ -550,7 +563,7 @@ export function eventMarkersPlugin(
           u.ctx.fill();
           u.ctx.stroke();
           u.ctx.fillStyle = palette.interactive;
-          u.ctx.font = chartFont(scale, 10);
+          u.ctx.font = chartFont(1, Math.round(10 * scale));
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(String(marker.number), x, badgeY);
@@ -588,11 +601,15 @@ export function legendPlugin(
           return;
         }
         const scale = canvasScale(u);
-        const radius = 3.5 * scale;
-        const gap = 5 * scale;
-        const lineHeight = 16 * scale;
+        const px = uPlot.pxRatio;
+        const radius = 3.5 * px;
+        const swatch = 16 * px;
+        const gap = 5 * px;
+        const lineHeight = 16 * px;
+        const hasLines = items.some((item) => item.line);
+        const markWidth = hasLines ? swatch : radius * 2;
         u.ctx.save();
-        u.ctx.font = chartFont(scale);
+        u.ctx.font = chartFont(px, CHART_LABEL_PX);
         // The axes leave their own alignment on the context, so say what this wants
         u.ctx.textAlign = "left";
         u.ctx.textBaseline = "middle";
@@ -606,18 +623,29 @@ export function legendPlugin(
             u.bbox.left +
             u.bbox.width -
             inset * scale -
-            (radius + gap + widest);
+            (markWidth + gap + widest);
         } else {
           x = u.bbox.left + inset * scale;
         }
         let y = designY * scale;
         for (const item of items) {
-          u.ctx.fillStyle = item.fill;
-          u.ctx.beginPath();
-          u.ctx.arc(x, y, radius, 0, Math.PI * 2);
-          u.ctx.fill();
+          if (item.line) {
+            u.ctx.strokeStyle = item.fill;
+            u.ctx.lineWidth = item.line.width * px;
+            u.ctx.setLineDash((item.line.dash || []).map((d) => d * px));
+            u.ctx.beginPath();
+            u.ctx.moveTo(x, y);
+            u.ctx.lineTo(x + markWidth, y);
+            u.ctx.stroke();
+            u.ctx.setLineDash([]);
+          } else {
+            u.ctx.fillStyle = item.fill;
+            u.ctx.beginPath();
+            u.ctx.arc(x + markWidth / 2, y, radius, 0, Math.PI * 2);
+            u.ctx.fill();
+          }
           u.ctx.fillStyle = chartPalette().legendText;
-          u.ctx.fillText(item.name, x + radius + gap, y);
+          u.ctx.fillText(item.name, x + markWidth + gap, y);
           y += lineHeight;
         }
         u.ctx.restore();
@@ -644,7 +672,7 @@ export function titlePlugin(
         }
         const scale = canvasScale(u);
         u.ctx.save();
-        u.ctx.font = chartFont(scale, 14);
+        u.ctx.font = chartFont(uPlot.pxRatio, 14);
         u.ctx.fillStyle = chartPalette().legendText;
         u.ctx.textAlign = "center";
         u.ctx.textBaseline = "middle";

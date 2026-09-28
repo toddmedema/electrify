@@ -25,10 +25,11 @@ test("phone surfaces share stable gutters and compact chrome", async ({
   const secondManualEntry = await manualEntries.nth(2).boundingBox();
   expect(firstManualEntry).not.toBeNull();
   expect(secondManualEntry).not.toBeNull();
-  expect(firstManualEntry!.x).toBeCloseTo(8, 0);
+  // Entries in a group join into one grouped list on the 16px gutter, hairline to hairline
+  expect(firstManualEntry!.x).toBeCloseTo(16, 0);
   expect(
     secondManualEntry!.y - (firstManualEntry!.y + firstManualEntry!.height),
-  ).toBeCloseTo(8, 0);
+  ).toBeCloseTo(0, 0);
   await expectNoHorizontalOverflow(page.locator("#manual"));
 
   await page.goto("/?scenario=103");

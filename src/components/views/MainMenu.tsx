@@ -97,9 +97,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
         Electrify
       </Typography>
       <Box id="centeredMenu" sx={{ px: 3 }}>
-        <Typography className="gameSubtitle" variant="body1" component="p">
-          Keep the lights on. Build a cleaner grid.
-        </Typography>
         <Stack
           component="section"
           aria-label="Primary actions"
@@ -183,12 +180,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           {shareStatus}
         </Typography>
       </Box>
-      <footer
-        className="mainMenuFooter"
-        style={{
-          opacity: 0.7,
-        }}
-      >
+      <footer className="mainMenuFooter">
         <IconButton
           color="primary"
           href={DISCORD_URL}

@@ -1,3 +1,8 @@
+import {
+  activeScenario,
+  activeScenarioOrDefault,
+  currentTick,
+} from "../../helpers/GameSelectors";
 import * as React from "react";
 import CustomerPrograms from "./CustomerPrograms";
 import {
@@ -50,7 +55,6 @@ import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
   getDateFromMinute,
-  getTimeFromTimeline,
   MINUTES_PER_MONTH,
   reduceHistories,
   summarizeHistory,
@@ -59,6 +63,7 @@ import {
   customerMarketSizeAt,
   getMarketRate,
   projectCustomerChange,
+  publicRateCap,
 } from "../../helpers/Customers";
 import { getInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
@@ -68,10 +73,6 @@ import {
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
-import {
-  formatLargeMassValueConcise,
-  largeMassUnit,
-} from "../../helpers/Units";
 import {
   getStorageJson,
   getStorageString,
@@ -88,7 +89,6 @@ import {
   signature as projectionSignature,
   subscribeProjection,
 } from "../base/DeferredProjection";
-import { getScenario, SCENARIOS } from "../../data/Scenarios";
 import {
   chartPalette,
   demandTypeColors,
@@ -114,7 +114,12 @@ import GameCard from "../base/GameCard";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
-import { buildChartKeys, formatCustomerChange } from "./Finances";
+import {
+  formatCustomerChange,
+  HISTORY_METRIC_KEYS,
+  HistoryMetricKeyType,
+  historyMetrics,
+} from "../../helpers/HistoryMetrics";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
@@ -348,10 +353,7 @@ const VIEWPORT_ZOOM_FACTOR = 0.5;
 const VIEWPORT_PAN_FRACTION = 0.25;
 
 function scenarioEndMinute(game: GameType): number | undefined {
-  const months = getScenario(
-    game.scenarioId,
-    game.customScenario,
-  )?.durationMonths;
+  const months = activeScenario(game)?.durationMonths;
   return months ? months * MINUTES_PER_MONTH : undefined;
 }
 
@@ -559,15 +561,6 @@ function storedLayers(): InsightLayerId[] {
   return valid.length ? valid : [...INSIGHT_PRESETS.overview.layers];
 }
 
-export function presetForLayers(layers: InsightLayerId[]): InsightPresetId {
-  const match = Object.entries(INSIGHT_PRESETS).find(
-    ([, preset]) =>
-      preset.layers.length === layers.length &&
-      preset.layers.every((layer, index) => layer === layers[index]),
-  );
-  return (match?.[0] as InsightPresetId | undefined) || "custom";
-}
-
 function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
   switch (scenarioId) {
     case 4:
@@ -599,6 +592,18 @@ export function withRequiredLayers(
   return next;
 }
 
+// The history metric each finance layer charts
+const FINANCE_LAYER_METRICS: Partial<
+  Record<InsightLayerId, HistoryMetricKeyType & DerivedHistoryKeysType>
+> = {
+  profit: "profit",
+  revenue: "revenue",
+  expenses: "expenses",
+  cash: "cash",
+  customers: "customers",
+  emissions: "kgco2e",
+};
+
 function financeMetadata(
   id: InsightLayerId,
   units: UnitSystemType,
@@ -607,33 +612,16 @@ function financeMetadata(
   label: string;
   format: (value: number) => string;
 } | null {
-  switch (id) {
-    case "profit":
-      return { key: "profit", label: "Profit", format: formatMoneyConcise };
-    case "revenue":
-      return { key: "revenue", label: "Revenue", format: formatMoneyConcise };
-    case "expenses":
-      return { key: "expenses", label: "Expenses", format: formatMoneyConcise };
-    case "cash":
-      return { key: "cash", label: "Cash", format: formatMoneyConcise };
-    case "customers":
-      return {
-        key: "customers",
-        label: "Customers",
-        format: (value) =>
-          new Intl.NumberFormat(undefined, { notation: "compact" }).format(
-            value,
-          ),
-      };
-    case "emissions":
-      return {
-        key: "kgco2e",
-        label: `CO2e Emitted (${largeMassUnit(units)})`,
-        format: (value) => formatLargeMassValueConcise(value, units),
-      };
-    default:
-      return null;
+  const key = FINANCE_LAYER_METRICS[id];
+  if (!key) {
+    return null;
   }
+  const metric = historyMetrics(units)[key];
+  return {
+    key,
+    label: metric.suffix ? `${metric.label} (${metric.suffix})` : metric.label,
+    format: metric.format,
+  };
 }
 
 function financeSeries(
@@ -1182,7 +1170,7 @@ export default class Insights extends React.Component<Props, State> {
   private requestStaleProjection() {
     const { game } = this.props;
     if (projectionReady(game)) return;
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    const now = currentTick(game);
     if (now) requestProjection(game, now);
   }
 
@@ -1201,8 +1189,7 @@ export default class Insights extends React.Component<Props, State> {
 
   private renderLevers(now: TickPresentFutureType) {
     const { game, onDelta } = this.props;
-    const scenario =
-      getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+    const scenario = activeScenarioOrDefault(game);
     const marketRate = getMarketRate(
       scenario.dollarsPerkWh,
       game.date,
@@ -1243,7 +1230,16 @@ export default class Insights extends React.Component<Props, State> {
     const targetRate = scenario.dollarsPerkWh * inflationIndex;
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
-      : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
+      : // A public board caps the rate at twice its target in today's dollars; the reducer enforces it
+        Math.max(
+          publicRateCap(
+            scenario.dollarsPerkWh,
+            game.date,
+            game.startingYear,
+            game.seed,
+          ),
+          game.dollarsPerkWh,
+        );
     // The final score decomposes exactly into a supply-weighted sum over the years played, so
     // what a rate is worth is the coming year's own term of that sum: the distance from the
     // target, times how much of the lifetime energy the coming year makes up. Always a full
@@ -1298,8 +1294,8 @@ export default class Insights extends React.Component<Props, State> {
             value: max,
             label: rateMarkLabel(
               max,
-              formatMoneyConcise(max),
-              formatRateCompact(max),
+              `${formatMoneyConcise(max)} board cap`,
+              `cap ${formatRateCompact(max)}`,
             ),
           },
         ];
@@ -1519,7 +1515,7 @@ export default class Insights extends React.Component<Props, State> {
     const summary = deriveExpandedSummary(
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
-    const units = this.context as UnitSystemType;
+    const metrics = historyMetrics(this.context as UnitSystemType);
     const selected = game.facilities.find(
       (facility) => facility.id === selectedFacilityId,
     );
@@ -1534,12 +1530,12 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
+            {HISTORY_METRIC_KEYS.map((key) => {
+              const metadata = metrics[key];
               const value =
                 key === "interestRate"
-                  ? getTimeFromTimeline(game.date.minute, game.timeline)!
-                      .interestRate
-                  : summary[key as DerivedHistoryKeysType];
+                  ? currentTick(game)!.interestRate
+                  : (summary[key] ?? 0);
               return (
                 <TableRow key={key}>
                   <TableCell sx={{ pl: 2 + (metadata.nesting || 0) * 2 }}>
@@ -1835,12 +1831,7 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         case "powerExchange":
-          body = (
-            <PowerExchangeSummary
-              game={game}
-              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
-            />
-          );
+          body = <PowerExchangeSummary game={game} now={currentTick(game)!} />;
           break;
         case "demandByType": {
           const demandTypes = demandTypesBySizeAtStart(
@@ -2177,7 +2168,7 @@ export default class Insights extends React.Component<Props, State> {
 
   public render() {
     const { game } = this.props;
-    const now = getTimeFromTimeline(game.date.minute, game.timeline);
+    const now = currentTick(game);
     if (!now) {
       return <span />;
     }

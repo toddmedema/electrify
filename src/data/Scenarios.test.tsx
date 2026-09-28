@@ -146,7 +146,10 @@ describe("tutorial mission metadata", () => {
     });
     expect(interties.facilities).toEqual([
       expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
-      expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
+      expect.objectContaining({
+        name: "Natural Gas Peaker",
+        peakW: 500000000,
+      }),
     ]);
     expect(interties.tutorialSteps).toHaveLength(19);
   });
@@ -308,7 +311,7 @@ describe("authored starting fleets", () => {
     ]);
     expect(manassas.facilities).toEqual([
       expect.objectContaining({
-        fuel: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 75_000_000,
       }),
       expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
@@ -323,7 +326,7 @@ describe("authored starting fleets", () => {
       reliabilityObjective: {
         year: 2021,
         month: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
         label: "February 2021 freeze",
       },
     });
@@ -350,15 +353,33 @@ describe("authored starting fleets", () => {
     ).toBe(3_827_000_000);
     expect(
       austin.facilities.map((facility) => ({
-        fuel: facility.fuel,
+        technology: facility.name ?? facility.fuel,
         peakW: facility.peakW,
       })),
     ).toEqual([
-      { fuel: "Natural Gas", peakW: 1_497_000_000 },
-      { fuel: "Coal", peakW: 700_000_000 },
-      { fuel: "Uranium", peakW: 430_000_000 },
-      { fuel: "Wind", peakW: 1_200_000_000 },
+      { technology: "Natural Gas CC", peakW: 1_497_000_000 },
+      { technology: "Coal", peakW: 700_000_000 },
+      { technology: "Uranium", peakW: 430_000_000 },
+      { technology: "Wind", peakW: 1_200_000_000 },
     ]);
+  });
+
+  it("names the gas technology of every starting gas plant", () => {
+    // A fuel-only search silently takes whichever gas plant the catalog lists first
+    const fleets = [...SCENARIOS, DEFAULT_CUSTOM_SCENARIO].flatMap(
+      (scenario) => scenario.facilities,
+    );
+    const gas = fleets.filter(
+      (facility) =>
+        facility.fuel === "Natural Gas" ||
+        facility.name?.startsWith("Natural Gas"),
+    );
+    expect(gas.length).toBeGreaterThan(0);
+    gas.forEach((facility) => {
+      expect(["Natural Gas Peaker", "Natural Gas CC"]).toContain(facility.name);
+      // Kept alongside the name for readers of the authored fleet, such as the debrief
+      expect(facility.fuel).toBe("Natural Gas");
+    });
   });
 
   it("authors distinct heatwave and generation-loss resilience challenges", () => {
@@ -369,7 +390,7 @@ describe("authored starting fleets", () => {
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
     });
     expect(heatwave).toMatchObject({
       name: "Heatwave + Drought",
@@ -412,7 +433,7 @@ describe("authored starting fleets", () => {
         year: 2025,
         month: 1,
         durationMonths: 2,
-        minimumDemandServed: 1,
+        minimumDemandServed: 0.995,
       },
     });
     expect(wildfire.briefing?.threat).toMatch(
@@ -425,6 +446,7 @@ describe("authored starting fleets", () => {
       ),
     ).toBe(80_810_000);
     expect(wildfire.facilities[0]).toEqual({
+      name: "Natural Gas CC",
       fuel: "Natural Gas",
       peakW: 24_240_000,
       initialAgeYears: 18,
@@ -438,6 +460,21 @@ describe("authored starting fleets", () => {
 
     endOfEra.facilities.forEach((facility) => {
       expect(facility.initialAgeYears).toBeGreaterThanOrEqual(20);
+    });
+  });
+});
+
+describe("briefing objectives", () => {
+  // A briefing objective is what the player optimises for, so it must not promise a check the
+  // game never makes. The classics that name a clean-up goal are won by surviving the term.
+  it("describe the real win condition in the classic scenarios", () => {
+    [100, 101, 103, 105].forEach((id) => {
+      const scenario = getScenario(id)!;
+      expect(scenario.reliabilityObjective).toBeUndefined();
+      expect([scenario.name, scenario.briefing!.objective]).toEqual([
+        scenario.name,
+        expect.stringMatching(/solvent/),
+      ]);
     });
   });
 });

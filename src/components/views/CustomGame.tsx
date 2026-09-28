@@ -8,10 +8,6 @@ import {
   Button,
   Card,
   CardHeader,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   MenuItem,
   Select,
@@ -22,21 +18,19 @@ import {
   TableCell,
   TableRow,
   TextField,
-  Toolbar,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
+import ScreenHeader from "../base/ScreenHeader";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
-import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import InfoDialog from "../base/InfoDialog";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
@@ -46,6 +40,10 @@ import { inEraRate } from "../../data/RetailRates";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
+import {
+  useWorkerRequest,
+  WorkerRequestOptions,
+} from "../base/useWorkerRequest";
 import {
   CustomGameForecastRequest,
   CustomGameForecastResponse,
@@ -57,6 +55,8 @@ import {
   formatMoneyConcise,
   formatWattHours,
   formatWatts,
+  formatCount,
+  formatFacilitySize,
 } from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
@@ -98,6 +98,18 @@ const STARTING_YEARS = Array.from(
 );
 const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
 const FORECAST_DEBOUNCE_MS = 250;
+
+// One worker for the whole setup screen, since each one has to load the simulation data first
+const FORECAST_WORKER: WorkerRequestOptions<
+  CustomGameForecastResponse,
+  YearOneOutlook
+> = {
+  // Called through, so tests can replace the client's factory
+  createWorker: () => createCustomGameForecastWorker(),
+  debounceMs: FORECAST_DEBOUNCE_MS,
+  reuseWorker: true,
+  read: (data) => ("outlook" in data ? { result: data.outlook } : undefined),
+};
 
 type OutlookState =
   | { status: "loading" }
@@ -187,9 +199,10 @@ function facilityName(facility: Partial<FacilityShoppingType>): string {
 }
 
 function facilitySize(facility: Partial<FacilityShoppingType>): string {
-  return facility.peakWh
-    ? formatWattHours(facility.peakWh)
-    : formatWatts(facility.peakW || 0);
+  return formatFacilitySize({
+    peakW: facility.peakW || 0,
+    peakWh: facility.peakWh,
+  });
 }
 
 function demandServedLabel(outlook: YearOneOutlook): string {
@@ -234,42 +247,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [addName, setAddName] = React.useState("");
   const [addSize, setAddSize] = React.useState(GENERATOR_SIZES_W[2]);
   const previewSeed = React.useRef(scenario.seed ?? newSeed());
-  const forecastRequestId = React.useRef(0);
-  const forecastWorker = React.useRef<Worker>();
-  const [outlook, setOutlook] = React.useState<OutlookState>({
-    status: "loading",
-  });
-  const ensureForecastWorker = React.useCallback(() => {
-    if (forecastWorker.current) {
-      return forecastWorker.current;
-    }
-    const worker = createCustomGameForecastWorker();
-    forecastWorker.current = worker;
-    worker.onmessage = (event: MessageEvent<CustomGameForecastResponse>) => {
-      if (event.data.requestId !== forecastRequestId.current) {
-        return;
-      }
-      if ("outlook" in event.data) {
-        setOutlook({ status: "ready", outlook: event.data.outlook });
-      } else {
-        setOutlook({ status: "error" });
-      }
-    };
-    worker.onerror = (event: ErrorEvent) => {
-      // The outlook is optional. Handle a worker failure without making the setup unusable.
-      event.preventDefault();
-      setOutlook({ status: "error" });
-    };
-    return worker;
-  }, []);
-  React.useEffect(() => {
-    return () => {
-      const worker = forecastWorker.current;
-      forecastWorker.current = undefined;
-      worker?.terminate();
-    };
-  }, []);
-
   const technologies = React.useMemo(
     () => technologiesFor(scenario, game.difficulty),
     [scenario, game.difficulty],
@@ -410,55 +387,36 @@ export default function CustomGame(props: Props): React.JSX.Element {
     },
   );
 
-  React.useEffect(() => {
-    const requestId = ++forecastRequestId.current;
-    if (unavailable.length > 0 || hydroSetup.error) {
-      setOutlook({ status: "invalid" });
-      return;
-    }
-    const location = getScenarioLocation(scenario);
-    if (!location) {
-      setOutlook({ status: "error" });
-      return;
-    }
-
-    setOutlook({ status: "loading" });
-    const timer = window.setTimeout(() => {
-      const request: CustomGameForecastRequest = {
-        requestId,
-        scenario: {
-          ...scenario,
-          locationId: location.id,
-          location,
+  const forecastInvalid = unavailable.length > 0 || !!hydroSetup.error;
+  const forecastLocation = getScenarioLocation(scenario);
+  const forecast = useWorkerRequest(
+    forecastInvalid || !forecastLocation
+      ? undefined
+      : {
+          // Anything that changes the scenario is a new request
+          key: game.difficulty,
+          scope: scenario,
+          message: (requestId: number): CustomGameForecastRequest => ({
+            requestId,
+            scenario: {
+              ...scenario,
+              locationId: forecastLocation.id,
+              location: forecastLocation,
+            },
+            difficulty: game.difficulty,
+            seed: scenario.seed ?? previewSeed.current,
+          }),
         },
-        difficulty: game.difficulty,
-        seed: scenario.seed ?? previewSeed.current,
-      };
-      try {
-        ensureForecastWorker().postMessage(request);
-      } catch {
-        // Startup and structured-clone failures happen synchronously, outside onerror.
-        const worker = forecastWorker.current;
-        forecastWorker.current = undefined;
-        if (worker) {
-          worker.onmessage = null;
-          worker.onerror = null;
-          worker.terminate();
-        }
-        setOutlook({ status: "error" });
-      }
-    }, FORECAST_DEBOUNCE_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [
-    ensureForecastWorker,
-    game.difficulty,
-    scenario,
-    unavailable.length,
-    hydroSetup.error,
-  ]);
+    FORECAST_WORKER,
+  );
+  // The outlook is optional: a worker failure reads as unavailable without blocking Play
+  const outlook: OutlookState = forecastInvalid
+    ? { status: "invalid" }
+    : !forecastLocation || forecast.status === "error"
+      ? { status: "error" }
+      : forecast.status === "ready"
+        ? { status: "ready", outlook: forecast.result }
+        : { status: "loading" };
 
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
@@ -518,20 +476,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   return (
     <div id="listCard" className="flexContainer screenCustom">
-      <div id="topbar">
-        <Toolbar>
-          <IconButton
-            onClick={onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ArrowBackIosIcon />
-          </IconButton>
-          <Typography variant="h6">Custom setup</Typography>
-        </Toolbar>
-      </div>
+      <ScreenHeader title="Custom setup" onBack={onBack} />
 
       <div className="scrollable">
         <LocationPicker
@@ -573,9 +518,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         getStartingCustomers(getScenarioLocation(scenario))
                       }
                       valueLabelDisplay="auto"
-                      valueLabelFormat={(value: number) =>
-                        value.toLocaleString()
-                      }
+                      valueLabelFormat={(value: number) => formatCount(value)}
                       onChange={(_event: Event, value: number | number[]) =>
                         changeStartingCustomers(
                           Array.isArray(value) ? value[0] : value,
@@ -583,10 +526,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       }
                     />
                     <Typography variant="caption" color="textSecondary">
-                      {(
+                      {formatCount(
                         scenario.startingCustomers ||
-                        getStartingCustomers(getScenarioLocation(scenario))
-                      ).toLocaleString()}
+                          getStartingCustomers(getScenarioLocation(scenario)),
+                      )}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -745,33 +688,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   <TableCell>
                     {/* Difficulty lives on the game rather than the scenario, the same way it does
                     on the scenario details screen */}
-                    <Select
+                    <DifficultyPicker
                       id="difficulty"
-                      inputProps={{ "aria-label": "Difficulty" }}
+                      variant="select"
                       value={game.difficulty}
-                      onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                        onDelta({
-                          difficulty: e.target.value as DifficultyType,
-                        })
-                      }
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => {
-                          return (
-                            <MenuItem value={d} key={d}>
-                              <Tooltip
-                                title={DIFFICULTIES[d].description}
-                                placement="right"
-                              >
-                                <span>
-                                  {DIFFICULTY_LABELS[d as DifficultyType]}
-                                </span>
-                              </Tooltip>
-                            </MenuItem>
-                          );
-                        },
-                      )}
-                    </Select>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -1025,53 +947,25 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </div>
       </div>
 
-      <Dialog
+      <VictoryConditionsDialog
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
-      >
-        <ClosableDialogTitle onClose={() => setVictoryDialogOpen(false)}>
-          Victory Conditions: {scenario.ownership}-Owned
-        </ClosableDialogTitle>
-        <DialogContent>
-          <VictoryConditions
-            ownership={scenario.ownership}
-            dollarsPerkWh={scenario.dollarsPerkWh}
-            startingCustomers={scenario.startingCustomers}
-            minimumCustomerRetention={scenario.minimumCustomerRetention}
-            reliabilityObjective={scenario.reliabilityObjective}
-            difficulty={game.difficulty}
-            meaningfulDecisions={game.meaningfulDecisions}
-            meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setVictoryDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={`Victory Conditions: ${scenario.ownership}-Owned`}
+        scenario={scenario}
+        difficulty={game.difficulty}
+        meaningfulDecisions={game.meaningfulDecisions}
+        meaningfulDecisionGateWaived={game.meaningfulDecisionGateWaived}
+      />
 
-      <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)}>
-        <DialogTitle>Carbon fee</DialogTitle>
-        <DialogContent>
-          A carbon fee charges for greenhouse gas emissions. The game measures
-          them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
-          common unit for comparing different greenhouse gases.
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => setFeeDialogOpen(false)}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <InfoDialog
+        open={feeDialogOpen}
+        onClose={() => setFeeDialogOpen(false)}
+        title="Carbon fee"
+      >
+        A carbon fee charges for greenhouse gas emissions. The game measures
+        them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
+        common unit for comparing different greenhouse gases.
+      </InfoDialog>
     </div>
   );
 }

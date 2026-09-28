@@ -1,3 +1,4 @@
+import { maxLoanAmount } from "./helpers/Financials";
 import {
   accessContextForGame,
   effectiveCorridor,
@@ -24,6 +25,7 @@ import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
+  validGasCycle,
   validResilienceRecord,
   validUpgradeInProgress,
 } from "./helpers/BuildValidation";
@@ -34,7 +36,6 @@ import {
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
 import {
-  DOWNPAYMENT_PERCENT,
   TICKS_PER_MONTH,
   INTERTIE_UPGRADE_STEP,
   MAX_INTERTIE_UPGRADES,
@@ -58,6 +59,7 @@ import {
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
+import { pow } from "./helpers/Pow";
 
 /**
  * Saving and restoring a game.
@@ -135,9 +137,8 @@ function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
   );
   if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
   return (
-    Math.abs(
-      capacityW / (corridorW * Math.pow(INTERTIE_UPGRADE_STEP, steps)) - 1,
-    ) <= 1e-9
+    Math.abs(capacityW / (corridorW * pow(INTERTIE_UPGRADE_STEP, steps)) - 1) <=
+    1e-9
   );
 }
 
@@ -212,7 +213,7 @@ function validLineInvestment(
   return (
     approximatelyEqual(line.buildCost, buildCost) &&
     line.loanAmountLeft! <=
-      buildCost * (1 - DOWNPAYMENT_PERCENT) + Math.max(1, buildCost) * 1e-9 &&
+      maxLoanAmount(buildCost) + Math.max(1, buildCost) * 1e-9 &&
     line.yearsToBuildLeft! <= yearsToBuild &&
     validConstruction(line, constructionKgco2e)
   );
@@ -410,6 +411,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       ].some((value) => typeof value !== "number" || !Number.isFinite(value));
       const optionalNumbersInvalid = [
         current.costPerStart,
+        current.assumedStartsPerYear,
         current.lifetimeStarts,
         current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
@@ -432,8 +434,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
         optionalNumbersInvalid ||
         (typeof current.minimumStableOutput === "number" &&
           current.minimumStableOutput > 1) ||
+        (current.costIndexAtBuild !== undefined &&
+          !(
+            typeof current.costIndexAtBuild === "number" &&
+            Number.isFinite(current.costIndexAtBuild) &&
+            current.costIndexAtBuild > 0
+          )) ||
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
+        !validGasCycle(current.fuel, current.gasCycle) ||
         !validUpgradeInProgress(current.upgradeInProgress)
       );
     }) ||

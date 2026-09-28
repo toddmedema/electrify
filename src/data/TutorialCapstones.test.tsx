@@ -54,9 +54,10 @@ describe("authored tutorial capstones", () => {
   });
 
   it.each([
-    ["Natural Gas", "Solar"],
+    ["Natural Gas Peaker", "Solar"],
     ["Solar", "Wind"],
-    ["Solar", "Natural Gas"],
+    ["Solar", "Natural Gas Peaker"],
+    ["Natural Gas CC", "Natural Gas Peaker"],
   ])(
     "completes Mission 2 when ordering %s then %s, in any fleet order",
     (first, second) => {
@@ -76,7 +77,10 @@ describe("authored tutorial capstones", () => {
         buildFacility({ facility: differentGenerator, financed: true }),
       );
 
-      expect(game.facilities[0].yearsToBuildLeft).toBeGreaterThan(0);
+      expect(
+        game.facilities.find((facility) => facility.name === second)
+          ?.yearsToBuildLeft,
+      ).toBeGreaterThan(0);
       expect(objective.success(appState(game))).toBe(true);
       for (const facilities of [
         [...game.facilities].reverse(),
@@ -179,7 +183,7 @@ describe("authored tutorial capstones", () => {
   it("rewards profitable customer growth and rejects an unsustainable discount", () => {
     const objective = capstone(3);
     const balanced = createGame({ scenarioId: 3, dollarsPerkWh: 0.06 });
-    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0.03 });
+    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0.02 });
 
     expect(tickUntil(balanced, objective.success, 700)).toBe(true);
     expect(tickUntil(tooCheap, objective.failure!, 700)).toBe(true);

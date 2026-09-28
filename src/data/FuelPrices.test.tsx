@@ -159,7 +159,7 @@ describe("getFuelPricesPerMBTU", () => {
       region: "Europe",
       country: "France",
     });
-    expect(europe["Natural Gas"]).toBeCloseTo(us["Natural Gas"] * 3);
+    expect(europe["Natural Gas"]).toBeCloseTo(us["Natural Gas"] * 1.7);
     expect(europe.Coal).toBeCloseTo(us.Coal * 1.5);
     expect(Object.isFrozen(europe)).toBe(true);
   });

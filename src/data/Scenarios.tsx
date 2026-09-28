@@ -220,7 +220,7 @@ export const SCENARIOS: ScenarioType[] = [
   {
     id: 1,
     name: "Mission 2: Generators",
-    icon: "natural gas",
+    icon: "natural gas peaker",
     summary: "Build a generator",
     locationId: "SF",
     ownership: "Investor",
@@ -808,7 +808,13 @@ export const SCENARIOS: ScenarioType[] = [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
       // much nameplate to create observable daytime surplus after customer demand.
       { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
-      { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 12 },
+      // A peaker, the backup the tutorial pauses and restores
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 500000000,
+        initialAgeYears: 12,
+      },
     ],
     tutorialSteps: [
       {
@@ -890,11 +896,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        target: '[data-facility="Natural Gas Peaker"] .facilityDisclosure',
         advanceOn: (s: AppStateType) =>
           s.ui.selectedFacilityId ===
           s.game.facilities.find(
-            (facility) => "fuel" in facility && facility.fuel === "Natural Gas",
+            (facility) => facility.name === "Natural Gas Peaker",
           )?.id,
         action: "Tap the gas plant",
         content: (
@@ -903,13 +909,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[aria-label="Pause Natural Gas"]',
+        target: '[aria-label="Pause Natural Gas Peaker"]',
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some(
             (facility) =>
-              "fuel" in facility &&
-              facility.fuel === "Natural Gas" &&
-              facility.paused,
+              facility.name === "Natural Gas Peaker" && facility.paused,
           ),
         action: "Tap Pause on the gas plant",
         content: (
@@ -990,11 +994,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        target: '[data-facility="Natural Gas Peaker"] .facilityDisclosure',
         action: "Restore your gas backup",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some(
-            (f) => "fuel" in f && f.fuel === "Natural Gas" && !f.paused,
+            (f) => f.name === "Natural Gas Peaker" && !f.paused,
           ),
         content: (
           <TutorialPrompt text="Open the gas plant and resume it before running time. Keep Solar on too." />
@@ -1030,17 +1034,24 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
-      objective: "Replace high-emission power while keeping the lights on.",
+      objective:
+        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
     startingYear: 2020,
     cash: 330000000,
     feePerKgCO2e: 50 / 1000,
-    dollarsPerkWh: 0.05,
+    dollarsPerkWh: 0.11, // 0.6 x EIA 2020 CA average retail, 18.0 cents
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      // California's 2010-vintage gas was mostly combined cycle
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 10,
+      },
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
     ],
   },
@@ -1054,14 +1065,15 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
-      objective: "Grow with cheaper gas without relying on it alone.",
+      objective:
+        "Stay solvent for 20 years through a gas boom and whatever follows.",
       threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
     startingYear: 2006,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.03,
+    dollarsPerkWh: 0.05, // 0.6 x EIA 2006 PA average retail, 8.68 cents
     durationMonths: 12 * 20,
     facilities: [{ fuel: "Coal", peakW: 500000000, initialAgeYears: 25 }],
   },
@@ -1075,14 +1087,14 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
-      objective: "Use less costly oil while meeting changing demand.",
+      objective: "Keep the island supplied and solvent as oil prices swing.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
     startingYear: 2004,
     cash: 275000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.094, // 0.6 x EIA 2004 HI average retail, 15.7 cents
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
@@ -1100,7 +1112,8 @@ export const SCENARIOS: ScenarioType[] = [
     briefing: {
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
-      objective: "Replace aging oil plants with cleaner options.",
+      objective:
+        "Stay solvent and keep up with demand as clean technology gets cheaper.",
       threat:
         "Invest too early and overpay; wait too long and demand may exceed supply.",
     },
@@ -1108,7 +1121,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2002,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.02,
+    dollarsPerkWh: 0.07, // 0.6 x EIA 2002 CA average retail, 12.19 cents
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Uranium", peakW: 400000000, initialAgeYears: 15 },
@@ -1133,11 +1146,19 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2000,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.05,
+    // About 0.6 x PREPA's oil-indexed tariff, which ran roughly twice the 2000 U.S. average
+    // (6.81 cents): an island burning distillate cannot sell generation at mainland prices.
+    dollarsPerkWh: 0.08,
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      // 1990-vintage island combustion turbines
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 10,
+      },
       { fuel: "Coal", peakW: 100000000, initialAgeYears: 30 },
     ],
   },
@@ -1160,7 +1181,7 @@ export const SCENARIOS: ScenarioType[] = [
     // CEO balance gate intact: a passive fleet still runs out of runway before year twenty.
     cash: 160000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.025,
+    dollarsPerkWh: 0.033, // 0.6 x 1980 US retail scaled by PA/US in 1990 (7.65 / 6.57)
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Coal", peakW: 200000000, initialAgeYears: 35 },
@@ -1202,11 +1223,15 @@ export const SCENARIOS: ScenarioType[] = [
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
     minimumCustomerRetention: 0.9,
+    // Manassas City Utilities' researched average tariff. The two researched public-utility
+    // scenarios keep their calibrated full tariffs rather than the 60% generation-share convention
+    // (docs/facilities-economics.md): their demand, fleet and choice balance are fitted to them.
     dollarsPerkWh: 0.1,
     cash: 25000000,
     feePerKgCO2e: 0,
     facilities: [
       {
+        name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 75000000,
         initialAgeYears: 0,
@@ -1261,20 +1286,23 @@ export const SCENARIOS: ScenarioType[] = [
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
     // Calibrated without utility-emissions weather forcing; representative days remain approximate.
     startingDemandScale: 7.75,
+    // Austin Energy's researched average tariff; see the Manassas note above.
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
     reliabilityObjective: {
       year: 2021,
       month: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "February 2021 freeze",
     },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
     // share with wind; the published 3,827 MW total is unchanged.
     facilities: [
-      { fuel: "Natural Gas", peakW: 1497000000 },
+      // Sand Hill's combined cycle, Decker's steam units and both sites' peakers, grouped as the
+      // combined cycle that carries the portfolio's mid-merit gas role
+      { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 1497000000 },
       { fuel: "Coal", peakW: 700000000 },
       { fuel: "Uranium", peakW: 430000000 },
       { fuel: "Wind", peakW: 1200000000 },
@@ -1323,7 +1351,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 6,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2026 heatwave and drought",
     },
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
@@ -1338,7 +1366,12 @@ export const SCENARIOS: ScenarioType[] = [
       },
       { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
       { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
-      { fuel: "Natural Gas", peakW: 263160000, initialAgeYears: 12 },
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 263160000,
+        initialAgeYears: 12,
+      },
       { fuel: "Uranium", peakW: 71170000, initialAgeYears: 30 },
       // 1% of national storage power, represented as a four-hour equivalent.
       { name: "Battery", peakWh: 134240000, initialAgeYears: 3 },
@@ -1386,7 +1419,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2026,
       month: 7,
       durationMonths: 18,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "possible nuclear shutdown period and recovery",
     },
     facilities: [
@@ -1398,7 +1431,13 @@ export const SCENARIOS: ScenarioType[] = [
       },
       { fuel: "Wind", peakW: 250000000, initialAgeYears: 6 },
       { fuel: "Sun", peakW: 200000000, initialAgeYears: 5 },
-      { fuel: "Natural Gas", peakW: 50000000, initialAgeYears: 15 },
+      // France keeps its few gas turbines as reserve
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 50000000,
+        initialAgeYears: 15,
+      },
       { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
     ],
     endTitle: "Reserve proved its value",
@@ -1436,14 +1475,16 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2025,
       month: 1,
       durationMonths: 2,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "January and February 2025 wildfire emergency",
     },
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
     // resources using its 2024 power-content mix as the portfolio anchor.
     // https://www.ladwp.com/who-we-are/power-system/power-content-label
     facilities: [
+      // LADWP's in-basin gas stations were largely repowered as combined cycles
       {
+        name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 24240000,
         initialAgeYears: 18,
@@ -1505,7 +1546,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2022,
       month: 1,
       durationMonths: 12,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "2022, the worst year of the shortage",
     },
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
@@ -1675,7 +1716,7 @@ export const SCENARIOS: ScenarioType[] = [
       year: 2024,
       month: 5,
       durationMonths: 3,
-      minimumDemandServed: 1,
+      minimumDemandServed: 0.995,
       label: "the record summer of 2024",
     },
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
@@ -1683,7 +1724,13 @@ export const SCENARIOS: ScenarioType[] = [
     // and allocated solar that had been built by then.
     facilities: [
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 15 },
+      // Delhi's gas stations (Pragati, Bawana) are combined cycles
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 15,
+      },
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 4 },
       { fuel: "Wind", peakW: 30000000, initialAgeYears: 7 },
       { name: "Battery", peakWh: 40000000, initialAgeYears: 1 },
@@ -1751,5 +1798,8 @@ export const DEFAULT_CUSTOM_SCENARIO: ScenarioType = {
   dollarsPerkWh: 0.07,
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,
-  facilities: [{ name: "Natural Gas", peakW: 500000000 }],
+  // A peaker because a custom game can start before combined cycles were built
+  facilities: [
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 500000000 },
+  ],
 };

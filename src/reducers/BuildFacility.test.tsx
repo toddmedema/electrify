@@ -46,6 +46,60 @@ describe("buildFacility", () => {
     }
   });
 
+  it("dispatches a new combined cycle first and a new peaker after the other generators", () => {
+    // Carbon Fee opens with a combined cycle (id 1) above a coal plant (id 2)
+    let state = createGame({ scenarioId: 100 });
+    const quote = (name: string) =>
+      GENERATORS(state, 300000000, [20], [500]).find((g) => g.name === name)!;
+    state = gameReducer(
+      state,
+      buildFacility({ facility: quote("Natural Gas Peaker"), financed: true }),
+    );
+    state = gameReducer(
+      state,
+      buildFacility({ facility: quote("Natural Gas CC"), financed: true }),
+    );
+    state = gameReducer(
+      state,
+      buildFacility({ facility: quote("Natural Gas Peaker"), financed: true }),
+    );
+    state = gameReducer(
+      state,
+      buildFacility({ facility: STORAGE(state, 400000000)[0], financed: true }),
+    );
+    expect(state.facilities.map(({ id, name }) => `${id} ${name}`)).toEqual([
+      "4 Natural Gas CC",
+      "1 Natural Gas CC",
+      "2 Coal",
+      "5 Natural Gas Peaker",
+      "3 Natural Gas Peaker",
+      "6 Battery",
+    ]);
+  });
+
+  it("amortizes a build loan during construction, as quoted", () => {
+    const before = createGame({ scenarioId: 103 });
+    const generator = aGeneratorToBuild(before);
+    const state = cloneDeep(
+      gameReducer(
+        before,
+        buildFacility({ facility: generator, financed: true }),
+      ),
+    );
+    const built = state.facilities.find((f) => f.yearsToBuildLeft > 0)!;
+    const borrowed = built.loanAmountLeft;
+    for (let i = 0; i < TICKS_PER_MONTH; i++) {
+      tickState(state);
+    }
+    expect(built.yearsToBuildLeft).toBeGreaterThan(0);
+    // About one month's full payment minus its interest comes off the principal (the month
+    // boundary's pre-roll frames make it slightly more than exactly one)
+    const interest = borrowed * (built.interestRate / 12);
+    const repaid = borrowed - built.loanAmountLeft;
+    expect(repaid / (built.loanMonthlyPayment - interest)).toBeGreaterThan(0.9);
+    expect(repaid / (built.loanMonthlyPayment - interest)).toBeLessThan(1.1);
+  });
+
   it.each([false, true])(
     "preserves project equity during construction (financed: %s)",
     (financed) => {

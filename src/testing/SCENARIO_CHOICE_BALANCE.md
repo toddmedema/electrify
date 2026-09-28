@@ -4,7 +4,19 @@
 scenario-sized intertie calibration. See the [current intertie balance report](../../docs/intertie-balance.md)
 for measured results and the updated reference plans. Wildfire preparedness now costs $2M at every difficulty (10× the historical $200k proxy),
 so protecting the grid competes meaningfully with construction funds; restoration costs and
-the 50% protection remain unchanged. The historical balances below predate this change.
+the 50% protection remain unchanged. The historical balances below predate this change, and
+also predate the economics correction that priced fuel at EIA delivered-to-generator cost,
+deflated capital to the starting year and escalated O&M with inflation (see
+`docs/facilities-economics.md`); the winning and losing outcomes still hold, but the cash
+amounts have moved. Run with `SCENARIO_CHOICE_REPORT=1` for current figures.
+
+**Gas split (September 2026):** gas is now two facilities, Natural Gas Peaker and Natural Gas
+CC (`docs/facilities-economics.md`). Every plan below names the one it builds. The Data Center
+and Wildfire expansions and the Deep Freeze 1,800 MW, 900 MW and winterization-sized builds
+are peakers, carrying the old gas plant's economics unchanged; a new peaker now joins the
+dispatch order below the other generators. Deep Freeze's 1,497 MW starting gas and Wildfire's
+starting gas are combined cycles. All 18 tests still pass with the same winners and losers;
+cash amounts moved again.
 
 See the [cost research report](SCENARIO_CHOICE_RESEARCH.md) for sources, monetary
 normalization, and uncertainty behind the final amounts.

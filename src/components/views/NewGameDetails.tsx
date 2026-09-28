@@ -1,3 +1,4 @@
+import { activeScenario } from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   collection,
@@ -17,22 +18,16 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  Toolbar,
   Typography,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
-import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import ClosableDialogTitle from "../base/ClosableDialogTitle";
+import ScreenHeader from "../base/ScreenHeader";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
-import VictoryConditions from "../base/VictoryConditions";
+import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -40,7 +35,6 @@ import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
   ChallengeInvitationV1,
-  DifficultyType,
   GameType,
   LocationType,
   ReplayType,
@@ -48,15 +42,7 @@ import {
   ScoreType,
 } from "../../Types";
 
-import numbro from "numbro";
-
-function formatScore(score: number): string {
-  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
-}
-
-function formatDifficulty(difficulty: string): string {
-  return DIFFICULTY_LABELS[difficulty] || difficulty;
-}
+import { formatScore } from "../../helpers/Format";
 
 export interface StateProps {
   challenge?: ChallengeInvitationV1;
@@ -116,8 +102,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    const scenario =
-      getScenario(props.game.scenarioId, props.game.customScenario) || null;
+    const scenario = activeScenario(props.game) || null;
     this.state = {
       scenario,
       location: getScenarioLocation(scenario) || null,
@@ -348,16 +333,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     if (!scenario || !location) {
       return (
         <div>
-          <IconButton
-            onClick={onBack}
-            aria-label="back"
-            edge="start"
-            color="primary"
-            size="large"
-          >
-            <ArrowBackIosIcon />
-          </IconButton>
-          UNKNOWN SCENARIO OR LOCATION
+          <ScreenHeader title="Unknown scenario or location" onBack={onBack} />
         </div>
       );
     }
@@ -377,22 +353,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
     return (
       <div id="listCard" className="flexContainer">
-        <div id="topbar">
-          <Toolbar>
-            <IconButton
-              onClick={onBack}
-              aria-label="back"
-              edge="start"
-              color="primary"
-              size="large"
-            >
-              <ArrowBackIosIcon />
-            </IconButton>
-            <Typography component="div" variant="h6">
-              {challenge ? "Friend challenge" : "Game details"}
-            </Typography>
-          </Toolbar>
-        </div>
+        <ScreenHeader
+          title={challenge ? "Friend challenge" : "Game details"}
+          titleComponent="div"
+          onBack={onBack}
+        />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
             <img
@@ -405,12 +370,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 id="scenario-title"
                 variant="h6"
                 component="h1"
-                sx={{ fontWeight: 800, lineHeight: 1.2 }}
+                sx={{ fontWeight: 600, lineHeight: 1.2 }}
               >
                 {scenario.name}
               </Typography>
               <Typography variant="overline" component="div">
-                {location.name} · {scenario.startingYear}-{endYear}
+                {location.name} · {scenario.startingYear}–{endYear}
               </Typography>
               <Typography variant="body1" color="textSecondary">
                 {briefing.fantasy}
@@ -450,38 +415,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   </div>
                 ) : (
                   <div className="difficultyPicker">
-                    <ToggleButtonGroup
-                      exclusive
+                    <DifficultyPicker
+                      variant="toggle"
+                      showDescription
                       value={game.difficulty}
-                      size="small"
-                      color="primary"
-                      aria-label="Difficulty"
-                      onChange={(_event, difficulty: DifficultyType | null) => {
-                        if (difficulty) {
-                          onDelta({ difficulty });
-                        }
-                      }}
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => (
-                          <ToggleButton
-                            value={d}
-                            key={d}
-                            title={DIFFICULTIES[d].description}
-                            aria-label={DIFFICULTY_LABELS[d]}
-                          >
-                            {DIFFICULTY_LABELS[d]}
-                          </ToggleButton>
-                        ),
-                      )}
-                    </ToggleButtonGroup>
-                    <Typography
-                      className="difficultyDescription"
-                      variant="body2"
-                      color="textSecondary"
-                    >
-                      {DIFFICULTIES[game.difficulty].description}
-                    </Typography>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </div>
                 )}
                 <Button
@@ -490,7 +429,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   variant="contained"
                   color="primary"
                   onClick={() => onStart(scenario.id)}
-                  autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
                   {challenge ? "Start challenge" : "Start game"}
@@ -502,36 +440,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </div>
           </section>
 
-          <Dialog
+          <VictoryConditionsDialog
             open={victoryDialogOpen || false}
-            onClose={toggleVictoryDialog}
-          >
-            <ClosableDialogTitle onClose={toggleVictoryDialog}>
-              What counts as a win
-            </ClosableDialogTitle>
-            <DialogContent>
-              <VictoryConditions
-                ownership={scenario.ownership}
-                dollarsPerkWh={scenario.dollarsPerkWh}
-                startingCustomers={scenario.startingCustomers}
-                minimumCustomerRetention={scenario.minimumCustomerRetention}
-                reliabilityObjective={scenario.reliabilityObjective}
-                difficulty={game.difficulty}
-                meaningfulDecisions={[]}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button
-                color="primary"
-                variant="contained"
-                onClick={(e: React.MouseEvent<HTMLElement>) => {
-                  toggleVictoryDialog(e);
-                }}
-              >
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
+            onClose={() => this.setState({ victoryDialogOpen: false })}
+            title="What counts as a win"
+            scenario={scenario}
+            difficulty={game.difficulty}
+            meaningfulDecisions={[]}
+          />
 
           {!challenge && (
             <div className="leaderboard">
@@ -557,14 +473,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 <TableBody>
                   {myTopScore && (
                     <TableRow
-                      sx={{ fontWeight: "bold", bgcolor: "action.selected" }}
+                      sx={{ fontWeight: 600, bgcolor: "action.selected" }}
                     >
                       <TableCell className="rank" />
                       <TableCell>Your best</TableCell>
                       <TableCell>{formatScore(myTopScore.score)}</TableCell>
                       {leaderboardExpanded && (
                         <TableCell>
-                          {formatDifficulty(myTopScore.difficulty)}
+                          {difficultyLabel(myTopScore.difficulty)}
                         </TableCell>
                       )}
                       {this.renderReplayCell(myTopScore)}
@@ -599,7 +515,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           sx={
                             mine
                               ? {
-                                  fontWeight: "bold",
+                                  fontWeight: 600,
                                   bgcolor: "action.selected",
                                 }
                               : undefined
@@ -613,7 +529,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           <TableCell>{formatScore(score.score)}</TableCell>
                           {leaderboardExpanded && (
                             <TableCell>
-                              {formatDifficulty(score.difficulty)}
+                              {difficultyLabel(score.difficulty)}
                             </TableCell>
                           )}
                           {this.renderReplayCell(score)}

@@ -26,7 +26,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   }
 
   await page.getByRole("button", { name: "Start game" }).click();
-  await expect(page.getByText("Natural Gas", { exact: true })).toBeVisible();
+  await expect(page.getByText("Natural Gas CC", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Events", exact: true }).click();
   await page
     .locator("#appbar:visible")
@@ -44,7 +44,12 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   await expect(
     page.getByRole("heading", { name: "Ongoing events" }),
   ).toBeVisible({ timeout: 25000 });
-  await expect(page.getByText("Wildfire emergency")).toBeVisible();
+  // The status bar's event chip names it too; check the ongoing card itself
+  await expect(
+    page
+      .locator(".ongoingEvents:visible")
+      .getByText("Wildfire emergency", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Through Feb 2025")).toBeVisible();
   await expect(page.getByText(/restoration costs \$0\.7M/)).toBeVisible();
   await expect(page.getByText("Red-flag warning")).toBeVisible();

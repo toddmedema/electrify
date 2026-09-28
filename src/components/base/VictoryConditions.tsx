@@ -6,6 +6,8 @@ import {
 } from "../../Types";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import { scoreRuleText } from "../../helpers/Scoring";
+import { formatRequiredShare } from "../../helpers/ObjectiveRules";
 import {
   meaningfulDecisionCategoryCount,
   meaningfulDecisionRequirement,
@@ -23,34 +25,11 @@ export interface Props {
   meaningfulDecisionGateWaived?: boolean;
 }
 
-/** The point rule behind each score category, keyed like `computeScoreBreakdown`. */
-export function scoreRules(
-  ownership: ScenarioType["ownership"],
-  dollarsPerkWh: number,
-  perEmissions: string,
-): { [category: string]: string } {
-  return ownership === "Investor"
-    ? {
-        netWorth: "Earn 40 points per $1 billion of net worth at the end.",
-        customers: "Earn 2 points per 100,000 customers at the end.",
-        supply: "Earn 1 point per terawatt-hour (TWh) of electricity supplied.",
-        emissions: `Lose 2 points per ${perEmissions} of greenhouse gas emissions.`,
-        blackouts: "Lose 8 points per TWh of customer demand not served.",
-      }
-    : {
-        rate: `Earn 80 points for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose 80 points for each $0.01/kWh it is above. The target is in the starting year's dollars and rises with inflation.`,
-        supply:
-          "Earn 10 points per terawatt-hour (TWh) of electricity supplied.",
-        emissions: `Lose 5 points per ${perEmissions} of greenhouse gas emissions.`,
-        blackouts: "Lose 10 points per TWh of customer demand not served.",
-      };
-}
-
 /**
  * How a scenario is scored, in the player's terms. Shared by the scenario details screen and the
  * custom game screen, which both offer it behind an info button.
  *
- * Scoring algorithm should also be updated in helpers/Scoring.tsx and in the Manual.
+ * The score rules come from helpers/Scoring `SCORE_RULES`; the Manual describes them by hand.
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
   const {
@@ -116,11 +95,12 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
       {reliabilityObjective !== undefined && (
         <p>
           Required: serve at least{" "}
-          {Math.round(reliabilityObjective.minimumDemandServed * 100)}% of
+          {formatRequiredShare(reliabilityObjective.minimumDemandServed)} of
           demand during the {reliabilityObjective.label}
           {(reliabilityObjective.durationMonths || 1) > 1
             ? " in every event month"
             : ""}
+          . A month below target ends the run.
         </p>
       )}
       {minimumCustomerRetention !== undefined && (
@@ -133,7 +113,7 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
       )}
     </>
   );
-  const rules = scoreRules(ownership, dollarsPerkWh, perEmissions);
+  const rules = scoreRuleText(ownership, dollarsPerkWh, perEmissions);
   return (
     <div>
       {decisionProgress}

@@ -49,14 +49,15 @@ test("public insights show the rate score and an absolute customer objective", a
       .evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(1);
   if (testInfo.project.name === "mobile-390px") {
-    const metrics = await page.locator(".insightsRateMetric").all();
+    // The rate metrics render in both the wide and compact layouts; measure the shown set
+    const metrics = await page.locator(".insightsRateMetric:visible").all();
     const boxes = await Promise.all(
       metrics.map((metric) => metric.boundingBox()),
     );
     expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
-    await expect(page.locator(".insightsRateMetric").last()).toContainText(
-      "Points / yr",
-    );
+    await expect(
+      page.locator(".insightsRateMetric:visible").last(),
+    ).toContainText("Points / yr");
   }
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
   if (reviewDir) {
@@ -70,13 +71,11 @@ test("public insights show the rate score and an absolute customer objective", a
   }
   await page
     .locator("#appbar:visible")
-    .getByRole("button", { name: "menu", exact: true })
+    .getByRole("button", { name: "All requirements" })
     .first()
     .click();
-  await page.getByRole("menuitem", { name: "Scenario details" }).click();
   await expect(page.getByRole("dialog")).toContainText("14,850 customers");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
-    await page.getByRole("menu").waitFor({ state: "hidden" });
     await page.waitForTimeout(400);
     await page.screenshot({
       path: path.join(reviewDir, "customer-objective.png"),

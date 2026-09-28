@@ -59,7 +59,7 @@ async function startSeededLosAngelesGame(
   // would spend its first months in blackout noise. Add a matching plant to keep the grid stable;
   // ignition timing is fleet-independent, so the pinned seed still holds.
   await page.getByRole("combobox", { name: "Facility type" }).click();
-  await page.getByRole("option", { name: "Natural Gas" }).click();
+  await page.getByRole("option", { name: "Natural Gas Peaker" }).click();
   await page.getByRole("button", { name: "Add facility" }).click();
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
   await expect(outlook).toContainText("Demand covered", { timeout: 20_000 });
@@ -257,13 +257,14 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await expect(ongoing).not.toContainText("Prepared crews are in place");
     }
-    // The status bar names the incident beside the grid readout without growing any taller.
+    // The status bar names the incident beside the grid readout. Desktop keeps its height; on a
+    // phone the grid readout and mission share one 44px row until an event chip needs the room,
+    // then the mission wraps onto its own 44px row by design.
     const activeEvents = page.locator(".activeEventsChip:visible");
     await expect(activeEvents).toHaveAccessibleName(
       /Active events: Wildfire emergency \(critical\), through Sep 2020/,
     );
     await expect(activeEvents).toHaveClass(/activeEventsChip-critical/);
-    expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
     if (testInfo.project.name.startsWith("mobile")) {
       const heights = await page.evaluate(() =>
         ["#topbar", ".gridHealth", ".missionSummary"].map(
@@ -271,7 +272,10 @@ for (const theme of ["light", "dark"] as const) {
             document.querySelector(selector)!.getBoundingClientRect().height,
         ),
       );
-      expect(heights).toEqual([56, 56, 56]);
+      // The wrapped mission row adds a 1px hairline above its 44px row
+      expect(heights).toEqual([heightsBeforeEvents[0], 44, 45]);
+    } else {
+      expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
     }
     expect(
       await page.evaluate(

@@ -15,6 +15,9 @@ import { chartPalette, withAlpha } from "../../Theme";
  * badge -- its icon is a bare decorative image -- and carries direction in its signed reading
  * and in the row button's own accessible name.
  *
+ * Forward flow is one neutral tint on every row, whatever the fuel: a fuel-coloured fill turned
+ * a gas row lavender, which reads as a selected state, and the fuel is already the icon's job.
+ *
  * Forward flow keeps the compositor-friendly `scaleX` it has always used. Reverse flow sizes
  * with `width` instead, because `scaleX` squashes the hatch along with the fill -- the same
  * trap the construction bar's glow head fell into. Reverse flow is the rarer state, so the
@@ -23,13 +26,12 @@ import { chartPalette, withAlpha } from "../../Theme";
 export default function FlowBar(props: {
   /** Signed share of rating: positive generating, discharging or importing. */
   fraction: number;
-  /** The accent this row is tinted with when power flows the normal way. */
-  color: string;
 }): React.JSX.Element {
   const reverse = props.fraction < 0;
   const magnitude = Math.min(1, Math.abs(props.fraction) || 0);
   // Reverse flow borrows the battery blue, which already means "storing" on the capacity bar
-  const tint = withAlpha(reverse ? chartPalette().storage : props.color, 0.18);
+  // Forward flow takes the stylesheet's neutral --flow-fill
+  const tint = withAlpha(chartPalette().storage, 0.18);
   return (
     <div
       className={`outputProgressBar${reverse ? " reverseFlow" : ""}`}
@@ -39,7 +41,7 @@ export default function FlowBar(props: {
       style={
         reverse
           ? { width: `${magnitude * 100}%`, backgroundColor: tint }
-          : { transform: `scaleX(${magnitude})`, backgroundColor: tint }
+          : { transform: `scaleX(${magnitude})` }
       }
     />
   );

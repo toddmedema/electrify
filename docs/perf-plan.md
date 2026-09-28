@@ -13,7 +13,7 @@ This revision corrects the first draft against the code. The changes that matter
   that Insights and the top bar's cash-runway warning share (`selectProjection`, 5,760 steps) was
   rebuilt in `render` on every month change. `HydroWaterSection` (one year) and the intertie outlook
   (two years, hourly) are also keyed on the month. The reducer's own rollover forecast is 96 ticks.
-  The `Forecasts` and `Finances` panes the first draft named are no longer mounted.
+  The `Forecasts` and `Finances` panes the first draft named have been removed.
 - Weather is already memoized: `getWeather` reads a cached row array and extrapolates each day once.
   "Load weather up front" is not a lever.
 - `TICK_MS` lives in `src/Constants.tsx` and the tick loop in `src/reducers/Game.tsx`, both inside
@@ -92,7 +92,13 @@ hashed, so measuring never forces a manifest regeneration.
 Determinism tests compare runs against each other. B2 pins absolute output: for every scenario at
 its `sim --all` seed (authored, else 12345), hash `monthlyHistory` plus a final-state summary, and
 store the hashes as a Jest snapshot. Numbers are rounded to 10 significant digits before hashing, so
-libm or V8 last-bit drift doesn't flake the gate while any real behavior change still does.
+V8 last-bit drift doesn't flake the gate while any real behavior change still does. Rounding can't
+absorb drift that a run amplifies, though: V8 hands `Math.pow` and `**` to the C library's `pow`,
+whose last bit differs between glibc and Windows' CRT, and 32 such bits sent scenario 108 down a
+different path on Windows. Simulation code therefore calls `pow` from `src/helpers/Pow.ts` (a port
+of glibc's, bit-identical to CI's Linux `Math.pow`), and lint rejects `Math.pow` and computed `**`
+in `src/data`, `src/helpers` and `src/reducers`. The other Math functions are V8's own fdlibm port
+and agree everywhere.
 Rebaseline with `npm run perf:rebaseline` (Jest `-u` on that suite); CI's `--ci` mode never writes
 snapshots, so a changed hash fails. The snapshot diff shows which scenarios moved, which also helps
 review balance work. Regenerate last; never hand-edit.

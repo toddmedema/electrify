@@ -38,14 +38,14 @@ describe("simulation scenario overrides", () => {
   it("re-quotes historical cash, rates and fees for a future start", () => {
     const scenario = { ...shale, feePerKgCO2e: 0.05 };
     const shifted = withScenarioOverrides(scenario, { year: 2080 })!;
-    expect(money(shifted)).toEqual([2300000000, 0.38, 0.53]);
+    expect(money(shifted)).toEqual([970000000, 0.26, 0.22]);
     expect(shifted.id).toBe(CUSTOM_SCENARIO_ID);
     expect(scenario.cash).toBe(220000000);
   });
 
   it("converts from a recent scenario's own era, not from 2020 again", () => {
     expect(money(withScenarioOverrides(recent, { year: 2025 })!)).toEqual([
-      190000000, 0.25, 0.052,
+      180000000, 0.25, 0.051,
     ]);
   });
 
@@ -53,11 +53,11 @@ describe("simulation scenario overrides", () => {
     const future = {
       ...shale,
       startingYear: 2080,
-      cash: 2300000000,
-      dollarsPerkWh: 0.32,
+      cash: 970000000,
+      dollarsPerkWh: 0.26,
     };
     expect(money(withScenarioOverrides(future, { year: 2000 })!)).toEqual([
-      220000000, 0.02, 0,
+      220000000, 0.038, 0,
     ]);
   });
 
@@ -85,6 +85,6 @@ describe("simulation scenario overrides", () => {
     });
     expect(game.startingYear).toBe(2080);
     expect(game.dollarsPerkWh).toBe(0.05);
-    expect(game.customScenario?.dollarsPerkWh).toBe(0.38);
+    expect(game.customScenario?.dollarsPerkWh).toBe(0.26);
   });
 });

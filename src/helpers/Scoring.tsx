@@ -1,10 +1,178 @@
 import { getInflationIndex } from "../data/Economy";
-import { MonthlyHistoryType, ScenarioType, ScoreBreakdownType } from "../Types";
+import {
+  MonthlyHistoryType,
+  ScenarioType,
+  ScoreBreakdownType,
+  ScoreCategoryType,
+} from "../Types";
+
+// What each scored category is called on the score screen, in lower case to sit mid-sentence
+export const SCORE_LABELS: Record<ScoreCategoryType, string> = {
+  supply: "electricity supplied",
+  netWorth: "final net worth",
+  customers: "final customers",
+  rate: "electric rates",
+  emissions: "emissions",
+  blackouts: "blackouts",
+};
+
+/**
+ * The label for a breakdown key. Breakdowns can arrive from saves, replays and the leaderboard,
+ * so an unrecognised key falls back to itself instead of rendering blank.
+ */
+export function scoreLabel(category: string): string {
+  return (SCORE_LABELS as Record<string, string>)[category] || category;
+}
+
+interface ScoreInputsType {
+  summary: MonthlyHistoryType;
+  blackoutsTWh: number;
+  targetRate: number;
+  effectiveRate: number;
+}
+
+interface ScoreTextContextType {
+  dollarsPerkWh: number;
+  // The emissions unit the player reads in, such as "1 megatonne"
+  perEmissions: string;
+}
+
+interface ScoreRuleType {
+  category: ScoreCategoryType;
+  // Points per `per` units of `measure`; negative for a penalty
+  points: number;
+  per: number;
+  measure: (inputs: ScoreInputsType) => number;
+  // A category whose points aren't a straight `points * measure / per`
+  score?: (inputs: ScoreInputsType) => number;
+  text: (context: ScoreTextContextType, rule: ScoreRuleType) => string;
+}
+
+function pointsText(points: number): string {
+  const magnitude = Math.abs(points);
+  return `${magnitude} point${magnitude === 1 ? "" : "s"}`;
+}
+
+function earnOrLose(rule: ScoreRuleType): string {
+  return `${rule.points < 0 ? "Lose" : "Earn"} ${pointsText(rule.points)}`;
+}
+
+const TWH = 1e12;
+const BILLION = 1e9;
+
+function supplyRule(points: number): ScoreRuleType {
+  return {
+    category: "supply",
+    points,
+    per: TWH,
+    measure: ({ summary }) => summary.supplyWh,
+    text: (_context, rule) =>
+      `${earnOrLose(rule)} per terawatt-hour (TWh) of electricity supplied.`,
+  };
+}
+
+function emissionsRule(points: number): ScoreRuleType {
+  return {
+    category: "emissions",
+    points,
+    per: BILLION,
+    measure: ({ summary }) => summary.kgco2e,
+    text: ({ perEmissions }, rule) =>
+      `${earnOrLose(rule)} per ${perEmissions} of greenhouse gas emissions.`,
+  };
+}
+
+function blackoutsRule(points: number): ScoreRuleType {
+  return {
+    category: "blackouts",
+    points,
+    per: 1,
+    measure: ({ blackoutsTWh }) => blackoutsTWh,
+    text: (_context, rule) =>
+      `${earnOrLose(rule)} per TWh of customer demand not served.`,
+  };
+}
+
+// A public utility earns this many points for each cent per kWh its lifetime average rate sits
+// below the scenario's target, in starting-year dollars, and loses the same above it.
+export const PUBLIC_RATE_POINTS_PER_CENT = 80;
+
+/**
+ * Every scored category for each ownership model, in the order the score screen lists them. The
+ * formula in `computeScoreBreakdown` and the rule text players read are both generated from this
+ * table, so the two can't drift apart.
+ */
+export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
+  Investor: [
+    supplyRule(1),
+    {
+      category: "netWorth",
+      points: 40,
+      per: BILLION,
+      measure: ({ summary }) => summary.netWorth,
+      text: (_context, rule) =>
+        `${earnOrLose(rule)} per $1 billion of net worth at the end.`,
+    },
+    {
+      category: "customers",
+      points: 2,
+      per: 100000,
+      measure: ({ summary }) => summary.customers,
+      text: (_context, rule) =>
+        `${earnOrLose(rule)} per 100,000 customers at the end.`,
+    },
+    emissionsRule(-2),
+    blackoutsRule(-8),
+  ],
+  Public: [
+    {
+      category: "rate",
+      points: PUBLIC_RATE_POINTS_PER_CENT,
+      per: 0.01,
+      measure: ({ targetRate, effectiveRate }) => targetRate - effectiveRate,
+      score: ({ targetRate, effectiveRate }) =>
+        publicRateScore(targetRate, effectiveRate),
+      text: ({ dollarsPerkWh }, rule) =>
+        `Earn ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose ${pointsText(rule.points)} for each $0.01/kWh it is above. The target is in the starting year's dollars and rises with inflation.`,
+    },
+    supplyRule(10),
+    emissionsRule(-5),
+    blackoutsRule(-10),
+  ],
+};
+
+// The rules read as a list lead with what the player is chasing, which isn't the scoring order
+const RULE_TEXT_ORDER: ScoreCategoryType[] = [
+  "rate",
+  "netWorth",
+  "customers",
+  "supply",
+  "emissions",
+  "blackouts",
+];
+
+/** The point rule behind each score category, in the player's terms. */
+export function scoreRuleText(
+  ownership: ScenarioType["ownership"],
+  dollarsPerkWh: number,
+  perEmissions: string,
+): ScoreBreakdownText {
+  const text: ScoreBreakdownText = {};
+  for (const category of RULE_TEXT_ORDER) {
+    const rule = SCORE_RULES[ownership].find((r) => r.category === category);
+    if (rule) {
+      text[category] = rule.text({ dollarsPerkWh, perEmissions }, rule);
+    }
+  }
+  return text;
+}
+
+export type ScoreBreakdownText = Partial<Record<ScoreCategoryType, string>>;
 
 /**
  * The end-of-run scoring formula, factored out so the reducer and any UI that wants to show a
- * score (final or in-progress) call the same code. This is also described in the manual and in
- * VictoryConditions -- if the algorithm changes, update those too.
+ * score (final or in-progress) call the same code. The rules come from `SCORE_RULES`, which also
+ * writes the in-game description; the manual describes them separately and needs updating by hand.
  *
  * `revenueInStartingDollars` is the run's revenue in its starting year's dollars, from
  * `startingDollarRevenue` below. A public utility's target rate is authored in those dollars, and
@@ -26,20 +194,19 @@ export function computeScoreBreakdown(
     { revenue: revenueInStartingDollars, supplyWh: summary.supplyWh },
     scenario.dollarsPerkWh,
   );
-  return scenario.ownership === "Investor"
-    ? {
-        supply: Math.round(summary.supplyWh / 1000000000000),
-        netWorth: Math.round((40 * summary.netWorth) / 1000000000),
-        customers: Math.round((2 * summary.customers) / 100000),
-        emissions: Math.round((-2 * summary.kgco2e) / 1000000000),
-        blackouts: Math.round(-8 * blackoutsTWh),
-      }
-    : {
-        rate: publicRateScore(scenario.dollarsPerkWh, effectiveRate),
-        supply: Math.round((10 * summary.supplyWh) / 1000000000000),
-        emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
-        blackouts: Math.round(-10 * blackoutsTWh),
-      };
+  const inputs: ScoreInputsType = {
+    summary,
+    blackoutsTWh,
+    targetRate: scenario.dollarsPerkWh,
+    effectiveRate,
+  };
+  const breakdown: ScoreBreakdownType = {};
+  for (const rule of SCORE_RULES[scenario.ownership]) {
+    breakdown[rule.category] = rule.score
+      ? rule.score(inputs)
+      : Math.round((rule.points * rule.measure(inputs)) / rule.per);
+  }
+  return breakdown;
 }
 
 /**
@@ -60,10 +227,6 @@ export function startingDollarRevenue(
     0,
   );
 }
-
-// A public utility earns this many points for each cent per kWh its lifetime average rate sits
-// below the scenario's target, in starting-year dollars, and loses the same above it.
-export const PUBLIC_RATE_POINTS_PER_CENT = 80;
 
 /** The rate category of a public utility's score, for a lifetime average `rate` in $/kWh. */
 export function publicRateScore(targetRate: number, rate: number): number {
@@ -145,5 +308,5 @@ export function publicRateYearContribution(
 }
 
 export function totalScore(breakdown: ScoreBreakdownType): number {
-  return Object.values(breakdown).reduce((a, b) => a + b, 0);
+  return Object.values(breakdown).reduce((a, b) => a + (b ?? 0), 0);
 }

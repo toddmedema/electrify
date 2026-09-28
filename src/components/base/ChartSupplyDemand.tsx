@@ -61,7 +61,17 @@ interface State {
   startingYear: number;
 }
 
-const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
+// Words rather than emoji: platform emoji are full-colour art that clash with the flat icon
+// set and change shape from one OS to the next
+const SUN_LABELS = ["Sunrise", "Noon", "Sunset"];
+
+// Supply and demand differ in width and dash as well as hue, so the lines stay distinct for a
+// colourblind player and in the tutorial's all-forecast first frame. Demand is the heavy line
+// the player has to meet; supply is the lighter, filled one. The legend draws these samples.
+const SUPPLY_WIDTH = 1.5;
+const DEMAND_WIDTH = 3;
+const SUPPLY_FORECAST_DASH = [2, 3];
+const DEMAND_FORECAST_DASH = [8, 4];
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
@@ -90,7 +100,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         scale: "x",
         side: 2,
         stroke: tickLabelFill(),
-        font: chartFont(scale),
+        font: chartFont(),
         grid: { show: false },
         ticks: { show: false },
         border: { show: false },
@@ -107,28 +117,28 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {},
       {
         stroke: chartPalette().supply,
-        width: 1.75,
+        width: SUPPLY_WIDTH,
         fill: chartPalette().historicFill,
         points: { show: false },
         spanGaps: false,
       },
       {
         stroke: chartPalette().supply,
-        width: 1.75,
-        dash: [6, 4],
+        width: SUPPLY_WIDTH,
+        dash: SUPPLY_FORECAST_DASH,
         points: { show: false },
         spanGaps: false,
       },
       {
         stroke: chartPalette().demand,
-        width: 2.5,
+        width: DEMAND_WIDTH,
         points: { show: false },
         spanGaps: false,
       },
       {
         stroke: chartPalette().demand,
-        width: 2.5,
-        dash: [6, 4],
+        width: DEMAND_WIDTH,
+        dash: DEMAND_FORECAST_DASH,
         points: { show: false },
         spanGaps: false,
       },
@@ -281,8 +291,16 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const legendItems: LegendItem[] = [];
   if (legend) {
     legendItems.push(
-      { name: "Supply", fill: chartPalette().supply },
-      { name: "Demand", fill: chartPalette().demand },
+      {
+        name: "Supply",
+        fill: chartPalette().supply,
+        line: { width: SUPPLY_WIDTH + 0.5, dash: SUPPLY_FORECAST_DASH },
+      },
+      {
+        name: "Demand",
+        fill: chartPalette().demand,
+        line: { width: DEMAND_WIDTH, dash: DEMAND_FORECAST_DASH },
+      },
     );
     if (blackoutCount > 0) {
       legendItems.push({ name: "Blackout", fill: chartPalette().blackout });

@@ -7,20 +7,30 @@ import {
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 import { regionalizeFuelPrices } from "./LocationProfiles";
+import { pow } from "../helpers/Pow";
+import { BASE_INFLATION } from "./Economy";
 
-// GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
-// Sources: (all prices real / in that year's $'s, per million BTU)
+// Sources: every column is nominal (that month's own dollars) per million Btu delivered to the
+// generator, so a fuel's price times a plant's heat rate is its fuel cost per MWh.
 
-// Coal: lignite https://www.eia.gov/totalenergy/data/annual/xls/stb0709.xls
-// ^^ 1949 - 2011, whole years only
+// Coal and natural gas: EIA Monthly Energy Review Table 9.9, "Cost of Fossil-Fuel Receipts at
+// Electric Generating Plants" (series CLERDUS and NGERDUS, including taxes), monthly 1975-2019:
+// https://www.eia.gov/totalenergy/data/browser/?tbl=T09.09
+// Retrieved 2026-09. The gas column used to hold a series 2-5x below every published benchmark,
+// which flattered gas against every other technology and set neighbours' import prices adrift.
 
-// Natural gas: https://www.eia.gov/dnav/ng/hist/n3020us3M.htm
-// ^^ 1983 - 2019, whole years only
+// Oil: the facility is a distillate-burning reciprocating engine, so from 2001 the column is MER
+// Table 9.9's distillate receipts (DKERDUS). Before 2001 EIA does not publish that series; those
+// months carry the earlier imported-crude record (https://www.eia.gov/outlooks/steo/realprices/)
+// times 1.415, the geometric-mean distillate/crude ratio across the 228 months both exist.
 
-// Uranium: https://www.eia.gov/uranium/marketing/html/summarytable1b.php
-// 35Bbtu / lb - https://smartenergy.illinois.edu/energy-efficiency-basics/energy-concepts-and-terms
-
-// Oil: imported crude oil prices https://www.eia.gov/outlooks/steo/realprices/
+// Uranium: reactor fuel rather than ore. The earlier column divided the U3O8 contract price
+// (https://www.eia.gov/uranium/marketing/html/summarytable1b.php) by 35,000 MMBtu/lb, the fission
+// energy of pure U-235, which priced nuclear fuel ~600x too cheap. A light-water reactor gets
+// about 177 MMBtu of heat per lb of U3O8 after enrichment tails and burnup, so the ore term was
+// multiplied by 35e9 / 177e6 (~198) and $0.40/MMBtu of conversion, enrichment and fabrication
+// added. 2019 lands at $0.62/MMBtu, ~$6.6/MWh at the game's heat rate, against EIA Electric Power
+// Annual Table 8.4's ~5-7 mills/kWh nuclear fuel expense.
 
 // The first year in FuelPricesRaw.csv. Asking for a year before this means the CSV was never
 // loaded, rather than that the game is being played in the 1970s.
@@ -105,10 +115,18 @@ const BIOMASS_PRICES_PER_MBTU: Record<number, number> = {
   2019: 2.28,
 };
 
-// Authored nominal-price trend for the reference game future, not an economic prediction.
-// Its 4%/year assumption is exposed alongside 2% and 6% price-only sensitivities in Insights.
-// Historical observations remain unchanged; inflation and fuel prices are separate models.
-export const TREND_ESCALATION_YEARLY = 0.04;
+// Real fuel price growth beyond general inflation in the reference future. EIA's Annual Energy
+// Outlook reference cases project roughly flat real coal and gas prices, and a real premium
+// compounds absurdly over a century-long sandbox (a 1.5% premium is 4.4x by 2120).
+export const REAL_FUEL_ESCALATION_YEARLY = 0;
+
+// Authored nominal-price trend for the reference game future, not an economic prediction: the
+// projected economy's long-run inflation plus the real escalation above, so fuel, interties and
+// future-era retail rates move with the same money as capital costs and the market's rate. It is
+// exposed alongside 0.5% and 4.5% price-only sensitivities in Insights. Historical observations
+// remain unchanged.
+export const TREND_ESCALATION_YEARLY =
+  BASE_INFLATION + REAL_FUEL_ESCALATION_YEARLY;
 
 // How much of last month's departure from that trend carries into this month's, and how far it is
 // allowed to sit from the trend. Both are measured off the record rather than written down here;
@@ -234,23 +252,20 @@ function measureDeparture(prices: number[]): DepartureType {
   let variance = 0;
   for (let i = 0; i < n; i++) {
     covariance += (i - meanIndex) * (logs[i] - meanLog);
-    variance += Math.pow(i - meanIndex, 2);
+    variance += pow(i - meanIndex, 2);
   }
   const slope = covariance / variance;
 
   let departureSquares = 0;
   for (let i = 0; i < n; i++) {
-    departureSquares += Math.pow(
-      logs[i] - (meanLog + slope * (i - meanIndex)),
-      2,
-    );
+    departureSquares += pow(logs[i] - (meanLog + slope * (i - meanIndex)), 2);
   }
   const departureSd = Math.sqrt(departureSquares / n);
 
   // The month to month step, with the trend's own slope taken out of it
   let stepSquares = 0;
   for (let i = 1; i < n; i++) {
-    stepSquares += Math.pow(logs[i] - logs[i - 1] - slope, 2);
+    stepSquares += pow(logs[i] - logs[i - 1] - slope, 2);
   }
   const stepSd = Math.sqrt(stepSquares / (n - 1));
   if (departureSd <= 0 || stepSd <= 0) {
@@ -259,17 +274,14 @@ function measureDeparture(prices: number[]): DepartureType {
 
   const persistence = Math.min(
     MAX_PERSISTENCE,
-    Math.max(
-      MIN_PERSISTENCE,
-      1 - Math.pow(stepSd, 2) / (2 * Math.pow(departureSd, 2)),
-    ),
+    Math.max(MIN_PERSISTENCE, 1 - pow(stepSd, 2) / (2 * pow(departureSd, 2))),
   );
   return {
     persistence,
     departureSd,
     // Sized so the departure settles at exactly the spread the record shows rather than growing
     // with the horizon -- the same relationship the weather's anomaly walk uses
-    shockSd: departureSd * Math.sqrt(1 - Math.pow(persistence, 2)),
+    shockSd: departureSd * Math.sqrt(1 - pow(persistence, 2)),
   };
 }
 
@@ -315,10 +327,7 @@ function buildFuelTrends() {
  * which is what inEraMoney below does for the cash, rate and fee a run opens with.
  */
 export function getFuelEscalation(year: number): number {
-  return Math.pow(
-    1 + TREND_ESCALATION_YEARLY,
-    Math.max(0, year - LATEST_DATA_YEAR),
-  );
+  return pow(1 + TREND_ESCALATION_YEARLY, Math.max(0, year - LATEST_DATA_YEAR));
 }
 
 // Custom-game option amounts are written in this era.
@@ -349,7 +358,7 @@ export function inEraMoney(
 function anchorPrice(trend: FuelTrendType, month: number): number {
   return (
     trend.baseline *
-    Math.pow(1 + TREND_ESCALATION_YEARLY, (month - anchorMonth) / 12)
+    pow(1 + TREND_ESCALATION_YEARLY, (month - anchorMonth) / 12)
   );
 }
 

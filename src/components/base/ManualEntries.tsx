@@ -297,6 +297,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           fuel. Keeping one idle can be cheaper than a blackout.
         </p>
         <p>
+          Gas comes in both roles. A <strong>Natural Gas Peaker</strong> is a
+          single turbine that starts in minutes. A{" "}
+          <strong>Natural Gas CC</strong> (combined cycle) reuses the turbine's
+          hot exhaust to raise steam for a second turbine, so it burns about a
+          third less gas per MWh, but it starts slowly and suits steady,
+          mid-merit demand. A new gas peaker joins the dispatch order below your
+          other generators; other new plants join at the top.
+        </p>
+        <p>
           Many grids use both steady and flexible plants. These are operating
           roles: hydro, for example, can provide steady power or change output
           quickly.
@@ -520,9 +529,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Fuel Prices:</strong> Historical prices and future estimates.{" "}
-          <strong>Compare possible costs in five years</strong> applies 2%, 4%
-          or 6% yearly growth to this month's fuel bill multiplied by 12. It
-          holds fuel use and facilities fixed, assigns no probabilities and
+          <strong>Compare possible costs in five years</strong> applies 0.5%,
+          2.5% or 4.5% yearly growth to this month's fuel bill multiplied by 12.
+          It holds fuel use and facilities fixed, assigns no probabilities and
           changes no loans or settings.
         </p>
         <p>

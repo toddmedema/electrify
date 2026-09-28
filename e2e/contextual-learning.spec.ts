@@ -45,9 +45,6 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     const purchase = page.getByRole("dialog");
-    await purchase
-      .getByRole("button", { name: "Show financing terms", exact: true })
-      .click();
     const help = purchase.getByRole("button", {
       name: "What is interest rate?",
       exact: true,
@@ -121,6 +118,10 @@ for (const theme of ["light", "dark"] as const) {
     }
 
     await page.getByRole("button", { name: "close", exact: true }).click();
+    // The outgoing catalog retains its speed controls during the closing transition.
+    await expect(page.getByRole("group", { name: "game speed" })).toHaveCount(
+      1,
+    );
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   });
 }
@@ -163,10 +164,6 @@ test("reading help preserves the current tutorial objective", async ({
   await page
     .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
     .first()
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Show financing terms", exact: true })
     .click();
   await expect(objective).toBeVisible();
   const before = await objective.innerText();

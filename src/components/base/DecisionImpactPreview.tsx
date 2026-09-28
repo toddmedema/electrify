@@ -7,6 +7,7 @@ export interface DecisionImpactFactType {
   label: string;
   value: string;
   detail?: string;
+  help?: React.ReactNode;
 }
 
 export interface DecisionImpactPreviewProps {
@@ -26,6 +27,7 @@ export default function DecisionImpactPreview({
             <div>
               <Typography variant="caption" component="div">
                 {fact.label}
+                {fact.help}
               </Typography>
               <Typography variant="body2" component="div">
                 <strong>{fact.value}</strong>

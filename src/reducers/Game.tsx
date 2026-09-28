@@ -16,7 +16,13 @@ import {
 } from "../helpers/RunIdentity";
 import { launchRun } from "./GameActions";
 import {
+  generatorsAboveDemandFloor,
+  mothballAdvice,
+} from "../helpers/Mothball";
+import {
+  decidedObjectiveFailure,
   hasChronicBlackouts,
+  retentionBaseline,
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
@@ -24,6 +30,7 @@ import {
   validBuildFacility,
   validRetrofitFacility,
 } from "../helpers/BuildValidation";
+import { defaultDispatchIndex } from "../helpers/DispatchOrder";
 import {
   optionalScenarioChoice,
   pendingScenarioChoice,
@@ -69,17 +76,25 @@ import {
   facilityCashBack,
   getCreditInputs,
   getCreditPremium,
-  getMonthlyPayment,
+  purchaseTerms,
+  facilityLoanMonths,
   getPaymentInterest,
   facilityOutputFactor,
   estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
-import { getInflationRate, getPrimeRate } from "../data/Economy";
+import {
+  getCostTableIndex,
+  getInflationIndex,
+  getInflationRate,
+  getPrimeRate,
+  hasEconomy,
+} from "../data/Economy";
 import {
   CUSTOMER_MARKET_MULTIPLIER,
   customerMarketSizeAt,
   getMarketRate,
   nextCustomerCount,
+  publicRateCap,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -96,7 +111,11 @@ import {
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
-import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
+import {
+  buildStoryPeriodSnapshot,
+  buildStorySnapshot,
+  storyOutputMultiplier,
+} from "../helpers/Story";
 import {
   isMaterialCapacityDecision,
   recordMeaningfulDecision,
@@ -200,11 +219,10 @@ import { navigate, navigateBack } from "./Card";
 import {
   DAYS_PER_YEAR,
   DIFFICULTIES,
-  DOWNPAYMENT_PERCENT,
   FUELS,
+  feeableKgCO2ePerBtu,
   GAME_TO_REAL_YEARS,
   INTEREST_RATE_YEARLY,
-  LOAN_MONTHS,
   ORGANIC_GROWTH_MAX_ANNUAL,
   TICK_MINUTES,
   TICK_MS,
@@ -272,6 +290,7 @@ import {
   WorldEventEffectsType,
   isStorage,
 } from "../Types";
+import { pow } from "../helpers/Pow";
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -499,7 +518,7 @@ function generatorCostPerMWh(
   const carbonCost =
     generator.btuPerWh *
     WH_PER_MWH *
-    (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
+    feeableKgCO2ePerBtu(generator.fuel) *
     feePerKgCO2e;
   return (
     (estimatedAnnualOperatingCost(generator) * operatingCostMultiplier) /
@@ -1523,7 +1542,10 @@ export const gameSlice = createSlice({
       ) {
         state.runIdentity = undefined;
       }
-      const recorded = recordedDelta(action.payload);
+      if (typeof payload.dollarsPerkWh === "number") {
+        payload.dollarsPerkWh = capRateForScenario(state, payload);
+      }
+      const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
       if (recorded && recorded.dollarsPerkWh !== rateBefore) {
@@ -2145,9 +2167,11 @@ function applyBuildFacility(
     ? { ...requested, hydroSiteId: hydroSite!.selected!.id }
     : requested;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  const amountDue = payload.financed
-    ? built.buildCost * DOWNPAYMENT_PERCENT
-    : built.buildCost;
+  const { amountDue } = purchaseTerms(
+    built.buildCost,
+    !!payload.financed,
+    state.interestRate,
+  );
   // The dialog's quote can be stale by the time an action lands (or a replay/import can be
   // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
   if (!now || now.cash < amountDue) {
@@ -2328,12 +2352,13 @@ function applyBuildTransmissionLine(
     return false;
   }
   const financed = !!payload.financed;
-  const amountDue = financed
-    ? corridor.buildCost * DOWNPAYMENT_PERCENT
-    : corridor.buildCost;
+  const { amountDue, loanAmount, monthlyPayment } = purchaseTerms(
+    corridor.buildCost,
+    financed,
+    state.interestRate,
+  );
   if (now.cash < amountDue) return false;
   now.cash -= amountDue;
-  const loanAmount = financed ? corridor.buildCost - amountDue : 0;
   const line: TransmissionLineOperatingType = {
     id:
       state.transmission.lines.reduce(
@@ -2349,9 +2374,7 @@ function applyBuildTransmissionLine(
     minuteCreated: state.date.minute,
     financed,
     loanAmountLeft: loanAmount,
-    loanMonthlyPayment: financed
-      ? getMonthlyPayment(loanAmount, state.interestRate, LOAN_MONTHS)
-      : 0,
+    loanMonthlyPayment: monthlyPayment,
     interestRate: financed ? state.interestRate : 0,
     // Nothing flows until the line is energised, which is years away
     currentFlowW: 0,
@@ -2405,22 +2428,20 @@ function applyUpgradeTransmissionLine(
   );
   if (!quote) return false;
   const financed = !!payload.financed;
-  const amountDue = financed
-    ? quote.buildCost * DOWNPAYMENT_PERCENT
-    : quote.buildCost;
+  // One line, one loan. Rolling the new borrowing into the existing balance at the current
+  // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
+  // needing a second schedule of its own.
+  const { amountDue, loanAmount, monthlyPayment } = purchaseTerms(
+    quote.buildCost,
+    financed,
+    state.interestRate,
+    line.loanAmountLeft,
+  );
   if (now.cash < amountDue) return false;
   now.cash -= amountDue;
-  const loanAmount = financed ? quote.buildCost - amountDue : 0;
   if (financed) {
-    // One line, one loan. Rolling the new borrowing into the existing balance at the current
-    // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
-    // needing a second schedule of its own.
     line.loanAmountLeft += loanAmount;
-    line.loanMonthlyPayment = getMonthlyPayment(
-      line.loanAmountLeft,
-      state.interestRate,
-      LOAN_MONTHS,
-    );
+    line.loanMonthlyPayment = monthlyPayment;
     line.interestRate = state.interestRate;
     line.financed = true;
   }
@@ -2794,7 +2815,11 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       break;
     }
     case "delta": {
-      const recorded = recordedDelta((payload || {}) as Partial<GameType>);
+      const requested = { ...((payload || {}) as Partial<GameType>) };
+      if (typeof requested.dollarsPerkWh === "number") {
+        requested.dollarsPerkWh = capRateForScenario(state, requested);
+      }
+      const recorded = recordedDelta(requested);
       if (
         recorded?.dollarsPerkWh !== undefined &&
         recorded.dollarsPerkWh !== state.dollarsPerkWh
@@ -2814,6 +2839,37 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     default:
       break;
   }
+}
+
+/**
+ * A public utility's board caps its rate (see publicRateCap); investors are left to competition.
+ * Deltas that also pick the scenario are setup, not a player's rate choice, and pass unchanged.
+ */
+function capRateForScenario(
+  state: GameType,
+  payload: Partial<GameType>,
+): number {
+  const rate = payload.dollarsPerkWh as number;
+  if (
+    !Number.isFinite(rate) ||
+    "scenarioId" in payload ||
+    "customScenario" in payload
+  ) {
+    return rate;
+  }
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (!scenario || scenario.ownership !== "Public" || scenario.tutorialSteps) {
+    return rate;
+  }
+  return Math.min(
+    rate,
+    publicRateCap(
+      scenario.dollarsPerkWh,
+      state.date,
+      state.startingYear,
+      state.seed,
+    ),
+  );
 }
 
 /**
@@ -2889,6 +2945,7 @@ export function tutorialCompleteDialog({
     open: true,
     // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
     notCancellable: true,
+    offerInstall: true,
     secondaryLabel: "Back to main menu",
     secondaryAction: () => getStore().dispatch(quit()),
     actionLabel: nextTutorial ? "Next tutorial" : undefined,
@@ -3029,6 +3086,17 @@ export function tickState(state: GameType) {
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
+      // Advised once per plant: a paused-and-resumed plant is the player's informed choice
+      generatorsAboveDemandFloor(state.facilities, history[0]).forEach(
+        (generator) =>
+          logGameEvent(state, "WORLD_EVENT", mothballAdvice(generator), {
+            title: "Plant running above demand",
+            concept: "fuel",
+            importance: "NOTABLE",
+            actionTarget: { card: "FACILITIES", view: "FLEET" },
+            reportedKey: `above-demand-floor:${generator.id}`,
+          }),
+      );
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
@@ -3158,16 +3226,32 @@ export function tickState(state: GameType) {
       };
 
       const chronicBlackouts = hasChronicBlackouts(history);
+      const termMonths = scenario.durationMonths || 12 * 20;
+      const retentionStart = retentionBaseline(
+        scenario,
+        state.customerMarketSize,
+      );
+      // Objectives are judged in full at term end; before that, only once already decided
       const objectiveFailure =
-        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20)
+        state.date.monthsElapsed === termMonths
           ? scenarioObjectiveFailure(
               scenario,
               history,
               state.difficulty,
               state.meaningfulDecisions,
               !!state.meaningfulDecisionGateWaived,
+              retentionStart,
             )
-          : undefined;
+          : state.date.monthsElapsed < termMonths && !isTutorial
+            ? decidedObjectiveFailure(scenario, history, {
+                startingCustomers: retentionStart,
+                monthsRemaining: termMonths - state.date.monthsElapsed,
+                marketSize: customerMarketSizeAt(
+                  state.customerMarketSize,
+                  now.minute,
+                ),
+              })
+            : undefined;
       const failure =
         now.cash < 0
           ? ({
@@ -3362,13 +3446,13 @@ function getDemandW(
             sun.sunset - date.minuteOfDay,
           ) / 420;
   const minutesFromDarkLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
+    1 / (1 + Math.exp(-minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
   const minutesFrom9amLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFrom9amNormalized * 2));
+    1 / (1 + Math.exp(-minutesFrom9amNormalized * 2));
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
   const minutesFrom5pmLogistics =
-    1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
+    1 / (1 + Math.exp(-minutesFrom5pmNormalized * 2));
   const temperatureDemandW = temperatureDemandWattsPerCustomer(
     now.temperatureC,
     game.location,
@@ -3510,6 +3594,22 @@ function reforecastDemand(
   });
 }
 
+/**
+ * How far a facility's non-fuel operating costs have escalated since it was bought. Its O&M,
+ * variable O&M and start costs are quoted in purchase-month dollars; labour and parts rise with
+ * inflation afterwards, just as fuel and the market's rate do.
+ */
+function operatingCostEscalation(
+  state: GameType,
+  facility: { costIndexAtBuild?: number },
+  date: { year: number; monthNumber: number },
+): number {
+  return (
+    getInflationIndex(date, state.startingYear, state.seed) /
+    (facility.costIndexAtBuild || 1)
+  );
+}
+
 /** Variable cost of holding one generator at its minimum stable output for one game tick. */
 function minimumStableOperatingCost(
   state: GameType,
@@ -3528,7 +3628,8 @@ function minimumStableOperatingCost(
   const variableOM =
     (generatedWh / 1000000) *
     (generator.variableOperatingCostPerMWh || 0) *
-    operatingCostMultiplier;
+    operatingCostMultiplier *
+    operatingCostEscalation(state, generator, tickDate);
   const fuel = FUELS[generator.fuel];
   if (!fuel) {
     return variableOM;
@@ -3538,7 +3639,9 @@ function minimumStableOperatingCost(
     GAME_TO_REAL_YEARS;
   const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
   const carbonCost =
-    fuelBtu * fuel.kgCO2ePerBtu * effectiveCarbonFee(tickDate, state);
+    fuelBtu *
+    feeableKgCO2ePerBtu(generator.fuel) *
+    effectiveCarbonFee(tickDate, state);
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -3736,29 +3839,24 @@ function updateSupplyFacilitiesFinances(
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
-    // Only read or written behind hasMinimumStableOutput, which storage never has
-    const generator = g as GeneratorOperatingType;
-    const hasMinimumStableOutput = (g.minimumStableOutput || 0) > 0;
+    // Commitment is only read or written behind hasMinimumStableOutput, which storage never has
+    const generator = isStorage(g) ? undefined : g;
+    const hasMinimumStableOutput =
+      generator !== undefined && (generator.minimumStableOutput || 0) > 0;
     const previouslyCommitted = simulated
-      ? (generator.committed ?? previousW > 0)
-      : (generator.generatingLastRealTick ??
-        generator.committed ??
+      ? (generator?.committed ?? previousW > 0)
+      : (generator?.generatingLastRealTick ??
+        generator?.committed ??
         previousW > 0);
-    const generatorFuel = g.fuel;
-    const fuelOutputMultiplier = generatorFuel
-      ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
-      : 1;
     // A retrofit holds the plant offline until it completes.
-    const facilityOutputMultiplier = isUpgradingAt(g, now.minute)
+    const availablePeakW = isUpgradingAt(g, now.minute)
       ? 0
-      : (tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1);
-    const availablePeakW =
-      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
+      : g.peakW * storyOutputMultiplier(g, tickStoryEffects);
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
-    const storage = !!g.peakWh && g.yearsToBuildLeft === 0;
+    const storage = isStorage(g) && g.yearsToBuildLeft === 0;
     if (hydro && g.yearsToBuildLeft === 0) {
       const capacityWh = g.reservoirCapacityWh || 0;
       const inflowWh =
@@ -3808,7 +3906,7 @@ function updateSupplyFacilitiesFinances(
       // Storage leaks even while paused: pausing controls grid dispatch, not battery
       // self-discharge or water evaporating from a pumped-hydro upper reservoir.
       const lossWh =
-        g.currentWh * (1 - Math.pow(1 - g.hourlyLoss, 1 / ticksPerHour));
+        g.currentWh * (1 - pow(1 - g.hourlyLoss, 1 / ticksPerHour));
       g.currentWh = Math.max(0, g.currentWh - lossWh);
       storageLossWh += lossWh;
     }
@@ -3894,6 +3992,7 @@ function updateSupplyFacilitiesFinances(
                     startCost:
                       (generator.costPerStart || 0) *
                       GAME_TO_REAL_YEARS *
+                      operatingCostEscalation(state, generator, tickDate) *
                       (tickStoryEffects.operatingCostMultipliersByFuel?.[
                         generator.fuel
                       ] || 1),
@@ -4190,6 +4289,8 @@ function updateSupplyFacilitiesFinances(
 
   // Facilities expenses
   let kgco2e = 0;
+  // The part of kgco2e the carbon fee is charged on: biogenic combustion is exempt
+  let feeableKgco2e = 0;
   // Some authored emergencies carry company-level response costs that do not belong to a single
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
@@ -4219,6 +4320,13 @@ function updateSupplyFacilitiesFinances(
   const revenueBasisW = grossLocalSupplyW + importedW;
   const revenuePerSuppliedW =
     revenueBasisW > 0 ? (customerRevenue + revenueExports) / revenueBasisW : 0;
+  // Non-fuel operating costs were quoted in each facility's purchase-month dollars and escalate
+  // with inflation from there (see operatingCostEscalation)
+  const costIndexNow = getInflationIndex(
+    tickDate,
+    state.startingYear,
+    state.seed,
+  );
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
@@ -4245,14 +4353,18 @@ function updateSupplyFacilitiesFinances(
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
       facilityOM *=
-        (g.fuel && tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
-        1;
+        ((g.fuel &&
+          tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel]) ||
+          1) *
+        (costIndexNow / (g.costIndexAtBuild || 1));
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       const fuel = g.fuel && FUELS[g.fuel];
       if (fuel) {
+        // Burned for delivered output only: a paused plant still winding down internally sells
+        // nothing, so it buys no fuel and emits nothing, like its variable O&M above.
         const fuelBtu =
-          ((g.currentW * (g.btuPerWh || 0)) / ticksPerHour) *
+          ((deliveredW * (g.btuPerWh || 0)) / ticksPerHour) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         // Hydro and geothermal carry a zero-emission FUELS entry so carbon accounting can name
         // them, but they do not buy a fuel and therefore have no entry in the price table. In
@@ -4261,10 +4373,13 @@ function updateSupplyFacilitiesFinances(
         // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
         const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
         const facilityKgco2e = fuelBtu * fuel.kgCO2ePerBtu;
+        const facilityFeeableKgco2e = fuelBtu * feeableKgCO2ePerBtu(g.fuel);
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
+        feeableKgco2e += facilityFeeableKgco2e;
         facilityExpenses +=
-          facilityFuel + effectiveCarbonFee(tickDate, state) * facilityKgco2e;
+          facilityFuel +
+          effectiveCarbonFee(tickDate, state) * facilityFeeableKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -4314,8 +4429,21 @@ function updateSupplyFacilitiesFinances(
         }
       }
     } else {
-      facilityExpenses =
-        getPaymentInterest(g.loanAmountLeft, g.interestRate) / ticksPerMonth;
+      // Full amortizing payments start with the loan, as the purchase screen quotes and as
+      // interties already do: construction is not an interest-only holiday.
+      const paymentInterest = getPaymentInterest(
+        g.loanAmountLeft,
+        g.interestRate,
+      );
+      if (g.loanAmountLeft > 0) {
+        const paymentPrincipal = Math.min(
+          (g.loanMonthlyPayment - paymentInterest) / ticksPerMonth,
+          g.loanAmountLeft,
+        );
+        principalRepayment += paymentPrincipal;
+        g.loanAmountLeft -= paymentPrincipal;
+      }
+      facilityExpenses = paymentInterest / ticksPerMonth;
       expensesInterest += facilityExpenses;
       // A half-built plant is already costing interest, and a row that only started counting on
       // the day it switched on would hide the cheapest place to notice that
@@ -4325,8 +4453,18 @@ function updateSupplyFacilitiesFinances(
     }
   });
   let transmissionPrincipalRepayment = 0;
+  // Intertie O&M is authored in the same 2023 dollars as the facility tables, so it is carried
+  // into the run's money the same way: deflated to the starting year, then escalated with the
+  // game's inflation. Line capex is still charged at the authored quote, because saves validate
+  // a line's investment by rebuilding those quotes exactly.
+  const transmissionCostIndex = getCostTableIndex(
+    tickDate,
+    state.startingYear,
+    state.seed,
+  );
   operatingLines.forEach((line) => {
-    expensesOM += line.annualOperatingCost / ticksPerYear;
+    expensesOM +=
+      (line.annualOperatingCost * transmissionCostIndex) / ticksPerYear;
   });
   transmission.lines.forEach((line) => {
     if (line.loanAmountLeft <= 0) return;
@@ -4342,7 +4480,7 @@ function updateSupplyFacilitiesFinances(
     transmissionPrincipalRepayment += paymentPrincipal;
     line.loanAmountLeft -= paymentPrincipal;
   });
-  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * kgco2e;
+  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * feeableKgco2e;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough
@@ -4697,23 +4835,23 @@ function buildFacilityHelper(
     };
     if (newGame) {
       // Don't charge anything for initial builds
-    } else if (financed) {
-      const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
-      now.cash -= downpayment;
-      const loanAmount = g.buildCost - downpayment;
-      financing = {
-        loanAmountTotal: loanAmount,
-        loanAmountLeft: loanAmount,
-        loanMonthlyPayment: getMonthlyPayment(
-          loanAmount,
-          state.interestRate,
-          LOAN_MONTHS,
-        ),
-        interestRate: state.interestRate,
-      };
     } else {
-      // purchased in cash
-      now.cash -= g.buildCost;
+      const terms = purchaseTerms(
+        g.buildCost,
+        financed,
+        state.interestRate,
+        0,
+        facilityLoanMonths(g.lifespanYears),
+      );
+      now.cash -= terms.amountDue;
+      if (financed) {
+        financing = {
+          loanAmountTotal: terms.loanAmount,
+          loanAmountLeft: terms.loanAmount,
+          loanMonthlyPayment: terms.monthlyPayment,
+          interestRate: state.interestRate,
+        };
+      }
     }
     // Site availability belongs to the current fleet quote, not the facility bought from it. A
     // saved operating asset must not retain a permanently stale "remaining" count.
@@ -4736,6 +4874,17 @@ function buildFacilityHelper(
           }
         : {}),
       ...financing,
+      // The quote's O&M is in this month's dollars; escalation is measured from here. The
+      // starting fleet is quoted on the opening day, where the index is 1.
+      ...(!newGame && hasEconomy()
+        ? {
+            costIndexAtBuild: getInflationIndex(
+              state.date,
+              state.startingYear,
+              state.seed,
+            ),
+          }
+        : {}),
       lifetimeWh: 0,
       lifetimePotentialWh: 0,
       lifetimeRevenue: 0,
@@ -4786,8 +4935,17 @@ function buildFacilityHelper(
     if (g.peakWh) {
       facility.currentWh = 0;
       state.facilities.push(facility); // add storage to bottom so that it's on by default
+    } else if (newGame) {
+      // The authored fleet is put back into scenario order after it is built; see initGame
+      state.facilities.unshift(facility);
     } else {
-      state.facilities.unshift(facility); // add generators to top so that they produce by default
+      // New generators go to the top so that they produce by default, and peakers above only
+      // the other peakers so they are not run as baseload
+      state.facilities.splice(
+        defaultDispatchIndex(state.facilities, facility),
+        0,
+        facility,
+      );
     }
   }
 

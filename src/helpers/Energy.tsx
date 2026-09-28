@@ -1,5 +1,6 @@
 import { EQUATOR_RADIANCE, WEATHER_DEPENDENT_FUELS } from "../Constants";
 import { FacilityOperatingType, FuelNameType } from "../Types";
+import { pow } from "./Pow";
 
 const KPH_PER_MS = 3.6;
 
@@ -31,8 +32,7 @@ const OFFSHORE_ARRAY_LOSSES = 0.85;
 
 export function getOffshoreWindOutputFactor(windKph: number) {
   const turbineWindMS =
-    (windKph / KPH_PER_MS) *
-    Math.pow(OFFSHORE_HUB_M / 10, OFFSHORE_SHEAR_EXPONENT);
+    (windKph / KPH_PER_MS) * pow(OFFSHORE_HUB_M / 10, OFFSHORE_SHEAR_EXPONENT);
   return powerCurve(turbineWindMS) * OFFSHORE_ARRAY_LOSSES;
 }
 
@@ -53,8 +53,7 @@ const AIRBORNE_SYSTEM_AVAILABILITY = 0.888;
 
 export function getAirborneWindReferenceKph(wind10mKph: number): number {
   return (
-    wind10mKph *
-    Math.pow(AIRBORNE_REFERENCE_HEIGHT_M / 10, AIRBORNE_SHEAR_EXPONENT)
+    wind10mKph * pow(AIRBORNE_REFERENCE_HEIGHT_M / 10, AIRBORNE_SHEAR_EXPONENT)
   );
 }
 

@@ -718,7 +718,7 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
-            {ui.dialog.title.startsWith("🎉") && (
+            {ui.dialog.offerInstall && (
               <InstallAppButton label="Install for later" afterMilestone />
             )}
             {ui.dialog.secondaryAction && (

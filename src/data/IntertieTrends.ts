@@ -5,6 +5,7 @@ import {
   IntertieMarketTrendType,
   YearSeries,
 } from "./IntertieTrendData";
+import { pow } from "../helpers/Pow";
 
 /**
  * How a neighbour's grid changes over a run. The researched series in IntertieTrendData carry
@@ -43,12 +44,11 @@ export function intertieMarketTrend(
 function nominalPriceAt(prices: YearSeries, year: number): number {
   const [firstYear, first] = prices[0];
   if (year < firstYear) {
-    return first / Math.pow(1 + TREND_ESCALATION_YEARLY, firstYear - year);
+    return first / pow(1 + TREND_ESCALATION_YEARLY, firstYear - year);
   }
   const real = seriesAt(prices, year);
   return year > LAST_PRICE_RECORD_YEAR
-    ? real *
-        Math.pow(1 + TREND_ESCALATION_YEARLY, year - LAST_PRICE_RECORD_YEAR)
+    ? real * pow(1 + TREND_ESCALATION_YEARLY, year - LAST_PRICE_RECORD_YEAR)
     : real;
 }
 

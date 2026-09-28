@@ -151,7 +151,8 @@ failures should be rare; agents without that hook should run `npm run format` be
 ## Guardrails
 
 - Keep seeded simulation paths deterministic. Use the seed helpers in `src/helpers/Math.tsx`, not
-  ambient randomness, for any outcome that affects a replay.
+  ambient randomness, for any outcome that affects a replay. Raise powers with `pow` from
+  `src/helpers/Pow.ts`: `Math.pow` and `**` round differently on Windows than on Linux CI.
 - Load simulation data before calling weather or fuel-price helpers from a non-browser entry point;
   the simulator does this through `loadSimData`.
 - Preserve the import-order boundary around `StoreRegistry`: the game reducer dispatches follow-up

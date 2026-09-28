@@ -6,6 +6,7 @@ import {
   STORAGE,
 } from "./Facilities";
 import { LOCATIONS, GAME_TO_REAL_YEARS } from "../Constants";
+import { getCostTableDeflator } from "./Economy";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { estimatedAnnualOperatingCost } from "../helpers/Financials";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
@@ -71,15 +72,19 @@ function generatorAt(
 
 describe("current facility economics", () => {
   it("prices reference plants at their published benchmarks", () => {
+    // IRENA's 2024-dollar observations are carried in the tables' 2023 dollars
+    const in2023Dollars = 304.702 / 313.689;
     const benchmarks: Array<[string, number, number, number]> = [
       ["Coal", 2023, 650000000, 4.103],
       ["Nuclear", 2023, 2156000000, 7.861],
-      ["Natural Gas", 2023, 419000000, 0.836],
+      ["Natural Gas Peaker", 2023, 419000000, 0.836],
+      ["Natural Gas CC", 2023, 1227000000, 0.868],
       ["Oil", 2023, 3000000, 1.248],
-      ["Wind", 2024, 200000000, 1.041],
-      ["Solar", 2024, 150000000, 0.691],
-      ["Hydro", 2024, 100000000, 2.267],
-      ["Geothermal", 2024, 50000000, 4.015],
+      ["Wind", 2024, 200000000, 1.041 * in2023Dollars],
+      ["Solar", 2024, 150000000, 0.691 * in2023Dollars],
+      ["Hydro", 2024, 100000000, 2.267 * in2023Dollars],
+      ["Geothermal", 2024, 50000000, 4.015 * in2023Dollars],
+      ["Biomass", 2023, 50000000, (4843 * (304.702 / 321.943)) / 1000],
     ];
     benchmarks.forEach(([name, year, peakW, dollarsPerW]) => {
       const location =
@@ -102,17 +107,90 @@ describe("current facility economics", () => {
       annualOperatingCost: 6000000,
       roundTripEfficiency: 0.85,
     });
-    expect(battery?.buildCost).toBeCloseTo(115210000, -2);
+    expect(battery?.buildCost).toBeCloseTo(
+      10000 + 0.192 * 600000000 * (304.702 / 313.689),
+      -2,
+    );
     expect(battery?.yearsToBuild).toBeCloseTo(1.5, 2);
   });
 
   it("scales natural-gas start maintenance from EIA's 419 MW reference", () => {
-    expect(generatorAt(2023, "Natural Gas", 419000000)?.costPerStart).toBe(
-      23100,
-    );
     expect(
-      generatorAt(2023, "Natural Gas", 100000000)?.costPerStart,
+      generatorAt(2023, "Natural Gas Peaker", 419000000)?.costPerStart,
+    ).toBe(23100);
+    expect(
+      generatorAt(2023, "Natural Gas Peaker", 100000000)?.costPerStart,
     ).toBeCloseTo((23100 * 100) / 419, 8);
+  });
+
+  describe("the two gas plants", () => {
+    const peaker = (year = 2023, peakW = 419000000) =>
+      generatorAt(year, "Natural Gas Peaker", peakW)!;
+    const cc = (year = 2023, peakW = 1227000000) =>
+      generatorAt(year, "Natural Gas CC", peakW)!;
+
+    it("burn the same fuel but name their cycle", () => {
+      expect([peaker().fuel, cc().fuel]).toEqual([
+        "Natural Gas",
+        "Natural Gas",
+      ]);
+      expect([peaker().gasCycle, cc().gasCycle]).toEqual([
+        "simple",
+        "combined",
+      ]);
+    });
+
+    it("trade the peaker's quick start for the combined cycle's fuel economy", () => {
+      // EIA AEO2025 Cases 4 and 5
+      expect(peaker().btuPerWh).toBe(9.142);
+      expect(cc().btuPerWh).toBe(6.266);
+      expect(peaker().spinMinutes).toBeLessThan(cc().spinMinutes);
+      expect(cc().minimumStableOutput).toBe(0.45);
+      expect(peaker().minimumStableOutput).toBe(0.5);
+      expect(cc().variableOperatingCostPerMWh).toBe(3.41);
+      expect(cc().annualOperatingCost).toBeCloseTo(12.12 * 1227000, 0);
+      // U.S. fleet averages, EIA Electric Power Monthly Table 6.07.A
+      expect(peaker().capacityFactor).toBe(0.12);
+      expect(cc().capacityFactor).toBe(0.57);
+      expect(cc().lifespanYears).toBe(40);
+      // Case 5's 42-month lead time at its reference size
+      expect(cc().yearsToBuild * 12).toBeCloseTo(42, 0);
+      expect(peaker(2023, 300000000).yearsToBuild).toBeLessThan(
+        cc(2023, 300000000).yearsToBuild,
+      );
+    });
+
+    it("keep the peaker cheap when small and cap it below the combined cycle", () => {
+      // 12% of each reference project is fixed, and the combined cycle's is three times larger
+      expect(peaker(2023, 100000000).buildCost).toBeLessThan(
+        cc(2023, 100000000).buildCost * 0.6,
+      );
+      expect(peaker().maxPeakW).toBe(2000000000);
+      expect(cc().maxPeakW).toBe(6000000000);
+    });
+
+    it("anchors the combined cycle's older cost on AEO2020 in 2023 dollars", () => {
+      // $958/kW in 2019 dollars is $1,142/kW in the table's 2023 dollars
+      const realRatio = (0.958 * (304.702 / 255.657)) / 0.868;
+      expect(cc(2019).buildCost / cc(2023).buildCost).toBeCloseTo(
+        (realRatio * getCostTableDeflator(2019)) / getCostTableDeflator(2023),
+        6,
+      );
+    });
+
+    it("charges NREL's combined-cycle hot start by nameplate MW", () => {
+      expect(cc(2023, 1000000000).costPerStart).toBeCloseTo(
+        35 * (304.702 / 224.939) * 1000,
+        6,
+      );
+      expect(cc().assumedStartsPerYear).toBe(100);
+    });
+
+    it("arrives in 1990 while peakers were always available", () => {
+      expect(cc(1989)).toBeUndefined();
+      expect(cc(1990)).toBeDefined();
+      expect(peaker(1980)).toBeDefined();
+    });
   });
 
   it("splits Oil O&M into fixed capacity and variable generation costs", () => {
@@ -269,6 +347,14 @@ describe("enhanced geothermal", () => {
     expect(withExistingEnhanced?.buildCost).toBe(baseline?.buildCost);
   });
 
+  it("never undercuts conventional hydrothermal geothermal", () => {
+    for (const year of [2030, 2040, 2080]) {
+      expect(
+        generatorAt(iceland, year, "Enhanced Geothermal")!.buildCost,
+      ).toBeGreaterThan(generatorAt(iceland, year, "Geothermal")!.buildCost);
+    }
+  });
+
   it("only counts conventional plants against conventional geothermal sites", () => {
     const baseline = generatorAt(iceland, 2030, "Geothermal");
     const withEnhanced = generatorAt(iceland, 2030, "Geothermal", [
@@ -308,6 +394,49 @@ describe("offshore wind", () => {
     const cost2023 = generatorAt(newYork, 2023)?.buildCost as number;
     expect(cost2010).toBeGreaterThan(cost2000);
     expect(cost2010).toBeGreaterThan(cost2023);
+  });
+
+  it("stops learning at the 2030 outlook instead of undercutting onshore wind", () => {
+    expect(generatorAt(newYork, 2100)?.buildCost).toBe(
+      generatorAt(newYork, 2030)?.buildCost,
+    );
+    const offshore = generatorAt(newYork, 2100, 1500000000)?.buildCost;
+    const onshore = GENERATORS(stateAt(newYork, 2100), 1500000000, [], []).find(
+      (generator) => generator.name === "Wind",
+    )?.buildCost;
+    expect(offshore).toBeGreaterThan(2 * (onshore as number));
+  });
+
+  it("prices a first-generation 5MW farm near its real per-watt cost", () => {
+    // Vindeby and Middelgrunden cost about $1.2-2.5k/kW in their own dollars
+    const perW =
+      (generatorAt(newYork, 2000, 5000000)?.buildCost as number) / 5e6;
+    expect(perW).toBeLessThan(15);
+  });
+});
+
+describe("pre-2020 batteries", () => {
+  it("costs about $2/Wh in 2010 rather than the 2020 price", () => {
+    const perWh = (year: number) => {
+      const battery = STORAGE(stateAt(france, year), 600000000).find(
+        (facility) => facility.name === "Battery",
+      )!;
+      // Undo the starting-year deflator so years compare in the table's 2023 dollars
+      return battery.buildCost / 600000000 / getCostTableDeflator(year);
+    };
+    expect(perWh(2010) / perWh(2020)).toBeCloseTo(
+      Math.exp((10 / 4.5) * Math.LN2),
+      3,
+    );
+    expect(perWh(2010)).toBeGreaterThan(1.8);
+  });
+});
+
+describe("economies of scale", () => {
+  it("keeps a 10MW solar farm within LBNL's small-project premium", () => {
+    const perW = (peakW: number) =>
+      (generatorAt(2024, "Solar", peakW)?.buildCost as number) / peakW;
+    expect(perW(10000000) / perW(150000000)).toBeLessThan(1.2);
   });
 });
 

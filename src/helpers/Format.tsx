@@ -1,4 +1,5 @@
 import numbro from "numbro";
+import { pow } from "./Pow";
 
 /**
  * Format power using its actual magnitude, without promoting sub-GW values to GW. Values of 10 or
@@ -17,7 +18,7 @@ export function floorToTwoSignificantDigits(i: number): number {
   if (!(i > 0) || !Number.isFinite(i)) {
     return 0;
   }
-  const step = Math.pow(10, Math.floor(Math.log10(i)) - 1);
+  const step = pow(10, Math.floor(Math.log10(i)) - 1);
   return Math.floor(i / step + 1e-9) * step;
 }
 
@@ -162,4 +163,46 @@ export function formatWattHoursOfPeak(current: number, peak: number): string {
 export function formatSignedWattsOfPeak(current: number, peak: number): string {
   const pair = formatWattsOfPeak(current, peak);
   return current < 0 && !/^0(\.0*)?\//.test(pair) ? "-" + pair : pair;
+}
+
+/** A 0-1 fraction as a whole (or `digits`-decimal) percentage: 0.456 → "46%". */
+export function formatPercent(fraction: number, digits = 0): string {
+  return digits > 0
+    ? `${(fraction * 100).toFixed(digits)}%`
+    : `${Math.round(fraction * 100)}%`;
+}
+
+/** A whole count with thousands separators, independent of the browser's locale. */
+export function formatCount(n: number): string {
+  return Math.round(n).toLocaleString("en-US");
+}
+
+/** A dollar amount per megawatt-hour, in the concise money style: "$42.5/MWh". */
+export function formatPricePerMWh(dollarsPerMWh: number): string {
+  return `${formatMoneyConcise(dollarsPerMWh)}/MWh`;
+}
+
+/** A facility's size: energy capacity for storage, rated output for a generator. */
+export function formatFacilitySize(facility: {
+  peakW: number;
+  peakWh?: number;
+}): string {
+  // The same test as isStorage, which can't narrow this structural shape
+  return facility.peakWh !== undefined
+    ? formatWattHours(facility.peakWh)
+    : formatWatts(facility.peakW);
+}
+
+/** A construction time in whole months: "18 mo" or "18 months". */
+export function formatBuildMonths(
+  yearsToBuild: number,
+  style: "short" | "long" = "short",
+): string {
+  const months = Math.round(yearsToBuild * 12);
+  return `${months} ${style === "short" ? "mo" : "months"}`;
+}
+
+/** A game score as a whole number with thousands separators. */
+export function formatScore(score: number): string {
+  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }

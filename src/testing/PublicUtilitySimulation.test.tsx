@@ -37,7 +37,7 @@ describe("researched public-utility scenarios", () => {
     expect(
       state.facilities.find((facility) => facility.fuel === "Natural Gas")
         ?.name,
-    ).toBe("Natural Gas");
+    ).toBe("Natural Gas Peaker");
     expect(
       state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
     ).toBe(true);
@@ -78,10 +78,11 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 106,
       difficulty: "Employee",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 50_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     expect(full.months).toHaveLength(192);
     expect(full.months[0]).toMatchObject({ year: 2020, month: 1 });
@@ -95,7 +96,7 @@ describe("researched public-utility scenarios", () => {
     const base: ScenarioType = {
       id: CUSTOM_SCENARIO_ID,
       name: "Demand calibration fixture",
-      icon: "natural gas",
+      icon: "natural gas peaker",
       locationId: "SF",
       location: LOCATIONS.SF,
       ownership: "Public",
@@ -238,10 +239,12 @@ describe("researched public-utility scenarios", () => {
         scenarioId: 106,
         difficulty,
         initialBuild: {
-          name: "Natural Gas",
+          name: "Natural Gas Peaker",
           peakW: 50_000_000,
           financed: true,
         },
+        // Physical winnability of one build; the decision gate is covered by the CEO matrix
+        waiveDecisionGate: true,
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
@@ -275,13 +278,15 @@ describe("researched public-utility scenarios", () => {
       manassas.startingCustomers! * manassas.minimumCustomerRetention!;
     const history = [{ ...EMPTY_HISTORY, customers: required }];
     expect(
-      scenarioObjectiveFailure(manassas, history, "Manager"),
+      scenarioObjectiveFailure(manassas, history, "Manager", [], true),
     ).toBeUndefined();
     expect(
       scenarioObjectiveFailure(
         manassas,
         [{ ...history[0], customers: required - 1 }],
         "Manager",
+        [],
+        true,
       ),
     ).toContain("Customer attrition");
   });
@@ -306,10 +311,12 @@ describe("researched public-utility scenarios", () => {
         scenarioId: 107,
         difficulty,
         initialBuild: {
-          name: "Natural Gas",
+          name: "Natural Gas Peaker",
           peakW: 1_200_000_000,
           financed: true,
         },
+        // Physical winnability of one build; the decision gate is covered by the CEO matrix
+        waiveDecisionGate: true,
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
@@ -322,20 +329,22 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 40_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     // The same run "completes Data Center Boom on Manager" plays
     const reservePlan = runSimulationOnce({
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 50_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     expect(leanPlan.outcome).toBe("completed");
     expect(reservePlan.outcome).toBe("completed");
@@ -349,19 +358,28 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 107,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 1_100_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
+    // Distillate costs $15-20/MMBtu, so the oil plan only works as a peaker: the player moves the
+    // existing fleet back above it rather than letting the new plant burn oil for baseload.
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
       initialBuild: { name: "Oil", peakW: 700_000_000, financed: true },
+      waiveDecisionGate: true,
+      scheduledActions: [1, 2, 3, 4, 5].map((facilityId, index) => ({
+        month: 2 + index,
+        type: "reprioritize" as const,
+        facilityId,
+      })),
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");
-    expect(gasPlan.builds[0].name).toBe("Natural Gas");
+    expect(gasPlan.builds[0].name).toBe("Natural Gas Peaker");
     expect(oilPlan.builds[0].name).toBe("Oil");
   });
 });

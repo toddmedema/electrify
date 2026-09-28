@@ -11,8 +11,13 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const slow = page.getByRole("button", { name: "slow speed", exact: true });
-    const pause = page.getByRole("button", { name: "pause", exact: true });
+    // The build screen repeats the speed controls over the game's own app bar; both show one clock.
+    const slow = page
+      .getByRole("button", { name: "slow speed", exact: true })
+      .first();
+    const pause = page
+      .getByRole("button", { name: "pause", exact: true })
+      .first();
     await slow.click();
     await expect(slow).toHaveAttribute("aria-pressed", "true");
     await page.evaluate(() =>

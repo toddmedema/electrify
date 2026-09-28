@@ -5,6 +5,7 @@ import { getSunriseSunset } from "../helpers/DateTime";
 import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
 import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
+import { pow } from "../helpers/Pow";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -197,7 +198,7 @@ function buildClimatology(rows: RawWeatherType[]): MonthClimatologyType[] {
       }
       stats.mean = samples.reduce((a, b) => a + b, 0) / samples.length;
       stats.sd = Math.sqrt(
-        samples.reduce((a, b) => a + Math.pow(b - stats.mean, 2), 0) /
+        samples.reduce((a, b) => a + pow(b - stats.mean, 2), 0) /
           samples.length,
       );
     });
@@ -306,11 +307,8 @@ export function getMonthlyClimatology(
 }
 
 /**
- * Downloads a location's record, for the browser.
- *
- * TODO download several locations at start with a 2s init delay, like loading audio (but after
- * audio) for offline play. At 57-69KB apiece rather than 265KB of CSV that is far cheaper than it
- * was, though at 282 catalogued locations it can no longer be all of them.
+ * Downloads a location's record, for the browser. Offline play is covered by the service worker,
+ * which caches the scenario's weather (see helpers/OfflineData).
  *
  * @param callback - Called once, with the reason if the record could not be loaded. A caller that
  *   starts the game regardless would be starting one played on DUMMY_WEATHER: every hour of every
@@ -493,9 +491,7 @@ export function getRawSolarIrradianceWM2(
       date.minuteOfDay - sunrise,
       sunset - date.minuteOfDay,
     );
-    return (
-      irradiance / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 200)))
-    );
+    return irradiance / (1 + Math.exp(-0.015 * (minutesFromDark - 200)));
   }
   return 0;
 }
@@ -554,7 +550,7 @@ function forecastDay(
   // Ornstein-Uhlenbeck in one line per field: keep some of last year's anomaly, then add a fresh
   // shock scaled to the spread this month actually has. The sqrt keeps the resulting anomalies at
   // the observed standard deviation rather than inflating it by the part that was carried over.
-  const shockScale = Math.sqrt(1 - Math.pow(ANOMALY_PERSISTENCE, 2));
+  const shockScale = Math.sqrt(1 - pow(ANOMALY_PERSISTENCE, 2));
   const anomaly = {} as Record<ForecastFieldType, number>;
   const shapeMean = {} as Record<ForecastFieldType, number>;
   fields.forEach((field, fieldIndex) => {

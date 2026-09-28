@@ -27,6 +27,8 @@ for (const theme of ["light", "dark"]) {
     const slider = insights.getByRole("slider", {
       name: "The rate you charge for electricity generation",
     });
+    const showRate = insights.getByRole("button", { name: "Show rate slider" });
+    if (await showRate.isVisible()) await showRate.click();
     await slider.focus();
     await slider.press("End");
     await expect(insights.locator(".insightsRateScore").last()).toHaveClass(

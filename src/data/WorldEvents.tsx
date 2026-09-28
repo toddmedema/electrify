@@ -14,6 +14,7 @@ import {
   WorldEventEffectsType,
 } from "../Types";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 
 export interface StoryContextType {
@@ -121,6 +122,10 @@ function deliveredFrom(
   return fuels.reduce((total, fuel) => total + (delivered[fuel] || 0), 0);
 }
 
+// The national gas record already contains the shale price collapse (EIA MER Table 9.9: $8.87 in
+// 2008 to $3.45 in 2012), so the boom's multiplier is not a second national drop. It is the local
+// Marcellus glut: Appalachian hubs such as Dominion South traded 25-50% below Henry Hub through
+// 2013-2016 as production outran pipeline capacity out of the region.
 export interface ShaleBoomBalanceType {
   boomGasMultiplier: number;
   freezeSurcharge: number;
@@ -185,13 +190,13 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       durationMonths: 74,
       preview: ({ difficulty }) => ({
         title: "Gas prices will fall",
-        message: `Natural gas prices will drop ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% through Feb 2016.`,
+        message: `Local gas will sell ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% below the national price through Feb 2016.`,
       }),
       describe: ({ difficulty }) => {
         const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
         return {
           title: "Gas prices fall",
-          message: `Natural gas prices fall ${Math.round((1 - boomGasMultiplier) * 100)}% through Feb 2016.`,
+          message: `A regional shale glut puts local gas ${Math.round((1 - boomGasMultiplier) * 100)}% below the national price through Feb 2016.`,
           concept: "fuel",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -801,13 +806,15 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "outlook",
-      schedule: { atMonth: 96 },
+      // Landfall is seeded in months 101-106. Warning at month 60 leaves more than the CEO build
+      // time of the reference gas plant, so the forecast can be answered with construction.
+      schedule: { atMonth: 60 },
       preview: () => null,
       describe: ({ difficulty }) => {
         const balance = HURRICANE_BALANCE[difficulty];
         return {
-          title: "2008 hurricane forecast",
-          message: `A ${balance.severity.toLowerCase()} hurricane may cut output at several plants for ${balance.durationMonths} months and raise oil prices ${Math.round((balance.oilMultiplier - 1) * 100)}%, so add backup power and storage.`,
+          title: "2008 hurricane outlook",
+          message: `Forecasters expect a ${balance.severity.toLowerCase()} hurricane in 2008 that may cut output at several plants for ${balance.durationMonths} months and raise oil prices ${Math.round((balance.oilMultiplier - 1) * 100)}%, so add backup power and storage. ${buildLeadTimeHint(difficulty)}`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1236,12 +1243,12 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "seasonal-warning",
-      schedule: { atMonth: 24 },
+      // 23 months before the heat: time enough for a battery at any difficulty
+      schedule: { atMonth: 6 },
       preview: () => null,
-      describe: () => ({
+      describe: ({ difficulty }) => ({
         title: "A hot, dry summer ahead",
-        message:
-          "June–August 2026 heat will raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage.",
+        message: `Forecasters expect June–August 2026 heat to raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1500,12 +1507,12 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   phases: [
     {
       id: "contingency-review",
-      schedule: { atMonth: 24 },
+      // The trip is seeded in months 30-36; reviewing in the first month leaves time to build
+      schedule: { atMonth: 1 },
       preview: () => null,
-      describe: () => ({
+      describe: ({ difficulty }) => ({
         title: "Backup-power review",
-        message:
-          "The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator?",
+        message: `The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator? ${buildLeadTimeHint(difficulty)}`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -2362,15 +2369,4 @@ export function upcomingStoryPhases(
     .sort(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
-}
-
-export function activeWorldEventEffects(
-  events: ActiveWorldEventType[] | undefined,
-  minute: number,
-): WorldEventEffectsType {
-  return combineStoryEffects(
-    (events || []).filter(
-      (event) => minute >= event.startsMinute && minute < event.endsMinute,
-    ),
-  );
 }

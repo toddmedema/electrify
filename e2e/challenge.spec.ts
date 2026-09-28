@@ -66,9 +66,9 @@ test("an active run stays paused while browsing and cancelling a challenge", asy
   expect((await savedGame(page)).date.minute).toBe(before.date.minute);
   expect((await savedGame(page)).runIdentity).toEqual(before.runIdentity);
   await expect(
-    page.getByRole("button", { name: "back", exact: true }),
+    page.getByRole("button", { name: "Back", exact: true }),
   ).toHaveCount(1);
-  await page.getByRole("button", { name: "back", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await page
     .getByRole("button", { name: "All challenges", exact: true })
     .click();
@@ -79,9 +79,9 @@ test("an active run stays paused while browsing and cancelling a challenge", asy
     })
     .click();
   await expect(
-    page.getByRole("button", { name: "back", exact: true }),
+    page.getByRole("button", { name: "Back", exact: true }),
   ).toHaveCount(1);
-  await page.getByRole("button", { name: "back", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Choose a game", exact: true }),
   ).toBeVisible();
@@ -93,9 +93,9 @@ test("an active run stays paused while browsing and cancelling a challenge", asy
     .getByRole("button", { name: "View Custom Game details", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "back", exact: true }),
+    page.getByRole("button", { name: "Back", exact: true }),
   ).toHaveCount(1);
-  await page.getByRole("button", { name: "back", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Choose a game", exact: true }),
   ).toBeVisible();

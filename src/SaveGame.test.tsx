@@ -805,3 +805,12 @@ it("rejects missing or contradictory local/purchased emissions in current saves"
   wrong.game.timeline[0].importedKgco2e += 100;
   expect(parseSave(wrong)).toBeNull();
 });
+
+it.each([-1, "daily", null])(
+  "rejects invalid annual start assumptions (%p) in imported saves",
+  (assumedStartsPerYear) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(createGame(OPTIONS))));
+    raw.game.facilities[0].assumedStartsPerYear = assumedStartsPerYear;
+    expect(parseSave(raw)).toBeNull();
+  },
+);

@@ -295,6 +295,7 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         notCancellable: true,
+        offerInstall: true,
         secondaryLabel: "Back to main menu",
       }),
     );

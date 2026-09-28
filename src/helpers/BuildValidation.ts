@@ -1,5 +1,6 @@
 import {
   FacilityShoppingType,
+  GasCycleType,
   ResilienceUpgradeType,
   RetrofitFacilityAction,
 } from "../Types";
@@ -57,6 +58,17 @@ export function validResilienceRecord(fuel: unknown, raw: unknown): boolean {
       return typeof value === "boolean";
     },
   );
+}
+
+const GAS_CYCLES: readonly GasCycleType[] = ["simple", "combined"];
+
+/**
+ * A gas plant's turbine arrangement. Optional, so a crafted record without one stays loadable,
+ * but when present it must be a known cycle on a gas plant: the dispatch default reads it.
+ */
+export function validGasCycle(fuel: unknown, raw: unknown): boolean {
+  if (raw === undefined) return true;
+  return fuel === "Natural Gas" && GAS_CYCLES.includes(raw as GasCycleType);
 }
 
 /** A saved retrofit in progress: a known upgrade, a non-negative price and an ordered window. */
@@ -125,6 +137,7 @@ export function validBuildFacility(raw: unknown): raw is {
       "annualOutputDegradation",
       "minimumStableOutput",
       "costPerStart",
+      "assumedStartsPerYear",
       "variableOperatingCostPerMWh",
       "reservoirCapacityWh",
       "hydroWhPerMm",
@@ -150,7 +163,8 @@ export function validBuildFacility(raw: unknown): raw is {
         typeof facility[key] === "number" &&
         facility[key] > MAXIMUM_CONSTRUCTION_KGCO2E[key],
     ) ||
-    !validResilience(facility)
+    !validResilience(facility) ||
+    !validGasCycle(facility.fuel, facility.gasCycle)
   )
     return false;
   if (

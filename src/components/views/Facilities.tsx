@@ -3,11 +3,7 @@ import {
   Avatar,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
   DialogContentText,
-  DialogTitle,
   List,
   ListItem,
   ListItemAvatar,
@@ -16,13 +12,13 @@ import {
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
+import ConfirmDialog from "../base/ConfirmDialog";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { ChevronDownGlyph, ChevronUpGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
   Draggable,
@@ -38,16 +34,15 @@ import {
   isStorage,
   GameType,
   RetrofitFacilityAction,
-  WorldEventEffectsType,
   EvidenceRequestType,
 } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
+import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatMoneyConcise,
-  formatWattHours,
   formatWattHoursOfPeak,
-  formatWatts,
   formatWattsOfPeak,
+  formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FlowBar from "../base/FlowBar";
@@ -146,17 +141,6 @@ function HazardStatusLead(props: {
 function isWeatherHazardEvent(definitionId: string): boolean {
   return (
     definitionId === HAIL_DEFINITION_ID || definitionId === COLD_DEFINITION_ID
-  );
-}
-
-function storyOutputMultiplierForFacility(
-  facility: FacilityOperatingType,
-  effects: WorldEventEffectsType,
-): number {
-  const fuel = facility.fuel;
-  return (
-    (effects.facilityOutputMultipliersById?.[String(facility.id)] || 1) *
-    (fuel ? effects.facilityOutputMultipliersByFuel?.[fuel] || 1 : 1)
   );
 }
 
@@ -300,7 +284,7 @@ function FacilityActions(props: {
       {listLength > 1 && (
         <>
           <Button
-            startIcon={<KeyboardArrowUpIcon />}
+            startIcon={<ChevronUpGlyph />}
             aria-label={
               "Move " + facility.name + " earlier in the dispatch order"
             }
@@ -310,7 +294,7 @@ function FacilityActions(props: {
             <span className="facilityActionLabel">Move up</span>
           </Button>
           <Button
-            startIcon={<KeyboardArrowDownIcon />}
+            startIcon={<ChevronDownGlyph />}
             aria-label={
               "Move " + facility.name + " later in the dispatch order"
             }
@@ -514,6 +498,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           {...provided.draggableProps}
           className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           data-fuel={fuel}
+          data-facility={facility.name}
           style={getDraggableStyle(provided.draggableProps.style)}
         >
           <div
@@ -526,9 +511,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
-            {!offlineForWork && (
-              <FlowBar fraction={outputFraction} color={accentColor} />
-            )}
+            {!offlineForWork && <FlowBar fraction={outputFraction} />}
             {!readOnly && (
               <button
                 type="button"
@@ -660,64 +643,49 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </span>
                   )}
                 </span>
-                <KeyboardArrowDownIcon
-                  className="facilityChevron"
-                  aria-hidden
-                />
+                <ChevronDownGlyph className="facilityChevron" aria-hidden />
               </ListItem>
             </button>
           </div>
           {open && (
-            // Inside the row, so without this every click in the confirmation dialog also
-            // lands on the row behind it and toggles the selection
-            <Dialog
+            // Inside the row, so isolateClicks keeps every click in the confirmation dialog
+            // from also landing on the row behind it and toggling the selection
+            <ConfirmDialog
               open
-              onClose={toggleDialog}
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              isolateClicks
+              title={
+                <>
+                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
+                  {formatFacilitySize(facility)} {facility.name.toLowerCase()}{" "}
+                  facility?
+                </>
+              }
+              cancelLabel="Nevermind"
+              confirmLabel={underConstruction ? "Cancel construction" : "Sell"}
+              onCancel={toggleDialog}
+              onConfirm={() => {
+                props.onSell(facility.id);
+                toggleDialog();
+              }}
             >
-              <DialogTitle>
-                {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                {facility.peakWh
-                  ? formatWattHours(facility.peakWh)
-                  : formatWatts(facility.peakW)}{" "}
-                {facility.name.toLowerCase()} facility?
-              </DialogTitle>
-              <DialogContent>
-                {facility.hydroSiteId && (
-                  <DialogContentText>
-                    {underConstruction
-                      ? "Cancelling frees this site."
-                      : "Selling won't free this site."}
-                  </DialogContentText>
-                )}
+              {facility.hydroSiteId && (
                 <DialogContentText>
-                  You will receive{" "}
-                  {formatMoneyConcise(
-                    facilityCashBack(facility, game.date.minute),
-                  )}
-                  {facility.loanAmountLeft > 0
-                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                    : ""}
-                  .
+                  {underConstruction
+                    ? "Cancelling frees this site."
+                    : "Selling won't free this site."}
                 </DialogContentText>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={toggleDialog} color="primary">
-                  Nevermind
-                </Button>
-                <Button
-                  onClick={() => {
-                    props.onSell(facility.id);
-                    toggleDialog();
-                  }}
-                  color="primary"
-                  variant="contained"
-                  autoFocus
-                >
-                  {underConstruction ? "Cancel construction" : "Sell"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+              )}
+              <DialogContentText>
+                You will receive{" "}
+                {formatMoneyConcise(
+                  facilityCashBack(facility, game.date.minute),
+                )}
+                {facility.loanAmountLeft > 0
+                  ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                  : ""}
+                .
+              </DialogContentText>
+            </ConfirmDialog>
           )}
           {selected && (
             <MemoizedFacilityActions
@@ -785,7 +753,7 @@ export interface StateProps {
   facilityDragActive?: boolean;
   game: GameType;
   // The row the player has open, from the UI slice rather than this component's own state:
-  // Finances and Forecasts read it too, and building a facility unmounts this pane
+  // Insights reads it too, and building a facility unmounts this pane
   selectedFacilityId: number | null;
 }
 
@@ -978,7 +946,7 @@ export default class Facilities extends React.Component<Props> {
                             onCancelRetrofit={this.props.onCancelRetrofit}
                             onSelect={onSelect}
                             selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplierForFacility(
+                            storyOutputMultiplier={storyOutputMultiplier(
                               g,
                               storyEffects,
                             )}

@@ -5,6 +5,7 @@ import {
   DEFAULT_CUSTOM_SCENARIO,
 } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
+import { inEraRate } from "../../data/RetailRates";
 import { LOCATIONS } from "../../Constants";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
@@ -256,6 +257,8 @@ it("does not forecast a facility that is unavailable in the selected year", () =
       scenario={{
         ...DEFAULT_CUSTOM_SCENARIO,
         startingYear: 1980,
+        // An era-scaled rate, so the rate select has a matching option
+        dollarsPerkWh: inEraRate(DEFAULT_CUSTOM_SCENARIO.dollarsPerkWh, 1980),
         facilities: [{ name: "Solar", peakW: 500_000_000 }],
       }}
       onBack={jest.fn()}
@@ -347,7 +350,7 @@ it("scales starting nameplate capacity with starting customers", () => {
 
   const scenario = onStart.mock.calls[0][0];
   expect(scenario.facilities).toEqual([
-    expect.objectContaining({ name: "Natural Gas", peakW: 1000000000 }),
+    expect.objectContaining({ name: "Natural Gas Peaker", peakW: 1000000000 }),
     expect.objectContaining({ name: "Pumped Hydro", peakWh: 500000000 }),
   ]);
 

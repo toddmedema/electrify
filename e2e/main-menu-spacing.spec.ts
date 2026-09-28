@@ -23,7 +23,8 @@ for (const theme of ["light", "dark"]) {
     await expect(primary).toBeVisible();
     await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
     await expect(page.getByText(/free.*no sign.?in required/i)).toHaveCount(0);
-    await expectGap(page.locator(".gameSubtitle"), primary, 16);
+    // The logo carries the one tagline; nothing repeats it above the actions
+    await expect(page.locator(".gameSubtitle")).toHaveCount(0);
     await expectGap(primary, resources, 8);
     await expectGap(resources, discovery, 0);
     const button = await primary.getByRole("button").boundingBox();

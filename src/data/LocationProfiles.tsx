@@ -11,11 +11,14 @@ const US_PRICES: FuelMultipliers = {
 };
 
 // The game has one long, deterministic US price history. These broad landed-price ratios keep
-// that history and its shocks while moving its level to something recognisably regional.
+// that history and its shocks while moving its level to something recognisably regional. The
+// ratios are against the US delivered-to-generator series (EIA MER Table 9.9). Europe's gas
+// multiplier is the long-run ratio of European hub prices (NBP/TTF, 2000-2019) to that series:
+// near parity before the shale boom, 2-2.8x after it.
 const REGION_FUEL_MULTIPLIERS: Record<string, FuelMultipliers> = {
   "North America": US_PRICES,
   "South America": { Coal: 1.05, "Natural Gas": 1.25, Oil: 1.05, Uranium: 1.1 },
-  Europe: { Coal: 1.5, "Natural Gas": 3, Oil: 1.15, Uranium: 1.2 },
+  Europe: { Coal: 1.5, "Natural Gas": 1.7, Oil: 1.15, Uranium: 1.2 },
   Africa: { Coal: 1.05, "Natural Gas": 1.35, Oil: 1.2, Uranium: 1.2 },
   "Middle East": { Coal: 1.7, "Natural Gas": 0.6, Oil: 0.65, Uranium: 1.2 },
   // Caspian gas and Kazakh coal are produced and burned inside the region at administered
@@ -149,6 +152,8 @@ function stateFor(location?: LocationType): string | undefined {
 // Countries that sit at a different level from the region around them, usually because they
 // produce what their neighbours import. Only the fuels named here move; the rest stay regional.
 const COUNTRY_FUEL_OVERRIDES: Record<string, Partial<FuelMultipliers>> = {
+  // Oil-indexed LNG contracts: roughly 3x US delivered gas over 2010-2019 (about $10-16 against
+  // $3-5), nearer parity before the shale boom.
   Japan: { "Natural Gas": 3 },
   Australia: { Coal: 0.6 },
   Indonesia: { Coal: 0.6 },

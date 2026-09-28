@@ -1,6 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "./DateTime";
-import { buildStorySnapshot } from "./Story";
+import { buildStorySnapshot, storyOutputMultiplier } from "./Story";
 import { MonthlyHistoryType } from "../Types";
 import { createGame } from "../testing/Simulator";
 
@@ -19,6 +19,41 @@ function month(index: number): MonthlyHistoryType {
     peakDemandW: index * 1000,
   };
 }
+
+describe("storyOutputMultiplier", () => {
+  const coal = { id: 3, fuel: "Coal" as const };
+
+  it("multiplies the fuel and facility derates", () => {
+    expect(
+      storyOutputMultiplier(coal, {
+        facilityOutputMultipliersByFuel: { Coal: 0.5 },
+        facilityOutputMultipliersById: { "3": 0.5 },
+      }),
+    ).toBe(0.25);
+  });
+
+  it("treats only a missing derate as no limit", () => {
+    expect(storyOutputMultiplier(coal, {})).toBe(1);
+    expect(
+      storyOutputMultiplier(coal, {
+        facilityOutputMultipliersById: { "4": 0 },
+      }),
+    ).toBe(1);
+  });
+
+  it("keeps a multiplier of 0 as a full outage", () => {
+    expect(
+      storyOutputMultiplier(coal, {
+        facilityOutputMultipliersById: { "3": 0 },
+      }),
+    ).toBe(0);
+    expect(
+      storyOutputMultiplier(coal, {
+        facilityOutputMultipliersByFuel: { Coal: 0 },
+      }),
+    ).toBe(0);
+  });
+});
 
 describe("story snapshots", () => {
   it("summarizes only the prior twelve completed months", () => {

@@ -90,6 +90,22 @@ describe("validBuildFacility weather resilience", () => {
   });
 });
 
+describe("validBuildFacility gas cycle", () => {
+  it("accepts either cycle on a gas plant, or none", () => {
+    expect(valid(generator({ gasCycle: "simple" }))).toBe(true);
+    expect(valid(generator({ gasCycle: "combined" }))).toBe(true);
+    expect(valid(generator())).toBe(true);
+  });
+
+  it("rejects an unknown cycle or one on another fuel", () => {
+    expect(valid(generator({ gasCycle: "triple" }))).toBe(false);
+    expect(valid(generator({ gasCycle: 1 }))).toBe(false);
+    expect(valid(generator({ fuel: "Coal", gasCycle: "combined" }))).toBe(
+      false,
+    );
+  });
+});
+
 describe("validRetrofitFacility", () => {
   it("accepts a facility id and a known upgrade", () => {
     expect(
@@ -115,3 +131,16 @@ describe("validRetrofitFacility", () => {
     });
   });
 });
+
+it.each([-1, NaN, Infinity, "daily", null])(
+  "rejects invalid annual start assumptions (%p) in imported build quotes",
+  (assumedStartsPerYear) => {
+    expect(valid(generator({ assumedStartsPerYear }))).toBe(false);
+  },
+);
+it.each([0, 20, 100, 365])(
+  "accepts finite nonnegative annual start assumptions (%p)",
+  (assumedStartsPerYear) => {
+    expect(valid(generator({ assumedStartsPerYear }))).toBe(true);
+  },
+);

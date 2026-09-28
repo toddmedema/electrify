@@ -6,7 +6,9 @@
  * hashed.
  *
  * Every finite number is rounded to 10 significant digits before hashing, so last-bit libm or
- * V8 drift doesn't flake the gate while any real behavior change still moves the hash.
+ * V8 drift doesn't flake the gate while any real behavior change still moves the hash. The
+ * hashes hold on every OS only because simulation code raises powers with helpers/Pow rather
+ * than Math.pow, whose last bit comes from the platform's C library (see docs/perf-plan.md).
  *
  * An intended behavior change: rebaseline with `npm run perf:rebaseline` (which runs
  * `react-scripts test --watchAll=false GoldenOutputs -u`), after all other edits and alongside

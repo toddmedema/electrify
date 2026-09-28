@@ -34,11 +34,11 @@ const decisions: MeaningfulDecisionType[] = [
   {
     key: "asset-build:3",
     lever: "asset-build:3",
-    label: "Build Natural Gas (100MW)",
+    label: "Build Natural Gas Peaker (100MW)",
     month: 3,
     kind: "asset",
     before: "absent",
-    after: "Natural Gas:100000000:financed",
+    after: "Natural Gas Peaker:100000000:financed",
   },
 ];
 
@@ -82,22 +82,22 @@ it("makes the CEO meaningful-decision gate visible with live progress", () => {
     "Progress: 4 of 10 choices · 4 of 4 types",
   );
   expect(screen.getByTestId("meaningful-decision-history")).toHaveTextContent(
-    "Build Natural Gas (100MW) — grid investments",
+    "Build Natural Gas Peaker (100MW) — grid investments",
   );
 });
 
-it("does not add the CEO gate to lower difficulties", () => {
+it("asks lower difficulties for a smaller plan than CEO", () => {
   render(
     <VictoryConditions
       ownership="Public"
       dollarsPerkWh={0.1}
       difficulty="VP"
-      meaningfulDecisions={decisions}
+      meaningfulDecisions={[]}
     />,
   );
-  expect(
-    screen.queryByTestId("meaningful-decision-progress"),
-  ).not.toBeInTheDocument();
+  expect(screen.getByTestId("meaningful-decision-progress")).toHaveTextContent(
+    "Progress: 0 of 4",
+  );
 });
 
 it("shows the one-decision Intern objective and legacy waiver", () => {

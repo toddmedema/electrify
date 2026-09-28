@@ -1,3 +1,4 @@
+import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Button, IconButton, Tooltip } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -8,7 +9,6 @@ import {
   selectMissionRisk,
 } from "../../helpers/MissionStatus";
 import type { MissionRisk } from "../../helpers/MissionStatus";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { TICK_MINUTES } from "../../Constants";
 import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
 import ConceptIcon from "./ConceptIcon";
@@ -38,7 +38,7 @@ function readsProjection(risk: MissionRisk | undefined): boolean {
  * projection, so calling it costs nothing even while the projection is stale.
  */
 function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   if (
     now &&
     now.minute <= game.date.minute &&
@@ -78,7 +78,7 @@ function useMissionRisk(
   const last = React.useRef<{ risk: MissionRisk | undefined }>();
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
   React.useEffect(() => subscribeProjection(landed), []);
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const now = currentTick(game);
   const defer =
     !!now &&
     !!last.current &&
