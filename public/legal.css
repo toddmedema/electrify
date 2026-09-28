@@ -347,6 +347,10 @@ a:hover {
   gap: 0.75rem;
 }
 
+.signup-form__fields .button {
+  white-space: nowrap;
+}
+
 .signup-form__fields input {
   width: 100%;
   min-width: 0;
