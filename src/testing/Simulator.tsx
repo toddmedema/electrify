@@ -134,6 +134,9 @@ export interface SimOptionsType {
   // On by default, like the real game: a decided objective ends the run. Accounting checks that
   // need a fixed horizon regardless of the objective can keep playing, like an unscored sandbox.
   endOnDecidedObjective?: boolean;
+  // Off by default. Physical balance checks that play no operating plan of their own can waive the
+  // term-end decision gate, exactly like a save that predates decision tracking.
+  waiveDecisionGate?: boolean;
   scheduledActions?: ScheduledSimActionType[];
 }
 
@@ -153,6 +156,7 @@ export interface ResolvedSimOptionsType {
   wildfireHazardEnabled: boolean;
   weatherHazardsEnabled: boolean;
   endOnDecidedObjective: boolean;
+  waiveDecisionGate: boolean;
   scheduledActions: ScheduledSimActionType[];
 }
 
@@ -263,6 +267,9 @@ function setUpGame(
   }
   if (!options.weatherHazardsEnabled) {
     state = gameReducer(state, delta({ weatherHazardsDisabled: true }));
+  }
+  if (options.waiveDecisionGate) {
+    state = gameReducer(state, delta({ meaningfulDecisionGateWaived: true }));
   }
   if (options.initialBuild) {
     const build =
@@ -413,6 +420,7 @@ function resolveOptions(
     wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
     weatherHazardsEnabled: options.weatherHazardsEnabled !== false,
     endOnDecidedObjective: options.endOnDecidedObjective !== false,
+    waiveDecisionGate: options.waiveDecisionGate === true,
     scheduledActions: options.scheduledActions || [],
   };
 }

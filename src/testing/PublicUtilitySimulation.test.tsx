@@ -82,6 +82,7 @@ describe("researched public-utility scenarios", () => {
         peakW: 50_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     expect(full.months).toHaveLength(192);
     expect(full.months[0]).toMatchObject({ year: 2020, month: 1 });
@@ -242,6 +243,8 @@ describe("researched public-utility scenarios", () => {
           peakW: 50_000_000,
           financed: true,
         },
+        // Physical winnability of one build; the decision gate is covered by the CEO matrix
+        waiveDecisionGate: true,
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
@@ -275,13 +278,15 @@ describe("researched public-utility scenarios", () => {
       manassas.startingCustomers! * manassas.minimumCustomerRetention!;
     const history = [{ ...EMPTY_HISTORY, customers: required }];
     expect(
-      scenarioObjectiveFailure(manassas, history, "Manager"),
+      scenarioObjectiveFailure(manassas, history, "Manager", [], true),
     ).toBeUndefined();
     expect(
       scenarioObjectiveFailure(
         manassas,
         [{ ...history[0], customers: required - 1 }],
         "Manager",
+        [],
+        true,
       ),
     ).toContain("Customer attrition");
   });
@@ -310,6 +315,8 @@ describe("researched public-utility scenarios", () => {
           peakW: 1_200_000_000,
           financed: true,
         },
+        // Physical winnability of one build; the decision gate is covered by the CEO matrix
+        waiveDecisionGate: true,
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
@@ -326,6 +333,7 @@ describe("researched public-utility scenarios", () => {
         peakW: 40_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     // The same run "completes Data Center Boom on Manager" plays
     const reservePlan = runSimulationOnce({
@@ -336,6 +344,7 @@ describe("researched public-utility scenarios", () => {
         peakW: 50_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     expect(leanPlan.outcome).toBe("completed");
     expect(reservePlan.outcome).toBe("completed");
@@ -353,11 +362,13 @@ describe("researched public-utility scenarios", () => {
         peakW: 1_100_000_000,
         financed: true,
       },
+      waiveDecisionGate: true,
     });
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
       initialBuild: { name: "Oil", peakW: 700_000_000, financed: true },
+      waiveDecisionGate: true,
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");

@@ -3,6 +3,7 @@ import { scenarioObjectiveFailure } from "../reducers/Game";
 import { GameType, MeaningfulDecisionKindType } from "../Types";
 import {
   isMaterialCapacityDecision,
+  MEANINGFUL_DECISION_REQUIREMENTS,
   meaningfulDecisionCategoryCount,
   recordMeaningfulDecision,
   validMeaningfulDecisions,
@@ -148,5 +149,37 @@ describe("meaningful decisions", () => {
       scenarioObjectiveFailure(scenario, [], "CEO", tenDiverse),
     ).toBeFalsy();
     expect(scenarioObjectiveFailure(scenario, [], "CEO", [], true)).toBeFalsy();
+  });
+
+  it("asks for a larger, more varied plan at every step up in difficulty", () => {
+    const scenario = SCENARIOS.find(({ id }) => id === 100)!;
+    const order = ["Intern", "Employee", "Manager", "VP", "CEO"] as const;
+    order.slice(1).forEach((difficulty, index) => {
+      const easier = MEANINGFUL_DECISION_REQUIREMENTS[order[index]];
+      const harder = MEANINGFUL_DECISION_REQUIREMENTS[difficulty];
+      expect(harder.count).toBeGreaterThanOrEqual(easier.count);
+      expect(harder.categories).toBeGreaterThanOrEqual(easier.categories);
+    });
+    // Passive play no longer clears a middle difficulty
+    expect(scenarioObjectiveFailure(scenario, [], "Employee", [])).toContain(
+      "at least one",
+    );
+    expect(
+      scenarioObjectiveFailure(scenario, [], "Employee", choices(1)),
+    ).toBeFalsy();
+    expect(
+      scenarioObjectiveFailure(scenario, [], "Manager", choices(1)),
+    ).toContain("1 of 2");
+    expect(scenarioObjectiveFailure(scenario, [], "VP", choices(4))).toContain(
+      "1 of 2 decision types",
+    );
+    expect(
+      scenarioObjectiveFailure(
+        scenario,
+        [],
+        "VP",
+        choices(4, ["asset", "rate"]),
+      ),
+    ).toBeFalsy();
   });
 });

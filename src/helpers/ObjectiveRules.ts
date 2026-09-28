@@ -5,11 +5,10 @@ import {
   ScenarioType,
 } from "../Types";
 import {
-  CEO_MEANINGFUL_CATEGORIES_REQUIRED,
-  CEO_MEANINGFUL_DECISIONS_REQUIRED,
-  INTERN_MEANINGFUL_DECISIONS_REQUIRED,
   meaningfulDecisionCategoryCount,
+  meaningfulDecisionRequirement,
 } from "./MeaningfulDecisions";
+import { DIFFICULTY_LABELS } from "../Constants";
 import {
   bestReachableCustomers,
   CUSTOMER_MARKET_MULTIPLIER,
@@ -161,20 +160,17 @@ export function scenarioObjectiveFailure(
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the customers you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
     }
   }
-  if (!scenario.tutorialSteps && !decisionGateWaived) {
+  const gate = difficulty && meaningfulDecisionRequirement(difficulty);
+  if (!scenario.tutorialSteps && !decisionGateWaived && gate) {
+    const categories = meaningfulDecisionCategoryCount(meaningfulDecisions);
     if (
-      difficulty === "Intern" &&
-      meaningfulDecisions.length < INTERN_MEANINGFUL_DECISIONS_REQUIRED
+      meaningfulDecisions.length < gate.count ||
+      categories < gate.categories
     ) {
-      return "Make at least one meaningful decision that changes the grid or its economics.";
-    }
-    if (
-      difficulty === "CEO" &&
-      (meaningfulDecisions.length < CEO_MEANINGFUL_DECISIONS_REQUIRED ||
-        meaningfulDecisionCategoryCount(meaningfulDecisions) <
-          CEO_MEANINGFUL_CATEGORIES_REQUIRED)
-    ) {
-      return `You made ${meaningfulDecisions.length} of ${CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions across ${meaningfulDecisionCategoryCount(meaningfulDecisions)} of ${CEO_MEANINGFUL_CATEGORIES_REQUIRED} decision types; CEO difficulty requires a varied operating plan.`;
+      if (gate.count === 1) {
+        return "Make at least one meaningful decision that changes the grid or its economics.";
+      }
+      return `You made ${meaningfulDecisions.length} of ${gate.count} meaningful decisions across ${categories} of ${gate.categories} decision ${gate.categories === 1 ? "type" : "types"}; ${DIFFICULTY_LABELS[difficulty!] ?? difficulty} difficulty requires ${gate.categories > 1 ? "a varied" : "an active"} operating plan.`;
     }
   }
   return undefined;
