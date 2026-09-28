@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { GameType, ScoreCategoryType } from "../../Types";
+import { DIFFICULTY_LABELS } from "../../Constants";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -83,7 +84,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
       value: `${scenario.startingYear}â€“${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
     },
     ...(location ? [{ label: "Location", value: location.name }] : []),
-    { label: "Difficulty", value: game.difficulty },
+    { label: "Difficulty", value: DIFFICULTY_LABELS[game.difficulty] },
     { label: "Ownership", value: `${scenario.ownership}-owned` },
   ];
 

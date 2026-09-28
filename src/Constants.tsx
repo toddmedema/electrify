@@ -56,13 +56,33 @@ export const DIFFICULTIES = {
   },
 } satisfies Record<DifficultyType, DifficultyMultipliersType>;
 
-export const DIFFICULTY_LABELS: Record<string, string> = {
+// Every difficulty, easiest first, which is the order the pickers offer them in
+export const DIFFICULTY_IDS: readonly DifficultyType[] = [
+  "Intern",
+  "Employee",
+  "Manager",
+  "VP",
+  "CEO",
+];
+
+// What players see: the IDs are job titles kept for saves and the leaderboard
+export const DIFFICULTY_LABELS: Record<DifficultyType, string> = {
   Intern: "Beginner",
   Employee: "Easy",
   Manager: "Medium",
   VP: "Hard",
   CEO: "Expert",
 };
+
+/**
+ * The label for a difficulty ID that may have come from outside the game, such as a leaderboard
+ * row, falling back to the raw ID rather than rendering blank.
+ */
+export function difficultyLabel(difficulty: string): string {
+  return (
+    (DIFFICULTY_LABELS as Record<string, string>)[difficulty] || difficulty
+  );
+}
 
 export const LOCATIONS = {
   PIT: {

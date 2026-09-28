@@ -19,7 +19,6 @@ import {
   TableRow,
   TextField,
   Toolbar,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -32,7 +31,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
 import InfoDialog from "../base/InfoDialog";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
@@ -742,33 +741,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   <TableCell>
                     {/* Difficulty lives on the game rather than the scenario, the same way it does
                     on the scenario details screen */}
-                    <Select
+                    <DifficultyPicker
                       id="difficulty"
-                      inputProps={{ "aria-label": "Difficulty" }}
+                      variant="select"
                       value={game.difficulty}
-                      onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                        onDelta({
-                          difficulty: e.target.value as DifficultyType,
-                        })
-                      }
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => {
-                          return (
-                            <MenuItem value={d} key={d}>
-                              <Tooltip
-                                title={DIFFICULTIES[d].description}
-                                placement="right"
-                              >
-                                <span>
-                                  {DIFFICULTY_LABELS[d as DifficultyType]}
-                                </span>
-                              </Tooltip>
-                            </MenuItem>
-                          );
-                        },
-                      )}
-                    </Select>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>

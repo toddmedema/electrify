@@ -284,7 +284,7 @@ export interface ScoreType {
   scenarioId: number;
   score: number;
   scoreBreakdown: ScoreBreakdownType;
-  difficulty: string;
+  difficulty: DifficultyType;
   // A FieldValue on the way out (serverTimestamp() is resolved by Firestore, not by us) and a
   // Timestamp on the way back in
   date: Timestamp | FieldValue;

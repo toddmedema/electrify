@@ -19,8 +19,6 @@ import {
   TableRow,
   Toolbar,
   Typography,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import InfoIcon from "@mui/icons-material/Info";
@@ -28,7 +26,8 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditionsDialog from "../base/VictoryConditionsDialog";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
+import { DIFFICULTY_LABELS, difficultyLabel } from "../../Constants";
+import DifficultyPicker from "../base/DifficultyPicker";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -36,7 +35,6 @@ import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
   ChallengeInvitationV1,
-  DifficultyType,
   GameType,
   LocationType,
   ReplayType,
@@ -45,10 +43,6 @@ import {
 } from "../../Types";
 
 import { formatScore } from "../../helpers/Format";
-
-function formatDifficulty(difficulty: string): string {
-  return DIFFICULTY_LABELS[difficulty] || difficulty;
-}
 
 export interface StateProps {
   challenge?: ChallengeInvitationV1;
@@ -442,38 +436,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   </div>
                 ) : (
                   <div className="difficultyPicker">
-                    <ToggleButtonGroup
-                      exclusive
+                    <DifficultyPicker
+                      variant="toggle"
+                      showDescription
                       value={game.difficulty}
-                      size="small"
-                      color="primary"
-                      aria-label="Difficulty"
-                      onChange={(_event, difficulty: DifficultyType | null) => {
-                        if (difficulty) {
-                          onDelta({ difficulty });
-                        }
-                      }}
-                    >
-                      {(Object.keys(DIFFICULTIES) as DifficultyType[]).map(
-                        (d) => (
-                          <ToggleButton
-                            value={d}
-                            key={d}
-                            title={DIFFICULTIES[d].description}
-                            aria-label={DIFFICULTY_LABELS[d]}
-                          >
-                            {DIFFICULTY_LABELS[d]}
-                          </ToggleButton>
-                        ),
-                      )}
-                    </ToggleButtonGroup>
-                    <Typography
-                      className="difficultyDescription"
-                      variant="body2"
-                      color="textSecondary"
-                    >
-                      {DIFFICULTIES[game.difficulty].description}
-                    </Typography>
+                      onChange={(difficulty) => onDelta({ difficulty })}
+                    />
                   </div>
                 )}
                 <Button
@@ -534,7 +502,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       <TableCell>{formatScore(myTopScore.score)}</TableCell>
                       {leaderboardExpanded && (
                         <TableCell>
-                          {formatDifficulty(myTopScore.difficulty)}
+                          {difficultyLabel(myTopScore.difficulty)}
                         </TableCell>
                       )}
                       {this.renderReplayCell(myTopScore)}
@@ -583,7 +551,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           <TableCell>{formatScore(score.score)}</TableCell>
                           {leaderboardExpanded && (
                             <TableCell>
-                              {formatDifficulty(score.difficulty)}
+                              {difficultyLabel(score.difficulty)}
                             </TableCell>
                           )}
                           {this.renderReplayCell(score)}
