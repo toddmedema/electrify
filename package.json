@@ -108,7 +108,37 @@
       ],
       "no-var": "error",
       "prefer-const": "error"
-    }
+    },
+    "overrides": [
+      {
+        "files": [
+          "src/data/**",
+          "src/helpers/**",
+          "src/reducers/**",
+          "src/SaveGame.tsx"
+        ],
+        "excludedFiles": [
+          "*.test.*"
+        ],
+        "rules": {
+          "no-restricted-properties": [
+            "error",
+            {
+              "object": "Math",
+              "property": "pow",
+              "message": "Math.pow's last bit depends on the platform's C library. Use pow from helpers/Pow so simulations replay identically everywhere."
+            }
+          ],
+          "no-restricted-syntax": [
+            "error",
+            {
+              "selector": "BinaryExpression[operator='**'][right.type!='Literal'][right.type!='UnaryExpression'], AssignmentExpression[operator='**=']",
+              "message": "** with a computed exponent calls the platform's C pow. Use pow from helpers/Pow so simulations replay identically everywhere."
+            }
+          ]
+        }
+      }
+    ]
   },
   "browserslist": {
     "production": [

@@ -1,5 +1,6 @@
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
+import { pow } from "../helpers/Pow";
 
 // Rates only move with the calendar month, so this asks for just that rather than a whole
 // DateType. A DateType satisfies it, so callers holding one pass it straight through - and the
@@ -257,9 +258,8 @@ function getCycle(month: number, seed: number): CycleType {
           CYCLE_MAX_MONTHS,
         ),
       ),
-      primePeak: BASE_PRIME + (MAX_PRIME - BASE_PRIME) * Math.pow(peakDraw, 3),
-      primeTrough:
-        BASE_PRIME - (BASE_PRIME - MIN_PRIME) * Math.pow(troughDraw, 2),
+      primePeak: BASE_PRIME + (MAX_PRIME - BASE_PRIME) * pow(peakDraw, 3),
+      primeTrough: BASE_PRIME - (BASE_PRIME - MIN_PRIME) * pow(troughDraw, 2),
     });
   }
   for (let i = cycles.length - 1; i >= 0; i--) {

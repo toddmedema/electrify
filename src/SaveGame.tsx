@@ -58,6 +58,7 @@ import {
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
+import { pow } from "./helpers/Pow";
 
 /**
  * Saving and restoring a game.
@@ -135,9 +136,8 @@ function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
   );
   if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
   return (
-    Math.abs(
-      capacityW / (corridorW * Math.pow(INTERTIE_UPGRADE_STEP, steps)) - 1,
-    ) <= 1e-9
+    Math.abs(capacityW / (corridorW * pow(INTERTIE_UPGRADE_STEP, steps)) - 1) <=
+    1e-9
   );
 }
 

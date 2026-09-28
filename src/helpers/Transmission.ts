@@ -37,6 +37,7 @@ import {
   TransmissionCorridorDefinitionType,
   TransmissionLineOperatingType,
 } from "../Types";
+import { pow } from "./Pow";
 
 export interface TransmissionConditions {
   temperatureC: number;
@@ -520,7 +521,7 @@ export function corridorConstructionKgco2e(
   const costPerW = corridor.buildCost / corridor.capacityW;
   const perW =
     INTERTIE_CONSTRUCTION_KGCO2E_PER_W *
-    Math.pow(
+    pow(
       costPerW / INTERTIE_CONSTRUCTION_REFERENCE_COST_PER_W,
       INTERTIE_CONSTRUCTION_COST_EXPONENT,
     ) *
@@ -638,10 +639,7 @@ export function intertieUpgradeQuote(
     buildCost,
     annualOperatingCost:
       line.annualOperatingCost *
-      Math.pow(
-        targetCapacityW / line.capacityW,
-        INTERTIE_UPGRADE_OPEX_EXPONENT,
-      ),
+      pow(targetCapacityW / line.capacityW, INTERTIE_UPGRADE_OPEX_EXPONENT),
     yearsToBuild:
       corridor.yearsToBuild * INTERTIE_UPGRADE_TIME_SHARE * buildTimeMultiplier,
     // The same per-watt intensity as the corridor itself, charged on the watts being added.

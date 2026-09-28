@@ -21,6 +21,7 @@ import {
 } from "./FacilitySites";
 import { resolveStoryAtDate } from "./WorldEvents";
 import { applyDefaultResilience } from "../helpers/Hazards";
+import { pow } from "../helpers/Pow";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -48,8 +49,8 @@ function getCostInflation(state: GameType): number {
 // become a historical bargain.
 function offshoreEraMultiple(year: number): number {
   return year <= 2010
-    ? Math.max(1.64, 1.82 * Math.pow(2, (year - 2010) / 9))
-    : 1.82 * Math.pow(2, (2010 - year) / 15);
+    ? Math.max(1.64, 1.82 * pow(2, (year - 2010) / 9))
+    : 1.82 * pow(2, (2010 - year) / 15);
 }
 
 // EIA's 2020 capital-cost study is in 2019 dollars and its AEO 2025 study is in 2023
@@ -164,7 +165,7 @@ function windCostPerW(year: number): number {
   if (year < 2020) {
     // Preserve the established long-run historical learning curve, but anchor it to IRENA's
     // inflation-normalized 2020 observation.
-    return cost2020 * Math.pow(3, (2020 - year) / 40);
+    return cost2020 * pow(3, (2020 - year) / 40);
   }
   if (year <= 2024) {
     return costBetween(year, 2020, cost2020, 2024, 1.041);
@@ -177,7 +178,7 @@ function windCostPerW(year: number): number {
 function solarCostPerW(year: number): number {
   const cost2020 = 0.883 * CPI_2020_TO_2024;
   if (year < 2020) {
-    return cost2020 * Math.pow(2, (2020 - year) / 8);
+    return cost2020 * pow(2, (2020 - year) / 8);
   }
   if (year <= 2024) {
     return costBetween(year, 2020, cost2020, 2024, 0.691);
@@ -207,7 +208,7 @@ export function airborneWindCostPerW(year: number): number {
 }
 
 export function airborneWindMaxPeakW(year: number): number {
-  return Math.min(500000000, 1200000 * Math.pow(2, (year - 2028) / 2));
+  return Math.min(500000000, 1200000 * pow(2, (year - 2028) / 2));
 }
 
 export function GENERATORS(
@@ -268,7 +269,7 @@ export function GENERATORS(
   );
   const enhancedGeothermalCostPerW = Math.max(
     3,
-    5.5 * Math.pow(3 / 5.5, (year - 2028) / 7),
+    5.5 * pow(3 / 5.5, (year - 2028) / 7),
   );
 
   // Calculate intermittent generator capacity factors (here instead of passed in, since may eventually have different capacity factors
@@ -508,10 +509,7 @@ export function GENERATORS(
       // quarter fixed and three quarters variable makes small farms appropriately expensive.
       // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
       peakW,
-      maxPeakW: Math.min(
-        1500000000,
-        5000000 * Math.pow(2, (year - 1991) / 3.5),
-      ),
+      maxPeakW: Math.min(1500000000, 5000000 * pow(2, (year - 1991) / 3.5)),
       // Largest projects roughly doubled every 3.5 years from Vindeby through Hornsea, then
       // levelled near 1.5GW; Dogger Bank's 3.6GW is three separately phased farms.
       // https://en.wikipedia.org/wiki/List_of_offshore_wind_farms
@@ -722,7 +720,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       // ATB and EIA AEO2025, replacing the old Powerpack-derived 1.25-hour assumption.
       peakWh,
       maxPeakWh:
-        (year < 2021 ? 200000000 : 600000000) * Math.pow(2, (year - 2018) / 4),
+        (year < 2021 ? 200000000 : 600000000) * pow(2, (year - 2018) / 4),
       // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
       // ~2021 largest will be 1.2GWh - https://cleantechnica.com/2020/02/27/humongous-tesla-battery-plant-approved-in-california-is-10x-bigger-than-worlds-biggest-battery-plant/
       // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion

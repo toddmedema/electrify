@@ -6,6 +6,7 @@ import {
 } from "../Constants";
 import { getInflationIndex } from "../data/Economy";
 import { DateType } from "../Types";
+import { pow } from "./Pow";
 
 /** A new investor starts with half of the customers it could eventually serve. */
 export const CUSTOMER_MARKET_MULTIPLIER = 2;
@@ -50,7 +51,7 @@ export function updateCustomerRate(
   if (tickScale === 1) {
     return previousRate + (currentRate - previousRate) / ticksOfMemory;
   }
-  const retained = Math.pow(1 - 1 / ticksOfMemory, tickScale);
+  const retained = pow(1 - 1 / ticksOfMemory, tickScale);
   return previousRate + (currentRate - previousRate) * (1 - retained);
 }
 
@@ -107,9 +108,7 @@ export function customerMarketSizeAt(
   minute: number,
 ): number {
   const elapsedYears = minute / TICK_MINUTES / TICKS_PER_YEAR;
-  return (
-    startingMarketSize * Math.pow(1 + ORGANIC_GROWTH_MAX_ANNUAL, elapsedYears)
-  );
+  return startingMarketSize * pow(1 + ORGANIC_GROWTH_MAX_ANNUAL, elapsedYears);
 }
 
 export interface CustomerProjectionInputType {

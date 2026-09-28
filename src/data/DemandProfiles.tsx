@@ -6,6 +6,7 @@ import {
   ScenarioLoadAdditionType,
 } from "../Types";
 import { DAYS_PER_YEAR } from "../Constants";
+import { pow } from "../helpers/Pow";
 
 export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
   "Residential",
@@ -235,7 +236,7 @@ function interpolate(
   const [lastYear, lastValue] = points[points.length - 1];
   // Long-range uncertainty is high. Taper the post-2035 curve and keep one category from taking
   // over the whole grid even in century-long sandbox games.
-  return Math.min(0.2, lastValue * Math.pow(1.02, year - lastYear));
+  return Math.min(0.2, lastValue * pow(1.02, year - lastYear));
 }
 
 /** Fraction of local demand represented by data centers before the other sector trends apply. */
@@ -403,7 +404,7 @@ export function temperatureDemandWattsPerCustomer(
 function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
   const hour = minuteOfDay / 60;
   const peak = (at: number, width: number) =>
-    Math.exp(-Math.pow(hour - at, 2) / (2 * width * width));
+    Math.exp(-pow(hour - at, 2) / (2 * width * width));
   switch (type) {
     case "Residential":
       return 0.65 + 0.45 * peak(7, 1.8) + 0.75 * peak(19, 2.5);
@@ -496,7 +497,7 @@ export function demandByTypeAt(
       (baselineDemandW *
         startingWeights[type] *
         shape *
-        Math.pow(1 + growth[type], years)) /
+        pow(1 + growth[type], years)) /
       shapedStartingTotal;
   });
   if (years === 0) {
