@@ -59,7 +59,7 @@ async function startSeededLosAngelesGame(
   // would spend its first months in blackout noise. Add a matching plant to keep the grid stable;
   // ignition timing is fleet-independent, so the pinned seed still holds.
   await page.getByRole("combobox", { name: "Facility type" }).click();
-  await page.getByRole("option", { name: "Natural Gas" }).click();
+  await page.getByRole("option", { name: "Natural Gas Peaker" }).click();
   await page.getByRole("button", { name: "Add facility" }).click();
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
   await expect(outlook).toContainText("Demand covered", { timeout: 20_000 });

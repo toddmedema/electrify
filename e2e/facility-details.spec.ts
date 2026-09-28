@@ -23,7 +23,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       );
 
       // Hydro exercises long captions; gas adds upkeep/start costs; storage has charge/cycles.
-      for (const name of ["Hydro", "Natural Gas", "Battery"]) {
+      for (const name of ["Hydro", "Natural Gas CC", "Battery"]) {
         const row = facilities.locator(".facilityRow").filter({
           has: page.locator(".facilityName", {
             hasText: new RegExp(`^${name}$`),
@@ -119,7 +119,7 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
   const facilities = page.locator(".facilities:visible");
   await expect(facilities).toBeVisible();
   const row = facilities.locator(".facilityRow").filter({
-    has: page.locator(".facilityName", { hasText: /^Natural Gas$/ }),
+    has: page.locator(".facilityName", { hasText: /^Natural Gas CC$/ }),
   });
   await row.locator(".facilityDisclosure").click();
   const grid = row.locator(".facilityStats").first();

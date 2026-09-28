@@ -87,7 +87,7 @@ describe("a custom game", () => {
       scenario: {
         ...CUSTOM,
         facilities: [
-          { name: "Natural Gas", peakW: 100000000 },
+          { name: "Natural Gas Peaker", peakW: 100000000 },
           { name: "Coal", peakW: 200000000 },
           { name: "Pumped Hydro", peakWh: 500000000 },
         ],
@@ -95,7 +95,7 @@ describe("a custom game", () => {
     });
 
     expect(state.facilities.map((facility) => facility.name)).toEqual([
-      "Natural Gas",
+      "Natural Gas Peaker",
       "Coal",
       "Pumped Hydro",
     ]);
@@ -267,7 +267,7 @@ describe("a custom game", () => {
         feePerKgCO2e: 530 / 1000,
         // Enough firm capacity that this weather-projection test is not cut short by the real
         // game's chronic-blackout firing rule, which the simulator also enforces.
-        facilities: [{ name: "Natural Gas", peakW: 500000000 }],
+        facilities: [{ name: "Natural Gas Peaker", peakW: 500000000 }],
       } as ScenarioType,
     });
 

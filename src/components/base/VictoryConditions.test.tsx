@@ -34,11 +34,11 @@ const decisions: MeaningfulDecisionType[] = [
   {
     key: "asset-build:3",
     lever: "asset-build:3",
-    label: "Build Natural Gas (100MW)",
+    label: "Build Natural Gas Peaker (100MW)",
     month: 3,
     kind: "asset",
     before: "absent",
-    after: "Natural Gas:100000000:financed",
+    after: "Natural Gas Peaker:100000000:financed",
   },
 ];
 
@@ -82,7 +82,7 @@ it("makes the CEO meaningful-decision gate visible with live progress", () => {
     "Progress: 4 of 10 choices · 4 of 4 types",
   );
   expect(screen.getByTestId("meaningful-decision-history")).toHaveTextContent(
-    "Build Natural Gas (100MW) — grid investments",
+    "Build Natural Gas Peaker (100MW) — grid investments",
   );
 });
 

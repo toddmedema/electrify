@@ -26,8 +26,13 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("tablist", { name: "Build categories" }),
     ).toHaveCount(0);
-    await expect(page.locator(".buildOption")).toHaveCount(3);
-    for (const name of ["Natural Gas", "Solar", "Wind"]) {
+    await expect(page.locator(".buildOption")).toHaveCount(4);
+    for (const name of [
+      "Natural Gas Peaker",
+      "Natural Gas CC",
+      "Solar",
+      "Wind",
+    ]) {
       await expect(
         page.getByRole("button", { name: `Show ${name} details` }),
       ).toBeVisible();
@@ -37,7 +42,7 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`choices-${theme}.png`),
     });
     await page
-      .getByRole("button", { name: "Show Natural Gas details" })
+      .getByRole("button", { name: "Show Natural Gas Peaker details" })
       .click();
     const details = page.locator(".generatorDetails");
     await expect(details).toBeVisible();

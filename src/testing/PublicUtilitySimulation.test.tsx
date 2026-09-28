@@ -37,7 +37,7 @@ describe("researched public-utility scenarios", () => {
     expect(
       state.facilities.find((facility) => facility.fuel === "Natural Gas")
         ?.name,
-    ).toBe("Natural Gas");
+    ).toBe("Natural Gas Peaker");
     expect(
       state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
     ).toBe(true);
@@ -78,7 +78,7 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 106,
       difficulty: "Employee",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 50_000_000,
         financed: true,
       },
@@ -96,7 +96,7 @@ describe("researched public-utility scenarios", () => {
     const base: ScenarioType = {
       id: CUSTOM_SCENARIO_ID,
       name: "Demand calibration fixture",
-      icon: "natural gas",
+      icon: "natural gas peaker",
       locationId: "SF",
       location: LOCATIONS.SF,
       ownership: "Public",
@@ -239,7 +239,7 @@ describe("researched public-utility scenarios", () => {
         scenarioId: 106,
         difficulty,
         initialBuild: {
-          name: "Natural Gas",
+          name: "Natural Gas Peaker",
           peakW: 50_000_000,
           financed: true,
         },
@@ -311,7 +311,7 @@ describe("researched public-utility scenarios", () => {
         scenarioId: 107,
         difficulty,
         initialBuild: {
-          name: "Natural Gas",
+          name: "Natural Gas Peaker",
           peakW: 1_200_000_000,
           financed: true,
         },
@@ -329,7 +329,7 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 40_000_000,
         financed: true,
       },
@@ -340,7 +340,7 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 50_000_000,
         financed: true,
       },
@@ -358,7 +358,7 @@ describe("researched public-utility scenarios", () => {
       scenarioId: 107,
       difficulty: "Manager",
       initialBuild: {
-        name: "Natural Gas",
+        name: "Natural Gas Peaker",
         peakW: 1_100_000_000,
         financed: true,
       },
@@ -379,7 +379,7 @@ describe("researched public-utility scenarios", () => {
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");
-    expect(gasPlan.builds[0].name).toBe("Natural Gas");
+    expect(gasPlan.builds[0].name).toBe("Natural Gas Peaker");
     expect(oilPlan.builds[0].name).toBe("Oil");
   });
 });

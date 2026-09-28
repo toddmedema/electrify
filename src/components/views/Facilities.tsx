@@ -498,6 +498,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           {...provided.draggableProps}
           className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           data-fuel={fuel}
+          data-facility={facility.name}
           style={getDraggableStyle(provided.draggableProps.style)}
         >
           <div

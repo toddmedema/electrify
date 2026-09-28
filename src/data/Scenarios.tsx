@@ -220,7 +220,7 @@ export const SCENARIOS: ScenarioType[] = [
   {
     id: 1,
     name: "Mission 2: Generators",
-    icon: "natural gas",
+    icon: "natural gas peaker",
     summary: "Build a generator",
     locationId: "SF",
     ownership: "Investor",
@@ -808,7 +808,13 @@ export const SCENARIOS: ScenarioType[] = [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
       // much nameplate to create observable daytime surplus after customer demand.
       { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
-      { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 12 },
+      // A peaker, the backup the tutorial pauses and restores
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 500000000,
+        initialAgeYears: 12,
+      },
     ],
     tutorialSteps: [
       {
@@ -890,11 +896,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        target: '[data-facility="Natural Gas Peaker"] .facilityDisclosure',
         advanceOn: (s: AppStateType) =>
           s.ui.selectedFacilityId ===
           s.game.facilities.find(
-            (facility) => "fuel" in facility && facility.fuel === "Natural Gas",
+            (facility) => facility.name === "Natural Gas Peaker",
           )?.id,
         action: "Tap the gas plant",
         content: (
@@ -903,13 +909,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[aria-label="Pause Natural Gas"]',
+        target: '[aria-label="Pause Natural Gas Peaker"]',
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some(
             (facility) =>
-              "fuel" in facility &&
-              facility.fuel === "Natural Gas" &&
-              facility.paused,
+              facility.name === "Natural Gas Peaker" && facility.paused,
           ),
         action: "Tap Pause on the gas plant",
         content: (
@@ -990,11 +994,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        target: '[data-facility="Natural Gas Peaker"] .facilityDisclosure',
         action: "Restore your gas backup",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some(
-            (f) => "fuel" in f && f.fuel === "Natural Gas" && !f.paused,
+            (f) => f.name === "Natural Gas Peaker" && !f.paused,
           ),
         content: (
           <TutorialPrompt text="Open the gas plant and resume it before running time. Keep Solar on too." />
@@ -1041,7 +1045,13 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.11, // 0.6 x EIA 2020 CA average retail, 18.0 cents
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      // California's 2010-vintage gas was mostly combined cycle
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 10,
+      },
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
     ],
   },
@@ -1142,7 +1152,13 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      // 1990-vintage island combustion turbines
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 10,
+      },
       { fuel: "Coal", peakW: 100000000, initialAgeYears: 30 },
     ],
   },
@@ -1215,6 +1231,7 @@ export const SCENARIOS: ScenarioType[] = [
     feePerKgCO2e: 0,
     facilities: [
       {
+        name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 75000000,
         initialAgeYears: 0,
@@ -1283,7 +1300,9 @@ export const SCENARIOS: ScenarioType[] = [
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
     // share with wind; the published 3,827 MW total is unchanged.
     facilities: [
-      { fuel: "Natural Gas", peakW: 1497000000 },
+      // Sand Hill's combined cycle, Decker's steam units and both sites' peakers, grouped as the
+      // combined cycle that carries the portfolio's mid-merit gas role
+      { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 1497000000 },
       { fuel: "Coal", peakW: 700000000 },
       { fuel: "Uranium", peakW: 430000000 },
       { fuel: "Wind", peakW: 1200000000 },
@@ -1347,7 +1366,12 @@ export const SCENARIOS: ScenarioType[] = [
       },
       { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
       { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
-      { fuel: "Natural Gas", peakW: 263160000, initialAgeYears: 12 },
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 263160000,
+        initialAgeYears: 12,
+      },
       { fuel: "Uranium", peakW: 71170000, initialAgeYears: 30 },
       // 1% of national storage power, represented as a four-hour equivalent.
       { name: "Battery", peakWh: 134240000, initialAgeYears: 3 },
@@ -1407,7 +1431,13 @@ export const SCENARIOS: ScenarioType[] = [
       },
       { fuel: "Wind", peakW: 250000000, initialAgeYears: 6 },
       { fuel: "Sun", peakW: 200000000, initialAgeYears: 5 },
-      { fuel: "Natural Gas", peakW: 50000000, initialAgeYears: 15 },
+      // France keeps its few gas turbines as reserve
+      {
+        name: "Natural Gas Peaker",
+        fuel: "Natural Gas",
+        peakW: 50000000,
+        initialAgeYears: 15,
+      },
       { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
     ],
     endTitle: "Reserve proved its value",
@@ -1452,7 +1482,9 @@ export const SCENARIOS: ScenarioType[] = [
     // resources using its 2024 power-content mix as the portfolio anchor.
     // https://www.ladwp.com/who-we-are/power-system/power-content-label
     facilities: [
+      // LADWP's in-basin gas stations were largely repowered as combined cycles
       {
+        name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 24240000,
         initialAgeYears: 18,
@@ -1692,7 +1724,13 @@ export const SCENARIOS: ScenarioType[] = [
     // and allocated solar that had been built by then.
     facilities: [
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
-      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 15 },
+      // Delhi's gas stations (Pragati, Bawana) are combined cycles
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 200000000,
+        initialAgeYears: 15,
+      },
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 4 },
       { fuel: "Wind", peakW: 30000000, initialAgeYears: 7 },
       { name: "Battery", peakWh: 40000000, initialAgeYears: 1 },
@@ -1760,5 +1798,8 @@ export const DEFAULT_CUSTOM_SCENARIO: ScenarioType = {
   dollarsPerkWh: 0.07,
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,
-  facilities: [{ name: "Natural Gas", peakW: 500000000 }],
+  // A peaker because a custom game can start before combined cycles were built
+  facilities: [
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 500000000 },
+  ],
 };

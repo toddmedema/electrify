@@ -27,7 +27,7 @@ test("generator capstone completes immediately after a different second purchase
   await page.locator(".button-buildFacility").click();
   await page
     .getByRole("button", {
-      name: "Review purchase of Natural Gas",
+      name: "Review purchase of Natural Gas Peaker",
       exact: true,
     })
     .click();

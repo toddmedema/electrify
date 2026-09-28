@@ -25,6 +25,7 @@ import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import {
+  validGasCycle,
   validResilienceRecord,
   validUpgradeInProgress,
 } from "./helpers/BuildValidation";
@@ -440,6 +441,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
           )) ||
         optionalBooleansInvalid ||
         !validResilienceRecord(current.fuel, current.resilience) ||
+        !validGasCycle(current.fuel, current.gasCycle) ||
         !validUpgradeInProgress(current.upgradeInProgress)
       );
     }) ||

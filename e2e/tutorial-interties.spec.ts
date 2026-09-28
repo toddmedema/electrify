@@ -109,11 +109,13 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(
     page.getByRole("heading", { name: "Step 9 of 19" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Inspect Natural Gas" }).click();
+  await page
+    .getByRole("button", { name: "Inspect Natural Gas Peaker" })
+    .click();
   await expect(
-    page.getByRole("button", { name: "Pause Natural Gas" }),
+    page.getByRole("button", { name: "Pause Natural Gas Peaker" }),
   ).toHaveClass(/tutorialTarget/);
-  await page.getByRole("button", { name: "Pause Natural Gas" }).click();
+  await page.getByRole("button", { name: "Pause Natural Gas Peaker" }).click();
   await expect(
     page.getByRole("heading", { name: "Step 11 of 19" }),
   ).toBeVisible();
@@ -226,9 +228,13 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(
     page.getByRole("heading", { name: "Step 18 of 19" }),
   ).toBeVisible();
-  const gas = facilities.getByRole("button", { name: "Inspect Natural Gas" });
+  const gas = facilities.getByRole("button", {
+    name: "Inspect Natural Gas Peaker",
+  });
   if ((await gas.getAttribute("aria-expanded")) !== "true") await gas.click();
-  await facilities.getByRole("button", { name: "Resume Natural Gas" }).click();
+  await facilities
+    .getByRole("button", { name: "Resume Natural Gas Peaker" })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Your turn 19 of 19" }),
   ).toBeVisible();

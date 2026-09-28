@@ -58,7 +58,7 @@ describe("forecastCustomGameYearOne", () => {
     const supplied = forecastCustomGameYearOne(
       {
         ...DEFAULT_CUSTOM_SCENARIO,
-        facilities: [{ name: "Natural Gas", peakW: 2_000_000_000 }],
+        facilities: [{ name: "Natural Gas Peaker", peakW: 2_000_000_000 }],
       },
       "Intern",
       1234,

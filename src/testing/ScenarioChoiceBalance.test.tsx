@@ -126,7 +126,7 @@ describe("major scenario choice balance", () => {
           scenarioId: 107,
           difficulty,
           ...play,
-          initialBuild: { name: "Natural Gas", peakW, financed: true },
+          initialBuild: { name: "Natural Gas Peaker", peakW, financed: true },
           scenarioResponses: { [decision.id]: optionId },
         });
       const smallW = difficulty === "CEO" ? 300_000_000 : 100_000_000;
@@ -168,7 +168,11 @@ describe("major scenario choice balance", () => {
             {
               month: difficulty === "CEO" ? 60 : 72,
               type: "build",
-              build: { name: "Natural Gas", peakW: 50_000_000, financed: true },
+              build: {
+                name: "Natural Gas Peaker",
+                peakW: 50_000_000,
+                financed: true,
+              },
             },
           ],
         });
