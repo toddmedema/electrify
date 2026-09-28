@@ -46,7 +46,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 2,
     sellAtMonth: 37,
     scheduledActions: [
-      rate(0.08),
+      rate(0.1),
       ...line("california-north"),
       ...dispatch([1, 3]),
       { month: 36, type: "toggle", facilityId: 2 },
@@ -90,7 +90,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 1,
     sellAtMonth: 39,
     scheduledActions: [
-      rate(0.08),
+      rate(0.11),
       {
         month: 1,
         type: "build",
@@ -110,7 +110,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 1,
     sellAtMonth: 110,
     scheduledActions: [
-      rate(0.08),
+      rate(0.12),
       ...dispatch([1, 2, 3, 4]),
       { month: 109, type: "toggle", facilityId: 1 },
       ...programs(238),
@@ -121,7 +121,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 3,
     sellAtMonth: 39,
     scheduledActions: [
-      rate(0.085),
+      rate(0.1),
       ...dispatch([1, 2, 3, 4]),
       { month: 38, type: "toggle", facilityId: 3 },
       ...programs(142),
@@ -132,7 +132,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 2,
     sellAtMonth: 191,
     scheduledActions: [
-      rate(0.101),
+      rate(0.12),
       // The binding data-center connection is the tenth material choice.
       ...dispatch([1, 2]),
       ...line("pjm-miso-upgrade", 189, 188),
@@ -162,7 +162,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     // Fast construction covers the nuclear trip before a new gas plant could arrive.
     initialBuild: { name: "Oil", peakW: 300000000, financed: true },
     scheduledActions: [
-      rate(0.141),
+      rate(0.18),
       ...line("france-core-upgrade"),
       ...dispatch([2, 3, 6]),
       { month: 47, type: "toggle", facilityId: 2 },
@@ -198,7 +198,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     // what the utility being modelled actually ran - at a fuel cost the tariff rise has to cover.
     initialBuild: { name: "Oil", peakW: 150000000, financed: true },
     scheduledActions: [
-      rate(0.095),
+      rate(0.12),
       ...line("zambia-zimbabwe-upgrade", 8, 7),
       ...dispatch([1, 2, 3]),
       { month: 47, type: "toggle", facilityId: 2 },
@@ -231,14 +231,16 @@ export const INTERN_ONE_BUILD_PLAYS: Record<
   102: {
     initialBuild: { name: "Natural Gas", peakW: 350000000, financed: true },
   },
+  // 2006 gas cost about $7/MMBtu delivered, so the first lesson is cheaper baseload, not a peaker
   103: {
-    initialBuild: { name: "Natural Gas", peakW: 600000000, financed: true },
+    initialBuild: { name: "Coal", peakW: 300000000, financed: true },
   },
   104: {
     initialBuild: { name: "Natural Gas", peakW: 500000000, financed: true },
   },
+  // Hawaii's cheapest firm option in 2004 was imported coal, as at AES Hawaii
   105: {
-    initialBuild: { name: "Natural Gas", peakW: 525000000, financed: true },
+    initialBuild: { name: "Coal", peakW: 500000000, financed: true },
   },
   106: {
     initialBuild: { name: "Natural Gas", peakW: 50000000, financed: true },

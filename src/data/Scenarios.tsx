@@ -1133,7 +1133,9 @@ export const SCENARIOS: ScenarioType[] = [
     startingYear: 2000,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.05, // About 0.6 x Puerto Rico retail, ~1.2x the 2000 US average
+    // About 0.6 x PREPA's oil-indexed tariff, which ran roughly twice the 2000 U.S. average
+    // (6.81 cents): an island burning distillate cannot sell generation at mainland prices.
+    dollarsPerkWh: 0.08,
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },

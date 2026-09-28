@@ -354,10 +354,17 @@ describe("researched public-utility scenarios", () => {
         financed: true,
       },
     });
+    // Distillate costs $15-20/MMBtu, so the oil plan only works as a peaker: the player moves the
+    // existing fleet back above it rather than letting the new plant burn oil for baseload.
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
       initialBuild: { name: "Oil", peakW: 700_000_000, financed: true },
+      scheduledActions: [1, 2, 3, 4, 5].map((facilityId, index) => ({
+        month: 2 + index,
+        type: "reprioritize" as const,
+        facilityId,
+      })),
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");
