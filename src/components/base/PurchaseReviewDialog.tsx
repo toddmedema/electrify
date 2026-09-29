@@ -7,8 +7,6 @@ import DecisionImpactPreview, {
 } from "./DecisionImpactPreview";
 import { purchaseTerms } from "../../helpers/Financials";
 import { formatMoneyConcise } from "../../helpers/Format";
-import ManualLink from "./ManualLink";
-import { MANUAL_ENTRY } from "./ManualEntries";
 import { LOAN_MONTHS } from "../../Constants";
 
 /**
@@ -113,9 +111,6 @@ export default function PurchaseReviewDialog(
     {
       concept: "finances",
       label: "Loan option",
-      help: (
-        <ManualLink entry={MANUAL_ENTRY.INTEREST_RATES} label="interest rate" />
-      ),
       value: `${formatMoneyConcise(loan.downpayment)} now + ${formatMoneyConcise(loan.monthlyPayment)}/mo (${(interestRate * 100).toFixed(2)}% for ${loanMonths / 12} years)`,
       detail: `Payments start now.${
         refinancedBalance > 0
