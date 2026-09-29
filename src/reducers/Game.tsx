@@ -2657,6 +2657,7 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   now.cash += upfrontGrant - cost;
   now.netWorth += upfrontGrant - cost;
   now.revenue += upfrontGrant;
+  now.revenueGrants = (now.revenueGrants || 0) + upfrontGrant;
   now.expensesOM += cost;
   if (option.loadAdditions)
     state.loadAdditions = cloneDeep(option.loadAdditions);
@@ -4571,6 +4572,7 @@ function updateSupplyFacilitiesFinances(
   );
   now.revenue = revenue + (rebookingFrame ? choiceGrant : 0);
   now.revenueExports = revenueExports;
+  now.revenueGrants = choiceGrant;
   now.expensesImports = expensesImports;
   now.expensesOM = expensesOM + (rebookingFrame ? immediateCosts : 0);
   now.expensesFuel = expensesFuel;
@@ -4841,6 +4843,7 @@ export function generateNewTimeline(
       expensesPolicy: 0,
       expensesImports: 0,
       revenueExports: 0,
+      revenueGrants: 0,
       importedW: 0,
       exportedW: 0,
       transmissionCapacityW: 0,

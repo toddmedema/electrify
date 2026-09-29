@@ -59,11 +59,29 @@ for (const theme of ["light", "dark"]) {
       dialog.getByText("does not directly cover an evening peak"),
     ).toBeVisible();
     await expect(dialog).toContainText("48 months of installations");
+    const facts = dialog.locator(".customerProgramFacts").first();
+    expect(
+      await facts.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    const term = (await facts.locator("dt").first().boundingBox())!;
+    const value = (await facts.locator("dd").first().boundingBox())!;
+    if (page.viewportSize()!.width < 600) {
+      expect(value.x).toBeCloseTo(term.x, 0);
+      expect(value.y).toBeGreaterThanOrEqual(term.y + term.height);
+    } else {
+      expect(value.x).toBeGreaterThan(term.x + term.width);
+    }
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
-      name: "Start build-out next month",
+      name: "Start next month",
     });
     await expect(apply).toBeEnabled({ timeout: 30000 });
+    const backBounds = (await dialog
+      .getByRole("button", { name: "Back", exact: true })
+      .boundingBox())!;
+    const applyBounds = (await apply.boundingBox())!;
+    expect(applyBounds.y).toBeCloseTo(backBounds.y, 0);
+    expect(applyBounds.height).toBeCloseTo(backBounds.height, 0);
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
     await page.keyboard.press("g");

@@ -75,13 +75,13 @@ export interface TransmissionLineOperatingType {
    * Net power over this line in the current tick: positive importing, negative selling.
    * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
    * current-tick dispatch of a player-action reforecast. Future forecasts use cloned lines.
-   * Set to 0 when ordered; older saves may omit it.
+   * Set to 0 when ordered.
    */
-  currentFlowW?: number;
+  currentFlowW: number;
   /**
    * Embodied emissions from building the corridor, accrued over its construction period. Derived
    * from the corridor's cost per watt at purchase rather than stored per corridor, since the
-   * authored data carries no route length. Absent on legacy saves.
+   * authored data carries no route length.
    */
   constructionKgco2eTotal?: number;
   constructionKgco2eEmitted?: number;
@@ -489,9 +489,10 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
 }
 
 interface HistoryForecastShared {
-  expensesPolicy?: number; // Monthly funded upgrades; absent in legacy histories.
-  revenueExports?: number;
-  expensesImports?: number;
+  expensesPolicy: number; // Monthly funded upgrades.
+  revenueExports: number;
+  revenueGrants: number; // Scenario grants, excluded from customer electricity rates
+  expensesImports: number;
   cash: number;
   customers: number;
   netWorth: number;
@@ -585,7 +586,7 @@ export interface StorageOperatingType
  * What building this asset emits in total, resolved from the shopping quote at purchase so a
  * later price or technology revision cannot retroactively change what a standing plant emitted.
  * Accrued into the company's totals over the construction period rather than booked at once.
- * Absent on the starting fleet, which was built before the run began, and on legacy saves.
+ * Absent on the starting fleet, which was built before the run began.
  */
 export interface ConstructionEmissions {
   constructionKgco2eTotal?: number;
@@ -1153,7 +1154,7 @@ export interface PolicyChangeType {
 }
 export interface GameType {
   runIdentity?: RunIdentity;
-  challenge?: ChallengeInvitationV1;
+  challenge?: ChallengeInvitation;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
   /** Presentation speed restored after the pending scenario decision. */
@@ -1217,14 +1218,12 @@ export interface GameType {
   weatherHazardsDisabled?: boolean;
   commissionedHydroSiteIds: string[];
   facilities: FacilityOperatingType[];
-  // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
-  // scenarios and their normalized saves carry an explicit empty state.
+  // Absent in scenarios without intertie access. Enabled scenarios carry an explicit empty state.
   transmission?: TransmissionStateType;
   // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
   // same accepted state changes; saves persist and validate it so progress survives a reload.
   meaningfulDecisions: MeaningfulDecisionType[];
-  // Older in-progress saves/replays predate decision tracking. They keep their original victory
-  // rules rather than becoming impossible to finish after an upgrade.
+  // Headless balance harness can waive the decision gate to isolate economic outcomes.
   meaningfulDecisionGateWaived?: boolean;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
@@ -1289,7 +1288,7 @@ export interface SnackbarType {
  */
 export interface VictoryType {
   runIdentity?: RunIdentity;
-  challenge?: ChallengeInvitationV1;
+  challenge?: ChallengeInvitation;
   scenarioId: number;
   scenarioName: string;
   difficulty: DifficultyType;
@@ -1425,9 +1424,7 @@ export interface ScenarioChoiceType {
 
 /** Canonical initial inputs, captured before the first simulation tick. */
 export interface RunIdentity {
-  identitySchemaVersion: 1;
   scenarioId: number;
-  scenarioRevision: string;
   seed: number;
   difficulty: DifficultyType;
   compatibilityId: string;
@@ -1441,17 +1438,13 @@ export interface RunIdentity {
     meaningfulDecisionGateWaived: boolean;
   };
 }
-export interface AuthoredRunReferenceV1 {
-  identitySchemaVersion: 1;
+export interface AuthoredRunReference {
   scenarioId: number;
-  scenarioRevision: string;
   seed: number;
   difficulty: DifficultyType;
   compatibilityId: string;
-  optionsProfile: "canonical-v1";
 }
-export interface ChallengeInvitationV1 {
-  invitationSchemaVersion: 1;
-  run: AuthoredRunReferenceV1;
+export interface ChallengeInvitation {
+  run: AuthoredRunReference;
   target: number;
 }

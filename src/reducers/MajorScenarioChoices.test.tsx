@@ -45,6 +45,7 @@ test("developer contribution is paid once, remains revenue after reforecast and 
     DATA_CENTER_GRANT.Intern,
   );
   expect(now(after).expensesOM).toBe(now(before).expensesOM);
+  expect(now(after).revenueGrants).toBe(DATA_CENTER_GRANT.Intern);
   expect(after.facilities.map((f) => f.lifetimeRevenue)).toEqual(
     before.facilities.map((f) => f.lifetimeRevenue),
   );
@@ -57,9 +58,11 @@ test("developer contribution is paid once, remains revenue after reforecast and 
   );
   expect(now(refreshed).revenue).toBe(now(after).revenue);
   expect(now(refreshed).cash).toBe(now(after).cash);
+  expect(now(refreshed).revenueGrants).toBe(DATA_CENTER_GRANT.Intern);
   const advanced = cloneDeep(refreshed);
   tickState(advanced);
   expect(now(advanced).revenue).toBeLessThan(DATA_CENTER_GRANT.Intern);
+  expect(now(advanced).revenueGrants).toBe(0);
 });
 
 test("phased connection halves initial data-center load and rejoins full load in 2028", () => {

@@ -1,4 +1,4 @@
-import { ChallengeInvitationV1, VictoryType } from "../Types";
+import { ChallengeInvitation, VictoryType } from "../Types";
 import {
   expandAuthoredRunReference,
   projectAuthoredRunReference,
@@ -10,16 +10,15 @@ import { SCENARIOS } from "../data/Scenarios";
 
 export const MAX_CHALLENGE_URL = 2048;
 export type ChallengeRoute = {
-  invitation?: ChallengeInvitationV1;
+  invitation?: ChallengeInvitation;
   scenarioId?: number;
   error?: string;
 };
-export function validInvitation(raw: unknown): raw is ChallengeInvitationV1 {
+export function validInvitation(raw: unknown): raw is ChallengeInvitation {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
-  const value = raw as ChallengeInvitationV1;
+  const value = raw as ChallengeInvitation;
   return (
-    Object.keys(value).sort().join() === "invitationSchemaVersion,run,target" &&
-    value.invitationSchemaVersion === 1 &&
+    Object.keys(value).sort().join() === "run,target" &&
     Number.isSafeInteger(value.target) &&
     !!expandAuthoredRunReference(value.run)
   );
@@ -44,7 +43,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   try {
     const value: unknown = JSON.parse(url.searchParams.get("challenge")!);
     if (value && typeof value === "object") {
-      const id = (value as ChallengeInvitationV1).run?.scenarioId;
+      const id = (value as ChallengeInvitation).run?.scenarioId;
       if (SCENARIOS.some((s) => s.id === id && !s.tutorialSteps))
         failed.scenarioId = id;
     }
@@ -62,7 +61,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   }
 }
 export function challengeUrl(
-  invitation: ChallengeInvitationV1,
+  invitation: ChallengeInvitation,
   href = window.location.href,
 ): string | undefined {
   if (!validInvitation(invitation)) return;
@@ -83,9 +82,9 @@ export function challengeShareContent(
   href?: string,
 ): { content: ShareContentType; challenge: boolean } {
   const reference = projectAuthoredRunReference(victory.runIdentity);
-  const invitation: ChallengeInvitationV1 | undefined =
+  const invitation: ChallengeInvitation | undefined =
     reference && Number.isSafeInteger(victory.score)
-      ? { invitationSchemaVersion: 1, run: reference, target: victory.score }
+      ? { run: reference, target: victory.score }
       : undefined;
   const url = invitation && challengeUrl(invitation, href);
   if (!url)

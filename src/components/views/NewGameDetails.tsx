@@ -34,7 +34,7 @@ import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
-  ChallengeInvitationV1,
+  ChallengeInvitation,
   GameType,
   LocationType,
   ReplayType,
@@ -45,7 +45,7 @@ import {
 import { formatScore } from "../../helpers/Format";
 
 export interface StateProps {
-  challenge?: ChallengeInvitationV1;
+  challenge?: ChallengeInvitation;
   onContinue?: () => void;
   game: GameType;
   uid?: string;

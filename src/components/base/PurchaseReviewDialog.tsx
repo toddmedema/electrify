@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Button, Dialog, DialogActions, DialogContent } from "@mui/material";
-import ClosableDialogTitle from "./ClosableDialogTitle";
+import { Button } from "@mui/material";
+import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
 import DecisionImpactPreview, {
   DecisionImpactFactType,
@@ -76,8 +76,6 @@ export default function PurchaseReviewDialog(
     onClose,
     onPurchase,
   } = props;
-  const generatedTitleId = React.useId();
-  const titleId = props.titleId ?? generatedTitleId;
   // A double-click dispatches two click events before the closing dialog has necessarily
   // unmounted. The ref closes that window synchronously, and reopening rearms it.
   const purchaseSubmitted = React.useRef(false);
@@ -147,41 +145,41 @@ export default function PurchaseReviewDialog(
   ];
 
   return (
-    <Dialog
+    <DecisionDialog
       open={open}
       onClose={onClose}
       fullWidth
       maxWidth="sm"
-      aria-labelledby={titleId}
+      titleId={props.titleId}
+      title={props.title}
+      closable
+      contentClassName="noPadding"
+      actions={
+        <>
+          <Button
+            color="primary"
+            variant="contained"
+            disabled={cashDisabled}
+            onClick={(event) => submit(false, event)}
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
+          >
+            Pay cash
+          </Button>
+          <Button
+            id={props.loanButtonId}
+            color="primary"
+            variant="outlined"
+            disabled={loanDisabled}
+            onClick={(event) => submit(true, event)}
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
+          >
+            Take loan
+          </Button>
+        </>
+      }
     >
-      <ClosableDialogTitle id={titleId} onClose={onClose}>
-        {props.title}
-      </ClosableDialogTitle>
-      <DialogContent className="noPadding">
-        {props.preface}
-        <DecisionImpactPreview facts={facts} />
-      </DialogContent>
-      <DialogActions>
-        <Button
-          color="primary"
-          variant="contained"
-          disabled={cashDisabled}
-          onClick={(event) => submit(false, event)}
-          startIcon={<ConceptIcon concept="money" fontSize="small" />}
-        >
-          Pay cash
-        </Button>
-        <Button
-          id={props.loanButtonId}
-          color="primary"
-          variant="outlined"
-          disabled={loanDisabled}
-          onClick={(event) => submit(true, event)}
-          startIcon={<ConceptIcon concept="finances" fontSize="small" />}
-        >
-          Take loan
-        </Button>
-      </DialogActions>
-    </Dialog>
+      {props.preface}
+      <DecisionImpactPreview facts={facts} />
+    </DecisionDialog>
   );
 }

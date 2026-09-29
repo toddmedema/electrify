@@ -1,11 +1,6 @@
 import * as React from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-} from "@mui/material";
+import { Button } from "@mui/material";
+import DecisionDialog from "./DecisionDialog";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -39,31 +34,30 @@ export default function ConfirmDialog({
   contentClassName,
 }: ConfirmDialogProps): React.JSX.Element {
   return (
-    <Dialog
+    <DecisionDialog
       open={open}
       onClose={onCancel}
-      onClick={
-        isolateClicks ? (e: React.MouseEvent) => e.stopPropagation() : undefined
+      title={title}
+      isolateClicks={isolateClicks}
+      contentClassName={contentClassName}
+      actions={
+        <>
+          <Button onClick={onCancel} color="primary" autoFocus={destructive}>
+            {cancelLabel}
+          </Button>
+          <Button
+            onClick={onConfirm}
+            color={destructive ? "error" : "primary"}
+            variant="contained"
+            autoFocus={!destructive}
+            disabled={confirmDisabled}
+          >
+            {confirmLabel}
+          </Button>
+        </>
       }
     >
-      <DialogTitle>{title}</DialogTitle>
-      {children && (
-        <DialogContent className={contentClassName}>{children}</DialogContent>
-      )}
-      <DialogActions>
-        <Button onClick={onCancel} color="primary">
-          {cancelLabel}
-        </Button>
-        <Button
-          onClick={onConfirm}
-          color={destructive ? "error" : "primary"}
-          variant="contained"
-          autoFocus
-          disabled={confirmDisabled}
-        >
-          {confirmLabel}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      {children}
+    </DecisionDialog>
   );
 }

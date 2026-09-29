@@ -200,7 +200,8 @@ export const buildoutCompletionMonth = (
   startMonth: number,
 ) => startMonth + buildoutMonthsRemaining(id, adoption) - 1;
 /** Activation, then funded installations, then their spending. Idempotent per month.
- * Forecast callers own a private copy. Installed measures never retire during this run. */
+ * Forecast callers own a private copy. Installed cohorts remain recorded so efficiency savings
+ * can age independently of build-out progress. */
 export function advancePolicies(game: GameType, month: number): PolicyId[] {
   if (!game.policies) return [];
   const activated: PolicyId[] = [];

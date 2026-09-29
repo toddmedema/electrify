@@ -720,6 +720,7 @@ describe("unified connections", () => {
       loanAmountLeft: 1000,
       loanMonthlyPayment: 10,
       interestRate: game.interestRate,
+      currentFlowW: 0,
     }));
     return game;
   }

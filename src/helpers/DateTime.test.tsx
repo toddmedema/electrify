@@ -164,6 +164,7 @@ describe("summarizeTimeline", () => {
           customers: 1000 + i,
           netWorth: cash * 2,
           revenue: 10,
+          revenueGrants: 2,
           expensesFuel: 1,
           expensesOM: 0,
           expensesCarbonFee: 0,
@@ -182,6 +183,8 @@ describe("summarizeTimeline", () => {
     expect(summary.customers).toEqual(1002);
     expect(summary.interestRate).toBeCloseTo(0.042, 10);
     expect(summary.revenue).toEqual(30);
+    expect(summary.revenueGrants).toEqual(6);
+    expect(summarizeHistory([summary, summary]).revenueGrants).toEqual(12);
     expect(summary.expensesFuel).toEqual(3);
     expect(summary.peakDemandW).toEqual(400);
     expect(summary.deliveredWhByFuel.Coal).toBeCloseTo(

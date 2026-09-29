@@ -174,7 +174,7 @@ export type ScoreBreakdownText = Partial<Record<ScoreCategoryType, string>>;
  * score (final or in-progress) call the same code. The rules come from `SCORE_RULES`, which also
  * writes the in-game description; the manual describes them separately and needs updating by hand.
  *
- * `revenueInStartingDollars` is the run's revenue in its starting year's dollars, from
+ * `revenueInStartingDollars` is the run's customer revenue in its starting year's dollars, from
  * `startingDollarRevenue` below. A public utility's target rate is authored in those dollars, and
  * judging nominal revenue against it would charge the player for inflation their costs already
  * pass through: over twenty years of 2.5% inflation, a rate that merely holds its real value ends
@@ -210,21 +210,42 @@ export function computeScoreBreakdown(
 }
 
 /**
- * Revenue across completed months, each deflated to the run's starting-year dollars by the
+ * Customer revenue across completed months, each deflated to the run's starting-year dollars by the
  * inflation index in force that month. Every kWh then counts equally toward the lifetime average
  * rate, whichever year it was sold in.
  */
 export function startingDollarRevenue(
-  history: Pick<MonthlyHistoryType, "revenue" | "year" | "month">[],
+  history: Pick<
+    MonthlyHistoryType,
+    "revenue" | "revenueExports" | "revenueGrants" | "year" | "month"
+  >[],
   startingYear: number,
   seed: number,
 ): number {
   return history.reduce(
-    (sum, { revenue, year, month }) =>
+    (sum, entry) =>
       sum +
-      revenue /
-        getInflationIndex({ year, monthNumber: month }, startingYear, seed),
+      customerSalesRevenue(entry) /
+        getInflationIndex(
+          { year: entry.year, monthNumber: entry.month },
+          startingYear,
+          seed,
+        ),
     0,
+  );
+}
+
+/** Income from customer bills alone; wholesale sales and grants do not raise their rate. */
+export function customerSalesRevenue(
+  history: Pick<
+    MonthlyHistoryType,
+    "revenue" | "revenueExports" | "revenueGrants"
+  >,
+): number {
+  return (
+    history.revenue -
+    (history.revenueExports ?? 0) -
+    (history.revenueGrants ?? 0)
   );
 }
 

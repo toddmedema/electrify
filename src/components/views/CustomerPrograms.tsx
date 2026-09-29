@@ -1057,7 +1057,7 @@ function ProgramsScreen({
                         ? "Pause new installations next month"
                         : current!.adoption > 0
                           ? "Resume build-out next month"
-                          : "Start build-out next month"}
+                          : "Start next month"}
                 </Button>
               )}
         </div>

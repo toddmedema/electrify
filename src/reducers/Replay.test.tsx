@@ -205,10 +205,10 @@ describe("watching a replay", () => {
       unknown
     >;
     doc.meaningfulDecisionGateWaived = true;
-    const legacy = decodeReplay(doc)!;
-    const watched = createGameFromReplay(legacy);
+    const waived = decodeReplay(doc)!;
+    const watched = createGameFromReplay(waived);
 
-    expect(legacy.meaningfulDecisionGateWaived).toBe(true);
+    expect(waived.meaningfulDecisionGateWaived).toBe(true);
     expect(watched.meaningfulDecisionGateWaived).toBe(true);
   });
 
