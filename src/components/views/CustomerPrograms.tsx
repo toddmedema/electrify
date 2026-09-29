@@ -114,18 +114,6 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
 const WILDFIRE_SUMMARY =
   "Crews, inspections and vegetation clearing halve wildfire disconnections and generator losses at full strength. Protection builds over 12 months and fades over 12 months after funding stops; fires and restoration costs remain.";
 
-function monthlyCostLabel(game: GameType, cost: number): string {
-  const month = game.date.monthsElapsed;
-  const profit = deriveExpandedSummary(
-    summarizeTimeline(
-      game.timeline,
-      game.startingYear,
-      (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === month,
-    ),
-  ).profit;
-  return `${formatMoneyConcise(cost)}/mo (current profit: ${formatMoneyConcise(profit)}/mo)`;
-}
-
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
 const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
