@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 import {
   FacilityOperatingType,
   GameType,
@@ -9,6 +9,7 @@ import { gasConversionQuote } from "../../helpers/GasConversion";
 import { currentCash } from "../../helpers/GameSelectors";
 import { formatMoneyConcise, formatPercent } from "../../helpers/Format";
 import ConfirmDialog from "./ConfirmDialog";
+import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import DecisionImpactPreview from "./DecisionImpactPreview";
 import { getInflationIndex } from "../../data/Economy";
 
@@ -36,22 +37,20 @@ export default function GasConversion(props: {
       <Typography component="h3" className="facilityDetailHeading">
         Combined-cycle conversion
       </Typography>
-      <Typography variant="body2">
-        Use less gas for the same power. Six months offline; slower starts and a
-        45% minimum output afterward. Capacity and remaining life stay the same.
-      </Typography>
-      <Button
-        variant="outlined"
-        disabled={shortfall > 0}
-        onClick={() => setConfirming(true)}
+      <Typography variant="body2">Use less gas for the same power.</Typography>
+      <Typography
+        variant="body2"
+        color="textSecondary"
+        className="facilityDetailDescription"
       >
-        Convert to combined cycle · {formatMoneyConcise(quote.cost)}
-      </Button>
-      {shortfall > 0 && (
-        <Typography variant="caption">
-          {formatMoneyConcise(shortfall)} more cash needed
-        </Typography>
-      )}
+        Six months offline. Slower starts and 45% minimum output afterward.
+      </Typography>
+      <FacilityUpgradeAction
+        label="Convert"
+        cost={quote.cost}
+        shortfall={shortfall}
+        onClick={() => setConfirming(true)}
+      />
       {confirming && (
         <ConfirmDialog
           open

@@ -3640,16 +3640,44 @@ $pane_header_height: 48px;
     grid-column: 1 / -1;
   }
 
+  .facilityDetailDescription {
+    margin-top: 4px;
+  }
+
+  .facilityResilienceSummary {
+    display: grid;
+    gap: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .facilityResilienceFacts {
+    display: grid;
+    gap: 12px;
+    margin: 12px 0 0;
+
+    &:empty {
+      display: none;
+    }
+  }
+
   .facilityRetrofit {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
     margin-top: 12px;
+    overflow-wrap: anywhere;
 
     .MuiButton-root {
+      max-width: 100%;
       min-height: 40px;
+      white-space: normal;
+      overflow-wrap: anywhere;
       text-transform: none;
+
+      @media (max-width: 600px) {
+        width: 100%;
+      }
 
       @media (pointer: coarse) {
         min-height: 44px;
