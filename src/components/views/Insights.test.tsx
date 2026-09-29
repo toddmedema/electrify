@@ -1076,7 +1076,7 @@ describe("Insights layers", () => {
     await user.click(labelledButton("Preset actions"));
     expect(
       screen.getByRole("menuitem", { name: "Save preset changes" }),
-    ).toBeDisabled();
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("creates and updates a named preset", async () => {
