@@ -2,6 +2,43 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Resolve browser chrome before stylesheets or the React bundle can delay first paint. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      (function () {
+        let choice;
+        try {
+          choice = localStorage.getItem("theme");
+        } catch (_) {
+          // Storage can be unavailable; match the system in that case.
+        }
+        const mode =
+          choice === "light" || choice === "dark"
+            ? choice
+            : window.matchMedia &&
+                window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = mode;
+        document.documentElement.style.colorScheme = mode;
+        document
+          .querySelector('meta[name="color-scheme"]')
+          .setAttribute("content", mode);
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
+      })();
+    </script>
+    <style>
+      /* Match the app canvas while its stylesheet is still loading. */
+      html {
+        background: var(--bg-primary, #ffffff);
+      }
+      html[data-theme="dark"] {
+        background: var(--bg-primary, #0b1016);
+      }
+    </style>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
@@ -66,8 +103,6 @@
     <!-- App colors -->
     <meta name="msapplication-TileColor" content="#1C1818" />
     <!-- Windows 8 tile -->
-    <meta name="theme-color" content="#1C1818" />
-    <!-- Android task switcher -->
 
     <!-- Add to homescreen for Chrome on Android -->
     <meta name="mobile-web-app-capable" content="yes" />
