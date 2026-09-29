@@ -18,6 +18,7 @@ const IMAGE = /\.(svg|png|jpe?g|gif|webp|avif|ico)$/i;
 const EXCLUDED = new Set([
   // Link-preview (og:image / twitter:image) artwork, fetched only by social-media crawlers.
   "/images/icon/1024x1024.png",
+  "/images/gameplay-preview.png",
 ]);
 
 function filesUnder(directory) {
