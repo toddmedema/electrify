@@ -97,7 +97,7 @@ describe("story effects in dispatch", () => {
 
   it("keeps Paradise customer count unchanged while visitor usage rises", () => {
     const game = createGame({ scenarioId: 105, difficulty: "Manager" });
-    game.date = getDateFromMinute(28 * MINUTES_PER_MONTH, game.startingYear);
+    game.date = getDateFromMinute(40 * MINUTES_PER_MONTH, game.startingYear);
     const baselineGame = cloneDeep(game);
     baselineGame.storyEffectsDisabled = true;
     const story = generateNewTimeline(game, 1_000_000_000, 1_000_000, 1)[0];

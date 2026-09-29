@@ -38,7 +38,7 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: "Save preset", exact: true })
         .click();
       await expect(dialog).toHaveCount(0);
-      for (const action of ["Rename preset…", "Delete preset…"]) {
+      for (const action of ["Rename preset…", "Delete custom preset"]) {
         await insights.getByRole("button", { name: "Preset actions" }).click();
         await page.getByRole("menuitem", { name: action, exact: true }).click();
         await expectDialogToFit(dialog);

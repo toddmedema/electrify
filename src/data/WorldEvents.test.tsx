@@ -18,6 +18,7 @@ import {
   validateStoryDifficultyMonotonicity,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
+import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
 
 const EMPTY_SNAPSHOT: StorySnapshotType = {
   deliveredWhByFuel12m: {},
@@ -68,7 +69,11 @@ function context(month: number, scenarioId = 103, seed = 12345) {
     seed,
     scenarioId,
     difficulty: "Manager" as const,
-    date: getDateFromMinute(month * MINUTES_PER_MONTH, 2006),
+    date: getDateFromMinute(
+      (month + (SCENARIO_PREPARATION_MONTHS[scenarioId] || 0)) *
+        MINUTES_PER_MONTH,
+      2006,
+    ),
     location: LOCATIONS.PIT,
     snapshot: EMPTY_SNAPSHOT,
   };

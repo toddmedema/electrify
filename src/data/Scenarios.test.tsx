@@ -306,7 +306,7 @@ describe("authored starting fleets", () => {
         startsYear: 2026,
         peakW: 100_000_000,
         loadFactor: 0.9,
-        demandType: "Data centers",
+        demandType: "Data Centers",
       }),
     ]);
     expect(manassas.facilities).toEqual([
@@ -426,8 +426,8 @@ describe("authored starting fleets", () => {
       name: "Wildfire Emergency",
       icon: "wildfire emergency",
       locationId: "LA",
-      startingYear: 2024,
-      durationMonths: 36,
+      startingYear: 2022,
+      durationMonths: 60,
       startingCustomers: 16_000,
       reliabilityObjective: {
         year: 2025,

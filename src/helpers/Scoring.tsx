@@ -1,4 +1,4 @@
-import { getInflationIndex } from "../data/Economy";
+import { getRateInflationIndex } from "../data/Economy";
 import {
   MonthlyHistoryType,
   ScenarioType,
@@ -226,7 +226,7 @@ export function startingDollarRevenue(
     (sum, entry) =>
       sum +
       customerSalesRevenue(entry) /
-        getInflationIndex(
+        getRateInflationIndex(
           { year: entry.year, monthNumber: entry.month },
           startingYear,
           seed,

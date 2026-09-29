@@ -76,7 +76,7 @@ function demand(minute: number) {
     Commercial: 100,
     Industrial: 100,
     Mining: 0,
-    "Data centers": 100,
+    "Data Centers": 100,
     Transportation: 100,
   };
   return tick;
@@ -97,7 +97,7 @@ test.each([0, 6 * 60, 17 * 60 - 1, 17 * 60, 21 * 60 - 1, 21 * 60, 1440])(
     expect(tick.demandByType.Residential).toBe(peak ? 90 : 100);
     expect(tick.demandByType.Commercial).toBe(100);
     expect(tick.demandByType.Industrial).toBe(peak ? 90 : 100);
-    expect(tick.demandByType["Data centers"]).toBe(peak ? 90 : 100);
+    expect(tick.demandByType["Data Centers"]).toBe(peak ? 90 : 100);
     expect(tick.demandByType.Transportation).toBe(100);
     // Explicit enrolled/un-enrolled bills: contracts and TOU never share a sector.
     const bill = peak
@@ -131,7 +131,7 @@ test("season/month windows repeat; no enrolled load means no effect; rebates com
     Commercial: 0,
     Industrial: 0,
     Mining: 0,
-    "Data centers": 0,
+    "Data Centers": 0,
     Transportation: 100,
   };
   const before = cloneDeep(tick);
@@ -363,7 +363,7 @@ test.each([false, true])(
           tick.shiftedResidentialW! * 0.9 +
           before.Commercial +
           before.Industrial * 0.95 +
-          before["Data centers"] * 0.95 +
+          before["Data Centers"] * 0.95 +
           before.Transportation;
         const total = Object.values(tick.demandByType).reduce(
           (a, b) => a + b,

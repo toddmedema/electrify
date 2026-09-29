@@ -69,7 +69,7 @@ it.each(["Public", "Investor"] as const)(
   },
 );
 
-it("makes the CEO meaningful-decision gate visible with live progress", () => {
+it("keeps internal decision tracking out of player victory conditions", () => {
   render(
     <VictoryConditions
       ownership="Public"
@@ -78,49 +78,13 @@ it("makes the CEO meaningful-decision gate visible with live progress", () => {
       meaningfulDecisions={decisions}
     />,
   );
-  expect(screen.getByTestId("meaningful-decision-progress")).toHaveTextContent(
-    "Progress: 4 of 10 choices · 4 of 4 types",
+  expect(
+    screen.queryByTestId("meaningful-decision-progress"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByTestId("meaningful-decision-history"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText(/In all scenarios, you fail/)).toHaveTextContent(
+    "In all scenarios, you fail if you go bankrupt or serve less than 90% of demand in three consecutive months.",
   );
-  expect(screen.getByTestId("meaningful-decision-history")).toHaveTextContent(
-    "Build Natural Gas Peaker (100MW) — grid investments",
-  );
-});
-
-it("asks lower difficulties for a smaller plan than CEO", () => {
-  render(
-    <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
-      difficulty="VP"
-      meaningfulDecisions={[]}
-    />,
-  );
-  expect(screen.getByTestId("meaningful-decision-progress")).toHaveTextContent(
-    "Progress: 0 of 4",
-  );
-});
-
-it("shows the one-decision Intern objective and legacy waiver", () => {
-  const { rerender } = render(
-    <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
-      difficulty="Intern"
-      meaningfulDecisions={[]}
-    />,
-  );
-  expect(screen.getByTestId("meaningful-decision-progress")).toHaveTextContent(
-    "Progress: 0 of 1",
-  );
-
-  rerender(
-    <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
-      difficulty="Intern"
-      meaningfulDecisions={[]}
-      meaningfulDecisionGateWaived
-    />,
-  );
-  expect(screen.getByText(/original victory rules still apply/i)).toBeVisible();
 });

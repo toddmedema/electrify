@@ -16,7 +16,7 @@ import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
-import { getScenario } from "../../data/Scenarios";
+import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
@@ -157,7 +157,7 @@ jest.mock("../base/ChartForecastDemandByType", () => ({
     "Commercial",
     "Industrial",
     "Transportation",
-    "Data centers",
+    "Data Centers",
   ],
   default: ({ syncKey }: ChartMockProps) => (
     <div role="img" data-chart="demand-by-type" data-sync-key={syncKey} />
@@ -505,6 +505,29 @@ describe("Insights layers", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it.each(["Investor", "Public"] as const)(
+    "caps the %s slider at exactly twice the target, even with a higher saved rate",
+    (ownership) => {
+      const game = createGame({ scenarioId: 100 });
+      const target = 0.1234;
+      renderInsights(100, {
+        ...game,
+        scenarioId: CUSTOM_SCENARIO_ID,
+        customScenario: {
+          ...getScenario(100)!,
+          id: CUSTOM_SCENARIO_ID,
+          ownership,
+          dollarsPerkWh: target,
+        },
+        dollarsPerkWh: target * 3,
+      });
+      expect(screen.getByRole("slider")).toHaveAttribute(
+        "aria-valuemax",
+        String(target * 2),
+      );
+    },
+  );
 
   // Regression test. Construction progress was part of the projection's cache key, so every
   // tick of a build re-simulated the long-range forecast from a start that had moved on by one
@@ -1024,7 +1047,7 @@ describe("Insights layers", () => {
 
     await user.click(labelledButton("Preset actions"));
     await user.click(
-      screen.getByRole("menuitem", { name: "Restore original preset" }),
+      screen.getByRole("menuitem", { name: "Reset to default" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
@@ -1033,6 +1056,19 @@ describe("Insights layers", () => {
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
     expect(library.defaults.overview).toBeUndefined();
+  });
+
+  it("resets unsaved changes to a standard preset", async () => {
+    renderInsights();
+    await user.click(labelledButton(/Layers/));
+    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(labelledButton("Preset actions"));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Reset to default" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+    expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("creates and updates a named preset", async () => {
@@ -1089,7 +1125,9 @@ describe("Insights layers", () => {
     renderInsights();
 
     await user.click(labelledButton("Preset actions"));
-    await user.click(screen.getByRole("menuitem", { name: /Delete preset/ }));
+    await user.click(
+      screen.getByRole("menuitem", { name: /Delete custom preset/ }),
+    );
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),

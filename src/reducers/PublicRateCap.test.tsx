@@ -7,10 +7,10 @@ describe("public utility board rate cap", () => {
   // Loads the economic data the inflation index reads
   beforeAll(() => createGame({ scenarioId: 104 }));
 
-  it("rounds twice the inflation-adjusted target up to whole cents with a nickel floor", () => {
+  it("caps rates at exactly twice the annual inflation-adjusted target", () => {
     const start = { year: 2000, monthNumber: 1 };
     expect(publicRateCap(0.05, start, 2000, 1)).toBeCloseTo(0.1, 10);
-    expect(publicRateCap(0.01, start, 2000, 1)).toBe(0.05);
+    expect(publicRateCap(0.01, start, 2000, 1)).toBe(0.02);
     expect(
       publicRateCap(0.05, { year: 2010, monthNumber: 1 }, 2000, 1),
     ).toBeGreaterThan(0.1);

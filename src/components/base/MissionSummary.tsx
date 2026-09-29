@@ -142,7 +142,8 @@ export default function MissionSummary({
               </span>
             </Button>
           ) : (
-            mission.headline && (
+            mission.headline &&
+            mission.headline.id !== "decisions" && (
               <span
                 className="missionSummaryHeadline"
                 title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}

@@ -66,7 +66,7 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -149,7 +149,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -233,7 +233,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
     });
     const view = render(
       <Provider store={store}>
-        <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+        <CustomerPrograms game={game} />
       </Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -245,6 +245,14 @@ test.each<PolicyId>(["solar", "efficiency"])(
     act(() => jest.advanceTimersByTime(250));
     act(() => worker.onmessage!({ data: { result } }));
 
+    expect(
+      screen.queryByRole("button", { name: "View demand" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("How it works")).not.toBeInTheDocument();
+    expect(fact("Cost")).toMatch(/\/mo vs .*\/mo profit\)/);
+    expect(screen.queryByText(/^Facility comparable/) !== null).toBe(
+      id === "solar",
+    );
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
     const hint = screen.getByText(/^Little change in peak demand/);
     expect(hint).toBeVisible();
@@ -270,7 +278,7 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -311,7 +319,7 @@ test("a scheduled operating change is named in the card and cancelled from the f
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -352,7 +360,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   const entry = screen.getByRole("button", { name: "Customer programs" });
@@ -393,9 +401,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   expect(screen.getByText("Completed Jan 2022")).toBeVisible();
   expect(screen.getByText("Result")).toBeVisible();
   expect(screen.getByText(/one-time project is finished/)).toBeVisible();
-  expect(
-    screen.queryByText(POLICIES.efficiency.mechanism),
-  ).not.toBeInTheDocument();
+  expect(screen.queryByText("How it works")).not.toBeInTheDocument();
   expect(screen.queryByText(/next month$/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Estimated demand/)).not.toBeInTheDocument();
   view.unmount();
@@ -419,7 +425,7 @@ test("estimates on the page when the preview worker cannot load its data", () =>
   });
   render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -462,7 +468,7 @@ test.each([
     });
     const view = render(
       <Provider store={store}>
-        <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+        <CustomerPrograms game={game} />
       </Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -496,7 +502,7 @@ test("the completion preview is capped at the run's last month", () => {
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -535,7 +541,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -545,8 +551,8 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   ).toBeVisible();
   expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
   expect(
-    screen.getByText(/Wildfire preparedness billing changes now/),
-  ).toBeVisible();
+    screen.queryByText(/Changes start next month/),
+  ).not.toBeInTheDocument();
   const hazards = screen.getByRole("region", { name: "Hazard readiness" });
   fireEvent.click(
     within(hazards).getByRole("button", {
@@ -555,7 +561,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   );
   const { annualCost } = wildfirePreparedness(store.getState().game)!;
   expect(fact("Annual budget")).toBe(`${formatMoneyConcise(annualCost)}/yr`);
-  expect(fact("Next wildfire season")).toBe("Aug 2024 to Feb 2025");
+  expect(fact("Next wildfire season")).toBe("Aug 2022 to Feb 2023");
   expect(fact("Billing")).toBe("No charges while off · no upfront payment");
   expect(fact("One-time cost")).toBeUndefined();
   expect(fact("If funded now")).toBeUndefined();
@@ -605,6 +611,39 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   jest.useRealTimers();
 });
 
+test("an imported wildfire offers preparedness for its scheduled incident outside natural hazard regions", () => {
+  const game = createGame({
+    scenarioId: CUSTOM_SCENARIO_ID,
+    scenario: {
+      ...SCENARIOS.find((scenario) => scenario.id === 110)!,
+      id: CUSTOM_SCENARIO_ID,
+      startingYear: 2030,
+      eventScenarioIds: [111],
+    },
+  });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
+  );
+  expect(fact("Scenario wildfire")).toBe("Jan 2033 to Feb 2033");
+  expect(screen.queryByText("Next wildfire season")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/^Next wildfire season · simulated fire/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
+  expect(wildfirePreparedness(store.getState().game)?.active).toBe(true);
+  view.unmount();
+});
+
 test("solar facts compare a same-size facility and distinguish annual energy from capacity", () => {
   const game = createGame({ scenarioId: 106 });
   const store = configureStore({
@@ -613,7 +652,7 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+      <CustomerPrograms game={game} />
     </Provider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
@@ -634,10 +673,9 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
     )!.textContent!;
   const capacity = impact.split(" ")[0];
   expect(comparable).toContain("(" + capacity + "/");
-  const annualMWh = (text: string) =>
-    Number(text.match(/([\d,]+)MWh\/yr/)![1].replace(/,/g, ""));
+  const annualGWh = (text: string) => Number(text.match(/([\d.]+)GWh\/yr/)![1]);
   expect(
-    Math.abs(annualMWh(impact) - annualMWh(comparable) * POLICIES.solar.derate),
+    Math.abs(annualGWh(impact) - annualGWh(comparable) * POLICIES.solar.derate),
   ).toBeLessThan(1);
   const quote = GENERATORS(
     game,

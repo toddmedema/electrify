@@ -75,7 +75,7 @@ describe("SaveFile", () => {
       writeSave(
         fakeGame({
           scenarioId: CUSTOM_SCENARIO_ID,
-          customScenario: { id: CUSTOM_SCENARIO_ID, name: "My Grid" } as never,
+          customScenario: { ...DEFAULT_CUSTOM_SCENARIO, name: "My Grid" },
         }),
       );
       expect(describeSave(resumableSave()!)).toBe("My Grid, 2035");

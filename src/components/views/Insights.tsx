@@ -39,6 +39,8 @@ import AddIcon from "@mui/icons-material/Add";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
@@ -65,7 +67,7 @@ import {
   projectCustomerChange,
   publicRateCap,
 } from "../../helpers/Customers";
-import { getInflationIndex } from "../../data/Economy";
+import { getRateInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
@@ -1222,24 +1224,18 @@ export default class Insights extends React.Component<Props, State> {
     // changes nothing it can act on. What the rate does move is the score, against the
     // scenario's own target. That target is authored in starting-year dollars and scored against
     // deflated revenue, so the slider shows it in today's dollars, beside the rate being set.
-    const inflationIndex = getInflationIndex(
+    const inflationIndex = getRateInflationIndex(
       game.date,
       game.startingYear,
       game.seed,
     );
     const targetRate = scenario.dollarsPerkWh * inflationIndex;
-    const max = investor
-      ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
-      : // A public board caps the rate at twice its target in today's dollars; the reducer enforces it
-        Math.max(
-          publicRateCap(
-            scenario.dollarsPerkWh,
-            game.date,
-            game.startingYear,
-            game.seed,
-          ),
-          game.dollarsPerkWh,
-        );
+    const max = publicRateCap(
+      scenario.dollarsPerkWh,
+      game.date,
+      game.startingYear,
+      game.seed,
+    );
     // The final score decomposes exactly into a supply-weighted sum over the years played, so
     // what a rate is worth is the coming year's own term of that sum: the distance from the
     // target, times how much of the lifetime energy the coming year makes up. Always a full
@@ -1409,10 +1405,7 @@ export default class Insights extends React.Component<Props, State> {
             />
           </button>
         )}
-        <CustomerPrograms
-          game={game}
-          onViewDemand={() => this.setLayers(["demandByType"])}
-        />
+        <CustomerPrograms game={game} />
         <span id="insightsRateSummary" className="srOnly">
           {rateSummary}
         </span>
@@ -2483,14 +2476,23 @@ export default class Insights extends React.Component<Props, State> {
                 </MenuItem>
               )}
               {selectedCustom && (
-                <MenuItem onClick={() => this.openPresetDialog("delete")}>
-                  Delete preset…
+                <MenuItem
+                  className="insightsPresetResetMenuItem"
+                  onClick={() => this.openPresetDialog("delete")}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                  Delete custom preset
                 </MenuItem>
               )}
               {selectedDefault &&
-                this.state.presetLibrary.defaults[selectedDefault] && (
-                  <MenuItem onClick={() => this.openPresetDialog("restore")}>
-                    Restore original preset
+                (this.state.presetDirty ||
+                  this.state.presetLibrary.defaults[selectedDefault]) && (
+                  <MenuItem
+                    className="insightsPresetResetMenuItem"
+                    onClick={() => this.openPresetDialog("restore")}
+                  >
+                    <RefreshIcon fontSize="small" />
+                    Reset to default
                   </MenuItem>
                 )}
             </Menu>

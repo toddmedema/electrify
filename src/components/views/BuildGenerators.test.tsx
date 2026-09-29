@@ -144,6 +144,9 @@ describe("the three-year build forecast", () => {
 // The O&M tests below use a 2024 start, which prices at the tables' published 2023 dollars.
 it("shows natural-gas base, per-start, and daily-start estimated O&M", async () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+  // Pin the quote era independently of the scenario preparation start.
+  game.startingYear = 2024;
+  game.date = { ...game.date, year: 2024 };
   const generator = GENERATORS(game, 419000000, [], []).find(
     (candidate) => candidate.name === "Natural Gas Peaker",
   );
@@ -223,6 +226,9 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+  // Pin the quote era independently of the scenario preparation start.
+  game.startingYear = 2024;
+  game.date = { ...game.date, year: 2024 };
   const generator = GENERATORS(game, 650000000, [], []).find(
     (candidate) => candidate.name === "Coal",
   );
@@ -251,6 +257,9 @@ it("shows Coal's start charge without the representative-day breakdown", () => {
 
 it("shows Oil's fixed, variable, and expected-output O&M", () => {
   const game = createGame({ scenarioId: 111, difficulty: "CEO" });
+  // Pin the quote era independently of the scenario preparation start.
+  game.startingYear = 2024;
+  game.date = { ...game.date, year: 2024 };
   const generator = GENERATORS(game, 100000000, [], []).find(
     (candidate) => candidate.name === "Oil",
   );

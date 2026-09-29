@@ -1095,11 +1095,11 @@ export const SCENARIOS: ScenarioType[] = [
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
-    startingYear: 2004,
+    startingYear: 2003,
     cash: 275000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.094, // 0.6 x EIA 2004 HI average retail, 15.7 cents
-    durationMonths: 12 * 12,
+    durationMonths: 156,
     facilities: [
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
       { fuel: "Wind", peakW: 150000000, initialAgeYears: 8 },
@@ -1217,7 +1217,7 @@ export const SCENARIOS: ScenarioType[] = [
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
       objective:
-        "Build dependable generation and storage before data centers connect.",
+        "Build dependable generation and storage before Data Centers connect.",
       threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
@@ -1248,11 +1248,11 @@ export const SCENARIOS: ScenarioType[] = [
     loadAdditions: [
       {
         id: "manassas-data-centers",
-        label: "New data centers",
+        label: "Data Centers",
         startsYear: 2026,
         peakW: 100000000,
         loadFactor: 0.9,
-        demandType: "Data centers",
+        demandType: "Data Centers",
       },
     ],
     endTitle: "The municipal grid, transformed",
@@ -1345,8 +1345,8 @@ export const SCENARIOS: ScenarioType[] = [
       threat: "Rising heat will cut hydro inflow and nuclear output.",
     },
     ownership: "Public",
-    startingYear: 2024,
-    durationMonths: 36,
+    startingYear: 2023,
+    durationMonths: 48,
     startingCustomers: 900000,
     // Calibrates the game's account-based demand to 1% of Spain's 248.811TWh 2024 demand.
     // https://www.ree.es/es/sala-de-prensa/actualidad/nota-de-prensa/2025/03/la-produccion-renovable-crece-en-Espana-un-10-3-por-ciento-2024-alcanza-mayores-registros
@@ -1414,8 +1414,8 @@ export const SCENARIOS: ScenarioType[] = [
         "The shutdown date is hidden, and the reactor will remain offline for the rest of the mission.",
     },
     ownership: "Public",
-    startingYear: 2024,
-    durationMonths: 48,
+    startingYear: 2023,
+    durationMonths: 60,
     startingCustomers: 900000,
     dollarsPerkWh: 0.14,
     cash: 180000000,
@@ -1468,8 +1468,8 @@ export const SCENARIOS: ScenarioType[] = [
         "Safety shutoffs will cut sales, constrain part of the fleet, and raise restoration costs.",
     },
     ownership: "Public",
-    startingYear: 2024,
-    durationMonths: 36,
+    startingYear: 2022,
+    durationMonths: 60,
     // A 1%-scale model of LADWP's roughly 1.6 million electric customers and 20,749 GWh of
     // FY2023-24 retail sales. The demand scale reconciles the account-based load model to that
     // annual energy total. https://www.ladwp.com/who-we-are/power-system
@@ -1535,8 +1535,8 @@ export const SCENARIOS: ScenarioType[] = [
         "Unplanned breakdowns take more of the coal fleet offline every year, and the diesel peakers that cover them burn cash.",
     },
     ownership: "Public",
-    startingYear: 2018,
-    durationMonths: 60,
+    startingYear: 2016,
+    durationMonths: 84,
     // A 1%-scale model of Eskom's roughly 6.8 million direct and municipal customers, with the
     // demand scale reconciling the account-based load model to about 2.2TWh a year, a hundredth
     // of Eskom's roughly 208TWh of annual sales.
@@ -1609,8 +1609,8 @@ export const SCENARIOS: ScenarioType[] = [
         "Reservoir inflow falls year after year, and a fleet with no other firm generation has nothing to fall back on.",
     },
     ownership: "Public",
-    startingYear: 2014,
-    durationMonths: 48,
+    startingYear: 2012,
+    durationMonths: 72,
     // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 0.55TWh a year,
     // which is what a fifth of its metered household and commercial sales actually came to.
     // Zambia's whole system is smaller than one scenario at the 1% scale the larger grids use.
@@ -1625,7 +1625,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         id: "copperbelt-mines",
         label: "Copperbelt mines",
-        startsYear: 2014,
+        startsYear: 2012,
         peakW: 65000000,
         loadFactor: 0.95,
         demandType: "Mining",
@@ -1707,8 +1707,8 @@ export const SCENARIOS: ScenarioType[] = [
         "Extreme heat raises demand and cuts thermal output. A late monsoon prolongs the strain.",
     },
     ownership: "Public",
-    startingYear: 2021,
-    durationMonths: 48,
+    startingYear: 2018,
+    durationMonths: 84,
     // A 10%-scale model of Delhi's roughly 5.8 million distribution connections, with the demand
     // scale reconciling the account-based load model to about 3.5TWh a year, a tenth of the
     // city's 36TWh. https://cea.nic.in/general-review-report/

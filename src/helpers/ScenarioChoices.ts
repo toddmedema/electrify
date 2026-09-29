@@ -3,6 +3,7 @@ import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
 import { wildfirePreparedness } from "./Wildfire";
+import { SCENARIO_PREPARATION_MONTHS } from "../data/ScenarioPreparation";
 
 /** Keep the price and consequence in one sentence, using the active difficulty's terms. */
 export function scenarioChoiceDescription(
@@ -32,7 +33,10 @@ export function pendingScenarioChoice(
   return definitions.find(
     (choice) =>
       choice.scenarioId === game.scenarioId &&
-      game.date.minute >= choice.atMonth * MINUTES_PER_MONTH &&
+      game.date.minute >=
+        (choice.atMonth +
+          (SCENARIO_PREPARATION_MONTHS[choice.scenarioId] || 0)) *
+          MINUTES_PER_MONTH &&
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );
 }

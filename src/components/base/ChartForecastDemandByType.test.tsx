@@ -23,7 +23,7 @@ it("makes every demand category readable without the canvas", () => {
           Industrial: 220,
           Transportation: 10,
           Mining: 0,
-          "Data centers": 40,
+          "Data Centers": 40,
         }),
         tick(1440, {
           Residential: 400,
@@ -31,7 +31,7 @@ it("makes every demand category readable without the canvas", () => {
           Industrial: 220,
           Transportation: 12,
           Mining: 0,
-          "Data centers": 55,
+          "Data Centers": 55,
         }),
       ]}
       domain={{ x: [0, 1440] }}
@@ -47,7 +47,7 @@ it("makes every demand category readable without the canvas", () => {
   expect(chart).toHaveAccessibleName(/Commercial:/);
   expect(chart).toHaveAccessibleName(/Industrial:/);
   expect(chart).toHaveAccessibleName(/Transportation:/);
-  expect(chart).toHaveAccessibleName(/Data centers:/);
+  expect(chart).toHaveAccessibleName(/Data Centers:/);
 });
 
 it("orders the legend and tooltip by demand at the start of the plotted range", () => {
@@ -57,7 +57,7 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
     Industrial: 30,
     Transportation: 20,
     Mining: 0,
-    "Data centers": 10,
+    "Data Centers": 10,
   };
   const atStart = {
     Residential: 200,
@@ -65,7 +65,7 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
     Industrial: 300,
     Transportation: 100,
     Mining: 0,
-    "Data centers": 400,
+    "Data Centers": 400,
   };
   const timeline = [
     tick(-1440, beforeRange),
@@ -76,7 +76,7 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
   const ordered = demandTypesBySizeAtStart(timeline, 0);
   expect(ordered).toEqual([
     "Commercial",
-    "Data centers",
+    "Data Centers",
     "Industrial",
     "Residential",
     "Transportation",
@@ -96,13 +96,13 @@ it("shows an authored load label without changing its demand category", () => {
     Industrial: 50,
     Transportation: 25,
     Mining: 0,
-    "Data centers": 100,
+    "Data Centers": 100,
   };
   expect(
-    formatDemandTypeTooltip(0, breakdown, 2020, ["Data centers"], {
-      "Data centers": "New data centers",
+    formatDemandTypeTooltip(0, breakdown, 2020, ["Data Centers"], {
+      "Data Centers": "Campus demand",
     }),
-  ).toContain("New data centers: 100W");
+  ).toContain("Campus demand: 100W");
 
   render(
     <ChartForecastDemandByType
@@ -110,12 +110,12 @@ it("shows an authored load label without changing its demand category", () => {
       domain={{ x: [0, 1440] }}
       startingYear={2020}
       multiyear={false}
-      typeLabels={{ "Data centers": "New data centers" }}
+      typeLabels={{ "Data Centers": "Campus demand" }}
     />,
   );
   expect(
     screen.getByRole("img", {
-      name: /new data centers/i,
+      name: /Campus demand/i,
     }),
   ).toBeInTheDocument();
 });

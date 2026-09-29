@@ -1,3 +1,4 @@
+import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { getHydroAvailability } from "./HydroSites";
 import {
   batteryYearsToBuild,
@@ -295,6 +296,7 @@ export function GENERATORS(
   const storyContext = {
     seed: state.seed,
     scenarioId: state.scenarioId,
+    customEvents: customEventContext(state.customScenario),
     difficulty: state.difficulty,
     location: state.location,
     snapshot: storySnapshot,

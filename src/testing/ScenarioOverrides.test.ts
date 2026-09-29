@@ -4,7 +4,10 @@ import { withScenarioOverrides } from "./ScenarioOverrides";
 import { createGame } from "./Simulator";
 
 const shale = SCENARIOS.find((scenario) => scenario.id === 103)!;
-const recent = SCENARIOS.find((scenario) => scenario.startingYear === 2024)!;
+const recent = {
+  ...SCENARIOS.find((scenario) => scenario.id === 108)!,
+  startingYear: 2024,
+};
 
 function money(scenario: ScenarioType) {
   return [scenario.cash, scenario.dollarsPerkWh, scenario.feePerKgCO2e];

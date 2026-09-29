@@ -1,3 +1,4 @@
+import { customEventContext } from "../../helpers/CustomScenarioEvents";
 import {
   AppStateType,
   ConceptNameType,
@@ -89,6 +90,7 @@ export function selectUpcomingStoryEvents(
       (event) => event.key === WILDFIRE_DECISION_KEY,
     )?.attributes.choice || "standard",
     JSON.stringify(game.loadAdditions),
+    JSON.stringify(customEventContext(game.customScenario)),
     historyKey,
     fleetKey,
   ].join("|");
@@ -98,6 +100,7 @@ export function selectUpcomingStoryEvents(
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
     seed: game.seed,
     scenarioId: game.scenarioId,
+    customEvents: customEventContext(game.customScenario),
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,

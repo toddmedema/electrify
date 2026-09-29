@@ -8,11 +8,6 @@ import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreRuleText } from "../../helpers/Scoring";
 import { formatRequiredShare } from "../../helpers/ObjectiveRules";
-import {
-  meaningfulDecisionCategoryCount,
-  meaningfulDecisionRequirement,
-  MEANINGFUL_DECISION_CATEGORY_LABELS,
-} from "../../helpers/MeaningfulDecisions";
 
 export interface Props {
   ownership: ScenarioType["ownership"];
@@ -40,57 +35,11 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   } = props;
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
-  const decisions = props.meaningfulDecisions ?? [];
-  const requirement = props.difficulty
-    ? meaningfulDecisionRequirement(props.difficulty)
-    : null;
-  const decisionProgress = requirement ? (
-    <div data-testid="meaningful-decision-progress">
-      {props.meaningfulDecisionGateWaived ? (
-        <p>
-          This game began before decision tracking was added, so its original
-          victory rules still apply.
-        </p>
-      ) : (
-        <>
-          <p>
-            Required: make {requirement.count} meaningful decision
-            {requirement.count === 1 ? "" : "s"} that change the grid or its
-            economics
-            {requirement.categories > 1
-              ? ` across at least ${requirement.categories} decision types`
-              : ""}
-            . Progress: {decisions.length} of {requirement.count}
-            {requirement.categories > 1
-              ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
-              : ""}
-            .
-          </p>
-          <p>
-            Decision counts are learning goals for this game, not a real utility
-            standard. Meeting a score target does not waive required objectives.
-          </p>
-          {decisions.length > 0 && (
-            <ul data-testid="meaningful-decision-history">
-              {decisions.map((decision) => (
-                <li key={decision.key}>
-                  {decision.label} —{" "}
-                  {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </div>
-  ) : null;
   const requiredObjectives = (
     <>
       <p>
-        Regular scenarios end early if cash is negative at a month-end check, or
-        if less than 90% of demand is served in each of three consecutive
-        completed months. These are game failure rules, not regulatory
-        standards.
+        In all scenarios, you fail if you go bankrupt or serve less than 90% of
+        demand in three consecutive months.
       </p>
       {reliabilityObjective !== undefined && (
         <p>
@@ -116,7 +65,6 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   const rules = scoreRuleText(ownership, dollarsPerkWh, perEmissions);
   return (
     <div>
-      {decisionProgress}
       {requiredObjectives}
       {Object.entries(rules).map(([category, rule]) => (
         <p key={category}>{rule}</p>

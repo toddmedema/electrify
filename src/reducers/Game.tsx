@@ -1,3 +1,4 @@
+import { customEventContext } from "../helpers/CustomScenarioEvents";
 import {
   gasConversionQuote,
   completeGasConversion,
@@ -646,13 +647,15 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   );
   if (
     state.storyEffectsDisabled ||
-    !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
+    (!state.customScenario?.eventScenarioIds?.length &&
+      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
   ) {
     return storyPriceFuels;
   }
   const resolved = resolveStoryAtDate({
     seed: state.seed,
     scenarioId: state.scenarioId,
+    customEvents: customEventContext(state.customScenario),
     difficulty: state.difficulty,
     date: state.date,
     location: state.location,
@@ -1255,6 +1258,7 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
+    !!state.customScenario?.eventScenarioIds?.length ||
     state.scenarioId === 104 ||
     state.scenarioId === 111 ||
     (state.scenarioId === 102 &&
@@ -1277,6 +1281,7 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     : "";
   return [
     state.scenarioId,
+    JSON.stringify(customEventContext(state.customScenario)),
     state.difficulty,
     state.seed,
     date.monthsElapsed,
@@ -1321,7 +1326,8 @@ function storyEffectsAt(date: DateType, state: GameType) {
   );
   if (
     state.storyEffectsDisabled ||
-    !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
+    (!state.customScenario?.eventScenarioIds?.length &&
+      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
   ) {
     const effects = combineStoryEffects(persisted);
     storyEffectsCache.set(cacheKey, effects);
@@ -1331,6 +1337,7 @@ function storyEffectsAt(date: DateType, state: GameType) {
   const scheduled = resolveStoryAtDate({
     seed: state.seed,
     scenarioId: state.scenarioId,
+    customEvents: customEventContext(state.customScenario),
     difficulty: state.difficulty,
     date,
     location: state.location,
@@ -4824,7 +4831,7 @@ export function generateNewTimeline(
         Industrial: 0,
         Transportation: 0,
         Mining: 0,
-        "Data centers": 0,
+        "Data Centers": 0,
       },
       solarIrradianceWM2: 0,
       windKph: 0,
