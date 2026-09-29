@@ -1,4 +1,8 @@
-import { activeScenario, currentCash } from "../../helpers/GameSelectors";
+import {
+  activeScenario,
+  currentCash,
+  currentTick,
+} from "../../helpers/GameSelectors";
 import * as React from "react";
 import {
   Alert,
@@ -60,7 +64,6 @@ import {
 import {
   formatPercent,
   formatMoneyConcise,
-  formatMoneyStable,
   formatWatts,
   formatWattHours,
 } from "../../helpers/Format";
@@ -91,8 +94,9 @@ import {
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
-import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../base/ManualEntries";
+import { generateNewTimeline } from "../../reducers/Game";
+import { HOURS_PER_YEAR_REAL, TICKS_PER_YEAR } from "../../Constants";
+import { getSolarOutputFactor } from "../../helpers/Energy";
 import {
   policyWindowLabel,
   suggestedPolicyStartHour,
@@ -109,18 +113,6 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
 };
 const WILDFIRE_SUMMARY =
   "Crews, inspections and vegetation clearing halve wildfire disconnections and generator losses at full strength. Protection builds over 12 months and fades over 12 months after funding stops; fires and restoration costs remain.";
-
-function monthlyCostLabel(game: GameType, cost: number): string {
-  const month = game.date.monthsElapsed;
-  const profit = deriveExpandedSummary(
-    summarizeTimeline(
-      game.timeline,
-      game.startingYear,
-      (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === month,
-    ),
-  ).profit;
-  return `${formatMoneyConcise(cost)}/mo (current profit: ${formatMoneyConcise(profit)}/mo)`;
-}
 
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
@@ -143,6 +135,51 @@ function BuildoutSummary({
   effective: number;
   end: number;
 }) {
+  const snapshot = useEstimateSnapshot(game);
+  const solar = React.useMemo(() => {
+    const now = currentTick(snapshot);
+    if (id !== "solar" || !now) return undefined;
+    // A full year avoids presenting a single sunny or dark month as annual production.
+    const ticks = generateNewTimeline(
+      snapshot,
+      now.cash,
+      now.customers,
+      TICKS_PER_YEAR,
+    );
+    const peakW = POLICIES.solar.cap * programCustomers(snapshot);
+    const facility = GENERATORS(
+      snapshot,
+      peakW,
+      [],
+      ticks.map((t) => t.solarIrradianceWM2),
+    ).find((g) => g.name === "Solar");
+    if (!facility) return undefined;
+    const annualWh =
+      (peakW *
+        HOURS_PER_YEAR_REAL *
+        ticks.reduce(
+          (sum, tick) =>
+            sum +
+            getSolarOutputFactor(tick.solarIrradianceWM2, tick.temperatureC),
+          0,
+        )) /
+      ticks.length;
+    const energy = (wh: number) => `${formatWattHours(wh)}/yr`;
+    return {
+      impact: `${formatWatts(peakW)} (est ${energy(annualWh * POLICIES.solar.derate)}) of rooftop panels`,
+      label: `Facility comparable (${formatWatts(peakW)}/${energy(annualWh)})`,
+      cost: `${formatMoneyConcise(facility.buildCost)} upfront + ${formatMoneyConcise(facility.annualOperatingCost / 12)}/mo`,
+    };
+  }, [snapshot, id]);
+  const profit = deriveExpandedSummary(
+    summarizeTimeline(
+      game.timeline,
+      game.startingYear,
+      (tick) =>
+        Math.floor(tick.minute / MINUTES_PER_MONTH) === game.date.monthsElapsed,
+    ),
+  ).profit;
+  const impact = solar?.impact ?? buildoutImpact(game, id);
   const months = buildoutMonths(id);
   const complete = buildoutComplete(program.adoption);
   const done = buildoutMonthsDone(id, program.adoption);
@@ -158,43 +195,30 @@ function BuildoutSummary({
       ? "Finishes"
       : program.tier === "On"
         ? undefined
-        : program.adoption > 0
-          ? "If resumed now"
-          : "If started now";
+        : "If resumed now";
   const facts: [string, string][] = complete
     ? [
-        ["Result", buildoutImpact(game, id)],
-        ["Total cost", formatMoneyConcise(program.spent)],
+        ["Result", impact],
+        ["Cost", formatMoneyConcise(program.spent)],
       ]
     : [
-        ["Total cost", `About ${formatMoneyConcise(total)}`],
         [
-          "Monthly cost",
-          monthlyCostLabel(game, policyBudget(game, id, "On", effective)),
+          "Cost",
+          `${formatMoneyConcise(total)} (${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo vs ${formatMoneyConcise(profit)}/mo profit)`,
         ],
-        ["At completion", buildoutImpact(game, id)],
+        ["At completion", impact],
       ];
-  if (id === "solar") {
-    const capacityMW = (POLICIES.solar.cap * programCustomers(game)) / 1000000;
-    // Use an actual 150 MW quote, including difficulty and current story prices.
-    // Capital per MW makes no unsupported assumption about panel life or exported energy.
-    const solar = GENERATORS(game, 150000000, [], []).find(
-      (generator) => generator.name === "Solar",
-    );
-    if (capacityMW > 0 && solar?.available)
-      facts.push([
-        "Upfront utility cost / MW",
-        `${formatMoneyConcise(policyTotalCost(game, id, game.date.monthsElapsed) / capacityMW)} rooftop rebates · ${formatMoneyConcise(solar.buildCost / 150)} solar plant (150 MW)`,
-      ]);
-  }
-  // Progress already says how far a started project has to go.
   if (!complete && program.adoption === 0)
-    facts.unshift(["Duration", `${months} months of installations`]);
-  if (!complete && finishLabel)
+    facts.unshift([
+      "Duration",
+      `${months} months (${finish < end ? labelMonth(game, finish) : "After this run ends"})`,
+    ]);
+  if (!complete && program.adoption > 0 && finishLabel)
     facts.push([
       finishLabel,
       finish < end ? labelMonth(game, finish) : "After this run ends",
     ]);
+  if (solar) facts.push([solar.label, solar.cost]);
   const progress = complete
     ? programStatus(game, id, program)
     : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent`;
@@ -225,12 +249,10 @@ function BuildoutSummary({
           </React.Fragment>
         ))}
       </Box>
-      {id === "solar" && (
-        <Typography variant="body2" color="textSecondary">
-          Costs compare installed capacity, not energy delivered. Rebates
-          exclude customers' contributions; the plant price excludes operating
-          and financing costs. Rooftops also produce less per MW because of
-          shading and orientation.
+      {solar && (
+        <Typography variant="body2" color="text.secondary">
+          Rooftops produce less per MW because of shading and orientation, but
+          the utility does not pay full installation cost nor maintenance.
         </Typography>
       )}
     </Box>
@@ -723,7 +745,7 @@ function PolicyProgramDetail({
       ) : (
         <>
           <Typography component="h3" variant="subtitle1">
-            Estimated utility demand · {labelMonth(game, month)}
+            Estimated demand · {labelMonth(game, month)}
           </Typography>
           {error ? (
             <Alert severity="error">{error}</Alert>
@@ -937,7 +959,7 @@ function ProgramsScreen({ onClose }: { onClose: () => void }) {
               <span className="programsTitleShort">Programs</span>
             </>
           }
-          titleAdornment={<ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />}
+          compactCash
           titleComponent="h1"
           titleId="program-title"
           cash={cash}
@@ -950,13 +972,6 @@ function ProgramsScreen({ onClose }: { onClose: () => void }) {
         role="region"
         aria-label={title ?? "Programs"}
       >
-        <div
-          className="programsMobileCash weak"
-          aria-label={`Available cash ${formatMoneyStable(cash)}`}
-        >
-          {formatMoneyStable(cash)} cash
-          <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
-        </div>
         {!selected ? (
           <ProgramList
             game={game}

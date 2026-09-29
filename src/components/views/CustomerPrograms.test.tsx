@@ -10,9 +10,14 @@ import * as preview from "../../helpers/PolicyPreview";
 import { previewPolicy } from "../../helpers/PolicyPreview";
 import CustomerPrograms from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
+import { GENERATORS } from "../../data/Facilities";
 import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
-import { emptyPolicies, policyBudget } from "../../helpers/Policies";
+import {
+  emptyPolicies,
+  policyBudget,
+  programCustomers,
+} from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -244,11 +249,9 @@ test.each<PolicyId>(["solar", "efficiency"])(
       screen.queryByRole("button", { name: "View demand" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("How it works")).not.toBeInTheDocument();
-    expect(fact("Monthly cost")).toMatch(/\/mo \(current profit: .*\/mo\)/);
-    expect(fact("Upfront utility cost / MW")).toEqual(
-      id === "solar"
-        ? expect.stringMatching(/rooftop rebates · .* solar plant \(150 MW\)/)
-        : undefined,
+    expect(fact("Cost")).toMatch(/\/mo vs .*\/mo profit\)/);
+    expect(screen.queryByText(/^Facility comparable/) !== null).toBe(
+      id === "solar",
     );
     expect(screen.getByText(/^Electricity supplied:/)).toBeVisible();
     const hint = screen.getByText(/^Little change in peak demand/);
@@ -290,7 +293,7 @@ test("a paused build-out keeps its progress and offers to resume", () => {
     }),
   ).toHaveAttribute("aria-valuenow", "17");
   expect(
-    screen.getByText(/^Paused after month 8 of 48 · \$[\d.]+[KMB]? spent$/),
+    screen.getByText(/^Paused after month 8 of 48 · \$[\d.]+[kKMB]? spent$/),
   ).toBeVisible();
   expect(fact("If resumed now")).toBe("May 2023");
   expect(fact("Finishes")).toBeUndefined();
@@ -400,9 +403,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   expect(screen.getByText(/one-time project is finished/)).toBeVisible();
   expect(screen.queryByText("How it works")).not.toBeInTheDocument();
   expect(screen.queryByText(/next month$/)).not.toBeInTheDocument();
-  expect(
-    screen.queryByText(/Estimated utility demand/),
-  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/Estimated demand/)).not.toBeInTheDocument();
   view.unmount();
 });
 
@@ -477,9 +478,7 @@ test.each([
     });
     fireEvent.click(entry);
     expect(screen.getByText(status)).toBeVisible();
-    expect(
-      screen.queryByText(/Estimated utility demand/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Estimated demand/)).not.toBeInTheDocument();
     // A scheduled pause has no finish to promise; a scheduled resume does.
     expect(fact("Finishes")).toBe(finish);
     act(() => jest.advanceTimersByTime(250));
@@ -510,10 +509,8 @@ test("the completion preview is capped at the run's last month", () => {
   fireEvent.click(
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
-  expect(fact("If started now")).toBe("After this run ends");
-  expect(
-    screen.getByText("Estimated utility demand · Dec 2035"),
-  ).toBeInTheDocument();
+  expect(fact("Duration")).toBe("48 months (After this run ends)");
+  expect(screen.getByText("Estimated demand · Dec 2035")).toBeInTheDocument();
   view.unmount();
 });
 
@@ -644,5 +641,56 @@ test("an imported wildfire offers preparedness for its scheduled incident outsid
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
   expect(wildfirePreparedness(store.getState().game)?.active).toBe(true);
+  view.unmount();
+});
+
+test("solar facts compare a same-size facility and distinguish annual energy from capacity", () => {
+  const game = createGame({ scenarioId: 106 });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
+  );
+  expect(fact("Duration")).toBe("48 months (Jan 2024)");
+  expect(fact("If started now")).toBeUndefined();
+  expect(fact("While active")).toBeUndefined();
+  expect(fact("Cost")).toMatch(
+    /\$[\d.]+[kKMB]? \(\$[\d.]+[kKMB]?\/mo vs \$[\d.]+[kKMB]?\/mo profit\)/,
+  );
+  const impact = fact("At completion")!;
+  const comparable = screen
+    .getAllByRole("term")
+    .find((term) =>
+      term.textContent?.startsWith("Facility comparable"),
+    )!.textContent!;
+  const capacity = impact.split(" ")[0];
+  expect(comparable).toContain("(" + capacity + "/");
+  const annualGWh = (text: string) => Number(text.match(/([\d.]+)GWh\/yr/)![1]);
+  expect(
+    Math.abs(annualGWh(impact) - annualGWh(comparable) * POLICIES.solar.derate),
+  ).toBeLessThan(1);
+  const quote = GENERATORS(
+    game,
+    POLICIES.solar.cap * programCustomers(game),
+    [],
+    [],
+  ).find((g) => g.name === "Solar")!;
+  expect(fact(comparable)).toBe(
+    formatMoneyConcise(quote.buildCost) +
+      " upfront + " +
+      formatMoneyConcise(quote.annualOperatingCost / 12) +
+      "/mo",
+  );
+  expect(screen.getByLabelText(/^Available cash/)).not.toHaveTextContent(
+    "cash",
+  );
   view.unmount();
 });

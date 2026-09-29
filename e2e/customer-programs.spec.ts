@@ -58,9 +58,9 @@ for (const theme of ["light", "dark"]) {
       dialog.getByRole("button", { name: "View demand" }),
     ).toHaveCount(0);
     await expect(dialog).toContainText("they do not cover evening peaks");
-    await expect(dialog).toContainText("Upfront utility cost / MW");
-    await expect(dialog).toContainText("current profit:");
-    await expect(dialog).toContainText("48 months of installations");
+    await expect(dialog).toContainText("Facility comparable");
+    await expect(dialog).toContainText("/mo profit)");
+    await expect(dialog).toContainText("48 months (Jan 2024)");
     const facts = dialog.locator(".customerProgramFacts").first();
     expect(
       await facts.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -100,7 +100,7 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath(`comparison-${theme}.png`),
     });
     // The estimate always shows the end of the program, so no toggle is needed.
-    await expect(dialog).toContainText("Estimated utility demand · Jan 2024");
+    await expect(dialog).toContainText("Estimated demand · Jan 2024");
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await apply.click();
     await expect(scheduled).toBeVisible();

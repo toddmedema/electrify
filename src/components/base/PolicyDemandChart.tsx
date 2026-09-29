@@ -42,7 +42,7 @@ export default function PolicyDemandChart({
   current,
   changed,
   labels = ["Current plan", "With this change"],
-  ariaLabel = "Estimated utility demand: current plan and with this change, over a representative day",
+  ariaLabel = "Estimated demand: current plan and with this change, over a representative day",
 }: {
   current: number[];
   changed: number[];

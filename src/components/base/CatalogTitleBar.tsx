@@ -14,6 +14,8 @@ export interface CatalogTitleBarProps {
   /** Sits after the title, such as a manual link */
   titleAdornment?: React.ReactNode;
   cash: number;
+  /** Omit the cash suffix in compact headers. */
+  compactCash?: boolean;
   onClose: () => void;
   closeLabel?: string;
   closeButtonId?: string;
@@ -66,7 +68,8 @@ export default function CatalogTitleBar(
           className="weak constructionCash"
           aria-label={`Available cash ${cash}`}
         >
-          {cash} cash
+          {cash}
+          {props.compactCash ? "" : " cash"}
         </span>
       </Typography>
       {inGame && (
