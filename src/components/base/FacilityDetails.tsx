@@ -1,8 +1,9 @@
 import GasConversion from "./GasConversion";
+import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
-import { Button, DialogContentText, Typography } from "@mui/material";
+import { DialogContentText, Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import ConfirmDialog from "./ConfirmDialog";
 import {
@@ -158,7 +159,6 @@ function WeatherResilienceSection(props: {
   // Paying removes the offer button, so focus moves to the section heading instead of the page
   const [focusHeading, setFocusHeading] = React.useState(0);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
-  const shortfallId = React.useId();
   React.useEffect(() => {
     if (focusHeading > 0) {
       headingRef.current?.focus();
@@ -197,16 +197,15 @@ function WeatherResilienceSection(props: {
       >
         Weather resilience
       </Typography>
-      <dl className="facilityStats">
-        <Stat
-          label={hail ? "Hail protection" : "Cold protection"}
-          value={
-            <>
-              {summary.label}
-              <span className="facilityStatNote">{detail}</span>
-            </>
-          }
-        />
+      <div className="facilityResilienceSummary">
+        <Typography variant="body2" className="facilityStatValue">
+          {summary.label}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          {detail}
+        </Typography>
+      </div>
+      <dl className="facilityResilienceFacts">
         {facility.resilience?.solarTrackers && (
           <Stat
             label="Mounting"
@@ -235,26 +234,12 @@ function WeatherResilienceSection(props: {
         )}
       </dl>
       {canOffer && (
-        <div className="facilityRetrofit">
-          <Button
-            variant="outlined"
-            color="primary"
-            disabled={shortfall > 0}
-            aria-describedby={shortfall > 0 ? shortfallId : undefined}
-            onClick={() => setConfirming(true)}
-          >
-            {actionLabel} · {formatMoneyConcise(cost)}
-          </Button>
-          {shortfall > 0 && (
-            <Typography
-              id={shortfallId}
-              variant="caption"
-              color="textSecondary"
-            >
-              {shortfallText}
-            </Typography>
-          )}
-        </div>
+        <FacilityUpgradeAction
+          label={actionLabel}
+          cost={cost}
+          shortfall={shortfall}
+          onClick={() => setConfirming(true)}
+        />
       )}
       {canOffer && confirming && (
         <ConfirmDialog

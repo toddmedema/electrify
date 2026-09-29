@@ -22,9 +22,7 @@ for (const theme of ["light", "dark"]) {
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });
     await row.locator(".facilityDisclosure").click();
-    await row
-      .getByRole("button", { name: /^Convert to combined cycle/ })
-      .click();
+    await row.getByRole("button", { name: /^Convert ·/ }).click();
     const dialog = page.getByRole("dialog");
     await expectDialogToFit(dialog);
     await expect(dialog).toContainText("6 months");
@@ -47,8 +45,6 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toHaveCount(0);
     await expect(row).toContainText("combined-cycle generation");
     await row.getByRole("button", { name: /^Cancel upgrade of/ }).click();
-    await expect(
-      row.getByRole("button", { name: /^Convert to combined cycle/ }),
-    ).toBeVisible();
+    await expect(row.getByRole("button", { name: /^Convert ·/ })).toBeVisible();
   });
 }
