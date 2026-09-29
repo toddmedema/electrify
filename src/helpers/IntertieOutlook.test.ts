@@ -1,10 +1,16 @@
+import cloneDeep from "lodash.clonedeep";
+import { createGame } from "../testing/Simulator";
 import { DIFFICULTIES } from "../Constants";
 import {
   adjacentMarketForCorridor,
   TRANSMISSION_CORRIDORS,
 } from "../data/AdjacentMarkets";
 import { MINUTES_PER_MONTH } from "./DateTime";
-import { intertieOutlook, pricePeriodCaption } from "./IntertieOutlook";
+import {
+  intertieForecastKey,
+  intertieOutlook,
+  pricePeriodCaption,
+} from "./IntertieOutlook";
 import { IntertieContext, intertieImportLimitW } from "./Transmission";
 
 const intern: IntertieContext = {
@@ -164,4 +170,36 @@ describe("intertie outlook", () => {
       10,
     );
   });
+});
+
+it("invalidates same-month outlooks when scenario choices change loads or story consequences", () => {
+  const game = cloneDeep(createGame({ scenarioId: 111, seed: 12345 }));
+  const before = intertieForecastKey(game);
+  const changedStory = cloneDeep(game);
+  changedStory.worldEvents.occurrences.push({
+    key: "choice-test",
+    definitionId: "choice-test",
+    startsMinute: game.date.minute,
+    endsMinute: game.date.minute + 15,
+    attributes: { scenarioChoice: true, choice: "prepare" },
+    effects: {},
+  });
+  expect(intertieForecastKey(changedStory)).not.toBe(before);
+  const changedLoad = cloneDeep(game);
+  changedLoad.loadAdditions = [
+    {
+      id: "test-load",
+      label: "Campus",
+      demandType: "Data Centers",
+      peakW: 1e6,
+      startsYear: 2024,
+      startsMonth: 1,
+      loadFactor: 0.9,
+    },
+  ];
+  expect(intertieForecastKey(changedLoad)).not.toBe(before);
+  expect(intertieForecastKey({ ...game, storyEffectsDisabled: true })).not.toBe(
+    before,
+  );
+  expect(changedLoad.date.monthsElapsed).toBe(game.date.monthsElapsed);
 });

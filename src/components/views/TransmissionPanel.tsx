@@ -6,10 +6,6 @@ import {
   effectiveMarket,
   IntertieAccessContext,
 } from "../../data/IntertieAccess";
-import {
-  intertiePortfolioOutlook,
-  intertieForecastKey,
-} from "../../helpers/IntertiePortfolio";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
@@ -21,7 +17,6 @@ import {
   Chip,
   FormControl,
   InputLabel,
-  Link,
   MenuItem,
   Select,
   Slider,
@@ -38,10 +33,7 @@ import {
   adjacentMarketForCorridor,
   corridorsForLocation,
 } from "../../data/AdjacentMarkets";
-import {
-  importEmissionsAssumption,
-  importEmissionsKgco2ePerMWh,
-} from "../../data/ImportEmissions";
+import { importEmissionsKgco2ePerMWh } from "../../data/ImportEmissions";
 import {
   corridorAvailableFromYear,
   corridorOpenInYear,
@@ -65,6 +57,7 @@ import {
 } from "../../helpers/Transmission";
 import {
   intertieOutlook,
+  intertieForecastKey,
   IntertieOutlook,
   pricePeriodCaption,
 } from "../../helpers/IntertieOutlook";
@@ -118,8 +111,8 @@ const OUTLOOK_YEARS = 2;
 
 /**
  * A two-year hourly forecast, refreshed each month and whenever a portfolio, policy or story
- * decision changes its inputs. Excludes unfinished assets; the comparison assumes the candidate
- * is already open. Undefined while disabled or before the first tick exists. A refresh is
+ * decision changes its inputs. Excludes unfinished assets. Undefined while disabled or before
+ * the first tick exists. A refresh is
  * computed after paint, so the month rollover's frame keeps drawing last month's outlook.
  */
 function useIntertieForecast(
@@ -215,29 +208,6 @@ function IntertieYear({
   );
 }
 
-/** Where a neighbour's carbon figure comes from, beside the details that describe it. */
-function ImportEmissionsNote({ marketId }: { marketId: string }) {
-  const assumption = importEmissionsAssumption(marketId);
-  return (
-    <Typography
-      className="buildOptionDescription intertieEmissionsNote"
-      variant="caption"
-      color="textSecondary"
-      component="p"
-    >
-      Emissions: {assumption.emissionsBasis}.{" "}
-      <Link
-        href={assumption.emissionsSource}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Source for this neighbor's emissions"
-      >
-        Source
-      </Link>
-    </Typography>
-  );
-}
-
 function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
   const periods = pricePeriodCaption(outlook);
   return (
@@ -253,7 +223,7 @@ function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
  * One buildable corridor, laid out like the generator and storage purchase cards: heading and
  * Review button, the reason it can't be bought when it can't, a metric grid, then everything
  * that helps you compare neighbours behind the same disclosure. Supply availability leads the
- * details, followed by the candidate’s contribution to the current fleet.
+ * details, followed by import conditions and construction emissions.
  */
 function IntertieBuildItem(props: {
   corridor: TransmissionCorridorDefinitionType;
@@ -266,7 +236,6 @@ function IntertieBuildItem(props: {
   spareCapacityW: number;
   constructionKgco2eTotal: number;
   year: number;
-  renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
@@ -349,7 +318,7 @@ function IntertieBuildItem(props: {
           )}
         </>
       }
-      details={(expanded) => (
+      details={
         <>
           {outlook && (
             <Box className="buildOptionDetailBody">
@@ -388,12 +357,9 @@ function IntertieBuildItem(props: {
               yearsToBuild={corridor.yearsToBuild}
               units={units}
             />
-            {expanded && props.renderPortfolio()}
           </Box>
-
-          {market && <ImportEmissionsNote marketId={market.id} />}
         </>
-      )}
+      }
     />
   );
 }
@@ -971,43 +937,6 @@ export default function TransmissionPanel({
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
                   readOnly={readOnly}
                   units={units}
-                  renderPortfolio={() => {
-                    const portfolio =
-                      forecast &&
-                      intertiePortfolioOutlook(
-                        game,
-                        corridor.id,
-                        forecast,
-                        OUTLOOK_STEP_MINUTES,
-                        corridor.capacityW,
-                      );
-                    return portfolio ? (
-                      <>
-                        <BuildMetric
-                          label="Added shortfall coverage"
-                          value={percent(portfolio.marginalCoverage)}
-                        />
-                        <BuildMetric
-                          label="Largest remaining shortfall"
-                          value={formatWatts(portfolio.worstGapW)}
-                        />
-                        <BuildMetric
-                          label="Purchase cost change / year"
-                          value={formatMoneyConcise(
-                            portfolio.additionalEnergyCost,
-                          )}
-                        />
-                        <Typography
-                          className="intertieForecastNote"
-                          variant="caption"
-                          color="textSecondary"
-                        >
-                          If open with your current fleet · imports only;
-                          excludes upkeep and financing
-                        </Typography>
-                      </>
-                    ) : null;
-                  }}
                   onReview={() => setReviewId(corridor.id)}
                 />
               );

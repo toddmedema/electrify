@@ -33,14 +33,17 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
     await expect(card).not.toContainText("Portfolio outlook");
-    await expect(card).toContainText("Added shortfall coverage");
-    await expect(card).toContainText("Largest remaining shortfall");
+    await expect(card).not.toContainText("Added shortfall coverage");
+    await expect(card).not.toContainText("Largest remaining shortfall");
     await expect(card).not.toContainText("Gap with half the spare supply");
     await expect(card.locator(".MuiCollapse-root")).toHaveClass(
       /MuiCollapse-entered/,
     );
     const chart = card.locator(".intertieAvailability");
     const details = card.locator(".intertieDetailMetrics");
+    await expect(details.locator(".buildOptionMetric")).toHaveCount(4);
+    await expect(card).not.toContainText("Purchase cost change / year");
+    await expect(card).not.toContainText("If open with your current fleet");
     const chartBox = (await chart.boundingBox())!;
     const detailBox = (await details.boundingBox())!;
     expect(chartBox.y + chartBox.height).toBeLessThanOrEqual(detailBox.y);

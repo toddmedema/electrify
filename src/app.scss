@@ -1219,9 +1219,6 @@ $pane_header_height: 48px;
       min-width: 0;
     }
   }
-  .intertieForecastNote {
-    flex-basis: 100%;
-  }
 }
 
 // Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the
@@ -4980,15 +4977,6 @@ $sizemap: (
   .buildOptionWarning,
   .buildOptionDescription {
     padding: 0 12px 8px;
-  }
-  // The citation is a real control, so it keeps the shared tap height inside running text
-  .intertieEmissionsNote a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 40px;
-    @media (pointer: coarse) {
-      min-height: 44px;
-    }
   }
   .buildOptionFooter {
     display: flex;
