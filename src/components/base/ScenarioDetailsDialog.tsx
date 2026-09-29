@@ -81,7 +81,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const facts = [
     {
       label: "Timeframe",
-      value: `${scenario.startingYear}â€“${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
+      value: `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
     },
     ...(location ? [{ label: "Location", value: location.name }] : []),
     { label: "Difficulty", value: DIFFICULTY_LABELS[game.difficulty] },
@@ -115,46 +115,37 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
       <Box
         sx={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: "center",
+          minHeight: 56,
+          pl: 2,
+          pr: 1,
           gap: 1,
-          p: { xs: 2, sm: 3 },
+          flexShrink: 0,
         }}
       >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ lineHeight: 1.5 }}
-          >
-            Scenario details
-          </Typography>
-        </Box>
-        <IconButton
-          aria-label="Close scenario details"
-          onClick={onClose}
-          sx={{
-            width: 40,
-            height: 40,
-            "@media (pointer: coarse)": { width: 44, height: 44 },
-          }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
         <DialogTitle
           id="scenario-details-title"
           sx={{
             "&&": { p: 0 },
-            mb: 2,
-            fontSize: { xs: 24, sm: 28 },
-            fontWeight: 600,
-            lineHeight: 1.2,
+            flex: 1,
+            minWidth: 0,
+            typography: "h6",
             overflowWrap: "anywhere",
           }}
         >
           {scenario.name}
         </DialogTitle>
+        <IconButton
+          aria-label="Close scenario details"
+          onClick={onClose}
+          color="primary"
+          size="large"
+          sx={{ flexShrink: 0 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </Box>
+      <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
         <Box
           component="dl"
           sx={{

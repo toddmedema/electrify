@@ -232,12 +232,12 @@ test("insights header controls stay aligned in one compact row", async ({
     page.getByRole("button", { name: "Preset actions" }),
     page.getByRole("button", { name: /^Layers \(/ }),
   ];
+  await expect(
+    page.getByRole("button", { name: "Save", exact: true }),
+  ).toHaveCount(0);
   const compact = await insights.evaluate((element) =>
     element.classList.contains("insightsCompact"),
   );
-  if (!compact) {
-    controls.splice(1, 0, page.getByRole("button", { name: "Save" }));
-  }
   const boxes = await Promise.all(
     controls.map((control) => control.boundingBox()),
   );
