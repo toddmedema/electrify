@@ -104,9 +104,19 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => setSystemDark(query.matches);
     query.addEventListener("change", onChange);
+    // An installed app can be suspended while the OS theme changes.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") onChange();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onChange);
     // The listener can only have missed something between the first render and here
     onChange();
-    return () => query.removeEventListener("change", onChange);
+    return () => {
+      query.removeEventListener("change", onChange);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onChange);
+    };
   }, []);
 
   const mode =
@@ -119,11 +129,27 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   // that subscribed to it, and waking a component while another one is rendering is exactly
   // what React warns about. Before paint, so neither of the two lands a frame late
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = mode;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
+    const syncBrowserTheme = () => {
+      document.documentElement.dataset.theme = mode;
+      document.documentElement.style.colorScheme = mode;
+      document
+        .querySelector('meta[name="color-scheme"]')
+        ?.setAttribute("content", mode);
+      document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncBrowserTheme();
+    };
+    syncBrowserTheme();
     setThemeMode(mode);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", syncBrowserTheme);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", syncBrowserTheme);
+    };
   }, [mode]);
 
   return (
