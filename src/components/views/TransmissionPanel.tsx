@@ -6,10 +6,6 @@ import {
   effectiveMarket,
   IntertieAccessContext,
 } from "../../data/IntertieAccess";
-import {
-  intertiePortfolioOutlook,
-  intertieForecastKey,
-} from "../../helpers/IntertiePortfolio";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
@@ -21,10 +17,8 @@ import {
   Chip,
   FormControl,
   InputLabel,
-  Link,
   MenuItem,
   Select,
-  Slider,
   Typography,
 } from "@mui/material";
 import {
@@ -36,13 +30,9 @@ import {
 } from "../../Constants";
 import {
   adjacentMarketForCorridor,
-  corridorById,
   corridorsForLocation,
 } from "../../data/AdjacentMarkets";
-import {
-  importEmissionsAssumption,
-  importEmissionsKgco2ePerMWh,
-} from "../../data/ImportEmissions";
+import { importEmissionsKgco2ePerMWh } from "../../data/ImportEmissions";
 import {
   corridorAvailableFromYear,
   corridorOpenInYear,
@@ -66,6 +56,7 @@ import {
 } from "../../helpers/Transmission";
 import {
   intertieOutlook,
+  intertieForecastKey,
   IntertieOutlook,
   pricePeriodCaption,
 } from "../../helpers/IntertieOutlook";
@@ -94,6 +85,14 @@ import Sparkline from "../base/Sparkline";
 import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
+import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+
+type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
+const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
+  ["yearsToBuild", "Fastest"],
+  ["buildCost", "Cheapest"],
+  ["emissions", "Lowest emissions"],
+];
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -119,8 +118,8 @@ const OUTLOOK_YEARS = 2;
 
 /**
  * A two-year hourly forecast, refreshed each month and whenever a portfolio, policy or story
- * decision changes its inputs. Excludes unfinished assets; the comparison assumes the candidate
- * is already open. Undefined while disabled or before the first tick exists. A refresh is
+ * decision changes its inputs. Excludes unfinished assets. Undefined while disabled or before
+ * the first tick exists. A refresh is
  * computed after paint, so the month rollover's frame keeps drawing last month's outlook.
  */
 function useIntertieForecast(
@@ -157,56 +156,62 @@ function useIntertieForecast(
 }
 
 /** Typical-year import room, drawn like the generator build cards' output lines */
-function IntertieYear({ outlook }: { outlook: IntertieOutlook }) {
+function IntertieYear({
+  outlook,
+  prominent = false,
+}: {
+  outlook: IntertieOutlook;
+  prominent?: boolean;
+}) {
   const { monthly, lowMonth } = outlook;
   const highMonth = monthly.reduce(
     (high, value, month) => (value > monthly[high] ? month : high),
     0,
   );
   return (
-    <figure className="intertieYear">
+    <figure
+      className={`intertieYear${prominent ? " intertieAvailability" : ""}`}
+    >
+      {prominent && (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          component="figcaption"
+        >
+          Typical import availability · % of line
+        </Typography>
+      )}
+      {prominent && <span className="intertieAvailabilityLimit">100%</span>}
       <Sparkline
         values={monthly}
         domain={[0, 1]}
-        width={96}
-        height={24}
+        width={prominent ? 480 : 96}
+        height={prominent ? 80 : 24}
         stretch
         baseline
         fill
-        lowMarker
+        lowMarker={!prominent}
         ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${percent(monthly[highMonth])} of the line, least in ${MONTH_NAMES[lowMonth]} at ${percent(monthly[lowMonth])}.`}
       />
-      <Typography
-        variant="caption"
-        color="textSecondary"
-        component="figcaption"
-      >
-        Typical year · Low {MONTHS[lowMonth]} {percent(monthly[lowMonth])}
-      </Typography>
+      {prominent && <span className="intertieAvailabilityLimit">0%</span>}
+      {prominent ? (
+        <div className="intertieAvailabilityLabels">
+          <span>Jan</span>
+          <span>
+            Low {MONTHS[lowMonth]} {percent(monthly[lowMonth])}
+          </span>
+          <span>Dec</span>
+        </div>
+      ) : (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          component="figcaption"
+        >
+          Typical year · Low {MONTHS[lowMonth]} {percent(monthly[lowMonth])}
+        </Typography>
+      )}
     </figure>
-  );
-}
-
-/** Where a neighbour's carbon figure comes from, beside the details that describe it. */
-function ImportEmissionsNote({ marketId }: { marketId: string }) {
-  const assumption = importEmissionsAssumption(marketId);
-  return (
-    <Typography
-      className="buildOptionDescription intertieEmissionsNote"
-      variant="caption"
-      color="textSecondary"
-      component="p"
-    >
-      Emissions: {assumption.emissionsBasis}.{" "}
-      <Link
-        href={assumption.emissionsSource}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Source for this neighbor's emissions"
-      >
-        Source
-      </Link>
-    </Typography>
   );
 }
 
@@ -224,8 +229,8 @@ function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
 /**
  * One buildable corridor, laid out like the generator and storage purchase cards: heading and
  * Review button, the reason it can't be bought when it can't, a metric grid, then everything
- * that helps you compare neighbours behind the same disclosure. The archetype's character and
- * its typical year are the "why this one" material, which is what the details are for.
+ * that helps you compare neighbours behind the same disclosure. Supply availability leads the
+ * details, followed by import conditions and construction emissions.
  */
 function IntertieBuildItem(props: {
   corridor: TransmissionCorridorDefinitionType;
@@ -238,7 +243,6 @@ function IntertieBuildItem(props: {
   spareCapacityW: number;
   constructionKgco2eTotal: number;
   year: number;
-  renderPortfolio: () => React.ReactNode;
 }): React.JSX.Element {
   const { cash, corridor, outlook, readOnly, units } = props;
   const market = adjacentMarketForCorridor(corridor.id);
@@ -319,14 +323,15 @@ function IntertieBuildItem(props: {
               value={`${formatMass(importEmissionsKgco2ePerMWh(market.id, props.year), units)}/MWh`}
             />
           )}
-          <BuildMetric
-            label="Neighbor’s max spare capacity"
-            value={formatWatts(props.spareCapacityW)}
-          />
         </>
       }
-      details={(expanded) => (
+      details={
         <>
+          {outlook && (
+            <Box className="buildOptionDetailBody">
+              <IntertieYear outlook={outlook} prominent />
+            </Box>
+          )}
           {market && (
             <Typography
               className="buildOptionDescription"
@@ -336,50 +341,32 @@ function IntertieBuildItem(props: {
               {INTERTIE_ARCHETYPES[market.archetype].summary}
             </Typography>
           )}
-          {market && <ImportEmissionsNote marketId={market.id} />}
-          <Box className="buildOptionDetailBody">
-            <dl className="transmissionMetrics">
-              <div>
-                <dt>Regional corridor capacity</dt>
-                <dd>
-                  {formatWatts(
-                    corridorById(corridor.id)?.capacityW || corridor.capacityW,
-                  )}
-                </dd>
-              </div>
-
-              <div>
-                <dt>Down payment</dt>
-                <dd>{formatMoneyConcise(loan.downpayment)}</dd>
-              </div>
-              <div>
-                <dt>Amount financed</dt>
-                <dd>{formatMoneyConcise(loan.loanAmount)}</dd>
-              </div>
-            </dl>
-          </Box>
-          <Box className="buildOptionDetailBody">
+          <Box className="intertieDetailMetrics">
+            {outlook && (
+              <>
+                <BuildMetric
+                  label="At your peak"
+                  value={`~${percent(outlook.atPeak)} of line`}
+                />
+                <BuildMetric
+                  label="Typical import price"
+                  value={priceRange(outlook)}
+                  note={pricePeriodCaption(outlook) || undefined}
+                />
+              </>
+            )}
+            <BuildMetric
+              label="Neighbor’s max spare capacity"
+              value={formatWatts(props.spareCapacityW)}
+            />
             <ConstructionEmissionsMetric
               kgco2eTotal={props.constructionKgco2eTotal}
               yearsToBuild={corridor.yearsToBuild}
               units={units}
             />
           </Box>
-          {expanded && props.renderPortfolio()}
-          {outlook && (
-            <Box className="buildOptionDetailBody">
-              <dl className="transmissionMetrics">
-                <div>
-                  <dt>At your peak</dt>
-                  <dd>~{percent(outlook.atPeak)} of line</dd>
-                </div>
-                <PriceMetric outlook={outlook} />
-              </dl>
-              <IntertieYear outlook={outlook} />
-            </Box>
-          )}
         </>
-      )}
+      }
     />
   );
 }
@@ -580,6 +567,7 @@ export default function TransmissionPanel({
   const units = useUnits();
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = React.useState(1);
+  const [sort, setSort] = React.useState<IntertieSortKey>("yearsToBuild");
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);
@@ -618,6 +606,21 @@ export default function TransmissionPanel({
       game.date.year,
       selectedTier,
       intertieContext,
+    );
+  const projects = (projectsOnly ? unbuiltCorridors : [])
+    .map(({ id }) => buildQuote(id))
+    .filter((quote) => quote !== undefined)
+    .map((quote) => ({
+      quote,
+      emissions: importEmissionsKgco2ePerMWh(
+        quote.adjacentMarketId,
+        game.date.year,
+      ),
+    }))
+    .sort((a, b) =>
+      sort === "emissions"
+        ? a.emissions - b.emissions
+        : a.quote[sort] - b.quote[sort],
     );
   const maxTier = Math.max(
     1,
@@ -913,35 +916,22 @@ export default function TransmissionPanel({
       )}
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
-          <Box
-            className="constructionControls"
-            sx={{ gridTemplateColumns: "max-content minmax(80px, 1fr)", pr: 3 }}
-          >
-            <Typography
-              id="intertie-tier-label"
-              className="constructionCapacity"
-              variant="body2"
-              color="primary"
-            >
-              Tier <strong>{tier}</strong>
-            </Typography>
-            <Slider
-              className="constructionCapacitySlider"
-              sx={{ ml: 2 }}
-              aria-labelledby="intertie-tier-label"
-              getAriaValueText={(value) => `Tier ${value}`}
-              value={tier}
-              min={1}
-              max={maxTier}
-              step={1}
-              disabled={readOnly || maxTier === 1}
-              onChange={(_event, value) => setTier(value as number)}
-            />
-          </Box>
+          <ConstructionBuildHeader
+            capacityLabel="Tier"
+            capacity={String(tier)}
+            sliderValue={tier}
+            sliderMin={1}
+            sliderMax={maxTier}
+            sliderDisabled={readOnly || maxTier === 1}
+            sliderValueText={(value) => `Tier ${value}`}
+            onSliderChange={setTier}
+            sort={sort}
+            sortOptions={sortOptions}
+            sortLabel="Sort interties"
+            onSortChange={(value) => setSort(value as IntertieSortKey)}
+          />
           <div className="transmissionProjects">
-            {unbuiltCorridors.map((baseCorridor) => {
-              const corridor = buildQuote(baseCorridor.id);
-              if (!corridor) return null;
+            {projects.map(({ quote: corridor }) => {
               return (
                 <IntertieBuildItem
                   key={corridor.id}
@@ -957,58 +947,6 @@ export default function TransmissionPanel({
                   outlook={outlookFor(corridor.id, corridor.capacityW)}
                   readOnly={readOnly}
                   units={units}
-                  renderPortfolio={() => {
-                    const portfolio =
-                      forecast &&
-                      intertiePortfolioOutlook(
-                        game,
-                        corridor.id,
-                        forecast,
-                        OUTLOOK_STEP_MINUTES,
-                        corridor.capacityW,
-                      );
-                    return portfolio ? (
-                      <Box className="buildOptionDetailBody">
-                        <Typography variant="subtitle2">
-                          Portfolio outlook
-                        </Typography>
-                        <dl className="transmissionMetrics">
-                          <div>
-                            <dt>Shortfall covered</dt>
-                            <dd>{percent(portfolio.shortfallCoverage)}</dd>
-                            <dd className="transmissionMetricNote">
-                              Adds {percent(portfolio.marginalCoverage)} with
-                              this connection
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>Largest remaining gap</dt>
-                            <dd>{formatWatts(portfolio.worstGapW)}</dd>
-                          </div>
-                          <div>
-                            <dt>Electricity purchases / year</dt>
-                            <dd>
-                              {formatMoneyConcise(portfolio.annualEnergyCost)}
-                            </dd>
-                            <dd className="transmissionMetricNote">
-                              Change{" "}
-                              {formatMoneyConcise(
-                                portfolio.additionalEnergyCost,
-                              )}
-                              ; excludes upkeep and financing
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>Gap with half the spare supply</dt>
-                            <dd>{formatWatts(portfolio.stressGapW)}</dd>
-                            <dd className="transmissionMetricNote">
-                              Illustration, not a forecast
-                            </dd>
-                          </div>
-                        </dl>
-                      </Box>
-                    ) : null;
-                  }}
                   onReview={() => setReviewId(corridor.id)}
                 />
               );

@@ -577,7 +577,7 @@ $topbar_height: 56px;
   display: grid;
   grid-template-columns: max-content minmax(80px, 1fr) auto;
   align-items: center;
-  gap: $space-2;
+  gap: $space-3;
   min-height: 50px;
   padding: 0 max($space-2, env(safe-area-inset-right)) 0
     max($space-2, env(safe-area-inset-left));
@@ -1206,6 +1206,21 @@ $pane_header_height: 48px;
   padding: 0 12px 8px;
 }
 
+// Wrapped rows use the available card width, including their final row.
+.build-list-item.buildOption.transmissionProject {
+  .buildOptionMetrics,
+  .intertieDetailMetrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 0 12px 12px;
+    > .buildOptionMetric {
+      flex: 1 1 120px;
+      min-width: 0;
+    }
+  }
+}
+
 // Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the
 // same neutral marks as the generator build cards' output lines
 .transmissionArchetype {
@@ -1238,6 +1253,30 @@ $pane_header_height: 48px;
   }
   .sparklineMarker {
     fill: var(--spark-marker-fill);
+  }
+}
+
+.intertieYear.intertieAvailability {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  .sparkline {
+    width: 100%;
+    height: 80px;
+    @media (max-width: 599px) {
+      height: 64px;
+    }
+  }
+  .intertieAvailabilityLimit {
+    color: $font_color_faded;
+    font-size: var(--font-size-caption-sm);
+  }
+  .intertieAvailabilityLabels {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: $font_color_faded;
+    font-size: var(--font-size-caption-sm);
   }
 }
 
@@ -4948,15 +4987,6 @@ $sizemap: (
   .buildOptionWarning,
   .buildOptionDescription {
     padding: 0 12px 8px;
-  }
-  // The citation is a real control, so it keeps the shared tap height inside running text
-  .intertieEmissionsNote a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 40px;
-    @media (pointer: coarse) {
-      min-height: 44px;
-    }
   }
   .buildOptionFooter {
     display: flex;
