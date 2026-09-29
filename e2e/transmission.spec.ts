@@ -41,13 +41,8 @@ test("California players can build and understand an intertie", async ({
     .click();
   await expect(
     northernProject.getByText("Down payment", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    northernProject.getByText("$10.8M", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    northernProject.getByText("$43.2M", { exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(northernProject.locator(".intertieAvailability")).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
     const firstBuild = projects
       .getByRole("button", {
@@ -66,6 +61,7 @@ test("California players can build and understand an intertie", async ({
     })
     .first()
     .click();
+  await expect(page.getByRole("dialog")).toContainText("$10.8M now");
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })

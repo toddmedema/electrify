@@ -32,9 +32,59 @@ for (const theme of ["light", "dark"] as const) {
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    await expect(card).toContainText("Portfolio outlook");
-    await expect(card).toContainText("Shortfall covered");
-    await expect(card).toContainText("Gap with half the spare supply");
+    await expect(card).not.toContainText("Portfolio outlook");
+    await expect(card).toContainText("Added shortfall coverage");
+    await expect(card).toContainText("Largest remaining shortfall");
+    await expect(card).not.toContainText("Gap with half the spare supply");
+    await expect(card.locator(".MuiCollapse-root")).toHaveClass(
+      /MuiCollapse-entered/,
+    );
+    const chart = card.locator(".intertieAvailability");
+    const details = card.locator(".intertieDetailMetrics");
+    const chartBox = (await chart.boundingBox())!;
+    const detailBox = (await details.boundingBox())!;
+    expect(chartBox.y + chartBox.height).toBeLessThanOrEqual(detailBox.y);
+    expect(chartBox.width).toBeGreaterThan(
+      (await card.boundingBox())!.width * 0.85,
+    );
+    expect(
+      (await chart.locator("svg").boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(64);
+    // Every wrapped metric row fills the card rather than reserving empty grid cells.
+    for (const strip of [card.locator(".buildOptionMetrics"), details]) {
+      const rowEnds = await strip
+        .locator(":scope > .buildOptionMetric")
+        .evaluateAll((cells) => {
+          const rows = new Map<number, number>();
+          for (const cell of cells) {
+            const box = cell.getBoundingClientRect();
+            rows.set(
+              Math.round(box.y),
+              Math.max(rows.get(Math.round(box.y)) || 0, box.right),
+            );
+          }
+          return [...rows.values()];
+        });
+      const stripBox = (await strip.boundingBox())!;
+      expect(
+        rowEnds.every(
+          (right) => Math.abs(right - (stripBox.x + stripBox.width - 12)) < 2,
+        ),
+      ).toBe(true);
+    }
+    expect(
+      await card.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await card.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `intertie-details-${theme}-${testInfo.project.name}.png`,
+        ),
+        animations: "disabled",
+      });
+    }
     // Freeze the quote before checking its exact cash delta; navigation may have
     // allowed a tick before the catalog opened.
     await page.getByRole("button", { name: "pause", exact: true }).click();
@@ -62,7 +112,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(Number(quoted![1])).toBeCloseTo(cash / 1_000_000, 1);
     expect(Number(quoted![2])).toBeCloseTo((cash - 1_800_000) / 1_000_000, 1);
     await expect(dialog).toContainText("Payments start now");
-    await expect(dialog).toContainText("$3k/mo");
+    await expect(dialog).toContainText("$2.88k/mo");
     // Every purchase fact fits alongside both actions on desktop and a 390px phone.
     for (const fact of await dialog.locator(".decisionImpactFact").all()) {
       await expect(fact).toBeInViewport();
@@ -93,13 +143,14 @@ for (const theme of ["light", "dark"] as const) {
       });
     }
     await dialog.getByRole("button", { name: "close", exact: true }).click();
-    // A three-year southern project cannot rescue this scenario's year-two fire emergency.
+    // The slower southern project still opens within this five-year mission.
     await page
       .getByRole("button", {
         name: "Review purchase of Desert Southwest intertie",
       })
       .click();
-    await expect(page.getByRole("dialog")).toContainText(
+    await expect(page.getByRole("dialog")).toContainText("Ready in 36 months");
+    await expect(page.getByRole("dialog")).not.toContainText(
       "Won’t open before this mission ends",
     );
   });

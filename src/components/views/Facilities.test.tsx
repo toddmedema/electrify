@@ -560,9 +560,14 @@ describe("the interties view", () => {
     await user.click(
       within(north).getByRole("button", { name: /^Show .* details$/ }),
     );
-    expect(within(north).getByText("Down payment")).toBeInTheDocument();
-    expect(within(north).getByText("$10.8M")).toBeInTheDocument();
-    expect(within(north).getByText("$43.2M")).toBeInTheDocument();
+    expect(within(north).queryByText("Down payment")).not.toBeInTheDocument();
+    await user.click(
+      within(north).getByRole("button", { name: /Review purchase/ }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("$10.8M");
+    expect(dialog).toHaveTextContent("Loan option");
+    expect(dialog).toHaveTextContent("Payments start now");
   });
 
   it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
@@ -583,9 +588,7 @@ describe("the interties view", () => {
       expect(
         within(card).getByRole("img", { name: /^Typical year of import room/ }),
       ).toBeInTheDocument();
-      expect(
-        within(card).getByText(/^Typical year · Low \w{3} \d+%$/),
-      ).toBeInTheDocument();
+      expect(within(card).getByText(/^Low \w{3} \d+%$/)).toBeInTheDocument();
       expect(within(card).getByText("At your peak")).toBeInTheDocument();
       expect(within(card).getByText(/^~\d+% of line$/)).toBeInTheDocument();
       expect(within(card).getByText(/^\$\d+–\d+\/MWh$/)).toBeInTheDocument();
