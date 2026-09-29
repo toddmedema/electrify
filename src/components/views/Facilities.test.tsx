@@ -584,10 +584,10 @@ describe("the interties view", () => {
         within(card).getByRole("img", { name: /^Typical year of import room/ }),
       ).toBeInTheDocument();
       expect(
-        within(card).getByText(/^Typical year · Low \w{3} \d+%$/),
+        within(card).getByText(/^Typical year · Low \w{3} [\d.]+MW$/),
       ).toBeInTheDocument();
       expect(within(card).getByText("At your peak")).toBeInTheDocument();
-      expect(within(card).getByText(/^~\d+% of line$/)).toBeInTheDocument();
+      expect(within(card).getByText(/^~[\d.]+MW$/)).toBeInTheDocument();
       expect(within(card).getByText(/^\$\d+–\d+\/MWh$/)).toBeInTheDocument();
     }
     expect(

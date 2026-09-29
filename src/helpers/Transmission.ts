@@ -308,7 +308,13 @@ export function intertieImportLimitW(
 ): number {
   return Math.min(
     transmissionRatingW(line, conditions),
-    neighborImportSupplyW(line.corridorId, context, minute, conditions),
+    neighborImportSupplyW(
+      line.corridorId,
+      context,
+      minute,
+      conditions,
+      line.capacityW,
+    ),
   );
 }
 
@@ -373,8 +379,9 @@ export function neighborImportSupplyW(
   context: IntertieContext,
   minute: number,
   conditions: TransmissionConditions,
+  capacityW?: number,
 ): number {
-  const market = effectiveMarket(corridorId, context);
+  const market = effectiveMarket(corridorId, context, capacityW);
   const supply =
     corridorId === "california-north" &&
     context.tutorialSupplyLimitW !== undefined
@@ -384,10 +391,65 @@ export function neighborImportSupplyW(
     supply * importAvailabilityFraction(corridorId, context, minute, conditions)
   );
 }
+/** Regional generation is finite and shared, regardless of purchased access or line count. */
+export function physicalNeighborImportSupplyW(
+  corridorId: string,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): number {
+  const market = adjacentMarketForCorridor(corridorId);
+  const supply =
+    corridorId === "california-north" &&
+    context.tutorialSupplyLimitW !== undefined
+      ? Math.min(market?.availableSupplyW || 0, context.tutorialSupplyLimitW)
+      : market?.availableSupplyW || 0;
+  return (
+    supply * importAvailabilityFraction(corridorId, context, minute, conditions)
+  );
+}
+
+/** One source of trade limits for dispatch, previews and validation. */
+export function intertieOfferLimits(
+  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): Omit<IntertieOffer, "pricePerMWh"> {
+  const market = adjacentMarketForCorridor(line.corridorId);
+  const access = effectiveMarket(line.corridorId, context, line.capacityW);
+  const rating = transmissionRatingW(line, conditions);
+  const accessImportLimitW = neighborImportSupplyW(
+    line.corridorId,
+    context,
+    minute,
+    conditions,
+    line.capacityW,
+  );
+  const accessExportLimitW = access?.availableDemandW || 0;
+  return {
+    marketId: market?.id,
+    marketImportLimitW: physicalNeighborImportSupplyW(
+      line.corridorId,
+      context,
+      minute,
+      conditions,
+    ),
+    marketExportLimitW: market?.availableDemandW || 0,
+    accessId: line.corridorId,
+    accessImportLimitW,
+    accessExportLimitW,
+    importLimitW: Math.min(rating, accessImportLimitW),
+    exportLimitW: Math.min(rating, accessExportLimitW),
+  };
+}
 export interface IntertieOffer {
   marketId?: string;
   marketImportLimitW?: number;
   marketExportLimitW?: number;
+  accessId?: string;
+  accessImportLimitW?: number;
+  accessExportLimitW?: number;
   importLimitW: number;
   exportLimitW: number;
   pricePerMWh: number;
@@ -415,12 +477,19 @@ export function allocateIntertieFlows(
   );
   const importUsed = new Map<string, number>();
   const exportUsed = new Map<string, number>();
+  const accessImportsUsed = new Map<string, number>();
+  const accessExportsUsed = new Map<string, number>();
   let remaining = importedW;
   for (const { offer, index } of cheapestFirst) {
     if (remaining <= 0) break;
     imports[index] = Math.min(
       remaining,
       Math.max(0, offer.importLimitW),
+      Math.max(
+        0,
+        (offer.accessImportLimitW ?? Infinity) -
+          (offer.accessId ? accessImportsUsed.get(offer.accessId) || 0 : 0),
+      ),
       Math.max(
         0,
         (offer.marketImportLimitW ?? Infinity) -
@@ -433,6 +502,11 @@ export function allocateIntertieFlows(
         (importUsed.get(offer.marketId) || 0) + imports[index],
       );
     remaining -= imports[index];
+    if (offer.accessId)
+      accessImportsUsed.set(
+        offer.accessId,
+        (accessImportsUsed.get(offer.accessId) || 0) + imports[index],
+      );
   }
   remaining = exportedW;
   for (const { offer, index } of dearestFirst) {
@@ -440,6 +514,11 @@ export function allocateIntertieFlows(
     exports[index] = Math.min(
       remaining,
       Math.max(0, offer.exportLimitW),
+      Math.max(
+        0,
+        (offer.accessExportLimitW ?? Infinity) -
+          (offer.accessId ? accessExportsUsed.get(offer.accessId) || 0 : 0),
+      ),
       Math.max(
         0,
         (offer.marketExportLimitW ?? Infinity) -
@@ -452,6 +531,11 @@ export function allocateIntertieFlows(
         (exportUsed.get(offer.marketId) || 0) + exports[index],
       );
     remaining -= exports[index];
+    if (offer.accessId)
+      accessExportsUsed.set(
+        offer.accessId,
+        (accessExportsUsed.get(offer.accessId) || 0) + exports[index],
+      );
   }
   return { importedW: imports, exportedW: exports };
 }
@@ -588,7 +672,7 @@ export function intertieUpgradeCount(
 /**
  * The most this corridor may ever carry: whichever runs out first, the technology of the day or
  * the regional market's physical supply/demand scale. Purchased utility supply is a separate
- * budget, so a physical upgrade can be partly or entirely stranded; the UI discloses this.
+ * budget: upgrades acquire only the finite authored import entitlement, not new generation.
  */
 export function intertieCapacityCeilingW(
   corridorId: string,

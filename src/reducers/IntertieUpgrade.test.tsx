@@ -1,6 +1,7 @@
 import {
   accessContextForGame,
   effectiveCorridor,
+  effectiveMarket,
 } from "../data/IntertieAccess";
 import cloneDeep from "lodash.clonedeep";
 import {
@@ -61,7 +62,12 @@ describe("intertie upgrades", () => {
     );
     const line = state.transmission!.lines[0];
     const original = corridor().capacityW;
+    const accessContext = accessContextForGame(state);
     expect(line.capacityW).toBe(original);
+    expect(
+      effectiveMarket(CORRIDOR, accessContext, line.capacityW)!
+        .availableSupplyW,
+    ).toBe(180e6);
     expect(line.upgrade!.targetCapacityW).toBe(
       Math.round(original * INTERTIE_UPGRADE_STEP),
     );
@@ -69,11 +75,22 @@ describe("intertie upgrades", () => {
     // Crews restring one circuit at a time; the interconnector does not go dark for a year.
     runMonths(state, 1);
     expect(state.transmission!.lines[0].capacityW).toBe(original);
+    expect(
+      effectiveMarket(
+        CORRIDOR,
+        accessContext,
+        state.transmission!.lines[0].capacityW,
+      )!.availableSupplyW,
+    ).toBe(180e6);
 
     runMonths(state, 24);
     const done = state.transmission!.lines[0];
     expect(done.upgrade).toBeUndefined();
     expect(done.capacityW).toBe(Math.round(original * INTERTIE_UPGRADE_STEP));
+    expect(
+      effectiveMarket(CORRIDOR, accessContext, done.capacityW)!
+        .availableSupplyW,
+    ).toBe(210e6);
   });
 
   it("grows operating cost far slower than capacity", () => {

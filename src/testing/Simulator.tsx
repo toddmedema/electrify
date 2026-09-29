@@ -88,7 +88,14 @@ export type ScheduledSimActionType =
   | { month: number; type: "trading"; policy: TradingPolicyType }
   | {
       month: number;
-      type: "intertie" | "intertie-upgrade";
+      type: "intertie";
+      corridorId: string;
+      financed: boolean;
+      tier?: number;
+    }
+  | {
+      month: number;
+      type: "intertie-upgrade";
       corridorId: string;
       financed: boolean;
     };
@@ -573,6 +580,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
                 buildTransmissionLine({
                   corridorId: action.corridorId,
                   financed: action.financed,
+                  tier: action.tier,
                 }),
               ),
             );

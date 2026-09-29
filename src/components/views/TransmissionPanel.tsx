@@ -157,7 +157,13 @@ function useIntertieForecast(
 }
 
 /** Typical-year import room, drawn like the generator build cards' output lines */
-function IntertieYear({ outlook }: { outlook: IntertieOutlook }) {
+function IntertieYear({
+  outlook,
+  capacityW,
+}: {
+  outlook: IntertieOutlook;
+  capacityW: number;
+}) {
   const { monthly, lowMonth } = outlook;
   const highMonth = monthly.reduce(
     (high, value, month) => (value > monthly[high] ? month : high),
@@ -174,14 +180,15 @@ function IntertieYear({ outlook }: { outlook: IntertieOutlook }) {
         baseline
         fill
         lowMarker
-        ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${percent(monthly[highMonth])} of the line, least in ${MONTH_NAMES[lowMonth]} at ${percent(monthly[lowMonth])}.`}
+        ariaLabel={`Typical year of import room: most in ${MONTH_NAMES[highMonth]} at ${formatWatts(monthly[highMonth] * capacityW)}, least in ${MONTH_NAMES[lowMonth]} at ${formatWatts(monthly[lowMonth] * capacityW)}.`}
       />
       <Typography
         variant="caption"
         color="textSecondary"
         component="figcaption"
       >
-        Typical year · Low {MONTHS[lowMonth]} {percent(monthly[lowMonth])}
+        Typical year · Low {MONTHS[lowMonth]}{" "}
+        {formatWatts(monthly[lowMonth] * capacityW)}
       </Typography>
     </figure>
   );
@@ -320,7 +327,7 @@ function IntertieBuildItem(props: {
             />
           )}
           <BuildMetric
-            label="Neighbor’s max spare capacity"
+            label="Import access"
             value={formatWatts(props.spareCapacityW)}
           />
         </>
@@ -371,11 +378,11 @@ function IntertieBuildItem(props: {
               <dl className="transmissionMetrics">
                 <div>
                   <dt>At your peak</dt>
-                  <dd>~{percent(outlook.atPeak)} of line</dd>
+                  <dd>~{formatWatts(outlook.atPeak * corridor.capacityW)}</dd>
                 </div>
                 <PriceMetric outlook={outlook} />
               </dl>
-              <IntertieYear outlook={outlook} />
+              <IntertieYear outlook={outlook} capacityW={corridor.capacityW} />
             </Box>
           )}
         </>
@@ -479,7 +486,14 @@ function IntertieUpgradeControl(props: {
               label: "Connection capacity",
               value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
               detail:
-                "The line keeps its current capacity during construction. Imports still need spare neighboring supply.",
+                "Current capacity and import access stay in effect until construction finishes.",
+            },
+            {
+              concept: "supply",
+              label: "Import access",
+              value: `${formatWatts(effectiveMarket(line.corridorId, context, line.capacityW)?.availableSupplyW || 0)} → ${formatWatts(effectiveMarket(line.corridorId, context, quote.targetCapacityW)?.availableSupplyW || 0)}`,
+              detail:
+                "Maximum purchased supply; weather and the neighbor’s own demand still limit availability. Export access is unchanged.",
             },
           ]}
           upkeepLabel="Upkeep after upgrade"
@@ -810,7 +824,9 @@ export default function TransmissionPanel({
                           <>
                             <div>
                               <dt>At your peak</dt>
-                              <dd>~{percent(outlook.atPeak)} of line</dd>
+                              <dd>
+                                ~{formatWatts(outlook.atPeak * line.capacityW)}
+                              </dd>
                             </div>
                             <PriceMetric outlook={outlook} />
                           </>
@@ -839,17 +855,19 @@ export default function TransmissionPanel({
                                     intertieContext,
                                     now.minute,
                                     now,
+                                    line.capacityW,
                                   ) < rating
-                                ? "neighbor spare supply"
+                                ? "available import access"
                                 : "own line rating"}
-                        . Line rating {formatWatts(rating)}; neighbor spare
-                        supply{" "}
+                        . Line rating {formatWatts(rating)}; available import
+                        access{" "}
                         {formatWatts(
                           neighborImportSupplyW(
                             line.corridorId,
                             intertieContext,
                             now.minute,
                             now,
+                            line.capacityW,
                           ),
                         )}
                         ; neighbor export demand{" "}
@@ -860,7 +878,12 @@ export default function TransmissionPanel({
                         .
                       </Typography>
                     )}
-                    {outlook && <IntertieYear outlook={outlook} />}
+                    {outlook && (
+                      <IntertieYear
+                        outlook={outlook}
+                        capacityW={line.capacityW}
+                      />
+                    )}
                     {!building && (
                       <IntertieUpgradeControl
                         costIndex={getCostTableIndex(
@@ -947,8 +970,11 @@ export default function TransmissionPanel({
                   key={corridor.id}
                   corridor={corridor}
                   spareCapacityW={
-                    effectiveMarket(corridor.id, intertieContext)
-                      ?.availableSupplyW || 0
+                    effectiveMarket(
+                      corridor.id,
+                      intertieContext,
+                      corridor.capacityW,
+                    )?.availableSupplyW || 0
                   }
                   constructionKgco2eTotal={corridor.constructionKgco2eTotal}
                   year={game.date.year}
@@ -1047,6 +1073,15 @@ export default function TransmissionPanel({
           interestRate={game.interestRate}
           cashDisabled={readOnly || !now}
           loanDisabled={readOnly || !now}
+          leadingFacts={[
+            {
+              concept: "supply",
+              label: "Import access",
+              value: `Up to ${formatWatts(effectiveMarket(review.id, intertieContext, review.capacityW)?.availableSupplyW || 0)}`,
+              detail:
+                "Available after construction; seasonal supply and regional peaks can reduce imports.",
+            },
+          ]}
           preface={
             <Box sx={{ px: 2, pb: 1 }}>
               <Typography variant="body2">

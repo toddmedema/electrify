@@ -4,11 +4,7 @@ import {
   completeGasConversion,
   GAS_CONVERSION_MINUTES,
 } from "../helpers/GasConversion";
-import {
-  accessContextForGame,
-  corridorsForGame,
-  effectiveMarket,
-} from "../data/IntertieAccess";
+import { accessContextForGame, corridorsForGame } from "../data/IntertieAccess";
 import { beginIntertieStress } from "./GameActions";
 import {
   getHydroAvailability,
@@ -144,13 +140,12 @@ import { importEmissionsKgco2ePerMWh } from "../data/ImportEmissions";
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
-  neighborImportSupplyW,
+  intertieOfferLimits,
   clearTransmissionMarket,
   intertieContextForGame,
   intertieYear,
   intertieUpgradeQuote,
   intertieBuildQuote,
-  intertieImportLimitW,
   IntertieOffer,
   transmissionRatingW,
 } from "../helpers/Transmission";
@@ -4173,38 +4168,19 @@ function updateSupplyFacilitiesFinances(
   const offers: (IntertieOffer & { emissionsKgco2ePerMWh: number })[] = [];
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
-    const market = effectiveMarket(line.corridorId, intertieContext);
+    const limits = intertieOfferLimits(line, intertieContext, now.minute, now);
     const pricePerMWh = adjacentMarketPricePerMWh(
       line.corridorId,
       intertieContext,
       now.minute,
       now,
     );
-    // The neighbour's archetype decides how much of the line it can fill right now.
-    const importLimitW = intertieImportLimitW(
-      line,
-      intertieContext,
-      now.minute,
-      now,
-    );
-    const exportLimitW = Math.min(rating, market?.availableDemandW || 0);
     transmissionCapacity += rating;
-    marketImportLimitW += importLimitW;
-    marketExportLimitW += exportLimitW;
     offers.push({
-      marketId: market?.id,
-      marketImportLimitW: neighborImportSupplyW(
-        line.corridorId,
-        intertieContext,
-        now.minute,
-        now,
-      ),
-      marketExportLimitW: market?.availableDemandW || 0,
-      importLimitW,
-      exportLimitW,
+      ...limits,
       pricePerMWh,
-      emissionsKgco2ePerMWh: market
-        ? importEmissionsKgco2ePerMWh(market.id, tradingYear)
+      emissionsKgco2ePerMWh: limits.marketId
+        ? importEmissionsKgco2ePerMWh(limits.marketId, tradingYear)
         : 0,
     });
   }

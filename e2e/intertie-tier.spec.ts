@@ -23,6 +23,10 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const card = page.getByTestId("transmission-project-california-north");
+    const importAccess = card
+      .locator(".buildOptionMetric")
+      .filter({ hasText: "Import access" });
+    const baseAccess = await importAccess.innerText();
     const slider = page.getByRole("slider");
     await expect(slider).toHaveCount(1);
     await slider.focus();
@@ -32,7 +36,11 @@ for (const theme of ["light", "dark"] as const) {
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    await expect(card).toContainText("Neighbor’s max spare capacity");
+    await expect(importAccess).not.toHaveText(baseAccess);
+    const selectedAccess = await importAccess
+      .locator(":scope > div")
+      .nth(1)
+      .innerText();
     // One market summary; the emissions source note shares its caption style
     await expect(
       card.locator(".buildOptionDescription:not(.intertieEmissionsNote)"),
@@ -58,6 +66,11 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Tier 4");
     await expect(dialog).toContainText("17MW access");
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: "Import access" }),
+    ).toContainText(`Up to ${selectedAccess}`);
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(
       page

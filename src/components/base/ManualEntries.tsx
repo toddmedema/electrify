@@ -740,6 +740,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           neighbor’s spare supply and export demand.
         </p>
         <p>
+          In missions, higher tiers can purchase more import access along with a
+          wider connection. Both become available when construction finishes;
+          export access stays unchanged. The review shows your import access
+          before and after an upgrade. Custom games already have the full
+          regional allocation, so their upgrades only widen the connection.
+        </p>
+        <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s
           build card names the neighboring grid type, such as seasonal hydro or
           solar surplus. Open Show details for a description and monthly

@@ -1,13 +1,12 @@
 import { GAME_TO_REAL_YEARS, TICKS_PER_YEAR, TICK_MINUTES } from "../Constants";
-import { effectiveCorridor, effectiveMarket } from "../data/IntertieAccess";
+import { effectiveCorridor } from "../data/IntertieAccess";
 import { GameType, TickPresentFutureType } from "../Types";
 import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
   allowsImports,
   intertieContextForGame,
-  intertieImportLimitW,
-  neighborImportSupplyW,
+  intertieOfferLimits,
   transmissionRatingW,
 } from "./Transmission";
 
@@ -54,17 +53,8 @@ export function intertiePortfolioOutlook(
     const local = tick.supplyW - (tick.importedW || 0) + (tick.exportedW || 0);
     const gap = Math.max(0, tick.demandW - local);
     const offers = lines.map((line) => {
-      const market = effectiveMarket(line.corridorId, context);
-      const marketImportLimitW = neighborImportSupplyW(
-        line.corridorId,
-        context,
-        tick.minute,
-        tick,
-      );
       return {
-        marketId: market?.id,
-        marketImportLimitW,
-        importLimitW: intertieImportLimitW(line, context, tick.minute, tick),
+        ...intertieOfferLimits(line, context, tick.minute, tick),
         exportLimitW: 0,
         pricePerMWh: adjacentMarketPricePerMWh(
           line.corridorId,
@@ -97,8 +87,9 @@ export function intertiePortfolioOutlook(
     const stressed = allocateIntertieFlows(
       offers.map((o) => ({
         ...o,
-        marketImportLimitW: o.marketImportLimitW * 0.5,
-        importLimitW: Math.min(o.rating, o.marketImportLimitW * 0.5),
+        marketImportLimitW: (o.marketImportLimitW || 0) * 0.5,
+        accessImportLimitW: (o.accessImportLimitW || 0) * 0.5,
+        importLimitW: Math.min(o.rating, (o.accessImportLimitW || 0) * 0.5),
       })),
       need,
       0,

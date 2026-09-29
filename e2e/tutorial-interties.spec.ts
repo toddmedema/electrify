@@ -206,7 +206,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .click();
   await expect(facilities.locator(".transmissionLineDetails")).toBeVisible();
   await expect(facilities.locator(".transmissionLineDetails")).toContainText(
-    "neighbor spare supply",
+    "available import access",
   );
   // Inspection is safe even if the player tries to advance the clock before restoring backup.
   await page.getByRole("button", { name: "fast speed" }).click();

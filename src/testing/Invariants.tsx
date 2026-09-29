@@ -26,8 +26,8 @@ import { getSolarOutputFactor } from "../helpers/Energy";
 import { programCustomers } from "../helpers/Policies";
 import {
   allocateIntertieFlows,
-  neighborImportSupplyW,
-  intertieImportLimitW,
+  physicalNeighborImportSupplyW,
+  intertieOfferLimits,
   intertieContextForGame,
 } from "../helpers/Transmission";
 
@@ -645,18 +645,31 @@ function checkTrade(
     for (const line of state.transmission.lines.filter(
       (l) => l.yearsToBuildLeft <= 0,
     )) {
-      const market = effectiveMarket(line.corridorId, context);
+      const market = effectiveMarket(line.corridorId, context, line.capacityW);
       if (!market) continue;
+      const limits = intertieOfferLimits(line, context, now.minute, conditions);
+      if (
+        (line.currentFlowW || 0) >
+          limits.importLimitW * (1 + RELATIVE_TOLERANCE) + 1 ||
+        -(line.currentFlowW || 0) >
+          limits.exportLimitW * (1 + RELATIVE_TOLERANCE) + 1
+      ) {
+        collector.add(
+          "each intertie respects purchased access and wire capacity",
+          when,
+          `${line.corridorId}: flow ${line.currentFlowW}W, import ${limits.importLimitW}W, export ${limits.exportLimitW}W`,
+        );
+      }
       const entry = markets.get(market.id) || {
         imported: 0,
         exported: 0,
-        supply: neighborImportSupplyW(
+        supply: physicalNeighborImportSupplyW(
           line.corridorId,
           context,
           now.minute,
           conditions,
         ),
-        demand: market.availableDemandW,
+        demand: limits.marketExportLimitW || 0,
       };
       entry.imported += Math.max(0, line.currentFlowW || 0);
       entry.exported += Math.max(0, -(line.currentFlowW || 0));
@@ -683,19 +696,7 @@ function checkTrade(
     const offers = state.transmission.lines
       .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
       .map((line) => ({
-        marketId: effectiveMarket(line.corridorId, context)?.id,
-        marketImportLimitW: neighborImportSupplyW(
-          line.corridorId,
-          context,
-          now.minute,
-          conditions,
-        ),
-        importLimitW: intertieImportLimitW(
-          line,
-          context,
-          now.minute,
-          conditions,
-        ),
+        ...intertieOfferLimits(line, context, now.minute, conditions),
         exportLimitW: 0,
         pricePerMWh: 0,
       }));
