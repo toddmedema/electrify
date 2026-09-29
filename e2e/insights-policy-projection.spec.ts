@@ -26,7 +26,7 @@ test("paused insights refresh customer programs and keep chart zoom after a pale
     .getByRole("button", { name: /Efficiency.*Not started/i })
     .click();
   const start = dialog.getByRole("button", {
-    name: "Start build-out next month",
+    name: "Start next month",
   });
   await expect(start).toBeEnabled({ timeout: 30000 });
   await start.click();

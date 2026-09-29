@@ -73,9 +73,15 @@ for (const theme of ["light", "dark"]) {
     }
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
-      name: "Start build-out next month",
+      name: "Start next month",
     });
     await expect(apply).toBeEnabled({ timeout: 30000 });
+    const backBounds = (await dialog
+      .getByRole("button", { name: "Back", exact: true })
+      .boundingBox())!;
+    const applyBounds = (await apply.boundingBox())!;
+    expect(applyBounds.y).toBeCloseTo(backBounds.y, 0);
+    expect(applyBounds.height).toBeCloseTo(backBounds.height, 0);
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
     await page.keyboard.press("g");

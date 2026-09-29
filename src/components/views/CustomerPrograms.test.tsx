@@ -431,7 +431,7 @@ test("estimates on the page when the preview worker cannot load its data", () =>
   });
   expect(screen.queryByRole("alert")).toBeNull();
   expect(
-    screen.getByRole("button", { name: "Start build-out next month" }),
+    screen.getByRole("button", { name: "Start next month" }),
   ).toBeEnabled();
   stub.mockRestore();
   jest.useRealTimers();
