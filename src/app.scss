@@ -577,7 +577,7 @@ $topbar_height: 56px;
   display: grid;
   grid-template-columns: max-content minmax(80px, 1fr) auto;
   align-items: center;
-  gap: $space-2;
+  gap: $space-3;
   min-height: 50px;
   padding: 0 max($space-2, env(safe-area-inset-right)) 0
     max($space-2, env(safe-area-inset-left));

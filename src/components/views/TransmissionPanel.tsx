@@ -19,7 +19,6 @@ import {
   InputLabel,
   MenuItem,
   Select,
-  Slider,
   Typography,
 } from "@mui/material";
 import {
@@ -86,6 +85,14 @@ import Sparkline from "../base/Sparkline";
 import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
+import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+
+type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
+const sortOptions: ReadonlyArray<readonly [IntertieSortKey, string]> = [
+  ["yearsToBuild", "Fastest"],
+  ["buildCost", "Cheapest"],
+  ["emissions", "Lowest emissions"],
+];
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -560,6 +567,7 @@ export default function TransmissionPanel({
   const units = useUnits();
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = React.useState(1);
+  const [sort, setSort] = React.useState<IntertieSortKey>("yearsToBuild");
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);
@@ -598,6 +606,21 @@ export default function TransmissionPanel({
       game.date.year,
       selectedTier,
       intertieContext,
+    );
+  const projects = (projectsOnly ? unbuiltCorridors : [])
+    .map(({ id }) => buildQuote(id))
+    .filter((quote) => quote !== undefined)
+    .map((quote) => ({
+      quote,
+      emissions: importEmissionsKgco2ePerMWh(
+        quote.adjacentMarketId,
+        game.date.year,
+      ),
+    }))
+    .sort((a, b) =>
+      sort === "emissions"
+        ? a.emissions - b.emissions
+        : a.quote[sort] - b.quote[sort],
     );
   const maxTier = Math.max(
     1,
@@ -893,35 +916,22 @@ export default function TransmissionPanel({
       )}
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
-          <Box
-            className="constructionControls"
-            sx={{ gridTemplateColumns: "max-content minmax(80px, 1fr)", pr: 3 }}
-          >
-            <Typography
-              id="intertie-tier-label"
-              className="constructionCapacity"
-              variant="body2"
-              color="primary"
-            >
-              Tier <strong>{tier}</strong>
-            </Typography>
-            <Slider
-              className="constructionCapacitySlider"
-              sx={{ ml: 2 }}
-              aria-labelledby="intertie-tier-label"
-              getAriaValueText={(value) => `Tier ${value}`}
-              value={tier}
-              min={1}
-              max={maxTier}
-              step={1}
-              disabled={readOnly || maxTier === 1}
-              onChange={(_event, value) => setTier(value as number)}
-            />
-          </Box>
+          <ConstructionBuildHeader
+            capacityLabel="Tier"
+            capacity={String(tier)}
+            sliderValue={tier}
+            sliderMin={1}
+            sliderMax={maxTier}
+            sliderDisabled={readOnly || maxTier === 1}
+            sliderValueText={(value) => `Tier ${value}`}
+            onSliderChange={setTier}
+            sort={sort}
+            sortOptions={sortOptions}
+            sortLabel="Sort interties"
+            onSortChange={(value) => setSort(value as IntertieSortKey)}
+          />
           <div className="transmissionProjects">
-            {unbuiltCorridors.map((baseCorridor) => {
-              const corridor = buildQuote(baseCorridor.id);
-              if (!corridor) return null;
+            {projects.map(({ quote: corridor }) => {
               return (
                 <IntertieBuildItem
                   key={corridor.id}

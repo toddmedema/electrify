@@ -13,6 +13,10 @@ import SortIcon from "@mui/icons-material/Sort";
 
 interface Props {
   capacity: string;
+  capacityLabel?: string;
+  sliderDisabled?: boolean;
+  sliderValueText?: (value: number) => string;
+  sortLabel?: string;
   sliderValue: number;
   sliderMin: number;
   sliderMax: number;
@@ -23,7 +27,7 @@ interface Props {
 }
 
 /**
- * The size and sort controls shared by the generator and storage catalogs. The title, cash and
+ * The size and sort controls shared by the construction catalogs. The title, cash and
  * close button belong to the Build screen's CatalogTitleBar above them.
  */
 export default function ConstructionBuildHeader(
@@ -52,7 +56,7 @@ export default function ConstructionBuildHeader(
           className="constructionCapacity"
           variant="body2"
         >
-          <span className="weak">Capacity</span>
+          <span className="weak">{props.capacityLabel || "Capacity"}</span>
           <Typography color="primary" component="strong">
             {props.capacity}
           </Typography>
@@ -60,6 +64,8 @@ export default function ConstructionBuildHeader(
         <Slider
           className="constructionCapacitySlider"
           value={props.sliderValue}
+          disabled={props.sliderDisabled}
+          getAriaValueText={props.sliderValueText}
           aria-labelledby="construction-capacity"
           valueLabelDisplay="off"
           min={props.sliderMin}
@@ -77,7 +83,9 @@ export default function ConstructionBuildHeader(
               value={props.sort}
               onChange={(event) => updateSort(event.target.value)}
               renderValue={() => `Sort: ${currentSortLabel}`}
-              inputProps={{ "aria-label": "Sort facilities" }}
+              inputProps={{
+                "aria-label": props.sortLabel || "Sort facilities",
+              }}
             >
               {props.sortOptions.map(([value, label]) => (
                 <MenuItem value={value} key={value}>
@@ -92,7 +100,7 @@ export default function ConstructionBuildHeader(
               className="constructionSortButton"
               color="primary"
               onClick={(event) => setSortAnchorEl(event.currentTarget)}
-              aria-label={`Sort facilities: ${currentSortLabel}`}
+              aria-label={`${props.sortLabel || "Sort facilities"}: ${currentSortLabel}`}
               size="large"
             >
               <SortIcon />

@@ -22,6 +22,7 @@ import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
+import * as transmission from "../../helpers/Transmission";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import {
   COLD_DEFINITION_ID,
@@ -671,6 +672,44 @@ describe("the interties view", () => {
     expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 
+  it("sorts current-tier quotes by time, price and import emissions", async () => {
+    const quote = transmission.intertieBuildQuote;
+    const mock = jest
+      .spyOn(transmission, "intertieBuildQuote")
+      .mockImplementation((...args) => {
+        const result = quote(...args);
+        if (!result) return result;
+        // Make price order differ from time/emissions and reverse it at higher tiers.
+        const cheap = args[2] === 1 ? "california-south" : "california-north";
+        return { ...result, buildCost: result.id === cheap ? 1e6 : 2e6 };
+      });
+    try {
+      renderProjects(createGame({ scenarioId: 111 }));
+      const first = () => screen.getAllByTestId(/^transmission-project-/)[0];
+      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+      const select = async (label: string) => {
+        await user.click(
+          screen.getByRole("button", { name: /^Sort interties:/ }),
+        );
+        await user.click(screen.getByRole("menuitem", { name: label }));
+      };
+      expect(
+        screen.getByRole("button", { name: "Sort interties: Fastest" }),
+      ).toBeInTheDocument();
+      await select("Cheapest");
+      expect(first()).toHaveAttribute("data-corridor-id", "california-south");
+      fireEvent.change(screen.getByRole("slider"), { target: { value: 2 } });
+      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+      fireEvent.change(screen.getByRole("slider"), { target: { value: 1 } });
+      expect(first()).toHaveAttribute("data-corridor-id", "california-south");
+      await select("Lowest emissions");
+      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+      await select("Fastest");
+      expect(first()).toHaveAttribute("data-corridor-id", "california-north");
+    } finally {
+      mock.mockRestore();
+    }
+  });
   it("updates capacity and purchase quote when selecting a larger tier", async () => {
     const onBuild = jest.fn();
     renderProjects(createGame({ scenarioId: 111 }), onBuild);
