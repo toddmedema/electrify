@@ -5685,8 +5685,7 @@ $programs_column: 800px;
   background: var(--bg-primary);
   background-image: none;
 }
-.programsTitleShort,
-.programsMobileCash {
+.programsTitleShort {
   display: none;
 }
 .customerProgramsScreen .constructionHeader {
@@ -5783,23 +5782,27 @@ $programs_column: 800px;
     display: inline;
   }
   .customerProgramsScreen .constructionTitle .iconLabel > svg,
-  .customerProgramsScreen .constructionCash,
   .customerProgramsScreen .constructionTitle > .manual-link {
     display: none;
   }
   .customerProgramsScreen .constructionTitle {
-    gap: 0;
+    gap: $space-2;
     font-size: var(--font-size-subtitle);
   }
-  .programsMobileCash {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: $space-3;
+  .customerProgramsScreen .constructionCash {
+    display: inline;
+    font-size: var(--font-size-body2);
   }
   .customerProgramsScreen .constructionTitleBar.MuiToolbar-root {
     padding-left: max($space-1, env(safe-area-inset-left));
     padding-right: max($space-1, env(safe-area-inset-right));
+  }
+}
+
+@media screen and (max-width: 359px) {
+  .customerProgramsScreen .constructionTitle {
+    flex-wrap: wrap;
+    gap: 0;
   }
 }
 
