@@ -21,8 +21,7 @@ function MassUnitName(): React.JSX.Element {
 }
 
 /**
- * The families of data behind every neighbour's emissions and price trend. Each build card names
- * its own neighbour's basis and source; this is the overview a citation list is for.
+ * The families of data behind every neighbour's emissions and price trend.
  */
 function IntertieTrendSources(): React.JSX.Element {
   return (
@@ -471,9 +470,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Your total includes local generation and purchased electricity.
-          Insights separates them; Interties lists import estimates and sources.
-          Import emissions per MWh stay fixed rather than tracking each hour's
-          generation.
+          Insights separates them; Interties lists import estimates. Sources are
+          listed in the Interties manual entry. Import emissions per MWh stay
+          fixed rather than tracking each hour's generation.
         </p>
         <p>
           Local estimates count CO2 from burning fuel, including biomass without
@@ -761,14 +760,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Imports come from the cheapest available neighbor first, and exports
           go to the best-paying one. Hot, sunny weather can also reduce line
-          capacity. The purchase review compares the candidate with your
-          existing connections and operating fleet against next-year demand: how
-          much shortfall energy it covers, the worst remaining gap, and the
-          annual electricity bill. This comparison assumes the new line is open;
-          it does not bring construction forward or include unfinished plants.
-          Its regional-stress example is an illustration, not a predicted event.
-          Live line details identify whether your wire, the neighbor, or your
-          own demand and trading rule limits actual flow.
+          capacity. Build details show typical import availability and price,
+          including how much of the line is available at your peak. Live line
+          details identify whether your wire, the neighbor, or your own demand
+          and trading rule limits actual flow.
         </p>
         <p>
           Neighbors change with the era. Each one follows a researched trend of
@@ -778,8 +773,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           emissions to your score, and imports get dearer or cheaper as the
           neighbor&rsquo;s market did, such as during the 2022 energy crisis. A
           connection can only be built once its real path existed. These are
-          annual averages that do not model a full transmission network; a
-          neighbor&rsquo;s details name its own basis and source.
+          annual averages that do not model a full transmission network. The
+          source families below document their basis.
         </p>
         <IntertieTrendSources />
       </div>

@@ -87,16 +87,8 @@ for (const theme of ["light", "dark"] as const) {
       .first();
     await expect(trade.getByText("Emissions", { exact: true })).toBeVisible();
     await expect(trade.getByText(/^[\d,]+\s*\S+\/MWh$/)).toBeVisible();
-    // The citation behind that number sits in the card's details, beside the basis it cites.
-    // It is an inline link within that sentence, so it has to be a real link rather than a
-    // separate touch target.
     await trade.getByRole("button", { name: /^Show .* details$/ }).click();
-    const citation = trade.getByRole("link", {
-      name: "Source for this neighbor's emissions",
-      exact: true,
-    });
-    await expect(citation).toHaveAttribute("href", /https:\/\//);
-    await expect(citation).toHaveAttribute("target", "_blank");
+    await expect(trade.getByRole("link")).toHaveCount(0);
     expect(
       await page
         .getByRole("tabpanel", { name: "Interties" })
@@ -113,6 +105,15 @@ for (const theme of ["light", "dark"] as const) {
       await page.screenshot({
         path: path.join(reviewDir, "mobile-intertie-assumptions-light.png"),
       });
+    }
+    await page
+      .getByRole("button", { name: "How interties work", exact: true })
+      .click();
+    const sources = page.locator(".manual-sources a");
+    await expect(sources.first()).toBeVisible();
+    for (const citation of await sources.all()) {
+      await expect(citation).toHaveAttribute("href", /^https:/);
+      await expect(citation).toHaveAttribute("target", "_blank");
     }
   });
 }

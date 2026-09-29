@@ -63,7 +63,13 @@ import {
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
-import { createSlice, original, PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  current,
+  isDraft,
+  original,
+  PayloadAction,
+} from "@reduxjs/toolkit";
 import { submitHighscore } from "./User";
 import {
   getDateFromMinute,
@@ -4758,6 +4764,10 @@ export function generateNewTimeline(
   ticks = TICKS_PER_DAY,
   stepMinutes = TICK_MINUTES,
 ): TickPresentFutureType[] {
+  // Forecasts only read the live state. Snapshot a draft once so the horizon does not repeatedly
+  // traverse Immer proxies for location, events, history and other shared inputs. `current`, not
+  // `original`, includes this tick's completed construction, policies and month-boundary events.
+  if (isDraft(readOnlyState)) readOnlyState = current(readOnlyState);
   const tickScale = stepMinutes / TICK_MINUTES;
   // Everything below runs against a private copy, because reforecastSupply ramps generators and
   // pays down loans by mutating the facilities it is handed. Only the facilities need the deep

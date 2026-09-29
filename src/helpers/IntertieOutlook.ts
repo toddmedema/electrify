@@ -4,7 +4,7 @@ import {
   INTERTIE_ARCHETYPES,
   IntertieArchetypeType,
 } from "../data/IntertieArchetypes";
-import { TickPresentFutureType } from "../Types";
+import { GameType, TickPresentFutureType } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import {
   adjacentMarketPricePerMWh,
@@ -164,4 +164,35 @@ export function pricePeriodCaption(
   if (!parts.length) return undefined;
   const text = parts.join(" · ");
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Structural decision state; ticking readings alone do not rebuild the two-year outlook. */
+export function intertieForecastKey(game: GameType): string {
+  return JSON.stringify([
+    game.date.monthsElapsed,
+    game.location.id,
+    game.seed,
+    game.scenarioId,
+    game.customScenario,
+    game.dollarsPerkWh,
+    game.startingDemandScale,
+    game.loadAdditions,
+    game.worldEvents,
+    game.storyEffectsDisabled,
+    game.policies,
+    game.tutorialIntertieStress?.active,
+    game.transmission?.tradingPolicy,
+    game.facilities.map((f) => [
+      f.id,
+      f.peakW,
+      f.peakWh,
+      f.paused,
+      f.yearsToBuildLeft > 0,
+    ]),
+    game.transmission?.lines.map((l) => [
+      l.id,
+      l.capacityW,
+      l.yearsToBuildLeft > 0,
+    ]),
+  ]);
 }

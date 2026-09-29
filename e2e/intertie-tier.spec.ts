@@ -26,9 +26,62 @@ for (const theme of ["light", "dark"] as const) {
     const importAccess = card
       .locator(".buildOptionMetric")
       .filter({ hasText: "Import access" });
+    await card
+      .getByRole("button", { name: "Show Pacific Northwest details" })
+      .click();
     const baseAccess = await importAccess.innerText();
+    await card
+      .getByRole("button", { name: "Hide Pacific Northwest details" })
+      .click();
     const slider = page.getByRole("slider");
     await expect(slider).toHaveCount(1);
+    const desktop = testInfo.project.use.viewport!.width >= 600;
+    const sortControl = () =>
+      desktop
+        ? page.getByRole("combobox", { name: "Sort interties" })
+        : page.getByRole("button", { name: /^Sort interties:/ });
+    await expect(sortControl()).toBeVisible();
+    if (desktop) await expect(sortControl()).toContainText("Fastest");
+    else
+      await expect(sortControl()).toHaveAccessibleName(
+        "Sort interties: Fastest",
+      );
+    const sliderBox = (await slider.boundingBox())!;
+    const sortBox = (await sortControl().boundingBox())!;
+    expect(sortBox.x).toBeGreaterThanOrEqual(sliderBox.x + sliderBox.width);
+    expect(
+      Math.abs(
+        sortBox.y + sortBox.height / 2 - sliderBox.y - sliderBox.height / 2,
+      ),
+    ).toBeLessThan(2);
+    for (const option of ["Cheapest", "Lowest emissions", "Fastest"]) {
+      await sortControl().click();
+      await page
+        .getByRole(desktop ? "option" : "menuitem", {
+          name: option,
+          exact: true,
+        })
+        .click();
+      if (desktop) await expect(sortControl()).toContainText(option);
+      else
+        await expect(sortControl()).toHaveAccessibleName(
+          `Sort interties: ${option}`,
+        );
+    }
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      ((theme === "light" && desktop) || (theme === "dark" && !desktop))
+    ) {
+      if (desktop) await sortControl().click();
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `intertie-sort-${theme}-${testInfo.project.name}.png`,
+        ),
+        animations: "disabled",
+      });
+      if (desktop) await page.keyboard.press("Escape");
+    }
     await slider.focus();
     await slider.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "4");
@@ -41,23 +94,11 @@ for (const theme of ["light", "dark"] as const) {
       .locator(":scope > div")
       .nth(1)
       .innerText();
-    // One market summary; the emissions source note shares its caption style
-    await expect(
-      card.locator(".buildOptionDescription:not(.intertieEmissionsNote)"),
-    ).toHaveCount(1);
+    // Keep only the neighbor’s supply-risk summary.
+    await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
     expect(
       await card.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    if (process.env.REVIEW_SCREENSHOT_DIR && theme === "light") {
-      await slider.scrollIntoViewIfNeeded();
-      await page.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `intertie-tier-${testInfo.project.name}.png`,
-        ),
-        animations: "disabled",
-      });
-    }
     await card
       .getByRole("button", {
         name: "Review purchase of Pacific Northwest intertie",
