@@ -90,6 +90,7 @@ export default function BuildOptionCard(
     ) : undefined;
   // Without metrics, or with a resize shortcut under Review, the context line moves up beside it
   const contextInHeader = metrics === undefined || !!sizeAction;
+  const warningInHeader = !!sizeAction && !!props.warning;
 
   return (
     <Card
@@ -106,13 +107,20 @@ export default function BuildOptionCard(
         className={sizeAction ? "stackedActionsHeader" : undefined}
         avatar={<Avatar alt={props.iconAlt ?? name} src={props.iconSrc} />}
         action={action}
-        slotProps={
-          props.titleComponent
-            ? { title: { component: props.titleComponent } }
-            : undefined
-        }
+        slotProps={{
+          ...(props.titleComponent && {
+            title: { component: props.titleComponent },
+          }),
+          ...(warningInHeader && { subheader: { component: "div" } }),
+        }}
         title={name}
-        subheader={contextInHeader ? context : undefined}
+        subheader={
+          warningInHeader
+            ? props.warning
+            : contextInHeader
+              ? context
+              : undefined
+        }
       />
       {metrics !== undefined && (
         <>
@@ -122,7 +130,7 @@ export default function BuildOptionCard(
             </Typography>
           )}
           {props.summary}
-          {props.warning && (
+          {props.warning && !warningInHeader && (
             <Typography
               component="div"
               className="buildOptionWarning"

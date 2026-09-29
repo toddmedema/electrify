@@ -36,7 +36,11 @@ import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { inEraMoney } from "../../data/FuelPrices";
-import { inEraRate } from "../../data/RetailRates";
+import {
+  CUSTOM_EVENT_SCENARIOS,
+  prepareCustomScenario,
+  standardCustomRate,
+} from "../../helpers/CustomScenarioEvents";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
@@ -129,14 +133,7 @@ function nearestIndex(options: number[], value: number): number {
   return best;
 }
 
-// Older eras quote rates in fractions of a cent, which two decimal places would round together.
-function formatRateOption(dollarsPerkWh: number): string {
-  const tenthsOfCents = Math.round(dollarsPerkWh * 1000);
-  return dollarsPerkWh.toFixed(tenthsOfCents % 10 === 0 ? 2 : 3);
-}
-
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
-const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
 const GENERATOR_SIZES_W = [
   100000000, 250000000, 500000000, 1000000000, 2000000000,
@@ -241,7 +238,9 @@ function facilitiesForStartingCustomers(
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
-  const [scenario, setScenario] = React.useState<ScenarioType>(props.scenario);
+  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
+    prepareCustomScenario(props.scenario),
+  );
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
@@ -318,10 +317,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
       STARTING_CASH.map((cash: number) =>
         inEraMoney(cash, scenario.startingYear),
       ),
-    [scenario.startingYear],
-  );
-  const rateOptions = React.useMemo(
-    () => RATES_PER_KWH.map((r: number) => inEraRate(r, scenario.startingYear)),
     [scenario.startingYear],
   );
   const feeOptions = React.useMemo(
@@ -419,22 +414,24 @@ export default function CustomGame(props: Props): React.JSX.Element {
         : { status: "loading" };
 
   const change = (delta: Partial<ScenarioType>) => {
-    setScenario({ ...scenario, ...delta });
+    setScenario(prepareCustomScenario({ ...scenario, ...delta }));
   };
 
   const changeStartingCustomers = (
     startingCustomers: number,
     delta: Partial<ScenarioType> = {},
   ) => {
-    setScenario((currentScenario: ScenarioType) => ({
-      ...currentScenario,
-      ...delta,
-      startingCustomers,
-      facilities: facilitiesForStartingCustomers(
-        currentScenario,
+    setScenario((currentScenario: ScenarioType) =>
+      prepareCustomScenario({
+        ...currentScenario,
+        ...delta,
         startingCustomers,
-      ),
-    }));
+        facilities: facilitiesForStartingCustomers(
+          currentScenario,
+          startingCustomers,
+        ),
+      }),
+    );
   };
 
   /**
@@ -446,12 +443,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
    */
   const changeStartingYear = (startingYear: number) => {
     const cash = nearestIndex(cashOptions, scenario.cash);
-    const rate = nearestIndex(rateOptions, scenario.dollarsPerkWh);
     const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
     change({
       startingYear,
       cash: inEraMoney(STARTING_CASH[cash], startingYear),
-      dollarsPerkWh: inEraRate(RATES_PER_KWH[rate], startingYear),
+      dollarsPerkWh: standardCustomRate({ ...scenario, startingYear }),
       feePerKgCO2e: inEraMoney(FEES_PER_TON[fee], startingYear) / 1000,
     });
   };
@@ -565,13 +561,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
                         change({ durationMonths: Number(e.target.value) })
                       }
                     >
-                      {DURATION_YEARS.map((y: number) => {
-                        return (
-                          <MenuItem value={y * 12} key={y}>
-                            {y} {y === 1 ? "year" : "years"}
-                          </MenuItem>
-                        );
-                      })}
+                      {Array.from(
+                        new Set([
+                          ...DURATION_YEARS,
+                          scenario.durationMonths / 12,
+                        ]),
+                      )
+                        .sort((a, b) => a - b)
+                        .map((y: number) => {
+                          return (
+                            <MenuItem value={y * 12} key={y}>
+                              {y} {y === 1 ? "year" : "years"}
+                            </MenuItem>
+                          );
+                        })}
                     </Select>
                   </TableCell>
                 </TableRow>
@@ -630,24 +633,50 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Electricity rate</TableCell>
+                  <TableCell>Scenario events</TableCell>
                   <TableCell>
-                    <Select
-                      id="dollarsPerkWh"
-                      inputProps={{ "aria-label": "Electricity rate" }}
-                      value={scenario.dollarsPerkWh}
-                      onChange={(e: SelectChangeEvent<number>) =>
-                        change({ dollarsPerkWh: Number(e.target.value) })
+                    <Select<number[]>
+                      multiple
+                      displayEmpty
+                      fullWidth
+                      sx={{ "& .MuiSelect-select": { whiteSpace: "normal" } }}
+                      inputProps={{ "aria-label": "Scenario events" }}
+                      value={scenario.eventScenarioIds || []}
+                      renderValue={(selected) =>
+                        selected.length
+                          ? CUSTOM_EVENT_SCENARIOS.filter((source) =>
+                              selected.includes(source.id),
+                            )
+                              .map((source) => source.name)
+                              .join(", ")
+                          : "None"
+                      }
+                      onChange={(e: SelectChangeEvent<number[]>) =>
+                        change({
+                          eventScenarioIds: (typeof e.target.value === "string"
+                            ? e.target.value.split(",").map(Number)
+                            : e.target.value
+                          ).sort((a, b) => a - b),
+                        })
                       }
                     >
-                      {rateOptions.map((r: number) => {
+                      {CUSTOM_EVENT_SCENARIOS.map((source) => {
                         return (
-                          <MenuItem value={r} key={r}>
-                            ${formatRateOption(r)}/kWh
+                          <MenuItem value={source.id} key={source.id}>
+                            {source.name}
                           </MenuItem>
                         );
                       })}
                     </Select>
+                    <Typography
+                      variant="caption"
+                      component="p"
+                      color="textSecondary"
+                    >
+                      Events keep their preparation time and scale to your grid.
+                      Duration extends to include them. Electricity prices
+                      follow your location and era.
+                    </Typography>
                   </TableCell>
                 </TableRow>
                 <TableRow>

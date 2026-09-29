@@ -84,7 +84,7 @@ test("phased connection halves initial data-center load and rejoins full load in
         future,
         1000000000,
         future.scenarioId === 106 ? 16500 : 472701,
-      )[0].demandByType["Data centers"];
+      )[0].demandByType["Data Centers"];
     };
     expect(demand(phased) / demand(before)).toBeCloseTo(ratio, 8);
   }

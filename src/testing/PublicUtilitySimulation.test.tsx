@@ -39,7 +39,7 @@ describe("researched public-utility scenarios", () => {
         ?.name,
     ).toBe("Natural Gas Peaker");
     expect(
-      state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
+      state.timeline.every((tick) => tick.demandByType["Data Centers"] === 0),
     ).toBe(true);
     const restored = parseSave(
       JSON.parse(JSON.stringify(serializeSave(state))),

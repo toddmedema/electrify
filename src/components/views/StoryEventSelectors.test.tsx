@@ -42,7 +42,7 @@ describe("active event groups", () => {
       ]),
     );
     expect(groups.map((group) => group.title)).toEqual(["now"]);
-    expect(groups[0].throughLabel).toBe("through Feb 2025");
+    expect(groups[0].throughLabel).toBe("through Feb 2023");
   });
 
   it("groups repeated occurrences and leads with the most severe", () => {

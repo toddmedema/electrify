@@ -64,7 +64,7 @@ function makeTick(minute: number): TickPresentFutureType {
       Commercial: 25_000,
       Industrial: 20_000,
       Transportation: 8_000,
-      "Data centers": 4_000,
+      "Data Centers": 4_000,
       Mining: 3_000,
     },
     solarIrradianceWM2: 400,

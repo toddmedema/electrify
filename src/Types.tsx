@@ -122,7 +122,7 @@ export interface LocationType {
   lat: number;
   long: number;
   // State / province / first-level subdivision from the city catalogue. Demand profiles use it
-  // for location-specific structural trends such as Virginia data centers and Texas growth.
+  // for location-specific structural trends such as Virginia Data Centers and Texas growth.
   admin?: string;
   // Curated cities carry an IANA zone. An arbitrary coordinate may not, in which case local time
   // is derived from longitude rather than from the player's computer.
@@ -173,7 +173,7 @@ export type DemandTypeNameType =
   | "Commercial"
   | "Industrial"
   | "Transportation"
-  | "Data centers"
+  | "Data Centers"
   | "Mining";
 
 export type DemandByTypeType = Record<DemandTypeNameType, number>;
@@ -838,6 +838,8 @@ export interface ScenarioBriefingType {
 }
 
 export interface ScenarioType {
+  /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
+  eventScenarioIds?: number[];
   hydroInventoryKey?: string;
   // Persisted in scores, completion and shared links; append new ids rather than renumbering
   id: number;
@@ -868,7 +870,7 @@ export interface ScenarioType {
   // Customer count and utility-scale load are not interchangeable. Authored scenarios can
   // calibrate the ordinary customer-driven baseline; otherwise the location profile is enough.
   startingDemandScale?: number;
-  // Absolute loads owned by this scenario. A Data centers schedule replaces the generic regional
+  // Absolute loads owned by this scenario. A Data Centers schedule replaces the generic regional
   // data-center curve instead of stacking on top of it.
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
@@ -919,10 +921,10 @@ export interface ScenarioLoadAdditionType {
   /**
    * The two end uses a scenario can own outright. Both sit outside the regional sector mix: a
    * grid either has the mine or the campus on it or it does not, and neither scales with the
-   * customer count. "Data centers" replaces the generic regional curve when authored; "Mining"
+   * customer count. "Data Centers" replaces the generic regional curve when authored; "Mining"
    * has no generic curve and is purely additive.
    */
-  demandType: "Data centers" | "Mining";
+  demandType: "Data Centers" | "Mining";
 }
 
 /**

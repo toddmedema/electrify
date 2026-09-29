@@ -437,7 +437,7 @@ describe("SaveGame", () => {
           startsMonth: 4,
           peakW: 100_000_000,
           loadFactor: 0.9,
-          demandType: "Data centers",
+          demandType: "Data Centers",
         },
       ],
     };

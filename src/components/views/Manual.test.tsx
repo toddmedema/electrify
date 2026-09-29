@@ -85,7 +85,7 @@ describe("Manual", () => {
   it.each([
     ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
     ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
-    ["meaningful decisions", MANUAL_ENTRY.SCORE],
+    ["scoring", MANUAL_ENTRY.SCORE],
   ])("finds the right lesson when searching %s", (term, title) => {
     renderManual();
     search(term);

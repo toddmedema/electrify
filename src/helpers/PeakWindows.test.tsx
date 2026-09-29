@@ -57,7 +57,7 @@ test.each(Array.from({ length: 24 }, (_, hour) => hour))(
         Commercial: 100,
         Industrial: 100,
         Mining: 0,
-        "Data centers": 100,
+        "Data Centers": 100,
         Transportation: 100,
       };
       applyPeakDemand(game, tick, queue);
@@ -101,7 +101,7 @@ test("independent windows bill recovered energy at a discount even during a new 
     Commercial: 100,
     Industrial: 100,
     Mining: 0,
-    "Data centers": 100,
+    "Data Centers": 100,
     Transportation: 100,
   };
   applyPeakDemand(game, tick, [

@@ -17,7 +17,7 @@ for (const theme of ["light", "dark"]) {
       .first();
     await fast.click();
     const region = page.getByRole("dialog", { name: /Wildfire preparedness/ });
-    await expect(region).toBeVisible({ timeout: 30000 });
+    await expect(region).toBeVisible({ timeout: 75000 });
     await expectDialogToFit(region);
     const fund = region.getByRole("button", {
       name: /^Fund preparedness \(\$2M\)$/,

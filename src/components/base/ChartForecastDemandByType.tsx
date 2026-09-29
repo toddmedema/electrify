@@ -87,7 +87,7 @@ const EMPTY_BREAKDOWN: DemandByTypeType = {
   Industrial: 0,
   Transportation: 0,
   Mining: 0,
-  "Data centers": 0,
+  "Data Centers": 0,
 };
 
 /**

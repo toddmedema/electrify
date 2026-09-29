@@ -813,18 +813,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SCORE,
     group: "Gameplay",
     keywords:
-      "points scoring high score meaningful decisions end of game investor public replay watch",
+      "points scoring high score end of game investor public replay watch",
     entry: (
       <div>
         <p>
-          Check <strong>Victory conditions</strong> for reliability, customer
-          and decision goals. Intern requires one meaningful decision; CEO
-          requires ten across four types. Tutorial missions have separate
-          objectives.
+          Check <strong>Victory conditions</strong> for reliability and customer
+          goals. Tutorial missions have separate objectives.
         </p>
         <p>
-          Regular scenarios end early if cash is negative at month-end, or you
-          supply less than 90% of demand for three consecutive months.
+          In all scenarios, you fail if you go bankrupt or serve less than 90%
+          of demand in three consecutive months.
         </p>
         <p>
           The tables below score your term; reliability, costs and emissions are

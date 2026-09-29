@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
+  SCENARIOS,
 } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { inEraRate } from "../../data/RetailRates";
@@ -71,7 +72,7 @@ it("opens after economic data is loaded and names every setup control", () => {
     "Duration",
     "Ownership",
     "Starting cash",
-    "Electricity rate",
+    "Scenario events",
     "Carbon fee",
     "Difficulty",
     "Facility type",
@@ -311,17 +312,28 @@ it("quotes electricity rates at the prices of a historical starting year", () =>
 
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Starting year" }));
   fireEvent.click(screen.getByRole("option", { name: "1980" }));
-  fireEvent.mouseDown(
-    screen.getByRole("combobox", { name: "Electricity rate" }),
-  );
   expect(
-    screen.getAllByRole("option").map((option) => option.textContent),
-  ).toEqual(["$0.022/kWh", "$0.031/kWh", "$0.044/kWh", "$0.067/kWh"]);
-  fireEvent.click(screen.getByRole("option", { name: "$0.022/kWh" }));
+    screen.queryByRole("combobox", { name: "Electricity rate" }),
+  ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Play" }));
 
   expect(onStart).toHaveBeenCalledWith(
-    expect.objectContaining({ startingYear: 1980, dollarsPerkWh: 0.022 }),
+    expect.objectContaining({
+      startingYear: 1980,
+      dollarsPerkWh: inEraRate(
+        SCENARIOS.find(
+          (s) =>
+            s.locationId === DEFAULT_CUSTOM_SCENARIO.locationId &&
+            !s.tutorialSteps,
+        )!.dollarsPerkWh,
+        1980,
+        SCENARIOS.find(
+          (s) =>
+            s.locationId === DEFAULT_CUSTOM_SCENARIO.locationId &&
+            !s.tutorialSteps,
+        )!.startingYear,
+      ),
+    }),
   );
 });
 

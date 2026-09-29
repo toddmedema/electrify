@@ -237,5 +237,24 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       battery.getByRole("row", { name: /Stored energy lost per hour/ }),
     ).toContainText("0.01%");
+    await battery.getByRole("button", { name: "Hide Battery details" }).click();
+    await page.getByRole("slider").focus();
+    await page.getByRole("slider").press("End");
+    const maxSize = battery.getByRole("button", { name: "Use max size" });
+    await expect(maxSize).toBeVisible();
+    await expect(battery.locator(".MuiCardHeader-root")).toContainText(
+      "This project size is not available",
+    );
+    await expect(battery.locator(".buildOptionWarning")).toHaveCount(0);
+    expect(
+      await battery.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await page.screenshot({
+      path: testInfo.outputPath(`Storage-max-size-${theme}.png`),
+    });
+    await maxSize.click();
+    await expect(
+      battery.getByRole("button", { name: "Review purchase of Battery" }),
+    ).toBeEnabled();
   });
 }

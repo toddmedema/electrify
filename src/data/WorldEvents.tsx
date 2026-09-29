@@ -16,8 +16,11 @@ import {
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
+import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
+import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
 
 export interface StoryContextType {
+  customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
   seed: number;
   scenarioId: number;
   difficulty: DifficultyType;
@@ -2241,7 +2244,110 @@ export function resolveStoryPhase(
       RANDOM_STREAM.worldEvents,
       storyHash(`${key}|${attribute}`),
     );
-  const description = phase.describe(context, random);
+  let description = phase.describe(context, random);
+  const imported =
+    context.scenarioId === 999 &&
+    context.customEvents?.find((event) => event.scenarioId === arc.scenarioId);
+  if (imported) {
+    const effects = { ...description.effects };
+    if (arc.scenarioId === 111 && phase.id === "firestorm") {
+      const effectiveness = wildfirePreparednessEffectiveness(
+        context.occurrences || [],
+        context.location.id,
+        scheduledMonth * MINUTES_PER_MONTH,
+      );
+      effects.demandMultiplier =
+        1 - (1 - (effects.demandMultiplier ?? 1)) * (1 - 0.5 * effectiveness);
+      effects.facilityOutputMultipliersById = Object.fromEntries(
+        Object.entries(effects.facilityOutputMultipliersById || {}).map(
+          ([id, output]) => [id, 1 - (1 - output) * (1 - 0.5 * effectiveness)],
+        ),
+      );
+      description.attributes = {
+        ...description.attributes,
+        preparednessEffectiveness: effectiveness,
+        prepared: effectiveness > 0,
+        disconnectedDemand: 1 - effects.demandMultiplier,
+      };
+    }
+    if (effects.operatingExpensePerMonth !== undefined)
+      effects.operatingExpensePerMonth *= imported.moneyScale;
+    // Prices per unit and percentage shocks retain their meaning in the receiving market.
+    // Fixed restoration budgets scale to grid size and era; source-city choices are not imported.
+    const changes: string[] = [];
+    if (effects.demandMultiplier !== undefined)
+      changes.push(
+        `Demand: ${Math.round(effects.demandMultiplier * 100)}% of normal`,
+      );
+    if (effects.temperatureOffsetC)
+      changes.push(
+        `Temperature: ${effects.temperatureOffsetC > 0 ? "+" : ""}${effects.temperatureOffsetC}°C`,
+      );
+    if (effects.hydroRunoffMultiplier !== undefined)
+      changes.push(
+        `Hydro inflow: ${Math.round(effects.hydroRunoffMultiplier * 100)}% of normal`,
+      );
+    if (effects.operatingExpensePerMonth)
+      changes.push(
+        `Restoration: $${Math.round(effects.operatingExpensePerMonth).toLocaleString("en-US")}/month`,
+      );
+    for (const [label, values] of [
+      ["fuel price", effects.fuelPriceMultipliers],
+      ["construction cost", effects.buildCostMultipliersByFuel],
+      ["operating cost", effects.operatingCostMultipliersByFuel],
+      ["output", effects.facilityOutputMultipliersByFuel],
+    ] as const) {
+      Object.entries(values || {}).forEach(([fuel, value]) =>
+        changes.push(
+          `${fuel} ${label}: ${Math.round(value! * 100)}% of normal`,
+        ),
+      );
+    }
+    if (
+      effects.facilityOutputMultipliersById &&
+      Object.keys(effects.facilityOutputMultipliersById).length
+    )
+      changes.push("Affected generators have reduced output");
+    if (effects.carbonFeePerKgCO2e !== undefined)
+      changes.push(
+        `Carbon fee: $${Math.round(effects.carbonFeePerKgCO2e * 1000)}/tonne`,
+      );
+    description = {
+      ...description,
+      effects,
+      message: `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`,
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    };
+    const eventYear =
+      context.date.year -
+      Math.floor(context.date.monthsElapsed / 12) +
+      Math.floor(scheduledMonth / 12);
+    description.title = description.title?.replace(
+      /\b(?:19|20)\d{2}\b/g,
+      String(eventYear),
+    );
+    if (phase.id === "trip") {
+      const largest = context.snapshot.facilities
+        .filter(
+          (facility) => facility.operational && facility.fuel === "Uranium",
+        )
+        .sort((a, b) => b.peakW - a.peakW || a.id - b.id)[0];
+      effects.facilityOutputMultipliersById = largest
+        ? { [String(largest.id)]: 0 }
+        : {};
+      description.title = largest
+        ? `${largest.name} shuts down`
+        : "Nuclear shutdown: no operating reactor affected";
+      description.message = largest
+        ? `${largest.name} is offline for the rest of this event. Replace its output with generation, storage or imports.`
+        : "Your grid has no operating nuclear reactor, so this shutdown causes no loss of supply.";
+      description.attributes = {
+        ...description.attributes,
+        selectedFacilityIds: largest ? [largest.id] : [],
+        selectedFacilityNames: largest ? [largest.name] : [],
+      };
+    }
+  }
   const startsMinute = scheduledMonth * MINUTES_PER_MONTH;
   return {
     key,
@@ -2273,7 +2379,8 @@ function resolvePhaseTiming(
       : phase.scheduleOffsetMonths || 0;
   const scheduledMonth =
     resolveStoryScheduleMonth(phase.schedule, context.seed, scheduleKey) +
-    offset;
+    offset +
+    (SCENARIO_PREPARATION_MONTHS[arc.scenarioId] || 0);
   const durationMonths =
     typeof phase.durationMonths === "function"
       ? phase.durationMonths(context)
@@ -2294,7 +2401,14 @@ export function resolveStoryAtDate(
   definitions
     // This explicit equality is the scenario boundary. Custom games (id 999) cannot inherit
     // authored content by sharing a location or starting year with one of the scored scenarios.
-    .filter((arc) => arc.scenarioId === context.scenarioId)
+    .filter(
+      (arc) =>
+        arc.scenarioId === context.scenarioId ||
+        (context.scenarioId === 999 &&
+          context.customEvents?.some(
+            (event) => event.scenarioId === arc.scenarioId,
+          )),
+    )
     .flatMap((arc) => arc.phases.map((phase) => ({ arc, phase })))
     // Persisted occurrence order is part of save/replay determinism too, so content-file order is
     // not allowed to decide it.
@@ -2334,13 +2448,20 @@ export function upcomingStoryPhases(
   definitions: StoryArcDefinitionType[] = STORY_ARC_DEFINITIONS,
 ): Array<ActiveWorldEventType & StoryPhaseDescriptionType> {
   return definitions
-    .filter((arc) => arc.scenarioId === context.scenarioId)
+    .filter(
+      (arc) =>
+        arc.scenarioId === context.scenarioId ||
+        (context.scenarioId === 999 &&
+          context.customEvents?.some(
+            (event) => event.scenarioId === arc.scenarioId,
+          )),
+    )
     .flatMap((arc) =>
       arc.phases
         .filter((phase) => phase.forecastable !== false)
         .flatMap((phase) => {
           const resolved = resolveStoryPhase(arc, phase, context);
-          if (!phase.preview) {
+          if (!phase.preview || context.scenarioId === 999) {
             return [resolved];
           }
           const random = (attribute: string) =>

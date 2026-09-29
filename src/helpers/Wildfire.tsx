@@ -682,8 +682,16 @@ export interface WildfirePreparednessType {
 export function wildfirePreparedness(
   game: GameType,
 ): WildfirePreparednessType | undefined {
-  if (!isWildfireHazardEligible(game)) return undefined;
-  const profile = getWildfireProfile(game.location.id);
+  const importedWildfire =
+    game.scenarioId === CUSTOM_SCENARIO_ID &&
+    game.customScenario?.eventScenarioIds?.includes(
+      WILDFIRE_AUTHORED_SCENARIO_ID,
+    ) &&
+    !game.storyEffectsDisabled;
+  if (!importedWildfire && !isWildfireHazardEligible(game)) return undefined;
+  const profile =
+    getWildfireProfile(game.location.id) ||
+    (importedWildfire ? getWildfireProfile("LA") : undefined);
   if (!profile) return undefined;
   const firstMonth = game.date.monthsElapsed + 1;
   let season = wildfireSeasonAt(profile, game.startingYear, firstMonth);
@@ -747,7 +755,9 @@ export function wildfirePreparedness(
       scenarioId: game.scenarioId,
       atMonth: game.date.monthsElapsed,
       title: "Wildfire preparedness",
-      message: wildfireSeasonOdds(profile),
+      message: importedWildfire
+        ? "Prepare crews and backup equipment for your selected wildfire scenario. Protection ramps up over 12 months."
+        : wildfireSeasonOdds(profile),
       options: [
         {
           id: active ? "stop" : "prepare",

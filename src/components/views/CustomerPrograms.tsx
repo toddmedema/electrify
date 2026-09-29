@@ -37,6 +37,13 @@ import {
   PolicyTier,
 } from "../../Types";
 import { POLICIES, POLICY_IDS, POLICY_TIERS } from "../../data/Policies";
+import { GENERATORS } from "../../data/Facilities";
+import { SCENARIO_PREPARATION_MONTHS } from "../../data/ScenarioPreparation";
+import {
+  deriveExpandedSummary,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+} from "../../helpers/DateTime";
 import {
   BuildoutPolicyId,
   buildoutComplete,
@@ -47,6 +54,7 @@ import {
   policyAvailable,
   policyBudget,
   policyTotalCost,
+  programCustomers,
   isOperatingPolicy,
 } from "../../helpers/Policies";
 import {
@@ -99,6 +107,21 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   timeOfUse: ScheduleIcon,
   curtailment: FactoryIcon,
 };
+const WILDFIRE_SUMMARY =
+  "Crews, inspections and vegetation clearing halve wildfire disconnections and generator losses at full strength. Protection builds over 12 months and fades over 12 months after funding stops; fires and restoration costs remain.";
+
+function monthlyCostLabel(game: GameType, cost: number): string {
+  const month = game.date.monthsElapsed;
+  const profit = deriveExpandedSummary(
+    summarizeTimeline(
+      game.timeline,
+      game.startingYear,
+      (tick) => Math.floor(tick.minute / MINUTES_PER_MONTH) === month,
+    ),
+  ).profit;
+  return `${formatMoneyConcise(cost)}/mo (current profit: ${formatMoneyConcise(profit)}/mo)`;
+}
+
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
 const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
@@ -146,11 +169,24 @@ function BuildoutSummary({
     : [
         ["Total cost", `About ${formatMoneyConcise(total)}`],
         [
-          "While active",
-          `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/month`,
+          "Monthly cost",
+          monthlyCostLabel(game, policyBudget(game, id, "On", effective)),
         ],
         ["At completion", buildoutImpact(game, id)],
       ];
+  if (id === "solar") {
+    const capacityMW = (POLICIES.solar.cap * programCustomers(game)) / 1000000;
+    // Use an actual 150 MW quote, including difficulty and current story prices.
+    // Capital per MW makes no unsupported assumption about panel life or exported energy.
+    const solar = GENERATORS(game, 150000000, [], []).find(
+      (generator) => generator.name === "Solar",
+    );
+    if (capacityMW > 0 && solar?.available)
+      facts.push([
+        "Upfront utility cost / MW",
+        `${formatMoneyConcise(policyTotalCost(game, id, game.date.monthsElapsed) / capacityMW)} rooftop rebates · ${formatMoneyConcise(solar.buildCost / 150)} solar plant (150 MW)`,
+      ]);
+  }
   // Progress already says how far a started project has to go.
   if (!complete && program.adoption === 0)
     facts.unshift(["Duration", `${months} months of installations`]);
@@ -189,6 +225,14 @@ function BuildoutSummary({
           </React.Fragment>
         ))}
       </Box>
+      {id === "solar" && (
+        <Typography variant="body2" color="textSecondary">
+          Costs compare installed capacity, not energy delivered. Rebates
+          exclude customers' contributions; the plant price excludes operating
+          and financing costs. Rooftops also produce less per MW because of
+          shading and orientation.
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -275,6 +319,10 @@ function WildfireDetails({
   error?: string;
 }) {
   const { season, effectiveness, remainingMonths, active } = preparedness;
+  const importedFire =
+    game.scenarioId === 999 &&
+    game.customScenario?.eventScenarioIds?.includes(111);
+  const fireMonth = 12 + SCENARIO_PREPARATION_MONTHS[111];
   const progress = active
     ? effectiveness >= 1
       ? "Fully effective"
@@ -299,22 +347,17 @@ function WildfireDetails({
     ],
     ["Ramp-up / decay", "12 months each · linear"],
     [
-      "Next wildfire season",
-      `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
+      importedFire ? "Scenario wildfire" : "Next wildfire season",
+      importedFire
+        ? `${labelMonth(game, fireMonth)} to ${labelMonth(game, fireMonth + 1)}`
+        : `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
     ],
   ];
   const standard = result?.standardIncident;
   const prepared = result?.preparedIncident;
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
-      <Typography>
-        Crews, inspections and vegetation clearing reduce wildfire
-        disconnections and generator losses by up to 50%. Benefits build
-        linearly over 12 months. Turning off stops charges now and fades
-        remaining protection over 12 months; restarting ramps from the current
-        level. Preparedness does not prevent fires or reduce restoration costs.
-        Existing fires keep their initial response.
-      </Typography>
+      <Typography>{WILDFIRE_SUMMARY}</Typography>
       <Box
         className="customerProgramProject"
         sx={{ display: "grid", gap: 1.5 }}
@@ -332,7 +375,15 @@ function WildfireDetails({
         />
         <Typography variant="body2">{progress}</Typography>
       </Box>
-      <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
+      {!importedFire && (
+        <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
+      )}
+      {importedFire && (
+        <Typography variant="body2" color="textSecondary">
+          Protection at the start of the scenario wildfire determines how much
+          it reduces disconnections and generator losses for that incident.
+        </Typography>
+      )}
       <Box component="dl" className="customerProgramFacts">
         {facts.map(([term, value]) => (
           <React.Fragment key={term}>
@@ -345,13 +396,13 @@ function WildfireDetails({
           </React.Fragment>
         ))}
       </Box>
-      {month === undefined && (
+      {!importedFire && month === undefined && (
         <Typography variant="body2" color="textSecondary">
           The next wildfire season starts after this run ends. The program can
           still protect against new fires before then.
         </Typography>
       )}
-      {month !== undefined && (
+      {!importedFire && month !== undefined && (
         <>
           <Box>
             <Typography component="h3" variant="subtitle1">
@@ -529,11 +580,6 @@ function ProgramList({
     );
   return (
     <Box className="customerProgramList">
-      <Typography variant="body2" color="textSecondary">
-        {preparedness
-          ? "Wildfire preparedness billing changes now; benefits ramp up or fade over 12 months. Other programs start next month."
-          : "Changes start next month."}
-      </Typography>
       {policiesOn &&
         section(
           "Rebate projects",
@@ -550,8 +596,7 @@ function ProgramList({
             id: "wildfire",
             name: "Wildfire preparedness",
             status: preparednessStatus(preparedness),
-            description:
-              "Ongoing protection with a 12-month ramp-up and decay. At full effectiveness, halves disconnections and generator losses. Billed monthly until turned off.",
+            description: WILDFIRE_SUMMARY,
             Icon: LocalFireDepartmentIcon,
             active: preparedness.active,
             onOpen: onOpenWildfire,
@@ -581,8 +626,6 @@ function PolicyProgramDetail({
   onStartHourChange,
   result,
   error,
-  onClose,
-  onViewDemand,
 }: {
   game: GameType;
   selected: PolicyId;
@@ -600,8 +643,6 @@ function PolicyProgramDetail({
   onStartHourChange: (hour: number) => void;
   result: PolicyPreviewResult | undefined;
   error: string | undefined;
-  onClose: () => void;
-  onViewDemand: () => void;
 }) {
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
@@ -612,12 +653,6 @@ function PolicyProgramDetail({
           ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
           : POLICIES[selected].description}
       </Typography>
-      {!complete && (
-        <details className="customerProgramHowItWorks">
-          <summary>How it works</summary>
-          <Typography sx={{ mt: 1 }}>{POLICIES[selected].mechanism}</Typography>
-        </details>
-      )}
       {current.pending && (
         // A standing notice, not an interruption: it is already true when the card opens.
         <Alert severity="info" role="status">
@@ -758,27 +793,13 @@ function PolicyProgramDetail({
           )}
         </>
       )}
-      <Button
-        onClick={() => {
-          onClose();
-          onViewDemand();
-        }}
-      >
-        View demand
-      </Button>
     </>
   );
 }
 
 type Selection = PolicyId | "wildfire";
 
-function ProgramsScreen({
-  onClose,
-  onViewDemand,
-}: {
-  onClose: () => void;
-  onViewDemand: () => void;
-}) {
+function ProgramsScreen({ onClose }: { onClose: () => void }) {
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
@@ -847,7 +868,10 @@ function ProgramsScreen({
     snapshot,
   );
   const fireMonth =
-    selected === "wildfire" ? wildfirePreviewMonth(snapshot) : undefined;
+    selected === "wildfire" &&
+    !game.customScenario?.eventScenarioIds?.includes(111)
+      ? wildfirePreviewMonth(snapshot)
+      : undefined;
   const wildfireEstimate = useEstimate<WildfirePreviewResult>(
     fireMonth === undefined
       ? undefined
@@ -975,8 +999,6 @@ function ProgramsScreen({
                 onStartHourChange={setStartHour}
                 result={result}
                 error={error}
-                onClose={onClose}
-                onViewDemand={onViewDemand}
               />
             )}
           </Box>
@@ -1066,13 +1088,7 @@ function ProgramsScreen({
   );
 }
 
-export default function CustomerPrograms({
-  game,
-  onViewDemand,
-}: {
-  game: GameType;
-  onViewDemand: () => void;
-}) {
+export default function CustomerPrograms({ game }: { game: GameType }) {
   const [open, setOpen] = React.useState(false);
   const policiesOn = policyAvailable(game);
   const preparedness = wildfirePreparedness(game);
@@ -1119,12 +1135,7 @@ export default function CustomerPrograms({
       >
         Programs
       </Button>
-      {open && (
-        <ProgramsScreen
-          onClose={() => setOpen(false)}
-          onViewDemand={onViewDemand}
-        />
-      )}
+      {open && <ProgramsScreen onClose={() => setOpen(false)} />}
     </Box>
   );
 }
