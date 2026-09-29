@@ -133,7 +133,7 @@ export const SCORE_RULES: Record<ScenarioType["ownership"], ScoreRuleType[]> = {
       score: ({ targetRate, effectiveRate }) =>
         publicRateScore(targetRate, effectiveRate),
       text: ({ dollarsPerkWh }, rule) =>
-        `Earn ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is below the $${dollarsPerkWh}/kWh target. Lose ${pointsText(rule.points)} for each $0.01/kWh it is above. The target is in the starting year's dollars and rises with inflation.`,
+        `Earn ± ${pointsText(rule.points)} for each $0.01/kWh your lifetime average rate is above/below the $${dollarsPerkWh}/kWh target.`,
     },
     supplyRule(10),
     emissionsRule(-5),

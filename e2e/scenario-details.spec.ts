@@ -7,6 +7,8 @@ for (const theme of ["light", "dark"] as const) {
   test(`scenario details reflow and dismiss in ${theme} mode`, async ({
     page,
   }, testInfo) => {
+    // Allow the existing 75-second event wait to finish before the test deadline.
+    test.setTimeout(120_000);
     await page.addInitScript((mode) => {
       window.localStorage.clear();
       window.localStorage.setItem("theme", mode);

@@ -1368,7 +1368,6 @@ $pane_header_height: 48px;
     margin-left: 0;
   }
 
-  .insightsPresetSave,
   .insightsPresetActions {
     width: var(--insights-control-size);
     height: var(--insights-control-size);
@@ -1393,9 +1392,7 @@ $pane_header_height: 48px;
   white-space: nowrap;
 }
 
-.insightsPresetEdited,
-.insightsPresetCustomized,
-.insightsPresetMenuHint {
+.insightsPresetEdited {
   flex: 0 0 auto;
   padding: 1px 4px;
   border-radius: var(--radius-pill);
@@ -1407,16 +1404,6 @@ $pane_header_height: 48px;
 .insightsPresetEdited {
   background: $interactive_blue;
   color: $bg_primary;
-}
-
-.insightsPresetCustomized,
-.insightsPresetMenuHint {
-  background: var(--interactive-tint);
-  color: $interactive_blue;
-}
-
-.insightsPresetMenuHint {
-  margin-left: auto;
 }
 
 .insightsPresetDialog {
@@ -1715,10 +1702,6 @@ $pane_header_height: 48px;
         width: 100%;
         min-width: 0;
       }
-
-      .insightsPresetSave {
-        display: none;
-      }
     }
 
     .insightsLayerControls {
@@ -1727,8 +1710,7 @@ $pane_header_height: 48px;
     }
   }
 
-  .insightsPresetEdited,
-  .insightsPresetCustomized {
+  .insightsPresetEdited {
     position: absolute !important;
     width: 1px !important;
     height: 1px !important;
@@ -5615,9 +5597,7 @@ $sizemap: (
   color: var(--font-color-faded);
 }
 .insights .insightsRateMetricLabel,
-.insights .insightsRateMarkMobile,
-.insightsPresetMenuHint,
-.insightsPresetCustomized {
+.insights .insightsRateMarkMobile {
   font-size: var(--font-size-caption);
   line-height: 1.4;
   text-transform: none;
@@ -6578,6 +6558,33 @@ $programs_column: 800px;
     .MuiAccordionSummary-root {
       border-bottom-left-radius: var(--radius-lg);
       border-bottom-right-radius: var(--radius-lg);
+    }
+  }
+}
+
+// The three-pane layout keeps Programs beside the Insights title, like Build.
+.insightsTitle .customerProgramsControl {
+  display: none;
+}
+.desktop-layout .insights {
+  .insightsTitle {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .insightsTitle .customerProgramsControl {
+    display: block;
+    position: static;
+    margin-left: auto;
+  }
+  .insightsLevers {
+    padding-right: 16px;
+    .customerProgramsControl {
+      display: none;
+    }
+    .budgetSlider {
+      width: 100%;
+      margin-right: 0;
     }
   }
 }

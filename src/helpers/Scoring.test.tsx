@@ -321,7 +321,7 @@ describe("SCORE_RULES", () => {
     );
     const publicText = scoreRuleText("Public", 0.12, "1 Mt");
     expect(publicText.rate).toContain(
-      `Earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each $0.01/kWh`,
+      `Earn ± ${PUBLIC_RATE_POINTS_PER_CENT} points for each $0.01/kWh`,
     );
     expect(publicText.rate).toContain("$0.12/kWh target");
     expect(publicText.blackouts).toBe(

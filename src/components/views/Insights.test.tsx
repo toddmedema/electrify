@@ -1020,8 +1020,10 @@ describe("Insights layers", () => {
     await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
 
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(labelledButton("Preset actions"));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Save preset changes" }),
+    );
 
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
@@ -1043,7 +1045,10 @@ describe("Insights layers", () => {
     renderInsights();
     await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(labelledButton("Preset actions"));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Save preset changes" }),
+    );
 
     await user.click(labelledButton("Preset actions"));
     await user.click(
@@ -1068,7 +1073,10 @@ describe("Insights layers", () => {
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
     expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await user.click(labelledButton("Preset actions"));
+    expect(
+      screen.getByRole("menuitem", { name: "Save preset changes" }),
+    ).toBeDisabled();
   });
 
   it("creates and updates a named preset", async () => {
@@ -1089,7 +1097,10 @@ describe("Insights layers", () => {
 
     await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(labelledButton("Preset actions"));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Save preset changes" }),
+    );
     const library = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );

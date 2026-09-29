@@ -45,6 +45,18 @@ for (const theme of ["light", "dark"]) {
         .toBe(true);
       const insights = page.locator(".insights:visible").last();
       await expect(insights).toHaveClass(/insightsCompact/);
+      const programs = insights.getByRole("button", {
+        name: "Customer programs",
+      });
+      await expect(programs).toHaveCount(1);
+      await expect(programs).toBeVisible();
+      if (width >= 1300) {
+        await expect(
+          insights
+            .locator(".insightsTitle")
+            .getByRole("button", { name: "Customer programs" }),
+        ).toBeVisible();
+      }
       const controls = insights.locator(".insightsHeaderControls");
       expect(
         await controls.evaluate((el) => el.scrollWidth - el.clientWidth),

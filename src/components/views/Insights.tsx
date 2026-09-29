@@ -2263,10 +2263,6 @@ export default class Insights extends React.Component<Props, State> {
         : null;
     const customLimitReached =
       this.state.presetLibrary.custom.length >= MAX_CUSTOM_INSIGHT_PRESETS;
-    const selectedDefaultCustomized =
-      !!selectedDefault &&
-      !!this.state.presetLibrary.defaults[selectedDefault] &&
-      !this.state.presetDirty;
     const upcomingEvents = (this.props.upcomingEvents || []).filter(
       (event) =>
         event.startsMinute !== undefined &&
@@ -2290,6 +2286,7 @@ export default class Insights extends React.Component<Props, State> {
         <div className="scrollable" ref={this.paneRef}>
           <Toolbar className="paneHeader insightsTitle">
             <Typography variant="h6">Insights</Typography>
+            <CustomerPrograms game={game} />
           </Toolbar>
           {this.renderLevers(now)}
           {/* The preset and layer controls sit directly above the charts they choose */}
@@ -2325,31 +2322,15 @@ export default class Insights extends React.Component<Props, State> {
                           Edited
                         </span>
                       )}
-                      {selectedDefaultCustomized && (
-                        <span className="insightsPresetCustomized">
-                          Customized
-                        </span>
-                      )}
                     </span>
                   )}
                 >
                   <ListSubheader>Default presets</ListSubheader>
-                  {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => {
-                    const modified =
-                      !!this.state.presetLibrary.defaults[
-                        id as DefaultInsightPresetId
-                      ];
-                    return (
-                      <MenuItem key={id} value={id} data-insight-preset={id}>
-                        <span>{preset.label}</span>
-                        {modified && (
-                          <span className="insightsPresetMenuHint">
-                            Modified
-                          </span>
-                        )}
-                      </MenuItem>
-                    );
-                  })}
+                  {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
+                    <MenuItem key={id} value={id} data-insight-preset={id}>
+                      {preset.label}
+                    </MenuItem>
+                  ))}
                   {!!this.state.presetLibrary.custom.length && (
                     <ListSubheader>
                       Your presets ({this.state.presetLibrary.custom.length}/
@@ -2371,27 +2352,6 @@ export default class Insights extends React.Component<Props, State> {
                     Unsaved view
                   </MenuItem>
                 </Select>
-                <IconButton
-                  className="insightsPresetSave"
-                  size="small"
-                  aria-label={
-                    this.state.preset === "custom" ? "Save as" : "Save"
-                  }
-                  disabled={
-                    !this.state.layers.length ||
-                    (this.state.preset !== "custom" &&
-                      !this.state.presetDirty) ||
-                    (this.state.preset === "custom" && customLimitReached)
-                  }
-                  title={
-                    this.state.preset === "custom" && customLimitReached
-                      ? `Limit of ${MAX_CUSTOM_INSIGHT_PRESETS} custom presets reached`
-                      : undefined
-                  }
-                  onClick={() => this.savePresetChanges()}
-                >
-                  <SaveIcon fontSize="small" />
-                </IconButton>
                 <Tooltip title="Rename, save a copy, restore, or delete">
                   <IconButton
                     className="insightsPresetActions"
@@ -2439,28 +2399,25 @@ export default class Insights extends React.Component<Props, State> {
               open={!!this.state.presetMenuAnchor}
               onClose={() => this.setState({ presetMenuAnchor: null })}
             >
-              {this.state.compact && (
-                <MenuItem
-                  className="insightsPresetSaveMenuItem"
-                  disabled={
-                    !this.state.layers.length ||
-                    (this.state.preset !== "custom" &&
-                      !this.state.presetDirty) ||
-                    (this.state.preset === "custom" && customLimitReached)
-                  }
-                  onClick={() => {
-                    this.setState({ presetMenuAnchor: null }, () =>
-                      this.savePresetChanges(),
-                    );
-                  }}
-                >
-                  <SaveIcon fontSize="small" />
-                  {this.state.preset === "custom"
-                    ? "Save as new preset"
-                    : "Save preset changes"}
-                </MenuItem>
-              )}
-              {(!this.state.compact || this.state.preset !== "custom") && (
+              <MenuItem
+                className="insightsPresetSaveMenuItem"
+                disabled={
+                  !this.state.layers.length ||
+                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
+                  (this.state.preset === "custom" && customLimitReached)
+                }
+                onClick={() => {
+                  this.setState({ presetMenuAnchor: null }, () =>
+                    this.savePresetChanges(),
+                  );
+                }}
+              >
+                <SaveIcon fontSize="small" />
+                {this.state.preset === "custom"
+                  ? "Save as new preset"
+                  : "Save preset changes"}
+              </MenuItem>
+              {this.state.preset !== "custom" && (
                 <MenuItem
                   className="insightsPresetSaveAsMenuItem"
                   disabled={customLimitReached || !this.state.layers.length}
