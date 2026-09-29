@@ -448,35 +448,6 @@ function IntertieUpgradeControl(props: {
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
   return (
     <div className="transmissionUpgrade">
-      <Typography variant="body2">
-        Upgrade to {formatWatts(quote.targetCapacityW, 3)} ·{" "}
-        {formatMoneyConcise(quote.buildCost)} · {months} mo ·{" "}
-        {formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)}{" "}
-        {largeMassUnit(units)} CO2e to build
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        Neighbor supply ceiling{" "}
-        {formatWatts(
-          effectiveMarket(line.corridorId, context)?.availableSupplyW || 0,
-        )}
-        . Extra import room before weather and seasonal limits:{" "}
-        {formatWatts(
-          Math.max(
-            0,
-            Math.min(
-              quote.targetCapacityW,
-              effectiveMarket(line.corridorId, context)?.availableSupplyW || 0,
-            ) -
-              Math.min(
-                line.capacityW,
-                effectiveMarket(line.corridorId, context)?.availableSupplyW ||
-                  0,
-              ),
-          ),
-        )}
-        . Wider wires do not increase the neighbor’s spare supply or export
-        budget.
-      </Typography>
       {shortfall && (
         <Typography variant="caption" color="textSecondary" component="div">
           {shortfall}

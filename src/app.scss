@@ -1433,7 +1433,9 @@ $pane_header_height: 48px;
   }
 }
 
-.insightsPresetSaveMenuItem {
+.insightsPresetSaveMenuItem,
+.insightsPresetSaveAsMenuItem,
+.insightsPresetResetMenuItem {
   > svg {
     margin-right: 12px;
   }

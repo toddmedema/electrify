@@ -77,7 +77,7 @@ const DEMAND_TYPE_COLORS: Record<
     Industrial: "#8d4b20",
     Transportation: "#2e7d32",
     Mining: "#00695c",
-    "Data centers": "#c62828",
+    "Data Centers": "#c62828",
   },
   dark: {
     Residential: "#64b5f6",
@@ -85,7 +85,7 @@ const DEMAND_TYPE_COLORS: Record<
     Industrial: "#d7a86e",
     Transportation: "#81c784",
     Mining: "#4db6ac",
-    "Data centers": "#ef9a9a",
+    "Data Centers": "#ef9a9a",
   },
 };
 

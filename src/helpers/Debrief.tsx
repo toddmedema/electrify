@@ -126,7 +126,7 @@ function scenarioMetrics(
     );
     return [
       {
-        label: "Months with blackouts after data centers arrived",
+        label: "Months with blackouts after Data Centers arrived",
         value:
           afterArrival.length === 0
             ? "Not reached"

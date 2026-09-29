@@ -368,13 +368,20 @@ export function getInflationRate(date: MonthRefType, seed: number): number {
   return getEconomy(date, seed).inflation;
 }
 
-/**
- * Cumulative inflation since January of the game's starting year, as a multiplier on costs quoted
- * in that year's dollars. Exactly 1 on the opening day of every run, whichever year it starts in:
- * anchoring on the game rather than on a fixed year is what keeps a 1980 scenario's build costs
- * matching its authored table instead of being deflated into triviality against a nominal
- * retail rate.
- */
+/** Retail benchmarks change each January; costs still follow monthly inflation. */
+export function getRateInflationIndex(
+  date: MonthRefType,
+  startingYear: number,
+  seed: number,
+): number {
+  return getInflationIndex(
+    { year: date.year, monthNumber: 1 },
+    startingYear,
+    seed,
+  );
+}
+
+/** Cumulative monthly cost inflation, anchored to January of the run's starting year. */
 export function getInflationIndex(
   date: MonthRefType,
   startingYear: number,

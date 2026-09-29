@@ -504,6 +504,7 @@ export function baselinePlugin(stroke: string): uPlot.Plugin {
         u.ctx.save();
         u.ctx.strokeStyle = stroke;
         u.ctx.lineWidth = width;
+        u.ctx.setLineDash([]);
         u.ctx.beginPath();
         u.ctx.moveTo(u.bbox.left, y);
         u.ctx.lineTo(u.bbox.left + u.bbox.width, y);

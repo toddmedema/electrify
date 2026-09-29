@@ -87,7 +87,7 @@ describe("demand profiles", () => {
     expect(total(withMine) - total(withoutMine)).toBeCloseTo(withMine.Mining);
   });
 
-  it("introduces data centers around 2000 and accelerates them after 2025", () => {
+  it("introduces Data Centers around 2000 and accelerates them after 2025", () => {
     const california = location("CA");
     expect(dataCenterLoadShare(1999, california)).toBe(0);
     expect(dataCenterLoadShare(2000, california)).toBeGreaterThan(0);
@@ -142,11 +142,11 @@ describe("demand profiles", () => {
   describe("authored absolute loads", () => {
     const addition: ScenarioLoadAdditionType = {
       id: "manassas-data-centers",
-      label: "New data centers",
+      label: "Data Centers",
       startsYear: 2026,
       peakW: 100_000_000,
       loadFactor: 0.9,
-      demandType: "Data centers",
+      demandType: "Data Centers",
     };
 
     it("starts in the authored month, remains one absolute block and averages its load factor", () => {
@@ -183,7 +183,7 @@ describe("demand profiles", () => {
       ).toBe(100_000_000);
     });
 
-    it("replaces Virginia's generic curve and reports only under Data centers", () => {
+    it("replaces Virginia's generic curve and reports only under Data Centers", () => {
       const virginia = location("VA", "Manassas");
       const before = demandByTypeAt(
         50_000_000,
@@ -200,8 +200,8 @@ describe("demand profiles", () => {
         [addition],
       );
 
-      expect(before["Data centers"]).toBe(0);
-      expect(after["Data centers"]).toBe(100_000_000);
+      expect(before["Data Centers"]).toBe(0);
+      expect(after["Data Centers"]).toBe(100_000_000);
       expect(total(after)).toBeGreaterThan(100_000_000);
     });
 

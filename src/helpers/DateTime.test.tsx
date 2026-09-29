@@ -204,7 +204,7 @@ describe("summarizeTimeline", () => {
         Industrial: 0,
         Transportation: 0,
         Mining: 0,
-        "Data centers": 100,
+        "Data Centers": 100,
       };
       tick.windKph = index * 100;
       tick.windAirborneKph = 0;
@@ -214,7 +214,7 @@ describe("summarizeTimeline", () => {
     const original = JSON.stringify(timeline);
     const average = summarizeTimeline(timeline, 2020).chartAverage!;
     expect(average.demandByType.Residential).toBe(150);
-    expect(average.demandByType["Data centers"]).toBe(100);
+    expect(average.demandByType["Data Centers"]).toBe(100);
     expect(average.supplyByFuel.Coal).toBe(65);
     expect(average.storedWh).toBe(500);
     expect(average.windKph).toBe(50);

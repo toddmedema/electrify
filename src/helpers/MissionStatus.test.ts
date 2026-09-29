@@ -60,17 +60,17 @@ const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
-  expect(getMissionStatus(fixture(11)).headline?.id).toBe("reliability");
-  expect(requirement(fixture(11), "reliability").status).toBe("pending");
-  expect(requirement(fixture(12), "reliability").status).toBe("in-progress");
-  const partial = createNextState(fixture(13), (g) => {
+  expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
+  expect(requirement(fixture(35), "reliability").status).toBe("pending");
+  expect(requirement(fixture(36), "reliability").status).toBe("in-progress");
+  const partial = createNextState(fixture(37), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 0), monthRow(2025, 1)];
   });
   expect(requirement(partial, "reliability").status).toBe("in-progress");
   expect(requirement(partial, "reliability").current).toContain(
     "1 of 2 months counted",
   );
-  const completed = createNextState(fixture(14), (g) => {
+  const completed = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [monthRow(2025, 2), monthRow(2025, 1)];
   });
   expect(requirement(completed, "reliability").status).toBe("completed");
@@ -86,7 +86,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
 });
 
 test("empty and partial required history stay unknown even at term end without changing canonical outcome", () => {
-  for (const months of [14, 36]) {
+  for (const months of [38, 60]) {
     for (const rows of [[], [monthRow(2025, 1)]]) {
       const game = createNextState(fixture(months), (g) => {
         g.monthlyHistory = rows;
@@ -103,14 +103,14 @@ test("empty and partial required history stay unknown even at term end without c
       ).toBeUndefined();
     }
   }
-  expect(getMissionStatus(fixture(36)).finalNote).toContain(
+  expect(getMissionStatus(fixture(60)).finalNote).toContain(
     "recorded final outcome",
   );
-  expect(getMissionStatus(fixture(36)).monthsRemaining).toBe(0);
+  expect(getMissionStatus(fixture(60)).monthsRemaining).toBe(0);
 });
 
 test("zero demand shares evaluator measurement and cannot invent blackout failure", () => {
-  const game = createNextState(fixture(14), (g) => {
+  const game = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [
       monthRow(2025, 2, 0, 0),
       monthRow(2025, 1, 0, 0),
@@ -125,7 +125,7 @@ test("zero demand shares evaluator measurement and cannot invent blackout failur
 });
 
 test("survival is chronological completed evidence and ignores current partial history", () => {
-  const game = createNextState(fixture(5), (g) => {
+  const game = createNextState(fixture(29), (g) => {
     g.monthlyHistory = [
       monthRow(2024, 3, 80),
       monthRow(2024, 6),
@@ -257,7 +257,7 @@ test("risk precedence distinguishes actual shortage, cash, required failure, sam
     g.timeline[0].supplyW = 99;
   });
   expect(selectMissionRisk(shortage, [event])?.id).toBe("shortage");
-  const failed = createNextState(fixture(14), (g) => {
+  const failed = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
     g.timeline.push(
       Object.assign({}, g.timeline[0], {

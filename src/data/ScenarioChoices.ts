@@ -43,19 +43,19 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         loadAdditions: [
           {
             id: "manassas-data-centers-phase-one",
-            label: "New data centers",
+            label: "Data Centers",
             startsYear: 2026,
             peakW: 50000000,
             loadFactor: 0.9,
-            demandType: "Data centers",
+            demandType: "Data Centers",
           },
           {
             id: "manassas-data-centers-phase-two",
-            label: "New data centers",
+            label: "Data Centers",
             startsYear: 2028,
             peakW: 50000000,
             loadFactor: 0.9,
-            demandType: "Data centers",
+            demandType: "Data Centers",
           },
         ],
       },

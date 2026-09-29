@@ -191,14 +191,15 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   110: {
-    // Fast construction covers the nuclear trip before a new gas plant could arrive.
+    // Backup covers the nuclear trip; keep the remaining gas online until the final month.
     initialBuild: { name: "Oil", peakW: 300000000, financed: true },
     scheduledActions: [
-      rate(0.18),
+      // The longer preparation period needs a tariff that covers the backup fleet's upkeep.
+      rate(0.19),
       ...line("france-core-upgrade"),
       ...dispatch([2, 3, 6]),
-      { month: 47, type: "toggle", facilityId: 2 },
-      ...programs(46),
+      { month: 59, type: "toggle", facilityId: 2 },
+      ...programs(58),
     ],
   },
   111: {

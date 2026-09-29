@@ -832,12 +832,12 @@ describe("the intertie upgrade control", () => {
     const upgrade = screen.getByLabelText(
       `Upgrade ${line.name} to ${formatWatts(line.capacityW * 1.5, 3)}`,
     );
-    // The embodied cost of the work is on the button's own row, where the decision is made,
-    // rather than somewhere the player has to go looking for it.
-    expect(screen.getByText(/CO2e to build/)).toBeInTheDocument();
+    expect(screen.queryByText(/CO2e to build/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Extra import room/)).not.toBeInTheDocument();
     await user.click(upgrade);
     expect(handleUpgrade).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
     expect(dialog).toHaveTextContent(/for 30 years/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
     await user.click(within(dialog).getByRole("button", { name: "Take loan" }));

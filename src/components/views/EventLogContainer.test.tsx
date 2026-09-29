@@ -57,7 +57,7 @@ describe("ongoing story events", () => {
       expect.objectContaining({
         key: "story:111:california-wildfire-2025:firestorm",
         title: "Wildfire emergency",
-        label: "Through Feb 2025",
+        label: "Through Feb 2023",
       }),
     ]);
   });
@@ -96,7 +96,7 @@ test("scheduled data-center connections appear and update when the schedule chan
       expect.objectContaining({
         key: "load:manassas-data-centers",
         startsMinute: 72 * MINUTES_PER_MONTH,
-        title: "New data centers online",
+        title: "Data Centers online",
         message: expect.stringContaining("100MW"),
       }),
     ]),

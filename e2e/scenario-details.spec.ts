@@ -50,8 +50,8 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "fast speed", exact: true })
       .first()
       .click();
-    // The preparedness decision comes due 11 game months in, so the fast-forward above takes
-    // about 11s of real time to reach it. The default 12s expect window leaves barely a second
+    // The preparedness decision comes due 35 game months in, so the fast-forward above takes
+    // about 35s of real time to reach it. The default 12s expect window is too short
     // of margin, and a loaded machine has been observed to miss it; widen the window instead of
     // racing the clock.
     const preparedness = page.getByRole("dialog", {
@@ -73,7 +73,7 @@ for (const theme of ["light", "dark"] as const) {
             await fast.click();
           return preparedness.isVisible();
         },
-        { timeout: 30000, intervals: [1000] },
+        { timeout: 75000, intervals: [1000] },
       )
       .toBe(true);
     await preparedness.getByRole("button", { name: "Keep cash" }).click();

@@ -4,7 +4,7 @@ import {
   TICKS_PER_MONTH,
   TICKS_PER_YEAR,
 } from "../Constants";
-import { getInflationIndex } from "../data/Economy";
+import { getRateInflationIndex } from "../data/Economy";
 import { DateType } from "../Types";
 import { pow } from "./Pow";
 
@@ -22,14 +22,14 @@ export const CUSTOMER_RATE_MEMORY_MONTHS = 3;
 export const CUSTOMER_PRICE_ELASTICITY = 1.5;
 export const CUSTOMER_SWITCHING_MAX_ANNUAL = 0.3;
 
-/** The competitor benchmark follows the same cumulative inflation as the utility's costs. */
+/** The competitor benchmark updates each January with cumulative inflation. */
 export function getMarketRate(
   startingRate: number,
   date: Pick<DateType, "year" | "monthNumber">,
   startingYear: number,
   seed: number,
 ): number {
-  return startingRate * getInflationIndex(date, startingYear, seed);
+  return startingRate * getRateInflationIndex(date, startingYear, seed);
 }
 
 /**
@@ -38,8 +38,6 @@ export function getMarketRate(
  * score deflates by. Investors face the competitor benchmark rather than a cap.
  */
 export const PUBLIC_RATE_CAP_MULTIPLE = 2;
-/** The cap never falls below a nickel, so tiny authored targets still leave a usable slider. */
-export const PUBLIC_RATE_CAP_FLOOR = 0.05;
 
 export function publicRateCap(
   targetRate: number,
@@ -50,9 +48,8 @@ export function publicRateCap(
   const cap =
     targetRate *
     PUBLIC_RATE_CAP_MULTIPLE *
-    getInflationIndex(date, startingYear, seed);
-  // Rounded up to whole cents so the slider ends on a clean mark and never below the exact cap
-  return Math.max(PUBLIC_RATE_CAP_FLOOR, Math.ceil(cap * 100 - 1e-9) / 100);
+    getRateInflationIndex(date, startingYear, seed);
+  return cap;
 }
 
 export interface CustomerTickInputType {

@@ -31,7 +31,10 @@ function ready(month = 11, cash = 100000000) {
     difficulty: "Employee",
     seed: 2468,
   });
-  game.date = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
+  game.date = getDateFromMinute(
+    (month + 24) * MINUTES_PER_MONTH,
+    game.startingYear,
+  );
   game.timeline = generateNewTimeline(game, cash, 1000000);
   game.replayLog = [];
   return game;
@@ -43,7 +46,10 @@ function emergency(game: ReturnType<typeof ready>, month = 12) {
     seed: game.seed,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
-    date: getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear),
+    date: getDateFromMinute(
+      (month + 24) * MINUTES_PER_MONTH,
+      game.startingYear,
+    ),
     location: game.location,
     snapshot: buildStorySnapshot(
       game.monthlyHistory,
@@ -148,7 +154,7 @@ test.each(["prepare", "standard"] as const)(
     const advance = (game: typeof live, month: number) => {
       while (game.date.monthsElapsed < month) tickState(game);
     };
-    advance(live, 11);
+    advance(live, 35);
     if (choice) live = cloneDeep(reducer(live, chooseWildfireResponse(choice)));
     const saved = cloneDeep(
       parseSave(JSON.parse(JSON.stringify(serializeSave(live))))!.game,
@@ -156,9 +162,9 @@ test.each(["prepare", "standard"] as const)(
     const replay = createGameFromReplay(
       decodeReplay(encodeReplay(serializeReplay(live)!))!,
     );
-    advance(live, 36);
-    advance(saved, 36);
-    advance(replay, 36);
+    advance(live, 60);
+    advance(saved, 60);
+    advance(replay, 60);
     expect(replay.worldEvents.occurrences).toEqual(
       live.worldEvents.occurrences,
     );
@@ -185,7 +191,7 @@ test("forecast refresh includes funded disconnections without changing customer 
   const after = cloneDeep(reducer(before, chooseWildfireResponse("prepare")));
   const standard = cloneDeep(before);
   standard.date = getDateFromMinute(
-    12 * MINUTES_PER_MONTH,
+    36 * MINUTES_PER_MONTH,
     before.startingYear,
   );
   after.date = standard.date;

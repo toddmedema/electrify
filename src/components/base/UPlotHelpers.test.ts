@@ -1,9 +1,33 @@
 import uPlot from "uplot";
 import {
+  baselinePlugin,
   eventMarkersPlugin,
   spansBelow,
   splitPastProjected,
 } from "./UPlotHelpers";
+
+it("draws the baseline solid after a dashed forecast across the whole plot", () => {
+  let dash = [8, 4];
+  const ctx = {
+    save: jest.fn(),
+    restore: jest.fn(),
+    setLineDash: (value: number[]) => {
+      dash = value;
+    },
+    beginPath: jest.fn(),
+    moveTo: jest.fn(),
+    lineTo: jest.fn(),
+    stroke: jest.fn(() => expect(dash).toEqual([])),
+  };
+  const plot = {
+    bbox: { left: 20, top: 10, width: 300, height: 100 },
+    ctx,
+  } as unknown as uPlot;
+  (baselinePlugin("black").hooks!.draw as (plot: uPlot) => void)(plot);
+  expect(ctx.moveTo).toHaveBeenCalledWith(20, expect.any(Number));
+  expect(ctx.lineTo).toHaveBeenCalledWith(320, expect.any(Number));
+  expect(ctx.stroke).toHaveBeenCalledTimes(1);
+});
 
 describe("eventMarkersPlugin", () => {
   it("draws numbered in-domain event markers and skips events outside the plot", () => {

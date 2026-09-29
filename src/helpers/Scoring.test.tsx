@@ -93,14 +93,14 @@ describe("inflation and the public rate target", () => {
   };
   const kWhPerMonth = 1000;
   // Months newest first, like state.monthlyHistory, each billed at the target raised by that
-  // month's inflation: a rate that only keeps pace with costs
+  // year's January inflation index: a rate that follows the annual target
   const history = Array.from({ length: 36 }, (_, elapsed) => ({
     ...EMPTY_HISTORY,
     deliveredWhByFuel: {},
     year: 2020 + Math.floor(elapsed / 12),
     month: (elapsed % 12) + 1,
     supplyWh: kWhPerMonth * 1000,
-    revenue: 0.1 * Math.pow(1.01, elapsed) * kWhPerMonth,
+    revenue: 0.1 * Math.pow(1.01, Math.floor(elapsed / 12) * 12) * kWhPerMonth,
   })).reverse();
   const summary = history.reduce(
     (acc, month) => ({

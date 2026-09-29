@@ -26,9 +26,7 @@ export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Shift home electricity use out of chosen peak hours for a discount.",
-    mechanism:
-      "When on, half of homes participate. Choose a four-hour daily window: participants shift 20% of that electricity use into the following three hours, such as charging cars later. They pay 30% more during the chosen peak window and 10% less during the following three hours. Total energy use is unchanged, including across midnight.",
+      "Half of homes shift 20% of peak-window use into the following three hours. Participants pay 30% more during your four-hour window and 10% less afterward; total energy use stays unchanged.",
     tradeoff:
       "Rates apply only to enrolled residential consumption actually supplied. Higher bills can affect customer retention. Compare the forecast: shifted consumption can create a later peak.",
     cap: 0.2,
@@ -37,9 +35,7 @@ export const POLICIES = {
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Pay industry and data centers to cut use during chosen peak hours. This use is eliminated.",
-    mechanism:
-      "When on, half of industrial and data-center load participates. Enrolled loads forgo 20% of consumption during your chosen four-hour daily window, for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
+      "Half of industrial and Data Centers load cuts consumption 20% during your chosen four-hour window, easing grid demand. Participants receive a 10% credit on electricity supplied throughout the day, even without shortages.",
     tradeoff:
       "Credits reduce sales revenue, including outside the curtailment window. Curtailment is agreed service, not a blackout. Contracts do not affect homes, businesses or transport, and do nothing without eligible industrial or data-center load.",
     cap: 0.2,
@@ -47,8 +43,8 @@ export const POLICIES = {
   },
   efficiency: {
     name: "Efficiency rebates",
-    description: "Help homes and businesses use less electricity.",
-    mechanism: `A one-time project that funds upgrades over ${BUILDOUT_MONTHS} months. Savings grow as upgrades are installed and are largest for heating and cooling, so they matter most in hot or cold climates. Upgrades wear out: savings fade after ${EFFICIENCY_FULL_LIFE_MONTHS / 12} years and end at ${EFFICIENCY_END_LIFE_MONTHS / 12}.`,
+    description:
+      "Fund home and business upgrades over 48 months to reduce demand, especially heating and cooling. Savings grow with installations, then fade between each upgrade’s tenth and twentieth years.",
     tradeoff:
       "Upgrades cost money and reduce sales, but can lower generation costs and improve reliability.",
     // At full adoption: lighting and appliance upgrades cut all home and business use, while
@@ -66,8 +62,8 @@ export const POLICIES = {
   },
   solar: {
     name: "Rooftop solar rebates",
-    description: "Help customers make electricity during daylight.",
-    mechanism: `A one-time project that funds rooftop panels over ${BUILDOUT_MONTHS} months. Output grows as panels are installed and continues with no further cost after completion. Helps in daylight; does not directly cover an evening peak.`,
+    description:
+      "Fund rooftop panels over 48 months to reduce daytime grid demand. Installed panels keep producing without further utility spending; they do not cover evening peaks, and surplus earns no export credit.",
     tradeoff:
       "Rebates cost money and reduce sales. Surplus is discarded, with no export payments or utility generation credits.",
     // Watts per starting customer, scaled with scenario demand, at full adoption. The California

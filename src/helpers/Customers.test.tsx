@@ -1,6 +1,7 @@
 import {
   CUSTOMER_RATE_MEMORY_MONTHS,
   getMarketRate,
+  publicRateCap,
   customerMarketSizeAt,
   customerSwitchingRate,
   nextCustomerCount,
@@ -64,6 +65,15 @@ describe("customer price competition", () => {
         0.1 * Math.pow(1.01, (year - 2020) * 12),
         10,
       );
+      for (let monthNumber = 1; monthNumber <= 12; monthNumber++) {
+        const january = getMarketRate(0.1, { year, monthNumber: 1 }, 2020, 1);
+        expect(getMarketRate(0.1, { year, monthNumber }, 2020, 1)).toBe(
+          january,
+        );
+        expect(publicRateCap(0.1, { year, monthNumber }, 2020, 1)).toBe(
+          2 * january,
+        );
+      }
     }
   });
   it("gains customers below market, holds share at market, and loses above it", () => {

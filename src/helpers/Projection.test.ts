@@ -57,7 +57,7 @@ it("rebuilds for another save with identical monthly keys but different balances
 
 it.each([
   [106, 48, DATA_CENTER_DECISION_KEY, "phased"],
-  [111, 11, WILDFIRE_DECISION_KEY, "prepare"],
+  [111, 35, WILDFIRE_DECISION_KEY, "prepare"],
 ] as const)(
   "refreshes the forecast after scenario %i's choice",
   (scenarioId, month, decisionId, optionId) => {

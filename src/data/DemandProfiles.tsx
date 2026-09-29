@@ -14,18 +14,18 @@ export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
   "Industrial",
   "Transportation",
   "Mining",
-  "Data centers",
+  "Data Centers",
 ] as const;
 
 // The two authored end uses sit outside the regional mix. A region has no characteristic share
 // of either: a grid has the mine or the campus on it or it does not, and how big it is comes
 // from the scenario rather than from how many customers the utility serves.
-type OrganicDemandType = Exclude<DemandTypeNameType, "Data centers" | "Mining">;
+type OrganicDemandType = Exclude<DemandTypeNameType, "Data Centers" | "Mining">;
 type SectorMix = Record<OrganicDemandType, number>;
 type GrowthProfile = Record<OrganicDemandType, number>;
 
 // EIA divides end-use demand into residential, commercial, industrial, and transportation.
-// These broad regional mixes preserve that standard while data centers are pulled out of the
+// These broad regional mixes preserve that standard while Data Centers are pulled out of the
 // commercial sector below. They are intentionally scenario-scale profiles rather than a claim
 // that every city in a region has an identical measured mix.
 // https://www.eia.gov/tools/faqs/faq.php?id=447&t=1
@@ -239,7 +239,7 @@ function interpolate(
   return Math.min(0.2, lastValue * pow(1.02, year - lastYear));
 }
 
-/** Fraction of local demand represented by data centers before the other sector trends apply. */
+/** Fraction of local demand represented by Data Centers before the other sector trends apply. */
 export function dataCenterLoadShare(
   year: number,
   location?: LocationType,
@@ -414,7 +414,7 @@ function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
       return 1;
     case "Transportation":
       return 0.55 + 0.8 * peak(1, 3) + 0.55 * peak(21, 2.5);
-    case "Data centers":
+    case "Data Centers":
       return 1;
     // A concentrator or a hoist runs the shift it is given, and the large mines run all of
     // them. Flat, for the same reason Industrial is.
@@ -442,7 +442,7 @@ export function demandByTypeAt(
   // An authored absolute schedule describes the whole scenario-specific data-center load. The
   // generic regional curve is therefore removed even before the first scheduled block arrives.
   const hasAuthoredDataCenters = loadAdditions.some(
-    (addition) => addition.demandType === "Data centers",
+    (addition) => addition.demandType === "Data Centers",
   );
   const startDataCenters = hasAuthoredDataCenters
     ? 0
@@ -461,8 +461,8 @@ export function demandByTypeAt(
     Commercial: nonDataCenterScale * mix.Commercial,
     Industrial: nonDataCenterScale * mix.Industrial,
     Transportation: nonDataCenterScale * mix.Transportation,
-    "Data centers": startDataCenters,
-    // There is no generic mining curve to open against, the way there is for data centers.
+    "Data Centers": startDataCenters,
+    // There is no generic mining curve to open against, the way there is for Data Centers.
     // A scenario that has mines on its grid says so with a schedule, and that load arrives
     // below as an absolute addition rather than as a share of the customer baseline.
     Mining: 0,
@@ -476,7 +476,7 @@ export function demandByTypeAt(
   const result = {} as DemandByTypeType;
   DEMAND_TYPES.forEach((type) => {
     const shape = hourShape(type, date.minuteOfDay);
-    if (type === "Data centers") {
+    if (type === "Data Centers") {
       // When a game begins before 2000 there is no starting component to grow, so introduce the
       // later load directly. Otherwise scale the opening component along the measured curve.
       const weight =
@@ -509,7 +509,7 @@ export function demandByTypeAt(
     // calculations compare the change in reserve capacity after adding a plant, and a residual
     // fraction of a watt from summing the components should not leak into that. Mining is never
     // the sink: it opens at zero, and pushing the residual there would invent a mine.
-    result[hasAuthoredDataCenters ? "Commercial" : "Data centers"] +=
+    result[hasAuthoredDataCenters ? "Commercial" : "Data Centers"] +=
       baselineDemandW - openingTotal;
   }
   loadAdditions.forEach((addition) => {

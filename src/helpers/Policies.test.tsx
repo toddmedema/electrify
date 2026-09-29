@@ -212,8 +212,8 @@ test("solar affects only eligible daylight load after efficiency; neutral demand
   expect(
     tick.demandByType.Residential + tick.demandByType.Commercial,
   ).toBeCloseTo(eligible * 0.775 - tick.rooftopSolarW!);
-  expect(tick.demandByType["Data centers"]).toBe(
-    original.demandByType["Data centers"],
+  expect(tick.demandByType["Data Centers"]).toBe(
+    original.demandByType["Data Centers"],
   );
   expect(tick.demandByType.Industrial).toBe(original.demandByType.Industrial);
 });
@@ -424,7 +424,7 @@ test("rooftop rebates follow the installed price of their year", () => {
     );
   };
   // Start-year dollars: a quarter of the era's installed price per watt, plus a month of inflation.
-  expect(perWatt(105) / (0.25 * residentialSolarCostPerW(2004))).toBeCloseTo(
+  expect(perWatt(105) / (0.25 * residentialSolarCostPerW(2003))).toBeCloseTo(
     1,
     1,
   );

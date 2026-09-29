@@ -148,7 +148,7 @@ it("invalidates same-month outlooks when scenario choices change loads or story 
     {
       id: "test-load",
       label: "Campus",
-      demandType: "Data centers",
+      demandType: "Data Centers",
       peakW: 1e6,
       startsYear: 2024,
       startsMonth: 1,

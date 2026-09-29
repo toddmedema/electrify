@@ -33,7 +33,7 @@ function choicePlay(scenarioId: number, difficulty: DifficultyType) {
         ...play,
         scheduledActions: [
           ...(play.scheduledActions || []),
-          { month: 35, type: "toggle" as const, facilityId: 5 },
+          { month: 59, type: "toggle" as const, facilityId: 5 },
         ],
       }
     : play;
@@ -71,7 +71,7 @@ describe("major scenario choice balance", () => {
             // neglects expansion. No cash injection, forced state, or artificial price is used.
             scheduledActions:
               scenarioId === 111
-                ? [{ month: 12, type: "toggle", facilityId: 1 }]
+                ? [{ month: 36, type: "toggle", facilityId: 1 }]
                 : scenarioId === 107
                   ? [{ month: 37, type: "toggle", facilityId: 2 }]
                   : [],

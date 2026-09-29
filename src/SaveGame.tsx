@@ -1,3 +1,4 @@
+import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import { maxLoanAmount } from "./helpers/Financials";
 import {
   accessContextForGame,
@@ -354,7 +355,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !Number.isFinite(addition.loadFactor) ||
         addition.loadFactor < 0 ||
         addition.loadFactor > 1 ||
-        (addition.demandType !== "Data centers" &&
+        (addition.demandType !== "Data Centers" &&
           addition.demandType !== "Mining"),
     ) ||
     typeof game.customerRate !== "number" ||
@@ -582,6 +583,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
+  if (!validCustomEventScenario(game.customScenario)) return null;
   const transmissionEnabled = !!(
     scenario && intertiesEnabledForScenario(scenario, game.location)
   );
