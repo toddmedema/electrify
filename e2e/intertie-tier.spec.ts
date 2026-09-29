@@ -23,6 +23,16 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const card = page.getByTestId("transmission-project-california-north");
+    const importAccess = card
+      .locator(".buildOptionMetric")
+      .filter({ hasText: "Import access" });
+    await card
+      .getByRole("button", { name: "Show Pacific Northwest details" })
+      .click();
+    const baseAccess = await importAccess.innerText();
+    await card
+      .getByRole("button", { name: "Hide Pacific Northwest details" })
+      .click();
     const slider = page.getByRole("slider");
     await expect(slider).toHaveCount(1);
     const desktop = testInfo.project.use.viewport!.width >= 600;
@@ -79,7 +89,11 @@ for (const theme of ["light", "dark"] as const) {
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    await expect(card).toContainText("Neighbor’s max spare capacity");
+    await expect(importAccess).not.toHaveText(baseAccess);
+    const selectedAccess = await importAccess
+      .locator(":scope > div")
+      .nth(1)
+      .innerText();
     // Keep only the neighbor’s supply-risk summary.
     await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
     expect(
@@ -93,6 +107,11 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Tier 4");
     await expect(dialog).toContainText("17MW access");
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: "Import access" }),
+    ).toContainText(`Up to ${selectedAccess}`);
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(
       page

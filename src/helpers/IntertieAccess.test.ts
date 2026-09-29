@@ -1,6 +1,7 @@
 import { MAX_INTERTIE_UPGRADES } from "../Constants";
 import {
   corridorById,
+  adjacentMarketForCorridor,
   intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
 import {
@@ -21,6 +22,8 @@ import {
   intertieUpgradeCount,
   intertieUpgradeQuote,
   neighborImportSupplyW,
+  physicalNeighborImportSupplyW,
+  intertieOfferLimits,
 } from "./Transmission";
 
 const mild = { temperatureC: 20, solarIrradianceWM2: 0 };
@@ -51,6 +54,15 @@ describe("authored utility transmission access", () => {
       expect(row.capacityW).toBeGreaterThan(0);
       expect(row.availableSupplyW).toBeGreaterThan(0);
       expect(row.availableDemandW).toBeGreaterThan(0);
+      expect(row.importAccessWByTier?.[0]).toBe(row.availableSupplyW);
+      row.importAccessWByTier?.forEach((supply) => {
+        expect(supply).toBeLessThanOrEqual(
+          adjacentMarketForCorridor(row.corridorId)!.availableSupplyW,
+        );
+      });
+      row.importAccessWByTier?.slice(1).forEach((supply, tier) => {
+        expect(supply).toBeGreaterThan(row.importAccessWByTier![tier]);
+      });
       // An authored allocation on a path that did not exist yet would be unreachable
       expect(
         corridorsForGame(game(row.scenarioId)).map(({ id }) => id),
@@ -101,7 +113,7 @@ describe("authored utility transmission access", () => {
     }
   });
 
-  it("prices upgrades from purchased access while neighboring supply stays fixed", () => {
+  it("upgrades purchased import rights while regional supply and export rights stay fixed", () => {
     const ctx = context(111);
     let line = {
       corridorId: "california-north",
@@ -109,6 +121,12 @@ describe("authored utility transmission access", () => {
       annualOperatingCost: 36000,
     };
     const supply = neighborImportSupplyW(line.corridorId, ctx, 0, mild);
+    const physical = physicalNeighborImportSupplyW(
+      line.corridorId,
+      ctx,
+      0,
+      mild,
+    );
     expect(supply).toBeCloseTo(3.2e6);
     const firstQuote = intertieUpgradeQuote(line, 2024, 1, 1, ctx)!;
     expect(firstQuote.targetCapacityW).toBe(7.5e6);
@@ -117,16 +135,21 @@ describe("authored utility transmission access", () => {
       expect(intertieUpgradeCount(line, ctx)).toBe(step);
       const quote = intertieUpgradeQuote(line, 2024, 1, 1, ctx)!;
       expect(quote).toBeDefined();
-      expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(supply);
+      expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(
+        (4 + step * 0.5) * 0.8e6,
+      );
       line = {
         ...line,
         capacityW: quote.targetCapacityW,
         annualOperatingCost: quote.annualOperatingCost,
       };
       expect(effectiveMarket(line.corridorId, ctx)!.availableDemandW).toBe(5e6);
+      expect(physicalNeighborImportSupplyW(line.corridorId, ctx, 0, mild)).toBe(
+        physical,
+      );
     }
     expect(intertieUpgradeQuote(line, 2024, 1, 1, ctx)).toBeUndefined();
-    expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(supply);
+    expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(5.5e6 * 0.8);
   });
 
   it("allows a wider wire to relieve a bottleneck without creating supply", () => {
@@ -139,14 +162,67 @@ describe("authored utility transmission access", () => {
     expect(intertieImportLimitW(line, ctx, minute, mild)).toBe(150e6);
     expect(
       intertieImportLimitW({ ...line, capacityW: 225e6 }, ctx, minute, mild),
-    ).toBe(180e6);
+    ).toBe(210e6);
     expect(
       intertieImportLimitW({ ...line, capacityW: 500e6 }, ctx, minute, mild),
-    ).toBe(180e6);
+    ).toBe(270e6);
+  });
+
+  it("keeps tutorial scarcity binding after every upgrade", () => {
+    const ctx = { ...context(112), tutorialSupplyLimitW: 150e6 };
+    for (const capacityW of [500e6, 750e6, 1125e6, 1687.5e6]) {
+      const limits = intertieOfferLimits(
+        { corridorId: "california-north", capacityW },
+        ctx,
+        0,
+        mild,
+      );
+      expect(limits.importLimitW).toBeCloseTo(120e6);
+      expect(limits.marketImportLimitW).toBeCloseTo(120e6);
+    }
+  });
+
+  it("does not duplicate purchased rights across multiple paths to the same corridor", () => {
+    const ctx = context(106);
+    const offer = {
+      ...intertieOfferLimits(
+        { corridorId: "pjm-nyiso-new", capacityW: 30e6 },
+        ctx,
+        0,
+        mild,
+      ),
+      pricePerMWh: 40,
+    };
+    const flows = allocateIntertieFlows([offer, offer], Infinity, 0).importedW;
+    expect(flows[0] + flows[1]).toBeCloseTo(offer.accessImportLimitW!);
+    expect(
+      allocateIntertieFlows([offer, offer], 0, Infinity).exportedW.reduce(
+        (a, b) => a + b,
+        0,
+      ),
+    ).toBe(20e6);
   });
 });
 
 describe("shared neighbor supply and export demand", () => {
+  it("adds separate access allocations without duplicating the regional pool", () => {
+    const offers: IntertieOffer[] = [40, 80].map((accessImportLimitW, i) => ({
+      marketId: "shared",
+      marketImportLimitW: 100,
+      accessId: `corridor-${i}`,
+      accessImportLimitW,
+      importLimitW: accessImportLimitW,
+      exportLimitW: 0,
+      pricePerMWh: 50,
+    }));
+    for (const ordered of [offers, [...offers].reverse()]) {
+      const flows = allocateIntertieFlows(ordered, Infinity, 0).importedW;
+      expect(flows.reduce((a, b) => a + b, 0)).toBe(100);
+      flows.forEach((flow, i) =>
+        expect(flow).toBeLessThanOrEqual(ordered[i].accessImportLimitW!),
+      );
+    }
+  });
   const offers: IntertieOffer[] = [
     {
       marketId: "A",

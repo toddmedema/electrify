@@ -66,6 +66,15 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toContainText("Includes refinancing the existing");
     await expect(dialog).toContainText("Construction emits");
     await expect(dialog).toContainText("Upkeep after upgrade");
+    const importAccess = dialog
+      .locator(".decisionImpactFact")
+      .filter({ hasText: /^Import access/ });
+    await expect(importAccess).toContainText("Export access is unchanged");
+    const rights = (await importAccess.innerText()).match(
+      /([\d.]+)MW → ([\d.]+)MW/,
+    );
+    expect(rights).not.toBeNull();
+    expect(Number(rights![2])).toBeGreaterThan(Number(rights![1]));
     await dialog.getByRole("button", { name: "close", exact: true }).click();
     await expect(line.getByText(/Upgrading to/)).toHaveCount(0);
     await review.click();

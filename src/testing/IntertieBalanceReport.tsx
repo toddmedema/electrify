@@ -25,6 +25,10 @@ const difficulties = (
   process.env.INTERTIE_REPORT_DIFFICULTIES || "Intern,CEO"
 ).split(",") as DifficultyType[];
 const requestedPlans = process.env.INTERTIE_REPORT_PLANS?.split(",");
+const requestedTiers = (process.env.INTERTIE_REPORT_TIERS || "")
+  .split(",")
+  .filter(Boolean)
+  .map(Number);
 const matchedTariff = process.env.INTERTIE_REPORT_MATCHED_TARIFF === "1";
 const buildOverride = process.env.INTERTIE_REPORT_BUILD?.split(":");
 const responseOverrides = process.env.INTERTIE_REPORT_RESPONSES
@@ -40,6 +44,7 @@ const output =
 function retryLines(
   scenario: ScenarioType,
   corridorIds: string[],
+  tier?: number,
 ): ScheduledSimActionType[] {
   // Retry each month until affordable. Already-built lines are harmless rejected duplicate
   // orders, not additional meaningful decisions. Only accepted actions appear in replay.
@@ -49,6 +54,7 @@ function retryLines(
       type: "intertie",
       corridorId,
       financed: true,
+      ...(tier !== undefined ? { tier } : {}),
     })),
   ).flat();
 }
@@ -105,6 +111,25 @@ function plansFor(scenario: ScenarioType, difficulty: DifficultyType): Plan[] {
         ).flat(),
       },
     });
+  }
+  for (const tier of requestedTiers) {
+    corridors.forEach(({ id }, index) =>
+      plans.push({
+        name: `intertie-${index + 1}-tier-${tier}`,
+        options: { scheduledActions: retryLines(scenario, [id], tier) },
+      }),
+    );
+    if (corridors.length)
+      plans.push({
+        name: `both-tier-${tier}`,
+        options: {
+          scheduledActions: retryLines(
+            scenario,
+            corridors.map(({ id }) => id),
+            tier,
+          ),
+        },
+      });
   }
   if (domestic) {
     plans.push({
