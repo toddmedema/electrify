@@ -6641,11 +6641,21 @@ $programs_column: 800px;
   }
 }
 
-// The three-pane layout keeps Programs beside the Insights title, like Build.
+// Single-panel views keep the control compact beside the rate summary.
+.insightsLevers .customerProgramsControl {
+  .customerProgramsLabel {
+    display: none;
+  }
+  .MuiButton-startIcon {
+    margin: 0;
+  }
+}
+
+// Both multi-pane layouts keep Programs beside the Insights title, like Build.
 .insightsTitle .customerProgramsControl {
   display: none;
 }
-.desktop-layout .insights {
+.insights.pane {
   .insightsTitle {
     display: flex;
     flex-wrap: nowrap;

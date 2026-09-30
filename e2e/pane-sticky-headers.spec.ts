@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test, type Locator } from "@playwright/test";
-import { openPane } from "./layout";
+import { isPaneLayout, openPane } from "./layout";
 
 async function scrollPast(target: Locator, distance: number) {
   return target.evaluate((element, above) => {
@@ -42,6 +42,33 @@ for (const colorScheme of ["light", "dark"] as const) {
     await expect(header.getByRole("slider")).toBeVisible();
     const programs = header.getByRole("button", { name: "Customer programs" });
     await expect(programs).toBeInViewport();
+    const label = programs.locator(".customerProgramsLabel");
+    const programsBox = (await programs.boundingBox())!;
+    if (isPaneLayout(page)) {
+      await expect(label).toBeVisible();
+      await expect(
+        header.locator(".insightsTitle").getByRole("button", {
+          name: "Customer programs",
+        }),
+      ).toBeVisible();
+      const buildBox = (await page
+        .locator(".facilities:visible .button-buildFacility")
+        .boundingBox())!;
+      expect(programsBox.y + programsBox.height / 2).toBeCloseTo(
+        buildBox.y + buildBox.height / 2,
+        0,
+      );
+    } else {
+      await expect(label).toBeHidden();
+      expect(programsBox.width).toBeCloseTo(programsBox.height, 0);
+      const metrics = await header
+        .locator(".insightsRateMetrics:visible")
+        .all();
+      for (const metric of metrics) {
+        const box = (await metric.boundingBox())!;
+        expect(box.x + box.width).toBeLessThanOrEqual(programsBox.x);
+      }
+    }
     await expect(page.getByText("Starting your mission…")).toBeHidden();
     if (process.env.PR_SCREENSHOTS) {
       await page.screenshot({

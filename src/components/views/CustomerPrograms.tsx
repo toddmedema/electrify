@@ -1148,7 +1148,7 @@ export default function CustomerPrograms({ game }: { game: GameType }) {
         startIcon={<GroupsIcon />}
         onClick={() => setOpen(true)}
       >
-        Programs
+        <span className="customerProgramsLabel">Programs</span>
       </Button>
       {open && <ProgramsScreen onClose={() => setOpen(false)} />}
     </Box>
