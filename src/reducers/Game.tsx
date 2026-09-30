@@ -1823,6 +1823,24 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "buildTransmissionLine", action.payload);
       }
     },
+    cancelTransmissionLine: (state, action: PayloadAction<number>) => {
+      if (
+        !state.replayPlayback &&
+        applyCancelTransmissionLine(state, action.payload)
+      )
+        recordReplayAction(state, "cancelTransmissionLine", action.payload);
+    },
+    togglePauseTransmissionLine: (state, action: PayloadAction<number>) => {
+      if (
+        !state.replayPlayback &&
+        applyTogglePauseTransmissionLine(state, action.payload)
+      )
+        recordReplayAction(
+          state,
+          "togglePauseTransmissionLine",
+          action.payload,
+        );
+    },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
@@ -2142,6 +2160,8 @@ export const {
   buildFacility,
   buildTransmissionLine,
   upgradeTransmissionLine,
+  cancelTransmissionLine,
+  togglePauseTransmissionLine,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -2429,6 +2449,42 @@ function applyBuildTransmissionLine(
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     },
   );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+function applyCancelTransmissionLine(state: GameType, id: number): boolean {
+  const line = state.transmission?.lines.find((item) => item.id === id);
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (!line || line.yearsToBuildLeft <= 0 || !now || !state.transmission)
+    return false;
+  now.cash += line.buildCost - line.loanAmountLeft;
+  state.transmission.lines = state.transmission.lines.filter(
+    (item) => item.id !== id,
+  );
+  state.meaningfulDecisions = state.meaningfulDecisions.filter(
+    (item) => item.lever !== `intertie:${id}`,
+  );
+  logGameEvent(state, "BUILD", `Cancelled construction of ${line.name}`);
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+function applyTogglePauseTransmissionLine(
+  state: GameType,
+  id: number,
+): boolean {
+  const line = state.transmission?.lines.find((item) => item.id === id);
+  if (!line || line.yearsToBuildLeft > 0) return false;
+  const before = line.paused ? "paused" : "operating";
+  line.paused = !line.paused;
+  recordMeaningfulDecision(state, {
+    lever: `intertie-operation:${id}`,
+    label: `${line.paused ? "Pause" : "Run"} ${line.name}`,
+    kind: "operation",
+    before,
+    after: line.paused ? "paused" : "operating",
+  });
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -2843,6 +2899,14 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       applyBuildTransmissionLine(state, build);
       break;
     }
+    case "cancelTransmissionLine":
+      if (typeof payload === "number")
+        applyCancelTransmissionLine(state, payload);
+      break;
+    case "togglePauseTransmissionLine":
+      if (typeof payload === "number")
+        applyTogglePauseTransmissionLine(state, payload);
+      break;
     case "upgradeTransmissionLine": {
       const upgrade = payload as Partial<UpgradeTransmissionLineAction>;
       applyUpgradeTransmissionLine(state, upgrade);
@@ -4501,7 +4565,10 @@ function updateSupplyFacilitiesFinances(
   );
   operatingLines.forEach((line) => {
     expensesOM +=
-      (line.annualOperatingCost * transmissionCostIndex) / ticksPerYear;
+      (line.annualOperatingCost *
+        transmissionCostIndex *
+        (line.paused ? 0.5 : 1)) /
+      ticksPerYear;
   });
   transmission.lines.forEach((line) => {
     if (line.loanAmountLeft <= 0) return;

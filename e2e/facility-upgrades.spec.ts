@@ -27,7 +27,7 @@ for (const theme of ["light", "dark"]) {
     const action = conversion.getByRole("button", { name: /^Convert ·/ });
     await expect(action).toBeDisabled();
     await expect(action).toHaveAccessibleDescription(/more cash needed/);
-    const resilience = row.getByRole("region", { name: "Weather resilience" });
+    const resilience = row.getByRole("region", { name: "Upgrades" });
     await expect(resilience).toContainText("Cold-weather package");
     await expect(resilience).not.toContainText("Cold protection");
     await expect(resilience).toContainText("Rated to");

@@ -18,7 +18,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import { ChevronDownGlyph, ChevronUpGlyph } from "../base/Glyphs";
+import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
   Draggable,
@@ -70,7 +70,6 @@ interface FacilityListItemProps {
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
   spotInList: number;
-  listLength: number;
   game: GameType;
   selected: boolean;
   storyOutputMultiplier: number;
@@ -82,7 +81,6 @@ interface FacilityListItemProps {
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
-  onReprioritize: DispatchProps["onReprioritize"];
   onRetrofit?: DispatchProps["onRetrofit"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
 }
@@ -210,25 +208,19 @@ const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
-  listLength: number;
   readOnly: boolean;
-  spotInList: number;
   upgrading: boolean;
   onPause: DispatchProps["onPause"];
-  onReprioritize: DispatchProps["onReprioritize"];
   onTogglePause: DispatchProps["onTogglePause"];
   onCancelRetrofit?: DispatchProps["onCancelRetrofit"];
   onOpenSell: () => void;
 }) {
   const {
     facility,
-    listLength,
     onOpenSell,
     onPause,
-    onReprioritize,
     onTogglePause,
     readOnly,
-    spotInList,
     upgrading,
     onCancelRetrofit,
   } = props;
@@ -281,30 +273,6 @@ function FacilityActions(props: {
           {underConstruction ? "Cancel construction" : "Sell"}
         </span>
       </Button>
-      {listLength > 1 && (
-        <>
-          <Button
-            startIcon={<ChevronUpGlyph />}
-            aria-label={
-              "Move " + facility.name + " earlier in the dispatch order"
-            }
-            disabled={spotInList === 0}
-            onClick={() => onReprioritize(spotInList, -1)}
-          >
-            <span className="facilityActionLabel">Move up</span>
-          </Button>
-          <Button
-            startIcon={<ChevronDownGlyph />}
-            aria-label={
-              "Move " + facility.name + " later in the dispatch order"
-            }
-            disabled={spotInList === listLength - 1}
-            onClick={() => onReprioritize(spotInList, 1)}
-          >
-            <span className="facilityActionLabel">Move down</span>
-          </Button>
-        </>
-      )}
     </div>
   );
 }
@@ -321,11 +289,8 @@ const MemoizedFacilityActions = React.memo(
       previousUnderConstruction === nextUnderConstruction &&
       previous.upgrading === next.upgrading &&
       previous.onCancelRetrofit === next.onCancelRetrofit &&
-      previous.listLength === next.listLength &&
       previous.readOnly === next.readOnly &&
-      previous.spotInList === next.spotInList &&
       previous.onPause === next.onPause &&
-      previous.onReprioritize === next.onReprioritize &&
       previous.onTogglePause === next.onTogglePause &&
       previous.onOpenSell === next.onOpenSell
     );
@@ -343,11 +308,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     game,
     onTogglePause,
     onPause,
-    onReprioritize,
     onSelect,
     readOnly,
     selected,
-    spotInList,
     storyOutputMultiplier,
     hazardStatus,
     arriving: arrivalRequested,
@@ -630,6 +593,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   {offlineForWork && (
                     <span
                       className="constructionProgress"
+                      data-paused={game.speed === "PAUSED"}
                       aria-hidden
                       style={{ background: withAlpha(accentColor, 0.24) }}
                     >
@@ -690,12 +654,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           {selected && (
             <MemoizedFacilityActions
               facility={facility}
-              listLength={props.listLength}
               readOnly={readOnly}
-              spotInList={spotInList}
               upgrading={upgrading}
               onPause={onPause}
-              onReprioritize={onReprioritize}
               onTogglePause={onTogglePause}
               onCancelRetrofit={props.onCancelRetrofit}
               onOpenSell={toggleDialog}
@@ -779,6 +740,8 @@ export interface DispatchProps {
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
   onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTransmissionCancel?: (id: number) => void;
+  onTransmissionPause?: (id: number, name: string, paused: boolean) => void;
   onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
@@ -810,6 +773,7 @@ export default class Facilities extends React.Component<Props> {
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
+      nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
@@ -871,7 +835,6 @@ export default class Facilities extends React.Component<Props> {
       onSell,
       onTogglePause,
       onPause,
-      onReprioritize,
       onSelect,
       onTransmissionBuild,
       onTransmissionUpgrade,
@@ -941,7 +904,6 @@ export default class Facilities extends React.Component<Props> {
                             onSell={onSell}
                             onTogglePause={onTogglePause}
                             onPause={onPause}
-                            onReprioritize={onReprioritize}
                             onRetrofit={this.props.onRetrofit}
                             onCancelRetrofit={this.props.onCancelRetrofit}
                             onSelect={onSelect}
@@ -952,7 +914,6 @@ export default class Facilities extends React.Component<Props> {
                             )}
                             hazardStatus={facilityHazardStatus(game, g)}
                             spotInList={i}
-                            listLength={facilitiesCount}
                             readOnly={readOnly}
                           />
                         ),
@@ -976,6 +937,8 @@ export default class Facilities extends React.Component<Props> {
                   game={game}
                   onBuild={onTransmissionBuild}
                   onUpgrade={onTransmissionUpgrade}
+                  onCancel={this.props.onTransmissionCancel}
+                  onPause={this.props.onTransmissionPause}
                   onPolicy={onTradingPolicy}
                 />
               )}

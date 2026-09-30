@@ -15,6 +15,8 @@ import { createGame, createGameFromReplay } from "../testing/Simulator";
 import { serializeReplay, encodeReplay, decodeReplay } from "../Replay";
 import gameReducer, {
   buildTransmissionLine,
+  cancelTransmissionLine,
+  togglePauseTransmissionLine,
   tickState,
   upgradeTransmissionLine,
 } from "./Game";
@@ -522,4 +524,88 @@ describe("building intertie tiers directly", () => {
       }),
     ).toBeUndefined();
   });
+});
+
+describe("intertie operating controls", () => {
+  it.each([false, true])(
+    "cancels construction and settles financing (%s)",
+    (financed) => {
+      const initial = createGame({ scenarioId: 112, seed: 249007 });
+      const before = getTimeFromTimeline(
+        initial.date.minute,
+        initial.timeline,
+      )!.cash;
+      const built = gameReducer(
+        initial,
+        buildTransmissionLine({ corridorId: CORRIDOR, financed }),
+      );
+      const line = built.transmission!.lines[0];
+      expect(line).toBeDefined();
+      const cancelled = gameReducer(built, cancelTransmissionLine(line.id));
+      expect(cancelled.transmission!.lines).toHaveLength(0);
+      expect(
+        getTimeFromTimeline(cancelled.date.minute, cancelled.timeline)!.cash,
+      ).toBeCloseTo(before);
+      expect(
+        cancelled.meaningfulDecisions.some(
+          (d) => d.lever === `intertie:${line.id}`,
+        ),
+      ).toBe(false);
+      const replay = serializeReplay(cancelled)!;
+      expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
+      const replayed = createGameFromReplay(replay);
+      tickState(replayed);
+      expect(replayed.transmission!.lines).toHaveLength(0);
+      replay.actions[replay.actions.length - 1].payload = "bad";
+      expect(decodeReplay(encodeReplay(replay))).toBeNull();
+    },
+  );
+  it("pauses dispatch, preserves loan payments and resumes", () => {
+    const initial = openIntertie(true);
+    const line = initial.transmission!.lines[0];
+    const paused = gameReducer(initial, togglePauseTransmissionLine(line.id));
+    expect(paused.transmission!.lines[0].paused).toBe(true);
+    expect(paused.transmission!.lines[0].currentFlowW).toBe(0);
+    expect(
+      getTimeFromTimeline(paused.date.minute, paused.timeline)!
+        .transmissionCapacityW,
+    ).toBe(0);
+    expect(paused.transmission!.lines[0].loanAmountLeft).toBe(
+      line.loanAmountLeft,
+    );
+    expect(
+      parseSave(serializeSave(paused))?.game.transmission!.lines[0].paused,
+    ).toBe(true);
+    const resumed = gameReducer(paused, togglePauseTransmissionLine(line.id));
+    expect(resumed.transmission!.lines[0].paused).toBe(false);
+    expect(
+      getTimeFromTimeline(resumed.date.minute, resumed.timeline)!
+        .transmissionCapacityW,
+    ).toBeGreaterThan(0);
+    expect(gameReducer(resumed, cancelTransmissionLine(line.id))).toEqual(
+      resumed,
+    );
+  });
+});
+
+it("replays an intertie pause and resume deterministically", () => {
+  let state = createGame({ scenarioId: 112, seed: 249007 });
+  state = cloneDeep(
+    gameReducer(
+      state,
+      buildTransmissionLine({ corridorId: CORRIDOR, financed: true }),
+    ),
+  );
+  runMonths(state, 14);
+  const id = state.transmission!.lines[0].id;
+  state = cloneDeep(gameReducer(state, togglePauseTransmissionLine(id)));
+  runMonths(state, 1);
+  state = cloneDeep(gameReducer(state, togglePauseTransmissionLine(id)));
+  runMonths(state, 1);
+  const replay = serializeReplay(state)!;
+  expect(decodeReplay(encodeReplay(replay))).not.toBeNull();
+  const replayed = createGameFromReplay(replay);
+  runMonths(replayed, 16);
+  expect(replayed.transmission).toEqual(state.transmission);
+  expect(replayed.monthlyHistory).toEqual(state.monthlyHistory);
 });

@@ -72,6 +72,8 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "reprioritizeFacility",
   "buildTransmissionLine",
   "upgradeTransmissionLine",
+  "cancelTransmissionLine",
+  "togglePauseTransmissionLine",
   "setTradingPolicy",
   "retrofitFacility",
   "cancelRetrofit",
@@ -204,6 +206,12 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
         action.payload === null ||
         typeof (action.payload as { corridorId?: unknown }).corridorId !==
           "string")
+    )
+      return null;
+    if (
+      (action.type === "cancelTransmissionLine" ||
+        action.type === "togglePauseTransmissionLine") &&
+      !(Number.isSafeInteger(action.payload) && (action.payload as number) > 0)
     )
       return null;
     if (action.type === "buildTransmissionLine") {

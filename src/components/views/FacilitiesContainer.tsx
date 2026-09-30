@@ -10,6 +10,8 @@ import {
   cancelRetrofit,
   buildTransmissionLine,
   upgradeTransmissionLine,
+  cancelTransmissionLine,
+  togglePauseTransmissionLine,
   setTradingPolicy,
 } from "../../reducers/Game";
 import {
@@ -110,6 +112,22 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           ),
         );
       }
+    },
+    onTransmissionCancel: (id) => {
+      dispatch(cancelTransmissionLine(id));
+    },
+    onTransmissionPause: (id, name, paused) => {
+      dispatch(togglePauseTransmissionLine(id));
+      if (!paused)
+        dispatch(
+          snackbarOpen({
+            message: `Paused ${name}`,
+            actionLabel: "Undo",
+            action: () => dispatch(togglePauseTransmissionLine(id)),
+            open: true,
+            timeout: 6000,
+          }),
+        );
     },
     onTransmissionUpgrade: (corridorId, financed) => {
       dispatch(upgradeTransmissionLine({ corridorId, financed }));

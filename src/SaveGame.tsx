@@ -256,6 +256,7 @@ function validTransmissionLine(
     typeof line.currentFlowW === "number" &&
     Number.isFinite(line.currentFlowW) &&
     Math.abs(line.currentFlowW) <= line.capacityW! &&
+    (line.paused === undefined || typeof line.paused === "boolean") &&
     typeof line.financed === "boolean" &&
     (line.financed
       ? line.loanMonthlyPayment! > 0

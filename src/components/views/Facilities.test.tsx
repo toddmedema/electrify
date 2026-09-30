@@ -233,61 +233,13 @@ describe("the fleet list", () => {
     ).toHaveAccessibleName(/MW/);
   });
 
-  /**
-   * onReprioritize was declared and passed for years without the row ever calling it: dispatch
-   * order could only be changed by dragging, which is undiscoverable with a mouse and unusable
-   * once the list has scrolled.
-   */
-  it("reorders from the row's own arrows", async () => {
-    const { onReprioritize } = renderFacilities(game, game.facilities[1].id);
-    await user.click(
-      screen.getByLabelText(
-        `Move ${game.facilities[1].name} earlier in the dispatch order`,
-      ),
-    );
-    expect(onReprioritize).toHaveBeenCalledWith(1, -1);
-    await user.click(
-      screen.getByRole("button", {
-        name: `Inspect ${game.facilities[0].name}`,
-      }),
-    );
-
-    await user.click(
-      screen.getByLabelText(
-        `Move ${game.facilities[0].name} later in the dispatch order`,
-      ),
-    );
-    expect(onReprioritize).toHaveBeenCalledWith(0, 1);
-  });
-
-  it("offers no way to move the ends of the list past themselves", async () => {
-    renderFacilities(game, game.facilities[0].id);
-    const last = game.facilities.length - 1;
+  it("omits move buttons from expanded actions", () => {
+    renderFacilities(game, game.facilities[1].id);
     expect(
-      screen.getByLabelText(
-        `Move ${game.facilities[0].name} earlier in the dispatch order`,
-      ),
-    ).toBeDisabled();
-    await user.click(
-      screen.getByRole("button", {
-        name: `Inspect ${game.facilities[last].name}`,
+      screen.queryByRole("button", {
+        name: /earlier in the dispatch order|later in the dispatch order/,
       }),
-    );
-    expect(
-      screen.getByLabelText(
-        `Move ${game.facilities[last].name} later in the dispatch order`,
-      ),
-    ).toBeDisabled();
-  });
-
-  it("does not select the row when a row action is used", async () => {
-    const { onSelect } = renderFacilities(game, game.facilities[1].id);
-    await user.click(
-      screen.getByLabelText(
-        `Move ${game.facilities[1].name} earlier in the dispatch order`,
-      ),
-    );
-    expect(onSelect).not.toHaveBeenCalled();
+    ).toBeNull();
   });
 
   it("keeps tick renders out of an active facility drag", () => {
@@ -508,8 +460,8 @@ describe("weather hazards in the fleet", () => {
     const cost = retrofitCost(state.facilities[2], state, "hailResistant")!;
     const { onRetrofit, onSelect } = renderFacilities(state, 3);
 
-    const details = screen.getByRole("region", { name: "Weather resilience" });
-    expect(details).toHaveTextContent("Standard panels");
+    const details = screen.getByRole("region", { name: "Upgrades" });
+    expect(details).not.toHaveTextContent("Standard panels");
     await user.click(
       within(details).getByRole("button", {
         name: `Add hail-resistant panels · ${formatMoneyConcise(cost)}`,
@@ -536,9 +488,10 @@ describe("weather hazards in the fleet", () => {
       ...gameWithSolar(),
       replayPlayback: { actions: [], index: 0 },
     } as GameType;
+    state.facilities[2].resilience = { hailResistant: true };
     renderFacilities(state, 3);
-    const details = screen.getByRole("region", { name: "Weather resilience" });
-    expect(details).toHaveTextContent("Standard panels");
+    const details = screen.getByRole("region", { name: "Upgrades" });
+    expect(details).not.toHaveTextContent("Standard panels");
     expect(within(details).queryByRole("button")).toBeNull();
   });
 });

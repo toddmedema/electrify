@@ -86,6 +86,8 @@ import Sparkline from "../base/Sparkline";
 import { useAfterPaintValue } from "../base/AfterPaint";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
+import CancelIcon from "@mui/icons-material/Cancel";
+import ConfirmDialog from "../base/ConfirmDialog";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 
 type IntertieSortKey = "yearsToBuild" | "buildCost" | "emissions";
@@ -506,6 +508,8 @@ function IntertieUpgradeControl(props: {
 }
 
 export interface TransmissionPanelProps {
+  onCancel?: (id: number) => void;
+  onPause?: (id: number, name: string, paused: boolean) => void;
   game: GameType;
   projectsOnly?: boolean;
   onBuild: (corridorId: string, financed: boolean, tier?: number) => void;
@@ -573,9 +577,13 @@ export default function TransmissionPanel({
   onBuild,
   onUpgrade,
   onPolicy,
+  onCancel,
+  onPause,
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
+  const [cancelLine, setCancelLine] =
+    React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = React.useState(1);
   const theme = useTheme();
@@ -738,7 +746,9 @@ export default function TransmissionPanel({
                 ? `importing ${formatWatts(flowW)} of ${formatWatts(rating)}`
                 : flowW < 0
                   ? `selling ${formatWatts(-flowW)} of ${formatWatts(rating)}`
-                  : "no power flowing";
+                  : line.paused
+                    ? "paused"
+                    : "no power flowing";
             return (
               <div key={line.id} className="transmissionLine">
                 <button
@@ -769,12 +779,16 @@ export default function TransmissionPanel({
                         constructionLabel
                       ) : (
                         <span className="transmissionLineFlow">
-                          {flowLabel}
+                          {line.paused ? "Paused" : flowLabel}
                         </span>
                       )}
                     </Typography>
                     {building && (
-                      <span className="constructionProgress" aria-hidden>
+                      <span
+                        className="constructionProgress"
+                        data-paused={game.speed === "PAUSED"}
+                        aria-hidden
+                      >
                         <span
                           className="constructionProgressFill"
                           style={{
@@ -789,6 +803,64 @@ export default function TransmissionPanel({
                 </button>
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
+                    {!readOnly && (
+                      <div className="facilityActions intertieActions">
+                        {building && onCancel && (
+                          <Button
+                            className="facilityCancelConstruction"
+                            startIcon={<CancelIcon />}
+                            aria-label={`Cancel construction of ${line.name}`}
+                            onClick={() => setCancelLine(line)}
+                          >
+                            <span className="facilityActionLabel">
+                              Cancel construction
+                            </span>
+                          </Button>
+                        )}
+                        {!building && onPause && (
+                          <Button
+                            startIcon={
+                              <ConceptIcon
+                                concept={line.paused ? "play" : "pause"}
+                              />
+                            }
+                            aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
+                            onClick={() =>
+                              onPause(line.id, line.name, !!line.paused)
+                            }
+                          >
+                            <span className="facilityActionLabel">
+                              {line.paused ? "Resume" : "Pause"}
+                            </span>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {cancelLine?.id === line.id && (
+                      <ConfirmDialog
+                        open
+                        title={`Cancel construction of ${line.name}?`}
+                        cancelLabel="Nevermind"
+                        confirmLabel="Cancel construction"
+                        onCancel={() => setCancelLine(null)}
+                        onConfirm={() => {
+                          onCancel?.(line.id);
+                          setCancelLine(null);
+                        }}
+                      >
+                        <Typography>
+                          Receive{" "}
+                          {formatMoneyConcise(
+                            line.buildCost - line.loanAmountLeft,
+                          )}{" "}
+                          back
+                          {line.loanAmountLeft > 0
+                            ? " after settling the outstanding loan"
+                            : ""}
+                          .
+                        </Typography>
+                      </ConfirmDialog>
+                    )}
                     {outlook && (
                       <div className="transmissionArchetype">
                         <Typography variant="body2" color="textSecondary">
@@ -854,29 +926,34 @@ export default function TransmissionPanel({
                     {!building && now && (
                       <Typography variant="body2" color="textSecondary">
                         Limiting factor:{" "}
-                        {state.tradingPolicy === "CLOSED" ||
-                        (state.tradingPolicy === "SURPLUS_ONLY" && flowW >= 0)
-                          ? "trading rule"
-                          : flowW < 0
-                            ? Math.abs(flowW) >=
-                              (effectiveMarket(line.corridorId, intertieContext)
-                                ?.availableDemandW || 0) -
-                                1
-                              ? "neighbor export demand"
-                              : Math.abs(flowW) >= rating - 1
-                                ? "own line rating"
-                                : "local surplus"
-                            : Math.abs(flowW) < importableW - 1
-                              ? "local need / trading rule"
-                              : neighborImportSupplyW(
-                                    line.corridorId,
-                                    intertieContext,
-                                    now.minute,
-                                    now,
-                                    line.capacityW,
-                                  ) < rating
-                                ? "available import access"
-                                : "own line rating"}
+                        {line.paused
+                          ? "paused"
+                          : state.tradingPolicy === "CLOSED" ||
+                              (state.tradingPolicy === "SURPLUS_ONLY" &&
+                                flowW >= 0)
+                            ? "trading rule"
+                            : flowW < 0
+                              ? Math.abs(flowW) >=
+                                (effectiveMarket(
+                                  line.corridorId,
+                                  intertieContext,
+                                )?.availableDemandW || 0) -
+                                  1
+                                ? "neighbor export demand"
+                                : Math.abs(flowW) >= rating - 1
+                                  ? "own line rating"
+                                  : "local surplus"
+                              : Math.abs(flowW) < importableW - 1
+                                ? "local need / trading rule"
+                                : neighborImportSupplyW(
+                                      line.corridorId,
+                                      intertieContext,
+                                      now.minute,
+                                      now,
+                                      line.capacityW,
+                                    ) < rating
+                                  ? "available import access"
+                                  : "own line rating"}
                         . Line rating {formatWatts(rating)}; available import
                         access{" "}
                         {formatWatts(

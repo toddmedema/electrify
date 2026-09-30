@@ -57,6 +57,7 @@ export interface TransmissionCorridorDefinitionType {
 }
 
 export interface TransmissionLineOperatingType {
+  paused?: boolean;
   id: number;
   corridorId: string;
   name: string;
@@ -313,6 +314,8 @@ export type ReplayActionNameType =
   | "reprioritizeFacility"
   | "buildTransmissionLine"
   | "upgradeTransmissionLine"
+  | "cancelTransmissionLine"
+  | "togglePauseTransmissionLine"
   | "setTradingPolicy"
   | "retrofitFacility"
   | "cancelRetrofit"
