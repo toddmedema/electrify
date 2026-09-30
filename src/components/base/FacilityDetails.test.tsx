@@ -103,7 +103,7 @@ function outage(
 }
 
 function section() {
-  return screen.getByRole("region", { name: "Weather resilience" });
+  return screen.getByRole("region", { name: "Upgrades" });
 }
 
 describe("weather resilience details", () => {
@@ -111,8 +111,8 @@ describe("weather resilience details", () => {
     const game = coldGame();
     const gas = game.facilities[0];
     showDetails(game, gas);
-    expect(section()).toHaveTextContent("Standard winterization");
-    expect(section()).toHaveTextContent("Rated to −8°C");
+    expect(section()).not.toHaveTextContent("Standard winterization");
+    expect(section()).not.toHaveTextContent("Rated to −8°C");
     const cost = retrofitCost(gas, game, "coldWeatherPackage")!;
     expect(
       within(section()).getByRole("button", {
@@ -188,9 +188,7 @@ describe("weather resilience details", () => {
       upgrade: "hailResistant",
     });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(
-      screen.getByRole("heading", { name: "Weather resilience" }),
-    ).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Upgrades" })).toHaveFocus();
   });
 
   it("closes on Cancel without buying anything", () => {
@@ -302,7 +300,7 @@ describe("weather resilience details", () => {
       </UnitsContext.Provider>,
     );
     // -8°C is 17.6°F, rounded to 18°F; Pittsburgh's package rating of -30°C is -22°F
-    expect(section()).toHaveTextContent("Rated to 18°F");
+    expect(section()).not.toHaveTextContent("Rated to 18°F");
     await userEvent.click(
       within(section()).getByRole("button", {
         name: /^Add cold-weather package/,
@@ -387,24 +385,19 @@ describe("weather resilience details", () => {
   it("hides the purchase in a replay", () => {
     const game = coldGame();
     showDetails(game, game.facilities[0], { readOnly: true });
-    expect(section()).toHaveTextContent("Standard winterization");
-    expect(within(section()).queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 
   it("leaves gas out where winters never get cold enough to matter", () => {
     const game = carbonFee();
     showDetails(game, game.facilities[0]);
-    expect(
-      screen.queryByRole("region", { name: "Weather resilience" }),
-    ).toBeNull();
+    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 
   it("leaves the section out of tutorials, which have no weather hazards", () => {
     const game = createGame({ scenarioId: 1 });
     const gas = game.facilities.find((f) => f.fuel === "Natural Gas");
     showDetails(game, gas || withSolar(game));
-    expect(
-      screen.queryByRole("region", { name: "Weather resilience" }),
-    ).toBeNull();
+    expect(screen.queryByRole("region", { name: "Upgrades" })).toBeNull();
   });
 });

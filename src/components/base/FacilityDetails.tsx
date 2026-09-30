@@ -187,24 +187,33 @@ function WeatherResilienceSection(props: {
         ? "Doesn't speed up current repairs."
         : "Doesn't end this month's cold outage."
       : undefined;
+  if (
+    !summary.installed &&
+    !facility.resilience?.solarTrackers &&
+    !installing &&
+    !canOffer
+  )
+    return <></>;
   return (
-    <section className="facilityDetailSection" aria-label="Weather resilience">
+    <section className="facilityDetailSection" aria-label="Upgrades">
       <Typography
         component="h3"
         className="facilityDetailHeading"
         ref={headingRef}
         tabIndex={-1}
       >
-        Weather resilience
+        Upgrades
       </Typography>
-      <div className="facilityResilienceSummary">
-        <Typography variant="body2" className="facilityStatValue">
-          {summary.label}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          {detail}
-        </Typography>
-      </div>
+      {summary.installed && (
+        <div className="facilityResilienceSummary">
+          <Typography variant="body2" className="facilityStatValue">
+            {summary.label}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {detail}
+          </Typography>
+        </div>
+      )}
       <dl className="facilityResilienceFacts">
         {facility.resilience?.solarTrackers && (
           <Stat
@@ -213,7 +222,7 @@ function WeatherResilienceSection(props: {
               <>
                 Solar trackers
                 <span className="facilityStatNote">
-                  More morning and evening power.
+                  More morning and evening power. Trackers stow ahead of hail.
                 </span>
               </>
             }

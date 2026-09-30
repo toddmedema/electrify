@@ -49,9 +49,13 @@ export interface TransmissionConditions {
  * It is intentionally bounded so weather changes capacity without making a built line vanish.
  */
 export function transmissionRatingW(
-  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "paused"
+  >,
   conditions: TransmissionConditions,
 ): number {
+  if (line.paused) return 0;
   const corridor = TRANSMISSION_CORRIDORS.find(
     ({ id }) => id === line.corridorId,
   );
@@ -301,7 +305,10 @@ export function importAvailabilityFraction(
  * neighboring generation. Additional paths still share the same market budget at allocation.
  */
 export function intertieImportLimitW(
-  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "paused"
+  >,
   context: IntertieContext,
   minute: number,
   conditions: TransmissionConditions,
@@ -411,7 +418,10 @@ export function physicalNeighborImportSupplyW(
 
 /** One source of trade limits for dispatch, previews and validation. */
 export function intertieOfferLimits(
-  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "paused"
+  >,
   context: IntertieContext,
   minute: number,
   conditions: TransmissionConditions,

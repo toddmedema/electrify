@@ -181,6 +181,33 @@ for (const theme of ["light", "dark"]) {
     const row = pane.locator('.facilityRow[data-facility="Solar"]');
     await row.locator(".facilityDisclosure").click();
     await expect(row).toContainText(/Building \d+%/);
+    await expect(row.getByText("Standard panels", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(row.getByText("Move up", { exact: true })).toHaveCount(0);
+    await expect(row.getByText("Move down", { exact: true })).toHaveCount(0);
+    const fill = row.locator(".constructionProgressFill");
+    const speed = (name: string) =>
+      page
+        .locator("#appbar:visible")
+        .getByRole("button", { name, exact: true })
+        .first();
+    await speed("normal speed").click();
+    await expect
+      .poll(() =>
+        fill.evaluate(
+          (el) => getComputedStyle(el, "::before").animationPlayState,
+        ),
+      )
+      .toBe("running");
+    await speed("pause").click();
+    await expect
+      .poll(() =>
+        fill.evaluate(
+          (el) => getComputedStyle(el, "::before").animationPlayState,
+        ),
+      )
+      .toBe("paused");
     await expect(row.locator(".facilityDisclosure")).toHaveAttribute(
       "aria-expanded",
       "true",
