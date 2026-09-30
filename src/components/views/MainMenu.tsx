@@ -129,13 +129,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
           component="nav"
           aria-label="Game resources"
           className="resourceActions"
-          direction="row"
+          direction="column"
           spacing={1}
           useFlexGap
           sx={{
             alignItems: "center",
             justifyContent: "center",
-            flexWrap: "wrap",
           }}
         >
           <Button variant="text" color="primary" onClick={props.onManual}>
@@ -155,20 +154,19 @@ const MainMenu = (props: Props): React.JSX.Element => {
             component="section"
             aria-label="Discovery actions"
             className="discoveryActions"
-            direction="row"
+            direction="column"
             spacing={1}
             useFlexGap
             sx={{
               alignItems: "center",
               justifyContent: "center",
-              flexWrap: "wrap",
             }}
           >
             <InstallAppButton />
             {props.audioEnabled === undefined && (
               <Button
                 color="primary"
-                endIcon={<VolumeUpIcon />}
+                startIcon={<VolumeUpIcon />}
                 onClick={() => props.onAudioChange(true)}
               >
                 Turn on sound

@@ -3496,6 +3496,11 @@ $pane_header_height: 48px;
     margin: 0 12px 12px;
     overflow-x: auto;
     padding-bottom: 2px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
 
     .MuiToggleButton-root {
       flex: 0 0 auto;
