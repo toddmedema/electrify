@@ -1485,6 +1485,13 @@ $pane_header_height: 48px;
   }
 }
 
+.insightsStickyHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-primary);
+}
+
 .insightsLevers {
   display: flex;
   flex-wrap: wrap;
@@ -3812,6 +3819,20 @@ $pane_header_height: 48px;
     gap: 1px;
     align-items: center;
     padding: 0 $space-4 $space-2;
+  }
+
+  .upcomingEvents > .eventLogSectionHeader,
+  .eventHistory > .eventLogSectionHeader {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding-top: $space-2;
+    margin-top: -$space-2;
+    background: var(--bg-primary);
+  }
+
+  .upcomingEvents > .eventLogSectionHeader {
+    background: var(--bg-sunken);
   }
 
   .eventHistoryFilterButton {
@@ -6614,11 +6635,21 @@ $programs_column: 800px;
   }
 }
 
-// The three-pane layout keeps Programs beside the Insights title, like Build.
+// Single-panel views keep the control compact beside the rate summary.
+.insightsLevers .customerProgramsControl {
+  .customerProgramsLabel {
+    display: none;
+  }
+  .MuiButton-startIcon {
+    margin: 0;
+  }
+}
+
+// Both multi-pane layouts keep Programs beside the Insights title, like Build.
 .insightsTitle .customerProgramsControl {
   display: none;
 }
-.desktop-layout .insights {
+.insights.pane {
   .insightsTitle {
     display: flex;
     flex-wrap: nowrap;

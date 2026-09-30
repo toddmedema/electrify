@@ -183,51 +183,48 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>Customer programs are set in Insights. Changes start next month.</p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Each is a
-          one-time build-out project. Once started, it installs upgrades over 48
-          months at a steady monthly cost, then finishes and costs nothing more.
-          You can pause new installations and resume later; the project picks up
-          where it left off. Both reduce electricity sales.
+          one-time, 48-month project with a fixed monthly cost and no cost after
+          completion. Pause installations and resume where you left off. Both
+          reduce electricity sales.
         </p>
         <p>
           Efficiency cuts home and business use by 10%, and heating and cooling
-          by 35%, so it saves most in hot or cold places. Upgrades wear out:
-          savings start fading after 10 years and are gone after 20.
+          by 35%, saving most in hot or cold places. Savings fade after 10 years
+          and disappear after 20.
         </p>
         <p>
-          Rooftop panels produce more in sunny, cooler places and lose output on
-          hot days. Their price follows the year: rebates cost several times
-          more in the early 2000s than today. Rooftop solar cuts home and
-          business daylight demand; surplus is discarded without payment.
+          Rooftop solar cuts home and business daylight demand; surplus is
+          discarded without payment. Panels produce most in sunny, cooler
+          places. Rebates cost several times more in the early 2000s than today.
         </p>
         <p>
           <strong>Time-of-use tariff:</strong> Half of homes move 20% of their
-          use from your chosen four-hour window into the next three hours. Total
-          energy use stays the same. Participants pay 30% above the base rate
-          during the window, 10% below during those later hours, and the base
-          rate otherwise.
+          use from your chosen four-hour window to the next three hours, without
+          changing total use. They pay 30% above the base rate in the window,
+          10% below in the next three hours, and the base rate otherwise.
         </p>
         <p>
           <strong>Peak curtailment contracts:</strong> Half of industrial and
-          data-center demand participates. Participants cut use by 20% during a
-          separate four-hour window, even with enough supply. That use is
-          canceled, not delayed. Participants get 10% off electricity delivered
-          all day.
+          data-center demand participates, cutting use by 20% during a separate
+          four-hour window even when supply is sufficient. This use is canceled,
+          not delayed. Participants get 10% off electricity delivered all day.
         </p>
         <p>
           <strong>Wildfire preparedness:</strong> In custom games in fire-prone
-          areas, you can keep crews, inspections and vegetation clearing funded
-          year-round. Effectiveness ramps up linearly over 12 months. Turning it
-          off stops spending immediately; remaining protection fades over 12
-          months. Restarting ramps from the remaining effectiveness over 12
-          months. The annual budget is billed monthly and stays fixed while the
-          program is on. It continues across years until you turn it off, with
-          no annual opt-in or upfront payment. At full effectiveness, safety
-          shutoffs disconnect half as much customer load and affected generators
-          lose half as much output. Partial effectiveness reduces those benefits
-          proportionally. It does not prevent fires, and restoration costs apply
-          either way. Its page simulates a typical fire in the next wildfire
-          season with the effectiveness projected for that month. An existing
-          fire keeps the response it started with.
+          areas, fund crews, inspections and vegetation clearing year-round. The
+          budget stays fixed while active and is billed monthly, with no upfront
+          payment or annual renewal. Protection builds steadily to full strength
+          over 12 months. Turning it off stops spending immediately; protection
+          fades over 12 months. Restarting builds from the remaining protection
+          over 12 months.
+        </p>
+        <p>
+          Full protection halves customer disconnections from safety shutoffs
+          and output losses at affected generators; partial protection scales
+          those benefits. It does not prevent fires or restoration costs. The
+          program preview models a typical fire next season using the protection
+          projected for that month. Fires already underway keep their original
+          response.
         </p>
       </div>
     ),
@@ -251,18 +248,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Facilities:</strong> Build and manage your plants here.
-          Generators higher in the list run first when possible. Wind and solar
-          follow the weather, so supply can fall short on some hours.
+          Generators higher in the list run first when possible. One simulated
+          day represents a month.
         </p>
         <p>
-          <strong>Insights:</strong> Finances, your electricity rate and
-          forecasts are here.
-        </p>
-        <p>
-          One simulated day represents a month. A four-hour battery still lasts
-          about four hours. This shortcut cannot test whether a real grid would
-          survive several windless days. The game handles plant startups, water
-          releases and loan calculations automatically.
+          <strong>Insights:</strong> Manage your finances, electricity rates,
+          customer programs and future forecasts here.
         </p>
       </div>
     ),

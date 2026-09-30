@@ -1144,11 +1144,11 @@ export default function CustomerPrograms({ game }: { game: GameType }) {
             : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
-        variant="outlined"
+        variant="contained"
         startIcon={<GroupsIcon />}
         onClick={() => setOpen(true)}
       >
-        Programs
+        <span className="customerProgramsLabel">Programs</span>
       </Button>
       {open && <ProgramsScreen onClose={() => setOpen(false)} />}
     </Box>
