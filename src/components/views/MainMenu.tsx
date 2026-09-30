@@ -101,7 +101,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           component="section"
           aria-label="Primary actions"
           className="mainActions"
-          spacing={1.5}
+          spacing={1}
           useFlexGap
         >
           {props.hasSavedGame && (

@@ -2869,6 +2869,7 @@ $pane_header_height: 48px;
       .utilityActions {
         display: flex;
         flex-direction: column;
+        margin-top: $space-2;
 
         // InstallAppButton can render nothing, leaving an empty discovery row.
         &:has(> .discoveryActions:empty) {

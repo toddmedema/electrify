@@ -39,7 +39,7 @@ describe("MainMenu", () => {
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
-      { gap: "12px" },
+      { gap: "8px" },
     );
   });
 
