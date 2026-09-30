@@ -280,6 +280,11 @@ counts the plant's routine turbine maintenance in variable O&M, so nothing else 
 
 ## Default dispatch order
 
+Every scenario starts with solar and wind (including offshore and airborne wind) ahead of
+dispatchable generators, so their output reduces the demand those generators must cover. This
+also applies to tutorials and custom games. Other starting generators retain their relative
+order, including reservoir hydro, whose water can be conserved by dispatching it later.
+
 The facility list is the dispatch order. A newly bought generator used to go to the top, so an
 expensive peaker ran as baseload until the player moved it. Now a new Natural Gas Peaker joins
 just above the existing peakers and storage, below every other generator; every other new

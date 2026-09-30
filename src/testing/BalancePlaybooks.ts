@@ -175,7 +175,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     },
     scheduledActions: [
       rate(0.091),
-      ...dispatch([1, 2, 3, 4, 5]),
+      // Wind now starts first; move coal before gas so nuclear stays ahead of backup.
+      ...dispatch([2, 1, 3, 4, 5]),
       { month: 82, type: "toggle", facilityId: 4 },
       ...programs(82),
     ],
@@ -237,7 +238,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     scheduledActions: [
       rate(0.12),
       ...line("zambia-zimbabwe-upgrade", 8, 7),
-      ...dispatch([1, 2, 3]),
+      // Move solar above the new diesel, then hydro and the existing oil ahead of it.
+      ...dispatch([3, 1, 2]),
       { month: 47, type: "toggle", facilityId: 2 },
       ...programs(46),
     ],

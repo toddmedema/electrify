@@ -1775,6 +1775,17 @@ export const gameSlice = createSlice({
         state.facilities = [...generators.reverse(), ...storage];
       }
 
+      // Weather-driven generation must be counted before dispatchable plants cover the
+      // remaining demand. Apply to every starting fleet, including tutorials and custom games,
+      // while preserving the relative order within both groups and leaving storage at the end.
+      const weatherDriven = (facility: FacilityOperatingType) =>
+        facility.fuel !== undefined &&
+        WEATHER_DEPENDENT_FUELS.includes(facility.fuel);
+      state.facilities = [
+        ...state.facilities.filter(weatherDriven),
+        ...state.facilities.filter((facility) => !weatherDriven(facility)),
+      ];
+
       // The first blank timeline is created before the authored fleet is resolved. Hydrology is
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.
