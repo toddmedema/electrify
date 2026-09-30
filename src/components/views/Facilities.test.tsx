@@ -807,11 +807,15 @@ describe("unified connections", () => {
 
   it("shows a building line's outlook without claiming it can import yet", async () => {
     const game = connectedGame();
+    game.transmission!.lines[1].minuteCreated -= 12 * MINUTES_PER_MONTH;
     renderFacilities(game, null);
     await user.click(screen.getByText(game.transmission!.lines[1].name));
     // eslint-disable-next-line testing-library/no-node-access
     const building = document.querySelectorAll(".transmissionLine")[1];
-    expect(building).toHaveTextContent("Power can flow when construction");
+    expect(building).not.toHaveTextContent("Power can flow when construction");
+    expect(building).toHaveTextContent("Building 50% · 12 months left");
+    expect(building).toHaveTextContent("Rated capacity");
+    expect(building).toHaveTextContent("Purchased emissions");
     expect(building).not.toHaveTextContent("Can import now");
     expect(building).toHaveTextContent("Typical price");
   });

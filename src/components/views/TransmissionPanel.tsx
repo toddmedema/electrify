@@ -20,6 +20,7 @@ import {
   MenuItem,
   Select,
   Typography,
+  useTheme,
 } from "@mui/material";
 import {
   MAX_INTERTIE_UPGRADES,
@@ -27,6 +28,7 @@ import {
   MONTHS,
   TICK_MINUTES,
   TICKS_PER_YEAR,
+  YEARS_PER_TICK,
 } from "../../Constants";
 import {
   adjacentMarketForCorridor,
@@ -577,6 +579,7 @@ export default function TransmissionPanel({
   const units = useUnits();
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = React.useState(1);
+  const theme = useTheme();
   const [sort, setSort] = React.useState<IntertieSortKey>("yearsToBuild");
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
@@ -701,6 +704,19 @@ export default function TransmissionPanel({
               ? transmissionRatingW(line, now)
               : line.capacityW;
             const building = line.yearsToBuildLeft > 0;
+            // Remaining time plus elapsed simulation time preserves the original build duration.
+            const elapsedYears =
+              (Math.max(0, game.date.minute - line.minuteCreated) /
+                TICK_MINUTES) *
+              YEARS_PER_TICK;
+            const builtFraction = building
+              ? elapsedYears / (elapsedYears + line.yearsToBuildLeft)
+              : 1;
+            const monthsLeft = Math.ceil(line.yearsToBuildLeft * 12);
+            const constructionLabel = `Building ${Math.round(builtFraction * 100)}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+            const constructionStyle = building
+              ? { opacity: theme.palette.action.disabledOpacity }
+              : undefined;
             const importableW = now
               ? intertieImportLimitW(line, intertieContext, now.minute, now)
               : rating;
@@ -718,9 +734,7 @@ export default function TransmissionPanel({
             // visually hidden span inside the row would never be announced. The reading and the
             // direction the bar and the sign carry visually have to be in the label itself.
             const flowDescription = building
-              ? `building, ${line.yearsToBuildLeft.toFixed(1)}${
-                  line.yearsToBuildLeft <= 1 ? " year" : " years"
-                } remaining`
+              ? constructionLabel
               : flowW > 0
                 ? `importing ${formatWatts(flowW)} of ${formatWatts(rating)}`
                 : flowW < 0
@@ -740,41 +754,42 @@ export default function TransmissionPanel({
                   {!building && <FlowBar fraction={flowFraction} />}
                   <img
                     className="transmissionListIcon"
+                    style={constructionStyle}
                     src="/images/transmission.svg"
                     alt=""
                   />
                   <span className="transmissionLineText">
-                    <span>{line.name}</span>
+                    <span style={constructionStyle}>{line.name}</span>
                     <Typography
                       component="span"
                       variant="body2"
                       color="textSecondary"
+                      style={constructionStyle}
                     >
                       {building ? (
-                        <>
-                          {line.yearsToBuildLeft.toFixed(1) +
-                            (line.yearsToBuildLeft <= 1 ? " year" : " years") +
-                            " remaining"}
-                          {" · "}
-                          <span className="transmissionLineStatus">
-                            Building
-                          </span>
-                        </>
+                        constructionLabel
                       ) : (
                         <span className="transmissionLineFlow">
                           {flowLabel}
                         </span>
                       )}
                     </Typography>
+                    {building && (
+                      <span className="constructionProgress" aria-hidden>
+                        <span
+                          className="constructionProgressFill"
+                          style={{
+                            width: `${builtFraction * 100}%`,
+                            background: "var(--interactive-blue)",
+                          }}
+                        />
+                      </span>
+                    )}
                   </span>
                   <ChevronDownGlyph className="facilityChevron" aria-hidden />
                 </button>
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
-                    <Typography variant="body2">
-                      {market?.name} · {formatWatts(line.capacityW, 3)} rated
-                      capacity
-                    </Typography>
                     {outlook && (
                       <div className="transmissionArchetype">
                         <Chip
@@ -787,51 +802,63 @@ export default function TransmissionPanel({
                         </Typography>
                       </div>
                     )}
-                    {building && (
-                      <Typography variant="body2" color="textSecondary">
-                        Power can flow when construction finishes.
-                      </Typography>
-                    )}
-                    {(outlook || (!building && now)) && (
-                      <dl className="transmissionMetrics">
-                        {!building && now && (
-                          <>
-                            <div>
-                              <dt>Price now</dt>
-                              <dd>
-                                {formatMoneyConcise(
-                                  adjacentMarketPricePerMWh(
-                                    line.corridorId,
-                                    intertieContext,
-                                    now.minute,
-                                    now,
-                                  ),
-                                )}
-                                /MWh
-                              </dd>
-                            </div>
-                            <div>
-                              <dt>Can import now</dt>
-                              <dd>
-                                {formatWatts(importableW)} of{" "}
-                                {formatWatts(rating)}
-                              </dd>
-                            </div>
-                          </>
-                        )}
-                        {outlook && (
-                          <>
-                            <div>
-                              <dt>At your peak</dt>
-                              <dd>
-                                ~{formatWatts(outlook.atPeak * line.capacityW)}
-                              </dd>
-                            </div>
-                            <PriceMetric outlook={outlook} />
-                          </>
-                        )}
-                      </dl>
-                    )}
+                    <dl className="transmissionMetrics">
+                      <div>
+                        <dt>Rated capacity</dt>
+                        <dd>{formatWatts(line.capacityW, 3)}</dd>
+                      </div>
+                      {market && (
+                        <div>
+                          <dt>Purchased emissions</dt>
+                          <dd>
+                            {formatMass(
+                              importEmissionsKgco2ePerMWh(
+                                market.id,
+                                game.date.year,
+                              ),
+                              units,
+                            )}
+                            /MWh CO2e
+                          </dd>
+                        </div>
+                      )}
+                      {!building && now && (
+                        <>
+                          <div>
+                            <dt>Price now</dt>
+                            <dd>
+                              {formatMoneyConcise(
+                                adjacentMarketPricePerMWh(
+                                  line.corridorId,
+                                  intertieContext,
+                                  now.minute,
+                                  now,
+                                ),
+                              )}
+                              /MWh
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Can import now</dt>
+                            <dd>
+                              {formatWatts(importableW)} of{" "}
+                              {formatWatts(rating)}
+                            </dd>
+                          </div>
+                        </>
+                      )}
+                      {outlook && (
+                        <>
+                          <div>
+                            <dt>At your peak</dt>
+                            <dd>
+                              ~{formatWatts(outlook.atPeak * line.capacityW)}
+                            </dd>
+                          </div>
+                          <PriceMetric outlook={outlook} />
+                        </>
+                      )}
+                    </dl>
                     {!building && now && (
                       <Typography variant="body2" color="textSecondary">
                         Limiting factor:{" "}
@@ -903,19 +930,6 @@ export default function TransmissionPanel({
                     {line.loanAmountLeft > 0 && (
                       <Typography variant="body2">
                         Loan balance {formatMoneyConcise(line.loanAmountLeft)}
-                      </Typography>
-                    )}
-                    {market && (
-                      <Typography variant="caption" color="textSecondary">
-                        Purchased emissions:{" "}
-                        {formatMass(
-                          importEmissionsKgco2ePerMWh(
-                            market.id,
-                            game.date.year,
-                          ),
-                          units,
-                        )}
-                        /MWh CO2e
                       </Typography>
                     )}
                   </div>

@@ -72,7 +72,9 @@ test("California players can build and understand an intertie", async ({
   await expect(
     facilities.locator("#your-interties-title", { hasText: "Interties" }),
   ).toBeVisible();
-  await expect(facilities.getByText("Building")).toBeVisible();
+  await expect(
+    facilities.getByText(/Building \d+% · \d+ months? left/),
+  ).toBeVisible();
   await expect(facilities.locator(".tradingControls")).toHaveCount(1);
   const line = facilities.locator(".transmissionLine").first();
   const [rowBox, chevronBox] = await Promise.all([
@@ -187,6 +189,68 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
 });
 
 for (const theme of ["light", "dark"] as const) {
+  test(`owned intertie details and construction align in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const facilities = page.locator(".facilities:visible");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await facilities
+      .getByRole("button", { name: "Build", exact: true })
+      .click();
+    await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    await page
+      .getByTestId("transmission-project-california-south")
+      .getByRole("button", { name: /Review purchase/ })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Take loan" })
+      .click();
+    const line = facilities.locator(".transmissionLine").first();
+    await line.getByRole("button", { name: /^Inspect/ }).click();
+    await expect(line).toContainText(/Building \d+% · \d+ months? left/);
+    await expect(line.locator(".constructionProgress")).toBeVisible();
+    await expect(line.locator(".transmissionMetrics")).toContainText(
+      "Rated capacity",
+    );
+    await expect(line.locator(".transmissionMetrics")).toContainText(
+      "Purchased emissions",
+    );
+    await expect(line).not.toContainText(
+      "Power can flow when construction finishes",
+    );
+    const chip = line.getByText("Solar surplus", { exact: true });
+    await expect(chip).toBeVisible();
+    const [chipBox, metricsBox, summaryBox] = await Promise.all([
+      line.locator(".MuiChip-root").boundingBox(),
+      line.locator(".transmissionMetrics").boundingBox(),
+      line.locator(".transmissionArchetype .MuiTypography-root").boundingBox(),
+    ]);
+    expect(chipBox!.x).toBeCloseTo(metricsBox!.x, 0);
+    expect(chipBox!.x).toBeCloseTo(summaryBox!.x, 0);
+    expect(
+      await line.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      await line
+        .locator(".transmissionListIcon")
+        .evaluate((el) => Number(getComputedStyle(el).opacity)),
+    ).toBeLessThan(1);
+    await line.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: testInfo.outputPath(`intertie-${theme}.png`),
+    });
+  });
+
   test(`intertie review stays at the top right in ${theme}`, async ({
     page,
   }, testInfo) => {
