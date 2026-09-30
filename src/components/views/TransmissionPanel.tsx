@@ -14,7 +14,6 @@ import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   Box,
   Button,
-  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -792,11 +791,6 @@ export default function TransmissionPanel({
                   <div className="transmissionLineDetails">
                     {outlook && (
                       <div className="transmissionArchetype">
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          label={outlook.archetype.label}
-                        />
                         <Typography variant="body2" color="textSecondary">
                           {outlook.archetype.summary}
                         </Typography>

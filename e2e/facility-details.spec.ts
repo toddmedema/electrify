@@ -156,3 +156,42 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
   for (const label of await row.locator(".facilityActionLabel").all())
     await expect(label).toBeVisible();
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`construction details omit operating results in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await page.locator(".button-buildGenerator").click();
+    await page
+      .getByRole("button", { name: "Review purchase of Solar", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Pay cash", exact: true }).click();
+    const row = pane.locator('.facilityRow[data-facility="Solar"]');
+    await row.locator(".facilityDisclosure").click();
+    await expect(row).toContainText(/Building \d+%/);
+    await expect(row.locator(".facilityDisclosure")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await expect(row.getByRole("region", { name: "Operation" })).toHaveCount(0);
+    await expect(row.getByRole("region", { name: "Economics" })).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".snackbarContent")).toBeHidden();
+    await row.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: testInfo.outputPath("facility-construction.png"),
+    });
+  });
+}

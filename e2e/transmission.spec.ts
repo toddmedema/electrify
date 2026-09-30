@@ -228,15 +228,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).not.toContainText(
       "Power can flow when construction finishes",
     );
-    const chip = line.getByText("Solar surplus", { exact: true });
-    await expect(chip).toBeVisible();
-    const [chipBox, metricsBox, summaryBox] = await Promise.all([
-      line.locator(".MuiChip-root").boundingBox(),
+    await expect(line.locator(".MuiChip-root")).toHaveCount(0);
+    const [metricsBox, summaryBox] = await Promise.all([
       line.locator(".transmissionMetrics").boundingBox(),
       line.locator(".transmissionArchetype .MuiTypography-root").boundingBox(),
     ]);
-    expect(chipBox!.x).toBeCloseTo(metricsBox!.x, 0);
-    expect(chipBox!.x).toBeCloseTo(summaryBox!.x, 0);
+    expect(summaryBox!.x).toBeCloseTo(metricsBox!.x, 0);
     expect(
       await line.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);

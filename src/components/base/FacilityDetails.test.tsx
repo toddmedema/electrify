@@ -277,7 +277,17 @@ describe("weather resilience details", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     solar.yearsToBuildLeft = 1;
-    showDetails(game, solar);
+    const view = render(details(game, solar, jest.fn()));
+    expect(screen.queryByRole("region", { name: "Operation" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Economics" })).toBeNull();
+    view.rerender(details(game, { ...solar, yearsToBuildLeft: 0 }, jest.fn()));
+    expect(
+      screen.getByRole("region", { name: "Operation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Economics" }),
+    ).toBeInTheDocument();
+    view.rerender(details(game, solar, jest.fn()));
     expect(
       screen.queryByRole("button", { name: /^Add hail-resistant panels/ }),
     ).toBeNull();
