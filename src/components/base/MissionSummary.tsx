@@ -10,7 +10,10 @@ import {
 } from "../../helpers/MissionStatus";
 import type { MissionRisk } from "../../helpers/MissionStatus";
 import { TICK_MINUTES } from "../../Constants";
-import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
+import {
+  ActiveEventGroupType,
+  UpcomingStoryEventType,
+} from "../views/StoryEventSelectors";
 import ConceptIcon from "./ConceptIcon";
 import {
   projectionReady,
@@ -62,10 +65,10 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
  * expected later today) are always judged against the current state: when one is due,
  * selectMissionRisk runs as usual, since it returns before the runway check. Only when none is
  * due and the projection is stale does the previous risk stay up while the new projection is
- * computed after paint. So for about a frame after a rollover or a rate change, only what comes
+ * computed in a worker. Until it arrives after a rollover or a rate change, only what comes
  * after the early checks can be stale: the runway warning, and the upcoming-event notice it would
  * otherwise give way to. A previous early risk that has since cleared is not kept, since it is no
- * longer true, so that case computes now, as does the first render.
+ * longer true; it clears while the worker computes its replacement. The first render computes now.
  *
  * earlyRiskDue mirrors selectMissionRisk's early checks. If those ever change without it, the
  * cost is a stale frame or a synchronous projection, never a wrong settled result.
@@ -82,10 +85,12 @@ function useMissionRisk(
   const defer =
     !!now &&
     !!last.current &&
-    readsProjection(last.current.risk) &&
     !projectionReady(game) &&
     !earlyRiskDue(game, mission);
-  const risk = defer ? last.current?.risk : selectMissionRisk(game, upcoming);
+  const previousRisk = readsProjection(last.current?.risk)
+    ? last.current?.risk
+    : undefined;
+  const risk = defer ? previousRisk : selectMissionRisk(game, upcoming);
   React.useEffect(() => {
     last.current = { risk };
     if (defer && now) requestProjection(game, now);
@@ -96,23 +101,46 @@ function useMissionRisk(
 export default function MissionSummary({
   game,
   upcoming = [],
+  activeEvents = [],
+  onActiveEvents,
   onDetails,
   onEvidence,
 }: {
   game: GameType;
   upcoming?: UpcomingStoryEventType[];
+  activeEvents?: ActiveEventGroupType[];
+  onActiveEvents?: () => void;
   onDetails: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
 }) {
   const mission = getMissionStatus(game);
   const risk = useMissionRisk(game, mission, upcoming);
   // The grid readout beside this already reports a shortage happening right now.
-  const shownRisk = risk && risk.id !== "shortage" ? risk : undefined;
+  const active = activeEvents[0];
+  const shownRisk =
+    active && (!risk || risk.id.startsWith("event:") || risk.id === "shortage")
+      ? {
+          id: `active:${active.key}`,
+          shortLabel: `Active: ${active.title}${activeEvents.length > 1 ? ` +${activeEvents.length - 1}` : ""}`,
+          label: activeEvents
+            .map((event) => `${event.title}, ${event.throughLabel}`)
+            .join("; "),
+          target: { card: "EVENTS" as const },
+        }
+      : risk && risk.id !== "shortage"
+        ? risk
+        : undefined;
   // Upcoming events are news to act on (a blue calendar beside body-contrast text); every
   // other risk threatens the goal (amber).
-  const warning = shownRisk && !shownRisk.id.startsWith("event:");
+  const warning =
+    shownRisk &&
+    !shownRisk.id.startsWith("event:") &&
+    !shownRisk.id.startsWith("active:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
-  const announcement = React.useMemo(() => risk?.label || "", [risk?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const announcement = React.useMemo(
+    () => shownRisk?.label || "",
+    [shownRisk?.id], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   return (
     <div
       className={`missionSummary${warning ? " statusWarning" : ""}`}
@@ -128,7 +156,11 @@ export default function MissionSummary({
               color="inherit"
               aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
               title={shownRisk.label}
-              onClick={() => onEvidence?.(shownRisk.target)}
+              onClick={() =>
+                shownRisk.id.startsWith("active:")
+                  ? onActiveEvents?.()
+                  : onEvidence?.(shownRisk.target)
+              }
             >
               {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
               <span className="statusIcon" aria-hidden="true">

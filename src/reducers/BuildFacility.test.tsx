@@ -75,6 +75,11 @@ describe("buildFacility", () => {
       "3 Natural Gas Peaker",
       "6 Battery",
     ]);
+    expect(
+      state.facilities
+        .filter((facility) => facility.id > 2)
+        .every((facility) => facility.lifetimeStarts === 0),
+    ).toBe(true);
   });
 
   it("amortizes a build loan during construction, as quoted", () => {

@@ -266,7 +266,34 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
   longest task drops from about 110–120 ms to under 50 ms; the projection still runs as an 85 ms
   task one frame later. The census's `maxStepMs` includes both, because the fake clock runs the
   deferred work inside the same step.
-- **Next: move the shared projection to a worker** (G3 step 4), the remaining rollover hitch.
+- **Done: G3 worker refreshes.** `DeferredProjection` now keeps a persistent worker for the
+  shared twenty-year forecast. It sends the exact snapshot that invalidated the forecast, adopts
+  the result into the shared projection cache, and rejects results superseded by a month change,
+  player decision, or imported run. One request can be in flight; rapid edits collapse to the
+  newest pending snapshot. The last subscriber leaving terminates the worker. Worker startup or
+  data-loading failures fall back to the existing after-paint computation. An expired immediate
+  mission warning clears while the worker computes its replacement, instead of synchronously
+  rebuilding the runway forecast on that transition.
+  The worker retains initialized data between requests: weather reloads only when the city or
+  watershed changes; a new seed resets all three datasets' seeded forecast caches. Failed
+  initializations remain retryable, with all loads settled before the next request begins.
+  - Windows / Node 24.14, desktop Chromium dev build, scenario 103, fixed seed: two alternating
+    comparisons of the after-paint fallback and worker, each with 2.1 seconds of warmup and 6.5
+    seconds at FAST, advanced from month 1 through month 5. The worst animation-frame gap fell
+    from **350–367 ms to 83–100 ms**. Worst observed long task fell from **342–360 ms to 75–78 ms**;
+    total long-task time fell from **1,598–1,682 ms to 269–285 ms**. These are local measurements,
+    not timing gates or production-device guarantees.
+  - `e2e/projection-worker.spec.ts` verifies on desktop and 390 px mobile that real workers
+    successfully return multiple month forecasts, without falling back, while animation frames
+    continue. Unit tests cover coalescing edits, rejecting stale results, cache adoption,
+    cleanup, and the error fallback.
+  - Remaining limits: the first projection on mount is synchronous, as is the recovery when
+    Insights has no suitable previous forecast. The reducer rollover, hydro and intertie
+    outlooks, worker-message cloning, and chart commits still use the main thread. The local
+    reducer benchmark measured a 34.51 ms median and 44.48 ms worst rollover; this change does
+    not claim to meet the 16.7 ms budget yet. Precomputing the reducer's next month would require
+    invalidating its exact state and side effects; it is unnecessary for isolating this larger,
+    pure UI forecast and was deliberately not introduced here.
 - **Then:** one manifest-regenerating release that bundles the Immer tax, the reducer-side rollover
   savings, the G2 rAF presentation loop, and the `TICK_MS.FAST` decision.
 - **Timeboxed spike:** Valgrind feasibility, kept only if it passes its criteria.

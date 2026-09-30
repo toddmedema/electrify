@@ -3,6 +3,26 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import InsightEventRail from "./InsightEventRail";
 
+it("restores the details anchor when a selected event returns to the viewport", () => {
+  const event = {
+    key: "one",
+    title: "Supply change",
+    label: "January 2026",
+    message: "Demand rises.",
+  };
+  const props = {
+    activeKey: "one",
+    onActiveChange: jest.fn(),
+    onZoom: jest.fn(),
+  };
+  const { rerender } = render(<InsightEventRail {...props} events={[event]} />);
+  expect(screen.getByRole("dialog", { name: "Supply change" })).toBeVisible();
+  rerender(<InsightEventRail {...props} events={[]} />);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  rerender(<InsightEventRail {...props} events={[event]} />);
+  expect(screen.getByRole("dialog", { name: "Supply change" })).toBeVisible();
+});
+
 it("focuses event details and restores the trigger on Escape and Zoom", async () => {
   const user = userEvent.setup();
   const zoom = jest.fn();

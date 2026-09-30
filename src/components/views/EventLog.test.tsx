@@ -8,6 +8,58 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 ));
 
 describe("EventLog", () => {
+  beforeEach(() => localStorage.clear());
+  it("retains an empty selection across remounts and restores all on request", async () => {
+    const user = userEvent.setup();
+    const props = {
+      events: [
+        {
+          id: 1,
+          kind: "BUILD" as const,
+          label: "Jan 2024",
+          message: "Built a plant.",
+        },
+      ],
+      onOpen: jest.fn(),
+      onSelect: jest.fn(),
+    };
+    const view = render(<EventLog {...props} />);
+    await user.click(
+      screen.getByRole("button", { name: "Filter event history, All events" }),
+    );
+    for (const name of [
+      "World events",
+      "Blackouts",
+      "Projects",
+      "Market & finance",
+    ]) {
+      await user.click(screen.getByRole("menuitemcheckbox", { name }));
+    }
+    await user.click(screen.getByRole("menuitem", { name: "Done" }));
+    expect(
+      screen.getByText("Select an event type to show its history."),
+    ).toBeVisible();
+    view.unmount();
+    render(<EventLog {...props} />);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Filter event history, No event types selected",
+      }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Show all events" }));
+    expect(screen.getByText("Built a plant.")).toBeVisible();
+  });
+
+  it("ignores a malformed saved filter preference", () => {
+    localStorage.setItem(
+      "eventHistoryFilters",
+      JSON.stringify({ broken: true }),
+    );
+    render(<EventLog events={[]} onOpen={jest.fn()} onSelect={jest.fn()} />);
+    expect(
+      screen.getByRole("button", { name: "Filter event history, All events" }),
+    ).toBeVisible();
+  });
   it("marks events read without returning the dispatched action as an effect cleanup", () => {
     const dispatchedAction = { type: "game/markEventsRead" };
     const onOpen = jest.fn(() => dispatchedAction) as unknown as () => void;
@@ -153,37 +205,37 @@ describe("EventLog", () => {
     await user.click(
       screen.getByRole("button", { name: "Filter event history, All events" }),
     );
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: "Blackouts" }),
+    );
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: "Market & finance" }),
+    );
     expect(
-      screen.getByRole("menuitemradio", { name: "All events" }),
+      screen.getByRole("menuitemcheckbox", { name: "World events" }),
     ).toBeChecked();
-    await user.click(screen.getByRole("menuitemradio", { name: "Blackouts" }));
-
-    expect(screen.getByText("A blackout started.")).toBeVisible();
-    expect(screen.queryByText("A scenario event happened.")).toBeNull();
-    expect(screen.queryByText("A solar project started.")).toBeNull();
     expect(
-      screen.getByRole("button", {
-        name: "Filter event history, Blackouts",
-      }),
-    ).toBeVisible();
+      screen.getByRole("menuitemcheckbox", { name: "Projects" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Blackouts" }),
+    ).not.toBeChecked();
+    expect(screen.getByText("A scenario event happened.")).toBeVisible();
+    expect(screen.getByText("A solar project started.")).toBeVisible();
+    expect(screen.queryByText("A blackout started.")).toBeNull();
+    expect(screen.queryByText("A loan was issued.")).toBeNull();
     expect(
       screen.getByText("An upcoming event remains visible."),
     ).toBeVisible();
-
+    await user.click(screen.getByRole("menuitem", { name: "Done" }));
     await user.click(
       screen.getByRole("button", {
-        name: "Filter event history, Blackouts",
+        name: "Filter event history, World events, Projects",
       }),
     );
-    expect(
-      screen.getByRole("menuitemradio", { name: "Blackouts" }),
-    ).toBeChecked();
-    await user.click(screen.getByRole("menuitemradio", { name: "All events" }));
-
-    expect(screen.getByText("A scenario event happened.")).toBeVisible();
-    expect(screen.getByText("A solar project started.")).toBeVisible();
+    await user.click(screen.getByRole("menuitem", { name: "Show all events" }));
+    expect(screen.getByText("A blackout started.")).toBeVisible();
     expect(screen.getByText("A loan was issued.")).toBeVisible();
-    expect(screen.getByText("Gas became more expensive.")).toBeVisible();
   });
 
   it("explains when the selected event group is empty", async () => {
@@ -206,7 +258,9 @@ describe("EventLog", () => {
     await user.click(
       screen.getByRole("button", { name: "Filter event history, All events" }),
     );
-    await user.click(screen.getByRole("menuitemradio", { name: "Projects" }));
+    for (const name of ["World events", "Blackouts", "Market & finance"]) {
+      await user.click(screen.getByRole("menuitemcheckbox", { name }));
+    }
 
     expect(screen.getByText("No project events yet.")).toBeVisible();
   });
@@ -231,7 +285,9 @@ describe("EventLog", () => {
     await user.click(
       screen.getByRole("button", { name: "Filter event history, All events" }),
     );
-    await user.click(screen.getByRole("menuitemradio", { name: "World" }));
+    for (const name of ["Projects", "Blackouts", "Market & finance"]) {
+      await user.click(screen.getByRole("menuitemcheckbox", { name }));
+    }
 
     expect(screen.getByText("No world or weather events yet.")).toBeVisible();
     expect(screen.queryByText("Built a solar farm.")).toBeNull();

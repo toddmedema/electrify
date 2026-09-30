@@ -127,7 +127,7 @@ describe("GameAppBar", () => {
     });
   });
 
-  it("shows active events beside the grid readout and opens Events", () => {
+  it("shows active events in the mission row and opens Events", () => {
     const onEvidence = jest.fn();
     renderAppBar({
       activeEvents: [
@@ -143,8 +143,8 @@ describe("GameAppBar", () => {
     });
     const chip = screen.getByRole("button", { name: /Wildfire emergency/ });
     const readout = screen.getByLabelText(/Current grid status/);
-    expect(readout).toHaveClass("hasActiveEvents");
-    expect(readout).toContainElement(chip);
+    expect(readout).not.toContainElement(chip);
+    expect(screen.getByLabelText("Mission progress")).toContainElement(chip);
     fireEvent.click(chip);
     expect(onEvidence).toHaveBeenCalledWith({ card: "EVENTS" });
   });

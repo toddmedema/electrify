@@ -229,6 +229,48 @@ jest.mock("../base/ChartForecastWeather", () => ({
 
 const user = userEvent.setup({ delay: null });
 
+it("reframes the same event after its selected chip leaves the viewport", () => {
+  localStorage.clear();
+  const ref = React.createRef<Insights>();
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+    onEvidenceReady: jest.fn(),
+    upcomingEvents: [
+      {
+        key: "growth",
+        startsMinute: 6 * MINUTES_PER_MONTH,
+        label: "July",
+        title: "Load growth",
+        message: "Demand grows.",
+      },
+    ],
+  };
+  const request = {
+    id: 1,
+    runId: 0,
+    target: { card: "INSIGHTS" as const, eventKey: "growth" },
+  };
+  const { rerender } = render(
+    <Insights {...props} ref={ref} evidenceRequest={request} />,
+  );
+  expect(
+    screen.getByRole("button", { name: "July: Load growth" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  rerender(<Insights {...props} ref={ref} />);
+  act(() => ref.current!.setState({ viewport: [0, MINUTES_PER_MONTH] }));
+  expect(
+    screen.queryByRole("button", { name: "July: Load growth" }),
+  ).not.toBeInTheDocument();
+  const nextRequest = { ...request, id: 2 };
+  rerender(<Insights {...props} ref={ref} evidenceRequest={nextRequest} />);
+  const chip = screen.getByRole("button", { name: "July: Load growth" });
+  expect(chip).toHaveAttribute("aria-expanded", "true");
+  expect(props.onEvidenceReady).toHaveBeenLastCalledWith(nextRequest, chip);
+});
+
 it("reveals finance evidence temporarily and lets explicit selection own saved layers", async () => {
   localStorage.clear();
   const configured = ["supplyDemand"];

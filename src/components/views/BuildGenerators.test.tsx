@@ -569,6 +569,9 @@ it("quotes a Hydro site maximum and updates the shared slider", () => {
   fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
   expect(slider).not.toHaveAttribute("aria-valuenow", before!);
   expect(
+    screen.queryByRole("button", { name: "Use site maximum" }),
+  ).not.toBeInTheDocument();
+  expect(
     screen.getByText(new RegExp("Site: " + HYDRO_SITES[site.id].name)),
   ).toBeInTheDocument();
   fireEvent.click(

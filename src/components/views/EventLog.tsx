@@ -1,6 +1,6 @@
 import * as React from "react";
 import {
-  IconButton,
+  Button,
   ListItemIcon,
   ListItemText,
   Menu,
@@ -20,6 +20,7 @@ import {
 import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
+import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -43,19 +44,18 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
 };
 
 type EventHistoryFilterType =
-  "ALL" | "WORLD" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
+  "WORLD" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
 
 const EVENT_HISTORY_FILTERS: {
   value: EventHistoryFilterType;
   label: string;
   emptyMessage?: string;
-  kinds?: GameEventKindType[];
+  kinds: GameEventKindType[];
 }[] = [
-  { value: "ALL", label: "All events" },
   {
     // Scenario stories, wildfires and weather hazards all log as world events
     value: "WORLD",
-    label: "World",
+    label: "World events",
     emptyMessage: "No world or weather events yet.",
     kinds: ["WORLD_EVENT"],
   },
@@ -122,17 +122,33 @@ export default function EventLog(props: Props): React.JSX.Element {
     ongoing = [],
     riskNotice,
   } = props;
-  const [historyFilter, setHistoryFilter] =
-    React.useState<EventHistoryFilterType>("ALL");
+  const [historyFilters, setHistoryFilters] = React.useState<
+    EventHistoryFilterType[]
+  >(() => {
+    const all = EVENT_HISTORY_FILTERS.map((filter) => filter.value);
+    const saved = getStorageJson<unknown[]>("eventHistoryFilters", all);
+    return Array.isArray(saved)
+      ? all.filter((value) => saved.includes(value))
+      : all;
+  });
+  React.useEffect(() => {
+    setStorageKeyValue("eventHistoryFilters", historyFilters);
+  }, [historyFilters]);
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(
     null,
   );
-  const activeFilter = EVENT_HISTORY_FILTERS.find(
-    (filter) => filter.value === historyFilter,
-  )!;
-  const visibleEvents = activeFilter.kinds
-    ? events.filter((event) => activeFilter.kinds?.includes(event.kind))
-    : events;
+  const activeFilters = EVENT_HISTORY_FILTERS.filter((filter) =>
+    historyFilters.includes(filter.value),
+  );
+  const allSelected = activeFilters.length === EVENT_HISTORY_FILTERS.length;
+  const filterLabel = allSelected
+    ? "All events"
+    : activeFilters.length
+      ? activeFilters.map((filter) => filter.label).join(", ")
+      : "No event types selected";
+  const visibleEvents = events.filter((event) =>
+    activeFilters.some((filter) => filter.kinds.includes(event.kind)),
+  );
   // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
   // so the expression-bodied form returned an object here; React later tried to call that object
   // while unmounting this phone-only pane and crashed the app to a blank screen.
@@ -292,25 +308,26 @@ export default function EventLog(props: Props): React.JSX.Element {
             </Typography>
             <Tooltip
               title={
-                historyFilter === "ALL"
-                  ? "Filter event history"
-                  : `Filter: ${activeFilter.label}`
+                allSelected ? "Filter event history" : `Filter: ${filterLabel}`
               }
             >
-              <IconButton
+              <Button
                 id="eventHistoryFilterButton"
-                className={`eventHistoryFilterButton${historyFilter === "ALL" ? "" : " active"}`}
+                className={`eventHistoryFilterButton${allSelected ? "" : " active"}`}
                 size="small"
                 onClick={(event) => setFilterAnchor(event.currentTarget)}
-                aria-label={`Filter event history, ${activeFilter.label}`}
+                aria-label={`Filter event history, ${filterLabel}`}
+                startIcon={<FilterListIcon fontSize="small" />}
                 aria-controls={
                   filterAnchor ? "eventHistoryFilterMenu" : undefined
                 }
                 aria-expanded={filterAnchor ? true : undefined}
                 aria-haspopup="menu"
               >
-                <FilterListIcon fontSize="small" />
-              </IconButton>
+                {allSelected
+                  ? "Filter"
+                  : `Types ${activeFilters.length}/${EVENT_HISTORY_FILTERS.length}`}
+              </Button>
             </Tooltip>
             <Menu
               id="eventHistoryFilterMenu"
@@ -320,28 +337,49 @@ export default function EventLog(props: Props): React.JSX.Element {
               anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
               transformOrigin={{ vertical: "top", horizontal: "right" }}
               slotProps={{
-                list: { "aria-labelledby": "eventHistoryFilterButton" },
+                list: {
+                  "aria-labelledby": "eventHistoryFilterButton",
+                  sx: {
+                    "& .MuiMenuItem-root": {
+                      minHeight: 40,
+                      "@media (pointer: coarse)": { minHeight: 44 },
+                    },
+                  },
+                },
               }}
             >
+              <MenuItem
+                onClick={() =>
+                  setHistoryFilters(
+                    EVENT_HISTORY_FILTERS.map((filter) => filter.value),
+                  )
+                }
+              >
+                Show all events
+              </MenuItem>
               {EVENT_HISTORY_FILTERS.map((filter) => (
                 <MenuItem
                   key={filter.value}
-                  role="menuitemradio"
-                  aria-checked={historyFilter === filter.value}
-                  selected={historyFilter === filter.value}
+                  role="menuitemcheckbox"
+                  aria-checked={historyFilters.includes(filter.value)}
+                  selected={historyFilters.includes(filter.value)}
                   onClick={() => {
-                    setHistoryFilter(filter.value);
-                    setFilterAnchor(null);
+                    setHistoryFilters((selected) =>
+                      selected.includes(filter.value)
+                        ? selected.filter((value) => value !== filter.value)
+                        : [...selected, filter.value],
+                    );
                   }}
                 >
                   <ListItemIcon className="eventHistoryFilterCheck">
-                    {historyFilter === filter.value && (
+                    {historyFilters.includes(filter.value) && (
                       <CheckIcon fontSize="small" />
                     )}
                   </ListItemIcon>
                   <ListItemText>{filter.label}</ListItemText>
                 </MenuItem>
               ))}
+              <MenuItem onClick={() => setFilterAnchor(null)}>Done</MenuItem>
             </Menu>
           </header>
           {events.length === 0 && (
@@ -360,7 +398,11 @@ export default function EventLog(props: Props): React.JSX.Element {
               variant="body2"
               color="textSecondary"
             >
-              {activeFilter.emptyMessage}
+              {activeFilters.length === 0
+                ? "Select an event type to show its history."
+                : activeFilters.length === 1
+                  ? activeFilters[0].emptyMessage
+                  : "No events match the selected types yet."}
             </Typography>
           )}
           <ul className="eventLogList">

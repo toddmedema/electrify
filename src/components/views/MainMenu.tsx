@@ -217,9 +217,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             <ShareIcon />
           </IconButton>
         )}
-        <Button color="primary" href="/privacy.html" size="small">
-          Privacy
-        </Button>
       </footer>
     </div>
   );

@@ -11,7 +11,8 @@ import {
   TICKS_PER_MONTH,
   TICKS_PER_YEAR,
 } from "../Constants";
-import { facilityLifetime } from "../helpers/Financials";
+import { facilityAgeYears, facilityLifetime } from "../helpers/Financials";
+import { SCENARIOS } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../Types";
@@ -43,6 +44,26 @@ function totals(f: FacilityOperatingType) {
 }
 
 describe("per-facility lifetime totals", () => {
+  it.each(SCENARIOS)(
+    "initializes inherited starts in scenario $id",
+    (scenario) => {
+      const state = createGame({ scenarioId: scenario.id });
+      const inherited = state.facilities.filter(
+        (facility) =>
+          facility.tracksStarts &&
+          facilityAgeYears(facility, state.date.minute) > 0,
+      );
+      for (const facility of inherited) {
+        expect(facility.lifetimeStarts).toBeGreaterThan(0);
+      }
+      for (const facility of state.facilities.filter(
+        (facility) => !inherited.includes(facility),
+      )) {
+        expect(facility.lifetimeStarts).toBe(0);
+      }
+    },
+  );
+
   it("starts a facility with nothing on its record", () => {
     const state = createGame({ scenarioId: 103 });
     state.facilities.forEach((f: FacilityOperatingType) => {

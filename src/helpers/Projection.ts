@@ -258,6 +258,18 @@ let cachedProjection:
   | { key: string; history: MonthlyHistoryType[]; projection: ProjectionView }
   | undefined;
 
+/** Adopt an isolated worker's result using the original main-thread history identity. */
+export function cacheProjection(
+  game: GameType,
+  projection: ProjectionView,
+): void {
+  cachedProjection = {
+    key: projectionSignature(game),
+    history: game.monthlyHistory,
+    projection,
+  };
+}
+
 /**
  * The game's long-range projection, memoized on the inputs that can change it.
  *

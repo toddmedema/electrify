@@ -33,6 +33,7 @@ import {
   validRetrofitFacility,
 } from "../helpers/BuildValidation";
 import { defaultDispatchIndex } from "../helpers/DispatchOrder";
+import { startingFacilityStarts } from "../helpers/StartingFacilityStarts";
 import {
   optionalScenarioChoice,
   pendingScenarioChoice,
@@ -5041,7 +5042,7 @@ function buildFacilityHelper(
       lifetimePotentialWh: 0,
       lifetimeRevenue: 0,
       lifetimeExpenses: 0,
-      lifetimeStarts: 0,
+      lifetimeStarts: newGame ? startingFacilityStarts(g, initialAgeYears) : 0,
       id:
         state.facilities.reduce(
           (max: number, f: FacilityOperatingType) => (max > f.id ? max : f.id),

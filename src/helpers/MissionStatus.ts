@@ -350,7 +350,6 @@ export function selectMissionRisk(
   const event = upcoming
     .filter(
       (event) =>
-        event.actionTarget &&
         event.startsMinute !== undefined &&
         event.startsMinute > game.date.minute,
     )
@@ -363,7 +362,7 @@ export function selectMissionRisk(
       id: `event:${event.key}`,
       label: `Announced event: ${event.title || event.label}`,
       shortLabel: `Upcoming: ${event.title || event.label}`,
-      target: event.actionTarget!,
+      target: { card: "INSIGHTS", eventKey: event.key },
     };
   return undefined;
 }

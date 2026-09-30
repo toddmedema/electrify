@@ -484,15 +484,6 @@ export default function Settings(props: Props): React.JSX.Element {
               GitHub
             </Button>
             <Button
-              component="a"
-              href="/privacy.html"
-              variant="text"
-              size="small"
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
-            >
-              Privacy
-            </Button>
-            <Button
               variant="text"
               size="small"
               onClick={() => void clearAppCache()}

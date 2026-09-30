@@ -880,6 +880,7 @@ $topbar_height: 56px;
 }
 
 .gridHealthSummary {
+  flex: 1;
   gap: 8px;
 }
 
@@ -894,8 +895,9 @@ $topbar_height: 56px;
 }
 
 .gridHealthMetric {
+  margin-left: auto;
   min-width: 8.5rem;
-  text-align: left;
+  text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -3828,6 +3830,8 @@ $pane_header_height: 48px;
   }
 
   .eventHistoryFilterButton {
+    min-height: var(--control-size);
+    padding-inline: 8px;
     margin: -5px -8px -5px 0;
     color: $font_color_faded;
 
@@ -6524,11 +6528,11 @@ $programs_column: 800px;
   }
 
   .gameStatusBar .gridHealth {
-    flex: 0 0 auto;
+    flex: 1 1 100%;
     flex-direction: row;
     min-height: 44px;
     padding-block: 0;
-    padding-right: $space-2;
+    padding-right: max(16px, env(safe-area-inset-right));
     border: 0;
 
     .gridHealthSummary {
@@ -6539,12 +6543,12 @@ $programs_column: 800px;
     }
 
     .gridHealthSeparator {
-      display: inline;
+      display: none;
       color: $font_color_faded;
     }
 
     .gridHealthMetric {
-      text-align: left;
+      text-align: right;
       white-space: nowrap;
     }
   }
@@ -6626,6 +6630,10 @@ $programs_column: 800px;
 // Both multi-pane layouts keep Programs beside the Insights title, like Build.
 .insightsTitle .customerProgramsControl {
   display: none;
+  .MuiButton-root {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
 }
 .insights.pane {
   .insightsTitle {

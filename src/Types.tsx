@@ -236,6 +236,7 @@ export type StoryActionTargetType =
     }
   | {
       card: "INSIGHTS";
+      eventKey?: string;
       layer?: "FINANCES" | "SUPPLY_DEMAND" | "FUEL_PRICES";
     }
   | { card: "EVENTS" };
@@ -617,6 +618,7 @@ export interface LifetimeTotals {
   lifetimeRevenue: number; // Its pro-rata share of what the company sold
   lifetimeExpenses: number; // Its own fuel, O&M, carbon fees and loan interest
   // Representative starts: one on/off edge in the sampled day stands for every day in its month.
+  // Inherited plants include estimated starts from their age and typical technology duty.
   // Present only for generators whose maintenance model tracks starts.
   lifetimeStarts?: number;
 }
