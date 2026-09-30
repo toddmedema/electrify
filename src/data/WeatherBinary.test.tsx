@@ -225,6 +225,7 @@ describe("the shipped weather files", () => {
     "Chittagong",
     "Colombo",
     "Guangzhou",
+    "HongKong",
     "Durban",
     "Fukuoka",
     "Seville",
@@ -244,8 +245,10 @@ describe("the shipped weather files", () => {
     "Seoul",
     "Shanghai",
     "Shenzhen",
+    "Taipei",
     "Busan",
     "Tokyo",
+    "Vladivostok",
   ];
   const ids = fs
     .readdirSync(DATA_DIR)
