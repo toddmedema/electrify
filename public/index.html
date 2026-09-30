@@ -97,7 +97,9 @@
       content="Build power plants, keep the lights on, and make your grid cleaner."
     />
 
-    <!-- Web Application Manifest -->
+    <!-- The installed Android shell can retain the manifest theme_color independently of
+         this page's meta tag. Keep its base colors dark too: color_scheme_dark alone
+         does not cover every WebAPK/browser. The page still follows the player's theme. -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <!-- App colors -->

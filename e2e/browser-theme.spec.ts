@@ -1,5 +1,25 @@
 import { expect, Page, test } from "@playwright/test";
 
+test("installed shell has a dark fallback without dark-scheme support", async ({
+  page,
+  request,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  const manifestUrl = await page
+    .locator('link[rel="manifest"]')
+    .evaluate((link) => (link as HTMLLinkElement).href);
+  const response = await request.get(manifestUrl);
+  expect(response.ok()).toBe(true);
+  const manifest = await response.json();
+  // Android may use only these base fields for its installed shell, even when the
+  // document is dark. A color_scheme_dark override cannot fix a white fallback.
+  expect(manifest.theme_color).toBe("#121212");
+  expect(manifest.background_color).toBe("#0b1016");
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.id).toBe("/");
+});
+
 async function expectTheme(page: Page, mode: "light" | "dark") {
   await expect(page.locator("html")).toHaveAttribute("data-theme", mode);
   await expect(page.locator("html")).toHaveCSS("color-scheme", mode);
