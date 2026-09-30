@@ -27,8 +27,8 @@
   "start_url": "/?utm_source=homescreen",
   "scope": "/",
   "lang": "en-US",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#0b1016",
+  "theme_color": "#121212",
   "color_scheme_dark": {
     "background_color": "#0b1016",
     "theme_color": "#121212"
