@@ -1,4 +1,5 @@
 import {
+  cacheProjection,
   ProjectionView,
   projectionSignature,
   selectProjection,
@@ -9,6 +10,7 @@ import {
   TickPresentFutureType,
 } from "../../Types";
 import { afterPaint } from "./AfterPaint";
+import { createProjectionWorker } from "./ProjectionWorkerClient";
 
 /**
  * Takes the game's long-range projection off the frame that invalidates it.
@@ -18,19 +20,93 @@ import { afterPaint } from "./AfterPaint";
  * twenty-year simulation in render, and at a rollover that is the same frame as the reducer's
  * own month-end work. Both on-screen readers, Insights and the top bar's runway warning, go
  * through this module instead. When the projection is stale they keep drawing the previous one
- * and ask for the new one here. It is computed once after paint for every reader, and they all
+ * and ask for the new one here. It is computed in a persistent worker for every reader, and they all
  * re-render in a single commit when it lands.
  *
- * The deferred call is selectProjection with the game and tick from the render that first saw
+ * The worker calls selectProjection with the game and tick from the render that first saw
  * the new signature, which is what the synchronous call would have used. Once it lands, every
  * reader's own selectProjection call is a cache hit with the same result as before.
  */
 
 let ready: { key: string; history: MonthlyHistoryType[] } | undefined;
 let pending:
-  | { key: string; history: MonthlyHistoryType[]; cancel: () => void }
+  | {
+      key: string;
+      history: MonthlyHistoryType[];
+      game: GameType;
+      now: TickPresentFutureType;
+      requestId: number;
+      cancel: () => void;
+    }
   | undefined;
 const listeners = new Set<() => void>();
+let worker: Worker | undefined;
+let workerUnavailable = false;
+let nextRequestId = 0;
+let inFlight: number | undefined;
+
+function publish(game: GameType, projection: ProjectionView): void {
+  cacheProjection(game, projection);
+  ready = { key: signature(game), history: game.monthlyHistory };
+  pending = undefined;
+  listeners.forEach((listener) => listener());
+}
+
+function fallback(): void {
+  worker?.terminate();
+  worker = undefined;
+  inFlight = undefined;
+  workerUnavailable = true;
+  if (!pending) return;
+  const request = pending;
+  request.cancel = afterPaint(() => {
+    if (pending === request) {
+      publish(request.game, selectProjection(request.game, request.now));
+    }
+  });
+}
+
+function dispatchPending(): void {
+  if (!pending || inFlight !== undefined) return;
+  if (workerUnavailable || typeof Worker === "undefined") {
+    fallback();
+    return;
+  }
+  try {
+    if (!worker) {
+      worker = createProjectionWorker();
+      worker.onmessage = (
+        event: MessageEvent<{
+          requestId: number;
+          projection?: ProjectionView;
+          error?: boolean;
+        }>,
+      ) => {
+        if (event.data.requestId !== inFlight) return;
+        inFlight = undefined;
+        if (pending?.requestId === event.data.requestId) {
+          if (event.data.error || !event.data.projection) {
+            fallback();
+            return;
+          }
+          publish(pending.game, event.data.projection);
+        }
+        // Only the newest edit is queued; old replies never replace current forecasts.
+        dispatchPending();
+      };
+      worker.onerror = fallback;
+      worker.onmessageerror = fallback;
+    }
+    inFlight = pending.requestId;
+    worker.postMessage({
+      requestId: pending.requestId,
+      game: pending.game,
+      now: pending.now,
+    });
+  } catch (_error) {
+    fallback();
+  }
+}
 
 // Every reader asks about the same game object in the same render pass, and the signature
 // stringifies the location, world events and policies, so it is worked out once per game
@@ -59,12 +135,15 @@ export function readProjection(
   now: TickPresentFutureType,
 ): ProjectionView {
   const projection = selectProjection(game, now);
+  // A synchronous initial/new-run render supersedes any older worker snapshot too.
+  pending?.cancel();
+  pending = undefined;
   ready = { key: signature(game), history: game.monthlyHistory };
   return projection;
 }
 
 /**
- * Asks for this game's projection after paint, then tells every subscriber. Asking again for the
+ * Asks for this game's projection in the worker, then tells every subscriber. Asking again for the
  * same inputs is free, and asking for different ones cancels the older request.
  */
 export function requestProjection(
@@ -79,12 +158,11 @@ export function requestProjection(
   pending = {
     key,
     history,
-    cancel: afterPaint(() => {
-      pending = undefined;
-      readProjection(game, now);
-      // One task, so React batches every reader's update into one commit
-      listeners.forEach((listener) => listener());
-    }),
+    game,
+    now,
+    requestId: ++nextRequestId,
+    // Even snapshot cloning and worker startup stay off the rollover's paint.
+    cancel: afterPaint(dispatchPending),
   };
 }
 
@@ -93,9 +171,13 @@ export function subscribeProjection(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
-    if (!listeners.size && pending) {
-      pending.cancel();
+    if (!listeners.size) {
+      pending?.cancel();
       pending = undefined;
+      worker?.terminate();
+      worker = undefined;
+      inFlight = undefined;
+      workerUnavailable = false;
     }
   };
 }

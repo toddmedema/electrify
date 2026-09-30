@@ -390,19 +390,23 @@ export function GeneratorBuildItem(
 
   const siteMaximum =
     props.hydroAvailability?.selected || props.hydroAvailability?.largest;
-  const useSiteMaximumAction = siteMaximum && props.onUseSiteMaximum && (
-    <Button
-      size="small"
-      onClick={() => props.onUseSiteMaximum?.(siteMaximum.maxPeakW)}
-    >
-      Use site maximum
-    </Button>
-  );
-  const useMaxSizeAction = offerMaxSize && props.onUseMaxSize && (
-    <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
-      Use max size
-    </Button>
-  );
+  const useSiteMaximumAction = siteMaximum &&
+    generator.peakW !== siteMaximum.maxPeakW &&
+    props.onUseSiteMaximum && (
+      <Button
+        size="small"
+        onClick={() => props.onUseSiteMaximum?.(siteMaximum.maxPeakW)}
+      >
+        Use site maximum
+      </Button>
+    );
+  const useMaxSizeAction = offerMaxSize &&
+    generator.peakW !== maxSizeW &&
+    props.onUseMaxSize && (
+      <Button size="small" onClick={() => props.onUseMaxSize?.(maxSizeW)}>
+        Use max size
+      </Button>
+    );
   // A resize shortcut sits under Review, so the context line moves up beside it
   const sizeAction = useSiteMaximumAction || useMaxSizeAction;
   const context = (

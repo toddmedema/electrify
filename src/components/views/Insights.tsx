@@ -844,10 +844,44 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  private selectedEventRequest?: import("../../Types").EvidenceRequestType;
+
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
     if (!request || this.props.facilityDragActive) return;
     const target = request.target;
+    if (
+      typeof target === "object" &&
+      target.card === "INSIGHTS" &&
+      target.eventKey
+    ) {
+      const event = this.props.upcomingEvents?.find(
+        (item) => item.key === target.eventKey,
+      );
+      if (!event) return;
+      if (this.selectedEventRequest !== request) {
+        const now = currentTick(this.props.game);
+        if (!now) return;
+        const bounds = this.getProjection(now).domain.x;
+        const minSpan = Math.min(bounds[1] - bounds[0], MINUTES_PER_MONTH);
+        this.selectedEventRequest = request;
+        this.setState({
+          activeEventKey: event.key,
+          viewport: eventChartViewport(
+            bounds,
+            event.startsMinute!,
+            event.endsMinute,
+            minSpan,
+          ),
+        });
+        return;
+      }
+      this.props.onEvidenceReady?.(
+        request,
+        document.querySelector<HTMLElement>(".insightEventChip.active"),
+      );
+      return;
+    }
     let layer: InsightLayerId | undefined;
     if (target === "finances") layer = "financeDetails";
     else if (typeof target === "object" && target.card === "INSIGHTS") {

@@ -270,6 +270,14 @@ test("risk precedence distinguishes actual shortage, cash, required failure, sam
   expect(
     selectMissionRisk(fixture(), [event, { ...event, key: "a" }])?.id,
   ).toBe("event:a");
+  expect(
+    selectMissionRisk(fixture(), [
+      {
+        ...event,
+        actionTarget: { card: "FACILITIES", view: "BUILD_GENERATORS" },
+      },
+    ])?.target,
+  ).toEqual({ card: "INSIGHTS", eventKey: "b" });
   expect(selectMissionRisk(fixture())).toBeUndefined(); // zero reserve is not shortage
 });
 

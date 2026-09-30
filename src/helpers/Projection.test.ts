@@ -12,8 +12,20 @@ import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DATA_CENTER_DECISION_KEY } from "../data/ScenarioChoices";
 import { WILDFIRE_DECISION_KEY } from "../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
-import { selectProjection } from "./Projection";
+import { cacheProjection, selectProjection } from "./Projection";
 import { cashRunwayMonths } from "./MissionStatus";
+
+it("adopts worker results with the original history identity without recalculating", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  const workerGame = cloneDeep(game);
+  const workerProjection = selectProjection(workerGame, workerGame.timeline[0]);
+  cacheProjection(game, workerProjection);
+  expect(selectProjection(game, game.timeline[0])).toBe(workerProjection);
+  const changed = { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 };
+  expect(selectProjection(changed, changed.timeline[0])).not.toBe(
+    workerProjection,
+  );
+});
 
 it("does not count ordinary within-month cash burn twice", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });

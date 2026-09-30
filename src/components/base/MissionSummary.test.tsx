@@ -11,6 +11,7 @@ const mockRequirements: { id: string; status: string }[] = [];
 jest.mock("../../helpers/Projection", () => ({
   projectionSignature: (game: GameType) => `month ${game.date.monthsElapsed}`,
   selectProjection: (...args: unknown[]) => mockSelectProjection(...args),
+  cacheProjection: () => undefined,
 }));
 jest.mock("../../helpers/MissionStatus", () => ({
   getMissionStatus: () => ({
@@ -93,7 +94,7 @@ it("keeps the runway warning off the frame that makes the projection stale", () 
   expect(screen.getByText("Cash out in ~5 mo")).toBeTruthy();
 });
 
-it("computes a risk that returns before the runway check as usual", () => {
+it("clears an expired early risk without synchronously rebuilding the runway forecast", () => {
   mockSelectMissionRisk.mockReturnValue({
     id: "reliability",
     label: "Required reliability window missed",
@@ -101,13 +102,17 @@ it("computes a risk that returns before the runway check as usual", () => {
     target: "mission-details",
   });
   const view = render(summary(makeGame(10)));
+  mockSelectMissionRisk.mockClear();
   mockSelectMissionRisk.mockReturnValue(runway(3));
   view.rerender(summary(makeGame(11)));
-  expect(screen.getByText("Cash out in ~3 mo")).toBeTruthy();
+  expect(screen.queryByText("Reliability missed")).not.toBeInTheDocument();
+  expect(mockSelectMissionRisk).not.toHaveBeenCalled();
+  expect(mockSelectProjection).not.toHaveBeenCalled();
   act(() => {
     jest.runAllTimers();
   });
-  expect(mockSelectProjection).not.toHaveBeenCalled();
+  expect(mockSelectProjection).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("Cash out in ~3 mo")).toBeTruthy();
 });
 
 /** Mounted mid-month with `risk` showing and the month's projection already current. */

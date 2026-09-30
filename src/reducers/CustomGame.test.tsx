@@ -147,6 +147,43 @@ describe("a custom game", () => {
     expect(solar.currentW).toBeLessThan(solar.peakW);
   });
 
+  it("gives inherited thermal plants deterministic starts for their age and duty", () => {
+    const scenario: ScenarioType = {
+      ...CUSTOM,
+      locationId: "SF",
+      startingYear: 2035,
+      facilities: [
+        { name: "Coal", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Natural Gas CC", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Natural Gas Peaker", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Nuclear", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Geothermal", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Biomass", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Coal", peakW: 10000000, initialAgeYears: 0 },
+        { name: "Solar", peakW: 10000000, initialAgeYears: 30 },
+        { name: "Battery", peakWh: 10000000, initialAgeYears: 10 },
+      ],
+    };
+    const initialize = () =>
+      createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
+    const state = initialize();
+    const starts = state.facilities
+      .slice()
+      .sort((a, b) => a.id - b.id)
+      .map((facility) => facility.lifetimeStarts);
+    expect(starts).toEqual([600, 3000, 10950, 30, 60, 600, 0, 0, 0]);
+    expect(
+      initialize()
+        .facilities.slice()
+        .sort((a, b) => a.id - b.id)
+        .map((facility) => facility.lifetimeStarts),
+    ).toEqual(starts);
+    // Prior owners' starts must not book a start charge against this company's accounts.
+    expect(
+      state.facilities.every((facility) => facility.lifetimeExpenses === 0),
+    ).toBe(true);
+  });
+
   it("dispatches an offshore wind starting facility from offshore weather", () => {
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,

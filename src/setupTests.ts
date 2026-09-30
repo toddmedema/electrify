@@ -63,3 +63,12 @@ jest.mock("./helpers/CustomGameForecastClient", () => ({
     terminate: () => undefined,
   }),
 }));
+
+jest.mock("./components/base/ProjectionWorkerClient", () => ({
+  createProjectionWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));

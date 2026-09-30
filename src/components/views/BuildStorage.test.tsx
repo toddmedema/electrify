@@ -119,4 +119,7 @@ it("offers an oversized storage project its max size", () => {
   const before = slider.getAttribute("aria-valuenow");
   fireEvent.click(useMaxSize);
   expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+  expect(
+    screen.queryByRole("button", { name: "Use max size" }),
+  ).not.toBeInTheDocument();
 });

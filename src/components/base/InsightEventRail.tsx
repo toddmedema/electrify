@@ -18,7 +18,12 @@ interface Props {
 export default function InsightEventRail(props: Props): React.JSX.Element {
   const { events, activeKey, onActiveChange, onZoom } = props;
   const selected = events.find((event) => event.key === activeKey);
+  const chips = React.useRef(new Map<string, HTMLButtonElement>());
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    setAnchor(activeKey ? chips.current.get(activeKey) || null : null);
+  }, [activeKey, events]);
 
   const focusDetails = React.useCallback((element: HTMLDivElement | null) => {
     element?.focus();
@@ -57,6 +62,10 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
           return (
             <li key={event.key}>
               <button
+                ref={(element) => {
+                  if (element) chips.current.set(event.key, element);
+                  else chips.current.delete(event.key);
+                }}
                 type="button"
                 className={`insightEventChip${open ? " active" : ""}`}
                 aria-label={`${event.label}: ${title}`}

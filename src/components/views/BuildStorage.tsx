@@ -96,7 +96,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         onClick: openReview,
       }}
       sizeAction={
-        offerMaxSize && (
+        offerMaxSize &&
+        storage.peakWh !== maxSizeWh && (
           <Button size="small" onClick={() => props.onUseMaxSize(maxSizeWh)}>
             Use max size
           </Button>

@@ -19,7 +19,6 @@ import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import { buildSpeedOptions } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
-import ActiveEventsChip from "./ActiveEventsChip";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
@@ -268,7 +267,6 @@ export function GameAppBar(props: Props) {
   // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
   // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
-  const hasActiveEvents = activeEvents.length > 0;
 
   return (
     <div id="appbar">
@@ -290,7 +288,7 @@ export function GameAppBar(props: Props) {
       </div>
       <div className="gameStatusBar">
         <div
-          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}${hasActiveEvents ? " hasActiveEvents" : ""}`}
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <div className="gridHealthSummary">
@@ -309,18 +307,16 @@ export function GameAppBar(props: Props) {
               </span>
               <strong className="statusLabel">{gridHealth.label}</strong>
             </span>
-            <span className="gridHealthSeparator" aria-hidden="true">
-              ·
-            </span>
             <strong className="gridHealthMetric">{gridHealth.metric}</strong>
           </div>
-          <ActiveEventsChip groups={activeEvents} onOpen={openEvents} />
         </div>
         {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
         {!isTutorial && (
           <MissionSummary
             game={game}
             upcoming={props.upcomingEvents}
+            activeEvents={activeEvents}
+            onActiveEvents={openEvents}
             onEvidence={props.onEvidence}
             onDetails={() => setScenarioDetailsOpen(true)}
           />
