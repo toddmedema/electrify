@@ -807,18 +807,11 @@ export default function TransmissionPanel({
                         <dt>Rated capacity</dt>
                         <dd>{formatWatts(line.capacityW, 3)}</dd>
                       </div>
-                      {market && (
+                      {outlook && (
                         <div>
-                          <dt>Purchased emissions</dt>
+                          <dt>At your peak</dt>
                           <dd>
-                            {formatMass(
-                              importEmissionsKgco2ePerMWh(
-                                market.id,
-                                game.date.year,
-                              ),
-                              units,
-                            )}
-                            /MWh CO2e
+                            ~{formatWatts(outlook.atPeak * line.capacityW)}
                           </dd>
                         </div>
                       )}
@@ -847,17 +840,22 @@ export default function TransmissionPanel({
                           </div>
                         </>
                       )}
-                      {outlook && (
-                        <>
-                          <div>
-                            <dt>At your peak</dt>
-                            <dd>
-                              ~{formatWatts(outlook.atPeak * line.capacityW)}
-                            </dd>
-                          </div>
-                          <PriceMetric outlook={outlook} />
-                        </>
+                      {market && (
+                        <div>
+                          <dt>Emissions</dt>
+                          <dd>
+                            {formatMass(
+                              importEmissionsKgco2ePerMWh(
+                                market.id,
+                                game.date.year,
+                              ),
+                              units,
+                            )}
+                            /MWh CO2e
+                          </dd>
+                        </div>
                       )}
+                      {outlook && <PriceMetric outlook={outlook} />}
                     </dl>
                     {!building && now && (
                       <Typography variant="body2" color="textSecondary">

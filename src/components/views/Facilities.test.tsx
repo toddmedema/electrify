@@ -797,7 +797,7 @@ describe("unified connections", () => {
     expect(connections[0]).toHaveTextContent(/Can import now.+ of /);
     expect(connections[0]).toHaveTextContent(/Typical price\$\d+–\d+\/MWh/);
     expect(connections[0]).toHaveTextContent("At your peak");
-    expect(connections[0]).toHaveTextContent("Purchased emissions");
+    expect(connections[0]).toHaveTextContent("Emissions");
     expect(
       within(connections[0] as HTMLElement).getByRole("img", {
         name: /^Typical year of import room/,
@@ -815,7 +815,7 @@ describe("unified connections", () => {
     expect(building).not.toHaveTextContent("Power can flow when construction");
     expect(building).toHaveTextContent("Building 50% · 12 months left");
     expect(building).toHaveTextContent("Rated capacity");
-    expect(building).toHaveTextContent("Purchased emissions");
+    expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Can import now");
     expect(building).toHaveTextContent("Typical price");
   });

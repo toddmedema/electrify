@@ -223,7 +223,7 @@ for (const theme of ["light", "dark"] as const) {
       "Rated capacity",
     );
     await expect(line.locator(".transmissionMetrics")).toContainText(
-      "Purchased emissions",
+      "Emissions",
     );
     await expect(line).not.toContainText(
       "Power can flow when construction finishes",
