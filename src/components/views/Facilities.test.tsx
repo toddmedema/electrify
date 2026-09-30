@@ -747,9 +747,9 @@ describe("unified connections", () => {
     expect(connections[0]).toHaveTextContent("Loan balance");
     // The connected line reports what it can do right now beside its typical year
     expect(connections[0]).toHaveTextContent(/Price now\$\d+/);
-    expect(connections[0]).toHaveTextContent(/Can import now.+ of /);
+    expect(connections[0]).toHaveTextContent(/Available for import.+ of /);
     expect(connections[0]).toHaveTextContent(/Typical price\$\d+–\d+\/MWh/);
-    expect(connections[0]).toHaveTextContent("At your peak");
+    expect(connections[0]).not.toHaveTextContent("At your peak");
     expect(connections[0]).toHaveTextContent("Emissions");
     expect(
       within(connections[0] as HTMLElement).getByRole("img", {
@@ -769,7 +769,7 @@ describe("unified connections", () => {
     expect(building).toHaveTextContent("Building 50% · 12 months left");
     expect(building).toHaveTextContent("Rated capacity");
     expect(building).toHaveTextContent("Emissions");
-    expect(building).not.toHaveTextContent("Can import now");
+    expect(building).not.toHaveTextContent("Available for import");
     expect(building).toHaveTextContent("Typical price");
   });
 

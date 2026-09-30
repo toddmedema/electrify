@@ -220,10 +220,12 @@ function IntertieYear({
 function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
   const periods = pricePeriodCaption(outlook);
   return (
-    <div>
+    <div className="facilityStat">
       <dt>Typical price</dt>
-      <dd>{priceRange(outlook)}</dd>
-      {periods && <dd className="transmissionMetricNote">{periods}</dd>}
+      <dd className="facilityStatValue">
+        {priceRange(outlook)}
+        {periods && <span className="facilityStatNote">{periods}</span>}
+      </dd>
     </div>
   );
 }
@@ -868,24 +870,18 @@ export default function TransmissionPanel({
                         </Typography>
                       </div>
                     )}
-                    <dl className="transmissionMetrics">
-                      <div>
+                    <dl className="transmissionMetrics facilityStats">
+                      <div className="facilityStat">
                         <dt>Rated capacity</dt>
-                        <dd>{formatWatts(line.capacityW, 3)}</dd>
+                        <dd className="facilityStatValue">
+                          {formatWatts(line.capacityW, 3)}
+                        </dd>
                       </div>
-                      {outlook && (
-                        <div>
-                          <dt>At your peak</dt>
-                          <dd>
-                            ~{formatWatts(outlook.atPeak * line.capacityW)}
-                          </dd>
-                        </div>
-                      )}
                       {!building && now && (
                         <>
-                          <div>
+                          <div className="facilityStat">
                             <dt>Price now</dt>
-                            <dd>
+                            <dd className="facilityStatValue">
                               {formatMoneyConcise(
                                 adjacentMarketPricePerMWh(
                                   line.corridorId,
@@ -897,9 +893,9 @@ export default function TransmissionPanel({
                               /MWh
                             </dd>
                           </div>
-                          <div>
-                            <dt>Can import now</dt>
-                            <dd>
+                          <div className="facilityStat">
+                            <dt>Available for import</dt>
+                            <dd className="facilityStatValue">
                               {formatWatts(importableW)} of{" "}
                               {formatWatts(rating)}
                             </dd>
@@ -907,9 +903,9 @@ export default function TransmissionPanel({
                         </>
                       )}
                       {market && (
-                        <div>
-                          <dt>Emissions</dt>
-                          <dd>
+                        <div className="facilityStat">
+                          <dt>Emissions (CO2e)</dt>
+                          <dd className="facilityStatValue">
                             {formatMass(
                               importEmissionsKgco2ePerMWh(
                                 market.id,
@@ -917,11 +913,19 @@ export default function TransmissionPanel({
                               ),
                               units,
                             )}
-                            /MWh CO2e
+                            /MWh
                           </dd>
                         </div>
                       )}
                       {outlook && <PriceMetric outlook={outlook} />}
+                      {line.loanAmountLeft > 0 && (
+                        <div className="facilityStat">
+                          <dt>Loan balance</dt>
+                          <dd className="facilityStatValue">
+                            {formatMoneyConcise(line.loanAmountLeft)}
+                          </dd>
+                        </div>
+                      )}
                     </dl>
                     {!building && now && (
                       <Typography variant="body2" color="textSecondary">
@@ -995,11 +999,6 @@ export default function TransmissionPanel({
                         readOnly={readOnly}
                         onUpgrade={onUpgrade}
                       />
-                    )}
-                    {line.loanAmountLeft > 0 && (
-                      <Typography variant="body2">
-                        Loan balance {formatMoneyConcise(line.loanAmountLeft)}
-                      </Typography>
                     )}
                   </div>
                 )}
