@@ -220,6 +220,7 @@ describe("the shipped weather files", () => {
     "Dublin",
     "Marseille",
     "Barcelona",
+    "Bangkok",
     "CapeTown",
     "Chennai",
     "Chittagong",

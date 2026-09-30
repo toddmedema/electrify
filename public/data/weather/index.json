@@ -3054,6 +3054,55 @@
       "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Novosibirsk": {
+      "id": "Novosibirsk",
+      "name": "Novosibirsk, Russia",
+      "region": "East Asia",
+      "country": "Russia",
+      "lat": 55.0084,
+      "long": 82.9357,
+      "timeZone": "Asia/Novosibirsk",
+      "elevation": 117,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Yakutsk": {
+      "id": "Yakutsk",
+      "name": "Yakutsk, Russia",
+      "region": "East Asia",
+      "country": "Russia",
+      "lat": 62.0355,
+      "long": 129.6755,
+      "timeZone": "Asia/Yakutsk",
+      "elevation": 102,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Bangkok": {
+      "id": "Bangkok",
+      "name": "Bangkok, Thailand",
+      "region": "Southeast Asia",
+      "country": "Thailand",
+      "lat": 13.7563,
+      "long": 100.5018,
+      "timeZone": "Asia/Bangkok",
+      "elevation": 4,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "ChiangMai": {
+      "id": "ChiangMai",
+      "name": "Chiang Mai, Thailand",
+      "region": "Southeast Asia",
+      "country": "Thailand",
+      "lat": 18.7883,
+      "long": 98.9853,
+      "timeZone": "Asia/Bangkok",
+      "elevation": 313,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }
