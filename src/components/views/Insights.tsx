@@ -2284,11 +2284,13 @@ export default class Insights extends React.Component<Props, State> {
         id="insightsPane"
       >
         <div className="scrollable" ref={this.paneRef}>
-          <Toolbar className="paneHeader insightsTitle">
-            <Typography variant="h6">Insights</Typography>
-            <CustomerPrograms game={game} />
-          </Toolbar>
-          {this.renderLevers(now)}
+          <div className="insightsStickyHeader">
+            <Toolbar className="paneHeader insightsTitle">
+              <Typography variant="h6">Insights</Typography>
+              <CustomerPrograms game={game} />
+            </Toolbar>
+            {this.renderLevers(now)}
+          </div>
           {/* The preset and layer controls sit directly above the charts they choose */}
           <Toolbar className="insightsHeader">
             <div className="insightsHeaderControls">
