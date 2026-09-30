@@ -26,14 +26,32 @@ for (const theme of ["light", "dark"]) {
     // The logo carries the one tagline; nothing repeats it above the actions
     await expect(page.locator(".gameSubtitle")).toHaveCount(0);
     await expectGap(primary, resources, 8);
-    await expectGap(resources, discovery, 0);
+    await expectGap(resources, discovery, 8);
+    const actions = page.locator("#centeredMenu button");
+    for (let index = 1; index < (await actions.count()); index += 1) {
+      await expectGap(actions.nth(index - 1), actions.nth(index), 8);
+    }
+
+    // Exercise the optional install action alongside the sound prompt.
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new Event("beforeinstallprompt", { cancelable: true }),
+      );
+    });
+    await expect(
+      page.getByRole("button", { name: "Install app" }),
+    ).toBeVisible();
+    for (let index = 1; index < (await actions.count()); index += 1) {
+      await expectGap(actions.nth(index - 1), actions.nth(index), 8);
+    }
     const button = await primary.getByRole("button").boundingBox();
     expect(button!.width).toBeLessThanOrEqual(260);
     expect(button!.x).toBeGreaterThanOrEqual(24);
 
-    // The sound prompt is the last thing in the discovery row here, so taking it removes the
-    // row, and with nothing else left in the utility block that block goes too.
+    // With sound enabled, the install action retains the same gap from Settings.
     await page.getByRole("button", { name: "Turn on sound" }).click();
+    await expectGap(resources, discovery, 8);
+    await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
     await expect(discovery).toBeHidden();
     await expect(page.locator(".utilityActions")).toBeHidden();
     const overflow = await page
@@ -61,13 +79,16 @@ test("a saved game remains separated from the logo and footer on short screens",
   await expectGap(
     primary.getByRole("button").nth(0),
     primary.getByRole("button").nth(1),
-    12,
+    8,
   );
   const logo = await page.locator("#logo").boundingBox();
   const menu = await page.locator("#centeredMenu").boundingBox();
   const footer = await page.locator(".mainMenuFooter").boundingBox();
   expect(menu!.y).toBeGreaterThanOrEqual(logo!.y + logo!.height);
   expect(footer!.y).toBeGreaterThanOrEqual(menu!.y + menu!.height);
-  await page.getByRole("link", { name: "Privacy" }).scrollIntoViewIfNeeded();
-  await expect(page.getByRole("link", { name: "Privacy" })).toBeInViewport();
+  const discord = page.getByRole("link", {
+    name: "Join the Electrify Discord",
+  });
+  await discord.scrollIntoViewIfNeeded();
+  await expect(discord).toBeInViewport();
 });
