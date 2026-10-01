@@ -3153,6 +3153,58 @@
       "elevation": 179,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Yangon": {
+      "id": "Yangon",
+      "name": "Yangon, Myanmar",
+      "region": "Southeast Asia",
+      "country": "Myanmar",
+      "lat": 16.8661,
+      "long": 96.1951,
+      "timeZone": "Asia/Yangon",
+      "elevation": 7,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "KualaLumpur": {
+      "id": "KualaLumpur",
+      "name": "Kuala Lumpur, Malaysia",
+      "region": "Southeast Asia",
+      "country": "Malaysia",
+      "lat": 3.139,
+      "long": 101.6869,
+      "timeZone": "Asia/Kuala_Lumpur",
+      "elevation": 55,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Singapore": {
+      "id": "Singapore",
+      "name": "Singapore, Singapore",
+      "region": "Southeast Asia",
+      "country": "Singapore",
+      "lat": 1.3521,
+      "long": 103.8198,
+      "timeZone": "Asia/Singapore",
+      "elevation": 46,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Jakarta": {
+      "id": "Jakarta",
+      "name": "Jakarta, Indonesia",
+      "region": "Southeast Asia",
+      "country": "Indonesia",
+      "lat": -6.2088,
+      "long": 106.8456,
+      "timeZone": "Asia/Jakarta",
+      "elevation": 12,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }
