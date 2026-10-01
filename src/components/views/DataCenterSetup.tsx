@@ -254,25 +254,6 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       {validAccounts ? formatCount(startingCustomers!) : "edit"}{" "}
                       accounts · edit
                     </summary>
-                    <Typography variant="body2">
-                      {accountsInput !== undefined
-                        ? `Your chosen size. Published reference: ${formatCount(customerProfile.customers)} accounts from `
-                        : customerProfile.basis === "reference-utility"
-                          ? "Example size based on "
-                          : "Based on "}
-                      <a
-                        href={customerProfile.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {customerProfile.serviceArea}
-                      </a>
-                      {customerProfile.sourceYear
-                        ? ` (${customerProfile.sourceYear})`
-                        : ""}
-                      . {customerProfile.note} This published count stays fixed
-                      when you change the starting year.
-                    </Typography>
                     <TextField
                       label="Homes and businesses served"
                       type="number"
@@ -288,6 +269,24 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       }
                       onChange={(event) => setAccountsInput(event.target.value)}
                     />
+                    <Typography variant="body2" color="textSecondary">
+                      {accountsInput !== undefined
+                        ? `Published reference: ${formatCount(customerProfile.customers)} accounts from `
+                        : customerProfile.basis === "reference-utility"
+                          ? "Example size based on "
+                          : "Based on "}
+                      <a
+                        href={customerProfile.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {customerProfile.serviceArea}
+                      </a>
+                      {customerProfile.sourceYear
+                        ? ` (${customerProfile.sourceYear})`
+                        : ""}
+                      .
+                    </Typography>
                   </details>
                 )}
 
@@ -430,20 +429,21 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
           )}
         </div>
       </div>
-      <footer className="dataCenterSetupFooter">
-        <div className="dataCenterSetupStart">
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            disabled={!scenario}
-            endIcon={<ArrowForwardIcon />}
-            onClick={() => scenario && onStart(scenario)}
-          >
-            Start exploring
-          </Button>
-        </div>
-      </footer>
+      {scenario && (
+        <footer className="dataCenterSetupFooter">
+          <div className="dataCenterSetupStart">
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => onStart(scenario)}
+            >
+              Start exploring
+            </Button>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

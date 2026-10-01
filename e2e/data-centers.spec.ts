@@ -46,6 +46,7 @@ test("the landing page opens a prepared current-year grid and supports browser h
     .click();
   await page.getByRole("link", { name: "Explore the impact" }).click();
   await expect(page).toHaveURL(/dataCenters=1/);
+  await expect(startButton(page)).toHaveCount(0);
   await ready(page);
   const search = await page
     .getByRole("combobox", { name: "Search cities", exact: true })
@@ -89,6 +90,26 @@ test("the landing page opens a prepared current-year grid and supports browser h
     await page.emulateMedia({ colorScheme: theme });
     await page.reload();
     await ready(page);
+    const start = (await startButton(page).boundingBox())!;
+    const content = (await page
+      .locator(".dataCenterSetupContent")
+      .boundingBox())!;
+    expect(
+      Math.abs(start.x + start.width - (content.x + content.width - 16)),
+    ).toBeLessThan(2);
+    const gridSize = page.locator(".dataCenterSetupGridSize");
+    await gridSize.locator("summary").click();
+    const accounts = (await page
+      .getByRole("spinbutton", { name: "Homes and businesses served" })
+      .boundingBox())!;
+    const source = (await gridSize.locator("p").last().boundingBox())!;
+    expect(source.y).toBeGreaterThan(accounts.y + accounts.height);
+    await expect(gridSize).not.toContainText("Your chosen size.");
+    await expect(gridSize).not.toContainText("More than 380,000");
+    await expect(gridSize).not.toContainText(
+      "This published count stays fixed",
+    );
+    await gridSize.locator("summary").click();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
@@ -131,9 +152,7 @@ test("nearest location uses browser permission and keeps manual selection availa
   await expect(
     page.getByRole("combobox", { name: "Search cities" }),
   ).toHaveValue(/Pittsburgh/);
-  await expect(
-    page.getByRole("status").filter({ hasText: "Closest available city:" }),
-  ).toContainText("Pittsburgh");
+  await expect(page.getByText(/Closest available city:/)).toHaveCount(0);
   await ready(page);
   await page.screenshot({
     path: testInfo.outputPath("nearest-location-success.png"),

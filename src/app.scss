@@ -6541,6 +6541,12 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
+  @media (min-width: 700px) {
+    .locationPicker {
+      grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    }
+  }
+
   .dataCenterSetupPower {
     display: flex;
     align-items: center;
@@ -6623,6 +6629,10 @@ $programs_column: 800px;
   .dataCenterSetupGridSize {
     margin-top: 0;
     border-top: 0;
+
+    > .MuiTypography-root {
+      margin-top: var(--space-2);
+    }
   }
 
   .dataCenterSetupStart {
@@ -6634,7 +6644,7 @@ $programs_column: 800px;
     gap: var(--space-2);
 
     button {
-      justify-self: start;
+      justify-self: end;
       min-height: 48px;
     }
   }
@@ -6642,10 +6652,6 @@ $programs_column: 800px;
   @media (max-width: 480px) {
     .dataCenterSetupContent {
       padding-top: var(--space-5);
-    }
-
-    .dataCenterSetupStart button {
-      width: 100%;
     }
   }
 }

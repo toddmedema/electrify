@@ -103,28 +103,34 @@ function reply(scenario: ScenarioType) {
   );
 }
 
+const startButton = () =>
+  screen.getByRole("button", { name: "Start exploring" });
+const expectStartHidden = () =>
+  expect(
+    screen.queryByRole("button", { name: "Start exploring" }),
+  ).not.toBeInTheDocument();
+
 it("waits for an explicit location and a prepared grid, then starts paired scenarios with the same seed", async () => {
   const onStart = jest.fn();
   render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
-  const start = screen.getByRole("button", { name: "Start exploring" });
-  expect(start).toBeDisabled();
+  expectStartHidden();
   await chooseCity("San Francisco");
-  expect(start).toBeDisabled();
+  expectStartHidden();
   expect(request.startingYear).toBe(new Date().getFullYear());
   const growth = preparedScenario();
   reply(growth);
-  expect(start).toBeEnabled();
+  expect(startButton()).toBeEnabled();
   expect(
     screen.getByRole("heading", { name: "How much extra power?" }),
   ).toBeVisible();
   expect(screen.getByText("Solar: 200MW")).toBeInTheDocument();
-  fireEvent.click(start);
+  fireEvent.click(startButton());
   const configured: ScenarioType = onStart.mock.calls[0][0];
   expect(configured.loadAdditions?.[0].peakW).toBe(100000000);
   fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
     target: { value: "8" },
   });
-  fireEvent.click(start);
+  fireEvent.click(startButton());
   const baseline: ScenarioType = onStart.mock.calls[1][0];
   expect(baseline.seed).toBe(growth.seed);
   expect(baseline.facilities).toEqual(growth.facilities);
@@ -141,7 +147,6 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   ).toBeVisible();
   await chooseCity("San Francisco");
   reply(preparedScenario());
-  const start = screen.getByRole("button", { name: "Start exploring" });
   const demand = screen.getByRole("slider", {
     name: "Power needed",
   });
@@ -158,8 +163,8 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
     [36, 10e9],
   ]) {
     fireEvent.change(demand, { target: { value: String(tick) } });
-    expect(start).toBeEnabled();
-    fireEvent.click(start);
+    expect(startButton()).toBeEnabled();
+    fireEvent.click(startButton());
     expect(
       onStart.mock.calls[onStart.mock.calls.length - 1][0].loadAdditions[0]
         .peakW,
@@ -169,7 +174,7 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   fireEvent.change(demand, { target: { value: "19" } });
   expect(within(arrival).queryByRole("option", { name: "2051" })).toBeNull();
   fireEvent.change(arrival, { target: { value: "2040" } });
-  fireEvent.click(start);
+  fireEvent.click(startButton());
   const scenario: ScenarioType = onStart.mock.calls[0][0];
   expect(scenario.loadAdditions?.[0]).toEqual(
     expect.objectContaining({ peakW: 200000000, startsYear: 2040 }),
@@ -179,7 +184,7 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   expect(within(year).queryByRole("option", { name: "2009" })).toBeNull();
   expect(within(year).queryByRole("option", { name: "2050" })).toBeNull();
   fireEvent.change(year, { target: { value: "2045" } });
-  expect(start).toBeDisabled();
+  expectStartHidden();
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
   expect(
@@ -188,7 +193,7 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
     "19",
   );
-  expect(start).toBeEnabled();
+  expect(startButton()).toBeEnabled();
   fireEvent.change(year, { target: { value: "2049" } });
   expect(arrival).toHaveValue("2050");
   expect(within(arrival).getAllByRole("option")).toHaveLength(1);
@@ -221,7 +226,6 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
   await chooseCity("San Francisco");
   reply(preparedScenario());
-  const start = screen.getByRole("button", { name: "Start exploring" });
   fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
     target: { value: "19" },
   });
@@ -230,9 +234,9 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
     name: "Homes and businesses served",
   });
   fireEvent.change(accounts, { target: { value: "0" } });
-  expect(start).toBeDisabled();
+  expectStartHidden();
   fireEvent.change(accounts, { target: { value: "123456" } });
-  expect(start).toBeDisabled();
+  expectStartHidden();
   expect(accounts).toHaveValue(123456);
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   expect(request.startingCustomers).toBe(123456);
@@ -240,10 +244,10 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
     "19",
   );
-  fireEvent.click(start);
+  fireEvent.click(startButton());
   expect(onStart.mock.calls[0][0].startingCustomers).toBe(123456);
   await chooseCity("Los Angeles");
-  expect(start).toBeDisabled();
+  expectStartHidden();
   expect(request.startingCustomers).toBe(
     getDataCenterCustomerProfile(request.location).customers,
   );
@@ -256,8 +260,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
 it("blocks starting and offers retry after a worker error", async () => {
   render(<DataCenterSetup onBack={jest.fn()} onStart={jest.fn()} />);
   await chooseCity("San Francisco");
-  const start = screen.getByRole("button", { name: "Start exploring" });
-  expect(start).toBeDisabled();
+  expectStartHidden();
   act(() =>
     worker.onmessage?.({
       data: { requestId: request.requestId, error: "Unavailable" },
@@ -266,8 +269,9 @@ it("blocks starting and offers retry after a worker error", async () => {
   expect(screen.getByRole("alert")).toHaveTextContent(
     "We couldn’t prepare this grid",
   );
+  expectStartHidden();
   fireEvent.click(screen.getByRole("button", { name: "Retry preparation" }));
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
-  expect(start).toBeEnabled();
+  expect(startButton()).toBeEnabled();
 });
