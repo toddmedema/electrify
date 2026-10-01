@@ -4,6 +4,36 @@ export interface MapLocation {
   long: number;
 }
 
+/** Great-circle proximity, including across the date line and near the poles. */
+export function nearestGeographicLocation<T extends MapLocation>(
+  locations: readonly T[],
+  latitude: number,
+  longitude: number,
+): T | undefined {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  )
+    return undefined;
+  const radians = Math.PI / 180;
+  let nearest: T | undefined;
+  let shortest = Infinity;
+  for (const location of locations) {
+    const distance =
+      Math.sin(((location.lat - latitude) * radians) / 2) ** 2 +
+      Math.cos(latitude * radians) *
+        Math.cos(location.lat * radians) *
+        Math.sin(((location.long - longitude) * radians) / 2) ** 2;
+    if (distance < shortest) {
+      shortest = distance;
+      nearest = location;
+    }
+  }
+  return nearest;
+}
+
 export interface MapPoint {
   x: number;
   y: number;

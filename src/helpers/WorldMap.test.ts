@@ -6,9 +6,22 @@ import {
   pointInViewport,
   projectLocation,
   zoomViewportAt,
+  nearestGeographicLocation,
 } from "./WorldMap";
 
 const world = { center: { x: 0.5, y: 0.5 }, zoom: 0 };
+
+it("finds geographical neighbors across the date line and near the poles", () => {
+  const across = { id: "across", lat: 0, long: -179 };
+  const sameSide = { id: "same", lat: 0, long: 170 };
+  expect(nearestGeographicLocation([sameSide, across], 0, 179)).toBe(across);
+  const polar = { id: "polar", lat: 89, long: 90 };
+  const south = { id: "south", lat: 85, long: 0 };
+  expect(nearestGeographicLocation([south, polar], 89, 0)).toBe(polar);
+  expect(nearestGeographicLocation([], 0, 0)).toBeUndefined();
+  expect(nearestGeographicLocation([polar], NaN, 0)).toBeUndefined();
+  expect(nearestGeographicLocation([polar], 91, 0)).toBeUndefined();
+});
 
 it("projects geographic extremes onto the map", () => {
   expect(projectLocation({ lat: 90, long: -180 })).toEqual({ x: 0, y: 0 });

@@ -202,6 +202,7 @@ export type CardNameType =
   | "MANUAL"
   | "SETTINGS"
   | "CUSTOM_GAME"
+  | "DATA_CENTER_SETUP"
   | "CHALLENGE";
 
 export type ConceptNameType =

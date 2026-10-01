@@ -246,3 +246,112 @@ it("drills into a cluster and lists unresolved cities at maximum zoom", async ()
     expect.objectContaining({ id: "two", name: "Close two" }),
   );
 });
+
+describe("finding the nearest city", () => {
+  const original = Object.getOwnPropertyDescriptor(navigator, "geolocation");
+  let success: PositionCallback;
+  let failure: PositionErrorCallback;
+  let locate: jest.Mock;
+  beforeEach(() => {
+    locate = jest.fn((yes: PositionCallback, no: PositionErrorCallback) => {
+      success = yes;
+      failure = no;
+    });
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: { getCurrentPosition: locate },
+    });
+  });
+  afterEach(() => {
+    if (original) Object.defineProperty(navigator, "geolocation", original);
+    else Reflect.deleteProperty(navigator, "geolocation");
+  });
+  const result = {
+    coords: { latitude: 36, longitude: -121 },
+  } as GeolocationPosition;
+  it("requests permission only on click and selects the closest existing city", () => {
+    const onChange = jest.fn();
+    render(
+      <LocationPicker locations={cities} allowNearest onChange={onChange} />,
+    );
+    expect(locate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Find nearest city" }));
+    expect(locate).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: "Finding your location…" }),
+    ).toBeDisabled();
+    act(() => success(result));
+    expect(onChange).toHaveBeenCalledWith(cities[0]);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Closest available city: West City",
+    );
+  });
+  it.each([1, 2, 3])(
+    "keeps manual selection usable after geolocation error %s",
+    (code) => {
+      const onChange = jest.fn();
+      render(
+        <LocationPicker
+          locations={cities}
+          value={cities[1]}
+          allowNearest
+          onChange={onChange}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Find nearest city" }),
+      );
+      act(() => failure({ code } as GeolocationPositionError));
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /Search for a city|search for a city/,
+      );
+      expect(
+        screen.getByRole("button", { name: "Find nearest city" }),
+      ).toBeEnabled();
+      expect(screen.getByRole("combobox")).toHaveValue("East City");
+    },
+  );
+  it("ignores a pending response after a manual choice or leaving the page", () => {
+    const onChange = jest.fn();
+    const view = render(
+      <LocationPicker locations={cities} allowNearest onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Find nearest city" }));
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "East City" },
+    });
+    fireEvent.click(screen.getByRole("option", { name: /East City/ }));
+    act(() => success(result));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(cities[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Find nearest city" }));
+    view.unmount();
+    act(() => success(result));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+  it("handles browsers without location services and waits for the city catalog", () => {
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: undefined,
+    });
+    const view = render(
+      <LocationPicker
+        locations={cities}
+        allowNearest
+        loading
+        onChange={jest.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Find nearest city" }),
+    ).toBeDisabled();
+    view.rerender(
+      <LocationPicker locations={cities} allowNearest onChange={jest.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Find nearest city" }));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Location isn’t available",
+    );
+  });
+});

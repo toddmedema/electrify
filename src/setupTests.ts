@@ -64,6 +64,15 @@ jest.mock("./helpers/CustomGameForecastClient", () => ({
   }),
 }));
 
+jest.mock("./helpers/DataCenterSetupClient", () => ({
+  createDataCenterSetupWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));
+
 jest.mock("./components/base/ProjectionWorkerClient", () => ({
   createProjectionWorker: () => ({
     onmessage: null,

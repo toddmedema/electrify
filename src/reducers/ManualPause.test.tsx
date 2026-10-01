@@ -219,3 +219,11 @@ it("keeps Back paused in mission previews until returning to play", () => {
   expect(state.speed).toBe("PAUSED");
   expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("FAST");
 });
+
+it("pauses an existing run while preparing a data-center example", () => {
+  gameReducer(undefined, quit());
+  const setup = gameReducer(running("FAST"), navigate("DATA_CENTER_SETUP"));
+  expect(setup.speed).toBe("PAUSED");
+  expect(gameReducer(setup, setSpeed("FAST")).speed).toBe("PAUSED");
+  expect(gameReducer(setup, navigate("FACILITIES")).speed).toBe("FAST");
+});

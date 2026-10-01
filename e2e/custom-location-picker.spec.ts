@@ -147,7 +147,7 @@ test("world map location picker works with pointer, touch, search, and keyboard"
     "Enter",
   );
   await expect(page.locator(".locationPickerCount")).toHaveText(
-    /\d+ playable locations/,
+    /\d+ available cities/,
   );
   await search.fill("Paris");
   await page.getByRole("option", { name: "Paris, France" }).click();
@@ -193,7 +193,7 @@ test("a city marker still selects after the map has zoomed", async ({
 
   const search = page.getByRole("combobox", { name: "Search playable cities" });
   await expect(page.locator(".locationPickerCount")).toHaveText(
-    /\d{3} playable locations/,
+    /\d{3} available cities/,
   );
   const map = page.getByRole("group", { name: "Playable locations map" });
   const startingSelection = await search.inputValue();
@@ -339,7 +339,7 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
     name: "Select San Francisco, CA, United States",
   });
   await expect(page.locator(".locationPickerCount")).toHaveText(
-    /\d{3} playable locations/,
+    /\d{3} available cities/,
   );
   await sanFrancisco.focus();
   await sanFrancisco.press("ArrowLeft");

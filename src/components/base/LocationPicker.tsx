@@ -2,8 +2,10 @@ import * as React from "react";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import PublicIcon from "@mui/icons-material/Public";
+import MyLocationIcon from "@mui/icons-material/MyLocation";
 import {
   Autocomplete,
+  CircularProgress,
   IconButton,
   Menu,
   MenuItem,
@@ -26,12 +28,16 @@ import {
   panViewport,
   projectLocation,
   zoomViewportAt,
+  nearestGeographicLocation,
 } from "../../helpers/WorldMap";
 
 interface Props {
   locations: CityType[];
   value?: CityType;
   loading?: boolean;
+  allowNearest?: boolean;
+  searchLabel?: string;
+  showHeading?: boolean;
   onChange: (location: CityType) => void;
 }
 
@@ -89,6 +95,9 @@ export default function LocationPicker({
   locations,
   value,
   loading = false,
+  allowNearest = false,
+  searchLabel = "Search playable cities",
+  showHeading = true,
   onChange,
 }: Props): React.JSX.Element {
   const coarsePointer = useMediaQuery("(pointer: coarse)");
@@ -99,6 +108,15 @@ export default function LocationPicker({
     value ? `location-${value.id}` : "",
   );
   const [announcement, setAnnouncement] = React.useState("");
+  const [findingNearest, setFindingNearest] = React.useState(false);
+  const [nearestMessage, setNearestMessage] = React.useState("");
+  const nearestRequest = React.useRef(0);
+  React.useEffect(
+    () => () => {
+      nearestRequest.current++;
+    },
+    [],
+  );
   const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [menuLocations, setMenuLocations] = React.useState<CityType[]>([]);
   const [focusAfterZoom, setFocusAfterZoom] = React.useState<MapPoint>();
@@ -216,6 +234,9 @@ export default function LocationPicker({
   };
 
   const select = (location: CityType, centerSearch = false) => {
+    nearestRequest.current++;
+    setFindingNearest(false);
+    setNearestMessage("");
     onChange(location);
     setAnnouncement(`${location.name} selected`);
     setRovingId(`location-${location.id}`);
@@ -426,36 +447,118 @@ export default function LocationPicker({
     wheelDeltaRef.current = 0;
   };
 
+  const findNearest = () => {
+    if (!navigator.geolocation) {
+      setNearestMessage(
+        "Location isn’t available in this browser. Search for a city or use the map.",
+      );
+      return;
+    }
+    const request = ++nearestRequest.current;
+    setFindingNearest(true);
+    setNearestMessage("");
+    const fail = (message: string) => {
+      if (request !== nearestRequest.current) return;
+      setFindingNearest(false);
+      setNearestMessage(message);
+    };
+    try {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          if (request !== nearestRequest.current) return;
+          const nearest = nearestGeographicLocation(
+            locations,
+            coords.latitude,
+            coords.longitude,
+          );
+          if (!nearest) {
+            fail(
+              "No nearby location could be found. Search for a city or use the map.",
+            );
+            return;
+          }
+          select(nearest, true);
+          setNearestMessage(`Closest available city: ${nearest.name}.`);
+        },
+        (error) =>
+          fail(
+            error.code === 1
+              ? "Location permission wasn’t granted. Search for a city or use the map."
+              : "We couldn’t find your location. Try again, search for a city or use the map.",
+          ),
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      );
+    } catch {
+      fail("We couldn’t find your location. Search for a city or use the map.");
+    }
+  };
+
   return (
-    <section className="locationPicker" aria-labelledby="location-picker-title">
-      <div className="locationPickerHeading">
-        <Typography id="location-picker-title" variant="h6" component="h2">
-          Location
-        </Typography>
-      </div>
+    <section
+      className={`locationPicker${showHeading ? "" : " locationPickerWithoutHeading"}`}
+      aria-labelledby={showHeading ? "location-picker-title" : undefined}
+      aria-label={showHeading ? undefined : "Location"}
+    >
+      {showHeading && (
+        <div className="locationPickerHeading">
+          <Typography id="location-picker-title" variant="h6" component="h2">
+            Location
+          </Typography>
+        </div>
+      )}
 
       <div className="locationPickerDetails">
-        <Autocomplete
-          id="location"
-          options={locations}
-          groupBy={(location: CityType) => location.region}
-          getOptionLabel={(location: CityType) => location.name}
-          isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
-          value={value}
-          onChange={(_event, picked: CityType | null) => {
-            if (picked) select(picked, true);
-          }}
-          disableClearable
-          autoHighlight
-          openOnFocus
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Search playable cities"
-              size="small"
-            />
+        <div className="locationPickerSearchRow">
+          <Autocomplete
+            id="location"
+            options={locations}
+            groupBy={(location: CityType) => location.region}
+            getOptionLabel={(location: CityType) => location.name}
+            isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
+            value={value ?? null}
+            onChange={(_event, picked: CityType | null) => {
+              if (picked) select(picked, true);
+            }}
+            disableClearable={!!value}
+            autoHighlight
+            openOnFocus
+            renderInput={(params) => (
+              <TextField {...params} label={searchLabel} size="small" />
+            )}
+          />
+          {allowNearest && (
+            <Tooltip title="Find nearest city">
+              <span>
+                <IconButton
+                  className="locationPickerNearest"
+                  color="primary"
+                  aria-label={
+                    findingNearest
+                      ? "Finding your location…"
+                      : "Find nearest city"
+                  }
+                  disabled={loading || findingNearest || locations.length === 0}
+                  onClick={findNearest}
+                >
+                  {findingNearest ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <MyLocationIcon />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
           )}
-        />
+        </div>
+        {allowNearest && (
+          <Typography
+            variant="body2"
+            className="locationPickerGeolocationStatus"
+            role="status"
+          >
+            {nearestMessage}
+          </Typography>
+        )}
         <Typography
           className="locationPickerCount"
           variant="caption"
@@ -463,7 +566,7 @@ export default function LocationPicker({
         >
           {loading
             ? "Loading playable locations"
-            : `${locations.length} playable locations`}
+            : `${locations.length} available cities`}
         </Typography>
       </div>
 
