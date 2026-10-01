@@ -45,6 +45,7 @@
     "test": "react-scripts test",
     "test:once": "react-scripts test --watchAll=false",
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\"",
+    "test:deploy": "node --test scripts/verify-deployment.test.js",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "sim": "node scripts/sim.js",
     "perf:bench": "node scripts/perf/bench.js",

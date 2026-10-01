@@ -1,7 +1,6 @@
 #!/bin/bash
 # Builds the web app and deploys to electrifygame.com, including invalidating the files on cloudfront (CDN)
 # Requires the aws cli for s3 deploys (make sure to set your bucket region!)
-# Requires that you run `aws configure set preview.cloudfront true` to enable cloudfront invalidation
 
 set -e
 
@@ -91,16 +90,22 @@ prod() {
   assertNoLfsPointers
   # Deploy web app to prod with 1 day cache for most files, 6 month cache for art assets
   export AWS_DEFAULT_REGION='us-east-2'
-  aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --exclude '*.webp' --cache-control 'public, max-age=86400'
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --exclude '*.webp' --exclude '*.html' --cache-control 'public, max-age=86400'
   aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control 'public, max-age=15552000'
   # Set WebP's type explicitly: older mimetypes tables used by the aws cli don't know it.
   aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.webp' --content-type image/webp --cache-control 'public, max-age=15552000'
 
+  # Publish HTML after its assets. CDN invalidation cannot evict browser caches,
+  # so every HTML entry point must revalidate instead of staying fresh for a day.
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.html' --content-type 'text/html; charset=utf-8' --cache-control 'public, max-age=0, must-revalidate'
+
   # Upload package.json for API's version check
   aws s3 cp package.json s3://electrifygame.com/package.json
 
-  # Invalidate files on cloudfront
-  aws cloudfront create-invalidation --distribution-id E38D57AILAHD00 --paths /\*
+  # Success means the CDN has finished invalidating and serves this build's HTML.
+  invalidation_id=$(aws cloudfront create-invalidation --distribution-id E38D57AILAHD00 --paths '/*' --query 'Invalidation.Id' --output text)
+  aws cloudfront wait invalidation-completed --distribution-id E38D57AILAHD00 --id "$invalidation_id"
+  node scripts/verify-deployment.js
 }
 
 getTarget

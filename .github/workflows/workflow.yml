@@ -52,6 +52,10 @@ jobs:
         if: '!cancelled()'
         run: npm run test:ci
 
+      - name: Deployment verification tests
+        if: '!cancelled()'
+        run: npm run test:deploy
+
       # The headless simulation asserts the economy's invariants across every
       # scenario. Simulation.test.tsx covers this too, but running the CLI keeps
       # the entry point itself honest.

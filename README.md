@@ -147,6 +147,18 @@ so losses never compound. `src/ManualFigures.test.ts` checks the two stay in ste
 To release, install and authenticate the AWS CLI.
 
 Merging to `master` deploys prod through GitHub Actions (`.github/workflows/deploy-prod.yml`).
+Production uploads HTML after its assets with `Cache-Control: public, max-age=0,
+must-revalidate` so browsers check for updates on each visit. The deploy waits for
+CloudFront invalidation, then verifies every built HTML page (and `/`) against the
+public site, including its content type and cache policy. A missing page, stale
+response, or game fallback fails the deployment. Run `npm run test:deploy` to test
+this verification locally without AWS credentials. The deploy IAM principal needs
+`cloudfront:GetInvalidation` as well as `cloudfront:CreateInvalidation` to wait for
+completion.
+
+Previously cached HTML can retain its old one-day lifetime after this change;
+a hard refresh retrieves the updated page and cache policy.
+
 To preview a change first, run `npm run deploy beta` and check that:
 
 - basic functionality works (app loads, game starts, music plays)

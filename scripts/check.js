@@ -11,6 +11,7 @@ const steps = [
   { name: "Lint", script: "lint", fix: "npm run lint:fix" },
   { name: "Formatting", script: "format:check", fix: "npm run format" },
   { name: "Tests", script: "test:ci" },
+  { name: "Deployment", script: "test:deploy" },
   { name: "Simulation", script: "sim", args: ["--", "--all"] },
 ];
 
@@ -47,6 +48,7 @@ async function main() {
     ...(await Promise.all(steps.slice(0, 3).map(run))),
     await run(steps[3]),
     await run(steps[4]),
+    await run(steps[5]),
   ];
   for (const result of results.filter((r) => !r.ok)) {
     console.error(
