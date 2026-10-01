@@ -20,7 +20,7 @@ async function savedGame(page: Page): Promise<GameType | undefined> {
 async function ready(page: Page) {
   await expect(setupHeading(page)).toBeVisible();
   const location = page.getByRole("combobox", {
-    name: "Search playable cities",
+    name: "Search cities",
     exact: true,
   });
   if (!(await location.inputValue())) {
@@ -88,7 +88,7 @@ test("the landing page opens a prepared current-year grid and supports browser h
       fullPage: true,
     });
     await page
-      .getByRole("heading", { name: "How much new demand?", exact: true })
+      .getByRole("heading", { name: "How much extra power?", exact: true })
       .evaluate((element) => element.scrollIntoView({ block: "start" }));
     await expect(startButton(page)).toBeInViewport({ ratio: 1 });
     await page.screenshot({
@@ -100,6 +100,69 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await expect(page).toHaveURL(/\/data-centers\.html$/);
 });
 
+test("nearest location uses browser permission and keeps manual selection available when denied", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await context.setGeolocation({ latitude: 40.44, longitude: -79.99 });
+  await context.grantPermissions(["geolocation"]);
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  await page.getByRole("button", { name: "Find nearest city" }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Search cities" }),
+  ).toHaveValue(/Pittsburgh/);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Closest available city:" }),
+  ).toContainText("Pittsburgh");
+  await ready(page);
+  await page.screenshot({
+    path: testInfo.outputPath("nearest-location-success.png"),
+    fullPage: true,
+  });
+  await page
+    .locator(".dataCenterSetupSummary .dataCenterSetupAssumptions summary")
+    .click();
+  await page
+    .locator(".dataCenterSetupSummary .dataCenterSetupAssumptions")
+    .evaluate((element) => element.scrollIntoView({ block: "start" }));
+  await page.screenshot({
+    path: testInfo.outputPath("data-center-assumptions.png"),
+    fullPage: true,
+  });
+
+  await context.clearPermissions();
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", {
+      configurable: true,
+      value: (_success: PositionCallback, failure: PositionErrorCallback) =>
+        failure({
+          code: 1,
+          message: "Permission denied",
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        }),
+    });
+  });
+  await page.reload();
+  await ready(page);
+  await page.getByRole("button", { name: "Find nearest city" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Location permission" }),
+  ).toContainText("Search for a city or use the map.");
+  await page.screenshot({
+    path: testInfo.outputPath("nearest-location-denied.png"),
+    fullPage: true,
+  });
+  const city = page.getByRole("combobox", { name: "Search cities" });
+  await city.fill("Pittsburgh");
+  await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await ready(page);
+  await expect(city).toHaveValue(/Pittsburgh/);
+});
+
 test("location changes prepare a populated grid and launching keeps its data-center load", async ({
   page,
 }) => {
@@ -107,7 +170,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   await page.goto("/?dataCenters=1");
   await ready(page);
   const location = page.getByRole("combobox", {
-    name: "Search playable cities",
+    name: "Search cities",
     exact: true,
   });
   await location.fill("Pittsburgh");
@@ -118,10 +181,10 @@ test("location changes prepare a populated grid and launching keeps its data-cen
     .fill("2030");
   await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
   await page
-    .getByRole("spinbutton", { name: "Data centers arrive", exact: true })
+    .getByRole("spinbutton", { name: "Year data centers open", exact: true })
     .fill("2035");
   await page
-    .getByRole("spinbutton", { name: "Data-center demand (MW)", exact: true })
+    .getByRole("spinbutton", { name: "Power needed (MW)", exact: true })
     .fill("250");
   await startButton(page).click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
@@ -167,7 +230,7 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     localStorage.getItem("savedGame"),
   );
   await page
-    .getByRole("spinbutton", { name: "Data-center demand (MW)", exact: true })
+    .getByRole("spinbutton", { name: "Power needed (MW)", exact: true })
     .fill("0");
   await startButton(page).click();
   const guard = page.getByRole("dialog", { name: "Start a new game?" });

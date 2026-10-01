@@ -3218,6 +3218,16 @@ $pane_header_height: 48px;
     color: $font_color_faded;
   }
 
+  .locationPickerNearest {
+    min-height: 44px;
+    margin-bottom: 12px;
+    width: 100%;
+  }
+
+  .locationPickerGeolocationStatus:not(:empty) {
+    margin-bottom: 12px;
+  }
+
   .worldMap {
     position: relative;
     grid-area: map;
@@ -6750,22 +6760,6 @@ $programs_column: 800px;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     background: var(--bg-raised);
-  }
-
-  .dataCenterSetupFacts {
-    display: grid;
-    gap: var(--space-4);
-    margin: var(--space-5) 0;
-
-    dt {
-      color: var(--font-color-faded);
-      font-size: var(--font-size-body2);
-    }
-
-    dd {
-      margin: var(--space-1) 0 0;
-      font-weight: var(--font-weight-emphasis);
-    }
   }
 
   .dataCenterSetupAssumptions {

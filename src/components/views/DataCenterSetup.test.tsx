@@ -78,7 +78,7 @@ async function chooseCity(name: string) {
   const clear = screen.queryByRole("button", { name: "Clear" });
   if (clear) fireEvent.click(clear);
   const input = screen.getByRole("combobox", {
-    name: "Search playable cities",
+    name: "Search cities",
   });
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: name } });
@@ -111,14 +111,14 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   reply(growth);
   expect(start).toBeEnabled();
   expect(
-    screen.getByRole("heading", { name: "Your starting grid is ready" }),
+    screen.getByRole("heading", { name: "How much extra power?" }),
   ).toBeVisible();
   expect(screen.getByText("Solar: 200MW")).toBeInTheDocument();
   fireEvent.click(start);
   const configured: ScenarioType = onStart.mock.calls[0][0];
   expect(configured.loadAdditions?.[0].peakW).toBe(787000000);
   fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Data-center demand (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
     { target: { value: "0" } },
   );
   fireEvent.click(start);
@@ -140,10 +140,10 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
   const demand = screen.getByRole("spinbutton", {
-    name: "Data-center demand (MW)",
+    name: "Power needed (MW)",
   });
   const arrival = screen.getByRole("spinbutton", {
-    name: "Data centers arrive",
+    name: "Year data centers open",
   });
   fireEvent.change(demand, { target: { value: "" } });
   expect(start).toBeDisabled();
@@ -165,10 +165,10 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
   expect(
-    screen.getByRole("spinbutton", { name: "Data centers arrive" }),
+    screen.getByRole("spinbutton", { name: "Year data centers open" }),
   ).toHaveValue(2045);
   expect(
-    screen.getByRole("spinbutton", { name: "Data-center demand (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
   ).toHaveValue(125);
   expect(start).toBeEnabled();
 });
@@ -197,7 +197,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
   fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Data-center demand (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
     { target: { value: "125" } },
   );
   fireEvent.click(screen.getByText(/accounts · edit/));
@@ -213,7 +213,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   expect(request.startingCustomers).toBe(123456);
   reply(preparedScenario());
   expect(
-    screen.getByRole("spinbutton", { name: "Data-center demand (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
   ).toHaveValue(125);
   fireEvent.click(start);
   expect(onStart.mock.calls[0][0].startingCustomers).toBe(123456);

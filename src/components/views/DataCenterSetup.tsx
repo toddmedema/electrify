@@ -157,11 +157,13 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               Start with your community
             </Typography>
             <Typography color="textSecondary">
-              Choose a nearby city. We’ll prepare an example grid so you can
-              explore what happens when data centers need more power.
+              Choose a nearby city. Explore what new data centers could mean for
+              its power supply using an example grid.
             </Typography>
           </div>
           <LocationPicker
+            allowNearest
+            searchLabel="Search cities"
             locations={cities}
             value={location || undefined}
             loading={loading}
@@ -267,50 +269,16 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
           {growthScenario && location && (
             <section
               className="dataCenterSetupSummary"
-              aria-labelledby="data-center-grid-heading"
+              aria-labelledby="data-center-demand-label"
               aria-live="polite"
             >
-              <Typography
-                component="h2"
-                variant="h6"
-                id="data-center-grid-heading"
-              >
-                Your starting grid is ready
-              </Typography>
-              <Typography color="textSecondary">
-                Starts in {growthScenario.startingYear} ·{" "}
-                {(scenario || growthScenario).durationMonths / 12}
-                -year simulation
-              </Typography>
-              <dl className="dataCenterSetupFacts">
-                <div>
-                  <dt>Modeled power sources</dt>
-                  <dd>
-                    {Array.from(
-                      new Set(
-                        growthScenario.facilities.map((facility) =>
-                          facility.fuel === "Sun"
-                            ? "Solar"
-                            : facility.fuel === "Uranium"
-                              ? "Nuclear"
-                              : facility.fuel || facility.name,
-                        ),
-                      ),
-                    ).join(", ")}
-                  </dd>
-                </div>
-              </dl>
               <div className="dataCenterSetupControls">
                 <Typography
-                  component="h3"
+                  component="h2"
                   variant="h6"
                   id="data-center-demand-label"
                 >
-                  How much new demand?
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Adjust the power your community’s new data centers would need.
-                  Set it to 0 to explore a future without them.
+                  How much extra power?
                 </Typography>
                 <Slider
                   aria-labelledby="data-center-demand-label"
@@ -323,7 +291,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   onChange={(_event, value) => setDemandInput(String(value))}
                 />
                 <TextField
-                  label="Data-center demand (MW)"
+                  label="Power needed (MW)"
                   type="number"
                   value={demandInput ?? defaultDemandW / 1e6}
                   slotProps={{
@@ -338,7 +306,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   onChange={(event) => setDemandInput(event.target.value)}
                 />
                 <TextField
-                  label="Data centers arrive"
+                  label="Year data centers open"
                   type="number"
                   value={arrivalInput ?? arrivalYear}
                   slotProps={{
@@ -362,9 +330,8 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                 color="textSecondary"
                 className="dataCenterSetupComparison"
               >
-                To compare, keep the same city, years and account count, with
-                demand set to 0. The starting grid, weather, and fuel prices
-                stay the same.
+                Run again with demand set to 0. Keep the same city, years and
+                grid size to compare the difference.
               </Typography>
               <Typography variant="body2" color="textSecondary">
                 Uses local weather and a regional power mix. This is an example
@@ -381,6 +348,12 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               <details className="dataCenterSetupAssumptions">
                 <summary>Power sources and assumptions</summary>
                 <Typography variant="body2">
+                  Explore {growthScenario.startingYear}–
+                  {growthScenario.startingYear +
+                    (scenario || growthScenario).durationMonths / 12}
+                  .
+                </Typography>
+                <Typography variant="body2">
                   Power mix based on{" "}
                   {powerMix && (
                     <a
@@ -391,8 +364,8 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       {powerMix.geography} capacity data ({powerMix.year})
                     </a>
                   )}
-                  . These are regional shares of installed equipment, not a
-                  local plant inventory.
+                  . Uses the region’s mix of power-generating equipment, not its
+                  electricity output or your city’s actual power plants.
                   {powerMix && startingYear > powerMix.year
                     ? " Later starts use the latest available mix, not a prediction."
                     : ""}
@@ -410,12 +383,12 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       supplements the regional source.{" "}
                     </>
                   )}
-                  The model sizes the starting fleet to serve ordinary demand,
-                  before your new data centers arrive. Hydro is limited to known
-                  sites, and geothermal to suitable locations; those limits can
-                  change the regional mix. Gas is split between steady and
-                  fast-response plants. Storage and unclassified sources are
-                  excluded.
+                  The model sizes the starting power plants to serve existing
+                  demand, before your new data centers arrive. Hydro is limited
+                  to known sites, and geothermal to suitable locations; those
+                  limits can change the regional mix. Gas is split between
+                  steady and quick-start plants. Storage and unclassified
+                  sources are excluded.
                 </Typography>
                 <ul>
                   {growthScenario.facilities.map((facility, index) => (
@@ -454,10 +427,6 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
           >
             Start exploring
           </Button>
-          <Typography variant="body2" color="textSecondary">
-            Try clean energy choices. See costs, reliability, and emissions
-            change.
-          </Typography>
         </div>
       </footer>
     </div>
