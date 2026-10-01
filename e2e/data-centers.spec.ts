@@ -20,7 +20,7 @@ async function savedGame(page: Page): Promise<GameType | undefined> {
 async function ready(page: Page) {
   await expect(setupHeading(page)).toBeVisible();
   const location = page.getByRole("combobox", {
-    name: "Choose a nearby city",
+    name: "Search playable cities",
     exact: true,
   });
   if (!(await location.inputValue())) {
@@ -47,6 +47,9 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await page.getByRole("link", { name: "Explore the impact" }).click();
   await expect(page).toHaveURL(/dataCenters=1/);
   await ready(page);
+  await expect(
+    page.getByRole("group", { name: "Playable locations map", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".dataCenterSetupContent")).toContainText(
     String(new Date().getFullYear()),
   );
@@ -84,6 +87,14 @@ test("the landing page opens a prepared current-year grid and supports browser h
       path: testInfo.outputPath(`data-center-setup-${theme}.png`),
       fullPage: true,
     });
+    await page
+      .getByRole("heading", { name: "How much new demand?", exact: true })
+      .evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await expect(startButton(page)).toBeInViewport({ ratio: 1 });
+    await page.screenshot({
+      path: testInfo.outputPath(`data-center-controls-${theme}.png`),
+      fullPage: true,
+    });
   }
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page).toHaveURL(/\/data-centers\.html$/);
@@ -96,12 +107,22 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   await page.goto("/?dataCenters=1");
   await ready(page);
   const location = page.getByRole("combobox", {
-    name: "Choose a nearby city",
+    name: "Search playable cities",
     exact: true,
   });
   await location.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
   await ready(page);
+  await page
+    .getByRole("spinbutton", { name: "Starting year", exact: true })
+    .fill("2030");
+  await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
+  await page
+    .getByRole("spinbutton", { name: "Data centers arrive", exact: true })
+    .fill("2035");
+  await page
+    .getByRole("spinbutton", { name: "Data-center demand (MW)", exact: true })
+    .fill("250");
   await startButton(page).click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
@@ -110,13 +131,17 @@ test("location changes prepare a populated grid and launching keeps its data-cen
     .poll(async () => (await savedGame(page))?.customScenario?.locationId)
     .toBe("PIT");
   const game = (await savedGame(page))!;
-  expect(game.startingYear).toBe(new Date().getFullYear());
+  expect(game.startingYear).toBe(2030);
   expect(game.customScenario?.startingCustomers).toBeGreaterThan(0);
   expect(game.customScenario?.facilities.length).toBeGreaterThan(1);
-  expect(game.customScenario?.eventScenarioIds).toEqual([106]);
+  expect(game.customScenario?.eventScenarioIds).toEqual([]);
   expect(game.customScenario?.loadAdditions).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ demandType: "Data Centers" }),
+      expect.objectContaining({
+        demandType: "Data Centers",
+        startsYear: 2035,
+        peakW: 250000000,
+      }),
     ]),
   );
   await expect(page).not.toHaveURL(/dataCenters/);
@@ -134,7 +159,7 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
   });
   await expect
     .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
-    .toEqual([106]);
+    .toEqual([]);
   const growth = (await savedGame(page))!;
   await page.goto("/?dataCenters=1");
   await ready(page);
@@ -142,8 +167,8 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     localStorage.getItem("savedGame"),
   );
   await page
-    .getByRole("checkbox", { name: "Add data-center growth", exact: true })
-    .uncheck();
+    .getByRole("spinbutton", { name: "Data-center demand (MW)", exact: true })
+    .fill("0");
   await startButton(page).click();
   const guard = page.getByRole("dialog", { name: "Start a new game?" });
   await expect(guard).toBeVisible();

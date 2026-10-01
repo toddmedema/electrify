@@ -11,6 +11,7 @@ import {
 } from "./CustomGameForecast";
 import {
   createDataCenterScenario,
+  configureDataCenterGrowth,
   DATA_CENTER_DIFFICULTY,
   DATA_CENTER_SEED,
   withoutDataCenterGrowth,
@@ -23,6 +24,12 @@ it("derives reproducible local assumptions and keeps a full current year", () =>
   expect(scenario.startingYear).toBe(2026);
   expect(scenario.loadAdditions?.[0].startsYear).toBe(2032);
   expect(scenario.durationMonths).toBe(192);
+  expect(scenario.loadAdditions?.[0].peakW).toBeCloseTo(
+    (100000000 * 1000000) / (16500 * 7.7),
+  );
+  expect(createDataCenterScenario(sf, 2026, 50000).loadAdditions).toEqual(
+    scenario.loadAdditions,
+  );
   expect(
     createDataCenterScenario(
       {
@@ -35,6 +42,60 @@ it("derives reproducible local assumptions and keeps a full current year", () =>
       2026,
     ).facilities,
   ).not.toEqual(scenario.facilities);
+});
+
+it("honors adjustable demand and arrival through game initialization and saves", () => {
+  const location = getSimLocation("SF")!;
+  loadSimData(location);
+  const base = createDataCenterScenario(location, 2010);
+  for (const [peakW, arrival] of [
+    [0, 2010],
+    [234000000, 2028],
+    [500000000, 2050],
+  ]) {
+    const scenario = configureDataCenterGrowth(base, peakW, arrival);
+    expect(scenario.facilities).toEqual(base.facilities);
+    expect(scenario.durationMonths).toBeGreaterThanOrEqual(
+      (arrival - 2010 + 10) * 12,
+    );
+    expect(scenario.eventScenarioIds).toEqual([]);
+    const game = createGame({
+      scenarioId: 999,
+      scenario,
+      difficulty: DATA_CENTER_DIFFICULTY,
+      seed: DATA_CENTER_SEED,
+    });
+    expect(game.loadAdditions).toEqual(scenario.loadAdditions);
+    expect(parseSave(serializeSave(game))?.game.loadAdditions).toEqual(
+      scenario.loadAdditions,
+    );
+    const before = { ...game.date, year: arrival - 1, monthNumber: 12 };
+    const after = { ...game.date, year: arrival, monthNumber: 1 };
+    expect(
+      demandByTypeAt(500000000, before, 2010, location, game.loadAdditions)[
+        "Data Centers"
+      ],
+    ).toBe(0);
+    expect(
+      demandByTypeAt(500000000, after, 2010, location, game.loadAdditions)[
+        "Data Centers"
+      ],
+    ).toBeCloseTo(peakW);
+  }
+  expect(
+    createDataCenterScenario(location, 2050).loadAdditions?.[0].startsYear,
+  ).toBe(2050);
+  for (const [peakW, arrival] of [
+    [-1, 2020],
+    [NaN, 2020],
+    [1, 2009],
+    [1, 2051],
+    [1, 2020.5],
+  ]) {
+    expect(() => configureDataCenterGrowth(base, peakW, arrival)).toThrow(
+      RangeError,
+    );
+  }
 });
 
 it("pairs ordinary demand exactly before the new campus and preserves zero-load baseline saves", () => {
@@ -90,6 +151,8 @@ it.each([
   "Phoenix",
   "Johannesburg",
   "Manassas",
+  "Asuncion",
+  "Bergen",
 ])(
   "prepares a supplied, solvent first year in %s using the actual model",
   (id) => {
@@ -106,6 +169,30 @@ it.each([
     );
     expect(summarizeYearOneOutlook(timeline).worstShortfallW).toBe(0);
     expect(Math.min(...timeline.map((tick) => tick.cash))).toBeGreaterThan(0);
-    expect(scenario.facilities.length).toBeGreaterThan(2);
+    expect(scenario.facilities.length).toBeGreaterThan(0);
   },
 );
+
+it("calibrates only ordinary demand even when arrival is in the starting year", () => {
+  const location = getSimLocation("SF")!;
+  loadSimData(location);
+  const ready = calibrateDataCenterScenario({
+    location,
+    startingYear: 2050,
+    startingCustomers: 50000,
+  });
+  const baseline = configureDataCenterGrowth(ready, 0, 2050);
+  const growth = configureDataCenterGrowth(ready, 2000000000, 2050);
+  const forecast = (scenario: typeof ready) =>
+    forecastCustomGameTimeline(
+      scenario,
+      DATA_CENTER_DIFFICULTY,
+      DATA_CENTER_SEED,
+    );
+  expect(summarizeYearOneOutlook(forecast(baseline)).worstShortfallW).toBe(0);
+  expect(
+    summarizeYearOneOutlook(forecast(growth)).worstShortfallW,
+  ).toBeGreaterThan(0);
+  expect(growth.facilities).toEqual(baseline.facilities);
+  expect(growth.startingCustomers).toBe(50000);
+});

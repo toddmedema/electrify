@@ -441,11 +441,11 @@ export default function LocationPicker({
           groupBy={(location: CityType) => location.region}
           getOptionLabel={(location: CityType) => location.name}
           isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
-          value={value}
+          value={value ?? null}
           onChange={(_event, picked: CityType | null) => {
             if (picked) select(picked, true);
           }}
-          disableClearable
+          disableClearable={!!value}
           autoHighlight
           openOnFocus
           renderInput={(params) => (

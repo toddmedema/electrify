@@ -6711,6 +6711,16 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
+  .dataCenterSetupControls {
+    display: grid;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+    .MuiSlider-root {
+      width: calc(100% - 24px);
+      margin: 0 12px;
+    }
+  }
+
   .dataCenterSetupProgress {
     display: flex;
     align-items: center;

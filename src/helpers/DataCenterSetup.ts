@@ -4,6 +4,7 @@ export interface DataCenterSetupRequest {
   requestId: number;
   location: LocationType;
   startingYear: number;
+  startingCustomers?: number;
 }
 
 export type DataCenterSetupResponse =
