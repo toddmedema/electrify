@@ -120,11 +120,10 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   expect(screen.getByText("Solar: 200MW")).toBeInTheDocument();
   fireEvent.click(start);
   const configured: ScenarioType = onStart.mock.calls[0][0];
-  expect(configured.loadAdditions?.[0].peakW).toBe(787000000);
-  fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
-    { target: { value: "0" } },
-  );
+  expect(configured.loadAdditions?.[0].peakW).toBe(100000000);
+  fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
+    target: { value: "8" },
+  });
   fireEvent.click(start);
   const baseline: ScenarioType = onStart.mock.calls[1][0];
   expect(baseline.seed).toBe(growth.seed);
@@ -143,21 +142,37 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   await chooseCity("San Francisco");
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
-  const demand = screen.getByRole("spinbutton", {
-    name: "Power needed (megawatts)",
+  const demand = screen.getByRole("slider", {
+    name: "Power needed",
   });
   const arrival = screen.getByRole("combobox", {
     name: "Data centers open",
   });
-  fireEvent.change(demand, { target: { value: "" } });
-  expect(start).toBeDisabled();
-  fireEvent.change(demand, { target: { value: "125" } });
+  expect(demand).toHaveAttribute("aria-valuetext", "100MW");
+  expect(screen.queryByRole("spinbutton", { name: /Power needed/ })).toBeNull();
+  for (const [tick, watts] of [
+    [8, 0],
+    [9, 10e6],
+    [18, 100e6],
+    [27, 1e9],
+    [36, 10e9],
+  ]) {
+    fireEvent.change(demand, { target: { value: String(tick) } });
+    expect(start).toBeEnabled();
+    fireEvent.click(start);
+    expect(
+      onStart.mock.calls[onStart.mock.calls.length - 1][0].loadAdditions[0]
+        .peakW,
+    ).toBe(watts);
+  }
+  onStart.mockClear();
+  fireEvent.change(demand, { target: { value: "19" } });
   expect(within(arrival).queryByRole("option", { name: "2051" })).toBeNull();
   fireEvent.change(arrival, { target: { value: "2040" } });
   fireEvent.click(start);
   const scenario: ScenarioType = onStart.mock.calls[0][0];
   expect(scenario.loadAdditions?.[0]).toEqual(
-    expect.objectContaining({ peakW: 125000000, startsYear: 2040 }),
+    expect.objectContaining({ peakW: 200000000, startsYear: 2040 }),
   );
   expect(worker.postMessage).toHaveBeenCalledTimes(1);
   const year = screen.getByRole("combobox", { name: "Start year" });
@@ -170,9 +185,9 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   expect(
     screen.getByRole("combobox", { name: "Data centers open" }),
   ).toHaveValue("2046");
-  expect(
-    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
-  ).toHaveValue(125);
+  expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
+    "19",
+  );
   expect(start).toBeEnabled();
   fireEvent.change(year, { target: { value: "2049" } });
   expect(arrival).toHaveValue("2050");
@@ -207,10 +222,9 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   await chooseCity("San Francisco");
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
-  fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
-    { target: { value: "125" } },
-  );
+  fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
+    target: { value: "19" },
+  });
   fireEvent.click(screen.getByText(/accounts · edit/));
   const accounts = screen.getByRole("spinbutton", {
     name: "Homes and businesses served",
@@ -223,9 +237,9 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   expect(request.startingCustomers).toBe(123456);
   reply(preparedScenario());
-  expect(
-    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
-  ).toHaveValue(125);
+  expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
+    "19",
+  );
   fireEvent.click(start);
   expect(onStart.mock.calls[0][0].startingCustomers).toBe(123456);
   await chooseCity("Los Angeles");

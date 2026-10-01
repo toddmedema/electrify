@@ -7,6 +7,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { sliderTickToW, wToSliderTick } from "../../helpers/BuildSizing";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { getDataCenterCustomerProfile } from "../../data/DataCenterCustomers";
@@ -47,6 +48,12 @@ export interface Props {
   onStart: (scenario: ScenarioType) => void;
 }
 
+const ZERO_DEMAND_TICK = wToSliderTick(10e6) - 1;
+const MAX_DEMAND_TICK = wToSliderTick(10e9);
+const demandAtTick = (tick: number) =>
+  tick === ZERO_DEMAND_TICK ? 0 : sliderTickToW(tick);
+const formatDemandPower = (watts: number) =>
+  watts === 0 ? "0MW" : formatWatts(watts);
 const validYear = (year: number) =>
   Number.isInteger(year) && year >= MIN_YEAR && year <= MAX_YEAR;
 const validStartingYear = (year: number) => validYear(year) && year < MAX_YEAR;
@@ -71,7 +78,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
   const [loading, setLoading] = React.useState(true);
   const [cityError, setCityError] = React.useState(false);
   const [location, setLocation] = React.useState<CityType | null>(null);
-  const [demandInput, setDemandInput] = React.useState<string>();
+  const [demandTick, setDemandTick] = React.useState(wToSliderTick(100e6));
   const [accountsInput, setAccountsInput] = React.useState<string>();
   const [attempt, setAttempt] = React.useState(0);
   const customerProfile = location
@@ -129,29 +136,14 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
   );
   const growthScenario =
     preparation.status === "ready" ? preparation.result : undefined;
-  const defaultDemandW =
-    Math.round(
-      (growthScenario?.loadAdditions?.reduce(
-        (total, load) =>
-          total + (load.demandType === "Data Centers" ? load.peakW : 0),
-        0,
-      ) || 0) / 1e6,
-    ) * 1e6;
-  const demandMW =
-    demandInput === undefined ? defaultDemandW / 1e6 : Number(demandInput);
-  const maxDemandMW = Math.max(2000, Math.ceil(defaultDemandW / 1e6) * 2);
-  const validDemand =
-    demandInput !== "" &&
-    Number.isFinite(demandMW) &&
-    demandMW >= 0 &&
-    demandMW <= maxDemandMW;
+  const demandW = demandAtTick(demandTick);
   const validArrival = validYear(arrivalYear) && arrivalYear > startingYear;
   const scenario = React.useMemo(
     () =>
-      growthScenario && validDemand && validArrival
-        ? configureDataCenterGrowth(growthScenario, demandMW * 1e6, arrivalYear)
+      growthScenario && validArrival
+        ? configureDataCenterGrowth(growthScenario, demandW, arrivalYear)
         : undefined,
-    [growthScenario, validDemand, validArrival, demandMW, arrivalYear],
+    [growthScenario, validArrival, demandW, arrivalYear],
   );
 
   return (
@@ -170,7 +162,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
             loading={loading}
             onChange={(selected) => {
               setLocation(selected);
-              setDemandInput(undefined);
+              setDemandTick(wToSliderTick(100e6));
               setAccountsInput(undefined);
             }}
           />
@@ -306,35 +298,33 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   How much extra power?
                 </Typography>
                 {growthScenario && (
-                  <>
+                  <div className="dataCenterSetupPower">
+                    <Typography
+                      component="strong"
+                      color="primary"
+                      className="dataCenterSetupPowerValue"
+                    >
+                      {formatDemandPower(demandW)}
+                    </Typography>
                     <Slider
-                      aria-labelledby="data-center-demand-label"
-                      getAriaValueText={(value) => `${value} megawatts`}
-                      value={validDemand ? demandMW : 0}
-                      min={0}
-                      max={maxDemandMW}
+                      aria-label="Power needed"
+                      value={demandTick}
+                      min={ZERO_DEMAND_TICK}
+                      max={MAX_DEMAND_TICK}
                       step={1}
+                      marks={[{ value: ZERO_DEMAND_TICK, label: "0" }]}
+                      getAriaValueText={(tick) =>
+                        formatDemandPower(demandAtTick(tick))
+                      }
+                      valueLabelFormat={(tick) =>
+                        formatDemandPower(demandAtTick(tick))
+                      }
                       valueLabelDisplay="auto"
                       onChange={(_event, value) =>
-                        setDemandInput(String(value))
+                        setDemandTick(Array.isArray(value) ? value[0] : value)
                       }
                     />
-                    <TextField
-                      label="Power needed (megawatts)"
-                      type="number"
-                      value={demandInput ?? defaultDemandW / 1e6}
-                      slotProps={{
-                        htmlInput: { min: 0, max: maxDemandMW, step: "any" },
-                      }}
-                      error={!validDemand}
-                      helperText={
-                        validDemand
-                          ? undefined
-                          : `Enter a value from 0 to ${maxDemandMW} MW.`
-                      }
-                      onChange={(event) => setDemandInput(event.target.value)}
-                    />
-                  </>
+                  </div>
                 )}
               </div>
               {growthScenario && (

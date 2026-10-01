@@ -205,9 +205,16 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   await page
     .getByRole("combobox", { name: "Data centers open", exact: true })
     .selectOption("2035");
-  await page
-    .getByRole("spinbutton", { name: "Power needed (megawatts)", exact: true })
-    .fill("250");
+  const power = page.getByRole("slider", { name: "Power needed", exact: true });
+  await expect(power).toHaveAttribute("aria-valuetext", "100MW");
+  await power.press("End");
+  await expect(power).toHaveAttribute("aria-valuetext", "10GW");
+  await power.press("Home");
+  await expect(power).toHaveAttribute("aria-valuetext", "0MW");
+  await power.press("ArrowRight");
+  await expect(power).toHaveAttribute("aria-valuetext", "10MW");
+  for (let tick = 9; tick < 20; tick += 1) await power.press("ArrowRight");
+  await expect(power).toHaveAttribute("aria-valuetext", "300MW");
   await startButton(page).click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
@@ -225,7 +232,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
       expect.objectContaining({
         demandType: "Data Centers",
         startsYear: 2035,
-        peakW: 250000000,
+        peakW: 300000000,
       }),
     ]),
   );
@@ -252,8 +259,8 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     localStorage.getItem("savedGame"),
   );
   await page
-    .getByRole("spinbutton", { name: "Power needed (megawatts)", exact: true })
-    .fill("0");
+    .getByRole("slider", { name: "Power needed", exact: true })
+    .press("Home");
   await startButton(page).click();
   const guard = page.getByRole("dialog", { name: "Start a new game?" });
   await expect(guard).toBeVisible();

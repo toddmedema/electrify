@@ -6731,6 +6731,18 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
+  .dataCenterSetupPower {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-right: 12px;
+
+    .dataCenterSetupPowerValue {
+      flex: 0 0 80px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+  }
   .dataCenterSetupYears {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
