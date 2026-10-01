@@ -155,6 +155,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
             Explore what new data centers could mean for your local grid.
           </Typography>
           <LocationPicker
+            showHeading={false}
             allowNearest
             searchLabel="Search cities"
             locations={cities}
@@ -312,7 +313,15 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       min={ZERO_DEMAND_TICK}
                       max={MAX_DEMAND_TICK}
                       step={1}
-                      marks={[{ value: ZERO_DEMAND_TICK, label: "0" }]}
+                      marks={[
+                        { value: ZERO_DEMAND_TICK, label: "0" },
+                        {
+                          value: MAX_DEMAND_TICK,
+                          label: formatDemandPower(
+                            demandAtTick(MAX_DEMAND_TICK),
+                          ),
+                        },
+                      ]}
                       getAriaValueText={(tick) =>
                         formatDemandPower(demandAtTick(tick))
                       }

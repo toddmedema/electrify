@@ -37,6 +37,7 @@ interface Props {
   loading?: boolean;
   allowNearest?: boolean;
   searchLabel?: string;
+  showHeading?: boolean;
   onChange: (location: CityType) => void;
 }
 
@@ -96,6 +97,7 @@ export default function LocationPicker({
   loading = false,
   allowNearest = false,
   searchLabel = "Search playable cities",
+  showHeading = true,
   onChange,
 }: Props): React.JSX.Element {
   const coarsePointer = useMediaQuery("(pointer: coarse)");
@@ -492,12 +494,18 @@ export default function LocationPicker({
   };
 
   return (
-    <section className="locationPicker" aria-labelledby="location-picker-title">
-      <div className="locationPickerHeading">
-        <Typography id="location-picker-title" variant="h6" component="h2">
-          Location
-        </Typography>
-      </div>
+    <section
+      className={`locationPicker${showHeading ? "" : " locationPickerWithoutHeading"}`}
+      aria-labelledby={showHeading ? "location-picker-title" : undefined}
+      aria-label={showHeading ? undefined : "Location"}
+    >
+      {showHeading && (
+        <div className="locationPickerHeading">
+          <Typography id="location-picker-title" variant="h6" component="h2">
+            Location
+          </Typography>
+        </div>
+      )}
 
       <div className="locationPickerDetails">
         <div className="locationPickerSearchRow">

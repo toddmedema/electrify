@@ -6661,6 +6661,10 @@ $programs_column: 800px;
   width: calc(100% - 32px);
   max-width: 960px;
   margin: 16px auto 8px;
+
+  &.locationPickerWithoutHeading {
+    grid-template-areas: "map details";
+  }
 }
 
 .locationPickerHeading {
@@ -6831,6 +6835,11 @@ $programs_column: 800px;
       "map";
     width: calc(100% - 24px);
     margin-top: 12px;
+    &.locationPickerWithoutHeading {
+      grid-template-areas:
+        "details"
+        "map";
+    }
   }
 }
 
