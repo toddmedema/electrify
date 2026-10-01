@@ -3218,14 +3218,24 @@ $pane_header_height: 48px;
     color: $font_color_faded;
   }
 
+  .locationPickerSearchRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .MuiAutocomplete-root {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
   .locationPickerNearest {
-    min-height: 44px;
-    margin-bottom: 12px;
-    width: 100%;
+    width: 44px;
+    height: 44px;
   }
 
   .locationPickerGeolocationStatus:not(:empty) {
-    margin-bottom: 12px;
+    margin-top: 12px;
   }
 
   .worldMap {
@@ -6721,6 +6731,15 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
+  .dataCenterSetupYears {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    .MuiFormControl-root {
+      min-width: 0;
+    }
+  }
   .dataCenterSetupControls {
     display: grid;
     gap: var(--space-4);
@@ -6748,13 +6767,6 @@ $programs_column: 800px;
     padding: var(--space-6) var(--space-4);
     display: grid;
     gap: var(--space-5);
-  }
-
-  .dataCenterSetupSummary {
-    padding: var(--space-5);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    background: var(--bg-raised);
   }
 
   .dataCenterSetupAssumptions {
@@ -6808,10 +6820,6 @@ $programs_column: 800px;
   @media (max-width: 480px) {
     .dataCenterSetupContent {
       padding-top: var(--space-5);
-    }
-
-    .dataCenterSetupSummary {
-      padding: var(--space-4);
     }
 
     .dataCenterSetupStart button {

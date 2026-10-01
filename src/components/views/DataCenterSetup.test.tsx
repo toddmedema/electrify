@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getDataCenterCustomerProfile } from "../../data/DataCenterCustomers";
@@ -12,6 +13,9 @@ import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient
 import { DataCenterSetupRequest } from "../../helpers/DataCenterSetup";
 import { ScenarioType } from "../../Types";
 import DataCenterSetup from "./DataCenterSetup";
+
+// Full map and native year options make these interaction tests slower under coverage.
+jest.setTimeout(30000);
 
 jest.mock("../../helpers/DataCenterSetupClient", () => ({
   createDataCenterSetupWorker: jest.fn(),
@@ -142,14 +146,13 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   const demand = screen.getByRole("spinbutton", {
     name: "Power needed (megawatts)",
   });
-  const arrival = screen.getByRole("spinbutton", {
-    name: "Year data centers open",
+  const arrival = screen.getByRole("combobox", {
+    name: "Data centers open",
   });
   fireEvent.change(demand, { target: { value: "" } });
   expect(start).toBeDisabled();
   fireEvent.change(demand, { target: { value: "125" } });
-  fireEvent.change(arrival, { target: { value: "2051" } });
-  expect(start).toBeDisabled();
+  expect(within(arrival).queryByRole("option", { name: "2051" })).toBeNull();
   fireEvent.change(arrival, { target: { value: "2040" } });
   fireEvent.click(start);
   const scenario: ScenarioType = onStart.mock.calls[0][0];
@@ -157,20 +160,28 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
     expect.objectContaining({ peakW: 125000000, startsYear: 2040 }),
   );
   expect(worker.postMessage).toHaveBeenCalledTimes(1);
-  const year = screen.getByRole("spinbutton", { name: "Starting year" });
-  fireEvent.change(year, { target: { value: "2009" } });
-  expect(start).toBeDisabled();
+  const year = screen.getByRole("combobox", { name: "Start year" });
+  expect(within(year).queryByRole("option", { name: "2009" })).toBeNull();
+  expect(within(year).queryByRole("option", { name: "2050" })).toBeNull();
   fireEvent.change(year, { target: { value: "2045" } });
   expect(start).toBeDisabled();
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
   expect(
-    screen.getByRole("spinbutton", { name: "Year data centers open" }),
-  ).toHaveValue(2045);
+    screen.getByRole("combobox", { name: "Data centers open" }),
+  ).toHaveValue("2046");
   expect(
     screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
   ).toHaveValue(125);
   expect(start).toBeEnabled();
+  fireEvent.change(year, { target: { value: "2049" } });
+  expect(arrival).toHaveValue("2050");
+  expect(within(arrival).getAllByRole("option")).toHaveLength(1);
+  fireEvent.change(year, { target: { value: "2010" } });
+  expect(within(arrival).queryByRole("option", { name: "2010" })).toBeNull();
+  expect(
+    within(arrival).getByRole("option", { name: "2011" }),
+  ).toBeInTheDocument();
 });
 
 it("selects a community using the map", async () => {

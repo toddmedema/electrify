@@ -47,6 +47,24 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await page.getByRole("link", { name: "Explore the impact" }).click();
   await expect(page).toHaveURL(/dataCenters=1/);
   await ready(page);
+  const search = await page
+    .getByRole("combobox", { name: "Search cities", exact: true })
+    .boundingBox();
+  const nearest = await page
+    .getByRole("button", { name: "Find nearest city", exact: true })
+    .boundingBox();
+  expect(nearest!.x).toBeGreaterThan(search!.x + search!.width);
+  expect(
+    Math.abs(nearest!.y + nearest!.height / 2 - search!.y - search!.height / 2),
+  ).toBeLessThan(4);
+  const startYear = await page
+    .getByRole("combobox", { name: "Start year", exact: true })
+    .boundingBox();
+  const openYear = await page
+    .getByRole("combobox", { name: "Data centers open", exact: true })
+    .boundingBox();
+  expect(openYear!.x).toBeGreaterThan(startYear!.x + startYear!.width);
+  expect(Math.abs(openYear!.y - startYear!.y)).toBeLessThan(2);
   await expect(
     page.getByRole("group", { name: "Playable locations map", exact: true }),
   ).toBeVisible();
@@ -181,12 +199,12 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
   await ready(page);
   await page
-    .getByRole("spinbutton", { name: "Starting year", exact: true })
-    .fill("2030");
+    .getByRole("combobox", { name: "Start year", exact: true })
+    .selectOption("2030");
   await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
   await page
-    .getByRole("spinbutton", { name: "Year data centers open", exact: true })
-    .fill("2035");
+    .getByRole("combobox", { name: "Data centers open", exact: true })
+    .selectOption("2035");
   await page
     .getByRole("spinbutton", { name: "Power needed (megawatts)", exact: true })
     .fill("250");

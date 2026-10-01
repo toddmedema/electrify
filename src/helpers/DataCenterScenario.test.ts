@@ -49,7 +49,7 @@ it("honors adjustable demand and arrival through game initialization and saves",
   loadSimData(location);
   const base = createDataCenterScenario(location, 2010);
   for (const [peakW, arrival] of [
-    [0, 2010],
+    [0, 2011],
     [234000000, 2028],
     [500000000, 2050],
   ]) {
@@ -83,12 +83,14 @@ it("honors adjustable demand and arrival through game initialization and saves",
     ).toBeCloseTo(peakW);
   }
   expect(
-    createDataCenterScenario(location, 2050).loadAdditions?.[0].startsYear,
+    createDataCenterScenario(location, 2049).loadAdditions?.[0].startsYear,
   ).toBe(2050);
+  expect(() => createDataCenterScenario(location, 2050)).toThrow(RangeError);
   for (const [peakW, arrival] of [
     [-1, 2020],
     [NaN, 2020],
     [1, 2009],
+    [1, 2010],
     [1, 2051],
     [1, 2020.5],
   ]) {
@@ -173,12 +175,12 @@ it.each([
   },
 );
 
-it("calibrates only ordinary demand even when arrival is in the starting year", () => {
+it("calibrates ordinary demand before the latest allowed opening year", () => {
   const location = getSimLocation("SF")!;
   loadSimData(location);
   const ready = calibrateDataCenterScenario({
     location,
-    startingYear: 2050,
+    startingYear: 2049,
     startingCustomers: 50000,
   });
   const baseline = configureDataCenterGrowth(ready, 0, 2050);
@@ -190,9 +192,7 @@ it("calibrates only ordinary demand even when arrival is in the starting year", 
       DATA_CENTER_SEED,
     );
   expect(summarizeYearOneOutlook(forecast(baseline)).worstShortfallW).toBe(0);
-  expect(
-    summarizeYearOneOutlook(forecast(growth)).worstShortfallW,
-  ).toBeGreaterThan(0);
+  expect(summarizeYearOneOutlook(forecast(growth)).worstShortfallW).toBe(0);
   expect(growth.facilities).toEqual(baseline.facilities);
   expect(growth.startingCustomers).toBe(50000);
 });

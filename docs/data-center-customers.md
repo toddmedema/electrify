@@ -11,7 +11,7 @@ several people or one business. Counts describe a **named utility service area**
 crosses city boundaries, or covers only part of a city. The UI must identify that area alongside
 the source link. They do not identify which power plants the utility owns or buys from.
 
-Sources are fixed published snapshots. Selecting a starting year from 2010–2050 does not turn
+Sources are fixed published snapshots. Selecting a starting year from 2010–2049 does not turn
 them into historical counts or population forecasts. Users can change the account count to
 match their intended community. Values published as “about”, “more than” or “approximately”
 retain the source's rounded precision. Undated corporate profile pages have no invented year.

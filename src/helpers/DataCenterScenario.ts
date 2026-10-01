@@ -29,9 +29,9 @@ export function configureDataCenterGrowth(
   if (
     !Number.isInteger(scenario.startingYear) ||
     scenario.startingYear < MIN_DATA_CENTER_YEAR ||
-    scenario.startingYear > MAX_DATA_CENTER_YEAR ||
+    scenario.startingYear >= MAX_DATA_CENTER_YEAR ||
     !Number.isInteger(arrivalYear) ||
-    arrivalYear < scenario.startingYear ||
+    arrivalYear <= scenario.startingYear ||
     arrivalYear > MAX_DATA_CENTER_YEAR ||
     !Number.isFinite(peakW) ||
     peakW < 0

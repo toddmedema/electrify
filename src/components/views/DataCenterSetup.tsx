@@ -49,10 +49,17 @@ export interface Props {
 
 const validYear = (year: number) =>
   Number.isInteger(year) && year >= MIN_YEAR && year <= MAX_YEAR;
+const validStartingYear = (year: number) => validYear(year) && year < MAX_YEAR;
+const YEARS = Array.from(
+  { length: MAX_YEAR - MIN_YEAR + 1 },
+  (_, index) => MIN_YEAR + index,
+);
 
 export default function DataCenterSetup({ onBack, onStart }: Props) {
   const [startingYearInput, setStartingYearInput] = React.useState(() =>
-    String(Math.max(MIN_YEAR, Math.min(MAX_YEAR, new Date().getFullYear()))),
+    String(
+      Math.max(MIN_YEAR, Math.min(MAX_YEAR - 1, new Date().getFullYear())),
+    ),
   );
   const startingYear = Number(startingYearInput);
   const [arrivalInput, setArrivalInput] = React.useState<string>();
@@ -71,7 +78,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
     ? getDataCenterCustomerProfile(location)
     : undefined;
   const powerMix =
-    location && validYear(startingYear)
+    location && validStartingYear(startingYear)
       ? getDataCenterPowerMix(location, startingYear)
       : undefined;
   const startingCustomers =
@@ -106,7 +113,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
   }, [location]);
 
   const preparation = useWorkerRequest(
-    location && validYear(startingYear) && validAccounts
+    location && validStartingYear(startingYear) && validAccounts
       ? {
           key: `${location.id}:${startingYear}:${startingCustomers}:${attempt}`,
           scope: location,
@@ -138,7 +145,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
     Number.isFinite(demandMW) &&
     demandMW >= 0 &&
     demandMW <= maxDemandMW;
-  const validArrival = validYear(arrivalYear) && arrivalYear >= startingYear;
+  const validArrival = validYear(arrivalYear) && arrivalYear > startingYear;
   const scenario = React.useMemo(
     () =>
       growthScenario && validDemand && validArrival
@@ -167,29 +174,49 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               setAccountsInput(undefined);
             }}
           />
-          <TextField
-            label="Starting year"
-            type="number"
-            value={startingYearInput}
-            slotProps={{ htmlInput: { min: MIN_YEAR, max: MAX_YEAR, step: 1 } }}
-            error={!validYear(startingYear)}
-            helperText={
-              !validYear(startingYear)
-                ? `Choose a year from ${MIN_YEAR} to ${MAX_YEAR}.`
-                : undefined
-            }
-            onChange={(event) => {
-              const value = event.target.value;
-              setStartingYearInput(value);
-              if (
-                validYear(Number(value)) &&
-                arrivalInput !== undefined &&
-                Number(arrivalInput) < Number(value)
-              ) {
-                setArrivalInput(value);
-              }
-            }}
-          />
+          <div className="dataCenterSetupYears">
+            <TextField
+              select
+              label="Start year"
+              value={startingYearInput}
+              slotProps={{ select: { native: true } }}
+              onChange={(event) => {
+                const year = Number(event.target.value);
+                if (!validStartingYear(year)) return;
+                setStartingYearInput(String(year));
+                if (
+                  arrivalInput !== undefined &&
+                  Number(arrivalInput) <= year
+                ) {
+                  setArrivalInput(String(year + 1));
+                }
+              }}
+            >
+              {YEARS.slice(0, -1).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </TextField>
+            <span aria-hidden="true">-</span>
+            <TextField
+              select
+              label="Data centers open"
+              value={arrivalYear}
+              slotProps={{ select: { native: true } }}
+              onChange={(event) => {
+                const year = Number(event.target.value);
+                if (validYear(year) && year > startingYear)
+                  setArrivalInput(String(year));
+              }}
+            >
+              {YEARS.filter((year) => year > startingYear).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </TextField>
+          </div>
           {cityError && (
             <Alert severity="warning">
               The full city list couldn’t load. You can choose an available city
@@ -222,13 +249,6 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               aria-live="polite"
             >
               <div className="dataCenterSetupControls">
-                <Typography
-                  component="h2"
-                  variant="h6"
-                  id="data-center-demand-label"
-                >
-                  How much extra power?
-                </Typography>
                 {customerProfile && (
                   <details className="dataCenterSetupAssumptions dataCenterSetupGridSize">
                     <summary>
@@ -278,6 +298,13 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   </details>
                 )}
 
+                <Typography
+                  component="h2"
+                  variant="h6"
+                  id="data-center-demand-label"
+                >
+                  How much extra power?
+                </Typography>
                 {growthScenario && (
                   <>
                     <Slider
@@ -307,25 +334,6 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                       }
                       onChange={(event) => setDemandInput(event.target.value)}
                     />
-                    <TextField
-                      label="Year data centers open"
-                      type="number"
-                      value={arrivalInput ?? arrivalYear}
-                      slotProps={{
-                        htmlInput: {
-                          min: Math.max(MIN_YEAR, startingYear),
-                          max: MAX_YEAR,
-                          step: 1,
-                        },
-                      }}
-                      error={!validArrival}
-                      helperText={
-                        !validArrival
-                          ? `Choose a year from ${startingYear} to ${MAX_YEAR}.`
-                          : undefined
-                      }
-                      onChange={(event) => setArrivalInput(event.target.value)}
-                    />
                   </>
                 )}
               </div>
@@ -336,8 +344,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                     color="textSecondary"
                     className="dataCenterSetupComparison"
                   >
-                    Run again with demand set to 0. Keep the same city, years
-                    and grid size to compare the difference.
+                    To compare the difference, run again with 0 power needed.
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
                     Uses local weather and a regional power mix. This is an

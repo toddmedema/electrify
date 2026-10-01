@@ -5,7 +5,7 @@ import PublicIcon from "@mui/icons-material/Public";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import {
   Autocomplete,
-  Button,
+  CircularProgress,
   IconButton,
   Menu,
   MenuItem,
@@ -500,43 +500,57 @@ export default function LocationPicker({
       </div>
 
       <div className="locationPickerDetails">
-        {allowNearest && (
-          <>
-            <Button
-              className="locationPickerNearest"
-              variant="outlined"
-              startIcon={<MyLocationIcon />}
-              disabled={loading || findingNearest || locations.length === 0}
-              onClick={findNearest}
-            >
-              {findingNearest ? "Finding your location…" : "Find nearest city"}
-            </Button>
-            <Typography
-              variant="body2"
-              className="locationPickerGeolocationStatus"
-              role="status"
-            >
-              {nearestMessage}
-            </Typography>
-          </>
-        )}
-        <Autocomplete
-          id="location"
-          options={locations}
-          groupBy={(location: CityType) => location.region}
-          getOptionLabel={(location: CityType) => location.name}
-          isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
-          value={value ?? null}
-          onChange={(_event, picked: CityType | null) => {
-            if (picked) select(picked, true);
-          }}
-          disableClearable={!!value}
-          autoHighlight
-          openOnFocus
-          renderInput={(params) => (
-            <TextField {...params} label={searchLabel} size="small" />
+        <div className="locationPickerSearchRow">
+          <Autocomplete
+            id="location"
+            options={locations}
+            groupBy={(location: CityType) => location.region}
+            getOptionLabel={(location: CityType) => location.name}
+            isOptionEqualToValue={(a: CityType, b: CityType) => a.id === b.id}
+            value={value ?? null}
+            onChange={(_event, picked: CityType | null) => {
+              if (picked) select(picked, true);
+            }}
+            disableClearable={!!value}
+            autoHighlight
+            openOnFocus
+            renderInput={(params) => (
+              <TextField {...params} label={searchLabel} size="small" />
+            )}
+          />
+          {allowNearest && (
+            <Tooltip title="Find nearest city">
+              <span>
+                <IconButton
+                  className="locationPickerNearest"
+                  color="primary"
+                  aria-label={
+                    findingNearest
+                      ? "Finding your location…"
+                      : "Find nearest city"
+                  }
+                  disabled={loading || findingNearest || locations.length === 0}
+                  onClick={findNearest}
+                >
+                  {findingNearest ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <MyLocationIcon />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
           )}
-        />
+        </div>
+        {allowNearest && (
+          <Typography
+            variant="body2"
+            className="locationPickerGeolocationStatus"
+            role="status"
+          >
+            {nearestMessage}
+          </Typography>
+        )}
         <Typography
           className="locationPickerCount"
           variant="caption"
