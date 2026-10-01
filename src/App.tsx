@@ -16,6 +16,7 @@ import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
 
 import {
+  customEventFromSearch,
   scenarioDetailsUrl,
   scenarioFromSearch,
   scenarioListUrl,
@@ -205,8 +206,20 @@ export default function App() {
         store.dispatch(navigate({ name: "CHALLENGE", url: href }));
         logEvent("challenge_view", { compatible: !!challenge.invitation });
       }
+      const customEvent =
+        !challenge && customEventFromSearch(window.location.search);
+      if (typeof customEvent === "number") {
+        const url = window.location.pathname + window.location.search;
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(navigate({ name: "CUSTOM_GAME", url }));
+      }
       const sharedScenario =
-        !challenge && scenarioFromSearch(window.location.search);
+        !challenge &&
+        customEvent === undefined &&
+        scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
         getHistoryApi().replaceState(null, "", scenarioListUrl());
@@ -224,6 +237,13 @@ export default function App() {
         store.dispatch(uiDelta({ challengeHref: window.location.href }));
         store.dispatch(
           navigate({ name: "CHALLENGE", skipBrowserHistory: true }),
+        );
+        e.preventDefault();
+        return;
+      }
+      if (customEventFromSearch(window.location.search) !== undefined) {
+        store.dispatch(
+          navigate({ name: "CUSTOM_GAME", skipBrowserHistory: true }),
         );
         e.preventDefault();
         return;

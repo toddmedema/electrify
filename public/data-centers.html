@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Data centers and your local grid — Electrify</title>
+    <meta
+      name="description"
+      content="Explore how new data centers could change your local grid. Build a custom Electrify game and compare electricity demand, reliability, costs, and emissions."
+    />
+    <meta name="theme-color" content="#0084f8" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/legal.css" />
+    <link rel="canonical" href="https://electrifygame.com/data-centers.html" />
+    <meta
+      property="og:title"
+      content="Data centers and your local grid — Electrify"
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://electrifygame.com/data-centers.html"
+    />
+    <meta
+      property="og:description"
+      content="What happens when data centers connect? Explore the tradeoffs in a free electricity-market simulation."
+    />
+    <meta
+      property="og:image"
+      content="https://electrifygame.com/images/gameplay-preview.png"
+    />
+    <meta
+      property="og:image:alt"
+      content="Electrify gameplay showing electricity supply, demand, and grid finances"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="Electrify home">
+          <picture>
+            <source
+              srcset="/images/logo-dark.svg"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img src="/images/logo.svg" alt="" width="300" height="70" />
+          </picture>
+        </a>
+        <nav class="topnav" aria-label="Primary navigation">
+          <a href="/about.html">About</a>
+          <a href="/data-centers.html" aria-current="page">Data centers</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero__inner">
+        <p class="eyebrow">Data centers &amp; your local grid</p>
+        <h1 id="page-title">New data centers.<br />Can your grid keep up?</h1>
+        <p class="hero__lede">
+          Put yourself in charge of your local power supply. Use Electrify to
+          explore how a wave of data-center demand changes the balance between
+          reliable electricity, affordable power, and lower emissions.
+        </p>
+        <div class="hero__actions">
+          <a class="button button--primary" href="/?customEvent=106"
+            >Simulate data-center growth</a
+          >
+        </div>
+        <p>Free to play. Opens Custom setup with Data Center Boom selected.</p>
+      </div>
+    </section>
+
+    <main class="page-content about-grid" id="main-content">
+      <section class="panel panel--story" aria-labelledby="setup-title">
+        <h2 id="setup-title">Start with a grid close to home</h2>
+        <p>
+          Choose your city or a nearby available location in Custom setup. Set
+          the starting year, customer count, and starting power plants to
+          approximate the grid you want to explore.
+        </p>
+        <p>
+          Keep Data Center Boom selected under Scenario events. The event adds a
+          scheduled increase in data-center demand, scaled to your custom grid,
+          with time to prepare before it connects. Setup extends the duration to
+          cover the event so you can see its aftermath.
+        </p>
+        <p>
+          Check the Year 1 outlook, then press Play. Expand generation, add
+          storage, and explore demand-management policies as your grid grows.
+        </p>
+      </section>
+
+      <section class="panel panel--impact" aria-labelledby="compare-title">
+        <h2 id="compare-title">Run the comparison</h2>
+        <p>
+          Play once with Data Center Boom and once with it deselected. Keep your
+          location, starting fleet, other settings, and random seed the same so
+          the added event is the difference you are exploring.
+        </p>
+        <p>
+          Then try a different response: build capacity earlier, change the
+          generation mix, or reduce peak demand. Compare the results in Insights
+          and your end-of-game review.
+        </p>
+      </section>
+
+      <section class="panel panel--community" aria-labelledby="questions-title">
+        <h2 id="questions-title">What would you change?</h2>
+        <ul class="summary-list">
+          <li>
+            <strong>Reliability:</strong> Can supply cover the extra demand
+            through the day and across seasons? When do shortages appear?
+          </li>
+          <li>
+            <strong>Costs:</strong> How do new construction, fuel purchases, and
+            electricity rates affect your utility's finances and customers?
+          </li>
+          <li>
+            <strong>Emissions:</strong> How does meeting the new load with
+            different combinations of generation and storage change your grid's
+            footprint?
+          </li>
+          <li>
+            <strong>Timing:</strong> What happens if you wait until the data
+            centers arrive to start building?
+          </li>
+        </ul>
+      </section>
+
+      <section class="panel panel--community" aria-labelledby="model-title">
+        <h2 id="model-title">Understand the tradeoffs behind the headlines</h2>
+        <p>
+          Electrify is a research-backed electricity-market game. Its local
+          weather and regional assumptions help you explore different places,
+          but your custom grid is an approximation, not a reconstruction of your
+          utility's network or a forecast for a specific proposed campus.
+        </p>
+        <p>
+          Data Center Boom uses an authored demand schedule scaled to your
+          settings; it does not import a project's requested megawatts or
+          connection date. Use the results to develop questions about capacity,
+          timing, costs, and emissions in your community. Learn more
+          <a href="/about.html">about Electrify</a> or explore the
+          <a href="https://github.com/toddmedema/electrify"
+            >model and its sources</a
+          >.
+        </p>
+        <div class="panel__actions">
+          <a class="button button--primary" href="/?customEvent=106"
+            >Simulate data-center growth</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>Free and open source under the MIT license.</p>
+        <nav aria-label="Footer navigation">
+          <a href="/about.html">About</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="https://github.com/toddmedema/electrify">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-BYRYY6BG1Y"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        window.dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-BYRYY6BG1Y");
+    </script>
+  </body>
+</html>

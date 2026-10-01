@@ -3,6 +3,15 @@ import { ScenarioType } from "./Types";
 
 type LocationParts = Pick<Location, "pathname" | "search">;
 
+/** Opens custom setup with one supported scenario event selected. */
+export function customEventFromSearch(search: string): number | undefined {
+  const rawId = new URLSearchParams(search).get("customEvent");
+  if (rawId === null || !/^\d+$/.test(rawId)) return undefined;
+  return SCENARIOS.find(
+    (scenario) => scenario.id === Number(rawId) && !scenario.tutorialSteps,
+  )?.id;
+}
+
 /** Resolves a public challenge details link without letting tutorial ids bypass the mission flow. */
 export function scenarioFromSearch(search: string): ScenarioType | undefined {
   const rawId = new URLSearchParams(search).get("scenario");
@@ -23,6 +32,7 @@ export function scenarioDetailsUrl(
 ): string {
   const params = new URLSearchParams(location.search);
   params.delete("challenge");
+  params.delete("customEvent");
   params.set("scenario", String(scenarioId));
   return `${location.pathname}?${params.toString()}`;
 }
@@ -34,6 +44,7 @@ export function scenarioListUrl(
   const params = new URLSearchParams(location.search);
   params.delete("scenario");
   params.delete("challenge");
+  params.delete("customEvent");
   const search = params.toString();
   return `${location.pathname}${search ? `?${search}` : ""}`;
 }

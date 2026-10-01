@@ -5,6 +5,8 @@ import {
   DEFAULT_CUSTOM_SCENARIO,
 } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
+import { getHistoryApi } from "../../Globals";
+import { customEventFromSearch, scenarioListUrl } from "../../ScenarioUrl";
 import { navigateBack } from "../../reducers/Card";
 import { delta, start, quit } from "../../reducers/Game";
 import { store } from "../../Store";
@@ -14,6 +16,9 @@ import { AppStateType, GameType, ScenarioType } from "../../Types";
 import CustomGame, { DispatchProps, StateProps } from "./CustomGame";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
+  const scenario =
+    state.game.customScenario || getCustomScenario(DEFAULT_CUSTOM_SCENARIO);
+  const eventId = customEventFromSearch(window.location.search);
   return {
     game: {
       ...state.game,
@@ -22,14 +27,20 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     // The game the player set up last time, so tweaking one setting and replaying doesn't mean
     // re-entering all of them
     scenario:
-      state.game.customScenario || getCustomScenario(DEFAULT_CUSTOM_SCENARIO),
+      eventId === undefined
+        ? scenario
+        : { ...scenario, eventScenarioIds: [eventId] },
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(navigateBack());
+      if (customEventFromSearch(window.location.search) !== undefined) {
+        getHistoryApi().back();
+      } else {
+        dispatch(navigateBack());
+      }
     },
     onDelta: (d: Partial<GameType>) => {
       dispatch(uiDelta({ previewDifficulty: d.difficulty }));
@@ -37,6 +48,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onStart: (scenario: ScenarioType) => {
       recordCustomScenario(scenario);
       startWithSaveGuard(dispatch, () => {
+        if (customEventFromSearch(window.location.search) !== undefined) {
+          getHistoryApi().replaceState(null, "", scenarioListUrl());
+        }
         const difficulty =
           store.getState().ui.previewDifficulty ??
           store.getState().game.difficulty;
