@@ -669,6 +669,94 @@ a:hover {
   }
 }
 
+.data-centers-page .hero__inner {
+  max-width: 60rem;
+  padding-block: clamp(3rem, 6vw, 4rem);
+  text-align: center;
+}
+
+.data-centers-page .hero h1 {
+  max-width: 22ch;
+  margin-inline: auto;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1.08;
+}
+
+.data-centers-page .hero__lede {
+  max-width: 40rem;
+  margin-inline: auto;
+}
+
+.data-centers-page .hero__actions {
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.data-centers-page .hero .button {
+  min-height: 3.5rem;
+  padding-inline: 2rem;
+  font-size: 1.125rem;
+}
+
+.data-centers-page .page-content {
+  max-width: 60rem;
+  padding-block: 3rem;
+}
+
+.data-centers-page h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.community-questions__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.community-questions h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.community-questions p,
+.community-next-step p {
+  margin: 0.75rem 0 0;
+  color: var(--text-muted);
+}
+
+.community-next-step {
+  margin-top: 2.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.community-next-step p {
+  max-width: 48rem;
+}
+
+.community-next-step .community-model-note {
+  margin-top: 1.5rem;
+  font-size: 0.9375rem;
+}
+
+@media (max-width: 48rem) {
+  .community-questions__grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .community-questions__grid > div + div {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
