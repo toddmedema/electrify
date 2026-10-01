@@ -60,6 +60,17 @@ export function forecastCustomGameYearOne(
   difficulty: DifficultyType,
   seed: number,
 ): YearOneOutlook {
+  return summarizeYearOneOutlook(
+    forecastCustomGameTimeline(scenario, difficulty, seed),
+  );
+}
+
+/** The production first-year forecast, shared with the guided setup's capacity check. */
+export function forecastCustomGameTimeline(
+  scenario: ScenarioType,
+  difficulty: DifficultyType,
+  seed: number,
+): TickPresentFutureType[] {
   const location = getScenarioLocation(scenario);
   if (!location) {
     throw new Error("The custom setup has no playable location");
@@ -91,5 +102,5 @@ export function forecastCustomGameYearOne(
     opening.customers,
     TICKS_PER_YEAR,
   );
-  return summarizeYearOneOutlook(timeline);
+  return timeline;
 }

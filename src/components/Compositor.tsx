@@ -36,6 +36,7 @@ import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import BuildFacilities from "./views/BuildFacilities";
 import CustomGameContainer from "./views/CustomGameContainer";
+import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
 import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
@@ -576,6 +577,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <ChallengeLanding />;
       case "CUSTOM_GAME":
         return <CustomGameContainer />;
+      case "DATA_CENTER_SETUP":
+        return <DataCenterSetupContainer />;
       default:
         throw new Error("Unknown card " + this.props.card.name);
     }

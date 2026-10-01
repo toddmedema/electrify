@@ -165,6 +165,7 @@
       "!src/testing/SimulationTestHelpers.ts",
       "!src/react-app-env.d.ts",
       "!src/helpers/CustomGameForecastClient.ts",
+      "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
       "!src/workers/**/*.ts",

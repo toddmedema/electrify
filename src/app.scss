@@ -6709,3 +6709,110 @@ $programs_column: 800px;
 .base_main .intertieActions {
   padding: 0 0 12px;
 }
+
+.screenDataCenterSetup {
+  .dataCenterSetupProgress {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .dataCenterSetupComparison {
+    margin-bottom: var(--space-4);
+  }
+
+  .dataCenterSetupContent {
+    width: min(100%, 680px);
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-4);
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .dataCenterSetupIntro {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .dataCenterSetupSummary {
+    padding: var(--space-5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+  }
+
+  .dataCenterSetupFacts {
+    display: grid;
+    gap: var(--space-4);
+    margin: var(--space-5) 0;
+
+    dt {
+      color: var(--font-color-faded);
+      font-size: var(--font-size-body2);
+    }
+
+    dd {
+      margin: var(--space-1) 0 0;
+      font-weight: var(--font-weight-emphasis);
+    }
+  }
+
+  .dataCenterSetupAssumptions {
+    margin-top: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+
+    summary {
+      min-height: var(--control-size);
+      align-content: center;
+      cursor: pointer;
+      color: var(--interactive-strong);
+      font-weight: var(--font-weight-emphasis);
+    }
+
+    summary:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    ul {
+      padding-left: var(--space-5);
+      font-size: var(--font-size-body2);
+    }
+  }
+
+  .dataCenterSetupFooter {
+    flex-shrink: 0;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-subtle);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .dataCenterSetupStart {
+    width: min(100%, 680px);
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-2);
+
+    button {
+      justify-self: start;
+      min-height: 48px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .dataCenterSetupContent {
+      padding-top: var(--space-5);
+    }
+
+    .dataCenterSetupSummary {
+      padding: var(--space-4);
+    }
+
+    .dataCenterSetupStart button {
+      width: 100%;
+    }
+  }
+}

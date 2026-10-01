@@ -1,81 +1,177 @@
-import { expect, test } from "@playwright/test";
+import { expect, Page, test } from "@playwright/test";
+import type { GameType } from "../src/Types";
 
-test("About leads to data-center setup and the selected event starts in the game", async ({
-  page,
-}, testInfo) => {
+const setupHeading = (page: Page) =>
+  page.getByRole("heading", {
+    name: "Explore data-center growth",
+    exact: true,
+  });
+const startButton = (page: Page) =>
+  page.getByRole("button", { name: "Start exploring", exact: true });
+
+async function savedGame(page: Page): Promise<GameType | undefined> {
+  return page.evaluate(() => {
+    window.dispatchEvent(new Event("pagehide"));
+    const saved = localStorage.getItem("savedGame");
+    return saved ? JSON.parse(saved).game : undefined;
+  });
+}
+
+async function ready(page: Page) {
+  await expect(setupHeading(page)).toBeVisible();
+  const location = page.getByRole("combobox", {
+    name: "Choose a nearby city",
+    exact: true,
+  });
+  if (!(await location.inputValue())) {
+    await location.fill("San Francisco");
+    await page.getByRole("option", { name: /San Francisco/ }).click();
+  }
+  await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
+}
+
+test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.clear();
     localStorage.setItem("audioEnabled", "false");
   });
+});
+
+test("the landing page opens a prepared current-year grid and supports browser history", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
   await page.goto("/about.html");
   await page
     .getByRole("link", { name: "Explore data centers and your grid" })
     .click();
+  await page.getByRole("link", { name: "Explore the impact" }).click();
+  await expect(page).toHaveURL(/dataCenters=1/);
+  await ready(page);
+  await expect(page.locator(".dataCenterSetupContent")).toContainText(
+    String(new Date().getFullYear()),
+  );
+  await expect(
+    page.getByRole("combobox", { name: "Scenario events", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Seed", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await ready(page);
+  await page.goBack();
   await expect(page).toHaveURL(/\/data-centers\.html$/);
-  for (const colorScheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme });
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "What could they mean for your community?",
-    );
+  await page.goForward();
+  await ready(page);
+
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((mode) => localStorage.setItem("theme", mode), theme);
+    await page.emulateMedia({ colorScheme: theme });
+    await page.reload();
+    await ready(page);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
       ),
     ).toBeLessThanOrEqual(1);
+    expect(
+      await page
+        .locator(".dataCenterSetupContent")
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await setupHeading(page).click();
+    await expect(startButton(page)).toBeInViewport({ ratio: 1 });
     await page.screenshot({
-      path: testInfo.outputPath(`data-centers-${colorScheme}.png`),
+      path: testInfo.outputPath(`data-center-setup-${theme}.png`),
       fullPage: true,
     });
   }
-  await page.getByRole("link", { name: "Explore the impact" }).first().click();
-  await expect(
-    page.getByRole("heading", { name: "Custom setup" }),
-  ).toBeVisible();
-  const events = page.getByRole("combobox", {
-    name: "Scenario events",
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page).toHaveURL(/\/data-centers\.html$/);
+});
+
+test("location changes prepare a populated grid and launching keeps its data-center load", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  const location = page.getByRole("combobox", {
+    name: "Choose a nearby city",
     exact: true,
   });
-  await expect(events).toHaveText("Data Center Boom");
-  await page.reload();
-  await expect(events).toHaveText("Data Center Boom");
-  await page.goBack();
-  await expect(events).toHaveCount(0);
-  await expect(page).not.toHaveURL(/customEvent/);
-  await page.goForward();
-  await expect(events).toHaveText("Data Center Boom");
-  await events.click();
-  const option = page.getByRole("option", {
-    name: "Data Center Boom",
-    exact: true,
-  });
-  await option.click();
-  await expect(option).toHaveAttribute("aria-selected", "false");
-  await option.click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await location.fill("Pittsburgh");
+  await page.getByRole("option", { name: /Pittsburgh/ }).click();
+  await ready(page);
+  await startButton(page).click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
   });
-  await expect(page).not.toHaveURL(/customEvent/);
   await expect
-    .poll(() =>
-      page.evaluate(() => {
-        window.dispatchEvent(new Event("pagehide"));
-        const save = localStorage.getItem("savedGame");
-        return save
-          ? JSON.parse(save).game.customScenario?.eventScenarioIds
-          : undefined;
-      }),
-    )
-    .toEqual([106]);
-  const loads = await page.evaluate(
-    () =>
-      JSON.parse(localStorage.getItem("savedGame")!).game.customScenario
-        .loadAdditions,
-  );
-  expect(loads).toEqual(
+    .poll(async () => (await savedGame(page))?.customScenario?.locationId)
+    .toBe("PIT");
+  const game = (await savedGame(page))!;
+  expect(game.startingYear).toBe(new Date().getFullYear());
+  expect(game.customScenario?.startingCustomers).toBeGreaterThan(0);
+  expect(game.customScenario?.facilities.length).toBeGreaterThan(1);
+  expect(game.customScenario?.eventScenarioIds).toEqual([106]);
+  expect(game.customScenario?.loadAdditions).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ demandType: "Data Centers" }),
     ]),
+  );
+  await expect(page).not.toHaveURL(/dataCenters/);
+});
+
+test("baseline comparison keeps the same starting assumptions and protects an existing save", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  await startButton(page).click();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible({
+    timeout: 30000,
+  });
+  await expect
+    .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
+    .toEqual([106]);
+  const growth = (await savedGame(page))!;
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  const originalSave = await page.evaluate(() =>
+    localStorage.getItem("savedGame"),
+  );
+  await page
+    .getByRole("checkbox", { name: "Add data-center growth", exact: true })
+    .uncheck();
+  await startButton(page).click();
+  const guard = page.getByRole("dialog", { name: "Start a new game?" });
+  await expect(guard).toBeVisible();
+  await guard.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(await page.evaluate(() => localStorage.getItem("savedGame"))).toBe(
+    originalSave,
+  );
+  await expect(setupHeading(page)).toBeVisible();
+  await startButton(page).click();
+  await guard
+    .getByRole("button", { name: "Start new game", exact: true })
+    .click();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible({
+    timeout: 30000,
+  });
+  await expect
+    .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
+    .toEqual([]);
+  const baseline = (await savedGame(page))!;
+  expect(baseline.seed).toBe(growth.seed);
+  expect(baseline.startingYear).toBe(growth.startingYear);
+  expect(baseline.customScenario?.facilities).toEqual(
+    growth.customScenario?.facilities,
+  );
+  expect(baseline.customScenario?.startingCustomers).toBe(
+    growth.customScenario?.startingCustomers,
+  );
+  expect(baseline.customScenario?.durationMonths).toBe(
+    growth.customScenario?.durationMonths,
   );
 });

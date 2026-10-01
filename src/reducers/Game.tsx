@@ -367,6 +367,7 @@ const BLOCKING_CARDS = new Set([
   "NEW_GAME",
   "NEW_GAME_DETAILS",
   "CUSTOM_GAME",
+  "DATA_CENTER_SETUP",
 ]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.

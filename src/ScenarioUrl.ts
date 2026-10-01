@@ -3,6 +3,11 @@ import { ScenarioType } from "./Types";
 
 type LocationParts = Pick<Location, "pathname" | "search">;
 
+/** Dedicated, guided setup for visitors exploring data-center growth. */
+export function isDataCenterSetupSearch(search: string): boolean {
+  return new URLSearchParams(search).get("dataCenters") === "1";
+}
+
 /** Opens custom setup with one supported scenario event selected. */
 export function customEventFromSearch(search: string): number | undefined {
   const rawId = new URLSearchParams(search).get("customEvent");
@@ -33,6 +38,7 @@ export function scenarioDetailsUrl(
   const params = new URLSearchParams(location.search);
   params.delete("challenge");
   params.delete("customEvent");
+  params.delete("dataCenters");
   params.set("scenario", String(scenarioId));
   return `${location.pathname}?${params.toString()}`;
 }
@@ -45,6 +51,7 @@ export function scenarioListUrl(
   params.delete("scenario");
   params.delete("challenge");
   params.delete("customEvent");
+  params.delete("dataCenters");
   const search = params.toString();
   return `${location.pathname}${search ? `?${search}` : ""}`;
 }

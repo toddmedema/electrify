@@ -17,6 +17,7 @@ import { SCENARIOS } from "./data/Scenarios";
 
 import {
   customEventFromSearch,
+  isDataCenterSetupSearch,
   scenarioDetailsUrl,
   scenarioFromSearch,
   scenarioListUrl,
@@ -206,8 +207,19 @@ export default function App() {
         store.dispatch(navigate({ name: "CHALLENGE", url: href }));
         logEvent("challenge_view", { compatible: !!challenge.invitation });
       }
+      const dataCenterSetup =
+        !challenge && isDataCenterSetupSearch(window.location.search);
+      if (dataCenterSetup) {
+        // This visitor came from the guide, so preserve that document as the
+        // browser's Back destination instead of inserting the game catalog.
+        store.dispatch(
+          navigate({ name: "DATA_CENTER_SETUP", skipBrowserHistory: true }),
+        );
+      }
       const customEvent =
-        !challenge && customEventFromSearch(window.location.search);
+        !challenge &&
+        !dataCenterSetup &&
+        customEventFromSearch(window.location.search);
       if (typeof customEvent === "number") {
         const url = window.location.pathname + window.location.search;
         getHistoryApi().replaceState(null, "", scenarioListUrl());
@@ -218,6 +230,7 @@ export default function App() {
       }
       const sharedScenario =
         !challenge &&
+        !dataCenterSetup &&
         customEvent === undefined &&
         scenarioFromSearch(window.location.search);
       if (sharedScenario) {
@@ -237,6 +250,13 @@ export default function App() {
         store.dispatch(uiDelta({ challengeHref: window.location.href }));
         store.dispatch(
           navigate({ name: "CHALLENGE", skipBrowserHistory: true }),
+        );
+        e.preventDefault();
+        return;
+      }
+      if (isDataCenterSetupSearch(window.location.search)) {
+        store.dispatch(
+          navigate({ name: "DATA_CENTER_SETUP", skipBrowserHistory: true }),
         );
         e.preventDefault();
         return;
