@@ -82,7 +82,7 @@ async function chooseCity(name: string) {
   const clear = screen.queryByRole("button", { name: "Clear" });
   if (clear) fireEvent.click(clear);
   const input = screen.getByRole("combobox", {
-    name: "Search cities",
+    name: "Select a city",
   });
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: name } });
@@ -114,11 +114,25 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   const onStart = jest.fn();
   render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
   expectStartHidden();
+  expect(
+    screen.queryByRole("combobox", { name: "Start year" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("combobox", { name: "Data centers open" }),
+  ).not.toBeInTheDocument();
   await chooseCity("San Francisco");
+  expect(screen.getByRole("combobox", { name: "Start year" })).toBeVisible();
+  expect(
+    screen.getByRole("combobox", { name: "Data centers open" }),
+  ).toBeVisible();
   expectStartHidden();
   expect(request.startingYear).toBe(new Date().getFullYear());
   const growth = preparedScenario();
   reply(growth);
+  const comparison = screen.getByText(/To compare the difference/);
+  expect(comparison).toHaveTextContent(
+    "Uses local weather and a regional power mix.",
+  );
   expect(startButton()).toBeEnabled();
   expect(
     screen.getByRole("heading", { name: "How much extra power?" }),

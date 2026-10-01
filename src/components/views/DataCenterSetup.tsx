@@ -157,7 +157,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
           <LocationPicker
             showHeading={false}
             allowNearest
-            searchLabel="Search cities"
+            searchLabel="Select a city"
             locations={cities}
             value={location || undefined}
             loading={loading}
@@ -167,49 +167,51 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               setAccountsInput(undefined);
             }}
           />
-          <div className="dataCenterSetupYears">
-            <TextField
-              select
-              label="Start year"
-              value={startingYearInput}
-              slotProps={{ select: { native: true } }}
-              onChange={(event) => {
-                const year = Number(event.target.value);
-                if (!validStartingYear(year)) return;
-                setStartingYearInput(String(year));
-                if (
-                  arrivalInput !== undefined &&
-                  Number(arrivalInput) <= year
-                ) {
-                  setArrivalInput(String(year + 1));
-                }
-              }}
-            >
-              {YEARS.slice(0, -1).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </TextField>
-            <span aria-hidden="true">-</span>
-            <TextField
-              select
-              label="Data centers open"
-              value={arrivalYear}
-              slotProps={{ select: { native: true } }}
-              onChange={(event) => {
-                const year = Number(event.target.value);
-                if (validYear(year) && year > startingYear)
-                  setArrivalInput(String(year));
-              }}
-            >
-              {YEARS.filter((year) => year > startingYear).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </TextField>
-          </div>
+          {location && (
+            <div className="dataCenterSetupYears">
+              <TextField
+                select
+                label="Start year"
+                value={startingYearInput}
+                slotProps={{ select: { native: true } }}
+                onChange={(event) => {
+                  const year = Number(event.target.value);
+                  if (!validStartingYear(year)) return;
+                  setStartingYearInput(String(year));
+                  if (
+                    arrivalInput !== undefined &&
+                    Number(arrivalInput) <= year
+                  ) {
+                    setArrivalInput(String(year + 1));
+                  }
+                }}
+              >
+                {YEARS.slice(0, -1).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </TextField>
+              <span aria-hidden="true">-</span>
+              <TextField
+                select
+                label="Data centers open"
+                value={arrivalYear}
+                slotProps={{ select: { native: true } }}
+                onChange={(event) => {
+                  const year = Number(event.target.value);
+                  if (validYear(year) && year > startingYear)
+                    setArrivalInput(String(year));
+                }}
+              >
+                {YEARS.filter((year) => year > startingYear).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </TextField>
+            </div>
+          )}
           {cityError && (
             <Alert severity="warning">
               The full city list couldn’t load. You can choose an available city
@@ -342,9 +344,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                     color="textSecondary"
                     className="dataCenterSetupComparison"
                   >
-                    To compare the difference, run again with 0 power needed.
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
+                    To compare the difference, run again with 0 power needed.{" "}
                     Uses local weather and a regional power mix. This is an
                     example grid, not a forecast of your utility’s plans.
                   </Typography>

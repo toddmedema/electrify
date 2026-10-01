@@ -30,6 +30,7 @@ import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
+import DataCenterGuide from "./base/DataCenterGuide";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -94,6 +95,7 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (document.querySelector('[data-data-center-guide="true"]')) return true;
     if (document.querySelector('[data-scenario-choice="true"]')) return true;
     if (document.querySelector('[data-manual-help="true"]')) return true;
     if (document.querySelector('[data-customer-programs="true"]')) return true;
@@ -700,6 +702,7 @@ export default class Compositor extends React.Component<Props, {}> {
               onExit={() => this.props.onTutorialEnd(tutorialSteps)}
             />
           )}
+        <DataCenterGuide />
         <ManualHelpPopover
           entry={ui.manualHelpEntry}
           onClose={() => store.dispatch(manualHelpClose())}
