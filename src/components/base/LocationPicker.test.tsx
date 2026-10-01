@@ -282,9 +282,8 @@ describe("finding the nearest city", () => {
     ).toBeDisabled();
     act(() => success(result));
     expect(onChange).toHaveBeenCalledWith(cities[0]);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Closest available city: West City",
-    );
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(screen.getByText("West City selected")).toBeInTheDocument();
   });
   it.each([1, 2, 3])(
     "keeps manual selection usable after geolocation error %s",

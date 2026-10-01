@@ -478,7 +478,6 @@ export default function LocationPicker({
             return;
           }
           select(nearest, true);
-          setNearestMessage(`Closest available city: ${nearest.name}.`);
         },
         (error) =>
           fail(
