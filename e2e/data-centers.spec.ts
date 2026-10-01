@@ -3,7 +3,7 @@ import type { GameType } from "../src/Types";
 
 const setupHeading = (page: Page) =>
   page.getByRole("heading", {
-    name: "Explore data-center growth",
+    name: "Explore data center growth",
     exact: true,
   });
 const startButton = (page: Page) =>
@@ -122,10 +122,14 @@ test("nearest location uses browser permission and keeps manual selection availa
     fullPage: true,
   });
   await page
-    .locator(".dataCenterSetupSummary .dataCenterSetupAssumptions summary")
+    .locator(
+      ".dataCenterSetupSummary .dataCenterSetupAssumptions:not(.dataCenterSetupGridSize) summary",
+    )
     .click();
   await page
-    .locator(".dataCenterSetupSummary .dataCenterSetupAssumptions")
+    .locator(
+      ".dataCenterSetupSummary .dataCenterSetupAssumptions:not(.dataCenterSetupGridSize)",
+    )
     .evaluate((element) => element.scrollIntoView({ block: "start" }));
   await page.screenshot({
     path: testInfo.outputPath("data-center-assumptions.png"),
@@ -184,7 +188,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
     .getByRole("spinbutton", { name: "Year data centers open", exact: true })
     .fill("2035");
   await page
-    .getByRole("spinbutton", { name: "Power needed (MW)", exact: true })
+    .getByRole("spinbutton", { name: "Power needed (megawatts)", exact: true })
     .fill("250");
   await startButton(page).click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
@@ -230,7 +234,7 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     localStorage.getItem("savedGame"),
   );
   await page
-    .getByRole("spinbutton", { name: "Power needed (MW)", exact: true })
+    .getByRole("spinbutton", { name: "Power needed (megawatts)", exact: true })
     .fill("0");
   await startButton(page).click();
   const guard = page.getByRole("dialog", { name: "Start a new game?" });

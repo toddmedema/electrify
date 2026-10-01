@@ -118,7 +118,7 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   const configured: ScenarioType = onStart.mock.calls[0][0];
   expect(configured.loadAdditions?.[0].peakW).toBe(787000000);
   fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
     { target: { value: "0" } },
   );
   fireEvent.click(start);
@@ -140,7 +140,7 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
   const demand = screen.getByRole("spinbutton", {
-    name: "Power needed (MW)",
+    name: "Power needed (megawatts)",
   });
   const arrival = screen.getByRole("spinbutton", {
     name: "Year data centers open",
@@ -168,7 +168,7 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
     screen.getByRole("spinbutton", { name: "Year data centers open" }),
   ).toHaveValue(2045);
   expect(
-    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
   ).toHaveValue(125);
   expect(start).toBeEnabled();
 });
@@ -197,7 +197,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   reply(preparedScenario());
   const start = screen.getByRole("button", { name: "Start exploring" });
   fireEvent.change(
-    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
     { target: { value: "125" } },
   );
   fireEvent.click(screen.getByText(/accounts · edit/));
@@ -213,7 +213,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   expect(request.startingCustomers).toBe(123456);
   reply(preparedScenario());
   expect(
-    screen.getByRole("spinbutton", { name: "Power needed (MW)" }),
+    screen.getByRole("spinbutton", { name: "Power needed (megawatts)" }),
   ).toHaveValue(125);
   fireEvent.click(start);
   expect(onStart.mock.calls[0][0].startingCustomers).toBe(123456);

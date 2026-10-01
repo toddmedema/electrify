@@ -6750,11 +6750,6 @@ $programs_column: 800px;
     gap: var(--space-5);
   }
 
-  .dataCenterSetupIntro {
-    display: grid;
-    gap: var(--space-3);
-  }
-
   .dataCenterSetupSummary {
     padding: var(--space-5);
     border: 1px solid var(--border-subtle);
@@ -6788,8 +6783,12 @@ $programs_column: 800px;
   .dataCenterSetupFooter {
     flex-shrink: 0;
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-subtle);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .dataCenterSetupGridSize {
+    margin-top: 0;
+    border-top: 0;
   }
 
   .dataCenterSetupStart {

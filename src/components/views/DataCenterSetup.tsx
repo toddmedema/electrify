@@ -149,18 +149,12 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
 
   return (
     <div id="listCard" className="flexContainer screenDataCenterSetup">
-      <ScreenHeader title="Explore data-center growth" onBack={onBack} />
+      <ScreenHeader title="Explore data center growth" onBack={onBack} />
       <div className="scrollable">
         <div className="dataCenterSetupContent">
-          <div className="dataCenterSetupIntro">
-            <Typography component="h2" variant="h4">
-              Start with your community
-            </Typography>
-            <Typography color="textSecondary">
-              Choose a nearby city. Explore what new data centers could mean for
-              its power supply using an example grid.
-            </Typography>
-          </div>
+          <Typography>
+            Explore what new data centers could mean for your local grid.
+          </Typography>
           <LocationPicker
             allowNearest
             searchLabel="Search cities"
@@ -196,51 +190,6 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               }
             }}
           />
-          {customerProfile && (
-            <details className="dataCenterSetupAssumptions">
-              <summary>
-                {accountsInput !== undefined
-                  ? "Your grid size"
-                  : customerProfile.basis === "reference-utility"
-                    ? "Example grid size"
-                    : "Grid size"}
-                : {validAccounts ? formatCount(startingCustomers!) : "edit"}{" "}
-                accounts · edit
-              </summary>
-              <Typography variant="body2">
-                {accountsInput !== undefined
-                  ? `Your chosen size. Published reference: ${formatCount(customerProfile.customers)} accounts from `
-                  : customerProfile.basis === "reference-utility"
-                    ? "Example size based on "
-                    : "Based on "}
-                <a
-                  href={customerProfile.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {customerProfile.serviceArea}
-                </a>
-                {customerProfile.sourceYear
-                  ? ` (${customerProfile.sourceYear})`
-                  : ""}
-                . {customerProfile.note} This published count stays fixed when
-                you change the starting year.
-              </Typography>
-              <TextField
-                label="Homes and businesses served"
-                type="number"
-                value={accountsInput ?? startingCustomers ?? ""}
-                slotProps={{ htmlInput: { min: 1, max: 100000000, step: 1 } }}
-                error={!validAccounts}
-                helperText={
-                  validAccounts
-                    ? "Customer accounts, not population. Adjust to match the area you want to explore."
-                    : "Enter a whole number from 1 to 100,000,000."
-                }
-                onChange={(event) => setAccountsInput(event.target.value)}
-              />
-            </details>
-          )}
           {cityError && (
             <Alert severity="warning">
               The full city list couldn’t load. You can choose an available city
@@ -266,7 +215,7 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               retry.
             </Alert>
           )}
-          {growthScenario && location && (
+          {location && (
             <section
               className="dataCenterSetupSummary"
               aria-labelledby="data-center-demand-label"
@@ -280,137 +229,197 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                 >
                   How much extra power?
                 </Typography>
-                <Slider
-                  aria-labelledby="data-center-demand-label"
-                  getAriaValueText={(value) => `${value} megawatts`}
-                  value={validDemand ? demandMW : 0}
-                  min={0}
-                  max={maxDemandMW}
-                  step={1}
-                  valueLabelDisplay="auto"
-                  onChange={(_event, value) => setDemandInput(String(value))}
-                />
-                <TextField
-                  label="Power needed (MW)"
-                  type="number"
-                  value={demandInput ?? defaultDemandW / 1e6}
-                  slotProps={{
-                    htmlInput: { min: 0, max: maxDemandMW, step: "any" },
-                  }}
-                  error={!validDemand}
-                  helperText={
-                    validDemand
-                      ? "MW means megawatts, a measure of power."
-                      : `Enter a value from 0 to ${maxDemandMW} MW.`
-                  }
-                  onChange={(event) => setDemandInput(event.target.value)}
-                />
-                <TextField
-                  label="Year data centers open"
-                  type="number"
-                  value={arrivalInput ?? arrivalYear}
-                  slotProps={{
-                    htmlInput: {
-                      min: Math.max(MIN_YEAR, startingYear),
-                      max: MAX_YEAR,
-                      step: 1,
-                    },
-                  }}
-                  error={!validArrival}
-                  helperText={
-                    !validArrival
-                      ? `Choose a year from ${startingYear} to ${MAX_YEAR}.`
-                      : undefined
-                  }
-                  onChange={(event) => setArrivalInput(event.target.value)}
-                />
-              </div>
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                className="dataCenterSetupComparison"
-              >
-                Run again with demand set to 0. Keep the same city, years and
-                grid size to compare the difference.
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Uses local weather and a regional power mix. This is an example
-                grid, not a forecast of your utility’s plans.
-              </Typography>
-              {growthScenario.facilities.some(
-                (facility) => facility.label === "Modeled balancing reserve",
-              ) && (
-                <Typography variant="body2" color="textSecondary">
-                  Includes modeled gas backup where the game cannot reproduce
-                  the regional supply.
-                </Typography>
-              )}
-              <details className="dataCenterSetupAssumptions">
-                <summary>Power sources and assumptions</summary>
-                <Typography variant="body2">
-                  Explore {growthScenario.startingYear}–
-                  {growthScenario.startingYear +
-                    (scenario || growthScenario).durationMonths / 12}
-                  .
-                </Typography>
-                <Typography variant="body2">
-                  Power mix based on{" "}
-                  {powerMix && (
-                    <a
-                      href={powerMix.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {powerMix.geography} capacity data ({powerMix.year})
-                    </a>
-                  )}
-                  . Uses the region’s mix of power-generating equipment, not its
-                  electricity output or your city’s actual power plants.
-                  {powerMix && startingYear > powerMix.year
-                    ? " Later starts use the latest available mix, not a prediction."
-                    : ""}
-                </Typography>
-                <Typography variant="body2">
-                  {powerMix?.geothermalSourceUrl && (
-                    <>
+                {customerProfile && (
+                  <details className="dataCenterSetupAssumptions dataCenterSetupGridSize">
+                    <summary>
+                      {accountsInput !== undefined
+                        ? "Your grid size"
+                        : customerProfile.basis === "reference-utility"
+                          ? "Example grid size"
+                          : "Grid size"}
+                      :{" "}
+                      {validAccounts ? formatCount(startingCustomers!) : "edit"}{" "}
+                      accounts · edit
+                    </summary>
+                    <Typography variant="body2">
+                      {accountsInput !== undefined
+                        ? `Your chosen size. Published reference: ${formatCount(customerProfile.customers)} accounts from `
+                        : customerProfile.basis === "reference-utility"
+                          ? "Example size based on "
+                          : "Based on "}
                       <a
-                        href={powerMix.geothermalSourceUrl}
+                        href={customerProfile.sourceUrl}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        IRENA geothermal capacity data
-                      </a>{" "}
-                      supplements the regional source.{" "}
-                    </>
+                        {customerProfile.serviceArea}
+                      </a>
+                      {customerProfile.sourceYear
+                        ? ` (${customerProfile.sourceYear})`
+                        : ""}
+                      . {customerProfile.note} This published count stays fixed
+                      when you change the starting year.
+                    </Typography>
+                    <TextField
+                      label="Homes and businesses served"
+                      type="number"
+                      value={accountsInput ?? startingCustomers ?? ""}
+                      slotProps={{
+                        htmlInput: { min: 1, max: 100000000, step: 1 },
+                      }}
+                      error={!validAccounts}
+                      helperText={
+                        validAccounts
+                          ? "Customer accounts, not population. Adjust to match the area you want to explore."
+                          : "Enter a whole number from 1 to 100,000,000."
+                      }
+                      onChange={(event) => setAccountsInput(event.target.value)}
+                    />
+                  </details>
+                )}
+
+                {growthScenario && (
+                  <>
+                    <Slider
+                      aria-labelledby="data-center-demand-label"
+                      getAriaValueText={(value) => `${value} megawatts`}
+                      value={validDemand ? demandMW : 0}
+                      min={0}
+                      max={maxDemandMW}
+                      step={1}
+                      valueLabelDisplay="auto"
+                      onChange={(_event, value) =>
+                        setDemandInput(String(value))
+                      }
+                    />
+                    <TextField
+                      label="Power needed (megawatts)"
+                      type="number"
+                      value={demandInput ?? defaultDemandW / 1e6}
+                      slotProps={{
+                        htmlInput: { min: 0, max: maxDemandMW, step: "any" },
+                      }}
+                      error={!validDemand}
+                      helperText={
+                        validDemand
+                          ? undefined
+                          : `Enter a value from 0 to ${maxDemandMW} MW.`
+                      }
+                      onChange={(event) => setDemandInput(event.target.value)}
+                    />
+                    <TextField
+                      label="Year data centers open"
+                      type="number"
+                      value={arrivalInput ?? arrivalYear}
+                      slotProps={{
+                        htmlInput: {
+                          min: Math.max(MIN_YEAR, startingYear),
+                          max: MAX_YEAR,
+                          step: 1,
+                        },
+                      }}
+                      error={!validArrival}
+                      helperText={
+                        !validArrival
+                          ? `Choose a year from ${startingYear} to ${MAX_YEAR}.`
+                          : undefined
+                      }
+                      onChange={(event) => setArrivalInput(event.target.value)}
+                    />
+                  </>
+                )}
+              </div>
+              {growthScenario && (
+                <>
+                  <Typography
+                    variant="body2"
+                    color="textSecondary"
+                    className="dataCenterSetupComparison"
+                  >
+                    Run again with demand set to 0. Keep the same city, years
+                    and grid size to compare the difference.
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Uses local weather and a regional power mix. This is an
+                    example grid, not a forecast of your utility’s plans.
+                  </Typography>
+                  {growthScenario.facilities.some(
+                    (facility) =>
+                      facility.label === "Modeled balancing reserve",
+                  ) && (
+                    <Typography variant="body2" color="textSecondary">
+                      Includes modeled gas backup where the game cannot
+                      reproduce the regional supply.
+                    </Typography>
                   )}
-                  The model sizes the starting power plants to serve existing
-                  demand, before your new data centers arrive. Hydro is limited
-                  to known sites, and geothermal to suitable locations; those
-                  limits can change the regional mix. Gas is split between
-                  steady and quick-start plants. Storage and unclassified
-                  sources are excluded.
-                </Typography>
-                <ul>
-                  {growthScenario.facilities.map((facility, index) => (
-                    <li key={`${facility.name}-${index}`}>
-                      {facility.label
-                        ? `${facility.label} (${facility.name})`
-                        : facility.name ||
-                          (facility.fuel === "Sun"
-                            ? "Solar"
-                            : facility.fuel === "Uranium"
-                              ? "Nuclear"
-                              : facility.fuel)}
-                      : {formatWatts(facility.peakW || 0)}
-                    </li>
-                  ))}
-                </ul>
-                <Typography variant="body2">
-                  Uses the model’s full costs and construction times. Results
-                  help you explore tradeoffs, rather than predict a specific
-                  project’s impact.
-                </Typography>
-              </details>
+                  <details className="dataCenterSetupAssumptions">
+                    <summary>Power sources and assumptions</summary>
+                    <Typography variant="body2">
+                      Explore {growthScenario.startingYear}–
+                      {growthScenario.startingYear +
+                        (scenario || growthScenario).durationMonths / 12}
+                      .
+                    </Typography>
+                    <Typography variant="body2">
+                      Power mix based on{" "}
+                      {powerMix && (
+                        <a
+                          href={powerMix.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {powerMix.geography} capacity data ({powerMix.year})
+                        </a>
+                      )}
+                      . Uses the region’s mix of power-generating equipment, not
+                      its electricity output or your city’s actual power plants.
+                      {powerMix && startingYear > powerMix.year
+                        ? " Later starts use the latest available mix, not a prediction."
+                        : ""}
+                    </Typography>
+                    <Typography variant="body2">
+                      {powerMix?.geothermalSourceUrl && (
+                        <>
+                          <a
+                            href={powerMix.geothermalSourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            IRENA geothermal capacity data
+                          </a>{" "}
+                          supplements the regional source.{" "}
+                        </>
+                      )}
+                      The model sizes the starting power plants to serve
+                      existing demand, before your new data centers arrive.
+                      Hydro is limited to known sites, and geothermal to
+                      suitable locations; those limits can change the regional
+                      mix. Gas is split between steady and quick-start plants.
+                      Storage and unclassified sources are excluded.
+                    </Typography>
+                    <ul>
+                      {growthScenario.facilities.map((facility, index) => (
+                        <li key={`${facility.name}-${index}`}>
+                          {facility.label
+                            ? `${facility.label} (${facility.name})`
+                            : facility.name ||
+                              (facility.fuel === "Sun"
+                                ? "Solar"
+                                : facility.fuel === "Uranium"
+                                  ? "Nuclear"
+                                  : facility.fuel)}
+                          : {formatWatts(facility.peakW || 0)}
+                        </li>
+                      ))}
+                    </ul>
+                    <Typography variant="body2">
+                      Uses the model’s full costs and construction times.
+                      Results help you explore tradeoffs, rather than predict a
+                      specific project’s impact.
+                    </Typography>
+                  </details>
+                </>
+              )}
             </section>
           )}
         </div>
