@@ -227,6 +227,8 @@ describe("the shipped weather files", () => {
     "Colombo",
     "Guangzhou",
     "HongKong",
+    "HoChiMinhCity",
+    "Hanoi",
     "Durban",
     "Fukuoka",
     "Seville",
