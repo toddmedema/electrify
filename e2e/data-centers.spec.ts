@@ -15,7 +15,7 @@ test("About leads to data-center setup and the selected event starts in the game
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "Can your grid keep up?",
+      "What could they mean for your community?",
     );
     expect(
       await page.evaluate(
@@ -27,10 +27,7 @@ test("About leads to data-center setup and the selected event starts in the game
       fullPage: true,
     });
   }
-  await page
-    .getByRole("link", { name: "Simulate data-center growth" })
-    .first()
-    .click();
+  await page.getByRole("link", { name: "Explore the impact" }).first().click();
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),
   ).toBeVisible();
