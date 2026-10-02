@@ -11,7 +11,7 @@
 // always zero here. Instead each window reports stepMs, the real main-thread wall time from
 // before runFor to the end of settling (ticks, renders, commits, effects and forced layout),
 // read from a performance.now captured before the clock was installed. Reported, never asserted.
-import { CDPSession, expect, Page, test, TestInfo } from "@playwright/test";
+import { CDPSession, expect, Page, test, TestInfo } from "./fixtures";
 import fs from "fs";
 import path from "path";
 import { openPane } from "./layout";

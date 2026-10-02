@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test, Page } from "@playwright/test";
+import { expect, test, Page } from "./fixtures";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
 import { copySavedGame, readSavedGame, readSaveRecords } from "./save-fixture";

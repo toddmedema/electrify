@@ -1,5 +1,5 @@
 import { expectDialogToFit } from "./dialog-layout";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 for (const theme of ["light", "dark"]) {
   test(`wildfire response is actionable and persistent in ${theme}`, async ({

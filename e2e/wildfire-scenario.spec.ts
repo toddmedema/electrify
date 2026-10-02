@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const REVIEW_PROJECTS = new Set(["desktop-chromium", "mobile-390px"]);
 

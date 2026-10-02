@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"] as const) {
   test(`wide desktop map keeps targets and clustering aligned in ${theme}`, async ({

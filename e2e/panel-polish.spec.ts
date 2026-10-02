@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 test("responsive controls and panel navigation keep their geometry", async ({

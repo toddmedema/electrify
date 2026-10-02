@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"]) {
   test(`tutorial build choices and consistent details in ${theme}`, async ({

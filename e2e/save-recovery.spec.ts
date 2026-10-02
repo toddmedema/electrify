@@ -1,5 +1,5 @@
 import { readFile } from "fs/promises";
-import { expect, Locator, Page, Route, test } from "@playwright/test";
+import { expect, Locator, Page, Route, test } from "./fixtures";
 import { decodeSave } from "../src/SaveEncoding";
 import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import type { SaveFileType, SaveGameType } from "../src/Types";

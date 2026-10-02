@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const isPhoneProject = (projectName: string) =>
   projectName === "mobile-390px" || projectName === "mobile-320px";

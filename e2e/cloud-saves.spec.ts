@@ -1,9 +1,9 @@
 import path from "path";
-import { expect, Page, test, TestInfo } from "@playwright/test";
+import { expect, Page, test, TestInfo } from "./fixtures";
 import { readSaveRecords } from "./save-fixture";
 
-// Most suites skip the one-time invitation; this suite exercises a fresh device.
-test.use({ storageState: { cookies: [], origins: [] } });
+// Exercise the real invitation on a fresh device, without the gameplay fixture's dismissal.
+test.use({ showCloudSaveInvitation: true });
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));

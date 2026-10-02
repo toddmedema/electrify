@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 for (const colorScheme of ["light", "dark"] as const) {

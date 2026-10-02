@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test, Page } from "@playwright/test";
+import { expect, test, Page } from "./fixtures";
 import manifest from "../src/data/RunCompatibility.json";
 import type { ChallengeInvitation } from "../src/Types";
 import { readSavedGame, readSaveRecords } from "./save-fixture";

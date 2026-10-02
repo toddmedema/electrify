@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"]) {
   test(`pane minimums and compact controls follow actual width in ${theme}`, async ({

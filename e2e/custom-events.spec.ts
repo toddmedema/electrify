@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { readSavedGame } from "./save-fixture";
 
 test("custom scenario events compose and persist without overflowing setup", async ({

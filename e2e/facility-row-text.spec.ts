@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 // Heatwave + Drought starts with hydro, storage and a mixed fleet, and a new build adds a row

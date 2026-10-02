@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test } from "./fixtures";
 import { openPane } from "./layout";
 
 /**

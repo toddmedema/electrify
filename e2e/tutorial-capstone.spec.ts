@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("guided objective reaches a retryable capstone and succeeds", async ({
   page,

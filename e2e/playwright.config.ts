@@ -15,18 +15,6 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL,
-    // Most suites exercise gameplay; the prompt has its own fresh-device coverage.
-    storageState: {
-      cookies: [],
-      origins: [
-        {
-          origin: baseURL,
-          localStorage: [
-            { name: "electrify-cloud-save-prompt-seen", value: "true" },
-          ],
-        },
-      ],
-    },
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },

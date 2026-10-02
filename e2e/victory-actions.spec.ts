@@ -1,7 +1,7 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"]) {
   test(`victory actions remain usable and replay the scenario in ${theme}`, async ({

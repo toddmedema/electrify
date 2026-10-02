@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 test("paused insights refresh customer programs and keep chart zoom after a palette change", async ({

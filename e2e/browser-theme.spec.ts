@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test } from "./fixtures";
 
 test("installed shell has a dark fallback without dark-scheme support", async ({
   page,

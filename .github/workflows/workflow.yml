@@ -84,7 +84,7 @@ jobs:
       # phone and desktop without running the entire responsive matrix per PR.
       - name: Browser smoke tests
         if: "!cancelled() && steps.browser.outcome == 'success'"
-        run: npm run test:e2e -- build-options.spec.ts tutorial-exit.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
+        run: npm run test:e2e -- build-options.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
 
       # Text can spill into adjacent columns without making the page horizontally scroll.
       - name: Mobile and desktop text layout

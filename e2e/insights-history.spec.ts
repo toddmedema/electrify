@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 test("public insights show the rate score and an absolute customer objective", async ({

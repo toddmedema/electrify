@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"]) {
   test(`home arc glints briefly between long quiet intervals in ${theme} mode`, async ({

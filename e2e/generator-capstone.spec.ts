@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("generator capstone completes immediately after a different second purchase", async ({
   page,
