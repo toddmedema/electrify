@@ -360,9 +360,7 @@ test("failed active deletion restores its writer and successful deletion cannot 
   ).toEqual([id]);
   await deleting.getByRole("button", { name: "Cancel", exact: true }).click();
   await setStorageFault(page, false);
-  await row
-    .getByRole("button", { name: "Return to game", exact: true })
-    .click();
+  await row.getByRole("button", { name: "Load", exact: true }).click();
   const rate = await changeRate(page);
   await expect
     .poll(async () => (await readSavedGame(page, id))?.dollarsPerkWh)
@@ -392,7 +390,7 @@ test("failed Resume data loading releases the target, preserves played order, an
   await page
     .locator('[data-save-id="' + copyId + '"]')
     .getByRole("button", {
-      name: "Resume",
+      name: "Load",
       exact: true,
     })
     .click();
@@ -429,7 +427,7 @@ test("a delayed Resume cannot commit after a fresh writer takes its expired leas
   await page
     .locator('[data-save-id="' + copyId + '"]')
     .getByRole("button", {
-      name: "Resume",
+      name: "Load",
       exact: true,
     })
     .click();
@@ -442,7 +440,7 @@ test("a delayed Resume cannot commit after a fresh writer takes its expired leas
   await other
     .locator('[data-save-id="' + copyId + '"]')
     .getByRole("button", {
-      name: "Resume",
+      name: "Load",
       exact: true,
     })
     .click();
@@ -499,14 +497,14 @@ test("a damaged inactive save offers recovery data without blocking a healthy cu
     { databaseName: SAVE_DATABASE_NAME, saveId: copyId },
   );
   const broken = page.locator('[data-save-id="' + copyId + '"]');
-  await broken.getByRole("button", { name: "Resume", exact: true }).click();
+  await broken.getByRole("button", { name: "Load", exact: true }).click();
   const failure = page.getByRole("dialog", {
     name: "Could not open this save",
   });
   await expect(failure).toBeVisible();
   await failure.getByRole("button", { name: "OK", exact: true }).click();
   await expect(
-    broken.getByRole("button", { name: "Unavailable", exact: true }),
+    broken.getByRole("button", { name: "Load", exact: true }),
   ).toBeDisabled();
   await expect(broken).toContainText("Download its recovery data");
   expect((await readWriters(page)).map((writer) => writer.saveId)).toEqual([
@@ -532,7 +530,7 @@ test("a damaged inactive save offers recovery data without blocking a healthy cu
   });
   await page
     .locator('[data-save-id="' + id + '"]')
-    .getByRole("button", { name: "Return to game", exact: true })
+    .getByRole("button", { name: "Load", exact: true })
     .click();
   await expect(saveState(page)).toHaveAttribute("data-active-save-id", id);
   const rate = await changeRate(page);
@@ -644,7 +642,7 @@ test("completed saves remain writable and historical results leave the current r
   await page
     .locator('[data-save-id="' + id + '"]')
     .getByRole("button", {
-      name: "Return to game",
+      name: "Load",
       exact: true,
     })
     .click();

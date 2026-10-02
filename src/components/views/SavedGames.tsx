@@ -110,9 +110,10 @@ export default function SavedGames(): React.JSX.Element {
       }
     });
   };
-  const resume = (save: SaveMetadata) => {
+  const loadSave = (save: SaveMetadata) => {
     void perform(async () => {
       await resumeSavedGame(save.id);
+      if (save.id === saves.activeId && inGame) focusGameMenu();
     });
   };
   const onFileChosen = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,12 +137,15 @@ export default function SavedGames(): React.JSX.Element {
       350,
     );
   };
-  const returnToGame = () => {
-    dispatch(navigate("FACILITIES"));
+  const focusGameMenu = () => {
     window.setTimeout(
       () => document.querySelector<HTMLElement>(".gameMenuButton")?.focus(),
       350,
     );
+  };
+  const loadUnsavedGame = () => {
+    dispatch(navigate("FACILITIES"));
+    focusGameMenu();
   };
   const pending =
     saves.activeId &&
@@ -261,7 +265,7 @@ export default function SavedGames(): React.JSX.Element {
                   {saves.pendingName || "Current game"}
                 </Typography>
                 <Typography color="warning.main" variant="body2">
-                  Unsaved · Currently open
+                  Unsaved
                 </Typography>
                 <Typography
                   variant="body2"
@@ -271,8 +275,8 @@ export default function SavedGames(): React.JSX.Element {
                     "Keep this game open while saving is unavailable."}
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                  <Button variant="contained" onClick={returnToGame}>
-                    Return to game
+                  <Button variant="contained" onClick={loadUnsavedGame}>
+                    Load
                   </Button>
                   <Button
                     onClick={() => void perform(retryCurrentSave)}
@@ -404,7 +408,6 @@ export default function SavedGames(): React.JSX.Element {
                       >
                         {STATUS_LABELS[save.status]}
                       </Box>
-                      {current ? " · Currently open" : ""}
                     </Typography>
                     <Typography
                       component="div"
@@ -436,20 +439,10 @@ export default function SavedGames(): React.JSX.Element {
                       busy || (!current && !!saves.unavailable?.[save.id])
                     }
                     onClick={() =>
-                      current
-                        ? returnToGame()
-                        : resumable
-                          ? resume(save)
-                          : viewResult(save)
+                      resumable ? loadSave(save) : viewResult(save)
                     }
                   >
-                    {current
-                      ? "Return to game"
-                      : saves.unavailable?.[save.id]
-                        ? "Unavailable"
-                        : resumable
-                          ? "Resume"
-                          : "View result"}
+                    {resumable ? "Load" : "View result"}
                   </Button>
                 </Stack>
               </Paper>

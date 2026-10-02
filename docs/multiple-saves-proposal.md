@@ -21,7 +21,7 @@ The single-save assumption appears in several connected paths:
 
 These observations come from [SaveGame](../src/SaveGame.tsx), [SaveFile](../src/SaveFile.tsx), [StartGame](../src/components/views/StartGame.tsx), [SettingsContainer](../src/components/views/SettingsContainer.tsx), [MainMenuContainer](../src/components/views/MainMenuContainer.tsx), and the [game reducer](../src/reducers/Game.tsx).
 
-Preserve the existing serialization and validation. A save contains the game slice and explicit commitment-forecast metadata; JSON alone would omit metadata attached to timeline ticks. Resume restores that metadata, pauses the game, and passes through Loading to reload simulation data. Tutorials and replay playback currently do not autosave and should remain outside the library.
+Preserve the existing serialization and validation. A save contains the game slice and explicit commitment-forecast metadata; JSON alone would omit metadata attached to timeline ticks. Load restores that metadata, pauses the game, and passes through Loading to reload simulation data. Tutorials and replay playback currently do not autosave and should remain outside the library.
 
 ## Player experience
 
@@ -29,7 +29,7 @@ Preserve the existing serialization and validation. A save contains the game sli
 
 Keep **Continue** as the dominant action when a resumable save exists. Add its name and scenario/date below the button so the player knows what will open. Offer **Saved games** as a quieter secondary action, followed by **Start a new game**. Without a resumable save, **Start playing** remains dominant. Keep Saved games available when the library is empty so import remains discoverable.
 
-Derive Continue from the resumable record with the newest `lastPlayedAt`, using save ID as a deterministic tie-breaker. Set that timestamp only after a new run is initialized or Resume successfully completes Loading. Rename, export, import, and background autosave do not change it. Imports have no `lastPlayedAt`; if no resumable run has ever been played, Continue may offer the newest imported save by creation time. Deleting a record or making it terminal naturally removes it from consideration; there is no stored Continue pointer to repair. If a load fails, show the reason and open the library instead of silently opening another run.
+Derive Continue from the resumable record with the newest `lastPlayedAt`, using save ID as a deterministic tie-breaker. Set that timestamp only after a new run is initialized or Load successfully completes Loading. Rename, export, import, and background autosave do not change it. Imports have no `lastPlayedAt`; if no resumable run has ever been played, Continue may offer the newest imported save by creation time. Deleting a record or making it terminal naturally removes it from consideration; there is no stored Continue pointer to repair. If a load fails, show the reason and open the library instead of silently opening another run.
 
 Add Saved games to the existing game-bar overflow menu. Opening it pauses the simulation through the established blocking-card mechanism. Back returns to the existing run and restores its prior speed according to the current navigation behavior. Choosing another run saves the outgoing one before replacing live state.
 
@@ -42,8 +42,8 @@ Use one centered list on desktop and one full-width pane on phones. Avoid a dens
 - The player-chosen name as the strongest text.
 - Scenario, location, difficulty, and in-game month/year as supporting text, using existing labels and formatters.
 - Last saved time, with the full timestamp available to assistive technology and in a tooltip.
-- A textual state: In progress, Completed, Bankrupt, or Fired. Mark the currently open run separately.
-- A primary Resume action for in-progress and completed saves, or View result for terminal failures. The currently open entry uses Return to game.
+- A textual state: In progress, Completed, Bankrupt, or Fired.
+- A primary Load action for every playable save, including the active game, or View result for terminal failures. Use the same labels and summary fields for all playable entries.
 - A labeled overflow menu containing Rename, Export, and Delete, plus View result when a result exists on a resumable completed save.
 
 Sort by most recently played, using creation time for runs never opened. Autosaving and renaming should not reorder the list under the player's pointer. Include name/scenario search; additional filtering and alternative sorting are outside this change.
@@ -59,12 +59,12 @@ Search saves...                         Import save
 Renewables experiment                            ...
 Rise of Renewables · Ontario · Normal
 June 2035 · In progress · Saved 2 minutes ago
-                                              Resume
+                                              Load
 
 Low carbon utility                               ...
 Custom game · British Columbia · Hard
 December 2040 · Completed · Saved yesterday
-                                              Resume
+                                              Load
 ```
 
 On a phone, stack the search field and Import save action, then place each entry's main action below its text. Allow long names to wrap; do not compress supporting labels into unreadable text. Keep overflow controls at the upper right of each entry and avoid nested click targets: clicking an entry must not accidentally resume it while the player opens its menu.
@@ -73,17 +73,17 @@ On a phone, stack the search field and Import save action, then place each entry
 
 A new game creates a save automatically at its first fully initialized playable state. Do not interrupt scenario selection with a required naming dialog. Use a suggested name such as `Rise of Renewables — Ontario`, adding a numeric suffix to generated names already in use. Offer Rename from the library and from the active run's overflow menu.
 
-Track launch intent explicitly: new run, resume, tutorial, or replay. Allocate a new slot once per new-run launch token; retries and duplicate Loading callbacks must not create additional entries. Resume binds to the selected existing ID, including a save just created by import.
+Track launch intent explicitly: new run, resume, tutorial, or replay. Allocate a new slot once per new-run launch token; retries and duplicate Loading callbacks must not create additional entries. Load binds to the selected existing ID, including a save just created by import.
 
 Names are plain text, trimmed, nonempty, and limited to 60 Unicode code points. Reject line breaks and control characters. Use one shared name-normalization and validation function for generated names, rename, import, and export. Allow duplicate player-entered names: identity comes from the save ID, and scenario/date help distinguish entries. Renaming never changes the scenario's authored name, seed, run identity, or replay.
 
 The rename dialog has a labeled Name field, a character count, inline validation, Cancel, and Save name. Select the existing text on entry. Commit on Save name or Enter; Escape cancels. Keep the old name visible until persistence succeeds.
 
-If initial persistence fails, show **This game has not been saved** with Retry and Export current game. Do not label the run saved or silently reuse an older slot. The player may keep playing with a persistent unsaved-state notice; the coordinator retains the pending ID, name, and latest run snapshot and retries creating that same slot. Show this unsaved current run explicitly in the manager, with Return to game and recovery actions, rather than hiding it behind an empty-library state.
+If initial persistence fails, show **This game has not been saved** with Retry and Export current game. Do not label the run saved or silently reuse an older slot. The player may keep playing with a persistent unsaved-state notice; the coordinator retains the pending ID, name, and latest run snapshot and retries creating that same slot. Show this unsaved current run explicitly in the manager, with Load and recovery actions, rather than hiding it behind an empty-library state.
 
-### Resume and switching
+### Loading and switching
 
-When a player selects Resume, disable repeated activation and show Loading on that entry. Prepare the target through an atomic read-and-acquire operation: read its metadata, payload, and revision and acquire writer ownership in the same transaction. Validate that returned candidate and resolve its scenario outside the transaction, releasing ownership on failure. This prevents a write in another tab between a separate read and acquisition from producing a stale resume. Continue through Loading and start paused, as today.
+When a player selects Load, disable repeated activation and show Loading on that entry. Prepare the target through an atomic read-and-acquire operation: read its metadata, payload, and revision and acquire writer ownership in the same transaction. Validate that returned candidate and resolve its scenario outside the transaction, releasing ownership on failure. This prevents a write in another tab between a separate read and acquisition from producing a stale resume. Continue through Loading and start paused, as today.
 
 Route all replacements of live gameplay through one transition coordinator: starting a scenario, challenge or replay, resuming another save, retrying a run, and returning to the main menu. Prepare the target without replacing live Redux state, pause the outgoing run, and wait for its outstanding write and latest snapshot to commit. Only then release the outgoing ownership and begin the requested load. Recheck the transition generation before committing delayed Loading callbacks; an abandoned or older request cannot bind or initialize a different run.
 
@@ -95,13 +95,13 @@ Validation failure releases the prepared target and returns to the outgoing run.
 
 Renew a prepared target's lease throughout Loading. Before committing the loaded run and `markOpened`, check both the transition generation and its ownership token/revision; the latter check belongs in the transaction that marks it opened and renews its lease. If another tab acquired the save or advanced its revision during a slow load, abandon the old candidate and reopen the latest payload. Same-tab generation checks alone cannot protect this case.
 
-Return to game closes the manager and uses the current live run; it never reloads an older snapshot. The manager still preserves any pending unsaved snapshot when returning.
+Selecting Load for the active game closes the manager and keeps its live progress, including any pending unsaved snapshot. The player uses the same Load action for every playable save.
 
 ### Deletion and ended runs
 
 Use a confirmation dialog: **Delete “Renewables experiment”?** Explain that deletion removes this browser's copy and that exported files remain usable. Offer Cancel and Delete save, with Cancel receiving initial focus. Remove the entry only after the delete transaction succeeds. Use confirmed permanent deletion; an undo system is outside this change.
 
-Deleting the active run uses distinct wording: **Delete and leave this game?** After confirmation, suspend new autosaves, settle any in-flight operation, invalidate queued snapshots, and delete the exact record. Leave gameplay for the library only after success. If deletion fails, retain the live snapshot, restore a usable writer session and retry state, and remain paused with Cancel/Return to game available. For a never-saved pending run, use **Discard and leave this game?** and abandon its pending creation through the same coordinator. Never allow a delayed creation or queued save to recreate a deleted or discarded entry.
+Deleting the active run uses distinct wording: **Delete and leave this game?** After confirmation, suspend new autosaves, settle any in-flight operation, invalidate queued snapshots, and delete the exact record. Leave gameplay for the library only after success. If deletion fails, retain the live snapshot, restore a usable writer session and retry state, and remain paused with Cancel and Load available. For a never-saved pending run, use **Discard and leave this game?** and abandon its pending creation through the same coordinator. Never allow a delayed creation or queued save to recreate a deleted or discarded entry.
 
 Preserve the existing **Keep playing** behavior after a successful term. Completed saves remain resumable and writable; their captured result remains available in secondary actions while later autosaves retain the completed status and result. If continued play later ends in bankruptcy or firing, replace that result with the final failure and make the save terminal. Bankrupt and fired saves offer View result as their primary action and cannot resume. Export and Delete remain available for all records.
 
@@ -109,7 +109,7 @@ Saved-result viewing loads the result on demand and uses a presentation-only dia
 
 ### Visual and accessibility details
 
-Follow the existing theme tokens and 4 px spacing rhythm, with 8/12/16 px gaps and padding. Use restrained neutral surfaces and dividers. Electric blue identifies Resume and other primary actions; reserve red for deletion, failures, and harmful outcomes. Pair every state color with text.
+Follow the existing theme tokens and 4 px spacing rhythm, with 8/12/16 px gaps and padding. Use restrained neutral surfaces and dividers. Electric blue identifies Load and other primary actions; reserve red for deletion, failures, and harmful outcomes. Pair every state color with text.
 
 Use existing scenario icons at their normal 40–48 px size, beside visible scenario labels. Controls must be at least 40 px tall on desktop and 44 px on coarse-pointer devices. Verify light and dark contrast separately, 390 px and 320 px layouts, and enlarged text.
 
@@ -167,7 +167,7 @@ interface SaveFileType {
 
 Generate opaque IDs outside the simulation. Never key records by scenario ID, seed, or `RunIdentity`: two attempts can share all three, and custom games already share a scenario ID. Save IDs, names, timestamps, and writer tokens belong to persistence/session state, not deterministic gameplay or recorded replay actions.
 
-Derive summary fields from a validated payload at creation, import, and autosave, committing them atomically with the payload. Read only metadata to render the library; load full game/result data only for Resume, View result, or Export. Validate payloads on use and mark individual invalid entries unavailable without hiding healthy ones. Normal writes cannot produce stale summaries, so add no full-payload startup scan or general reconciliation subsystem.
+Derive summary fields from a validated payload at creation, import, and autosave, committing them atomically with the payload. Read only metadata to render the library; load full game/result data only for Load, View result, or Export. Validate payloads on use and mark individual invalid entries unavailable without hiding healthy ones. Normal writes cannot produce stale summaries, so add no full-payload startup scan or general reconciliation subsystem.
 
 Define one shared status policy for UI, repository guards, and import validation: `inProgress` and `completed` can resume and save; `bankrupt` and `fired` are terminal. A completed or terminal record must have a matching validated result in its payload. Keep `SavedRunResult` to the serializable score/debrief fields needed for presentation, excluding live callbacks, account-specific rank state, and score-submission authority. Do not copy the full result into metadata.
 
@@ -221,7 +221,7 @@ Replace the single-save reader, writer, cache, and replacement guards outright. 
 
 Use a fresh IndexedDB database with the new object stores. Its structural version is an implementation detail, not a game-schema compatibility system. Support only the current save format, keep `appVersion` diagnostic, and preserve the existing challenge/run compatibility checks.
 
-Import validates the payload, status/result relationship, and name, allocates a fresh local ID, and creates another entry with no `lastPlayedAt`. It never adopts an exported device ID or overwrites a matching scenario/name. Land in the library with **Imported “Name”** and the appropriate Resume or View result action; importing during play does not replace the live run or change Continue's played target. Reject tutorial/replay payloads as non-playable library entries. Preserve the existing 8 MiB file limit.
+Import validates the payload, status/result relationship, and name, allocates a fresh local ID, and creates another entry with no `lastPlayedAt`. It never adopts an exported device ID or overwrites a matching scenario/name. Land in the library with **Imported “Name”** and the appropriate Load or View result action; importing during play does not replace the live run or change Continue's played target. Reject tutorial/replay payloads as non-playable library entries. Preserve the existing 8 MiB file limit.
 
 Use `SaveFileType` as the single current file envelope: required plain-text `name`, `status`, the existing serialized payload under `save`, and a validated `result` when completed or terminal. The nested `SaveGameType` keeps its existing `savedAt`, `appVersion`, `game`, and commitment-forecast fields. Files contain no local save ID, lease, revision, or played-order timestamps. Reject unsupported old envelopes with **This file uses an unsupported save format.** Do not add a legacy importer or game-schema conversions.
 
@@ -246,7 +246,7 @@ Most work is persistence and lifecycle coordination. Reuse existing MUI dialogs,
 
 Extend the existing save/serialization tests rather than replacing them. Test the repository/coordinator with controlled transaction outcomes; use real-browser tests for IndexedDB, page lifecycle, and cross-tab behavior.
 
-- Create A and B with the same scenario and seed. Resume each, make different decisions, and verify their progress stays independent after reload.
+- Create A and B with the same scenario and seed. Load each, make different decisions, and verify their progress stays independent after reload.
 - Rename A, including Unicode and duplicate-name cases. Verify the name survives reload/export/import without changing gameplay or the scenario label.
 - Delete B, then flush a previously queued B write. Verify B stays deleted and A remains resumable. Repeat for the active save, pending creation, and deletion failure; a failed delete must restore a usable session.
 - Switch after a paused build or rate change. Verify that change survives. Inject an outgoing save failure and verify the live run is retained. Test confirmed Leave without saving, cancellation, and the different warnings for never-saved runs and unsaved changes.
@@ -256,7 +256,7 @@ Extend the existing save/serialization tests rather than replacing them. Test th
 - Run tutorials and replays while other saves exist; verify they create no slot and change no unrelated record.
 - Verify the obsolete `savedGame` key is ignored and no legacy paths remain. Old test fixtures must not influence Continue or autosave.
 - Import current-format exports and reject unsupported old files. Verify fresh local IDs, validation, file-size limits, and recovery/export of unavailable entries.
-- Open the same save in two tabs, including another-tab commit immediately before Resume acquisition; verify the acquired payload/revision are consistent. Suspend a tab, expire its lease, and resume it after the other writes; reacquisition must not overwrite newer progress. Verify release, paused renewal, and independence of different saves.
+- Open the same save in two tabs, including another-tab commit immediately before Load acquisition; verify the acquired payload/revision are consistent. Suspend a tab, expire its lease, and resume it after the other writes; reacquisition must not overwrite newer progress. Verify release, paused renewal, and independence of different saves.
 - Copy a tab's session storage into a popup and reload it; verify it cannot borrow the live writer token. Verify ordinary reload and same-tab navigation can resume immediately, and cleanup/remount can recover after database release fails.
 - Delay source or prepared-target lease release while accepting overlapping switches. Only the newest accepted switch may proceed, gameplay cannot change during the final handoff, and a concurrent export still contains the originally requested run.
 - Seed 100 metadata entries and representative long-run payloads. Verify opening/searching the library reads summaries only and writes do not serialize the whole collection. Measure checkpoint serialization on a long run.

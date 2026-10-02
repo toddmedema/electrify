@@ -88,7 +88,41 @@ it("searches names and scenarios without opening a save", async () => {
   expect(resumeSavedGame).not.toHaveBeenCalled();
 });
 
-it("keeps save actions separate from Resume and focuses Cancel for deletion", async () => {
+it("offers Load for both the active game and other playable saves", async () => {
+  renderLibrary({
+    activeId: "wind",
+    entries: [
+      entry(),
+      entry({
+        id: "second",
+        name: "Completed experiment",
+        status: "completed",
+      }),
+    ],
+  });
+  expect(screen.queryByText(/Currently open/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Return to game|Resume/ }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(
+    within(screen.getByRole("article", { name: "Wind experiment" })).getByRole(
+      "button",
+      { name: "Load" },
+    ),
+  );
+  expect(resumeSavedGame).toHaveBeenLastCalledWith("wind");
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: "Load" })[1]).toBeEnabled(),
+  );
+  await userEvent.click(
+    within(
+      screen.getByRole("article", { name: "Completed experiment" }),
+    ).getByRole("button", { name: "Load" }),
+  );
+  expect(resumeSavedGame).toHaveBeenLastCalledWith("second");
+});
+
+it("keeps save actions separate from Load and focuses Cancel for deletion", async () => {
   renderLibrary();
   await userEvent.click(
     screen.getByRole("button", { name: "Actions for Wind experiment" }),
@@ -112,9 +146,9 @@ it("shows the unsaved current run even when the library is empty", async () => {
   expect(screen.queryByText("No saved games yet")).not.toBeInTheDocument();
   const current = screen.getByRole("article", { name: "Unsaved current game" });
   expect(within(current).getByText("New experiment")).toBeInTheDocument();
-  expect(
-    within(current).getByText("Unsaved · Currently open"),
-  ).toBeInTheDocument();
+  expect(within(current).getByText("Unsaved")).toBeInTheDocument();
+  expect(within(current).getByRole("button", { name: "Load" })).toBeEnabled();
+  expect(screen.queryByText(/Currently open/)).not.toBeInTheDocument();
   await userEvent.click(
     within(current).getByRole("button", { name: "Retry save" }),
   );
@@ -135,7 +169,7 @@ it("views a terminal result with only Close and no gameplay transition", async (
     metadata: terminal,
     result,
   });
-  renderLibrary({ entries: [terminal], activeId: "other" });
+  renderLibrary({ entries: [terminal], activeId: terminal.id });
   await userEvent.click(screen.getByRole("button", { name: "View result" }));
   const dialog = await screen.findByRole("dialog", { name: "Bankrupt!" });
   expect(within(dialog).getAllByRole("button")).toHaveLength(1);
@@ -159,13 +193,11 @@ it("keeps a corrupt entry visible with recovery and deletion while healthy games
     },
   });
   const corrupt = screen.getByRole("article", { name: "Wind experiment" });
-  expect(
-    within(corrupt).getByRole("button", { name: "Unavailable" }),
-  ).toBeDisabled();
+  expect(within(corrupt).getByRole("button", { name: "Load" })).toBeDisabled();
   expect(
     within(screen.getByRole("article", { name: "Healthy game" })).getByRole(
       "button",
-      { name: "Resume" },
+      { name: "Load" },
     ),
   ).toBeEnabled();
   await userEvent.click(

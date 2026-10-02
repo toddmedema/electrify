@@ -51,9 +51,7 @@ test("exports compact JSON, imports an independent copy, and resumes it paused",
   const imported = records.find((record) => record.metadata.id !== originalId)!;
   expect(imported.metadata.lastPlayedAt).toBeUndefined();
   const importedRow = page.locator(`[data-save-id="${imported.metadata.id}"]`);
-  await importedRow
-    .getByRole("button", { name: "Resume", exact: true })
-    .click();
+  await importedRow.getByRole("button", { name: "Load", exact: true }).click();
   await expect(page.locator("#appbar:visible")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
@@ -79,6 +77,20 @@ for (const theme of ["light", "dark"]) {
     const originalRow = page.locator(
       `[data-save-id="${original.metadata.id}"]`,
     );
+    await expect(page.getByText(/Currently open/)).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /^(Return to game|Resume)$/ }),
+    ).toHaveCount(0);
+    const liveGame = await readSavedGame(page, original.metadata.id);
+    await originalRow
+      .getByRole("button", { name: "Load", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "menu", exact: true }),
+    ).toBeFocused();
+    expect(await readSavedGame(page, original.metadata.id)).toEqual(liveGame);
+    expect(await readSaveRecords(page)).toHaveLength(1);
+    await openSaves(page);
     await originalRow.getByRole("button", { name: /^Actions for/ }).click();
     await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
     const rename = page.getByRole("dialog", { name: "Rename saved game" });
@@ -181,7 +193,7 @@ test("another tab cannot resume the live save", async ({ page, context }) => {
   await other.getByRole("button", { name: "Saved games", exact: true }).click();
   await other
     .locator(`[data-save-id="${original.metadata.id}"]`)
-    .getByRole("button", { name: "Resume", exact: true })
+    .getByRole("button", { name: "Load", exact: true })
     .click();
   await expect(
     other
