@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { openPane } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([

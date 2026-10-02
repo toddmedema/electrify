@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("month rollover forecasts finish in a worker while the UI keeps painting", async ({
   page,

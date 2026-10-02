@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const theme of ["light", "dark"] as const) {
   test(`custom setup inputs and map targets are legible in ${theme}`, async ({

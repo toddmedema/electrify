@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const REVIEW_VIEWPORTS = new Set([
   "desktop-chromium",

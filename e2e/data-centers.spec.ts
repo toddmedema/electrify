@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test } from "./fixtures";
 import type { GameType } from "../src/Types";
 import path from "path";
 import { expectDialogToFit } from "./dialog-layout";

@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator } from "./fixtures";
 import { isPaneLayout, openPane } from "./layout";
 
 async function scrollPast(target: Locator, distance: number) {

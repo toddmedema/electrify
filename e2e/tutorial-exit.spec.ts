@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test } from "./fixtures";
 
 async function reachStartTimeStep(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());

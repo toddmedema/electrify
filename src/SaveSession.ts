@@ -277,7 +277,8 @@ export class ActiveSaveSession {
   }
 }
 
-const repository = new SaveRepository(parseSave);
+export const saveRepository = new SaveRepository(parseSave);
+const repository = saveRepository;
 type ReservedSave = Awaited<ReturnType<SaveRepository["prepareResume"]>> & {
   writerLock: SaveWriterLock;
 };
@@ -405,6 +406,26 @@ export async function exportSavedGame(id: string): Promise<void> {
     save: record.save,
     result: record.result,
   });
+}
+export async function snapshotSavedGame(id: string): Promise<SaveFileType> {
+  const requested = active;
+  if (requested?.id === id) {
+    requested.capture(getStore().getState().game);
+    // Sharing also offers a way to keep progress when local storage is full.
+    try {
+      await requested.flush();
+    } catch {
+      /* The captured snapshot is still valid. */
+    }
+    return requested.file();
+  }
+  const record = await readSavedGame(id);
+  return {
+    name: record.metadata.name,
+    status: record.metadata.status,
+    save: record.save,
+    result: record.result,
+  };
 }
 export async function exportCurrentSave(): Promise<void> {
   const requested = active;

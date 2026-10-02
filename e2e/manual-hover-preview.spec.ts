@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 // With a mouse, resting on a (?) previews its entry and moving away dismisses it, without

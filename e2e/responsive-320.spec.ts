@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("custom setup and settings stay usable on a 320px phone", async ({
   page,

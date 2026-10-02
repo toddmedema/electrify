@@ -1,6 +1,6 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { openPane } from "./layout";
 
 const reviewProjects = new Set([

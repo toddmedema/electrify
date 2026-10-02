@@ -1,5 +1,5 @@
 import { expectDialogToFit } from "./dialog-layout";
-import { expect, Locator, test } from "@playwright/test";
+import { expect, Locator, test } from "./fixtures";
 import { openPane } from "./layout";
 
 async function expectTextToFit(elements: Locator) {

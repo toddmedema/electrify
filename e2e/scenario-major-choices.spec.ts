@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 for (const scenario of [106, 107]) {
   for (const theme of ["light", "dark"]) {

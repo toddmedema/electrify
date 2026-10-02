@@ -1,4 +1,4 @@
-import { expect, test, Locator } from "@playwright/test";
+import { expect, test, Locator } from "./fixtures";
 import { readSavedGame } from "./save-fixture";
 
 async function expectGap(above: Locator, below: Locator, gap: number) {

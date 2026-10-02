@@ -19,14 +19,11 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate, navigateBack } from "../../reducers/Card";
-import { readSaveFile } from "../../SaveFile";
 import { isResumableStatus, sortSaves } from "../../SaveModel";
 import {
   deleteSavedGame,
   exportCurrentSave,
-  exportSavedGame,
   exportSaveRecovery,
-  importSavedGame,
   readSavedGame,
   refreshSavedGames,
   resumeSavedGame,
@@ -37,6 +34,8 @@ import ScreenHeader from "../base/ScreenHeader";
 import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
 import { savedTime } from "../../helpers/SaveDisplay";
+import CloudSaveStatus from "../base/CloudSaveStatus";
+import ShareSaveDialog from "../base/ShareSaveDialog";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -50,7 +49,7 @@ export default function SavedGames(): React.JSX.Element {
   const saves = useAppSelector((state) => state.saves);
   const inGame = useAppSelector((state) => state.game.inGame);
   const [search, setSearch] = React.useState("");
-  const [notice, setNotice] = React.useState("");
+  const [sharing, setSharing] = React.useState<string>();
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [menu, setMenu] = React.useState<{
@@ -70,7 +69,6 @@ export default function SavedGames(): React.JSX.Element {
   const [unavailable, setUnavailable] = React.useState<Record<string, string>>(
     {},
   );
-  const input = React.useRef<HTMLInputElement>(null);
   const deleteCancel = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     void refreshSavedGames();
@@ -114,19 +112,6 @@ export default function SavedGames(): React.JSX.Element {
     void perform(async () => {
       await resumeSavedGame(save.id);
       if (save.id === saves.activeId && inGame) focusGameMenu();
-    });
-  };
-  const onFileChosen = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const chosen = event.target.files?.[0];
-    event.target.value = "";
-    if (!chosen) return;
-    void perform(async () => {
-      const imported = await readSaveFile(chosen);
-      if (!imported.file)
-        throw new Error(imported.error || "That file isn't a save game.");
-      await importSavedGame(imported.file);
-      setNotice(`Imported “${imported.file.name}”`);
-      setSearch("");
     });
   };
   const onBack = () => {
@@ -175,9 +160,7 @@ export default function SavedGames(): React.JSX.Element {
             pb: "max(24px, env(safe-area-inset-bottom))",
           }}
         >
-          <Typography color="text.secondary" variant="body2">
-            Saved on this device and browser. Export a save to keep a backup.
-          </Typography>
+          <CloudSaveStatus />
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               fullWidth
@@ -186,28 +169,7 @@ export default function SavedGames(): React.JSX.Element {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <Button
-              variant="outlined"
-              disabled={busy}
-              onClick={() => input.current?.click()}
-              sx={{ flexShrink: 0 }}
-            >
-              Import save
-            </Button>
-            <input
-              ref={input}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              aria-label="Save game file"
-              onChange={onFileChosen}
-            />
           </Stack>
-          {notice && (
-            <Alert severity="success" onClose={() => setNotice("")}>
-              {notice}
-            </Alert>
-          )}
           {error && !deleting && (
             <Alert severity="error" role="alert" onClose={() => setError("")}>
               {error}
@@ -325,8 +287,8 @@ export default function SavedGames(): React.JSX.Element {
                 No saved games yet
               </Typography>
               <Typography color="text.secondary" sx={{ my: 1 }}>
-                Games save automatically when you start playing. You can also
-                import a save.
+                Games save automatically when you start playing. Sign in to
+                restore cloud backups from another device.
               </Typography>
               <Button
                 variant="contained"
@@ -469,16 +431,14 @@ export default function SavedGames(): React.JSX.Element {
             const id = menu?.save.id;
             setMenu(undefined);
             if (id)
-              void perform(() =>
-                saves.unavailable?.[id]
-                  ? exportSaveRecovery(id)
-                  : exportSavedGame(id),
-              );
+              if (saves.unavailable?.[id])
+                void perform(() => exportSaveRecovery(id));
+              else setSharing(id);
           }}
         >
           {menu && saves.unavailable?.[menu.save.id]
             ? "Download recovery data"
-            : "Export"}
+            : "Share"}
         </MenuItem>
         {menu?.save.status === "completed" &&
           !saves.unavailable?.[menu.save.id] && (
@@ -504,6 +464,7 @@ export default function SavedGames(): React.JSX.Element {
         </MenuItem>
       </Menu>
       <RenameSaveDialog save={rename} onClose={() => setRename(undefined)} />
+      <ShareSaveDialog id={sharing} onClose={() => setSharing(undefined)} />
       <Dialog
         open={!!deleting}
         onClose={busy ? undefined : () => setDeleting(undefined)}

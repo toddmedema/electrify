@@ -53,6 +53,54 @@ export async function readSaveRecords(page: Page): Promise<WireRecord[]> {
   );
 }
 
+/** Seed an independent local fixture without using the removed file import/export UI. */
+export async function copySavedGame(
+  page: Page,
+  originalId: string,
+): Promise<string> {
+  await flushSave(page);
+  return page.evaluate(
+    ({ databaseName, originalId }) =>
+      new Promise<string>((resolve, reject) => {
+        const request = indexedDB.open(databaseName);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(["saves", "payloads"], "readwrite");
+          const metadata = tx.objectStore("saves").get(originalId);
+          const payload = tx.objectStore("payloads").get(originalId);
+          const id = crypto.randomUUID().replace(/-/g, "");
+          const copy = () => {
+            if (metadata.readyState !== "done" || payload.readyState !== "done")
+              return;
+            if (!metadata.result || !payload.result) return;
+            const entry = {
+              ...metadata.result,
+              id,
+              createdAt: new Date().toISOString(),
+              revision: 1,
+            };
+            delete entry.lastPlayedAt;
+            delete entry.cloud;
+            tx.objectStore("saves").put(entry);
+            tx.objectStore("payloads").put({ ...payload.result, id });
+          };
+          metadata.onsuccess = copy;
+          payload.onsuccess = copy;
+          tx.onabort = () => reject(tx.error);
+          tx.oncomplete = () => {
+            db.close();
+            const channel = new BroadcastChannel(`${databaseName}:changes`);
+            channel.postMessage("changed");
+            channel.close();
+            resolve(id);
+          };
+        };
+      }),
+    { databaseName: SAVE_DATABASE_NAME, originalId },
+  );
+}
+
 async function selectedRecord(
   page: Page,
   saveId?: string,

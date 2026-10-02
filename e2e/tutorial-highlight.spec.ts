@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // The tutorial cue is a ring overlay around the highlighted control. It must stay visible on
 // all four sides even when the control runs edge to edge: a pane, a card or the viewport clips

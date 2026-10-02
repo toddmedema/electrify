@@ -28,16 +28,18 @@ const firebaseApp = initializeApp({
 export const firebaseAppAuth = getAuth(firebaseApp);
 const provider = new GoogleAuthProvider();
 
-export function login() {
-  signInWithPopup(firebaseAppAuth, provider)
+export function login(): Promise<boolean> {
+  return signInWithPopup(firebaseAppAuth, provider)
     .then(() => {
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
       // access token, and the console is readable by anything running on the page.
+      return true;
     })
     .catch((error) => {
       // Firebase errors can include OAuth credentials; only log the diagnostic code.
       console.error("Auth error:", error.code);
+      return false;
     });
 }
 

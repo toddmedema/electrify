@@ -1,4 +1,4 @@
-import { expect, Locator, Page, test } from "@playwright/test";
+import { expect, Locator, Page, test } from "./fixtures";
 
 async function openCustomSetup(page: Page) {
   await page.addInitScript(() => {

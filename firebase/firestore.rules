@@ -47,6 +47,78 @@ service cloud.firestore {
         && (!('displayName' in request.resource.data)
             || isValidDisplayName(request.resource.data.displayName));
       allow delete: if false;
+
+      // Backups are private, including their names, and deletions persist as tombstones.
+      match /cloudSaves/{saveId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['version', 'deleted', 'chunks', 'metadata', 'garbage', 'writerDeviceId', 'writerLocalId', 'sourceRevision'])
+          && request.resource.data.version is string
+          && request.resource.data.version.matches('[a-f0-9]{32}')
+          && request.resource.data.deleted is bool
+          && request.resource.data.chunks is list
+          && request.resource.data.chunks.size() <= 60;
+        allow delete: if false;
+      }
+    }
+
+    function validExpiry(expiry) {
+      // A bounded allowance for browser clock skew; the server controls the load timestamp.
+      return expiry is timestamp
+        && expiry >= request.time + duration.value(365, 'd') - duration.value(5, 'm')
+        && expiry <= request.time + duration.value(365, 'd') + duration.value(5, 'm');
+    }
+
+    match /sharedGames/{shareId} {
+      // No collection listing. Missing-document reads let authenticated creators check collisions.
+      allow get: if (resource == null && isSignedIn())
+        || (resource != null && resource.data.expiresAt > request.time);
+      allow list: if false;
+      allow create: if isSignedIn()
+        && shareId.matches('[A-Za-z0-9]{10}')
+        && request.resource.data.keys().hasOnly(['uid', 'chunks', 'lastLoadedAt', 'expiresAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.chunks is list
+        && request.resource.data.chunks.size() > 0
+        && request.resource.data.chunks.size() <= 60
+        && request.resource.data.lastLoadedAt == request.time
+        && validExpiry(request.resource.data.expiresAt);
+      // Anyone with the link can refresh retention, but cannot change the frozen payload.
+      allow update: if resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoadedAt', 'expiresAt'])
+        && request.resource.data.lastLoadedAt == request.time
+        && validExpiry(request.resource.data.expiresAt);
+      allow delete: if false; // Firestore TTL performs deletion with administrative privileges.
+    }
+
+    match /saveBlobs/{blobId} {
+      function shared() {
+        return get(/databases/$(database)/documents/sharedGames/$(resource.data.shareId));
+      }
+      allow get: if (resource.data.shareId == null && isOwner(resource.data.uid))
+        || (resource.data.shareId != null
+          && shared().data.expiresAt > request.time
+          && blobId in shared().data.chunks);
+      allow list: if false;
+      allow create: if isOwner(request.resource.data.uid)
+        && request.resource.data.keys().hasOnly(['uid', 'shareId', 'data', 'expiresAt'])
+        && blobId.matches('[a-f0-9]{32}')
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 600000
+        && ((request.resource.data.shareId == null && request.resource.data.expiresAt == null)
+          || (request.resource.data.shareId is string
+            && !exists(/databases/$(database)/documents/sharedGames/$(request.resource.data.shareId))
+            && getAfter(/databases/$(database)/documents/sharedGames/$(request.resource.data.shareId)).data.uid == request.auth.uid
+            && blobId in getAfter(/databases/$(database)/documents/sharedGames/$(request.resource.data.shareId)).data.chunks
+            && request.resource.data.expiresAt == getAfter(/databases/$(database)/documents/sharedGames/$(request.resource.data.shareId)).data.expiresAt));
+      allow update: if resource.data.shareId != null
+        && shared().data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expiresAt'])
+        && request.resource.data.expiresAt == getAfter(/databases/$(database)/documents/sharedGames/$(resource.data.shareId)).data.expiresAt
+        && validExpiry(request.resource.data.expiresAt);
+      // Retried cleanup may encounter chunks already removed by another batch/device.
+      allow delete: if (resource == null && isSignedIn())
+        || (resource.data.shareId == null && isOwner(resource.data.uid));
     }
 
     // Publicly readable: hiding the board from logged-out players inverts the incentive to sign
