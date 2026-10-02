@@ -43,6 +43,12 @@ for (const theme of ["light", "dark"]) {
       await header.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     const title = header.locator(".iconLabel");
+    if (await title.locator("svg").isVisible()) {
+      const icon = (await title.locator("svg").boundingBox())!;
+      const label = (await title.locator(".programsTitleLong").boundingBox())!;
+      const gap = label.x - icon.x - icon.width;
+      expect(gap).toBeCloseTo(8, 0);
+    }
     expect(
       await title.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
