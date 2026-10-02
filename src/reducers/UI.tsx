@@ -130,6 +130,7 @@ export const uiSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
+      delete state.dataCenterGuideRequested;
       delete state.arrivingFacilityId;
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
@@ -141,6 +142,15 @@ export const uiSlice = createSlice({
       delete state.insightsViewport;
       state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
+    builder.addMatcher(
+      (action) =>
+        [start.type, resume.type, startReplay.type, launchRun.type].includes(
+          action.type,
+        ),
+      (state) => {
+        delete state.dataCenterGuideRequested;
+      },
+    );
     builder.addMatcher(
       (action) =>
         [

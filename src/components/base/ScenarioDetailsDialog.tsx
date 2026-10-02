@@ -210,15 +210,18 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                   <React.Fragment key={requirement.id}>
                     <Typography component="dt" sx={{ mt: 2, fontWeight: 600 }}>
                       {requirement.label}{" "}
-                      <span
-                        className="missionRequirementStatus"
-                        data-status={requirement.status}
-                      >
-                        {statusLabel(requirement.status)}
-                      </span>
+                      {requirement.status !== "unknown" &&
+                        requirement.status !== "in-progress" && (
+                          <span
+                            className="missionRequirementStatus"
+                            data-status={requirement.status}
+                          >
+                            {statusLabel(requirement.status)}
+                          </span>
+                        )}
                     </Typography>
                     <Typography component="dd">
-                      {requirement.current}
+                      {requirement.current.replace(" (partial month)", "")}
                     </Typography>
                     <Typography
                       component="dd"

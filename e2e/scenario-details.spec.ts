@@ -24,6 +24,12 @@ for (const theme of ["light", "dark"] as const) {
     await details.click();
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });
     await expect(dialog).toBeVisible();
+    await expect(
+      dialog.locator(
+        '.missionRequirementStatus[data-status="unknown"], .missionRequirementStatus[data-status="in-progress"]',
+      ),
+    ).toHaveCount(0);
+    await expect(dialog).not.toContainText("(partial month)");
     await expectDialogToFit(dialog);
     await expect(
       dialog.getByText(/Score appears after your first month/),

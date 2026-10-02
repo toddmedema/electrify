@@ -1344,6 +1344,8 @@ export interface VictoryDebriefType {
 }
 
 export interface UIType {
+  // A one-time guide requested by the data center launch; never part of a save or scenario.
+  dataCenterGuideRequested?: boolean;
   challengeHref?: string;
   scenarioPreview?: number;
   previewDifficulty?: DifficultyType;

@@ -5,6 +5,7 @@ import { DATA_CENTER_DIFFICULTY } from "../../helpers/DataCenterScenario";
 import { scenarioListUrl } from "../../ScenarioUrl";
 import { useAppDispatch } from "../../Store";
 import { delta, quit, start } from "../../reducers/Game";
+import { delta as uiDelta } from "../../reducers/UI";
 import { ScenarioType } from "../../Types";
 import { startWithSaveGuard } from "./StartGame";
 import DataCenterSetup from "./DataCenterSetup";
@@ -23,6 +24,7 @@ export default function DataCenterSetupContainer() {
         }),
       );
       dispatch(start(CUSTOM_SCENARIO_ID));
+      dispatch(uiDelta({ dataCenterGuideRequested: true }));
     });
   };
   return (

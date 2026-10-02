@@ -1,5 +1,7 @@
 import { expect, Page, test } from "@playwright/test";
 import type { GameType } from "../src/Types";
+import path from "path";
+import { expectDialogToFit } from "./dialog-layout";
 
 const setupHeading = (page: Page) =>
   page.getByRole("heading", {
@@ -13,6 +15,8 @@ async function savedGame(page: Page): Promise<GameType | undefined> {
   return page.evaluate(() => {
     window.dispatchEvent(new Event("pagehide"));
     const saved = localStorage.getItem("savedGame");
+    // Pair our synthetic save flush with a restore so later play controls still work.
+    window.dispatchEvent(new Event("pageshow"));
     return saved ? JSON.parse(saved).game : undefined;
   });
 }
@@ -20,7 +24,7 @@ async function savedGame(page: Page): Promise<GameType | undefined> {
 async function ready(page: Page) {
   await expect(setupHeading(page)).toBeVisible();
   const location = page.getByRole("combobox", {
-    name: "Search cities",
+    name: "Select a city",
     exact: true,
   });
   if (!(await location.inputValue())) {
@@ -44,12 +48,18 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await page
     .getByRole("link", { name: "Explore data centers and your grid" })
     .click();
-  await page.getByRole("link", { name: "Explore the impact" }).click();
+  await page.getByRole("link", { name: "Explore the impact" }).last().click();
   await expect(page).toHaveURL(/dataCenters=1/);
   await expect(startButton(page)).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Start year" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("combobox", { name: "Data centers open" }),
+  ).toHaveCount(0);
   await ready(page);
   const search = await page
-    .getByRole("combobox", { name: "Search cities", exact: true })
+    .getByRole("combobox", { name: "Select a city", exact: true })
     .boundingBox();
   const nearest = await page
     .getByRole("button", { name: "Find nearest city", exact: true })
@@ -139,6 +149,126 @@ test("the landing page opens a prepared current-year grid and supports browser h
   await expect(page).toHaveURL(/\/data-centers\.html$/);
 });
 
+test("the header explore button opens setup and first-time tips preserve the chosen grid", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  const theme = testInfo.project.name === "mobile-390px" ? "dark" : "light";
+  await page.addInitScript(
+    (mode) => localStorage.setItem("theme", mode),
+    theme,
+  );
+  await page.emulateMedia({ colorScheme: theme });
+  await page.goto("/data-centers.html");
+  await page
+    .locator(".topnav")
+    .getByRole("link", { name: "Explore the impact" })
+    .click();
+  await expect(page).toHaveURL(/dataCenters=1/);
+  await ready(page);
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir && testInfo.project.name === "desktop-chromium") {
+    await page.screenshot({
+      path: path.join(reviewDir, "data-center-setup-desktop.png"),
+      animations: "disabled",
+    });
+  }
+  await startButton(page).click();
+  const intro = page.getByRole("dialog", { name: "New to Electrify?" });
+  await expect(intro).toBeVisible({ timeout: 30000 });
+  await expectDialogToFit(intro);
+  const before = (await savedGame(page))!;
+  expect(before.inGame).toBe(true);
+  expect(before.speed).toBe("PAUSED");
+  for (const key of ["1", "3", "Space", "q", "w", "g", "?"])
+    await page.keyboard.press(key);
+  await expect(intro).toBeVisible();
+  expect(await savedGame(page)).toEqual(before);
+  await intro.getByRole("button", { name: "Show me the basics" }).click();
+  await expect(page.getByText("1 of 4", { exact: true })).toBeVisible();
+  if (reviewDir && testInfo.project.name === "desktop-chromium") {
+    await page.getByRole("heading", { name: "Keep the lights on" }).click();
+    await page.screenshot({
+      path: path.join(reviewDir, "data-center-guide-desktop.png"),
+      animations: "disabled",
+    });
+  }
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByText("1 of 4", { exact: true })).toBeVisible();
+  for (let step = 0; step < 3; step++)
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+  const final = page.getByRole("dialog", {
+    name: "Watch costs and emissions",
+  });
+  await expectDialogToFit(final);
+  await expect(final.getByText(/Choose 1× at the top/)).toBeVisible();
+  if (reviewDir && testInfo.project.name === "mobile-390px") {
+    await page
+      .getByRole("heading", { name: "Watch costs and emissions" })
+      .click();
+    await page.screenshot({
+      path: path.join(reviewDir, "data-center-guide-mobile.png"),
+      animations: "disabled",
+    });
+  }
+  await final
+    .getByRole("button", { name: "Ready to explore", exact: true })
+    .click();
+  await expect(final).toBeHidden();
+  expect(await savedGame(page)).toEqual(before);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("plays")!).plays.filter(
+        (play: { scenarioId: number }) => play.scenarioId === 0,
+      ),
+    ),
+  ).toEqual([expect.objectContaining({ timesPlayed: 1 })]);
+  await page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "slow speed", exact: true })
+    .first()
+    .click();
+  await expect
+    .poll(async () => (await savedGame(page))?.date.minute)
+    .toBeGreaterThan(before.date.minute);
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "New to Electrify?" }),
+  ).toHaveCount(0);
+});
+
+test("ignoring first-time tips records Mission 1 and prevents another offer", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  await startButton(page).click();
+  const guide = page.getByRole("dialog", { name: "New to Electrify?" });
+  await expect(guide).toBeVisible({ timeout: 30000 });
+  await page.keyboard.press("Escape");
+  await expect(guide).toBeHidden();
+  expect((await savedGame(page))?.speed).toBe("PAUSED");
+  await page.goto("/?dataCenters=1");
+  await ready(page);
+  await startButton(page).click();
+  const guard = page.getByRole("dialog", { name: "Start a new game?" });
+  await expect(guard).toBeVisible();
+  await guard.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(setupHeading(page)).toBeVisible();
+  await startButton(page).click();
+  await guard
+    .getByRole("button", { name: "Start new game", exact: true })
+    .click();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(guide).toHaveCount(0);
+});
+
 test("nearest location uses browser permission and keeps manual selection available when denied", async ({
   page,
   context,
@@ -150,7 +280,7 @@ test("nearest location uses browser permission and keeps manual selection availa
   await ready(page);
   await page.getByRole("button", { name: "Find nearest city" }).click();
   await expect(
-    page.getByRole("combobox", { name: "Search cities" }),
+    page.getByRole("combobox", { name: "Select a city" }),
   ).toHaveValue(/Pittsburgh/);
   await expect(page.getByText(/Closest available city:/)).toHaveCount(0);
   await ready(page);
@@ -197,7 +327,7 @@ test("nearest location uses browser permission and keeps manual selection availa
     path: testInfo.outputPath("nearest-location-denied.png"),
     fullPage: true,
   });
-  const city = page.getByRole("combobox", { name: "Search cities" });
+  const city = page.getByRole("combobox", { name: "Select a city" });
   await city.fill("Pittsburgh");
   await page.getByRole("option", { name: /Pittsburgh/ }).click();
   await ready(page);
@@ -211,7 +341,7 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   await page.goto("/?dataCenters=1");
   await ready(page);
   const location = page.getByRole("combobox", {
-    name: "Search cities",
+    name: "Select a city",
     exact: true,
   });
   await location.fill("Pittsburgh");
