@@ -83,7 +83,7 @@ for (const theme of ["light", "dark"]) {
       await screenshot(page, info, "cloud-invitation-mobile-light.png");
     }
     await invitation
-      .getByRole("button", { name: "Keep saves on this device", exact: true })
+      .getByRole("button", { name: "Continue without syncing", exact: true })
       .click();
     await expect(invitation).toBeHidden();
     const originalId = (await readSaveRecords(page))[0].metadata.id;

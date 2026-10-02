@@ -77,7 +77,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
       </DialogContent>
       <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
         <Button disabled={busy} onClick={dismiss}>
-          Keep saves on this device
+          Continue without syncing
         </Button>
         <Button
           variant="contained"

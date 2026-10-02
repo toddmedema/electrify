@@ -325,7 +325,7 @@ it("offers optional cloud sign-in only once after a device has a save", async ()
   expect(localStorage.getItem(CLOUD_PROMPT_KEY)).toBe("true");
   await userEvent.click(
     within(invitation).getByRole("button", {
-      name: "Keep saves on this device",
+      name: "Continue without syncing",
     }),
   );
   await waitFor(() =>
@@ -352,7 +352,7 @@ it("keeps the cloud invitation available after a cancelled sign-in", async () =>
     "Sign-in didn't finish",
   );
   expect(
-    screen.getByRole("button", { name: "Keep saves on this device" }),
+    screen.getByRole("button", { name: "Continue without syncing" }),
   ).toBeEnabled();
 });
 
