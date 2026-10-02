@@ -1,3 +1,4 @@
+import { encodeSave } from "./SaveEncoding";
 import { LOCATIONS } from "./Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
@@ -135,7 +136,7 @@ describe("SaveFile", () => {
     it("round trips an exported save", async () => {
       writeSave(fakeGame());
       const exported = resumableSave()!.save;
-      const { save } = await readSaveFile(saveFile(exported));
+      const { save } = await readSaveFile(saveFile(encodeSave(exported)));
       expect(save).toEqual(exported);
     });
 
@@ -169,7 +170,9 @@ describe("SaveFile", () => {
       );
 
       const exported = resumableSave()!.save;
-      const { save, error } = await readSaveFile(saveFile(exported));
+      const { save, error } = await readSaveFile(
+        saveFile(encodeSave(exported)),
+      );
 
       expect(error).toBeUndefined();
       expect(save?.game.difficulty).toBe("CEO");

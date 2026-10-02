@@ -21,6 +21,7 @@ import {
   validCommitmentMetadata,
 } from "./helpers/Commitment";
 import packageJson from "../package.json";
+import { decodeSave, encodeSave } from "./SaveEncoding";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
@@ -312,6 +313,7 @@ export function serializeSave(game: GameType): SaveGameType {
  * malformed facility would otherwise crash the sim mid-tick.
  */
 export function parseSave(raw: unknown): SaveGameType | null {
+  raw = decodeSave(raw);
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
@@ -720,7 +722,7 @@ export function readSave(): SaveGameType | null {
 export function writeSave(game: GameType): boolean {
   cached = undefined;
   try {
-    setStorageKeyValue(SAVE_KEY, serializeSave(game), false);
+    setStorageKeyValue(SAVE_KEY, encodeSave(serializeSave(game)), false);
   } catch (_err) {
     return false;
   }

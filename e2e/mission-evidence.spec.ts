@@ -1,3 +1,4 @@
+import { editSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
 import { openPane } from "./layout";
@@ -76,11 +77,8 @@ for (const theme of ["light", "dark"]) {
     await waitForSave(page);
     // Keep this layout/focus fixture solvent so a valid long-term cash warning does not
     // replace the upcoming-event label under test.
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      const save = JSON.parse(localStorage.getItem("savedGame")!);
+    await editSavedGame(page, (save) => {
       for (const tick of save.game.timeline) tick.cash = 1e12;
-      localStorage.setItem("savedGame", JSON.stringify(save));
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -267,14 +265,11 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
   await waitForSave(page);
   // A saved-game fixture isolates the presentation warning from economic outcomes.
-  await page.evaluate(() => {
-    window.dispatchEvent(new Event("pagehide"));
-    const save = JSON.parse(localStorage.getItem("savedGame")!);
+  await editSavedGame(page, (save) => {
     for (const tick of save.game.timeline) {
       tick.cash = -100;
       tick.supplyW = Math.max(tick.supplyW, tick.demandW);
     }
-    localStorage.setItem("savedGame", JSON.stringify(save));
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -358,14 +353,11 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
   await waitForSave(page);
-  await page.evaluate(() => {
-    window.dispatchEvent(new Event("pagehide"));
-    const save = JSON.parse(localStorage.getItem("savedGame")!);
+  await editSavedGame(page, (save) => {
     // Derate the real starting fleet to 390 MW; the real reducer computes the sample.
     save.game.facilities.forEach((facility: { peakW: number }) => {
       facility.peakW *= 0.78;
     });
-    localStorage.setItem("savedGame", JSON.stringify(save));
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();

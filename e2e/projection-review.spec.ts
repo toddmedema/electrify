@@ -1,3 +1,4 @@
+import { editSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
@@ -42,11 +43,8 @@ for (const theme of ["light", "dark"]) {
     await expect(slider).toHaveAttribute("aria-valuetext", /rate score \+/);
     // Persist a negative cash fixture so both the clipped chart and its textual alternative
     // can be inspected without relying on a particular scenario's path to insolvency.
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      const save = JSON.parse(localStorage.getItem("savedGame")!);
+    await editSavedGame(page, (save) => {
       for (const tick of save.game.timeline) tick.cash = -1_000_000;
-      localStorage.setItem("savedGame", JSON.stringify(save));
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();

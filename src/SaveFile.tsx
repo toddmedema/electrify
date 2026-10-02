@@ -1,6 +1,7 @@
 import { getScenario } from "./data/Scenarios";
 import { parseSave, readSave, SaveGameType } from "./SaveGame";
 import { ScenarioType } from "./Types";
+import { encodeSave } from "./SaveEncoding";
 
 /**
  * Moving a save between the browser and a file, plus the question the settings screen and the
@@ -50,7 +51,9 @@ export function saveFilename(scenarioName: string, year: number): string {
 /** Hands the saved game to the browser as a download. */
 export function downloadSave(resumable: ResumableSaveType) {
   const url = URL.createObjectURL(
-    new Blob([JSON.stringify(resumable.save)], { type: "application/json" }),
+    new Blob([JSON.stringify(encodeSave(resumable.save))], {
+      type: "application/json",
+    }),
   );
   const link = document.createElement("a");
   link.href = url;
@@ -67,9 +70,9 @@ export function downloadSave(resumable: ResumableSaveType) {
 }
 
 /**
- * A cap on what will be read into memory. A century-long run saves at a few hundred kilobytes, so
- * this sits far past any real save; it's here so that pointing the file picker at a video doesn't
- * hang the tab before the JSON parse gets a chance to reject it.
+ * Reject oversized files before reading them into memory. Long runs retain megabytes of monthly
+ * chart history; this cap leaves room for those while keeping an accidental video selection from
+ * hanging the tab before JSON validation.
  */
 export const MAX_SAVE_FILE_BYTES = 8 * 1024 * 1024;
 
