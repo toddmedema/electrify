@@ -354,7 +354,7 @@ export default function Settings(props: Props): React.JSX.Element {
           <SettingsGroup id="saved-game-settings" title="Game data">
             <SettingRow
               label="Saved games"
-              description="Resume, rename, import, export, or delete games saved on this device and browser."
+              description="Resume, rename, share, or delete saves. Sign in for cloud backup and access on other devices."
               stackOnMobile
             >
               <Stack

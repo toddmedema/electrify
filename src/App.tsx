@@ -22,6 +22,9 @@ import {
   scenarioListUrl,
 } from "./ScenarioUrl";
 import { startSaveSessions } from "./SaveSession";
+import { startCloudSaves } from "./CloudSaves";
+import CloudSavePrompt from "./components/base/CloudSavePrompt";
+import SharedGameDialog from "./components/base/SharedGameDialog";
 import { store, useAppSelector } from "./Store";
 import {
   createAppTheme,
@@ -304,6 +307,7 @@ export default function App() {
     window.addEventListener("resize", onResize);
 
     const stopSaveSessions = startSaveSessions(store);
+    const stopCloudSaves = startCloudSaves(store);
 
     // Returns its own unsubscribe, which was previously dropped on the floor
     const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
@@ -347,6 +351,7 @@ export default function App() {
       window.removeEventListener("pageshow", onVisibilityChange, false);
       window.removeEventListener("resize", onResize);
       stopSaveSessions();
+      stopCloudSaves();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);
       teardownDevice?.();
@@ -363,6 +368,8 @@ export default function App() {
           <UnitsProvider>
             <CompositorContainer store={store} />
             <ScenarioChoiceDialog />
+            <CloudSavePrompt />
+            <SharedGameDialog />
           </UnitsProvider>
         </InstallPromptProvider>
       </ThemedApp>

@@ -5,7 +5,7 @@ import {
   GAS_CONVERSION_MINUTES,
 } from "../helpers/GasConversion";
 import { accessContextForGame, corridorsForGame } from "../data/IntertieAccess";
-import { beginIntertieStress } from "./GameActions";
+import { beginIntertieStress, cloudSavePromptVisible } from "./GameActions";
 import {
   getHydroAvailability,
   getHydroInventoryKey,
@@ -354,6 +354,7 @@ let speedBeforeBlockingCard: SpeedType | undefined;
 // open. Every other blocking card keeps the clock frozen until it closes.
 let blockingCardAllowsSpeed = false;
 let speedBeforeManualHelp: SpeedType | undefined;
+let speedBeforeCloudSavePrompt: SpeedType | undefined;
 // While hidden, pause owners read and update this foreground speed; the real clock stays
 // paused even if a dialog or card opens or closes before the page returns.
 let speedBeforeHidden: SpeedType | undefined;
@@ -1471,11 +1472,13 @@ function scheduleTick(speed: SpeedType) {
 // Backgrounding is an outer pause: UI transitions still update the speed to restore,
 // but may never restart the actual clock until the page is visible.
 function foregroundSpeed(state: GameType): SpeedType {
-  return speedBeforeHidden ?? state.speed;
+  return speedBeforeCloudSavePrompt ?? speedBeforeHidden ?? state.speed;
 }
 
 function setForegroundSpeed(state: GameType, speed: SpeedType) {
-  if (speedBeforeHidden !== undefined) {
+  if (speedBeforeCloudSavePrompt !== undefined) {
+    speedBeforeCloudSavePrompt = speed;
+  } else if (speedBeforeHidden !== undefined) {
     speedBeforeHidden = speed;
   } else {
     state.speed = speed;
@@ -1908,6 +1911,7 @@ export const gameSlice = createSlice({
       if (
         ((speedBeforeBlockingCard !== undefined && !blockingCardAllowsSpeed) ||
           speedBeforeManualHelp !== undefined ||
+          speedBeforeCloudSavePrompt !== undefined ||
           speedBeforeHidden !== undefined) &&
         action.payload !== "PAUSED"
       ) {
@@ -1946,6 +1950,7 @@ export const gameSlice = createSlice({
       if (!projectAuthoredRunReference(identity)) return;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
       return {
@@ -1977,6 +1982,7 @@ export const gameSlice = createSlice({
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
@@ -1996,6 +2002,7 @@ export const gameSlice = createSlice({
       const replay = action.payload;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
       return {
@@ -2042,6 +2049,7 @@ export const gameSlice = createSlice({
     builder.addCase(quit, () => {
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       return cloneDeep(initialGame);
     });
@@ -2075,6 +2083,20 @@ export const gameSlice = createSlice({
       if (speedBeforeManualHelp !== undefined) {
         setForegroundSpeed(state, speedBeforeManualHelp);
         speedBeforeManualHelp = undefined;
+        ensureTicking(state);
+      }
+    });
+    builder.addCase(cloudSavePromptVisible, (state, action) => {
+      if (action.payload) {
+        if (state.inGame && speedBeforeCloudSavePrompt === undefined) {
+          const remembered = foregroundSpeed(state);
+          setForegroundSpeed(state, "PAUSED");
+          speedBeforeCloudSavePrompt = remembered;
+        }
+      } else if (speedBeforeCloudSavePrompt !== undefined) {
+        const remembered = speedBeforeCloudSavePrompt;
+        speedBeforeCloudSavePrompt = undefined;
+        setForegroundSpeed(state, remembered);
         ensureTicking(state);
       }
     });

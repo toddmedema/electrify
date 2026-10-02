@@ -64,6 +64,9 @@ export const chooseScenarioResponse = createAction<{
  */
 export const pageHidden = createAction("game/pageHidden");
 export const pageVisible = createAction("game/pageVisible");
+export const cloudSavePromptVisible = createAction<boolean>(
+  "game/cloudSavePromptVisible",
+);
 
 /** Player-acknowledged, tutorial-only stress exercise. */
 export const beginIntertieStress = createAction("game/beginIntertieStress");

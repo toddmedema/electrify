@@ -4,7 +4,12 @@ import { decodeSave } from "../src/SaveEncoding";
 import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import type { SaveFileType, SaveGameType } from "../src/Types";
 import { openPane } from "./layout";
-import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
+import {
+  copySavedGame,
+  editSavedGame,
+  readSavedGame,
+  readSaveRecords,
+} from "./save-fixture";
 
 type FaultWindow = Window & { saveRecoveryFault?: boolean };
 interface WriterRecord {
@@ -113,13 +118,7 @@ async function exportedFile(page: Page, button: Locator) {
 }
 
 async function importCopy(page: Page, id: string) {
-  const row = page.locator('[data-save-id="' + id + '"]');
-  await row.getByRole("button", { name: /^Actions for/ }).click();
-  const exported = await exportedFile(
-    page,
-    page.getByRole("menuitem", { name: "Export", exact: true }),
-  );
-  await page.getByLabel("Save game file").setInputFiles(exported.path);
+  await copySavedGame(page, id);
   await expect(page.locator("article[data-save-id]")).toHaveCount(2);
   const copy = (await readSaveRecords(page)).find(
     (record) => record.metadata.id !== id,

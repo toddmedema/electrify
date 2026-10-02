@@ -18,7 +18,7 @@ import type {
 
 export { SaveRepositoryError } from "./SaveModel";
 export const SAVE_DATABASE_NAME = "electrify-saves";
-export const SAVE_DATABASE_VERSION = 1;
+export const SAVE_DATABASE_VERSION = 2;
 export const SAVE_LEASE_MS = 30_000;
 
 interface SessionRecord {
@@ -31,6 +31,15 @@ interface StoredPayload {
   id: string;
   save: unknown;
   result?: unknown;
+}
+
+export interface PendingCloudDelete {
+  key: string;
+  uid: string;
+  id: string;
+  version?: string;
+  writerDeviceId?: string;
+  writerLocalId?: string;
 }
 
 export interface CreateSaveOptions {
@@ -112,9 +121,12 @@ export class SaveRepository {
       }
       request.onupgradeneeded = () => {
         const database = request.result;
-        database.createObjectStore("saves", { keyPath: "id" });
-        database.createObjectStore("payloads", { keyPath: "id" });
-        database.createObjectStore("sessions", { keyPath: "saveId" });
+        if (!database.objectStoreNames.contains("saves")) {
+          database.createObjectStore("saves", { keyPath: "id" });
+          database.createObjectStore("payloads", { keyPath: "id" });
+          database.createObjectStore("sessions", { keyPath: "saveId" });
+        }
+        database.createObjectStore("sync", { keyPath: "key" });
       };
       request.onerror = () => reject(databaseError(request.error));
       request.onblocked = () => {
@@ -550,7 +562,7 @@ export class SaveRepository {
     mutation: (tx: IDBTransaction, metadata: SaveMetadata) => T,
   ): Promise<T> {
     return this.transaction<T>(
-      ["saves", "payloads", "sessions"],
+      ["saves", "payloads", "sessions", "sync"],
       "readwrite",
       (tx, done, request) => {
         request(
@@ -791,7 +803,18 @@ export class SaveRepository {
   }
 
   async delete(id: string, lease?: SaveLease): Promise<void> {
-    await this.mutate(id, lease, (tx) => {
+    await this.mutate(id, lease, (tx, metadata) => {
+      if (metadata.cloud) {
+        const { uid, id: cloudId, version, writerDeviceId } = metadata.cloud;
+        tx.objectStore("sync").put({
+          key: `${uid}:${cloudId}`,
+          uid,
+          id: cloudId,
+          version,
+          writerDeviceId,
+          writerLocalId: metadata.id,
+        });
+      }
       tx.objectStore("saves").delete(id);
       tx.objectStore("payloads").delete(id);
       tx.objectStore("sessions").delete(id);
@@ -814,5 +837,218 @@ export class SaveRepository {
         );
       },
     );
+  }
+
+  /** Bind before uploading, so a concurrent local deletion always queues a cloud deletion. */
+  async bindCloud(
+    id: string,
+    uid: string,
+    cloudId = id,
+    expected?: SaveMetadata,
+  ): Promise<boolean> {
+    const writerDeviceId = await this.transaction<string>(
+      ["sync"],
+      "readwrite",
+      (tx, done, request) => {
+        request(
+          tx.objectStore("sync").get("device"),
+          (record: { value: string } | undefined) => {
+            const value = record?.value || newSaveId();
+            if (!record) tx.objectStore("sync").put({ key: "device", value });
+            done(value);
+          },
+        );
+      },
+    );
+    return this.transaction<boolean>(
+      ["saves"],
+      "readwrite",
+      (tx, done, request) => {
+        request(
+          tx.objectStore("saves").get(id),
+          (metadata: SaveMetadata | undefined) => {
+            if (
+              expected &&
+              (metadata?.cloud?.uid !== expected.cloud?.uid ||
+                metadata?.cloud?.id !== expected.cloud?.id ||
+                metadata?.cloud?.version !== expected.cloud?.version)
+            ) {
+              done(false);
+              return;
+            }
+            if (!metadata || (metadata.cloud && metadata.cloud.uid !== uid))
+              throw new SaveRepositoryError(
+                "conflict",
+                "This save belongs to another account.",
+              );
+            tx.objectStore("saves").put({
+              ...metadata,
+              cloud:
+                metadata.cloud?.id === cloudId
+                  ? { ...metadata.cloud, writerDeviceId }
+                  : { uid, id: cloudId, writerDeviceId },
+            });
+            done(true);
+          },
+        );
+      },
+    );
+  }
+
+  async acknowledgeCloud(
+    id: string,
+    uid: string,
+    cloudId: string,
+    revision: number,
+    version: string,
+  ): Promise<void> {
+    await this.transaction<void>(
+      ["saves", "sync"],
+      "readwrite",
+      (tx, done, request) => {
+        request(
+          tx.objectStore("saves").get(id),
+          (metadata: SaveMetadata | undefined) => {
+            if (metadata?.cloud?.uid === uid && metadata.cloud.id === cloudId) {
+              if ((metadata.cloud.syncedRevision || 0) > revision) {
+                done(undefined);
+                return;
+              }
+              tx.objectStore("saves").put({
+                ...metadata,
+                cloud: {
+                  uid,
+                  id: cloudId,
+                  version,
+                  syncedRevision: revision,
+                  writerDeviceId: metadata.cloud.writerDeviceId,
+                },
+              });
+            } else {
+              // Deletion can commit while the upload is in flight. Persist its new cloud version.
+              request(
+                tx.objectStore("sync").get(`${uid}:${cloudId}`),
+                (pending: PendingCloudDelete | undefined) => {
+                  if (pending)
+                    tx.objectStore("sync").put({ ...pending, version });
+                },
+              );
+            }
+            done(undefined);
+          },
+        );
+      },
+    );
+  }
+
+  pendingCloudDeletes(uid: string): Promise<PendingCloudDelete[]> {
+    return this.transaction(["sync"], "readonly", (tx, done, request) => {
+      request(
+        tx.objectStore("sync").getAll(),
+        (entries: PendingCloudDelete[]) =>
+          done(entries.filter((entry) => entry.uid === uid)),
+      );
+    });
+  }
+
+  clearCloudDelete(key: string): Promise<void> {
+    return this.transaction(["sync"], "readwrite", (tx, done) => {
+      tx.objectStore("sync").delete(key);
+      done(undefined);
+    });
+  }
+
+  /** Cloud restore never replaces a live writer or a revision edited during the download. */
+  async applyCloud(
+    uid: string,
+    cloudId: string,
+    version: string,
+    record: SaveRecord | null,
+    expected?: SaveMetadata,
+  ): Promise<boolean> {
+    const prepared = record
+      ? this.prepare(record.save, record.metadata.status, record.result)
+      : undefined;
+    const applied = await this.transaction<boolean>(
+      ["saves", "payloads", "sessions", "sync"],
+      "readwrite",
+      (tx, done, request) => {
+        request(tx.objectStore("saves").getAll(), (entries: SaveMetadata[]) => {
+          // Dedupe by cloud identity inside the transaction, including when the
+          // same cloud ID was restored under a different local ID after a fork.
+          if (
+            !expected &&
+            entries.some(
+              (entry) => entry.cloud?.uid === uid && entry.cloud.id === cloudId,
+            )
+          ) {
+            done(false);
+            return;
+          }
+          const id =
+            expected?.id ||
+            (entries.some((entry) => entry.id === cloudId)
+              ? newSaveId()
+              : cloudId);
+          const current = entries.find((entry) => entry.id === id);
+          if (
+            expected
+              ? current?.revision !== expected.revision ||
+                current?.cloud?.version !== expected.cloud?.version ||
+                current?.cloud?.id !== expected.cloud?.id ||
+                current?.cloud?.uid !== expected.cloud?.uid
+              : !!current
+          ) {
+            done(false);
+            return;
+          }
+          request(
+            tx.objectStore("sessions").get(id),
+            (owner: SessionRecord | undefined) => {
+              if (owner && owner.expiresAt > this.now()) {
+                done(false);
+                return;
+              }
+              request(
+                tx.objectStore("sync").get(`${uid}:${cloudId}`),
+                (pending: PendingCloudDelete | undefined) => {
+                  if (pending) {
+                    done(false);
+                    return;
+                  }
+                  if (record && prepared) {
+                    const revision = (current?.revision || 0) + 1;
+                    tx.objectStore("saves").put({
+                      ...record.metadata,
+                      id,
+                      name: normalizeSaveName(record.metadata.name),
+                      revision,
+                      cloud: {
+                        uid,
+                        id: cloudId,
+                        version,
+                        syncedRevision: revision,
+                      },
+                    });
+                    tx.objectStore("payloads").put({
+                      id,
+                      save: prepared.wire,
+                      result: prepared.result,
+                    });
+                  } else {
+                    tx.objectStore("saves").delete(id);
+                    tx.objectStore("payloads").delete(id);
+                  }
+                  tx.objectStore("sessions").delete(id);
+                  done(true);
+                },
+              );
+            },
+          );
+        });
+      },
+    );
+    if (applied) this.changed();
+    return applied;
   }
 }

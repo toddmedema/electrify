@@ -37,5 +37,12 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "sharedGames", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "saveBlobs", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "saveBlobs", "fieldPath": "data", "indexes": [] },
+    { "collectionGroup": "cloudSaves", "fieldPath": "metadata", "indexes": [] },
+    { "collectionGroup": "cloudSaves", "fieldPath": "chunks", "indexes": [] },
+    { "collectionGroup": "sharedGames", "fieldPath": "chunks", "indexes": [] }
+  ]
 }

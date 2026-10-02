@@ -105,7 +105,7 @@ describe("Settings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Manage saves" }));
     expect(onManageSaves).toHaveBeenCalledTimes(1);
     expect(
-      screen.getByText(/saved on this device and browser/),
+      screen.getByText(/Sign in for cloud backup and access on other devices/),
     ).toBeInTheDocument();
   });
 

@@ -13,12 +13,18 @@ export interface SaveLibraryState {
   mutationId?: string;
   transitioning?: boolean;
   unavailable?: Record<string, { revision: number; message: string }>;
+  cloudState?:
+    "initializing" | "signedOut" | "syncing" | "synced" | "offline" | "failed";
+  cloudError?: string;
+  cloudUid?: string;
+  cloudConflicts?: boolean;
 }
 
 export const initialSaveLibrary: SaveLibraryState = {
   entries: [],
   loading: true,
   saveState: "idle",
+  cloudState: "initializing",
 };
 
 const slice = createSlice({

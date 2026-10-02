@@ -1358,6 +1358,13 @@ export type SavedRunResult = Pick<
 > & { outcome: Exclude<SaveStatus, "inProgress"> };
 
 export interface SaveMetadata {
+  cloud?: {
+    uid: string;
+    id: string;
+    version?: string;
+    syncedRevision?: number;
+    writerDeviceId?: string;
+  };
   id: SaveId;
   name: string;
   createdAt: string;

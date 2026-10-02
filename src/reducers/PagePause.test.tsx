@@ -7,6 +7,7 @@ import {
   quit,
   openPolicyDecision,
   closePolicyDecision,
+  cloudSavePromptVisible,
 } from "./GameActions";
 import { GameType } from "../Types";
 
@@ -29,6 +30,59 @@ function paused(): GameType {
 }
 
 describe("the backgrounded page pausing the game", () => {
+  it("pauses for the cloud invitation and restores speed after background sign-in", () => {
+    let state = gameReducer(running("FAST"), cloudSavePromptVisible(true));
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(state, setSpeed("NORMAL"));
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(state, pageHidden());
+    state = gameReducer(state, cloudSavePromptVisible(false));
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, pageVisible()).speed).toBe("FAST");
+  });
+
+  it("does not restart a deliberately paused or ended game after the invitation", () => {
+    let state = gameReducer(paused(), cloudSavePromptVisible(true));
+    state = gameReducer(state, cloudSavePromptVisible(false));
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(running(), cloudSavePromptVisible(true));
+    state = gameReducer(state, quit());
+    expect(gameReducer(state, cloudSavePromptVisible(false)).speed).toBe(
+      "PAUSED",
+    );
+  });
+  it("keeps the invitation paused if the manual closes underneath it", () => {
+    let state = gameReducer(running("FAST"), manualHelpOpen("Interties"));
+    state = gameReducer(state, cloudSavePromptVisible(true));
+    state = gameReducer(state, manualHelpClose());
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, cloudSavePromptVisible(false)).speed).toBe(
+      "FAST",
+    );
+  });
+
+  it("keeps a later dialog paused after the invitation closes", () => {
+    let state = gameReducer(running("FAST"), cloudSavePromptVisible(true));
+    state = gameReducer(
+      state,
+      dialogOpen({ open: true, title: "Review", message: "Review purchase" }),
+    );
+    state = gameReducer(state, cloudSavePromptVisible(false));
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, dialogClose()).speed).toBe("FAST");
+  });
+
+  it("preserves changes beneath the invitation through a background round trip", () => {
+    let state = gameReducer(running("FAST"), manualHelpOpen("Interties"));
+    state = gameReducer(state, pageHidden());
+    state = gameReducer(state, cloudSavePromptVisible(true));
+    state = gameReducer(state, manualHelpClose());
+    state = gameReducer(state, pageVisible());
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, cloudSavePromptVisible(false)).speed).toBe(
+      "FAST",
+    );
+  });
   it("pauses on the way out and restores the speed on the way back", () => {
     const hidden = gameReducer(running("FAST"), pageHidden());
     expect(hidden.speed).toBe("PAUSED");

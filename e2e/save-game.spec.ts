@@ -1,9 +1,8 @@
-import { readFile } from "fs/promises";
 import path from "path";
 import { expect, test, Page } from "@playwright/test";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
-import { readSavedGame, readSaveRecords } from "./save-fixture";
+import { copySavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
 async function startGame(page: Page) {
   await page.goto("/?scenario=101");
@@ -26,26 +25,20 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
 });
 
-test("exports compact JSON, imports an independent copy, and resumes it paused", async ({
+test("an independent local copy preserves compact save data and resumes paused", async ({
   page,
 }) => {
   await startGame(page);
   await openSaves(page);
-  const originalId = (await readSaveRecords(page))[0].metadata.id;
-  await page
-    .locator("article.saveEntry")
-    .getByRole("button", { name: /^Actions for/ })
-    .click();
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("menuitem", { name: "Export", exact: true }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^electrify-.*\.json$/);
-  const file = (await download.path())!;
-  const wire = JSON.parse(await readFile(file, "utf8"));
-  expect(wire.save.game.timeline.shapes.length).toBeGreaterThan(0);
-  expect(wire.save.game.timeline.rows).toHaveLength(96);
-  const exported = decodeSave(wire.save) as SaveGameType;
-  await page.getByLabel("Save game file").setInputFiles(file);
+  const original = (await readSaveRecords(page))[0];
+  const originalId = original.metadata.id;
+  const wire = original.save as {
+    game: { timeline: { shapes: unknown[]; rows: unknown[] } };
+  };
+  expect(wire.game.timeline.shapes.length).toBeGreaterThan(0);
+  expect(wire.game.timeline.rows).toHaveLength(96);
+  const exported = decodeSave(original.save) as SaveGameType;
+  await copySavedGame(page, originalId);
   await expect(page.locator("article.saveEntry")).toHaveCount(2);
   const records = await readSaveRecords(page);
   const imported = records.find((record) => record.metadata.id !== originalId)!;
@@ -103,12 +96,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       originalRow.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
-    await originalRow.getByRole("button", { name: /^Actions for/ }).click();
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("menuitem", { name: "Export", exact: true }).click();
-    const download = await downloadPromise;
-    const file = (await download.path())!;
-    await page.getByLabel("Save game file").setInputFiles(file);
+    await copySavedGame(page, original.metadata.id);
     await expect(page.locator("article.saveEntry")).toHaveCount(2);
     const records = await readSaveRecords(page);
     const copy = records.find(
@@ -243,7 +231,7 @@ test("the same tab can reload or navigate home and resume without waiting for le
   expect(await readSaveRecords(page)).toHaveLength(1);
 });
 
-test("legacy local storage and unsupported imported envelopes do not create saves", async ({
+test("legacy local storage does not create saves and file import is replaced", async ({
   page,
 }) => {
   await page.addInitScript(() =>
@@ -254,13 +242,9 @@ test("legacy local storage and unsupported imported envelopes do not create save
   await expect(
     page.getByRole("heading", { name: "No saved games yet" }),
   ).toBeVisible();
-  await page.getByLabel("Save game file").setInputFiles({
-    name: "old-save.json",
-    mimeType: "application/json",
-    buffer: Buffer.from('{"game":{"scenarioId":101}}'),
-  });
+  await expect(page.getByLabel("Save game file")).toHaveCount(0);
   await expect(
-    page.getByRole("alert").filter({ hasText: /unsupported|format|save/i }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Import", exact: true }),
+  ).toHaveCount(0);
   expect(await readSaveRecords(page)).toHaveLength(0);
 });
