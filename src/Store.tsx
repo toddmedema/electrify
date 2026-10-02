@@ -1,5 +1,7 @@
 import { configureStore, ThunkAction, Action } from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+import savesReducer from "./SaveLibrary";
+import { saveSessionMiddleware } from "./SaveSession";
 import { registerStore } from "./StoreRegistry";
 import cardReducer, { navigationDestinationMiddleware } from "./reducers/Card";
 import gameReducer from "./reducers/Game";
@@ -10,6 +12,7 @@ import userReducer from "./reducers/User";
 
 export const store = configureStore({
   reducer: {
+    saves: savesReducer,
     card: cardReducer,
     game: gameReducer,
     settings: settingsReducer,
@@ -34,13 +37,18 @@ export const store = configureStore({
           "ui.dialog.message",
           "ui.dialog.action",
           "ui.dialog.secondaryAction",
+          "ui.dialog.tertiaryAction",
           "ui.snackbar.action",
           "game.timeline",
           "game.monthlyHistory",
           "game.replayLog",
         ],
       },
-    }).concat(tutorialGateMiddleware, navigationDestinationMiddleware),
+    }).concat(
+      tutorialGateMiddleware,
+      navigationDestinationMiddleware,
+      saveSessionMiddleware,
+    ),
 });
 
 export type AppStore = typeof store;

@@ -1,6 +1,6 @@
 import { UnknownAction } from "@reduxjs/toolkit";
 import { getPlayedScenarioIds } from "../../LocalStorage";
-import { resumableSave } from "../../SaveFile";
+import { SaveMetadata } from "../../Types";
 import type { AppDispatch } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
 import { navigate } from "../../reducers/Card";
@@ -11,16 +11,21 @@ jest.mock("../../LocalStorage", () => ({
   ...jest.requireActual("../../LocalStorage"),
   getPlayedScenarioIds: jest.fn(),
 }));
-jest.mock("../../SaveFile", () => ({
-  resumableSave: jest.fn(),
+jest.mock("../../SaveSession", () => ({
+  saveSessionMiddleware:
+    () => (next: (action: unknown) => unknown) => (action: unknown) =>
+      next(action),
+  runSaveTransition: (proceed: () => void) => {
+    proceed();
+    return Promise.resolve(true);
+  },
+  resumeSavedGame: jest.fn(),
 }));
 
 const mockedPlayed = getPlayedScenarioIds as jest.MockedFunction<
   typeof getPlayedScenarioIds
 >;
-const mockedResumableSave = resumableSave as jest.MockedFunction<
-  typeof resumableSave
->;
+let entries: SaveMetadata[] = [];
 
 function startFromMenu(): UnknownAction[] {
   const actions: UnknownAction[] = [];
@@ -28,14 +33,14 @@ function startFromMenu(): UnknownAction[] {
     actions.push(action);
     return action;
   }) as AppDispatch;
-  mapDispatchToProps(dispatch).onStart();
+  mapDispatchToProps(dispatch, () => entries).onStart();
   return actions;
 }
 
 describe("MainMenuContainer onStart", () => {
   beforeEach(() => {
     mockedPlayed.mockReturnValue([]);
-    mockedResumableSave.mockReturnValue(null);
+    entries = [];
   });
 
   it("starts Mission 1 immediately for a brand-new player", () => {
@@ -48,7 +53,14 @@ describe("MainMenuContainer onStart", () => {
   });
 
   it("opens the mission list when an unfinished save exists", () => {
-    mockedResumableSave.mockReturnValue({} as ReturnType<typeof resumableSave>);
+    entries = [
+      {
+        id: "saved",
+        status: "inProgress",
+        createdAt: "2026-10-01",
+        lastPlayedAt: "2026-10-01",
+      } as SaveMetadata,
+    ];
     expect(startFromMenu()).toEqual([navigate("NEW_GAME")]);
   });
 });

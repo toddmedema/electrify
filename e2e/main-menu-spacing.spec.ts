@@ -1,4 +1,5 @@
 import { expect, test, Locator } from "@playwright/test";
+import { readSavedGame } from "./save-fixture";
 
 async function expectGap(above: Locator, below: Locator, gap: number) {
   const first = await above.boundingBox();
@@ -44,7 +45,7 @@ for (const theme of ["light", "dark"]) {
     for (let index = 1; index < (await actions.count()); index += 1) {
       await expectGap(actions.nth(index - 1), actions.nth(index), 8);
     }
-    const button = await primary.getByRole("button").boundingBox();
+    const button = await primary.locator("[data-main-action]").boundingBox();
     expect(button!.width).toBeLessThanOrEqual(260);
     expect(button!.x).toBeGreaterThanOrEqual(24);
 
@@ -67,9 +68,7 @@ test("a saved game remains separated from the logo and footer on short screens",
   test.skip(testInfo.project.name !== "mobile-320px");
   await page.goto("/?scenario=103");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect
-    .poll(() => page.evaluate(() => Boolean(localStorage.getItem("savedGame"))))
-    .toBe(true);
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
   await page.setViewportSize({ width: 360, height: 320 });
   await page.goto("/");
   const primary = page.getByRole("region", { name: "Primary actions" });
@@ -77,8 +76,13 @@ test("a saved game remains separated from the logo and footer on short screens",
     primary.getByRole("button", { name: "Continue", exact: true }),
   ).toBeVisible();
   await expectGap(
-    primary.getByRole("button").nth(0),
-    primary.getByRole("button").nth(1),
+    primary.getByRole("button", { name: "Continue", exact: true }),
+    primary.locator("[data-continue-context]"),
+    8,
+  );
+  await expectGap(
+    primary.locator("[data-continue-context]"),
+    primary.getByRole("button", { name: "Saved games", exact: true }),
     8,
   );
   const logo = await page.locator("#logo").boundingBox();

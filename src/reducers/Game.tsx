@@ -266,7 +266,7 @@ import {
 } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { start, loaded, quit, resume, startReplay } from "./GameActions";
-import { clearSaveFor } from "../SaveGame";
+import { currentRunSaveEffects, RunSaveEffects } from "../SaveEffects";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   ActiveWorldEventType,
@@ -359,6 +359,7 @@ let speedBeforeManualHelp: SpeedType | undefined;
 let speedBeforeHidden: SpeedType | undefined;
 const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
+  "SAVED_GAMES",
   "MANUAL",
   "BUILD_GENERATORS",
   "BUILD_STORAGE",
@@ -1523,7 +1524,7 @@ export const gameSlice = createSlice({
         accumulatedTickMs + simulationStepMs * TICK_SNAP >=
         simulationStepMs
       ) {
-        tickState(state);
+        tickState(state, currentRunSaveEffects());
         accumulatedTickMs -= simulationStepMs;
         if (!state.inGame || (state.speed as SpeedType) === "PAUSED") {
           tickLoopRunning = false;
@@ -3079,7 +3080,7 @@ export function tutorialCompleteDialog({
 // Ticks the state forward in place
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
-export function tickState(state: GameType) {
+export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
   if (
     state.tutorialIntertieStress?.active &&
     !state.replayPlayback &&
@@ -3304,12 +3305,27 @@ export function tickState(state: GameType) {
               outcome,
             });
         }
+        // Bind the outcome before the reducer returns. The middleware persists the final
+        // Redux snapshot afterwards; no delayed callback can target a different live save.
+        if (!isReplay && saveEffects) {
+          saveEffects.outcome(
+            cloneDeep({
+              scenarioId: scoredScenarioId,
+              scenarioName,
+              difficulty,
+              score: finalScore,
+              breakdown: score,
+              endTitle,
+              endMessage:
+                typeof endMessage === "string" ? endMessage : undefined,
+              ranked,
+              outcome,
+              debrief,
+            }),
+            typeof endMessage === "function" ? endMessage : undefined,
+          );
+        }
         setTimeout(() => {
-          // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
-          // as this returns and would write the run straight back
-          if (!isReplay) {
-            clearSaveFor(scenarioId);
-          }
           // Read before the submit below, so "was 640" means the run before this one rather than
           // the one that just finished. getState() cannot be called while the reducer is running.
           const previousBest =
@@ -3412,9 +3428,6 @@ export function tickState(state: GameType) {
             });
           }
           setTimeout(() => {
-            if (!isReplay) {
-              clearSaveFor(scenarioId);
-            }
             getStore().dispatch(
               dialogOpen({
                 title: failure.title,
@@ -3475,9 +3488,6 @@ export function tickState(state: GameType) {
               });
             }
             setTimeout(() => {
-              if (!isReplay) {
-                clearSaveFor(scenarioId);
-              }
               return getStore().dispatch(
                 tutorialCompleteDialog({
                   title: endTitle || "Mission complete!",

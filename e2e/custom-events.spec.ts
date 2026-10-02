@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readSavedGame } from "./save-fixture";
 
 test("custom scenario events compose and persist without overflowing setup", async ({
   page,
@@ -65,21 +66,13 @@ test("custom scenario events compose and persist without overflowing setup", asy
     timeout: 30000,
   });
   await expect
-    .poll(() =>
-      page.evaluate(() => {
-        window.dispatchEvent(new Event("pagehide"));
-        const save = localStorage.getItem("savedGame");
-        return save
-          ? JSON.parse(save).game.customScenario?.eventScenarioIds
-          : undefined;
-      }),
+    .poll(
+      async () => (await readSavedGame(page))?.customScenario?.eventScenarioIds,
     )
     .toEqual([106, 108, 111]);
-  const scenario = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("savedGame")!).game.customScenario,
-  );
+  const scenario = (await readSavedGame(page))!.customScenario!;
   expect(
-    scenario.loadAdditions.some(
+    scenario.loadAdditions!.some(
       (load: { label: string }) => load.label === "Data Centers",
     ),
   ).toBe(true);

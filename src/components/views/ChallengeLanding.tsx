@@ -5,10 +5,10 @@ import { expandAuthoredRunReference } from "../../helpers/RunIdentity";
 import { getHistoryApi, logEvent } from "../../Globals";
 import { scenarioDetailsUrl, scenarioListUrl } from "../../ScenarioUrl";
 import { navigate } from "../../reducers/Card";
-import { resume } from "../../reducers/Game";
 import { delta as uiDelta } from "../../reducers/UI";
 import { launchRun } from "../../reducers/GameActions";
-import { resumableSave } from "../../SaveFile";
+import { selectContinueSave } from "../../SaveModel";
+import { resumeSavedGame } from "../../SaveSession";
 import { startWithSaveGuard } from "./StartGame";
 import NewGameDetails from "./NewGameDetails";
 
@@ -17,7 +17,9 @@ export default function ChallengeLanding() {
   const game = useAppSelector((s) => s.game);
   const route = parseChallengeUrl(href || window.location.href);
   const invitation = route?.invitation;
-  const saved = resumableSave();
+  const saved = useAppSelector((state) =>
+    selectContinueSave(state.saves.entries),
+  );
   const leave = () => {
     getHistoryApi().replaceState(null, "", scenarioListUrl());
     store.dispatch(navigate({ name: "NEW_GAME", skipBrowserHistory: true }));
@@ -25,7 +27,7 @@ export default function ChallengeLanding() {
   const continueGame = () => {
     getHistoryApi().replaceState(null, "", scenarioListUrl());
     if (game.inGame) store.dispatch(navigate("FACILITIES"));
-    else if (saved) store.dispatch(resume(saved.save.game));
+    else if (saved) void resumeSavedGame(saved.id);
   };
   if (!invitation)
     return (

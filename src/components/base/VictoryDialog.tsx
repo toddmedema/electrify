@@ -16,15 +16,11 @@ import { logEvent } from "../../Globals";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
-import numbro from "numbro";
-import { VictoryDebriefType, VictoryType } from "../../Types";
+import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
-import ConceptIcon from "./ConceptIcon";
-import { formatMoneyConcise, formatScore } from "../../helpers/Format";
-import { scoreLabel } from "../../helpers/Scoring";
-import { formatLargeMass } from "../../helpers/Units";
-import { useUnits } from "./UnitsContext";
+import { formatScore } from "../../helpers/Format";
+import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -42,51 +38,6 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
-
-function RunDebrief({
-  debrief,
-}: {
-  debrief: VictoryDebriefType;
-}): React.JSX.Element {
-  const units = useUnits();
-  const reliability = `${(debrief.reliability * 100).toFixed(
-    debrief.reliability >= 0.999 ? 2 : 1,
-  )}%`;
-  const metrics = [
-    { concept: "supply" as const, label: "served", value: reliability },
-    {
-      concept: "money" as const,
-      label: "cash",
-      value: formatMoneyConcise(debrief.finalCash),
-    },
-    {
-      concept: "customers" as const,
-      label: "customers",
-      value: numbro(debrief.finalCustomers).format({ average: true }),
-    },
-    {
-      concept: "danger" as const,
-      label: "emissions",
-      value: formatLargeMass(debrief.kgco2e, units),
-    },
-    ...(debrief.scenarioMetrics || []).map((metric) => ({
-      concept: metric.concept,
-      label: metric.label,
-      value: metric.value,
-    })),
-  ];
-  return (
-    <section className="victoryDebrief" aria-label="Mission results">
-      {metrics.map((metric) => (
-        <div key={metric.label} className="victoryMetric">
-          <ConceptIcon concept={metric.concept} fontSize="small" />
-          <strong>{metric.value}</strong>
-          <span>{metric.label}</span>
-        </div>
-      ))}
-    </section>
-  );
-}
 
 /**
  * The end of a run: the score breakdown, how it compares to the player's own best, where it lands
@@ -139,24 +90,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     return <Dialog open={false} />;
   }
 
-  const { previousBest, breakdown, endTitle, endMessage } = victory;
+  const { previousBest, endMessage } = victory;
   const failed = victory.outcome === "bankrupt" || victory.outcome === "fired";
   const isPersonalBest =
     previousBest === undefined || victory.score > previousBest;
-  const displayTitle = failed
-    ? endTitle || (victory.outcome === "bankrupt" ? "Bankrupt!" : "Fired!")
-    : !endTitle || /^mission complete!?$/i.test(endTitle.trim())
-      ? "Mission complete"
-      : endTitle;
-  // Gains carry an explicit "+" so the line reads as pluses and minuses at a glance; losses
-  // already print their "-" and zero stays bare
-  const breakdownSummary = Object.entries(breakdown)
-    .map(([category, points = 0]) => {
-      return `${points > 0 ? "+" : ""}${formatScore(points)} ${scoreLabel(
-        category,
-      )}`;
-    })
-    .join(" · ");
+  const displayTitle = resultTitle(victory);
 
   const shared = challengeShareContent(victory);
   const comparison = challengeComparison(victory);
@@ -226,21 +164,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             {endMessage}
           </Typography>
         )}
-        <Typography
-          className="victoryScore"
-          variant="h4"
-          component="p"
-          aria-label={`Final score ${formatScore(victory.score)} points`}
-        >
-          <strong>{formatScore(victory.score)}</strong> points
-        </Typography>
-        <Typography
-          className="victoryScoreBreakdown"
-          variant="body2"
-          color="textSecondary"
-        >
-          {breakdownSummary}
-        </Typography>
+        <ResultScore result={victory} />
         {comparison && (
           <Typography role="status" sx={{ mt: 2 }}>
             {comparison}{" "}

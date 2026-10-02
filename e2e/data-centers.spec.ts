@@ -2,6 +2,7 @@ import { expect, Page, test } from "@playwright/test";
 import type { GameType } from "../src/Types";
 import path from "path";
 import { expectDialogToFit } from "./dialog-layout";
+import { readSavedGame, readSaveRecords } from "./save-fixture";
 
 const setupHeading = (page: Page) =>
   page.getByRole("heading", {
@@ -12,13 +13,7 @@ const startButton = (page: Page) =>
   page.getByRole("button", { name: "Start exploring", exact: true });
 
 async function savedGame(page: Page): Promise<GameType | undefined> {
-  return page.evaluate(() => {
-    window.dispatchEvent(new Event("pagehide"));
-    const saved = localStorage.getItem("savedGame");
-    // Pair our synthetic save flush with a restore so later play controls still work.
-    window.dispatchEvent(new Event("pageshow"));
-    return saved ? JSON.parse(saved).game : undefined;
-  });
+  return readSavedGame(page);
 }
 
 async function ready(page: Page) {
@@ -324,10 +319,6 @@ test("ignoring first-time tips records Mission 1 and prevents another offer", as
       animations: "disabled",
     });
   }
-  await startButton(page).click();
-  const guard = page.getByRole("dialog", { name: "Start a new game?" });
-  await expect(guard).toBeVisible();
-  await guard.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(setupHeading(page)).toBeVisible();
   await page.getByRole("button", { name: "Resume game", exact: true }).click();
   await expect(page).not.toHaveURL(/dataCenters/);
@@ -342,9 +333,6 @@ test("ignoring first-time tips records Mission 1 and prevents another offer", as
   await page.goto("/?dataCenters=1");
   await ready(page);
   await startButton(page).click();
-  await guard
-    .getByRole("button", { name: "Start new game", exact: true })
-    .click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
   });
@@ -486,24 +474,11 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
   const growth = (await savedGame(page))!;
   await page.goto("/?dataCenters=1");
   await ready(page);
-  const originalSave = await page.evaluate(() =>
-    localStorage.getItem("savedGame"),
-  );
+  const originalRecords = await readSaveRecords(page);
   await page
     .getByRole("slider", { name: "Power needed", exact: true })
     .press("Home");
   await startButton(page).click();
-  const guard = page.getByRole("dialog", { name: "Start a new game?" });
-  await expect(guard).toBeVisible();
-  await guard.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect(await page.evaluate(() => localStorage.getItem("savedGame"))).toBe(
-    originalSave,
-  );
-  await expect(setupHeading(page)).toBeVisible();
-  await startButton(page).click();
-  await guard
-    .getByRole("button", { name: "Start new game", exact: true })
-    .click();
   await expect(page.locator("#appbar:visible").first()).toBeVisible({
     timeout: 30000,
   });
@@ -511,6 +486,13 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
     .toEqual([]);
   const baseline = (await savedGame(page))!;
+  const records = await readSaveRecords(page);
+  expect(records).toHaveLength(originalRecords.length + 1);
+  expect(
+    records.find(
+      (record) => record.metadata.id === originalRecords[0].metadata.id,
+    )?.save,
+  ).toEqual(originalRecords[0].save);
   expect(baseline.seed).toBe(growth.seed);
   expect(baseline.startingYear).toBe(growth.startingYear);
   expect(baseline.customScenario?.facilities).toEqual(

@@ -1,12 +1,5 @@
 import { decodeSave, encodeSave } from "./SaveEncoding";
-import {
-  parseSave,
-  serializeSave,
-  writeSave,
-  readSave,
-  clearSave,
-  SAVE_KEY,
-} from "./SaveGame";
+import { parseSave, serializeSave } from "./SaveGame";
 import { serializeCommitmentMetadata } from "./helpers/Commitment";
 import { tickState } from "./reducers/Game";
 import { createGame } from "./testing/Simulator";
@@ -21,7 +14,6 @@ beforeAll(() => {
   runMonths(game, 24);
   tickState(game);
 });
-afterEach(() => clearSave());
 
 it("preserves every JSON value and the commitment forecast without mutating live state", () => {
   const save = serializeSave(game);
@@ -68,12 +60,12 @@ it("distinguishes null, absent fields, empty objects, and nested arrays", () => 
   );
 });
 
-it("stores compact records and gives callers an expanded save", () => {
-  expect(writeSave(game)).toBe(true);
-  const wire = JSON.parse(localStorage.getItem(SAVE_KEY)!);
+it("encodes compact records and validates an expanded save", () => {
+  const wire = JSON.parse(JSON.stringify(encodeSave(serializeSave(game))));
   expect(Array.isArray(wire.game.timeline)).toBe(false);
-  expect(readSave()?.game.timeline).toEqual(game.timeline);
-  expect(readSave()?.game.monthlyHistory).toEqual(game.monthlyHistory);
+  const restored = parseSave(wire);
+  expect(restored?.game.timeline).toEqual(game.timeline);
+  expect(restored?.game.monthlyHistory).toEqual(game.monthlyHistory);
 });
 
 it("keeps a twenty-year save below 55% of the unpacked JSON without dropping history", () => {

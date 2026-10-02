@@ -13,7 +13,6 @@ import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { layoutChanged, snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
-import { SCENARIOS } from "./data/Scenarios";
 
 import {
   customEventFromSearch,
@@ -22,7 +21,7 @@ import {
   scenarioFromSearch,
   scenarioListUrl,
 } from "./ScenarioUrl";
-import { startAutosave } from "./SaveGame";
+import { startSaveSessions } from "./SaveSession";
 import { store, useAppSelector } from "./Store";
 import {
   createAppTheme,
@@ -172,7 +171,7 @@ function OfflineNotice(): React.JSX.Element | null {
   }, []);
   return online ? null : (
     <div className="offlineBanner" role="status">
-      Offline — your game stays saved on this device. Online features will
+      Offline — saves use this device’s browser storage. Online features will
       reconnect automatically.
     </div>
   );
@@ -304,15 +303,7 @@ export default function App() {
     const onResize = () => store.dispatch(layoutChanged());
     window.addEventListener("resize", onResize);
 
-    // Registered here rather than next to the store because the tutorial lookup needs the
-    // scenarios, and reducers/Game already reaches back into SaveGame -- App sits above both, so
-    // nothing can cycle. Tutorials are excluded: they're short, restoring a mid-walkthrough step
-    // isn't worth the complexity, and it means starting one can't clobber a real save.
-    const stopAutosave = startAutosave(
-      store,
-      (scenarioId: number) =>
-        !SCENARIOS.find((s) => s.id === scenarioId)?.tutorialSteps,
-    );
+    const stopSaveSessions = startSaveSessions(store);
 
     // Returns its own unsubscribe, which was previously dropped on the floor
     const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
@@ -355,7 +346,7 @@ export default function App() {
       window.removeEventListener("pagehide", onPageHide, false);
       window.removeEventListener("pageshow", onVisibilityChange, false);
       window.removeEventListener("resize", onResize);
-      stopAutosave();
+      stopSaveSessions();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);
       teardownDevice?.();

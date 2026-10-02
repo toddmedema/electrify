@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
+import { editSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
   test(`facility motion preserves facts and layout in ${theme}`, async ({
@@ -38,16 +39,12 @@ for (const theme of ["light", "dark"]) {
     await expect(pane.locator(".facilityRow.selected")).toHaveCount(0);
 
     // Resume a real saved run just before commissioning; loading must not celebrate it.
-    const commissionedId = await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      const save = JSON.parse(localStorage.getItem("savedGame")!);
-      const plant = save.game.facilities.reduce(
-        (latest: { id: number }, candidate: { id: number }) =>
-          candidate.id > latest.id ? candidate : latest,
+    const commissionedId = await editSavedGame(page, (save) => {
+      const plant = save.game.facilities.reduce((latest, candidate) =>
+        candidate.id > latest.id ? candidate : latest,
       );
       plant.yearsToBuildLeft = 0.00005;
       plant.paused = true;
-      localStorage.setItem("savedGame", JSON.stringify(save));
       return plant.id;
     });
     await page.reload();
@@ -117,17 +114,14 @@ test("exchange direction stays readable on narrow screens and with reduced motio
     .getByRole("dialog")
     .getByRole("button", { name: "Pay cash" })
     .click();
-  await page.evaluate(() => {
-    window.dispatchEvent(new Event("pagehide"));
-    const save = JSON.parse(localStorage.getItem("savedGame")!);
-    save.game.transmission.lines[0].yearsToBuildLeft = 0;
+  await editSavedGame(page, (save) => {
+    save.game.transmission!.lines[0].yearsToBuildLeft = 0;
     // Guarantee a local shortfall: a gas plant can cover demand even with coal paused.
     // This test exercises import presentation, not the scenario's generation balance.
     for (const plant of save.game.facilities) {
       plant.paused = true;
       plant.currentW = 0;
     }
-    localStorage.setItem("savedGame", JSON.stringify(save));
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();

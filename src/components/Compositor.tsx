@@ -35,6 +35,7 @@ import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
+import SaveTransitionDialog from "./base/SaveTransitionDialog";
 import BuildFacilities from "./views/BuildFacilities";
 import CustomGameContainer from "./views/CustomGameContainer";
 import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
@@ -47,6 +48,7 @@ import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
+import SavedGames from "./views/SavedGames";
 import { navigate, navigateBack } from "../reducers/Card";
 import {
   reprioritizeFacility,
@@ -353,6 +355,7 @@ export function shouldDismissSnackbarSwipe(
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
+  private dialogCancelRef = React.createRef<HTMLButtonElement>();
   private snackbarDrag?: { x: number; y: number; pointerId: number };
   private snackbarDismissTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -384,6 +387,13 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public componentDidUpdate(prevProps: Props) {
+    if (
+      this.props.ui.dialog.open &&
+      (this.props.ui.dialog.destructive || this.props.ui.dialog.focusCancel) &&
+      this.props.ui.dialog !== prevProps.ui.dialog
+    ) {
+      this.dialogCancelRef.current?.focus();
+    }
     // A new toast replaces one that is still flying out: keep it on screen and open
     const { snackbar } = this.props.ui;
     if (
@@ -565,6 +575,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <FacilitiesContainer />;
       case "SETTINGS":
         return <SettingsContainer />;
+      case "SAVED_GAMES":
+        return <SavedGames />;
       case "MAIN_MENU":
         return <MainMenuContainer />;
       case "MANUAL":
@@ -594,8 +606,8 @@ export default class Compositor extends React.Component<Props, {}> {
 
     // Update if dialog / snackbar changes
     if (
-      this.props.ui.dialog.open !== nextProps.ui.dialog.open ||
-      this.props.ui.snackbar.open !== nextProps.ui.snackbar.open ||
+      this.props.ui.dialog !== nextProps.ui.dialog ||
+      this.props.ui.snackbar !== nextProps.ui.snackbar ||
       this.props.ui.manualHelpEntry !== nextProps.ui.manualHelpEntry
     ) {
       return true;
@@ -710,6 +722,18 @@ export default class Compositor extends React.Component<Props, {}> {
         />
         <Dialog
           open={ui.dialog.open}
+          aria-labelledby="app-dialog-title"
+          slotProps={{
+            transition: {
+              onEntered: () => {
+                if (
+                  this.props.ui.dialog.destructive ||
+                  this.props.ui.dialog.focusCancel
+                )
+                  this.dialogCancelRef.current?.focus();
+              },
+            },
+          }}
           // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A
           // notCancellable dialog is one whose buttons are the only way forward - the end of a
           // run, the end of a tutorial - so a backdrop click has to be refused alongside Esc,
@@ -721,7 +745,7 @@ export default class Compositor extends React.Component<Props, {}> {
             closeDialog();
           }}
         >
-          <DialogTitle>{ui.dialog.title}</DialogTitle>
+          <DialogTitle id="app-dialog-title">{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
             {ui.dialog.offerInstall && (
@@ -732,14 +756,24 @@ export default class Compositor extends React.Component<Props, {}> {
                 {ui.dialog.secondaryLabel || "Close"}
               </Button>
             )}
+            {ui.dialog.tertiaryAction && (
+              <Button color="inherit" onClick={ui.dialog.tertiaryAction}>
+                {ui.dialog.tertiaryLabel}
+              </Button>
+            )}
             {!ui.dialog.notCancellable && (
-              <Button color="primary" onClick={closeDialog}>
+              <Button
+                color="primary"
+                autoFocus={ui.dialog.destructive || ui.dialog.focusCancel}
+                ref={this.dialogCancelRef}
+                onClick={closeDialog}
+              >
                 {ui.dialog.closeText || (ui.dialog.action ? "Cancel" : "OK")}
               </Button>
             )}
             {ui.dialog.action && (
               <Button
-                color="primary"
+                color={ui.dialog.destructive ? "error" : "primary"}
                 variant="contained"
                 onClick={ui.dialog.action}
               >
@@ -791,6 +825,7 @@ export default class Compositor extends React.Component<Props, {}> {
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
+        <SaveTransitionDialog />
         <DisplayNameDialogContainer />
         <AudioContainer />
       </div>

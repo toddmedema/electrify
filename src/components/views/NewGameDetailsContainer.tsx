@@ -41,11 +41,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dispatch(start(scenarioId));
       });
     },
-    // Watching a replay simulates a whole game, but never writes one, so unlike onStart it has
-    // no autosave to clobber and needs no confirmation
+    // A replay also replaces the current live run, so await its last checkpoint first.
     onWatchReplay: (replay: ReplayType) => {
-      getHistoryApi().replaceState(null, "", scenarioListUrl());
-      dispatch(startReplay(replay));
+      startWithSaveGuard(dispatch, () => {
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        dispatch(startReplay(replay));
+      });
     },
     onReplayError: (message: string) => {
       dispatch(snackbarOpen(message));

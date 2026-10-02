@@ -2,6 +2,7 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie purchase keeps forecasts in build details in ${theme}`, async ({
@@ -91,13 +92,10 @@ for (const theme of ["light", "dark"] as const) {
     // Freeze the quote before checking its exact cash delta; navigation may have
     // allowed a tick before the catalog opened.
     await page.getByRole("button", { name: "pause", exact: true }).click();
-    const cash = await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      const { game } = JSON.parse(localStorage.getItem("savedGame")!);
-      return game.timeline.find(
-        (tick: { minute: number }) => tick.minute === game.date.minute,
-      ).cash as number;
-    });
+    const game = (await readSavedGame(page))!;
+    const cash = game.timeline.find(
+      (tick) => tick.minute === game.date.minute,
+    )!.cash;
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);

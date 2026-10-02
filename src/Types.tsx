@@ -2,6 +2,7 @@ import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
 import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
+import type { SavedCommitmentMetadata } from "./helpers/Commitment";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 
@@ -201,6 +202,7 @@ export type CardNameType =
   | "NEW_GAME_DETAILS"
   | "MANUAL"
   | "SETTINGS"
+  | "SAVED_GAMES"
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
@@ -1280,6 +1282,10 @@ export interface DialogType {
   // Set alongside notCancellable, this replaces the close button rather than adding a third one
   secondaryAction?: (e: React.MouseEvent<HTMLElement>) => void;
   secondaryLabel?: string;
+  tertiaryAction?: (e: React.MouseEvent<HTMLElement>) => void;
+  tertiaryLabel?: string;
+  destructive?: boolean;
+  focusCancel?: boolean;
   notCancellable?: boolean;
   closeText?: string;
   // A milestone worth celebrating, where offering to install the app lands well
@@ -1325,6 +1331,64 @@ export interface VictoryType {
 export interface VictoryFleetCapacityType {
   fuel: FuelNameType;
   watts: number;
+}
+
+/** Browser-local save identity; deliberately independent of scenario and deterministic run IDs. */
+export type SaveId = string;
+export type SaveStatus = "inProgress" | "completed" | "bankrupt" | "fired";
+
+export interface SaveGameType {
+  savedAt: string;
+  appVersion: string;
+  game: GameType;
+  commitmentForecast?: SavedCommitmentMetadata[];
+}
+
+/** Presentation data only: a saved result can never authorize another leaderboard submission. */
+export type SavedRunResult = Pick<
+  VictoryType,
+  | "scenarioId"
+  | "scenarioName"
+  | "difficulty"
+  | "score"
+  | "breakdown"
+  | "endTitle"
+  | "endMessage"
+  | "debrief"
+> & { outcome: Exclude<SaveStatus, "inProgress"> };
+
+export interface SaveMetadata {
+  id: SaveId;
+  name: string;
+  createdAt: string;
+  lastPlayedAt?: string;
+  savedAt: string;
+  revision: number;
+  status: SaveStatus;
+  scenarioId: number;
+  scenarioName: string;
+  locationName: string;
+  difficulty: DifficultyType;
+  date: Pick<DateType, "month" | "year">;
+}
+
+export interface SaveFileType {
+  name: string;
+  status: SaveStatus;
+  save: SaveGameType;
+  result?: SavedRunResult;
+}
+
+export interface SaveRecord {
+  metadata: SaveMetadata;
+  save: SaveGameType;
+  result?: SavedRunResult;
+}
+
+export interface SaveLease {
+  saveId: SaveId;
+  writerToken: string;
+  revision: number;
 }
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
@@ -1409,6 +1473,8 @@ export interface UserType {
 export type TransitionClassType = "next" | "prev" | "instant" | "nav";
 
 export interface AppStateType {
+  // Optional for injected/headless state fixtures; the browser store always includes it.
+  saves?: import("./SaveLibrary").SaveLibraryState;
   card: CardType;
   game: GameType;
   settings: SettingsType;

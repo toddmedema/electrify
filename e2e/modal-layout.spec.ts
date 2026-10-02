@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
+import { SAVE_NAME_LIMIT } from "../src/SaveModel";
+import { readSavedGame, readSaveRecords } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
   test.describe(theme, () => {
@@ -85,7 +87,7 @@ for (const theme of ["light", "dark"]) {
       await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     });
 
-    test("pre-game requirements and replacement confirmation fit", async ({
+    test("pre-game requirements fit and starting another game preserves the earlier save", async ({
       page,
     }) => {
       await page.goto("/?scenario=111");
@@ -98,6 +100,10 @@ for (const theme of ["light", "dark"]) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
+      await expect(page.locator("#appbar:visible")).toBeVisible();
+      const original = await readSavedGame(page);
+      expect(original?.scenarioId).toBe(111);
+      const originalId = (await readSaveRecords(page))[0].metadata.id;
       await page.evaluate(() => {
         history.pushState(null, "", "/?scenario=100");
         dispatchEvent(new PopStateEvent("popstate"));
@@ -105,8 +111,86 @@ for (const theme of ["light", "dark"]) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      await expectDialogToFit(dialog);
-      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect
+        .poll(async () => (await readSaveRecords(page)).length)
+        .toBe(2);
+      const secondId = (await readSaveRecords(page)).find(
+        (record) => record.metadata.id !== originalId,
+      )!.metadata.id;
+      await expect(
+        page.locator("[data-save-state]:visible").first(),
+      ).toHaveAttribute("data-active-save-id", secondId);
+      expect((await readSavedGame(page, secondId))?.scenarioId).toBe(100);
+      expect(await readSavedGame(page, originalId)).toEqual(original);
+      await expect(dialog).toHaveCount(0);
+    });
+
+    test("saved-game rename and deletion dialogs fit a maximum-length unbroken name", async ({
+      page,
+    }, info) => {
+      await page.goto("/?scenario=100");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      await expect(page.locator("#appbar:visible")).toBeVisible();
+      await readSavedGame(page);
+      const id = (await readSaveRecords(page))[0].metadata.id;
+      await page.getByRole("button", { name: "menu", exact: true }).click();
+      await page
+        .getByRole("menuitem", { name: "Saved games", exact: true })
+        .click();
+      const row = page.locator('[data-save-id="' + id + '"]');
+      await row.getByRole("button", { name: /^Actions for/ }).click();
+      await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+      const rename = page.getByRole("dialog", { name: "Rename saved game" });
+      const name = "W".repeat(SAVE_NAME_LIMIT);
+      await rename.getByRole("textbox", { name: "Save name" }).fill(name);
+      await expectDialogToFit(rename);
+      await page.screenshot({
+        path: info.outputPath("rename-save.png"),
+        animations: "disabled",
+      });
+      await rename.getByRole("button", { name: "Rename", exact: true }).click();
+      await expect(
+        row.getByRole("heading", { name, exact: true }),
+      ).toBeVisible();
+      const saved = (await readSaveRecords(page))[0];
+
+      await row.getByRole("button", { name: /^Actions for/ }).click();
+      await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+      await expectDialogToFit(rename);
+      await rename
+        .getByRole("textbox", { name: "Save name" })
+        .fill("Cancelled name");
+      await rename.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(rename).toHaveCount(0);
+      expect(await readSaveRecords(page)).toEqual([saved]);
+
+      await row.getByRole("button", { name: /^Actions for/ }).click();
+      await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      const deleting = page.getByRole("dialog", { name: "Delete saved game?" });
+      await expectDialogToFit(deleting);
+      await expect(
+        deleting.getByRole("button", { name: "Cancel", exact: true }),
+      ).toBeFocused();
+      await page.screenshot({
+        path: info.outputPath("delete-save.png"),
+        animations: "disabled",
+      });
+      await deleting
+        .getByRole("button", { name: "Cancel", exact: true })
+        .click();
+      await expect(deleting).toHaveCount(0);
+      expect(await readSaveRecords(page)).toEqual([saved]);
+      await expect(row).toBeVisible();
+
+      await row.getByRole("button", { name: /^Actions for/ }).click();
+      await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      await deleting
+        .getByRole("button", { name: "Delete", exact: true })
+        .click();
+      await expect(row).toHaveCount(0);
+      expect(await readSaveRecords(page)).toEqual([]);
     });
 
     test("iPhone install instructions fit", async ({ page }, info) => {

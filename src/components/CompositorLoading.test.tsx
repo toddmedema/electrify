@@ -6,6 +6,7 @@ import Compositor, { Props } from "./Compositor";
 
 jest.mock("./base/AudioContainer", () => () => null);
 jest.mock("./base/VictoryDialogContainer", () => () => null);
+jest.mock("./base/SaveTransitionDialog", () => () => null);
 jest.mock("./base/DisplayNameDialogContainer", () => () => null);
 jest.mock("./base/DataCenterGuide", () => () => null);
 

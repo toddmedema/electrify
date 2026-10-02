@@ -5,17 +5,7 @@ import gameReducer, {
   delta,
   tickState,
 } from "./reducers/Game";
-import {
-  clearSave,
-  clearSaveFor,
-  isResumedGame,
-  parseSave,
-  readSave,
-  SAVE_KEY,
-  serializeSave,
-  startAutosave,
-  writeSave,
-} from "./SaveGame";
+import { isResumedGame, parseSave, serializeSave } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
 
@@ -35,14 +25,8 @@ describe("SaveGame", () => {
     game = createGame(OPTIONS);
   });
 
-  beforeEach(() => {
-    clearSave();
-  });
-
-  it("round trips a game through local storage", () => {
-    expect(writeSave(game)).toBe(true);
-
-    const save = readSave();
+  it("round trips a game through the serialized payload boundary", () => {
+    const save = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
     expect(save).not.toBeNull();
     expect(save!.game.seed).toBe(game.seed);
     expect(save!.game.scenarioId).toBe(game.scenarioId);
@@ -393,12 +377,8 @@ describe("SaveGame", () => {
     expect(parseSave(islanded)).toBeNull();
   });
 
-  // The memo must never alias the live game slice, or a Continue button would describe a game
-  // that has kept playing since it was saved
-  it("reads back through storage rather than handing back the live object", () => {
-    writeSave(game);
-
-    const save = readSave();
+  it("parses a detached snapshot rather than handing back the live object", () => {
+    const save = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
     expect(save!.game).not.toBe(game);
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
@@ -436,13 +416,6 @@ describe("SaveGame", () => {
     expect(
       corrupt((tick) => (tick.runningCostToNextDispatch[id] = null)),
     ).not.toBeNull();
-  });
-
-  it("forgets the save it just cleared", () => {
-    writeSave(game);
-    expect(readSave()).not.toBeNull();
-    clearSave();
-    expect(readSave()).toBeNull();
   });
 
   it("rejects a save without envelope metadata", () => {
@@ -635,11 +608,6 @@ describe("SaveGame", () => {
     ].forEach((bad) => expect(withUpgrade(bad)).toBeNull());
   });
 
-  it("ignores corrupt JSON", () => {
-    window.localStorage.setItem(SAVE_KEY, "{not json");
-    expect(readSave()).toBeNull();
-  });
-
   it("ignores blobs that aren't saves", () => {
     expect(parseSave(null)).toBeNull();
     expect(parseSave("nope")).toBeNull();
@@ -690,177 +658,6 @@ describe("SaveGame", () => {
     expect(withLocation({ ...save.game.location, timeZone: 5 })).toBeNull();
     // And the real one still round trips
     expect(parseSave(save)).not.toBeNull();
-  });
-
-  // Tutorials run a single month and hit the win trigger on the way past. Clearing on any
-  // scenario ending would throw away a real game the player still wanted.
-  it("only clears the save belonging to the scenario that ended", () => {
-    writeSave(game);
-    clearSaveFor(game.scenarioId + 1);
-    expect(readSave()).not.toBeNull();
-    clearSaveFor(game.scenarioId);
-    expect(readSave()).toBeNull();
-  });
-
-  describe("autosave", () => {
-    // Enough of a store for the subscriber: state it can read, and a way to notify
-    function fakeStore(initial: GameType) {
-      const listeners: Array<() => void> = [];
-      const self = {
-        state: initial,
-        dispatched: [] as unknown[],
-        getState: () => ({ game: self.state }),
-        subscribe: (fn: () => void) => {
-          listeners.push(fn);
-          return () => listeners.splice(listeners.indexOf(fn), 1);
-        },
-        dispatch: (a: unknown) => {
-          self.dispatched.push(a);
-          listeners.forEach((fn) => fn());
-        },
-        // Sets the slice the way a reducer would, then notifies like Redux does
-        set: (next: GameType) => {
-          self.state = next;
-          listeners.forEach((fn) => fn());
-        },
-      };
-      return self;
-    }
-
-    // A game running at a given point in a given year
-    function playing(base: GameType, year: number, minute: number): GameType {
-      return { ...base, inGame: true, date: { ...base.date, year, minute } };
-    }
-
-    // What quit leaves behind
-    const quit = { ...game, inGame: false };
-
-    it("backs off failed periodic writes and retries on the next year", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-      const setItem = jest
-        .spyOn(Storage.prototype, "setItem")
-        .mockImplementation(() => {
-          throw new Error("full");
-        });
-      try {
-        store.set(playing(game, 2020, 0));
-        store.set(playing(game, 2020, 100));
-        store.set(playing(game, 2020, 200));
-        expect(setItem).toHaveBeenCalledTimes(1);
-        expect(store.dispatched).toHaveLength(1);
-        store.set(playing(game, 2021, 300));
-        expect(setItem).toHaveBeenCalledTimes(2);
-        expect(store.dispatched).toHaveLength(1);
-        setItem.mockRestore();
-        store.set(playing(game, 2022, 400));
-        expect(readSave()!.game.date.minute).toBe(400);
-      } finally {
-        setItem.mockRestore();
-        stop();
-      }
-    });
-
-    it("retries failed writes on pagehide while an existing save remains", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-      store.set(playing(game, 2020, 0));
-      const setItem = jest
-        .spyOn(Storage.prototype, "setItem")
-        .mockImplementation(() => {
-          throw new Error("full");
-        });
-      store.set(playing(game, 2021, 100));
-      setItem.mockRestore();
-      window.dispatchEvent(new Event("pagehide"));
-      expect(readSave()!.game.date.minute).toBe(100);
-      stop();
-    });
-
-    it("writes once a year, at the turn of the year", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-
-      store.set(playing(game, 2020, 0));
-      // Mid-year progress isn't written on its own
-      store.set(playing(game, 2020, 100));
-      store.set(playing(game, 2020, 200));
-      expect(readSave()!.game.date.minute).toBe(0);
-
-      // ...until the year turns, which is never skipped, throttled or collapsed
-      store.set(playing(game, 2021, 300));
-      expect(readSave()!.game.date.minute).toBe(300);
-      store.set(playing(game, 2022, 400));
-      expect(readSave()!.game.date.minute).toBe(400);
-
-      stop();
-    });
-
-    /**
-     * The bug this guards: quitting from the in-game menu fires none of the page lifecycle events,
-     * and quit resets the slice before the subscriber sees it, so a player who quit partway
-     * through a year came back to the start of it.
-     */
-    it("flushes the part-year when the player quits to the menu", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-
-      store.set(playing(game, 2020, 0));
-      store.set(playing(game, 2020, 5000));
-      expect(readSave()!.game.date.minute).toBe(0);
-
-      store.set(quit);
-      expect(readSave()!.game.date.minute).toBe(5000);
-
-      stop();
-    });
-
-    it("flushes player actions made while the clock stays paused", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-      const running = playing(game, 2020, 0);
-
-      store.set(running);
-      store.set({ ...running, speed: "PAUSED" });
-      store.set(quit);
-
-      expect(readSave()!.game.speed).toBe("PAUSED");
-      stop();
-    });
-
-    // Bankrupt and fired clear the save and then quit, and the flush must not undo that
-    it("doesn't resurrect a save the scenario ending cleared", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-
-      store.set(playing(game, 2020, 0));
-      store.set(playing(game, 2020, 5000));
-      clearSave();
-
-      store.set(quit);
-      expect(readSave()).toBeNull();
-
-      stop();
-    });
-
-    it("leaves tutorials alone", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => false);
-
-      store.set(playing(game, 2020, 0));
-      store.set(quit);
-      expect(readSave()).toBeNull();
-
-      stop();
-    });
-
-    it("stops writing once torn down", () => {
-      const store = fakeStore(quit);
-      startAutosave(store as never, () => true)();
-
-      store.set(playing(game, 2020, 0));
-      expect(readSave()).toBeNull();
-    });
   });
 
   it("recognizes a restored slice by its timeline", () => {

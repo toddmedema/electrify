@@ -8,6 +8,7 @@ function props(overrides: Partial<Props> = {}): Props {
     hasSavedGame: false,
     onAudioChange: jest.fn(),
     onContinue: jest.fn(),
+    onSavedGames: jest.fn(),
     onSettings: jest.fn(),
     onManual: jest.fn(),
     onStart: jest.fn(),
@@ -41,6 +42,26 @@ describe("MainMenu", () => {
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
       { gap: "8px" },
     );
+  });
+
+  it("identifies Continue's target and keeps the library accessible", async () => {
+    const onSavedGames = jest.fn();
+    render(
+      <MainMenu
+        {...props({
+          hasSavedGame: true,
+          savedGameName: "Wind experiment",
+          savedGameDescription: "Rise of Renewables · June 2035",
+          onSavedGames,
+        })}
+      />,
+    );
+    expect(screen.getByText("Wind experiment")).toBeInTheDocument();
+    expect(
+      screen.getByText("Rise of Renewables · June 2035"),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
+    expect(onSavedGames).toHaveBeenCalledTimes(1);
   });
 
   it("links to Discord first in the footer", () => {
