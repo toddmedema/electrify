@@ -262,32 +262,25 @@ describe("researched public-utility scenarios", () => {
     );
   });
 
-  it("rejects an unattended Data Center Boom run on Intern for chronic outages", () => {
+  it("rejects an unattended Data Center Boom run on Intern for physical objectives", () => {
     const result = runSimulation({ scenarioId: 106, difficulty: "Intern" });
     expectNoViolations(result);
     expect(result.outcome).toBe("fired");
-    // The recalibrated load now causes chronic outages before attrition reaches 10%.
-    expect(result.months.slice(-3)).toHaveLength(3);
-    result.months.slice(-3).forEach((month) => {
-      expect(month.supplyWh / month.demandWh).toBeLessThan(0.9);
-    });
+    // A flat campus can fail on retention instead of three consecutive outage months.
+    expect(
+      scenarioObjectiveFailure(manassas, [...result.months].reverse()),
+    ).toBeTruthy();
   });
 
   it("enforces Data Center Boom's customer-retention boundary independently of outage timing", () => {
     const required =
       manassas.startingCustomers! * manassas.minimumCustomerRetention!;
     const history = [{ ...EMPTY_HISTORY, customers: required }];
+    expect(scenarioObjectiveFailure(manassas, history)).toBeUndefined();
     expect(
-      scenarioObjectiveFailure(manassas, history, "Manager", [], true),
-    ).toBeUndefined();
-    expect(
-      scenarioObjectiveFailure(
-        manassas,
-        [{ ...history[0], customers: required - 1 }],
-        "Manager",
-        [],
-        true,
-      ),
+      scenarioObjectiveFailure(manassas, [
+        { ...history[0], customers: required - 1 },
+      ]),
     ).toContain("Customer attrition");
   });
 

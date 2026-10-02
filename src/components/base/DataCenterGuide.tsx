@@ -16,7 +16,7 @@ import { delta as uiDelta } from "../../reducers/UI";
 const STEPS = [
   {
     title: "Keep the lights on",
-    text: "Keep electricity flowing without running out of cash. Pause whenever you want to inspect the grid or plan a build.",
+    text: "Keep electricity flowing. Pause whenever you want to inspect the grid or plan a build.",
   },
   {
     title: "Watch supply and demand",
@@ -28,7 +28,7 @@ const STEPS = [
   },
   {
     title: "Watch costs and emissions",
-    text: "Supplying more demand can raise costs and emissions, depending on what you build. Use Insights to track expenses, electricity rates and emissions together.",
+    text: "Supplying more demand can raise costs and emissions, depending on what you build. Use Insights to track expenses, electricity rates and emissions together. You may need to raise rates to expand infrastructure without going bankrupt.",
   },
 ];
 

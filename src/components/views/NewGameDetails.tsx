@@ -445,8 +445,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
             onClose={() => this.setState({ victoryDialogOpen: false })}
             title="What counts as a win"
             scenario={scenario}
-            difficulty={game.difficulty}
-            meaningfulDecisions={[]}
           />
 
           {!challenge && (

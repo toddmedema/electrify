@@ -58,6 +58,39 @@ describe("SaveGame", () => {
     );
   });
 
+  it.each([NaN, Infinity, 0, -1, 9, "2", null])(
+    "rejects an invalid saved demand shape %p",
+    (demandShapeExponent) => {
+      const save = serializeSave(game);
+      expect(
+        parseSave({ ...save, game: { ...game, demandShapeExponent } }),
+      ).toBeNull();
+    },
+  );
+
+  it("rejects a non-boolean marginal-load flag", () => {
+    const save = serializeSave(game);
+    expect(
+      parseSave({
+        ...save,
+        game: {
+          ...game,
+          loadAdditions: [
+            {
+              id: "campus",
+              label: "Campus",
+              startsYear: 2032,
+              peakW: 100000000,
+              loadFactor: 1,
+              demandType: "Data Centers",
+              supplementsBackground: "true",
+            },
+          ],
+        },
+      }),
+    ).toBeNull();
+  });
+
   it.each([
     { minute: NaN },
     { minute: Infinity },

@@ -30,8 +30,14 @@ default seed **12345** for Data Center and Wildfire, and Deep Freeze's authored 
 This proves reachable outcomes for reproducible seeds; it is not
 a claim that every strategy or weather seed wins. Both answers must actually be accepted before
 the outcome, all tick/month invariants must pass, and winning runs must clear the scenario's
-real duration, reliability/customer-retention objectives, and meaningful-decision requirements.
-Losses must remain losses without the meaningful-decision gate.
+real duration and reliability/customer-retention objectives. Accepted action counts
+are checked separately as internal balance metrics.
+
+**October 2026:** data-center blocks now draw their annual utilization steadily,
+without an artificial winter peak. The late-expansion fast-track Intern plan can
+complete; phasing still retains more customers. CEO fast-track still fails.
+Decision counts are internal playbook benchmarks and never determine player
+outcomes. Historical cash/customer figures below are not current measurements.
 
 ## Plans and results
 
@@ -86,10 +92,10 @@ intact starting fleet; it remains losable when the player mothballs needed capac
 **The fast-connection contribution is a fixed $15M.** Successful plans have approximately
 $142M CEO / $151M Intern before that contribution in the choice-month history, making it a
 roughly 10% addition. A prepared grid earns more with the fast connection. Phasing still has
-real value: on Intern, delaying the 50 MW gas build until month 72 loses under fast connection
-(fired month 75), but wins under phasing. On CEO, moving that build to month 60, keeping the
-other operating-plan actions, loses under fast connection (12,473 residents at the end) and
-wins under phasing (17,653 residents; $853.8M cash). Phasing gives time rather than a free
+real value: with the flat load, delaying the 50 MW gas build until month 72 on Intern now
+completes under both responses, but phasing retains more customers. On CEO, moving that build
+to month 60, keeping the other operating-plan actions, still loses under fast connection and
+wins under phasing. Phasing gives time rather than a free
 cash reward, and does not protect a player who never expands.
 
 **Historical wildfire preparedness cost: a fixed $200k**, decoupled from restoration charges.

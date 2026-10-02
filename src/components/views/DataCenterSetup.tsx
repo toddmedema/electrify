@@ -346,7 +346,9 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   >
                     To compare the difference, run again with 0 power needed.{" "}
                     Uses local weather and a regional power mix. This is an
-                    example grid, not a forecast of your utility’s plans.
+                    example grid, not a forecast of your utility’s plans. Your
+                    selected power is a steady total load, including cooling,
+                    added to existing demand and its growth.
                   </Typography>
                   {growthScenario.facilities.some(
                     (facility) =>
@@ -359,6 +361,39 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                   )}
                   <details className="dataCenterSetupAssumptions">
                     <summary>Power sources and assumptions</summary>
+                    <Typography variant="body2">
+                      {customerProfile?.annualMWh ? (
+                        <>
+                          Background electricity use is sized to{" "}
+                          {(customerProfile.annualMWh / 1000000).toFixed(2)} TWh
+                          per year for {customerProfile.serviceArea}, using{" "}
+                          <a
+                            href={
+                              customerProfile.energySourceUrl ||
+                              customerProfile.sourceUrl
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            published {customerProfile.energySourceYear}{" "}
+                            electricity sales
+                          </a>
+                          . Changing the account count scales this total.
+                        </>
+                      ) : (
+                        <>
+                          Annual electricity use has no verified local
+                          reference; demand per account uses the game’s regional
+                          assumptions.
+                        </>
+                      )}{" "}
+                      Published totals include existing data centers. Their
+                      share and future growth use regional model assumptions,
+                      rather than a measured local inventory. Starting years use
+                      the same published snapshot, shaped by local weather.
+                      {customerProfile?.observedPeakW &&
+                        " The demand curve also matches the territory’s reported annual peak."}
+                    </Typography>
                     <Typography variant="body2">
                       Explore {growthScenario.startingYear}–
                       {growthScenario.startingYear +
@@ -396,11 +431,14 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
                         </>
                       )}
                       The model sizes the starting power plants to serve
-                      existing demand, before your new data centers arrive.
-                      Hydro is limited to known sites, and geothermal to
-                      suitable locations; those limits can change the regional
-                      mix. Gas is split between steady and quick-start plants.
-                      Storage and unclassified sources are excluded.
+                      existing demand with a 5% model supply margin, before your
+                      new data centers arrive. This is an opening-year
+                      allowance; growing background demand can require more
+                      infrastructure. Hydro is limited to known sites, and
+                      geothermal to suitable locations; those limits can change
+                      the regional mix. Gas is split between steady and
+                      quick-start plants. Storage and unclassified sources are
+                      excluded.
                     </Typography>
                     <ul>
                       {growthScenario.facilities.map((facility, index) => (

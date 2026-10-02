@@ -1,10 +1,6 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { runSimulation } from "../testing/Simulator";
-import {
-  MeaningfulDecisionType,
-  MonthlyHistoryType,
-  ScenarioType,
-} from "../Types";
+import { MonthlyHistoryType, ScenarioType } from "../Types";
 import { bestReachableCustomers, nextCustomerCount } from "./Customers";
 import { TICKS_PER_MONTH } from "../Constants";
 import {
@@ -31,44 +27,14 @@ const row = (
   }) as MonthlyHistoryType;
 
 it("requires 80% retention without requiring a grid investment", () => {
-  const rate: MeaningfulDecisionType = {
-    key: "rate",
-    lever: "rate",
-    kind: "rate",
-    label: "Change rate",
-    before: "0",
-    after: "1",
-    month: 0,
-  };
   expect(
-    scenarioObjectiveFailure(
-      scenario(100),
-      [row(2031, 12, 1, 799)],
-      "Employee",
-      [rate],
-      false,
-      1000,
-    ),
+    scenarioObjectiveFailure(scenario(100), [row(2031, 12, 1, 799)], 1000),
   ).toMatch(/customers/);
   expect(
-    scenarioObjectiveFailure(
-      scenario(100),
-      [row(2031, 12, 1, 800)],
-      "Employee",
-      [rate],
-      false,
-      1000,
-    ),
+    scenarioObjectiveFailure(scenario(100), [row(2031, 12, 1, 800)], 1000),
   ).toBeUndefined();
   expect(
-    scenarioObjectiveFailure(
-      scenario(100),
-      [row(2031, 12, 1, 1000)],
-      "Employee",
-      [],
-      true,
-      1000,
-    ),
+    scenarioObjectiveFailure(scenario(100), [row(2031, 12, 1, 1000)], 1000),
   ).toBeUndefined();
 });
 
@@ -150,9 +116,6 @@ describe("retention baseline", () => {
       scenarioObjectiveFailure(
         investor,
         [row(2031, 12, 1, 400_000)],
-        "Employee",
-        [],
-        true,
         1_000_000,
       ),
     ).toMatch(/only 40% of the customers/);

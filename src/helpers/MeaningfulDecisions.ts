@@ -1,13 +1,9 @@
 import {
-  DifficultyType,
   GameType,
   MeaningfulDecisionKindType,
   MeaningfulDecisionType,
 } from "../Types";
 
-export const INTERN_MEANINGFUL_DECISIONS_REQUIRED = 1;
-export const CEO_MEANINGFUL_DECISIONS_REQUIRED = 10;
-export const CEO_MEANINGFUL_CATEGORIES_REQUIRED = 4;
 export const MAX_MEANINGFUL_DECISIONS = 1000;
 
 export const MEANINGFUL_DECISION_CATEGORY_LABELS: Record<
@@ -28,7 +24,7 @@ export type DecisionChangeType = Omit<MeaningfulDecisionType, "key" | "month">;
 /**
  * Records an accepted simulation change under one lifetime key for that lever or asset. Returning
  * a lever to its original value removes the entry even in a later month, so slider, program,
- * operating, dispatch, and trading churn cannot pad a victory objective.
+ * operating, dispatch, and trading churn cannot pad internal balance metrics.
  */
 export function recordMeaningfulDecision(
   game: GameType,
@@ -63,32 +59,6 @@ export function meaningfulDecisionCategoryCount(
   decisions: MeaningfulDecisionType[],
 ): number {
   return new Set(decisions.map(({ kind }) => kind)).size;
-}
-
-/**
- * The operating plan each difficulty asks for at term end. It never falls as difficulty rises, so no middle
- * difficulty is easier to pass idle than the one below it (Employee, Manager and VP used to
- * require nothing while Intern required one decision).
- */
-export const MEANINGFUL_DECISION_REQUIREMENTS: Record<
-  DifficultyType,
-  { count: number; categories: number }
-> = {
-  Intern: { count: INTERN_MEANINGFUL_DECISIONS_REQUIRED, categories: 1 },
-  Employee: { count: 1, categories: 1 },
-  Manager: { count: 2, categories: 1 },
-  VP: { count: 4, categories: 2 },
-  CEO: {
-    count: CEO_MEANINGFUL_DECISIONS_REQUIRED,
-    categories: CEO_MEANINGFUL_CATEGORIES_REQUIRED,
-  },
-};
-
-export function meaningfulDecisionRequirement(difficulty: DifficultyType): {
-  count: number;
-  categories: number;
-} | null {
-  return MEANINGFUL_DECISION_REQUIREMENTS[difficulty] ?? null;
 }
 
 /** One percent of current peak demand, with a 1 MW floor, is a material grid commitment. */

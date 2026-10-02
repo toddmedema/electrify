@@ -204,33 +204,31 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               {mission.monthsRemaining} months remaining. {mission.finalNote}
             </Typography>
             <Box component="dl" className="missionRequirements">
-              {mission.requirements
-                .filter((requirement) => requirement.id !== "decisions")
-                .map((requirement) => (
-                  <React.Fragment key={requirement.id}>
-                    <Typography component="dt" sx={{ mt: 2, fontWeight: 600 }}>
-                      {requirement.label}{" "}
-                      {requirement.status !== "unknown" &&
-                        requirement.status !== "in-progress" && (
-                          <span
-                            className="missionRequirementStatus"
-                            data-status={requirement.status}
-                          >
-                            {statusLabel(requirement.status)}
-                          </span>
-                        )}
-                    </Typography>
-                    <Typography component="dd">
-                      {requirement.current.replace(" (partial month)", "")}
-                    </Typography>
-                    <Typography
-                      component="dd"
-                      className="missionRequirementTarget"
-                    >
-                      {requirement.target}
-                    </Typography>
-                  </React.Fragment>
-                ))}
+              {mission.requirements.map((requirement) => (
+                <React.Fragment key={requirement.id}>
+                  <Typography component="dt" sx={{ mt: 2, fontWeight: 600 }}>
+                    {requirement.label}{" "}
+                    {requirement.status !== "unknown" &&
+                      requirement.status !== "in-progress" && (
+                        <span
+                          className="missionRequirementStatus"
+                          data-status={requirement.status}
+                        >
+                          {statusLabel(requirement.status)}
+                        </span>
+                      )}
+                  </Typography>
+                  <Typography component="dd">
+                    {requirement.current.replace(" (partial month)", "")}
+                  </Typography>
+                  <Typography
+                    component="dd"
+                    className="missionRequirementTarget"
+                  >
+                    {requirement.target}
+                  </Typography>
+                </React.Fragment>
+              ))}
             </Box>
           </Box>
           <Box

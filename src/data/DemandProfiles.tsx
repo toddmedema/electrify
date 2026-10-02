@@ -440,9 +440,10 @@ export function demandByTypeAt(
   const mix = REGION_MIX[location?.region || ""] || DEFAULT_MIX;
   const growth = growthFor(location);
   // An authored absolute schedule describes the whole scenario-specific data-center load. The
-  // generic regional curve is therefore removed even before the first scheduled block arrives.
+  // generic regional curve is removed unless the schedule explicitly adds a marginal campus.
   const hasAuthoredDataCenters = loadAdditions.some(
-    (addition) => addition.demandType === "Data Centers",
+    (addition) =>
+      addition.demandType === "Data Centers" && !addition.supplementsBackground,
   );
   const startDataCenters = hasAuthoredDataCenters
     ? 0
@@ -529,9 +530,15 @@ export function scheduledLoadAdditionWAt(
   if (currentMonth < scheduledMonth) {
     return 0;
   }
+  // A constant utilization models data-center baseload without inventing a winter peak.
+  if (addition.demandType === "Data Centers") {
+    return (
+      Math.max(0, addition.peakW) *
+      Math.max(0, Math.min(1, addition.loadFactor))
+    );
+  }
   // The game represents each month with one detailed day. Sampling this twelve-point cosine over
-  // a full game year has an exact mean of loadFactor and a maximum of peakW, which makes a 90%
-  // data-center load both near-flat and arithmetically auditable.
+  // a full game year has an exact mean of loadFactor and a maximum of peakW for mining.
   const monthOfCycle = (currentMonth - scheduledMonth) % 12;
   const loadFactor = Math.max(0, Math.min(1, addition.loadFactor));
   const multiplier =

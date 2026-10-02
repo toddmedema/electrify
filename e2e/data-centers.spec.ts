@@ -203,6 +203,9 @@ test("the header explore button opens setup and first-time tips preserve the cho
   });
   await expectDialogToFit(final);
   await expect(final.getByText(/Choose 1× at the top/)).toBeVisible();
+  await expect(final).toContainText(
+    "You may need to raise rates to expand infrastructure without going bankrupt.",
+  );
   if (reviewDir && testInfo.project.name === "mobile-390px") {
     await page
       .getByRole("heading", { name: "Watch costs and emissions" })
@@ -440,4 +443,77 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
   expect(baseline.customScenario?.durationMonths).toBe(
     growth.customScenario?.durationMonths,
   );
+  expect(baseline.loadAdditions[0]).toMatchObject({
+    peakW: 0,
+    supplementsBackground: true,
+  });
+  expect(baseline.timeline[0].demandByType).toEqual(
+    growth.timeline[0].demandByType,
+  );
+  expect(baseline.timeline[0].demandByType["Data Centers"]).toBeGreaterThan(0);
 });
+
+for (const [city, accounts, energy, territory] of [
+  ["Austin", 575087, "14.50", "Austin Energy"],
+  ["Seattle", 513504, "8.94", "Seattle City Light"],
+  ["Dallas", 4111000, "172.78", "Oncor"],
+] as const) {
+  test(`landing-page defaults preserve researched ${city} background and a marginal campus`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120000);
+    await page.goto("/data-centers.html");
+    await page.getByRole("link", { name: "Explore the impact" }).last().click();
+    await expect(setupHeading(page)).toBeVisible();
+    await page
+      .getByRole("combobox", { name: "Select a city", exact: true })
+      .fill(city);
+    await page.getByRole("option", { name: new RegExp(city) }).click();
+    await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
+    await expect(
+      page.getByRole("slider", { name: "Power needed" }),
+    ).toHaveAttribute("aria-valuetext", "100MW");
+    const grid = page.locator(".dataCenterSetupGridSize");
+    await grid.locator("summary").click();
+    await expect(
+      page.getByRole("spinbutton", { name: "Homes and businesses served" }),
+    ).toHaveValue(String(accounts));
+    await expect(grid).toContainText(territory);
+    const assumptions = page.locator(".dataCenterSetupAssumptions").filter({
+      has: page.locator("summary", {
+        hasText: "Power sources and assumptions",
+      }),
+    });
+    await assumptions.locator("summary").click();
+    await expect(assumptions).toContainText(`${energy} TWh`);
+    await expect(assumptions).toContainText(
+      "Published totals include existing data centers",
+    );
+    const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      reviewDir &&
+      city === "Austin" &&
+      testInfo.project.name === "desktop-chromium"
+    ) {
+      await grid.locator("summary").click();
+      await page.screenshot({
+        path: path.join(reviewDir, "data-center-austin-desktop.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+    await startButton(page).click();
+    await expect(page.locator("#appbar:visible").first()).toBeVisible({
+      timeout: 30000,
+    });
+    const game = (await savedGame(page))!;
+    expect(game.customScenario?.startingCustomers).toBe(accounts);
+    expect(game.loadAdditions[0]).toMatchObject({
+      peakW: 100000000,
+      loadFactor: 1,
+      supplementsBackground: true,
+    });
+    expect(game.timeline[0].demandByType["Data Centers"]).toBeGreaterThan(0);
+    expect(game.demandShapeExponent).toBeGreaterThan(0);
+  });
+}

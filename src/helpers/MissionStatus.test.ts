@@ -1,7 +1,7 @@
 import { createNextState as produce } from "@reduxjs/toolkit";
 import { createGame } from "../testing/Simulator";
 import { SCENARIOS, TUTORIALS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
-import { GameType, MonthlyHistoryType, MeaningfulDecisionType } from "../Types";
+import { GameType, MonthlyHistoryType } from "../Types";
 import {
   EMPTY_HISTORY,
   getDateFromMinute,
@@ -188,49 +188,23 @@ test("retention reads as failed once best-case growth cannot recover it", () => 
   );
 });
 
-test("decision gates use retained categories, waiver and tutorial/custom rules", () => {
-  const game = createNextState(fixture(), (g) => {
-    g.difficulty = "CEO";
-    g.meaningfulDecisions = [
-      {
-        key: "asset:1",
-        lever: "asset:1",
-        label: "Plant",
-        kind: "asset",
-        before: "0",
-        after: "1",
-        month: 0,
-      } as MeaningfulDecisionType,
-    ];
+test("internal decision benchmarks never appear in player requirements", () => {
+  const ordinary = createNextState(fixture(), (game) => {
+    game.difficulty = "CEO";
   });
-  expect(requirement(game, "decisions").current).toContain(
-    "1 decisions across 1 categories",
-  );
-  expect(requirement(game, "decisions").compact).toBe(
-    "Decisions ≥ 10 (1) · Categories ≥ 4 (1)",
-  );
-  expect(requirement(game, "decisions").target).toContain(
-    "10 decisions across 4 categories",
-  );
-  expect(
-    requirement(
-      createNextState(game, (g) => {
-        g.meaningfulDecisionGateWaived = true;
-      }),
-      "decisions",
-    ).status,
-  ).toBe("waived");
   const tutorial = createGame({ scenarioId: TUTORIALS[0].id });
-  expect(
-    getMissionStatus(tutorial).requirements.some((r) => r.id === "decisions"),
-  ).toBe(false);
-  expect(getMissionStatus(tutorial).requirements.map((r) => r.id)).toEqual(
-    expect.arrayContaining(["cash", "survival"]),
-  );
   const custom = createGame({
     scenarioId: CUSTOM_SCENARIO_ID,
     scenario: { ...wildfire, id: CUSTOM_SCENARIO_ID, name: "My grid" },
   });
+  for (const game of [ordinary, tutorial, custom]) {
+    expect(
+      getMissionStatus(game).requirements.some((r) => r.id === "decisions"),
+    ).toBe(false);
+    expect(getMissionStatus(game).requirements.map((r) => r.id)).toEqual(
+      expect.arrayContaining(["cash", "survival"]),
+    );
+  }
   expect(getMissionStatus(custom).label).toBe("My grid");
   expect(getMissionStatus(custom).scoreNote).toContain("separate");
 });

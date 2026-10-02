@@ -96,7 +96,11 @@ describe("ending a scenario from inside the reducer", () => {
   it("hands the score screen everything it needs", () => {
     getStore().dispatch(quit());
     const scenario = customScenario({ durationMonths: 2, name: "A Test Run" });
-    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
+    let state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario,
+      difficulty: "CEO",
+    });
     while (state.date.monthsElapsed < (scenario.durationMonths as number)) {
       state = tick(state);
     }
@@ -105,6 +109,8 @@ describe("ending a scenario from inside the reducer", () => {
     const victory = getStore().getState().ui.victory;
     expect(victory).not.toBeNull();
     expect(victory?.scenarioName).toBe("A Test Run");
+    expect(state.meaningfulDecisions).toEqual([]);
+    expect(victory?.outcome).toBe("completed");
     expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
     expect(victory?.debrief).toEqual(
       expect.objectContaining({
