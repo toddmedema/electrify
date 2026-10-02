@@ -1645,6 +1645,7 @@ export const gameSlice = createSlice({
       state.customerRate = startingRate;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
+      state.demandShapeExponent = scenario.demandShapeExponent;
       state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
       state.location = a.location;
       state.commissionedHydroSiteIds = [];
@@ -3354,14 +3355,7 @@ export function tickState(state: GameType) {
       // Objectives are judged in full at term end; before that, only once already decided
       const objectiveFailure =
         state.date.monthsElapsed === termMonths
-          ? scenarioObjectiveFailure(
-              scenario,
-              history,
-              state.difficulty,
-              state.meaningfulDecisions,
-              !!state.meaningfulDecisionGateWaived,
-              retentionStart,
-            )
+          ? scenarioObjectiveFailure(scenario, history, retentionStart)
           : state.date.monthsElapsed < termMonths && !isTutorial
             ? decidedObjectiveFailure(scenario, history, {
                 startingCustomers: retentionStart,
@@ -3584,8 +3578,13 @@ function getDemandW(
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
   const effects = storyEffectsAt(date, game);
+  const shapeExponent = game.demandShapeExponent ?? 1;
+  const shapedDemandMultiple =
+    shapeExponent === 1
+      ? demandMultiple
+      : 430 * pow(demandMultiple / 430, shapeExponent);
   const baselineDemandW =
-    demandMultiple *
+    shapedDemandMultiple *
     now.customers *
     game.startingDemandScale *
     (effects.demandMultiplier || 1);

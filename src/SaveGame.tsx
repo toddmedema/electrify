@@ -335,6 +335,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.startingDemandScale !== "number" ||
     !Number.isFinite(game.startingDemandScale) ||
     game.startingDemandScale <= 0 ||
+    (game.demandShapeExponent !== undefined &&
+      (typeof game.demandShapeExponent !== "number" ||
+        !Number.isFinite(game.demandShapeExponent) ||
+        game.demandShapeExponent < 0.1 ||
+        game.demandShapeExponent > 8)) ||
     !Array.isArray(game.loadAdditions) ||
     game.loadAdditions.some(
       (addition) =>
@@ -356,6 +361,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !Number.isFinite(addition.loadFactor) ||
         addition.loadFactor < 0 ||
         addition.loadFactor > 1 ||
+        (addition.supplementsBackground !== undefined &&
+          typeof addition.supplementsBackground !== "boolean") ||
         (addition.demandType !== "Data Centers" &&
           addition.demandType !== "Mining"),
     ) ||

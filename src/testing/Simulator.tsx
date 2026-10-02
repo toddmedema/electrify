@@ -141,8 +141,7 @@ export interface SimOptionsType {
   // On by default, like the real game: a decided objective ends the run. Accounting checks that
   // need a fixed horizon regardless of the objective can keep playing, like an unscored sandbox.
   endOnDecidedObjective?: boolean;
-  // Off by default. Physical balance checks that play no operating plan of their own can waive the
-  // term-end decision gate, exactly like a save that predates decision tracking.
+  // Legacy internal tracking metadata; has no effect on player or simulation outcomes.
   waiveDecisionGate?: boolean;
   scheduledActions?: ScheduledSimActionType[];
 }
@@ -766,9 +765,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     scenarioObjectiveFailure(
       scenario,
       state.monthlyHistory,
-      state.difficulty,
-      state.meaningfulDecisions,
-      !!state.meaningfulDecisionGateWaived,
       retentionBaseline(scenario, state.customerMarketSize),
     )
   ) {

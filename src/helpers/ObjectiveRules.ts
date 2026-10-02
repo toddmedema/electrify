@@ -1,14 +1,4 @@
-import {
-  DifficultyType,
-  MeaningfulDecisionType,
-  MonthlyHistoryType,
-  ScenarioType,
-} from "../Types";
-import {
-  meaningfulDecisionCategoryCount,
-  meaningfulDecisionRequirement,
-} from "./MeaningfulDecisions";
-import { DIFFICULTY_LABELS } from "../Constants";
+import { MonthlyHistoryType, ScenarioType } from "../Types";
 import {
   bestReachableCustomers,
   CUSTOMER_MARKET_MULTIPLIER,
@@ -117,7 +107,7 @@ export function retentionUnreachable(
  * A scenario objective that is already decided before the term ends. A reliability month that
  * fell short can never be un-missed, and customers that cannot grow back in the time left will
  * not be there at the end, so the run ends now instead of asking the player to fast-forward
- * through years with nothing at stake. Term-end-only rules (the decision gate) are not here.
+ * through years with nothing at stake. Customer retention is otherwise evaluated at term end.
  */
 export function decidedObjectiveFailure(
   scenario: ScenarioType,
@@ -142,9 +132,6 @@ export function decidedObjectiveFailure(
 export function scenarioObjectiveFailure(
   scenario: ScenarioType,
   history: MonthlyHistoryType[],
-  difficulty?: DifficultyType,
-  meaningfulDecisions: MeaningfulDecisionType[] = [],
-  decisionGateWaived = false,
   startingCustomers = scenario.startingCustomers,
 ): string | undefined {
   const reliability = reliabilityFailure(scenario, history);
@@ -158,19 +145,6 @@ export function scenarioObjectiveFailure(
     const retained = history[0].customers / startingCustomers;
     if (retained < scenario.minimumCustomerRetention) {
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the customers you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
-    }
-  }
-  const gate = difficulty && meaningfulDecisionRequirement(difficulty);
-  if (!scenario.tutorialSteps && !decisionGateWaived && gate) {
-    const categories = meaningfulDecisionCategoryCount(meaningfulDecisions);
-    if (
-      meaningfulDecisions.length < gate.count ||
-      categories < gate.categories
-    ) {
-      if (gate.count === 1) {
-        return "Make at least one meaningful decision that changes the grid or its economics.";
-      }
-      return `You made ${meaningfulDecisions.length} of ${gate.count} meaningful decisions across ${categories} of ${gate.categories} decision ${gate.categories === 1 ? "type" : "types"}; ${DIFFICULTY_LABELS[difficulty!] ?? difficulty} difficulty requires ${gate.categories > 1 ? "a varied" : "an active"} operating plan.`;
     }
   }
   return undefined;

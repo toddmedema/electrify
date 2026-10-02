@@ -1,3 +1,4 @@
+import { getDataCenterCustomerProfile } from "../data/DataCenterCustomers";
 import { DAYS_PER_YEAR } from "../Constants";
 import { demandByTypeAt } from "../data/DemandProfiles";
 import { getDateFromMinute } from "./DateTime";
@@ -21,12 +22,15 @@ it("derives reproducible local assumptions and keeps a full current year", () =>
   const sf = getSimLocation("SF")!;
   const scenario = createDataCenterScenario(sf, 2026);
   expect(createDataCenterScenario(sf, 2026)).toEqual(scenario);
+  expect(
+    createDataCenterScenario(getSimLocation("HNL")!, 2026).facilities.some(
+      (plant) => plant.fuel === "Geothermal",
+    ),
+  ).toBe(false);
   expect(scenario.startingYear).toBe(2026);
   expect(scenario.loadAdditions?.[0].startsYear).toBe(2032);
   expect(scenario.durationMonths).toBe(192);
-  expect(scenario.loadAdditions?.[0].peakW).toBeCloseTo(
-    (100000000 * 1000000) / (16500 * 7.7),
-  );
+  expect(scenario.loadAdditions?.[0].peakW).toBe(100000000);
   expect(createDataCenterScenario(sf, 2026, 50000).loadAdditions).toEqual(
     scenario.loadAdditions,
   );
@@ -71,16 +75,28 @@ it("honors adjustable demand and arrival through game initialization and saves",
     );
     const before = { ...game.date, year: arrival - 1, monthNumber: 12 };
     const after = { ...game.date, year: arrival, monthNumber: 1 };
+    const baseline = withoutDataCenterGrowth(scenario);
     expect(
-      demandByTypeAt(500000000, before, 2010, location, game.loadAdditions)[
-        "Data Centers"
-      ],
-    ).toBe(0);
-    expect(
-      demandByTypeAt(500000000, after, 2010, location, game.loadAdditions)[
-        "Data Centers"
-      ],
-    ).toBeCloseTo(peakW);
+      demandByTypeAt(500000000, before, 2010, location, game.loadAdditions),
+    ).toEqual(
+      demandByTypeAt(500000000, before, 2010, location, baseline.loadAdditions),
+    );
+    const afterGrowth = demandByTypeAt(
+      500000000,
+      after,
+      2010,
+      location,
+      game.loadAdditions,
+    )["Data Centers"];
+    const afterBaseline = demandByTypeAt(
+      500000000,
+      after,
+      2010,
+      location,
+      baseline.loadAdditions,
+    )["Data Centers"];
+    expect(afterBaseline).toBeGreaterThan(0);
+    expect(afterGrowth - afterBaseline).toBeCloseTo(peakW);
   }
   expect(
     createDataCenterScenario(location, 2049).loadAdditions?.[0].startsYear,
@@ -114,12 +130,46 @@ it("pairs ordinary demand exactly before the new campus and preserves zero-load 
   }
   expect(baseline.facilities).toEqual(scenario.facilities);
   expect(baseline.eventScenarioIds).toEqual([]);
+  const added = configureDataCenterGrowth(scenario, 100000000, 2032);
+  for (let month = 0; month < 12; month++) {
+    const date = getDateFromMinute(
+      60 * 24 * DAYS_PER_YEAR * (7 + month / 12),
+      2026,
+    );
+    const ordinary = demandByTypeAt(500000000, date, 2026, location);
+    const control = demandByTypeAt(
+      500000000,
+      date,
+      2026,
+      location,
+      baseline.loadAdditions,
+    );
+    const growth = demandByTypeAt(
+      500000000,
+      date,
+      2026,
+      location,
+      added.loadAdditions,
+    );
+    expect(control).toEqual(ordinary);
+    expect(growth["Data Centers"] - control["Data Centers"]).toBeCloseTo(
+      100000000,
+    );
+    for (const type of [
+      "Residential",
+      "Commercial",
+      "Industrial",
+      "Transportation",
+    ] as const) {
+      expect(growth[type]).toBe(control[type]);
+    }
+  }
   const date = getDateFromMinute(60 * 24 * DAYS_PER_YEAR * 7, 2026);
   expect(
     demandByTypeAt(500000000, date, 2026, location, baseline.loadAdditions)[
       "Data Centers"
     ],
-  ).toBe(0);
+  ).toBeGreaterThan(0);
   expect(
     demandByTypeAt(500000000, date, 2026, location, scenario.loadAdditions)[
       "Data Centers"
@@ -146,6 +196,9 @@ it("pairs ordinary demand exactly before the new campus and preserves zero-load 
 
 it.each([
   "SF",
+  "Austin",
+  "Seattle",
+  "Dallas",
   "PIT",
   "HNL",
   "Delhi",
@@ -172,6 +225,31 @@ it.each([
     expect(summarizeYearOneOutlook(timeline).worstShortfallW).toBe(0);
     expect(Math.min(...timeline.map((tick) => tick.cash))).toBeGreaterThan(0);
     expect(scenario.facilities.length).toBeGreaterThan(0);
+    // A modest increase must exceed the opening fleet; the calibrator cannot
+    // leave the old 3–5x oversized portfolio in place.
+    const stressed = forecastCustomGameTimeline(
+      {
+        ...withoutDataCenterGrowth(scenario),
+        startingDemandScale: scenario.startingDemandScale! * 1.15,
+      },
+      DATA_CENTER_DIFFICULTY,
+      DATA_CENTER_SEED,
+    );
+    expect(summarizeYearOneOutlook(stressed).worstShortfallW).toBeGreaterThan(
+      0,
+    );
+    const profile = getDataCenterCustomerProfile(location);
+    if (!profile.annualMWh) return;
+    const actualMWh =
+      ((timeline.reduce((sum, tick) => sum + tick.demandW, 0) /
+        timeline.length) *
+        8760) /
+      1000000;
+    expect(actualMWh / profile.annualMWh).toBeCloseTo(1, 5);
+    if (!profile.observedPeakW) return;
+    expect(
+      Math.max(...timeline.map((tick) => tick.demandW)) / profile.observedPeakW,
+    ).toBeCloseTo(1, 2);
   },
 );
 

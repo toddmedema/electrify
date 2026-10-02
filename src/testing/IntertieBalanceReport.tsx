@@ -203,9 +203,6 @@ it("reports actual import, domestic, and mixed outcomes separately from decision
           const physicalFailure = scenarioObjectiveFailure(
             scenario,
             [...result.months].reverse(),
-            undefined,
-            [],
-            true,
           );
           const durationReached =
             result.months.length >= scenario.durationMonths;

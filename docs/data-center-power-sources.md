@@ -52,11 +52,14 @@ to a particular utility service territory while this fleet represents its wider
 region. Capacity shares are not annual generation shares: wind, solar and
 thermal plants produce different amounts of electricity per MW.
 
-The scenario starts with these shares and scales available facilities to its
-model's demand and reliability needs. Hydro is restricted to researched playable
+The scenario starts with these shares and sizes facilities both down and up to
+serve background demand with a 5% opening-year model allowance. The selected new
+campus is excluded from calibration. See [demand calibration](data-center-calibration.md).
+Hydro is restricted to researched playable
 sites and their physical capacity limits; geothermal remains subject to the
-game's resource restrictions. These restrictions can omit part of a region's
-real supply and change the mix. After three proportional fleet increases, a
+game's resource restrictions; Honolulu excludes Hawaii Island geothermal capacity.
+These restrictions can omit part of a region's
+real supply and change the mix. After four failed proportional fleet doublings, a
 still-undersupplied model receives explicitly labeled modeled gas backup. The
 setup calls out that backup; it is not a claim about existing local gas plants.
 The absolute simulated plant sizes and reserve are model assumptions rather than
@@ -64,10 +67,13 @@ reported local capacities. The game rounds non-hydro starting plants to two
 significant digits, so their exact proportions can change. A regional hydro share
 never implies that a new dam can be built at the selected city's coordinates.
 
-The demand slider retains the previous builder's hypothetical project-size
-preset. It is not a researched forecast of proposed data centers. Editing accounts
+The demand slider defaults to a hypothetical 100 MW project.
+It is not a researched forecast of proposed data centers. Editing accounts
 changes the ordinary grid's size without changing that preset or a player's
-chosen project size. The selected arrival year and MW replace the fixed story's
+chosen project size. The dedicated setup treats the selected MW as a constant total
+electricity draw, including cooling; no arbitrary winter seasonality is imposed.
+Existing regional data-center demand and growth remain in both comparison runs.
+The selected arrival year and MW replace the fixed story's
 schedule; zero MW keeps an explicit zero-load schedule for a matched baseline.
 The run lasts at least ten years beyond arrival, with a minimum of sixteen years.
 

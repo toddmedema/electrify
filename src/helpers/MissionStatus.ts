@@ -16,10 +16,6 @@ import {
   retentionUnreachable,
 } from "./ObjectiveRules";
 import { customerMarketSizeAt } from "./Customers";
-import {
-  meaningfulDecisionCategoryCount,
-  meaningfulDecisionRequirement,
-} from "./MeaningfulDecisions";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyConcise, formatCount } from "./Format";
@@ -139,19 +135,6 @@ export function getMissionStatus(game: GameType) {
           ? "Required at term end; public customers grow slowly and cannot be won back with price"
           : "Required at term end; a lower rate wins customers back",
       status: unreachable ? "failed" : now ? "in-progress" : "unknown",
-      deadline: end,
-    });
-  }
-  const gate = meaningfulDecisionRequirement(game.difficulty);
-  if (gate && !scenario?.tutorialSteps) {
-    requirements.push({
-      id: "decisions",
-      label: "Meaningful decisions",
-      compact: `Decisions ≥ ${gate.count} (${game.meaningfulDecisions.length}) · Categories ≥ ${gate.categories} (${meaningfulDecisionCategoryCount(game.meaningfulDecisions)})`,
-      current: `${game.meaningfulDecisions.length} decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
-      target: `Needs ${gate.count} decisions across ${gate.categories} categories; reverting one removes it`,
-      timing: "Required at term end",
-      status: game.meaningfulDecisionGateWaived ? "waived" : "in-progress",
       deadline: end,
     });
   }

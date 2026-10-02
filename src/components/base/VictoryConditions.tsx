@@ -1,9 +1,5 @@
 import * as React from "react";
-import {
-  DifficultyType,
-  MeaningfulDecisionType,
-  ScenarioType,
-} from "../../Types";
+import { ScenarioType } from "../../Types";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreRuleText } from "../../helpers/Scoring";
@@ -15,9 +11,6 @@ export interface Props {
   startingCustomers?: number;
   minimumCustomerRetention?: number;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
-  difficulty?: DifficultyType;
-  meaningfulDecisions?: MeaningfulDecisionType[];
-  meaningfulDecisionGateWaived?: boolean;
 }
 
 /**

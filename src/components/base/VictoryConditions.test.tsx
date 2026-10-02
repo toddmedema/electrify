@@ -1,46 +1,6 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
-import { MeaningfulDecisionType } from "../../Types";
-
-const decisions: MeaningfulDecisionType[] = [
-  {
-    key: "rate",
-    lever: "rate",
-    label: "Set the customer electricity rate",
-    month: 0,
-    kind: "rate",
-    before: "0.1",
-    after: "0.11",
-  },
-  {
-    key: "policy:solar",
-    lever: "policy:solar",
-    label: "Fund rooftop solar rebates",
-    month: 1,
-    kind: "policy",
-    before: "Off",
-    after: "On",
-  },
-  {
-    key: "dispatch:1",
-    lever: "dispatch:1",
-    label: "Set Coal dispatch priority",
-    month: 2,
-    kind: "dispatch",
-    before: "0",
-    after: "1",
-  },
-  {
-    key: "asset-build:3",
-    lever: "asset-build:3",
-    label: "Build Natural Gas Peaker (100MW)",
-    month: 3,
-    kind: "asset",
-    before: "absent",
-    after: "Natural Gas Peaker:100000000:financed",
-  },
-];
 
 it.each(["Public", "Investor"] as const)(
   "shows required retention and reliability objectives for %s ownership",
@@ -70,14 +30,7 @@ it.each(["Public", "Investor"] as const)(
 );
 
 it("keeps internal decision tracking out of player victory conditions", () => {
-  render(
-    <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
-      difficulty="CEO"
-      meaningfulDecisions={decisions}
-    />,
-  );
+  render(<VictoryConditions ownership="Public" dollarsPerkWh={0.1} />);
   expect(
     screen.queryByTestId("meaningful-decision-progress"),
   ).not.toBeInTheDocument();

@@ -156,7 +156,7 @@ describe("demand profiles", () => {
       const before = getDateFromMinute((6 * 12 - 1) * MINUTES_PER_MONTH, 2020);
 
       expect(scheduledLoadAdditionWAt(addition, before)).toBe(0);
-      expect(scheduledLoadAdditionWAt(addition, months[0])).toBe(100_000_000);
+      expect(scheduledLoadAdditionWAt(addition, months[0])).toBe(90_000_000);
       expect(
         months.reduce(
           (sum, date) => sum + scheduledLoadAdditionWAt(addition, date),
@@ -168,7 +168,7 @@ describe("demand profiles", () => {
           addition,
           getDateFromMinute(18 * 12 * MINUTES_PER_MONTH, 2020),
         ),
-      ).toBe(100_000_000);
+      ).toBe(90_000_000);
       expect(
         scheduledLoadAdditionWAt(
           { ...addition, startsMonth: 4 },
@@ -180,7 +180,7 @@ describe("demand profiles", () => {
           { ...addition, startsMonth: 4 },
           getDateFromMinute((6 * 12 + 3) * MINUTES_PER_MONTH, 2020),
         ),
-      ).toBe(100_000_000);
+      ).toBe(90_000_000);
     });
 
     it("replaces Virginia's generic curve and reports only under Data Centers", () => {
@@ -201,7 +201,7 @@ describe("demand profiles", () => {
       );
 
       expect(before["Data Centers"]).toBe(0);
-      expect(after["Data Centers"]).toBe(100_000_000);
+      expect(after["Data Centers"]).toBe(90_000_000);
       expect(total(after)).toBeGreaterThan(100_000_000);
     });
 

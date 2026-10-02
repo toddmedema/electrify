@@ -1,8 +1,5 @@
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
-import {
-  getStartingCustomers,
-  hasGeothermalResource,
-} from "../data/LocationProfiles";
+import { hasGeothermalResource } from "../data/LocationProfiles";
 import { inEraMoney } from "../data/FuelPrices";
 import {
   FuelNameType,
@@ -13,7 +10,6 @@ import {
 import { getDataCenterCustomerProfile } from "../data/DataCenterCustomers";
 import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
 import { HYDRO_SITES, resolveHydroInventory } from "../data/HydroSites";
-import { prepareCustomScenario } from "./CustomScenarioEvents";
 
 export const DATA_CENTER_SEED = 1062026;
 export const DATA_CENTER_DIFFICULTY = "CEO" as const;
@@ -53,7 +49,8 @@ export function configureDataCenterGrowth(
         demandType: "Data Centers",
         peakW,
         startsYear: arrivalYear,
-        loadFactor: 0.9,
+        loadFactor: 1,
+        supplementsBackground: true,
       },
     ],
   };
@@ -87,6 +84,8 @@ export function createDataCenterScenario(
   // Research establishes relative installed capacity, not the local inventory or its size.
   // The same model load sizing and baseline-only calibration apply to every portfolio.
   Object.entries(mix.shares).forEach(([fuel, share]) => {
+    // Hawaii's reported geothermal capacity is on Hawaii Island, not Oahu.
+    if (fuel === "Geothermal" && location.id === "HNL") return;
     if (fuel === "Geothermal" && !hasGeothermalResource(location)) return;
     const peakW = Math.max(1, Math.round(scale * 2500 * share));
     if (fuel === "Hydro") {
@@ -119,7 +118,7 @@ export function createDataCenterScenario(
       facilities.push({ fuel: fuel as FuelNameType, peakW });
     }
   });
-  const scenario = prepareCustomScenario({
+  const scenario: ScenarioType = {
     ...DEFAULT_CUSTOM_SCENARIO,
     name: "Data centers & your community",
     summary: "Explore a regional example grid as new data centers connect.",
@@ -127,20 +126,17 @@ export function createDataCenterScenario(
     location,
     startingYear,
     seed: DATA_CENTER_SEED,
-    // Preserve the previously suggested hypothetical project size independently
-    // of newly researched/edited accounts. This is a slider preset, not a forecast.
-    startingCustomers:
-      researched?.startingCustomers || getStartingCustomers(location),
+    startingCustomers,
     startingDemandScale,
     ownership: "Public",
     durationMonths: 16 * 12,
     cash: inEraMoney(scale * 800, startingYear),
     facilities,
-    eventScenarioIds: [106],
-  });
+    eventScenarioIds: [],
+  };
   return configureDataCenterGrowth(
-    { ...scenario, startingCustomers },
-    scenario.loadAdditions?.[0].peakW || 0,
+    scenario,
+    100000000,
     Math.min(MAX_DATA_CENTER_YEAR, startingYear + 6),
   );
 }

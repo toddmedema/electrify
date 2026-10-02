@@ -5,8 +5,8 @@ import { getDataCenterCustomerProfile } from "./DataCenterCustomers";
 describe("data-center customer source boundaries", () => {
   it("uses electricity accounts instead of population or combined utility accounts", () => {
     expect(getDataCenterCustomerProfile(LOCATIONS.HNL)).toMatchObject({
-      customers: 310789,
-      sourceYear: 2025,
+      customers: 309839,
+      sourceYear: 2024,
       basis: "local-utility",
       serviceArea: "Hawaiian Electric, Oahu",
     });

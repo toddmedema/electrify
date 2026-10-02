@@ -116,6 +116,9 @@ it("supports back, next and completion without changing the game beyond pausing"
   for (let step = 0; step < 3; step++)
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
   expect(screen.getByText(/Choose 1× at the top/)).toBeVisible();
+  expect(screen.getByText(/You may need to raise rates/)).toHaveTextContent(
+    "You may need to raise rates to expand infrastructure without going bankrupt.",
+  );
   fireEvent.click(screen.getByRole("button", { name: "Ready to explore" }));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),

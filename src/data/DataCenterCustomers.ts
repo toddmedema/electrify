@@ -6,6 +6,12 @@ export interface DataCenterCustomerProfile {
   sourceLabel: string;
   sourceUrl: string;
   sourceYear?: number;
+  /** Retail/delivered energy for this same territory, including existing data centers. */
+  annualMWh?: number;
+  energySourceUrl?: string;
+  energySourceYear?: number;
+  /** Observed peak reference used to calibrate the modeled peak-to-average ratio. */
+  observedPeakW?: number;
   basis: "local-utility" | "reference-utility";
   note: string;
 }
@@ -17,71 +23,122 @@ type CustomerSource = Omit<DataCenterCustomerProfile, "basis">;
 // snapshots, not estimates for the user's selected starting year. See docs/data-center-customers.md.
 const SOURCES: Record<string, CustomerSource> = {
   PIT: {
-    customers: 600000,
+    customers: 615768,
     serviceArea: "Duquesne Light service area, southwestern Pennsylvania",
-    sourceLabel: "Duquesne Light: About us",
-    sourceUrl: "https://www.duquesnelight.com/company/about",
-    note: "More than 600,000 accounts across two counties, including Pittsburgh; not the city alone.",
+    sourceLabel: "Duquesne Light corporate responsibility report, 2024",
+    sourceUrl:
+      "https://www.duquesnelight.com/docs/default-source/default-document-library/dlc-corporate-responsibility-report.pdf?sfvrsn=db1aed44_3",
+    sourceYear: 2024,
+    annualMWh: 12743605,
+    energySourceYear: 2024,
+    note: "Electricity accounts and retail sales across two counties, including Pittsburgh; wholesale sales are excluded.",
   },
   SF: {
-    customers: 380000,
+    customers: 384194,
     serviceArea: "CleanPowerSF customers in San Francisco",
-    sourceLabel: "SFPUC customer accounts, February 2025",
-    sourceUrl:
-      "https://www.sfpuc.gov/about-us/news/cleanpowersf-provides-100-renewable-electricity-san-francisco-customers-two-years",
-    sourceYear: 2025,
-    note: "More than 380,000 CleanPowerSF accounts; excludes other suppliers' accounts, including Hetch Hetchy Power.",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 2844945,
+    energySourceYear: 2024,
+    note: "CleanPowerSF electricity accounts and retail sales in calendar 2024; excludes Hetch Hetchy Power and other suppliers.",
   },
   HNL: {
-    customers: 310789,
+    customers: 309839,
     serviceArea: "Hawaiian Electric, Oahu",
-    sourceLabel: "Hawaiian Electric: Power facts, 2025",
-    sourceUrl: "https://www.hawaiianelectric.com/about-us/power-facts",
-    sourceYear: 2025,
-    note: "All Oahu electricity customers as of December 31, 2025; not Honolulu alone.",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 6134550,
+    energySourceYear: 2024,
+    note: "Oahu electricity accounts and retail sales in 2024; excludes Hawaii and Maui subsidiaries.",
   },
   LA: {
-    customers: 1500000,
+    customers: 1510995,
     serviceArea: "Los Angeles Department of Water and Power",
-    sourceLabel: "LADWP electricity customers, 2023",
-    sourceUrl:
-      "https://ladwpnews.com/la-board-of-water-power-commissioners-approve-policy-to-end-water-and-power-shutoffs-for-low-income-residential-customers-unable-to-pay-their-utility-bill/",
-    sourceYear: 2023,
-    note: "Approximately 1.5 million electric accounts; water accounts are excluded.",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 21347075,
+    energySourceYear: 2024,
+    note: "LADWP electricity accounts and retail sales in 2024; water accounts and wholesale energy are excluded.",
   },
   CAMountains: {
-    customers: 50000,
+    customers: 50030,
     serviceArea: "Liberty CalPeco, California Lake Tahoe area",
-    sourceLabel: "Liberty CalPeco 2025 regulatory application",
-    sourceUrl:
-      "https://california.libertyutilities.com/uploads/A2510XXX-Liberty%20CalPeco%202025%20ECAC%20Application.pdf",
-    sourceYear: 2025,
-    note: "Approximately 50,000 accounts in and around the California Lake Tahoe Basin; not Echo Summit alone.",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 573460,
+    energySourceYear: 2024,
+    note: "Liberty CalPeco electricity accounts and retail sales in 2024; not Echo Summit alone.",
   },
   SJU: {
-    customers: 1500000,
+    customers: 1511847,
     serviceArea: "LUMA, Puerto Rico",
-    sourceLabel: "LUMA customer update, March 2025",
-    sourceUrl:
-      "https://lumapr.com/wp-content/uploads/2025/03/LUMA_March_Customer_Email_SPA_ENG.pdf",
-    sourceYear: 2025,
-    note: "Approximately 1.5 million accounts across Puerto Rico; not San Juan alone.",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 17229804,
+    energySourceYear: 2024,
+    note: "Puerto Rico electricity accounts and retail sales in 2024; not San Juan alone.",
   },
   Manassas: {
-    customers: 17000,
+    customers: 16624,
     serviceArea: "City of Manassas municipal electric utility",
-    sourceLabel: "Manassas 2045 Comprehensive Plan draft, 2025",
-    sourceUrl:
-      "https://cms9files.revize.com/manassasva/Community%20Development/Comp%20Plan/2045%20Comp%20Plan/2045%20Comprehensive%20Plan%20Draft%20-%208-5-25.pdf",
+    sourceLabel: "EIA-861 electricity accounts and sales, 2024",
+    sourceUrl: "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    sourceYear: 2024,
+    annualMWh: 394352,
+    energySourceYear: 2024,
+    note: "Municipal electricity accounts and retail sales in 2024; not the wider Northern Virginia data-center market.",
+  },
+  Austin: {
+    customers: 575087,
+    serviceArea: "Austin Energy service territory",
+    sourceLabel: "Austin Energy statistics, FY2025",
+    sourceUrl: "https://austinenergy.com/about/company-profile/numbers",
     sourceYear: 2025,
-    note: "More than 17,000 residential, commercial and industrial meters within the city (Appendix C2, page 185).",
+    annualMWh: 14501373,
+    energySourceYear: 2025,
+    observedPeakW: 2938000000,
+    note: "Austin Energy electricity accounts and retail sales; not the Austin–San Antonio metropolitan area.",
+  },
+  Seattle: {
+    customers: 513504,
+    serviceArea:
+      "Seattle City Light service territory, including nearby suburbs",
+    sourceLabel: "Seattle City Light Fingertip Facts, 2024",
+    sourceUrl:
+      "https://www.seattle.gov/Documents/Departments/CityLight/FingertipFacts.pdf",
+    sourceYear: 2024,
+    annualMWh: 8938932,
+    energySourceYear: 2024,
+    observedPeakW: 2027000000,
+    note: "Matched 2024 average electricity accounts and retail sales; system losses and wholesale energy are excluded.",
+  },
+  Dallas: {
+    customers: 4111000,
+    serviceArea: "Oncor distribution service territory across Texas",
+    sourceLabel: "Oncor operating statistics, 2025 (Table D)",
+    sourceUrl:
+      "https://www.sec.gov/Archives/edgar/data/1193311/000119312526073624/d17515dex991.htm",
+    sourceYear: 2025,
+    annualMWh: 172775000,
+    energySourceYear: 2025,
+    observedPeakW: 31000000000,
+    note: "Full Oncor territory, not Dallas city. Oncor distributes power; the Texas generation mix is an example grid proxy.",
   },
   Phoenix: {
-    customers: 1400000,
+    customers: 1400036,
     serviceArea: "Arizona Public Service territory across Arizona",
-    sourceLabel: "Arizona Public Service: About us",
-    sourceUrl: "https://www.aps.com/about/",
-    note: "Approximately 1.4 million accounts across the APS territory; not all Phoenix utilities or Phoenix city alone.",
+    sourceLabel: "Arizona Public Service operating statistics, 2024",
+    sourceUrl:
+      "https://www.sec.gov/Archives/edgar/data/7286/000076462225000022/q4_2024xearningsxfinal.htm",
+    sourceYear: 2024,
+    annualMWh: 33701000,
+    energySourceYear: 2024,
+    note: "Average electricity accounts and retail sales across APS territory; not all Phoenix utilities or Phoenix city alone.",
   },
   Delhi: {
     customers: 2000000,

@@ -1,9 +1,9 @@
+import { MEANINGFUL_DECISION_REQUIREMENTS } from "../testing/DecisionBenchmarks";
 import { SCENARIOS } from "../data/Scenarios";
 import { scenarioObjectiveFailure } from "../reducers/Game";
 import { GameType, MeaningfulDecisionKindType } from "../Types";
 import {
   isMaterialCapacityDecision,
-  MEANINGFUL_DECISION_REQUIREMENTS,
   meaningfulDecisionCategoryCount,
   recordMeaningfulDecision,
   validMeaningfulDecisions,
@@ -125,65 +125,28 @@ describe("meaningful decisions", () => {
     expect(validMeaningfulDecisions([{ hepo: "bad" }], 5)).toBe(false);
   });
 
-  it("makes the Intern and diverse CEO objectives explicit, with a simulation waiver", () => {
-    const scenario = {
-      ...SCENARIOS.find(({ id }) => id === 100)!,
-    };
-    const one = choices(1);
-    const nine = choices(9, ["asset", "rate", "policy", "dispatch"]);
-    const tenOneKind = choices(10);
-    const tenDiverse = choices(10, ["asset", "rate", "policy", "dispatch"]);
-
-    expect(scenarioObjectiveFailure(scenario, [], "Intern", [])).toContain(
-      "at least one",
-    );
-    expect(scenarioObjectiveFailure(scenario, [], "Intern", one)).toBeFalsy();
-    expect(scenarioObjectiveFailure(scenario, [], "CEO", nine)).toContain(
-      "9 of 10",
-    );
-    expect(scenarioObjectiveFailure(scenario, [], "CEO", tenOneKind)).toContain(
-      "1 of 4",
-    );
-    expect(meaningfulDecisionCategoryCount(tenDiverse)).toBeGreaterThanOrEqual(
-      4,
-    );
+  it("keeps decision benchmarks internal and never rejects a player term", () => {
+    const scenario = SCENARIOS.find(({ id }) => id === 100)!;
+    for (const difficulty of [
+      "Intern",
+      "Employee",
+      "Manager",
+      "VP",
+      "CEO",
+    ] as const) {
+      expect(scenarioObjectiveFailure(scenario, [])).toBeUndefined();
+      expect(
+        MEANINGFUL_DECISION_REQUIREMENTS[difficulty].count,
+      ).toBeGreaterThan(0);
+    }
     expect(
-      scenarioObjectiveFailure(scenario, [], "CEO", tenDiverse),
-    ).toBeFalsy();
-    expect(scenarioObjectiveFailure(scenario, [], "CEO", [], true)).toBeFalsy();
-  });
-
-  it("asks for a larger, more varied plan at every step up in difficulty", () => {
-    const scenario = {
-      ...SCENARIOS.find(({ id }) => id === 100)!,
-    };
-    const order = ["Intern", "Employee", "Manager", "VP", "CEO"] as const;
-    order.slice(1).forEach((difficulty, index) => {
-      const easier = MEANINGFUL_DECISION_REQUIREMENTS[order[index]];
-      const harder = MEANINGFUL_DECISION_REQUIREMENTS[difficulty];
-      expect(harder.count).toBeGreaterThanOrEqual(easier.count);
-      expect(harder.categories).toBeGreaterThanOrEqual(easier.categories);
-    });
-    // Passive play no longer clears a middle difficulty
-    expect(scenarioObjectiveFailure(scenario, [], "Employee", [])).toContain(
-      "at least one",
-    );
-    expect(
-      scenarioObjectiveFailure(scenario, [], "Employee", choices(1)),
-    ).toBeFalsy();
-    expect(
-      scenarioObjectiveFailure(scenario, [], "Manager", choices(1)),
-    ).toContain("1 of 2");
-    expect(scenarioObjectiveFailure(scenario, [], "VP", choices(4))).toContain(
-      "1 of 2 decision types",
-    );
-    expect(
-      scenarioObjectiveFailure(
-        scenario,
-        [],
-        "VP",
-        choices(4, ["asset", "rate"]),
+      meaningfulDecisionCategoryCount(
+        choices(10, ["asset", "rate", "policy", "dispatch"]),
       ),
-    ).toBeFalsy();
+    ).toBe(4);
+    expect(MEANINGFUL_DECISION_REQUIREMENTS.CEO).toEqual({
+      count: 10,
+      categories: 4,
+    });
   });
 });

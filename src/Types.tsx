@@ -876,8 +876,10 @@ export interface ScenarioType {
   // Customer count and utility-scale load are not interchangeable. Authored scenarios can
   // calibrate the ordinary customer-driven baseline; otherwise the location profile is enough.
   startingDemandScale?: number;
+  /** Optional weather/daily peak calibration; 1 preserves the original demand shape. */
+  demandShapeExponent?: number;
   // Absolute loads owned by this scenario. A Data Centers schedule replaces the generic regional
-  // data-center curve instead of stacking on top of it.
+  // data-center curve unless marked as a marginal addition with supplementsBackground.
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
@@ -924,10 +926,12 @@ export interface ScenarioLoadAdditionType {
   /** Maximum total load after the start date, never an annual increment. */
   peakW: number;
   loadFactor: number;
+  /** Adds a marginal campus on top of existing regional data-center demand and growth. */
+  supplementsBackground?: boolean;
   /**
    * The two end uses a scenario can own outright. Both sit outside the regional sector mix: a
    * grid either has the mine or the campus on it or it does not, and neither scales with the
-   * customer count. "Data Centers" replaces the generic regional curve when authored; "Mining"
+   * customer count. "Data Centers" replaces the generic regional curve unless supplementsBackground is true; "Mining"
    * has no generic curve and is purely additive.
    */
   demandType: "Data Centers" | "Mining";
@@ -1184,6 +1188,7 @@ export interface GameType {
   customerRate: number;
   // Copied from the scenario at init so saves carry the exact demand contract they started with.
   startingDemandScale: number;
+  demandShapeExponent?: number;
   loadAdditions: ScenarioLoadAdditionType[];
   // What a loan signed right now would cost, and the multiplier on prime that gets there.
   // Both recomputed once a month. The premium is kept separately so that a forecast can price
