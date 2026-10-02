@@ -4,6 +4,7 @@ import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getAirborneWindOutputFactor } from "../helpers/Energy";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
+import { encodeSave } from "../SaveEncoding";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { loadSimData } from "./SimData";
 import { expectNoViolations, runMonths } from "./SimulationTestHelpers";
@@ -105,7 +106,7 @@ describe("simulation determinism", () => {
     runMonths(interrupted, HALF_MONTHS);
     // Through the real save envelope, so the shipped serialize/validate path is what's covered
     const parsed = parseSave(
-      JSON.parse(JSON.stringify(serializeSave(interrupted))),
+      JSON.parse(JSON.stringify(encodeSave(serializeSave(interrupted)))),
     );
     expect(parsed).not.toBeNull();
     const saved: GameType = parsed!.game;

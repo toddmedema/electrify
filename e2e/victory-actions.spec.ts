@@ -1,3 +1,4 @@
+import { editSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "@playwright/test";
@@ -13,9 +14,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=101");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     // Move a real save to its final tick to exercise the actual completed-run flow.
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      const save = JSON.parse(localStorage.getItem("savedGame")!);
+    await editSavedGame(page, (save) => {
       const offset = 144 * 1440 - 15 - save.game.date.minute;
       save.game.date.minute += offset;
       save.game.date.monthsElapsed = 143;
@@ -32,7 +31,6 @@ for (const theme of ["light", "dark"]) {
           after: "$0.11/kWh",
         },
       ];
-      localStorage.setItem("savedGame", JSON.stringify(save));
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
