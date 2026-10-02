@@ -187,9 +187,7 @@ test("the header explore button opens setup and first-time tips preserve the cho
   await intro.getByRole("button", { name: "Show me the basics" }).click();
   await expect(page.getByText("1 of 4", { exact: true })).toBeVisible();
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
-    await page
-      .getByRole("heading", { name: "You run an example grid" })
-      .click();
+    await page.getByRole("heading", { name: "Keep the lights on" }).click();
     await page.screenshot({
       path: path.join(reviewDir, "data-center-guide-desktop.png"),
       animations: "disabled",
@@ -201,15 +199,13 @@ test("the header explore button opens setup and first-time tips preserve the cho
   for (let step = 0; step < 3; step++)
     await page.getByRole("button", { name: "Next", exact: true }).click();
   const final = page.getByRole("dialog", {
-    name: "Compare community tradeoffs",
+    name: "Watch costs and emissions",
   });
   await expectDialogToFit(final);
-  await expect(
-    final.getByText(/Close these tips, then choose 1×/),
-  ).toBeVisible();
+  await expect(final.getByText(/Choose 1× at the top/)).toBeVisible();
   if (reviewDir && testInfo.project.name === "mobile-390px") {
     await page
-      .getByRole("heading", { name: "Compare community tradeoffs" })
+      .getByRole("heading", { name: "Watch costs and emissions" })
       .click();
     await page.screenshot({
       path: path.join(reviewDir, "data-center-guide-mobile.png"),
