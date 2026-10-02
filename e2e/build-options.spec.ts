@@ -20,6 +20,20 @@ for (const theme of ["light", "dark"] as const) {
       await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
       const cards = page.locator(".buildOption");
+      const catalogTitle = page.locator(".constructionTitle .iconLabel");
+      if (await catalogTitle.locator("svg").isVisible()) {
+        const gap = await catalogTitle.evaluate((element) => {
+          const text = Array.from(element.childNodes).find(
+            (node) =>
+              node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+          )!;
+          const range = document.createRange();
+          range.selectNodeContents(text);
+          const icon = element.querySelector("svg")!.getBoundingClientRect();
+          return range.getBoundingClientRect().x - icon.right;
+        });
+        expect(gap).toBeCloseTo(8, 0);
+      }
       const first = cards.first();
       await expect(first).toBeVisible();
       await expect(first).not.toContainText("Construction emissions");

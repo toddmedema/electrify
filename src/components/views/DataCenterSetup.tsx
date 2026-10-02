@@ -46,6 +46,7 @@ const SETUP_WORKER: WorkerRequestOptions<
 export interface Props {
   onBack: () => void;
   onStart: (scenario: ScenarioType) => void;
+  onResume?: () => void;
 }
 
 const ZERO_DEMAND_TICK = wToSliderTick(10e6) - 1;
@@ -62,7 +63,7 @@ const YEARS = Array.from(
   (_, index) => MIN_YEAR + index,
 );
 
-export default function DataCenterSetup({ onBack, onStart }: Props) {
+export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
   const [startingYearInput, setStartingYearInput] = React.useState(() =>
     String(
       Math.max(MIN_YEAR, Math.min(MAX_YEAR - 1, new Date().getFullYear())),
@@ -151,6 +152,14 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
       <ScreenHeader title="Explore data center growth" onBack={onBack} />
       <div className="scrollable">
         <div className="dataCenterSetupContent">
+          {onResume && (
+            <div className="dataCenterSetupResume">
+              <Typography>Resume your current save?</Typography>
+              <Button variant="outlined" onClick={onResume}>
+                Resume game
+              </Button>
+            </div>
+          )}
           <Typography>
             Explore what new data centers could mean for your local grid.
           </Typography>
@@ -427,23 +436,21 @@ export default function DataCenterSetup({ onBack, onStart }: Props) {
               )}
             </section>
           )}
+          {scenario && (
+            <footer className="dataCenterSetupStart">
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => onStart(scenario)}
+              >
+                Start exploring
+              </Button>
+            </footer>
+          )}
         </div>
       </div>
-      {scenario && (
-        <footer className="dataCenterSetupFooter">
-          <div className="dataCenterSetupStart">
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              endIcon={<ArrowForwardIcon />}
-              onClick={() => onStart(scenario)}
-            >
-              Start exploring
-            </Button>
-          </div>
-        </footer>
-      )}
     </div>
   );
 }

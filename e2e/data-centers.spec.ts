@@ -45,6 +45,40 @@ test("the landing page opens a prepared current-year grid and supports browser h
 }, testInfo) => {
   test.setTimeout(120000);
   await page.goto("/about.html");
+  for (const panel of await page.locator(".panel--community").all()) {
+    const bounds = (await panel.boundingBox())!;
+    const button = (await panel.locator(".button").boundingBox())!;
+    expect(button.x + button.width / 2).toBeCloseTo(
+      bounds.x + bounds.width / 2,
+      0,
+    );
+  }
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir && testInfo.project.name === "desktop-chromium") {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    const panels = page.locator(".panel--community");
+    await panels
+      .first()
+      .evaluate((element) =>
+        element.scrollIntoView({ block: "start", behavior: "instant" }),
+      );
+    await page.evaluate(() =>
+      window.scrollBy({ top: -96, behavior: "instant" }),
+    );
+    const first = (await panels.first().boundingBox())!;
+    const last = (await panels.last().boundingBox())!;
+    await page.screenshot({
+      path: path.join(reviewDir, "about-community-actions.png"),
+      clip: {
+        x: first.x,
+        y: first.y,
+        width: first.width,
+        height: last.y + last.height - first.y,
+      },
+      animations: "disabled",
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
   await page
     .getByRole("link", { name: "Explore data centers and your grid" })
     .click();
@@ -58,6 +92,7 @@ test("the landing page opens a prepared current-year grid and supports browser h
     page.getByRole("combobox", { name: "Data centers open" }),
   ).toHaveCount(0);
   await ready(page);
+  await expect(page.getByText("Resume your current save?")).toHaveCount(0);
   const search = await page
     .getByRole("combobox", { name: "Select a city", exact: true })
     .boundingBox();
@@ -104,6 +139,16 @@ test("the landing page opens a prepared current-year grid and supports browser h
     const content = (await page
       .locator(".dataCenterSetupContent")
       .boundingBox())!;
+    const header = (await page.locator(".screenHeaderBar").boundingBox())!;
+    expect(header.x).toBeCloseTo(content.x, 0);
+    expect(header.width).toBeCloseTo(content.width, 0);
+    if (page.viewportSize()!.width >= 816)
+      expect(content.width).toBeCloseTo(816, 0);
+    const summary = (await page
+      .locator(".dataCenterSetupSummary")
+      .boundingBox())!;
+    if (page.viewportSize()!.width >= 700)
+      expect(start.y).toBeGreaterThanOrEqual(summary.y + summary.height);
     expect(
       Math.abs(start.x + start.width - (content.x + content.width - 16)),
     ).toBeLessThan(2);
@@ -131,14 +176,13 @@ test("the landing page opens a prepared current-year grid and supports browser h
         .evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     await setupHeading(page).click();
-    await expect(startButton(page)).toBeInViewport({ ratio: 1 });
     await page.screenshot({
       path: testInfo.outputPath(`data-center-setup-${theme}.png`),
       fullPage: true,
     });
     await page
-      .getByRole("heading", { name: "How much extra power?", exact: true })
-      .evaluate((element) => element.scrollIntoView({ block: "start" }));
+      .locator(".screenDataCenterSetup > .scrollable")
+      .evaluate((element) => (element.scrollTop = element.scrollHeight));
     await expect(startButton(page)).toBeInViewport({ ratio: 1 });
     await page.screenshot({
       path: testInfo.outputPath(`data-center-controls-${theme}.png`),
@@ -242,7 +286,7 @@ test("the header explore button opens setup and first-time tips preserve the cho
 
 test("ignoring first-time tips records Mission 1 and prevents another offer", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(120000);
   await page.goto("/?dataCenters=1");
   await ready(page);
@@ -251,14 +295,49 @@ test("ignoring first-time tips records Mission 1 and prevents another offer", as
   await expect(guide).toBeVisible({ timeout: 30000 });
   await page.keyboard.press("Escape");
   await expect(guide).toBeHidden();
-  expect((await savedGame(page))?.speed).toBe("PAUSED");
+  const before = await savedGame(page);
+  expect(before?.speed).toBe("PAUSED");
   await page.goto("/?dataCenters=1");
+  await expect(page.getByText("Resume your current save?")).toBeVisible();
   await ready(page);
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir) {
+    const mobile = testInfo.project.name === "mobile-390px";
+    if (!mobile) await page.setViewportSize({ width: 1600, height: 1100 });
+    else {
+      await page.evaluate(() => localStorage.setItem("theme", "dark"));
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.reload();
+      await ready(page);
+    }
+    await page
+      .locator(".scrollable")
+      .evaluate((element) => (element.scrollTop = 0));
+    await page.screenshot({
+      path: path.join(
+        reviewDir,
+        `setup-resume-${mobile ? "mobile" : "desktop"}.png`,
+      ),
+      animations: "disabled",
+    });
+  }
   await startButton(page).click();
   const guard = page.getByRole("dialog", { name: "Start a new game?" });
   await expect(guard).toBeVisible();
   await guard.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(setupHeading(page)).toBeVisible();
+  await page.getByRole("button", { name: "Resume game", exact: true }).click();
+  await expect(page).not.toHaveURL(/dataCenters/);
+  await expect(page.locator("#appbar:visible").first()).toBeVisible({
+    timeout: 30000,
+  });
+  expect(await savedGame(page)).toEqual(before);
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible();
+  expect(await savedGame(page)).toEqual(before);
+  await page.goto("/?dataCenters=1");
+  await ready(page);
   await startButton(page).click();
   await guard
     .getByRole("button", { name: "Start new game", exact: true })
