@@ -7,7 +7,10 @@ import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { isBigScreen, isDesktopScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
-import { quit, setSpeed, startTutorial } from "../../reducers/Game";
+import { setSpeed, startTutorial } from "../../reducers/Game";
+import { quitSavedGame, runSaveTransition } from "../../SaveSession";
+import RenameSaveDialog from "./RenameSaveDialog";
+import { savedTime } from "../../helpers/SaveDisplay";
 import {
   AppStateType,
   GameType,
@@ -45,6 +48,10 @@ export interface StateProps {
   game: GameType;
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
+  activeSave?: { id: string; name: string };
+  saveState?: "idle" | "saving" | "saved" | "failed";
+  savedAt?: string;
+  saveError?: string;
 }
 
 export interface DispatchProps {
@@ -52,6 +59,7 @@ export interface DispatchProps {
   onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
   onSettings: () => void;
+  onSavedGames?: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
@@ -137,6 +145,7 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
+  const [renameOpen, setRenameOpen] = React.useState(false);
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
       onEvidenceAcknowledged?.(evidenceRequest);
@@ -161,6 +170,7 @@ export function GameAppBar(props: Props) {
     setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
   const handleQuit = React.useCallback(() => {
+    setMenuAnchorEl(null);
     onQuit();
     window.setTimeout(() => {
       document.querySelector<HTMLElement>("[data-main-action]")?.focus();
@@ -199,6 +209,7 @@ export function GameAppBar(props: Props) {
       <>
         <IconButton
           data-settings-trigger
+          data-saves-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label="menu"
@@ -217,6 +228,17 @@ export function GameAppBar(props: Props) {
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Settings</MenuItem>
+          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          {props.activeSave && (
+            <MenuItem
+              onClick={() => {
+                handleMenuClose();
+                setRenameOpen(true);
+              }}
+            >
+              Rename current game
+            </MenuItem>
+          )}
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
@@ -242,6 +264,9 @@ export function GameAppBar(props: Props) {
       menuAnchorEl,
       onManual,
       onSettings,
+      props.onSavedGames,
+      props.activeSave?.id,
+      props.activeSave?.name,
       onNextTutorial,
       handleQuit,
       nextTutorial,
@@ -286,6 +311,38 @@ export function GameAppBar(props: Props) {
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
+      {!isTutorial && !isReplay && props.saveState && (
+        <Typography
+          className="saveStatus"
+          data-save-state={props.saveState}
+          data-active-save-id={props.activeSave?.id}
+          role={props.saveState === "failed" ? "alert" : "status"}
+          variant="caption"
+          color={
+            props.saveState === "failed" ? "warning.main" : "text.secondary"
+          }
+          sx={{ px: 2, pb: 0.5 }}
+          title={
+            props.saveState === "failed"
+              ? props.saveError
+              : props.savedAt
+                ? new Date(props.savedAt).toLocaleString()
+                : undefined
+          }
+        >
+          {props.saveState === "failed" ? (
+            <button className="saveStatusAction" onClick={props.onSavedGames}>
+              Save failed · Manage saves
+            </button>
+          ) : props.saveState === "saving" ? (
+            "Saving…"
+          ) : props.savedAt ? (
+            `Saved ${savedTime(props.savedAt)}`
+          ) : (
+            "Preparing save…"
+          )}
+        </Typography>
+      )}
       <div className="gameStatusBar">
         <div
           className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
@@ -353,6 +410,10 @@ export function GameAppBar(props: Props) {
         game={game}
         onClose={() => setScenarioDetailsOpen(false)}
       />
+      <RenameSaveDialog
+        save={renameOpen ? props.activeSave : undefined}
+        onClose={() => setRenameOpen(false)}
+      />
     </div>
   );
 }
@@ -363,6 +424,20 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
   evidenceRequest: state.ui.evidenceRequest,
   facilityDragActive: state.ui.facilityDragActive,
+  activeSave: state.saves?.activeId
+    ? {
+        id: state.saves.activeId,
+        name:
+          state.saves.entries.find(
+            (entry) => entry.id === state.saves?.activeId,
+          )?.name ||
+          state.saves.pendingName ||
+          "Current game",
+      }
+    : undefined,
+  saveState: state.saves?.saveState,
+  savedAt: state.saves?.savedAt,
+  saveError: state.saves?.saveError,
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
@@ -379,14 +454,17 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
     },
+    onSavedGames: () => {
+      dispatch(navigate("SAVED_GAMES"));
+    },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
-      startTutorial(dispatch, scenarioId);
+      void runSaveTransition(() => startTutorial(dispatch, scenarioId));
     },
     onQuit: () => {
-      dispatch(quit());
+      void quitSavedGame();
     },
   };
 };

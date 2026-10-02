@@ -1,18 +1,20 @@
 import path from "path";
 import { expect, test, Page } from "@playwright/test";
 import manifest from "../src/data/RunCompatibility.json";
+import type { ChallengeInvitation } from "../src/Types";
+import { readSavedGame, readSaveRecords } from "./save-fixture";
 
-function invitation(scenarioId = 101, seed = 42, target = 12400) {
+function invitation(
+  scenarioId = 101,
+  seed = 42,
+  target = 12400,
+): ChallengeInvitation {
   return {
-    invitationSchemaVersion: 1,
     run: {
-      identitySchemaVersion: 1,
       scenarioId,
-      scenarioRevision: manifest.compatibilityId,
       seed,
       difficulty: "CEO",
       compatibilityId: manifest.compatibilityId,
-      optionsProfile: "canonical-v1",
     },
     target,
   };
@@ -21,10 +23,7 @@ function link(value = invitation()) {
   return `/?challenge=${encodeURIComponent(JSON.stringify(value))}&utm_campaign=friend`;
 }
 async function savedGame(page: Page) {
-  return page.evaluate(() => {
-    const saved = localStorage.getItem("savedGame");
-    return saved ? JSON.parse(saved).game : undefined;
-  });
+  return (await readSavedGame(page))!;
 }
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -54,13 +53,6 @@ test("an active run stays paused while browsing and cancelling a challenge", asy
   await page.evaluate(() => dispatchEvent(new Event("pagehide")));
   const before = await savedGame(page);
   expect(before.speed).toBe("PAUSED");
-  await page
-    .getByRole("button", { name: "Start challenge", exact: true })
-    .click();
-  await page
-    .getByRole("dialog", { name: "Start a new game?" })
-    .getByRole("button", { name: "Cancel", exact: true })
-    .click();
   await page.waitForTimeout(500);
   await page.evaluate(() => dispatchEvent(new Event("pagehide")));
   expect((await savedGame(page)).date.minute).toBe(before.date.minute);
@@ -168,8 +160,8 @@ for (const theme of ["light", "dark"] as const) {
     expect(game.scenarioId).toBe(value.run.scenarioId);
     expect(game.difficulty).toBe("CEO");
     expect(game.challenge).toEqual(value);
-    expect(game.runIdentity.inputs.location).toEqual(game.location);
-    expect(game.runIdentity.seed).toBe(value.run.seed);
+    expect(game.runIdentity!.inputs.location).toEqual(game.location);
+    expect(game.runIdentity!.seed).toBe(value.run.seed);
     expect(game.facilities.length).toBeGreaterThan(0);
     await page.reload();
     await page
@@ -182,7 +174,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("landing, history and cancelled overwrite preserve the save", async ({
+test("landing and history preserve a save, and a challenge creates another", async ({
   page,
 }) => {
   await page.goto("/?scenario=111");
@@ -193,12 +185,6 @@ test("landing, history and cancelled overwrite preserve the save", async ({
   await expect(
     page.getByRole("button", { name: "Continue saved game" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Start challenge", exact: true })
-    .click();
-  const guard = page.getByRole("dialog", { name: "Start a new game?" });
-  await expect(guard).toBeVisible();
-  await guard.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(await savedGame(page)).toEqual(before);
   await page.goBack();
   await expect(
@@ -217,13 +203,14 @@ test("landing, history and cancelled overwrite preserve the save", async ({
   await page
     .getByRole("button", { name: "Start challenge", exact: true })
     .click();
-  await page
-    .getByRole("dialog", { name: "Start a new game?" })
-    .getByRole("button", { name: "Start new game", exact: true })
-    .click();
   await expect.poll(async () => (await savedGame(page))?.scenarioId).toBe(101);
   expect((await savedGame(page)).seed).toBe(42);
   expect((await savedGame(page)).challenge).toEqual(invitation());
+  const records = await readSaveRecords(page);
+  expect(records).toHaveLength(2);
+  expect(records.some((record) => record.metadata.scenarioId === 111)).toBe(
+    true,
+  );
 });
 
 test("incompatible invitations require an explicit ordinary mission choice", async ({

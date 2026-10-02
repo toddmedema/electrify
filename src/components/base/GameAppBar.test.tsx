@@ -31,6 +31,21 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  it("keeps save failure visible and opens recovery from the status", () => {
+    const onSavedGames = jest.fn();
+    renderAppBar({
+      saveState: "failed",
+      saveError: "Browser storage is full.",
+      onSavedGames,
+    });
+    const status = screen.getByRole("alert");
+    expect(status).toHaveAttribute("data-save-state", "failed");
+    expect(status).toHaveAttribute("title", "Browser storage is full.");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save failed · Manage saves" }),
+    );
+    expect(onSavedGames).toHaveBeenCalledTimes(1);
+  });
   afterEach(() => {
     mockDesktop = false;
   });

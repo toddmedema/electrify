@@ -1,7 +1,8 @@
 import { activeScenario } from "../helpers/GameSelectors";
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
-import { delta, quit } from "../reducers/Game";
+import { delta } from "../reducers/Game";
+import { quitSavedGame } from "../SaveSession";
 import { changeTutorialStep, recordTutorialExited } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import {
@@ -67,7 +68,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         snackbarOpen({
           message: "Walkthrough closed - keep playing, or pick another mission",
           actionLabel: "Missions",
-          action: () => dispatch(quit({ toScenarioList: true })),
+          action: () => {
+            void quitSavedGame({ toScenarioList: true });
+          },
           open: true,
           timeout: 6000,
         }),

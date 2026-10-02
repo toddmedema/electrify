@@ -22,11 +22,14 @@ import InstallAppButton from "../base/InstallAppButton";
 export interface StateProps {
   audioEnabled?: boolean;
   hasSavedGame: boolean;
+  savedGameName?: string;
+  savedGameDescription?: string;
 }
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onContinue: () => void;
+  onSavedGames: () => void;
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
@@ -105,16 +108,39 @@ const MainMenu = (props: Props): React.JSX.Element => {
           useFlexGap
         >
           {props.hasSavedGame && (
-            <Button
-              data-main-action
-              size="large"
-              variant="contained"
-              color="primary"
-              onClick={props.onContinue}
-            >
-              Continue
-            </Button>
+            <>
+              <Button
+                data-main-action
+                size="large"
+                variant="contained"
+                color="primary"
+                onClick={props.onContinue}
+              >
+                Continue
+              </Button>
+              {props.savedGameName && (
+                <Box
+                  data-continue-context
+                  sx={{ textAlign: "center", pb: 1, overflowWrap: "anywhere" }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {props.savedGameName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {props.savedGameDescription}
+                  </Typography>
+                </Box>
+              )}
+            </>
           )}
+          <Button
+            data-saves-trigger
+            size="large"
+            variant="text"
+            onClick={props.onSavedGames}
+          >
+            Saved games
+          </Button>
           <Button
             data-main-action
             size="large"

@@ -1,4 +1,4 @@
-import { editSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
 import { openPane } from "./layout";
@@ -27,14 +27,7 @@ async function openBuildGenerators(page: Page) {
 // reach after the first frame of the game screen. Poll the same pagehide flush the fixtures use
 // until that save exists, rather than editing a save that may not have been written yet.
 async function waitForSave(page: Page) {
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        window.dispatchEvent(new Event("pagehide"));
-        return localStorage.getItem("savedGame") !== null;
-      }),
-    )
-    .toBe(true);
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
 }
 
 // Brings the end of the fleet list into view. On a phone the whole Facilities body scrolls, so
@@ -386,11 +379,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   const origin = await range(page);
-  const countBefore = await page.evaluate(() => {
-    window.dispatchEvent(new Event("pagehide"));
-    return JSON.parse(localStorage.getItem("savedGame")!).game.facilities
-      .length;
-  });
+  const countBefore = (await readSavedGame(page))!.facilities.length;
   await openBuildGenerators(page);
   await page
     .getByRole("button", { name: /Review purchase of/ })
@@ -400,13 +389,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".MuiSnackbar-root")).toContainText("online in");
   await openInsights(page);
   expect(await range(page)).toEqual(origin);
-  expect(
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event("pagehide"));
-      return JSON.parse(localStorage.getItem("savedGame")!).game.facilities
-        .length;
-    }),
-  ).toBe(countBefore + 1);
+  expect((await readSavedGame(page))!.facilities.length).toBe(countBefore + 1);
   // Build repeats the speed controls over the game's app bar; both reflect one clock.
   await expect(
     page.getByRole("button", { name: "pause", exact: true }).first(),

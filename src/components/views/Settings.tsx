@@ -26,8 +26,6 @@ import { clearAppCache } from "../../helpers/Cache";
 
 export interface StateProps {
   settings: SettingsType;
-  // What the saved game is called, or undefined when there's nothing to export
-  savedGame?: string;
   loggedIn: boolean;
   // The leaderboard name, when one has been claimed
   displayName?: string;
@@ -42,8 +40,7 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
-  onExportSave: () => void;
-  onImportSave: (file: File) => void;
+  onManageSaves: () => void;
   onBack: () => void;
 }
 
@@ -177,18 +174,6 @@ function VolumeSlider(props: {
 
 export default function Settings(props: Props): React.JSX.Element {
   const canInstallApp = useCanInstallApp();
-  // The file picker is driven by the Import button rather than wrapping it, so that both buttons
-  // are plainly buttons and the disabled Export one behaves like one
-  const fileInput = React.useRef<HTMLInputElement>(null);
-  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files && e.target.files[0];
-    // Cleared so that picking the same file again still counts as a change, which is what a
-    // player who fixed a bad file by hand and came back would expect
-    e.target.value = "";
-    if (file) {
-      props.onImportSave(file);
-    }
-  };
   const onBack = () => {
     props.onBack();
     // Card transitions replace the button that opened Settings. Once the previous card is back,
@@ -368,12 +353,8 @@ export default function Settings(props: Props): React.JSX.Element {
 
           <SettingsGroup id="saved-game-settings" title="Game data">
             <SettingRow
-              label="Saved game"
-              description={
-                props.savedGame
-                  ? `Export “${props.savedGame}” to keep or share. Importing replaces your current save.`
-                  : "Start a game to export it, or import a shared save."
-              }
+              label="Saved games"
+              description="Resume, rename, import, export, or delete games saved on this device and browser."
               stackOnMobile
             >
               <Stack
@@ -389,27 +370,13 @@ export default function Settings(props: Props): React.JSX.Element {
                 }}
               >
                 <Button
+                  data-saves-trigger
                   variant="outlined"
-                  disabled={!props.savedGame}
-                  onClick={props.onExportSave}
+                  onClick={props.onManageSaves}
                 >
-                  Export save
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => fileInput.current?.click()}
-                >
-                  Import save
+                  Manage saves
                 </Button>
               </Stack>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="application/json,.json"
-                style={{ display: "none" }}
-                aria-label="Save game file"
-                onChange={onFileChosen}
-              />
             </SettingRow>
           </SettingsGroup>
 

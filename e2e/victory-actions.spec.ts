@@ -1,4 +1,4 @@
-import { editSavedGame } from "./save-fixture";
+import { editSavedGame, readSavedGame } from "./save-fixture";
 import { expectDialogToFit } from "./dialog-layout";
 import path from "path";
 import { expect, test } from "@playwright/test";
@@ -86,9 +86,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).not.toBeVisible();
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-    const restarted = await page.evaluate(
-      () => JSON.parse(localStorage.getItem("savedGame")!).game,
-    );
+    const restarted = (await readSavedGame(page))!;
     expect(restarted.scenarioId).toBe(101);
     expect(restarted.date.monthsElapsed).toBe(0);
   });

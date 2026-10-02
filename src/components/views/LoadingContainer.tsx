@@ -11,6 +11,12 @@ import { getScenarioLocation } from "../../helpers/Locations";
 import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
+import {
+  completeSaveLoading,
+  failSaveLoading,
+  getLoadingGeneration,
+  isCurrentLoadingGeneration,
+} from "../../SaveSession";
 import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
 
@@ -58,7 +64,10 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-let loadInProgress = false;
+let loadingGeneration: number | undefined;
+// Simulation data caches are shared. Finish an older download before starting a newer
+// location, otherwise a stale completion could overwrite the current mission’s cache.
+let dataLoading: Promise<void> = Promise.resolve();
 let loadListeners: Array<{
   onProgress: (message: string) => void;
   onError: (message: string) => void;
@@ -71,17 +80,23 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       onProgress: (message: string) => void,
       onError: (message: string) => void,
     ) => {
+      const request = getLoadingGeneration();
+      if (loadingGeneration !== request) loadListeners = [];
       loadListeners.push({ onProgress, onError });
-      if (loadInProgress) {
+      if (loadingGeneration === request) {
         // StrictMode and card transitions can mount the loading view twice. Both renders share
         // this module, so only the first one starts the downloads.
         return;
       }
-      loadInProgress = true;
-      const reportProgress = (message: string) =>
-        loadListeners.forEach((listener) => listener.onProgress(message));
-      const reportError = (message: string) =>
-        loadListeners.forEach((listener) => listener.onError(message));
+      loadingGeneration = request;
+      const reportProgress = (message: string) => {
+        if (isCurrentLoadingGeneration(request))
+          loadListeners.forEach((listener) => listener.onProgress(message));
+      };
+      const reportError = (message: string) => {
+        if (isCurrentLoadingGeneration(request))
+          loadListeners.forEach((listener) => listener.onError(message));
+      };
       // resume() has already restored the whole slice by the time a saved game reaches this
       // screen, so all that's left is re-reading the CSVs it couldn't carry
       const resumed = isResumedGame(game);
@@ -98,7 +113,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       const scenario = activeScenario(game);
       if (!scenario) {
         reportError("Mission not found. Choose another from the mission list.");
-        loadInProgress = false;
+        if (loadingGeneration === request) loadingGeneration = undefined;
         loadListeners = [];
         return;
       }
@@ -112,7 +127,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           : getScenarioLocation(scenario);
       if (!location) {
         reportError("We couldn't find the location data for this mission.");
-        loadInProgress = false;
+        if (loadingGeneration === request) loadingGeneration = undefined;
         loadListeners = [];
         return;
       }
@@ -128,11 +143,19 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
 
       reportProgress("Loading weather and market data…");
       try {
-        await Promise.all([
-          callbackLoad((done) => initWeather(location, done)),
-          callbackLoad(initFuelPrices),
-          callbackLoad(initEconomy),
-        ]);
+        const task = dataLoading
+          .catch(() => undefined)
+          .then(async () => {
+            if (!isCurrentLoadingGeneration(request)) return;
+            await Promise.all([
+              callbackLoad((done) => initWeather(location, done)),
+              callbackLoad(initFuelPrices),
+              callbackLoad(initEconomy),
+            ]);
+          });
+        dataLoading = task;
+        await task;
+        if (!isCurrentLoadingGeneration(request)) return;
         reportProgress("Starting your mission…");
         if (!resumed) {
           // A new game uses the scenario's authored opening fleet.
@@ -151,6 +174,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           );
         }
 
+        if (!(await completeSaveLoading(request))) return;
         dispatch(loaded());
 
         // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
@@ -158,21 +182,23 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           // A capstone retry comes through the same clean scenario-start path with its authored
           // step already selected. Preserve it; a normal tutorial still arrives with -1 and
           // starts at the first objective after the card transition has mounted its controls.
-          setTimeout(
-            () =>
-              dispatch(restoreLoadedTutorial(game, scenario.tutorialSteps!)),
-            300,
-          );
+          setTimeout(() => {
+            if (isCurrentLoadingGeneration(request))
+              dispatch(restoreLoadedTutorial(game, scenario.tutorialSteps!));
+          }, 300);
         }
       } catch (error) {
+        await failSaveLoading(request, error);
         reportError(
           error instanceof Error
             ? error.message
             : "Could not load game data. Check your connection and retry.",
         );
       } finally {
-        loadInProgress = false;
-        loadListeners = [];
+        if (loadingGeneration === request) {
+          loadingGeneration = undefined;
+          loadListeners = [];
+        }
       }
     },
   };

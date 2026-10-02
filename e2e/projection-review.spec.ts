@@ -10,7 +10,6 @@ for (const theme of ["light", "dark"]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript((mode) => {
-      if (!localStorage.getItem("savedGame")) localStorage.clear();
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
       localStorage.setItem(

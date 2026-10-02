@@ -6887,3 +6887,42 @@ $programs_column: 800px;
     transition: none !important;
   }
 }
+// Save management follows the same quiet grouped surfaces as Settings.
+.savedGames {
+  .MuiButton-root,
+  .MuiIconButton-root {
+    min-height: 40px;
+  }
+
+  .MuiIconButton-root {
+    min-width: 40px;
+  }
+
+  .saveEntry {
+    padding: 16px;
+  }
+}
+
+.saveStatusAction {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+@media (pointer: coarse) {
+  .savedGames .MuiButton-root,
+  .savedGames .MuiIconButton-root,
+  .savedGames .MuiInputBase-root,
+  .saveStatusAction {
+    min-height: 44px;
+  }
+
+  .savedGames .MuiIconButton-root {
+    min-width: 44px;
+  }
+}

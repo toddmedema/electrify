@@ -1,6 +1,7 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { startTutorial, quit } from "../../reducers/Game";
+import { startTutorial } from "../../reducers/Game";
+import { quitSavedGame, runSaveTransition } from "../../SaveSession";
 import { delta as uiDelta } from "../../reducers/UI";
 import { navigate } from "../../reducers/Card";
 import { scenarioDetailsUrl } from "../../ScenarioUrl";
@@ -16,7 +17,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(quit());
+      void quitSavedGame();
     },
     onCustomGame: () => {
       dispatch(navigate("CUSTOM_GAME"));
@@ -36,7 +37,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("MANUAL"));
     },
     onTutorial: (scenarioId: number) => {
-      startTutorial(dispatch, scenarioId);
+      void runSaveTransition(() => startTutorial(dispatch, scenarioId));
     },
   };
 };

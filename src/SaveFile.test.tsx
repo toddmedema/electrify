@@ -1,146 +1,113 @@
-import { encodeSave } from "./SaveEncoding";
 import { LOCATIONS } from "./Constants";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import {
-  describeSave,
   downloadSave,
+  downloadSaveRecovery,
+  encodeSaveFile,
   MAX_SAVE_FILE_BYTES,
   readSaveFile,
-  resumableSave,
   saveFilename,
 } from "./SaveFile";
-import { clearSave, serializeSave, writeSave } from "./SaveGame";
-import { GameType, ScenarioType } from "./Types";
+import { serializeSave } from "./SaveGame";
 import {
-  emptyTransmissionState,
-  intertiesEnabledForScenario,
-} from "./data/AdjacentMarkets";
-import { getScenario } from "./data/Scenarios";
+  fakeSaveFile,
+  fakeSaveGame,
+  fakeSavedResult,
+} from "./testing/SaveTestHelpers";
+import type { ScenarioType } from "./Types";
 
-// Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
-// crash on, not the whole of GameType, and building a real game here would cost a minute of setup
-function fakeGame(overrides: Partial<GameType> = {}): GameType {
-  const game = {
-    scenarioId: 101, // Rise of Renewables
-    difficulty: "Employee",
-    seed: 31337,
-    startingYear: 2020,
-    customerMarketSize: 2_000_000,
-    customerRate: 0.07,
-    startingDemandScale: 1,
-    loadAdditions: [],
-    location: LOCATIONS.PIT,
-    date: getDateFromMinute(185 * MINUTES_PER_MONTH + 1000, 2020),
-    commissionedHydroSiteIds: [],
-    facilities: [],
-    timeline: [],
-    monthlyHistory: [],
-    eventLog: [],
-    reportedEventKeys: [],
-    eventLogReadThroughId: 0,
-    worldEvents: { active: [], occurrences: [], checkedKeys: [] },
-    meaningfulDecisions: [],
-    meaningfulDecisionGateWaived: false,
-    ...overrides,
-  } as unknown as GameType;
-  const scenario = getScenario(game.scenarioId, game.customScenario);
-  if (scenario && intertiesEnabledForScenario(scenario, game.location)) {
-    game.transmission = emptyTransmissionState();
-  }
-  return game;
-}
-
-function saveFile(contents: unknown, name = "save.json"): File {
-  const text =
-    typeof contents === "string" ? contents : JSON.stringify(contents);
-  return new File([text], name, { type: "application/json" });
+function saveFile(contents: unknown): File {
+  return new File(
+    [typeof contents === "string" ? contents : JSON.stringify(contents)],
+    "save.json",
+    { type: "application/json" },
+  );
 }
 
 describe("SaveFile", () => {
-  beforeEach(() => {
-    clearSave();
-  });
-
-  describe("resumableSave", () => {
-    it("is nothing when no game has been saved", () => {
-      expect(resumableSave()).toBeNull();
-    });
-
-    it("resolves the scenario the save was played in", () => {
-      writeSave(fakeGame());
-      expect(describeSave(resumableSave()!)).toBe("Rise of Renewables, 2035");
-    });
-
-    it("takes a custom game's scenario from the save itself", () => {
-      writeSave(
-        fakeGame({
-          scenarioId: CUSTOM_SCENARIO_ID,
-          customScenario: { ...DEFAULT_CUSTOM_SCENARIO, name: "My Grid" },
-        }),
-      );
-      expect(describeSave(resumableSave()!)).toBe("My Grid, 2035");
-    });
-  });
-
-  describe("saveFilename", () => {
-    // A custom game's name is typed by the player, so it reaches here as anything at all
-    it("folds away everything a filename shouldn't carry", () => {
-      expect(saveFilename("../../etc/passwd", 2020)).toBe(
-        "electrify-etc-passwd-2020.json",
-      );
-      expect(saveFilename("!!!", 2020)).toBe("electrify-game-2020.json");
-    });
+  it("uses a sanitized player name for filenames", () => {
+    expect(saveFilename("../../etc/passwd", 2020)).toBe(
+      "electrify-etc-passwd-2020.json",
+    );
+    expect(saveFilename("!!!", 2020)).toBe("electrify-game-2020.json");
+    expect(saveFilename("My renamed game", 2035)).toBe(
+      "electrify-my-renamed-game-2035.json",
+    );
   });
 
   describe("downloadSave", () => {
     let clicked: HTMLAnchorElement | undefined;
-    let revoked: string[] = [];
-
+    const revoked: string[] = [];
     beforeEach(() => {
       jest.useFakeTimers();
       clicked = undefined;
-      revoked = [];
+      revoked.length = 0;
       URL.createObjectURL = jest.fn(() => "blob:save");
       URL.revokeObjectURL = jest.fn((url: string) => revoked.push(url));
       jest
         .spyOn(HTMLAnchorElement.prototype, "click")
         .mockImplementation(function (this: HTMLAnchorElement) {
           clicked = this;
-          // The anchor has to be in the document at the moment of the click for Firefox
           expect(this.isConnected).toBe(true);
         });
     });
-
     afterEach(() => {
       jest.runOnlyPendingTimers();
       jest.useRealTimers();
       jest.restoreAllMocks();
     });
-
-    it("downloads the save under the scenario's name", () => {
-      writeSave(fakeGame());
-      downloadSave(resumableSave()!);
-
-      expect(clicked?.download).toBe("electrify-rise-of-renewables-2035.json");
+    it("downloads the named envelope and releases its temporary DOM resources", () => {
+      downloadSave(fakeSaveFile());
+      expect(clicked?.download).toBe(
+        "electrify-renewables-experiment-2035.json",
+      );
       expect(clicked?.href).toBe("blob:save");
-      // Left where it was found, and the object URL released once the download has started
       expect(clicked?.isConnected).toBe(false);
       expect(revoked).toEqual([]);
       jest.runOnlyPendingTimers();
       expect(revoked).toEqual(["blob:save"]);
     });
+    it("downloads malformed raw data under a recovery filename without playable-save validation", async () => {
+      const raw = {
+        metadata: { id: "save-one" },
+        payload: { save: { broken: "original data" } },
+      };
+      downloadSaveRecovery("../SAVE one", raw);
+      expect(clicked?.download).toBe("electrify-recovery-save-one.json");
+      const blob = (URL.createObjectURL as jest.Mock).mock.calls[0][0] as Blob;
+      const contents = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+      });
+      expect(JSON.parse(contents)).toEqual(raw);
+      expect(clicked?.isConnected).toBe(false);
+    });
   });
 
   describe("readSaveFile", () => {
-    it("round trips an exported save", async () => {
-      writeSave(fakeGame());
-      const exported = resumableSave()!.save;
-      const { save } = await readSaveFile(saveFile(encodeSave(exported)));
-      expect(save).toEqual(exported);
+    it("round trips the packed current envelope", async () => {
+      const exported = fakeSaveFile();
+      expect(encodeSaveFile(exported).save.game.timeline).toHaveProperty(
+        "shapes",
+      );
+      expect(await readSaveFile(saveFile(encodeSaveFile(exported)))).toEqual({
+        file: exported,
+      });
     });
-
-    it("round trips every custom setup choice through export and import", async () => {
+    it("round trips completed and terminal results without account metadata", async () => {
+      for (const outcome of ["completed", "bankrupt", "fired"] as const) {
+        const exported = fakeSaveFile({
+          status: outcome,
+          result: fakeSavedResult({ outcome }),
+        });
+        expect(
+          (await readSaveFile(saveFile(encodeSaveFile(exported)))).file,
+        ).toEqual(exported);
+      }
+    });
+    it("round trips every custom setup choice", async () => {
       const customScenario: ScenarioType = {
         ...DEFAULT_CUSTOM_SCENARIO,
         locationId: LOCATIONS.HNL.id,
@@ -158,42 +125,53 @@ describe("SaveFile", () => {
           { name: "Battery", peakWh: 1_000_000_000 },
         ],
       };
-      writeSave(
-        fakeGame({
-          scenarioId: CUSTOM_SCENARIO_ID,
-          customScenario,
-          location: customScenario.location!,
-          startingYear: customScenario.startingYear,
-          seed: customScenario.seed!,
-          difficulty: "CEO",
-        }),
+      const exported = fakeSaveFile({
+        save: serializeSave(
+          fakeSaveGame({
+            scenarioId: CUSTOM_SCENARIO_ID,
+            customScenario,
+            location: customScenario.location!,
+            startingYear: customScenario.startingYear,
+            seed: customScenario.seed!,
+            difficulty: "CEO",
+          }),
+        ),
+      });
+      const { file, error } = await readSaveFile(
+        saveFile(encodeSaveFile(exported)),
       );
-
-      const exported = resumableSave()!.save;
-      const { save, error } = await readSaveFile(
-        saveFile(encodeSave(exported)),
-      );
-
       expect(error).toBeUndefined();
-      expect(save?.game.difficulty).toBe("CEO");
-      expect(save?.game.customScenario).toEqual(customScenario);
+      expect(file?.save.game.difficulty).toBe("CEO");
+      expect(file?.save.game.customScenario).toEqual(customScenario);
     });
-
-    it("rejects a file that isn't JSON", async () => {
-      const { save, error } = await readSaveFile(saveFile("not json {"));
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/isn't an Electrify save/);
-    });
-
-    // Whatever the player picked, it's read into memory before anything else looks at it
-    it("rejects a file too big to be a save", async () => {
-      const file = saveFile(serializeSave(fakeGame()));
-      Object.defineProperty(file, "size", {
+    it("rejects non-JSON, oversized files, and unsupported previous envelopes", async () => {
+      expect((await readSaveFile(saveFile("not json {"))).error).toMatch(
+        /isn't an Electrify save/,
+      );
+      const oversized = saveFile(fakeSaveFile());
+      Object.defineProperty(oversized, "size", {
         value: MAX_SAVE_FILE_BYTES + 1,
       });
-      const { save, error } = await readSaveFile(file);
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/too large/);
+      expect((await readSaveFile(oversized)).error).toMatch(/too large/);
+      expect((await readSaveFile(saveFile(fakeSaveFile().save))).error).toMatch(
+        /unsupported save format/,
+      );
+    });
+    it("rejects malformed nested payload, name and status-result relationships", async () => {
+      for (const invalid of [
+        { ...fakeSaveFile(), name: "Line\nbreak" },
+        { ...fakeSaveFile(), save: {} },
+        { ...fakeSaveFile(), status: "completed" },
+        {
+          ...fakeSaveFile(),
+          status: "completed",
+          result: fakeSavedResult({ score: Infinity }),
+        },
+      ]) {
+        const imported = await readSaveFile(saveFile(invalid));
+        expect(imported.file).toBeUndefined();
+        expect(imported.error).toBeDefined();
+      }
     });
   });
 });

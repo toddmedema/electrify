@@ -5,6 +5,7 @@ import cardReducer from "../reducers/Card";
 import uiReducer from "../reducers/UI";
 import userReducer from "../reducers/User";
 import settingsReducer from "../reducers/Settings";
+import savesReducer from "../SaveLibrary";
 import { GENERATORS } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
 import { GeneratorShoppingType } from "../Types";
@@ -18,6 +19,7 @@ it("acknowledges a purchase in the dispatching store, but not a rejected build",
       ui: uiReducer,
       user: userReducer,
       settings: settingsReducer,
+      saves: savesReducer,
     },
     preloadedState: { game },
     middleware: (getDefault) =>

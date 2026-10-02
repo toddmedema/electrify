@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { openPane } from "./layout";
+import { readSavedGame } from "./save-fixture";
 
 async function baselinePixels(chart: Locator) {
   return chart.evaluate((element) => {
@@ -47,16 +48,9 @@ for (const theme of ["light", "dark"]) {
       .first()
       .click();
     await expect
-      .poll(
-        () =>
-          page.evaluate(() => {
-            window.dispatchEvent(new Event("pagehide"));
-            const saved = localStorage.getItem("savedGame");
-            window.dispatchEvent(new Event("pageshow"));
-            return saved ? JSON.parse(saved).game?.date?.minute || 0 : 0;
-          }),
-        { timeout: 30000 },
-      )
+      .poll(async () => (await readSavedGame(page))?.date.minute || 0, {
+        timeout: 30000,
+      })
       .toBeGreaterThanOrEqual(720);
     await page
       .locator("#appbar:visible")

@@ -1,32 +1,42 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { AppStateType } from "../../Types";
+import { AppStateType, SaveMetadata } from "../../Types";
+import { store } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { navigate } from "../../reducers/Card";
-import { resume, start } from "../../reducers/Game";
+import { start } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
-import { resumableSave } from "../../SaveFile";
+import { selectContinueSave } from "../../SaveModel";
+import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
 import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
+  const saved = selectContinueSave(state.saves?.entries || []);
   return {
     audioEnabled: state.settings.audioEnabled,
-    hasSavedGame: !!resumableSave(),
+    hasSavedGame: !!saved,
+    savedGameName: saved?.name,
+    savedGameDescription: saved
+      ? `${saved.scenarioName} · ${saved.date.month} ${saved.date.year}`
+      : undefined,
   };
 };
 
-export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (
+  dispatch: AppDispatch,
+  getEntries: () => SaveMetadata[] = () => store.getState().saves.entries,
+): DispatchProps => {
   return {
     onAudioChange: (v: boolean) => {
       dispatch(changeSettings({ audioEnabled: v }));
     },
     onContinue: () => {
-      const resumable = resumableSave();
-      if (resumable) {
-        // Card sends this to LOADING, which re-reads the CSVs and then dispatches loaded()
-        dispatch(resume(resumable.save.game));
-      }
+      const saved = selectContinueSave(getEntries());
+      if (saved) void resumeSavedGame(saved.id);
+    },
+    onSavedGames: () => {
+      dispatch(navigate("SAVED_GAMES"));
     },
     onManual: () => {
       dispatch(navigate("MANUAL"));
@@ -35,15 +45,13 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("SETTINGS"));
     },
     onStart: () => {
-      // A brand-new player jumps straight into Mission 1 - "play, don't tell" starts at
-      // the menu. The save guard keeps Continue meaningful: someone mid-scenario isn't
-      // new, even if they skipped the missions
+      // A brand-new player jumps straight into Mission 1.
       const played = getPlayedScenarioIds();
       const anyTutorialDone = TUTORIALS.some(
         (t) => played.indexOf(t.id) !== -1,
       );
-      if (!anyTutorialDone && !resumableSave()) {
-        dispatch(start(TUTORIALS[0].id));
+      if (!anyTutorialDone && !selectContinueSave(getEntries())) {
+        void runSaveTransition(() => dispatch(start(TUTORIALS[0].id)));
       } else {
         dispatch(navigate("NEW_GAME"));
       }
@@ -51,9 +59,8 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
-const MainMenuContainer = connect(
-  mapStateToProps,
-  mapDispatchToProps,
+const MainMenuContainer = connect(mapStateToProps, (dispatch: AppDispatch) =>
+  mapDispatchToProps(dispatch),
 )(MainMenu);
 
 export default MainMenuContainer;

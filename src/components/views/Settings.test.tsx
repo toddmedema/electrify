@@ -29,22 +29,11 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
-    onExportSave: () => undefined,
-    onImportSave: () => undefined,
+    onManageSaves: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
   return render(<Settings {...props} />);
-}
-
-function exportButton(): HTMLButtonElement {
-  return screen.getByRole("button", {
-    name: "Export save",
-  }) as HTMLButtonElement;
-}
-
-function fileInput(): HTMLInputElement {
-  return screen.getByLabelText("Save game file") as HTMLInputElement;
 }
 
 describe("Settings", () => {
@@ -110,12 +99,14 @@ describe("Settings", () => {
     ).toBeVisible();
   });
 
-  // The button being greyed out says nothing about why, and "start a game first" is not something
-  // a player would otherwise guess from a settings screen
-  it("disables Export and says what's missing when there's no saved game", () => {
-    renderSettings();
-    expect(exportButton().disabled).toBe(true);
-    expect(screen.getByText(/Start a game to export it/)).toBeInTheDocument();
+  it("opens save management even when no game has been saved yet", async () => {
+    const onManageSaves = jest.fn();
+    renderSettings({ onManageSaves });
+    await userEvent.click(screen.getByRole("button", { name: "Manage saves" }));
+    expect(onManageSaves).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText(/saved on this device and browser/),
+    ).toBeInTheDocument();
   });
 
   it("offers a way in when nobody is logged in", () => {
@@ -141,18 +132,6 @@ describe("Settings", () => {
       screen.getByText(/Choose a public name for your scores/),
     ).toBeInTheDocument();
     expect(screen.getByText("Choose a name")).toBeInTheDocument();
-  });
-
-  it("imports whichever file the player picks, saved game or not", async () => {
-    const onImportSave = jest.fn();
-    renderSettings({ onImportSave });
-
-    const file = new File(["{}"], "save.json", { type: "application/json" });
-    await userEvent.upload(fileInput(), file);
-    expect(onImportSave).toHaveBeenCalledWith(file);
-
-    // Picking the same file again still counts, for the player who went and fixed a bad one
-    expect(fileInput().value).toBe("");
   });
 
   it("offers a subtle cache reset at the bottom", async () => {
