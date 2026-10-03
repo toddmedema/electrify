@@ -190,7 +190,7 @@ test("another tab cannot resume the live save", async ({ page, context }) => {
   ).toBeVisible();
   await expect(page.locator("#appbar:visible")).toBeVisible();
   await expect(
-    page.locator("[data-save-state]:visible").first(),
+    page.locator("#appbar:visible [data-save-state]").first(),
   ).toHaveAttribute("data-save-state", "saved");
   expect((await readSaveRecords(page))[0].metadata.id).toBe(
     original.metadata.id,
@@ -238,7 +238,11 @@ test("legacy local storage does not create saves and file import is replaced", a
     localStorage.setItem("savedGame", '{"game":{"scenarioId":101}}'),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Saved games", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Saved games", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Manage saves", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "No saved games yet" }),
   ).toBeVisible();

@@ -18,6 +18,7 @@ export interface SaveLibraryState {
   cloudError?: string;
   cloudUid?: string;
   cloudConflicts?: boolean;
+  cloudPromptRequested?: boolean;
 }
 
 export const initialSaveLibrary: SaveLibraryState = {

@@ -70,14 +70,16 @@ for (const theme of ["light", "dark"]) {
     const invitation = page.getByRole("dialog", {
       name: "Back up your saves to the cloud",
     });
+    await expect(invitation).toBeHidden();
+    await expect(page.locator("#appbar:visible .saveStatus")).toHaveCount(0);
+    await page.getByRole("button", { name: "menu", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: /Rename/ })).toHaveCount(0);
+    await page
+      .getByRole("menuitem", { name: "Save & Quit", exact: true })
+      .click();
     await expect(invitation).toBeVisible();
     await expect(invitation).toContainText("even offline");
     await expect(invitation).toContainText("sign in later from Saved games");
-    const clock = page.locator("#appbar:visible .gameStatusValue.weak");
-    const clockBefore = await clock.innerText();
-    await page.clock.install();
-    await page.clock.fastForward(2000);
-    await expect(clock).toHaveText(clockBefore);
     await checkDialogLayout(page, "Back up your saves to the cloud", info);
     if (theme === "light" && info.project.name === "mobile-390px") {
       await screenshot(page, info, "cloud-invitation-mobile-light.png");
@@ -87,6 +89,22 @@ for (const theme of ["light", "dark"]) {
       .click();
     await expect(invitation).toBeHidden();
     const originalId = (await readSaveRecords(page))[0].metadata.id;
+    const primary = page.getByRole("region", { name: "Primary actions" });
+    await expect(primary.getByRole("button")).toHaveText([
+      "Continue",
+      "Start a new game",
+      "Saved games",
+    ]);
+    await expect(
+      primary.getByRole("button", { name: "Saved games", exact: true }),
+    ).toHaveClass(/MuiButton-outlined/);
+    if (theme === "light" && info.project.name === "desktop-chromium") {
+      await screenshot(page, info, "main-menu-desktop-light.png");
+    }
+    if (theme === "dark" && info.project.name === "mobile-390px") {
+      await screenshot(page, info, "main-menu-mobile-dark.png");
+    }
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openSaves(page);
     await expect(
       page.getByText(

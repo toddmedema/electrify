@@ -32,7 +32,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
     if (
       seen.current ||
       saves.cloudState !== "signedOut" ||
-      !saves.entries.length ||
+      !saves.cloudPromptRequested ||
       new URLSearchParams(window.location.search).has("game")
     )
       return;
@@ -44,7 +44,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
     setStorageKeyValue(CLOUD_PROMPT_KEY, true);
     seen.current = true;
     setOpen(true);
-  }, [saves.cloudState, saves.entries.length]);
+  }, [saves.cloudState, saves.cloudPromptRequested]);
   const dismiss = () => {
     if (!busy) setOpen(false);
   };

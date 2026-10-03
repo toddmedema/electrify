@@ -2,10 +2,12 @@ import { configureStore } from "@reduxjs/toolkit";
 import savesReducer from "./SaveLibrary";
 import { startCloudSaves, retryCloudSync } from "./CloudSaves";
 import type { AppStore } from "./Store";
+import { requestCloudSave } from "./SaveEffects";
 
 let mockAuth: (user: { uid: string } | null) => void;
 let mockChanged: () => void;
 const mockSync = jest.fn();
+const mockList = jest.fn();
 const mockUnsubscribeAuth = jest.fn();
 const mockUnsubscribeRepository = jest.fn();
 jest.mock("./Globals", () => ({
@@ -18,6 +20,7 @@ jest.mock("./Globals", () => ({
 }));
 jest.mock("./SaveSession", () => ({
   saveRepository: {
+    list: () => mockList(),
     subscribe: (callback: () => void) => {
       mockChanged = callback;
       return mockUnsubscribeRepository;
@@ -25,6 +28,7 @@ jest.mock("./SaveSession", () => ({
   },
 }));
 jest.mock("./CloudSaveSync", () => ({
+  AUTO_CLOUD_SAVE_MS: 300_000,
   CloudSaveSync: class {
     sync = mockSync;
   },
@@ -48,6 +52,7 @@ beforeEach(() => {
     value: true,
   });
   mockSync.mockResolvedValue({ conflicts: false, deferred: false });
+  mockList.mockResolvedValue([]);
   store = configureTestStore();
   stop = startCloudSaves(store as unknown as AppStore);
 });
@@ -56,7 +61,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it("keeps signed-out play independent of cloud and debounces local changes", async () => {
+it("keeps signed-out play independent of cloud and rate limits automatic syncs", async () => {
   mockAuth(null);
   mockChanged();
   jest.advanceTimersByTime(1500);
@@ -67,11 +72,79 @@ it("keeps signed-out play independent of cloud and debounces local changes", asy
   expect(store.getState().saves.cloudState).toBe("synced");
   mockChanged();
   mockChanged();
-  jest.advanceTimersByTime(1499);
+  window.dispatchEvent(new Event("focus"));
+  window.dispatchEvent(new Event("online"));
+  jest.advanceTimersByTime(299_999);
   expect(mockSync).toHaveBeenCalledTimes(1);
   jest.advanceTimersByTime(1);
   await settle();
   expect(mockSync).toHaveBeenCalledTimes(2);
+  expect(mockSync.mock.calls[1][2]).toMatchObject({ automatic: true });
+});
+
+it("immediately syncs an explicitly saved game, including an interaction during another sync", async () => {
+  let resolve!: (value: { conflicts: boolean; deferred: boolean }) => void;
+  mockSync.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  mockAuth({ uid: "alice" });
+  requestCloudSave("A");
+  resolve({ conflicts: false, deferred: false });
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(2);
+  expect(mockSync.mock.calls[1][2].forceIds).toEqual(new Set(["A"]));
+  requestCloudSave("B");
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(3);
+  expect(mockSync.mock.calls[2][2].forceIds).toEqual(new Set(["B"]));
+});
+
+it("retains an explicit save requested offline for reconnection", async () => {
+  mockAuth({ uid: "alice" });
+  await settle();
+  Object.defineProperty(navigator, "onLine", {
+    configurable: true,
+    value: false,
+  });
+  requestCloudSave("A");
+  expect(mockSync).toHaveBeenCalledTimes(1);
+  Object.defineProperty(navigator, "onLine", {
+    configurable: true,
+    value: true,
+  });
+  window.dispatchEvent(new Event("online"));
+  await settle();
+  expect(mockSync.mock.calls[1][2].forceIds).toEqual(new Set(["A"]));
+});
+
+it("preserves the explicit sharing request when a signed-out player signs in", async () => {
+  mockAuth(null);
+  requestCloudSave("A");
+  mockAuth({ uid: "alice" });
+  await settle();
+  expect(mockSync.mock.calls[0][2].forceIds).toEqual(new Set(["A"]));
+});
+
+it("retries a failed explicit save even when automatic progress limits have not been met", async () => {
+  mockAuth({ uid: "alice" });
+  await settle();
+  mockList.mockResolvedValue([
+    { id: "A", revision: 2, cloud: { uid: "alice", syncedRevision: 1 } },
+  ]);
+  mockSync.mockResolvedValueOnce({
+    conflicts: false,
+    deferred: false,
+    failed: true,
+  });
+  requestCloudSave("A");
+  await settle();
+  expect(mockSync).toHaveBeenCalledTimes(2);
+  jest.advanceTimersByTime(300_000);
+  await settle();
+  expect(mockSync.mock.calls[2][2].forceIds).toEqual(new Set(["A"]));
 });
 
 it("waits while offline and retries on reconnection without blocking local saves", async () => {

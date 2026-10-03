@@ -4,10 +4,15 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createSharedSave, loadSharedSave } from "../../CloudSaveTransport";
 import { firebaseAppAuth, login } from "../../Globals";
-import { importSavedGame, snapshotSavedGame } from "../../SaveSession";
+import {
+  importSavedGame,
+  resumeSavedGame,
+  snapshotSavedGame,
+} from "../../SaveSession";
 import savesReducer, {
   initialSaveLibrary,
   SaveLibraryState,
+  sessionChanged,
 } from "../../SaveLibrary";
 import { retryCloudSync } from "../../CloudSaves";
 import ShareSaveDialog from "./ShareSaveDialog";
@@ -29,6 +34,7 @@ jest.mock("../../Globals", () => ({
 }));
 jest.mock("../../SaveSession", () => ({
   importSavedGame: jest.fn(),
+  resumeSavedGame: jest.fn(),
   snapshotSavedGame: jest.fn(),
 }));
 jest.mock("../../CloudSaveTransport", () => ({
@@ -59,6 +65,7 @@ const mockSnapshot = snapshotSavedGame as jest.Mock;
 const mockCreate = createSharedSave as jest.Mock;
 const mockLoad = loadSharedSave as jest.Mock;
 const mockImport = importSavedGame as jest.Mock;
+const mockResume = resumeSavedGame as jest.Mock;
 const mockLogin = login as jest.Mock;
 
 function renderWithSaves(
@@ -75,7 +82,11 @@ function renderWithSaves(
     preloadedState: { saves: { ...initialSaveLibrary, ...state } },
     middleware: (getDefault) => getDefault().concat(recordActions),
   });
-  return { ...render(<Provider store={store}>{element}</Provider>), actions };
+  return {
+    ...render(<Provider store={store}>{element}</Provider>),
+    actions,
+    store,
+  };
 }
 
 beforeEach(() => {
@@ -86,7 +97,8 @@ beforeEach(() => {
   mockSnapshot.mockResolvedValue(snapshot);
   mockCreate.mockResolvedValue("https://electrifygame.com/?game=Abc123Xy90");
   mockLoad.mockResolvedValue(snapshot);
-  mockImport.mockResolvedValue(undefined);
+  mockImport.mockResolvedValue("shared-local-save");
+  mockResume.mockResolvedValue(true);
   mockLogin.mockResolvedValue(false);
 });
 
@@ -200,24 +212,23 @@ it("discards a late share response when another saved game is opened", async () 
   );
 });
 
-it("previews a shared game before adding an independent copy and removing only its URL parameter", async () => {
+it("previews a shared game before playing an independent copy and removing only its URL parameter", async () => {
   window.history.replaceState(null, "", "/?game=Abc123Xy90&scenario=101#start");
   const { actions } = renderWithSaves(<SharedGameDialog />);
   expect(
     await screen.findByRole("heading", { name: "Ontario renewables" }),
   ).toBeInTheDocument();
   expect(screen.getByText("Ontario · Manager · Jun 2035")).toBeInTheDocument();
-  expect(screen.getByText(/Your existing saves are kept/)).toBeInTheDocument();
+  expect(screen.queryByText(/This is a frozen copy/)).not.toBeInTheDocument();
   expect(mockImport).not.toHaveBeenCalled();
-  await userEvent.click(
-    screen.getByRole("button", { name: "Add to my saves" }),
-  );
+  await userEvent.click(screen.getByRole("button", { name: "Play" }));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
   expect(mockLoad).toHaveBeenCalledWith("Abc123Xy90");
   expect(mockImport).toHaveBeenCalledWith(snapshot);
-  expect(actions).toContainEqual({
+  expect(mockResume).toHaveBeenCalledWith("shared-local-save");
+  expect(actions).not.toContainEqual({
     type: "card/navigate",
     payload: "SAVED_GAMES",
   });
@@ -230,23 +241,35 @@ it("keeps the shared preview open if device storage fails and allows another add
   mockImport.mockRejectedValueOnce(new Error("quota"));
   renderWithSaves(<SharedGameDialog />);
   await screen.findByRole("heading", { name: "Ontario renewables" });
-  await userEvent.click(
-    screen.getByRole("button", { name: "Add to my saves" }),
-  );
+  await userEvent.click(screen.getByRole("button", { name: "Play" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Check device storage and try again",
   );
   expect(
     screen.getByRole("heading", { name: "Ontario renewables" }),
   ).toBeInTheDocument();
-  await userEvent.click(
-    screen.getByRole("button", { name: "Add to my saves" }),
-  );
+  await userEvent.click(screen.getByRole("button", { name: "Play" }));
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
   expect(mockImport).toHaveBeenCalledTimes(2);
   expect(mockLoad).toHaveBeenCalledTimes(1);
+});
+
+it("opens the save library for an unplayable shared result", async () => {
+  window.history.replaceState(null, "", "/?game=Abc123Xy90");
+  mockLoad.mockResolvedValue({ ...snapshot, status: "bankrupt" });
+  const { actions } = renderWithSaves(<SharedGameDialog />);
+  await screen.findByRole("heading", { name: "Ontario renewables" });
+  await userEvent.click(screen.getByRole("button", { name: "Play" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(mockResume).not.toHaveBeenCalled();
+  expect(actions).toContainEqual({
+    type: "card/navigate",
+    payload: "SAVED_GAMES",
+  });
 });
 
 it("explains unavailable shared links and retries without importing anything", async () => {
@@ -259,7 +282,7 @@ it("explains unavailable shared links and retries without importing anything", a
     "expired or is no longer available",
   );
   expect(
-    screen.queryByRole("button", { name: "Add to my saves" }),
+    screen.queryByRole("button", { name: "Play" }),
   ).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   await screen.findByRole("heading", { name: "Ontario renewables" });
@@ -313,11 +336,16 @@ const existingSave = {
   date: { month: "Jun" as const, year: 2035 },
 };
 
-it("offers optional cloud sign-in only once after a device has a save", async () => {
+it("offers optional cloud sign-in only once after Save & Quit", async () => {
   const view = renderWithSaves(<CloudSavePrompt />, {
     cloudState: "signedOut",
     entries: [existingSave],
   });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(localStorage.getItem(CLOUD_PROMPT_KEY)).toBeNull();
+  act(() =>
+    view.store.dispatch(sessionChanged({ cloudPromptRequested: true })),
+  );
   const invitation = screen.getByRole("dialog", {
     name: "Back up your saves to the cloud",
   });
@@ -336,6 +364,7 @@ it("offers optional cloud sign-in only once after a device has a save", async ()
   renderWithSaves(<CloudSavePrompt />, {
     cloudState: "signedOut",
     entries: [existingSave],
+    cloudPromptRequested: true,
   });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
@@ -344,6 +373,7 @@ it("keeps the cloud invitation available after a cancelled sign-in", async () =>
   renderWithSaves(<CloudSavePrompt />, {
     cloudState: "signedOut",
     entries: [existingSave],
+    cloudPromptRequested: true,
   });
   await userEvent.click(
     screen.getByRole("button", { name: "Sign in with Google" }),
@@ -361,6 +391,7 @@ it("does not interrupt shared links with the cloud invitation", () => {
   renderWithSaves(<CloudSavePrompt />, {
     cloudState: "signedOut",
     entries: [existingSave],
+    cloudPromptRequested: true,
   });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(localStorage.getItem(CLOUD_PROMPT_KEY)).toBeNull();

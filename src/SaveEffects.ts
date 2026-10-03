@@ -20,3 +20,15 @@ export function withRunSaveEffects<T>(
     current = previous;
   }
 }
+
+const cloudSaveListeners = new Set<(id?: string) => void>();
+/** Explicit save interactions bypass the automatic cloud backup cadence. */
+export function requestCloudSave(id?: string): void {
+  cloudSaveListeners.forEach((listener) => listener(id));
+}
+export function subscribeCloudSaveRequests(
+  listener: (id?: string) => void,
+): () => void {
+  cloudSaveListeners.add(listener);
+  return () => cloudSaveListeners.delete(listener);
+}

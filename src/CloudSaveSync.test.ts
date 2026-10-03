@@ -1,13 +1,15 @@
 import "fake-indexeddb/auto";
 import { deserialize, serialize } from "v8";
 import { webcrypto } from "crypto";
-import { CloudSaveSync } from "./CloudSaveSync";
+import { AUTO_CLOUD_SAVE_MS, CloudSaveSync } from "./CloudSaveSync";
 import { CloudConflict } from "./CloudSaveTransport";
 import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
 import { SaveRepository } from "./SaveRepository";
 import { parseSave, serializeSave } from "./SaveGame";
 import { fakeSaveGame } from "./testing/SaveTestHelpers";
 import type { SaveRecord } from "./Types";
+import { getDateFromMinute } from "./helpers/DateTime";
+import { DAYS_PER_YEAR } from "./Constants";
 
 jest.mock("./CloudSaveTransport", () => ({
   CloudConflict: class CloudConflict extends Error {},
@@ -64,6 +66,8 @@ class MemoryCloud implements CloudSaveTransport {
       writerDeviceId: record?.metadata.cloud?.writerDeviceId,
       writerLocalId: record?.metadata.id,
       sourceRevision: record?.metadata.revision,
+      uploadedAt: record ? Date.now() : undefined,
+      uploadedMinute: record?.save.game.date.minute,
       metadata: record ? { ...record.metadata, id } : undefined,
     });
     if (record) this.records.set(id, structuredClone(record));
@@ -97,6 +101,84 @@ describe("CloudSaveSync", () => {
       scenarioName: "Rise of Renewables",
     });
   }
+
+  async function advance(id: string, minutes: number) {
+    const { record, lease } = await repository.prepareResume(
+      id,
+      `writer-${id}`,
+    );
+    const game = record.save.game;
+    await repository.writeSnapshot(
+      lease,
+      serializeSave({
+        ...game,
+        date: getDateFromMinute(game.date.minute + minutes, game.startingYear),
+      }),
+      record.metadata.scenarioName,
+    );
+    await repository.release(lease);
+  }
+
+  it("requires both five wall-clock minutes and a full game year for automatic uploads, even after reload", async () => {
+    const clock = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    try {
+      await create();
+      await sync.sync("alice", undefined, { automatic: true });
+      await advance("first", DAYS_PER_YEAR * 1440);
+      clock.mockReturnValue(1_000_000 + AUTO_CLOUD_SAVE_MS - 1);
+      await sync.sync("alice", undefined, { automatic: true });
+      expect(cloud.heads.get("first")?.version).toBe("1");
+      clock.mockReturnValue(1_000_000 + AUTO_CLOUD_SAVE_MS);
+      repository.close();
+      repository = new SaveRepository(parseSave, { databaseName });
+      sync = new CloudSaveSync(repository, cloud);
+      await sync.sync("alice", undefined, { automatic: true });
+      expect(cloud.heads.get("first")?.version).toBe("2");
+      await advance("first", DAYS_PER_YEAR * 1440 - 1);
+      clock.mockReturnValue(1_000_000 + 2 * AUTO_CLOUD_SAVE_MS);
+      await sync.sync("alice", undefined, { automatic: true });
+      expect(cloud.heads.get("first")?.version).toBe("2");
+      await advance("first", 1);
+      await sync.sync("alice", undefined, { automatic: true });
+      expect(cloud.heads.get("first")?.version).toBe("3");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("allows an explicit save immediately and resets the automatic checkpoint only for that game", async () => {
+    await create("first");
+    await create("second");
+    await sync.sync("alice");
+    await repository.rename("first", "Explicit change");
+    await repository.rename("second", "Automatic change");
+    await sync.sync("alice", undefined, {
+      automatic: true,
+      forceIds: new Set(["first"]),
+    });
+    expect(cloud.records.get("first")?.metadata.name).toBe("Explicit change");
+    expect(cloud.records.get("second")?.metadata.name).toBe("second");
+    await repository.rename("first", "Another automatic change");
+    await sync.sync("alice", undefined, { automatic: true });
+    expect(cloud.records.get("first")?.metadata.name).toBe("Explicit change");
+  });
+
+  it("does not let automatic retries upload progress captured during the previous upload", async () => {
+    await create();
+    let change = true;
+    cloud.beforeWrite = async () => {
+      if (change) {
+        change = false;
+        await repository.rename("first", "New progress");
+      }
+    };
+    await sync.sync("alice", undefined, { automatic: true });
+    await sync.sync("alice", undefined, { automatic: true });
+    expect(cloud.heads.get("first")?.version).toBe("1");
+    expect((await repository.list())[0].cloud?.syncedRevision).toBeLessThan(
+      (await repository.list())[0].revision,
+    );
+  });
 
   it("uploads a device save and restores it on another device", async () => {
     await create();

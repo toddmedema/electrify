@@ -118,7 +118,7 @@ for (const theme of ["light", "dark"]) {
         (record) => record.metadata.id !== originalId,
       )!.metadata.id;
       await expect(
-        page.locator("[data-save-state]:visible").first(),
+        page.locator("#appbar:visible [data-save-state]").first(),
       ).toHaveAttribute("data-active-save-id", secondId);
       expect((await readSavedGame(page, secondId))?.scenarioId).toBe(100);
       expect(await readSavedGame(page, originalId)).toEqual(original);
