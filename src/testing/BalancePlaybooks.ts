@@ -254,7 +254,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       rate(0.095),
       ...line("india-himalaya-upgrade", 8, 7),
       ...dispatch([1, 2, 3]),
-      { month: 35, type: "toggle", facilityId: 1 },
+      // Keep coal online until the new gas capacity is commissioned.
+      { month: 40, type: "toggle", facilityId: 1 },
       ...programs(34),
     ],
   },
