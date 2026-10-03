@@ -901,6 +901,10 @@ export class SaveRepository {
     cloudId: string,
     revision: number,
     version: string,
+    checkpoint?: Pick<
+      NonNullable<SaveMetadata["cloud"]>,
+      "uploadedAt" | "uploadedMinute"
+    >,
   ): Promise<void> {
     await this.transaction<void>(
       ["saves", "sync"],
@@ -922,6 +926,10 @@ export class SaveRepository {
                   version,
                   syncedRevision: revision,
                   writerDeviceId: metadata.cloud.writerDeviceId,
+                  uploadedAt:
+                    checkpoint?.uploadedAt ?? metadata.cloud.uploadedAt,
+                  uploadedMinute:
+                    checkpoint?.uploadedMinute ?? metadata.cloud.uploadedMinute,
                 },
               });
             } else {
@@ -1028,6 +1036,8 @@ export class SaveRepository {
                         id: cloudId,
                         version,
                         syncedRevision: revision,
+                        uploadedAt: this.now(),
+                        uploadedMinute: record.save.game.date.minute,
                       },
                     });
                     tx.objectStore("payloads").put({

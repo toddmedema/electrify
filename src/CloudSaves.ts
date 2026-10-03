@@ -2,8 +2,9 @@ import type { AppStore } from "./Store";
 import { firebaseAppAuth } from "./Globals";
 import { sessionChanged } from "./SaveLibrary";
 import { saveRepository } from "./SaveSession";
-import { CloudSaveSync } from "./CloudSaveSync";
+import { AUTO_CLOUD_SAVE_MS, CloudSaveSync } from "./CloudSaveSync";
 import { FirebaseSaveTransport } from "./CloudSaveTransport";
+import { subscribeCloudSaveRequests } from "./SaveEffects";
 
 let retry = () => {};
 export function retryCloudSync(): void {
@@ -17,6 +18,9 @@ export function startCloudSaves(store: AppStore): () => void {
   let stopped = false;
   let running = false;
   let again = false;
+  let lastRun = -Infinity;
+  let forceAll = false;
+  const forceIds = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const run = async () => {
     if (!uid || stopped) return;
@@ -28,15 +32,49 @@ export function startCloudSaves(store: AppStore): () => void {
       store.dispatch(sessionChanged({ cloudState: "offline" }));
       return;
     }
+    if (
+      !forceAll &&
+      !forceIds.size &&
+      Date.now() - lastRun < AUTO_CLOUD_SAVE_MS
+    )
+      return;
     running = true;
+    lastRun = Date.now();
+    const options = { automatic: !forceAll, forceIds: new Set(forceIds) };
+    forceAll = false;
+    forceIds.clear();
     const account = uid;
     const request = generation;
     const current = () => !stopped && request === generation;
+    const requestedRevisions = new Map<string, number>();
+    const retries = new Set<string>();
     store.dispatch(
       sessionChanged({ cloudState: "syncing", cloudError: undefined }),
     );
     try {
-      const result = await sync.sync(account, current);
+      if (!options.automatic || options.forceIds.size) {
+        for (const entry of await saveRepository.list()) {
+          if (
+            (!entry.cloud || entry.cloud.uid === account) &&
+            (!options.automatic || options.forceIds.has(entry.id))
+          )
+            requestedRevisions.set(entry.id, entry.revision);
+        }
+      }
+      const result = await sync.sync(account, current, options);
+      if (
+        current() &&
+        (result.failed || result.deferred) &&
+        requestedRevisions.size
+      ) {
+        for (const entry of await saveRepository.list()) {
+          if (
+            (entry.cloud?.syncedRevision || 0) <
+            (requestedRevisions.get(entry.id) || 0)
+          )
+            retries.add(entry.id);
+        }
+      }
       if (current())
         store.dispatch(
           sessionChanged({
@@ -53,6 +91,10 @@ export function startCloudSaves(store: AppStore): () => void {
           }),
         );
     } catch (_error) {
+      if (current()) {
+        requestedRevisions.forEach((_revision, id) => retries.add(id));
+        options.forceIds.forEach((id) => retries.add(id));
+      }
       if (current())
         store.dispatch(
           sessionChanged({
@@ -63,19 +105,31 @@ export function startCloudSaves(store: AppStore): () => void {
         );
     } finally {
       running = false;
-      if (again && !stopped) {
+      const newRequest = forceAll || forceIds.size > 0;
+      if (current()) retries.forEach((id) => forceIds.add(id));
+      if ((again || retries.size) && !stopped) {
         again = false;
-        schedule();
+        if (newRequest) void run();
+        else schedule();
       }
     }
   };
   const schedule = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => void run(), 1500);
+    timer = setTimeout(
+      () => void run(),
+      Math.max(1500, AUTO_CLOUD_SAVE_MS - (Date.now() - lastRun)),
+    );
   };
   const auth = firebaseAppAuth.onAuthStateChanged((user) => {
     generation++;
+    const previousUid = uid;
     uid = user?.uid;
+    lastRun = -Infinity;
+    if (previousUid) {
+      forceAll = false;
+      forceIds.clear();
+    }
     store.dispatch(
       sessionChanged({
         cloudUid: uid,
@@ -87,12 +141,20 @@ export function startCloudSaves(store: AppStore): () => void {
     if (uid) void run();
   });
   const unsubscribe = saveRepository.subscribe(schedule);
-  const checkpoint = setInterval(() => void run(), 60_000);
+  const unsubscribeRequests = subscribeCloudSaveRequests((id) => {
+    if (id) forceIds.add(id);
+    else forceAll = true;
+    void run();
+  });
+  const checkpoint = setInterval(() => void run(), AUTO_CLOUD_SAVE_MS);
   const offline = () => {
     if (uid) store.dispatch(sessionChanged({ cloudState: "offline" }));
   };
   const wake = () => void run();
-  retry = wake;
+  retry = () => {
+    forceAll = true;
+    void run();
+  };
   window.addEventListener("online", wake);
   window.addEventListener("offline", offline);
   window.addEventListener("focus", wake);
@@ -102,6 +164,7 @@ export function startCloudSaves(store: AppStore): () => void {
     retry = () => {};
     auth();
     unsubscribe();
+    unsubscribeRequests();
     clearTimeout(timer);
     clearInterval(checkpoint);
     window.removeEventListener("online", wake);

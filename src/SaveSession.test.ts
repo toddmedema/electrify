@@ -9,6 +9,7 @@ import {
   exportCurrentSave,
   startSaveSessions,
   saveSessionMiddleware,
+  snapshotSavedGame,
 } from "./SaveSession";
 import { downloadSave } from "./SaveFile";
 import { store } from "./Store";
@@ -32,7 +33,12 @@ import type {
   SaveGameType,
 } from "./Types";
 import { serializeSave } from "./SaveGame";
-import { currentRunSaveEffects, withRunSaveEffects } from "./SaveEffects";
+import {
+  currentRunSaveEffects,
+  subscribeCloudSaveRequests,
+  withRunSaveEffects,
+} from "./SaveEffects";
+import { sessionChanged } from "./SaveLibrary";
 
 jest.mock("./SaveFile", () => ({ downloadSave: jest.fn() }));
 jest.mock("./SaveRepository", () => {
@@ -395,6 +401,43 @@ async function openActive() {
   expect(await completeSaveLoading(getLoadingGeneration())).toBe(true);
   return repository;
 }
+
+test("only a successful Save & Quit requests the invitation and immediate cloud backup", async () => {
+  const repository = await openActive();
+  store.dispatch(sessionChanged({ cloudPromptRequested: false }));
+  const cloud = jest.fn();
+  const unsubscribe = subscribeCloudSaveRequests(cloud);
+  try {
+    store.dispatch({ type: "game/delta", payload: { dollarsPerkWh: 0.12 } });
+    repository.writeSnapshot.mockRejectedValueOnce(
+      new SaveRepositoryError("quota", "full"),
+    );
+    expect(await quitSavedGame()).toBe(false);
+    expect(store.getState().saves.cloudPromptRequested).toBe(false);
+    expect(cloud).not.toHaveBeenCalled();
+    store.dispatch(dialogClose());
+    expect(await quitSavedGame()).toBe(true);
+    expect(store.getState().saves.cloudPromptRequested).toBe(true);
+    expect(cloud).toHaveBeenCalledWith("A");
+  } finally {
+    unsubscribe();
+  }
+});
+
+test("sharing a snapshot requests immediate cloud backup without the invitation", async () => {
+  await openActive();
+  store.dispatch(sessionChanged({ cloudPromptRequested: false }));
+  const cloud = jest.fn();
+  const unsubscribe = subscribeCloudSaveRequests(cloud);
+  try {
+    await snapshotSavedGame("A");
+    expect(cloud).toHaveBeenCalledWith("A");
+    expect(store.getState().saves.cloudPromptRequested).toBe(false);
+    await quitSavedGame();
+  } finally {
+    unsubscribe();
+  }
+});
 async function eventually(predicate: () => boolean) {
   for (let attempt = 0; attempt < 30 && !predicate(); attempt++)
     await new Promise((resolve) => setTimeout(resolve, 0));

@@ -31,7 +31,7 @@ import {
   sessionChanged,
   saveUnavailable,
 } from "./SaveLibrary";
-import { withRunSaveEffects } from "./SaveEffects";
+import { requestCloudSave, withRunSaveEffects } from "./SaveEffects";
 import {
   launchRun,
   loaded,
@@ -387,19 +387,25 @@ function noteUnavailable(id: string, error: unknown, revision?: number): void {
 export async function exportSaveRecovery(id: string): Promise<void> {
   downloadSaveRecovery(id, await repository.readRaw(id));
 }
-export async function importSavedGame(file: SaveFileType): Promise<void> {
+export async function importSavedGame(file: SaveFileType): Promise<string> {
   const scenario = getScenario(
     file.save.game.scenarioId,
     file.save.game.customScenario,
   );
   if (!scenario || scenario.tutorialSteps || file.save.game.replayPlayback)
     throw new Error("Only playable games can be imported.");
-  await repository.create({ ...file, scenarioName: scenario.name });
+  const record = await repository.create({
+    ...file,
+    scenarioName: scenario.name,
+  });
   await refreshSavedGames();
+  requestCloudSave(record.metadata.id);
+  return record.metadata.id;
 }
 export async function exportSavedGame(id: string): Promise<void> {
   if (active?.id === id) return exportCurrentSave();
   const record = await readSavedGame(id);
+  requestCloudSave(id);
   downloadSave({
     name: record.metadata.name,
     status: record.metadata.status,
@@ -417,9 +423,11 @@ export async function snapshotSavedGame(id: string): Promise<SaveFileType> {
     } catch {
       /* The captured snapshot is still valid. */
     }
+    requestCloudSave(id);
     return requested.file();
   }
   const record = await readSavedGame(id);
+  requestCloudSave(id);
   return {
     name: record.metadata.name,
     status: record.metadata.status,
@@ -437,12 +445,14 @@ export async function exportCurrentSave(): Promise<void> {
     /* The direct snapshot remains exportable when storage fails. */
   }
   downloadSave(requested.file());
+  requestCloudSave(requested.id);
 }
 export async function retryCurrentSave(): Promise<boolean> {
   if (!active) return false;
   active.capture(getStore().getState().game);
   try {
     await active.flush();
+    requestCloudSave(active.id);
     return true;
   } catch {
     return false;
@@ -471,6 +481,7 @@ export async function renameSavedGame(id: string, name: string): Promise<void> {
       getStore().dispatch(sessionChanged({ pendingName: metadata.name }));
     }
     await refreshSavedGames();
+    requestCloudSave(id);
   } finally {
     if (current) {
       current.suspended = false;
@@ -631,7 +642,14 @@ export async function runSaveTransition(
 export async function quitSavedGame(options?: {
   toScenarioList?: boolean;
 }): Promise<boolean> {
-  return runSaveTransition(() => getStore().dispatch(quit(options)));
+  const outgoing = active;
+  return runSaveTransition(() => {
+    getStore().dispatch(quit(options));
+    if (outgoing?.created && !outgoing.failure) {
+      requestCloudSave(outgoing.id);
+      getStore().dispatch(sessionChanged({ cloudPromptRequested: true }));
+    }
+  });
 }
 
 export async function resumeSavedGame(id: string): Promise<boolean> {
@@ -803,6 +821,7 @@ export async function deleteSavedGame(id: string): Promise<void> {
     }
   } else await repository.delete(id);
   await refreshSavedGames();
+  requestCloudSave(id);
 }
 
 function snapshotChanged(): void {

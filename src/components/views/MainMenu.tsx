@@ -22,6 +22,7 @@ import InstallAppButton from "../base/InstallAppButton";
 export interface StateProps {
   audioEnabled?: boolean;
   hasSavedGame: boolean;
+  hasSavedGames: boolean;
   savedGameName?: string;
   savedGameDescription?: string;
 }
@@ -134,14 +135,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             </>
           )}
           <Button
-            data-saves-trigger
-            size="large"
-            variant="text"
-            onClick={props.onSavedGames}
-          >
-            Saved games
-          </Button>
-          <Button
             data-main-action
             size="large"
             variant={props.hasSavedGame ? "outlined" : "contained"}
@@ -150,6 +143,17 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             {startLabel}
           </Button>
+          {props.hasSavedGames && (
+            <Button
+              data-saves-trigger
+              size="large"
+              variant="outlined"
+              color="primary"
+              onClick={props.onSavedGames}
+            >
+              Saved games
+            </Button>
+          )}
         </Stack>
         <Stack
           component="nav"

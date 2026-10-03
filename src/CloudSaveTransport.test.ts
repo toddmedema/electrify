@@ -399,6 +399,22 @@ describe("CloudSaveTransport", () => {
     const manifest = documents.get("users/creator/cloudSaves/save-one")!;
     expect(manifest.deleted).toBe(false);
     expect(manifest.metadata).not.toHaveProperty("cloud");
+    expect(manifest.metadata).toMatchObject({
+      uploadedAt: expect.any(Number),
+      uploadedMinute: record.save.game.date.minute,
+    });
+    // Keep the upload checkpoint inside metadata, allowed by the deployed rules.
+    expect(manifest).not.toHaveProperty("uploadedAt");
+    expect(manifest).not.toHaveProperty("uploadedMinute");
+    (getDocsFromServer as jest.Mock).mockResolvedValue({
+      docs: [{ id: "save-one", data: () => manifest }],
+    });
+    expect(
+      (await new FirebaseSaveTransport().list("creator"))[0],
+    ).toMatchObject({
+      uploadedAt: (manifest.metadata as Record<string, unknown>).uploadedAt,
+      uploadedMinute: record.save.game.date.minute,
+    });
     const chunks = manifest.chunks as string[];
     expect(documents.get(`saveBlobs/${chunks[0]}`)).toEqual({
       uid: "creator",

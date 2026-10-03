@@ -1364,6 +1364,8 @@ export interface SaveMetadata {
     version?: string;
     syncedRevision?: number;
     writerDeviceId?: string;
+    uploadedAt?: number;
+    uploadedMinute?: number;
   };
   id: SaveId;
   name: string;

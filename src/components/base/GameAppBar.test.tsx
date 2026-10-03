@@ -31,6 +31,24 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  it.each(["idle", "saving", "saved"] as const)(
+    "keeps routine %s indicators off the game screen",
+    (saveState) => {
+      renderAppBar({
+        saveState,
+        savedAt: new Date().toISOString(),
+        activeSave: { id: "A", name: "Experiment" },
+      });
+      expect(
+        screen.queryByText(/Saved just now|Saving…|Preparing save…/),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "menu" }));
+      expect(
+        screen.queryByRole("menuitem", { name: /Rename/ }),
+      ).not.toBeInTheDocument();
+    },
+  );
   it("keeps save failure visible and opens recovery from the status", () => {
     const onSavedGames = jest.fn();
     renderAppBar({

@@ -10,7 +10,8 @@ import {
   Typography,
 } from "@mui/material";
 import { loadSharedSave } from "../../CloudSaveTransport";
-import { importSavedGame } from "../../SaveSession";
+import { importSavedGame, resumeSavedGame } from "../../SaveSession";
+import { isResumableStatus } from "../../SaveModel";
 import { useAppDispatch } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import type { SaveFileType } from "../../Types";
@@ -68,7 +69,7 @@ export default function SharedGameDialog(): React.JSX.Element {
         <Stack spacing={2}>
           {busy && (
             <Typography role="status">
-              {file ? "Adding to your saves…" : "Loading shared game…"}
+              {file ? "Opening shared game…" : "Loading shared game…"}
             </Typography>
           )}
           {error && <Alert severity="error">{error}</Alert>}
@@ -84,10 +85,6 @@ export default function SharedGameDialog(): React.JSX.Element {
               <Typography color="text.secondary">
                 {file.save.game.location.name} · {file.save.game.difficulty} ·{" "}
                 {file.save.game.date.month} {file.save.game.date.year}
-              </Typography>
-              <Typography>
-                This is a frozen copy. Add it to your saved games to play or
-                view its result. Your existing saves are kept.
               </Typography>
             </>
           )}
@@ -108,9 +105,11 @@ export default function SharedGameDialog(): React.JSX.Element {
               setBusy(true);
               setError("");
               try {
-                await importSavedGame(file);
+                const saveId = await importSavedGame(file);
                 close();
-                dispatch(navigate("SAVED_GAMES"));
+                if (isResumableStatus(file.status))
+                  await resumeSavedGame(saveId);
+                else dispatch(navigate("SAVED_GAMES"));
               } catch {
                 setError(
                   "Couldn't add this game. Check device storage and try again.",
@@ -120,7 +119,7 @@ export default function SharedGameDialog(): React.JSX.Element {
               }
             }}
           >
-            Add to my saves
+            Play
           </Button>
         )}
       </DialogActions>

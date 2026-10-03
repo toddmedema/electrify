@@ -52,7 +52,7 @@ async function setStorageFault(page: Page, failed: boolean) {
 }
 
 const saveState = (page: Page) =>
-  page.locator("[data-save-state]:visible").first();
+  page.locator("#appbar:visible [data-save-state]").first();
 
 async function startGame(page: Page, initialFailure = false) {
   await installStorageFault(page, initialFailure);
@@ -182,13 +182,20 @@ async function holdWriterTransactions(page: Page) {
         request.onsuccess = () => {
           const db = request.result;
           const transaction = db.transaction("sessions", "readwrite");
-          const started = performance.now();
+          let released = false;
+          window.addEventListener(
+            "release-writer-transactions",
+            () => {
+              released = true;
+            },
+            { once: true },
+          );
           const keepAlive = () => {
             const pending = transaction
               .objectStore("sessions")
               .get("contention-probe");
             pending.onsuccess = () => {
-              if (performance.now() - started < 750) keepAlive();
+              if (!released) keepAlive();
             };
           };
           transaction.oncomplete = () => db.close();
@@ -673,6 +680,9 @@ test("Cancel after a delayed source-save failure allows the paused clock to rest
   await expect(
     page.getByRole("dialog", { name: "Saving your game" }),
   ).toBeVisible();
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("release-writer-transactions")),
+  );
   const failure = page.getByRole("dialog", {
     name: "Your game could not be saved",
   });

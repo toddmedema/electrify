@@ -31,6 +31,8 @@ export interface CloudSaveHead {
   writerDeviceId?: string;
   writerLocalId?: string;
   sourceRevision?: number;
+  uploadedAt?: number;
+  uploadedMinute?: number;
 }
 export interface CloudSaveTransport {
   list(uid: string): Promise<CloudSaveHead[]>;
@@ -75,6 +77,9 @@ export function saveChunks(file: SaveFileType): string[] {
 }
 
 function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
+  const metadata = raw.metadata as
+    | (SaveMetadata & { uploadedAt?: unknown; uploadedMinute?: unknown })
+    | undefined;
   if (
     typeof raw.version !== "string" ||
     !/^[a-f0-9]{32}$/.test(raw.version) ||
@@ -101,7 +106,7 @@ function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
     version: raw.version,
     deleted: raw.deleted,
     chunks: raw.chunks as string[],
-    metadata: raw.metadata as SaveMetadata | undefined,
+    metadata,
     garbage: (raw.garbage || []) as string[],
     writerDeviceId:
       typeof raw.writerDeviceId === "string" ? raw.writerDeviceId : undefined,
@@ -112,6 +117,16 @@ function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
       Number.isSafeInteger(raw.sourceRevision) &&
       raw.sourceRevision > 0
         ? raw.sourceRevision
+        : undefined,
+    uploadedAt:
+      typeof metadata?.uploadedAt === "number" &&
+      Number.isFinite(metadata.uploadedAt)
+        ? metadata.uploadedAt
+        : undefined,
+    uploadedMinute:
+      typeof metadata?.uploadedMinute === "number" &&
+      Number.isFinite(metadata.uploadedMinute)
+        ? metadata.uploadedMinute
         : undefined,
   };
 }
@@ -241,7 +256,15 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
             writerLocalId: record?.metadata.id,
             sourceRevision: record?.metadata.revision,
             ...(record
-              ? { metadata: { ...record.metadata, id, cloud: undefined } }
+              ? {
+                  metadata: {
+                    ...record.metadata,
+                    id,
+                    cloud: undefined,
+                    uploadedAt: Date.now(),
+                    uploadedMinute: record.save.game.date.minute,
+                  },
+                }
               : {}),
           }),
         ),

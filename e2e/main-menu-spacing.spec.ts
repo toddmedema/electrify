@@ -24,6 +24,9 @@ for (const theme of ["light", "dark"]) {
     await expect(primary).toBeVisible();
     await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
     await expect(page.getByText(/free.*no sign.?in required/i)).toHaveCount(0);
+    await expect(
+      primary.getByRole("button", { name: "Saved games", exact: true }),
+    ).toHaveCount(0);
     // The logo carries the one tagline; nothing repeats it above the actions
     await expect(page.locator(".gameSubtitle")).toHaveCount(0);
     await expectGap(primary, resources, 8);
@@ -82,6 +85,11 @@ test("a saved game remains separated from the logo and footer on short screens",
   );
   await expectGap(
     primary.locator("[data-continue-context]"),
+    primary.getByRole("button", { name: "Start a new game", exact: true }),
+    8,
+  );
+  await expectGap(
+    primary.getByRole("button", { name: "Start a new game", exact: true }),
     primary.getByRole("button", { name: "Saved games", exact: true }),
     8,
   );

@@ -9,7 +9,7 @@ type WireRecord = { metadata: SaveMetadata; save: unknown };
 /** Wait for the asynchronous lifecycle flush before inspecting the real save database. */
 async function flushSave(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-  const status = page.locator("[data-save-state]:visible").first();
+  const status = page.locator("#appbar:visible [data-save-state]").first();
   if (await status.count()) {
     await expect(status).toHaveAttribute("data-save-state", /^(saved|idle)$/);
   }

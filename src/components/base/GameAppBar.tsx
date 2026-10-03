@@ -9,8 +9,6 @@ import { isBigScreen, isDesktopScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { setSpeed, startTutorial } from "../../reducers/Game";
 import { quitSavedGame, runSaveTransition } from "../../SaveSession";
-import RenameSaveDialog from "./RenameSaveDialog";
-import { savedTime } from "../../helpers/SaveDisplay";
 import {
   AppStateType,
   GameType,
@@ -145,7 +143,6 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
-  const [renameOpen, setRenameOpen] = React.useState(false);
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
       onEvidenceAcknowledged?.(evidenceRequest);
@@ -229,16 +226,6 @@ export function GameAppBar(props: Props) {
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Settings</MenuItem>
           <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
-          {props.activeSave && (
-            <MenuItem
-              onClick={() => {
-                handleMenuClose();
-                setRenameOpen(true);
-              }}
-            >
-              Rename current game
-            </MenuItem>
-          )}
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
@@ -265,8 +252,6 @@ export function GameAppBar(props: Props) {
       onManual,
       onSettings,
       props.onSavedGames,
-      props.activeSave?.id,
-      props.activeSave?.name,
       onNextTutorial,
       handleQuit,
       nextTutorial,
@@ -311,37 +296,28 @@ export function GameAppBar(props: Props) {
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      {!isTutorial && !isReplay && props.saveState && (
+      {!isTutorial && !isReplay && props.saveState === "failed" && (
         <Typography
           className="saveStatus"
           data-save-state={props.saveState}
           data-active-save-id={props.activeSave?.id}
-          role={props.saveState === "failed" ? "alert" : "status"}
+          role="alert"
           variant="caption"
-          color={
-            props.saveState === "failed" ? "warning.main" : "text.secondary"
-          }
+          color="warning.main"
           sx={{ px: 2, pb: 0.5 }}
-          title={
-            props.saveState === "failed"
-              ? props.saveError
-              : props.savedAt
-                ? new Date(props.savedAt).toLocaleString()
-                : undefined
-          }
+          title={props.saveError}
         >
-          {props.saveState === "failed" ? (
-            <button className="saveStatusAction" onClick={props.onSavedGames}>
-              Save failed · Manage saves
-            </button>
-          ) : props.saveState === "saving" ? (
-            "Saving…"
-          ) : props.savedAt ? (
-            `Saved ${savedTime(props.savedAt)}`
-          ) : (
-            "Preparing save…"
-          )}
+          <button className="saveStatusAction" onClick={props.onSavedGames}>
+            Save failed · Manage saves
+          </button>
         </Typography>
+      )}
+      {!isTutorial && !isReplay && props.saveState !== "failed" && (
+        <span
+          hidden
+          data-save-state={props.saveState}
+          data-active-save-id={props.activeSave?.id}
+        />
       )}
       <div className="gameStatusBar">
         <div
@@ -409,10 +385,6 @@ export function GameAppBar(props: Props) {
         open={scenarioDetailsOpen}
         game={game}
         onClose={() => setScenarioDetailsOpen(false)}
-      />
-      <RenameSaveDialog
-        save={renameOpen ? props.activeSave : undefined}
-        onClose={() => setRenameOpen(false)}
       />
     </div>
   );

@@ -2,8 +2,12 @@
 
 IndexedDB remains the source for loading and saving games. After Google sign-in, the
 app backs up device saves to `users/{uid}/cloudSaves/{id}` and restores missing or
-newer backups to IndexedDB. It retries on reconnect, focus, local writes and once a
-minute. No game waits for Firebase to load or save locally.
+newer backups to IndexedDB. Automatic sync attempts are spaced at least five minutes
+apart. After a game's first backup, automatic uploads require both five wall-clock
+minutes and a full in-game year since its last upload. The checkpoint persists across
+reloads and tabs. Explicit save interactions (including Save & Quit and Share) bypass
+that cadence. No game waits for Firebase to load or save locally. Signed-out players
+see the optional sign-in invitation only after their first successful Save & Quit.
 
 Each backup has an opaque version checked in a Firestore transaction. Concurrent
 offline edits keep both copies; an active local writer is never replaced. Local
@@ -14,8 +18,9 @@ switching accounts does not upload the first account's saves to the second.
 
 Share links require sign-in to create and no account to open. They use ten random
 base62 characters, retry collisions and store independent immutable payloads. Opening
-a link first shows a preview; adding it creates a new device save. Neither action
-replaces the current game. Saves keep the existing domain and result validation.
+a link first shows a preview; Play creates a new device save and opens playable games,
+saving any current run before switching. Finished, unplayable runs open in the save
+library. Saves keep the existing domain and result validation.
 Payloads use the existing compact lossless encoding, split across documents to stay
 below Firestore's 1 MiB document limit. The total limit is 8 MiB per save.
 

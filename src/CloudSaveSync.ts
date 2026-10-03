@@ -2,6 +2,9 @@ import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
 import { CloudConflict } from "./CloudSaveTransport";
 import { newSaveId, SaveRepository } from "./SaveRepository";
 import type { SaveMetadata, SaveRecord } from "./Types";
+import { DAYS_PER_YEAR } from "./Constants";
+
+export const AUTO_CLOUD_SAVE_MS = 5 * 60 * 1000;
 
 /** Reconcile backups without making cloud availability a dependency of loading or saving. */
 export class CloudSaveSync {
@@ -13,20 +16,22 @@ export class CloudSaveSync {
   async sync(
     uid: string,
     current: () => boolean = () => true,
+    options: { automatic?: boolean; forceIds?: ReadonlySet<string> } = {},
   ): Promise<{ conflicts: boolean; deferred: boolean; failed?: boolean }> {
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
       return navigator.locks.request(`electrify-cloud-sync:${uid}`, () =>
         current()
-          ? this.reconcile(uid, current)
+          ? this.reconcile(uid, current, options)
           : { conflicts: false, deferred: false },
       );
     }
-    return this.reconcile(uid, current);
+    return this.reconcile(uid, current, options);
   }
 
   private async reconcile(
     uid: string,
     current: () => boolean,
+    options: { automatic?: boolean; forceIds?: ReadonlySet<string> },
   ): Promise<{ conflicts: boolean; deferred: boolean; failed?: boolean }> {
     const remote = new Map(
       (await this.transport.list(uid)).map((head) => [head.id, head]),
@@ -114,6 +119,10 @@ export class CloudSaveSync {
             cloudId,
             head.sourceRevision,
             head.version,
+            {
+              uploadedAt: head.uploadedAt,
+              uploadedMinute: head.uploadedMinute,
+            },
           );
           const latest = (await this.repository.list()).find(
             (candidate) => candidate.id === entry.id,
@@ -126,6 +135,28 @@ export class CloudSaveSync {
         }
         const dirty =
           !entry.cloud || entry.cloud.syncedRevision !== entry.revision;
+        if (
+          (dirty || !head) &&
+          options.automatic &&
+          !options.forceIds?.has(entry.id) &&
+          entry.cloud?.uploadedAt !== undefined &&
+          entry.cloud.uploadedMinute !== undefined
+        ) {
+          // Keep the checkpoint in IndexedDB so reloads and other tabs cannot
+          // turn frequent device saves into frequent cloud uploads.
+          if (Date.now() - entry.cloud.uploadedAt < AUTO_CLOUD_SAVE_MS) {
+            deferred = true;
+            continue;
+          }
+          const record = await this.repository.read(entry.id);
+          if (
+            record.save.game.date.minute - entry.cloud.uploadedMinute <
+            DAYS_PER_YEAR * 1440
+          ) {
+            deferred = true;
+            continue;
+          }
+        }
         if (head && head.version !== entry.cloud?.version) {
           if (!dirty) {
             const record = head.deleted
@@ -224,6 +255,10 @@ export class CloudSaveSync {
       cloudId,
       record.metadata.revision,
       version,
+      {
+        uploadedAt: Date.now(),
+        uploadedMinute: record.save.game.date.minute,
+      },
     );
     return true;
   }
