@@ -3384,7 +3384,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
         }, 1);
       };
 
-      const chronicBlackouts = hasChronicBlackouts(history);
+      const chronicBlackouts = hasChronicBlackouts(history, state.difficulty);
       const termMonths = scenario.durationMonths || 12 * 20;
       const retentionStart = retentionBaseline(
         scenario,

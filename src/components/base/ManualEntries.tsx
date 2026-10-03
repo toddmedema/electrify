@@ -815,7 +815,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           In all scenarios, you fail if you go bankrupt or serve less than 90%
-          of demand in three consecutive months.
+          of demand in three consecutive months (95% on Expert difficulty).
         </p>
         <p>
           The tables below score your term; reliability, costs and emissions are

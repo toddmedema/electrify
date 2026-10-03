@@ -2,6 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
+  anchoredForecastPaths,
   bandsPlugin,
   chartFont,
   legendPlugin,
@@ -126,6 +127,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         stroke: chartPalette().supply,
         width: SUPPLY_WIDTH,
         dash: SUPPLY_FORECAST_DASH,
+        paths: anchoredForecastPaths(1),
         points: { show: false },
         spanGaps: false,
       },
@@ -139,6 +141,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         stroke: chartPalette().demand,
         width: DEMAND_WIDTH,
         dash: DEMAND_FORECAST_DASH,
+        paths: anchoredForecastPaths(3),
         points: { show: false },
         spanGaps: false,
       },

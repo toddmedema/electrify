@@ -2,6 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
+  anchoredForecastPaths,
   bandsPlugin,
   FORECAST_RIGHT_PAD,
   padRange,
@@ -85,6 +86,7 @@ function buildOptions(showXLabels: boolean) {
         stroke: chartPalette().supply,
         width: 1,
         dash: [4, 4],
+        paths: anchoredForecastPaths(1),
         points: { show: false },
         spanGaps: false,
       },
@@ -98,6 +100,7 @@ function buildOptions(showXLabels: boolean) {
         stroke: chartPalette().demand,
         width: 2,
         dash: [4, 4],
+        paths: anchoredForecastPaths(3),
         points: { show: false },
         spanGaps: false,
       },

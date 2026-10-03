@@ -700,7 +700,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       break; // The real game forces a restart here, so anything past it isn't a reachable state
     }
 
-    if (hasChronicBlackouts(state.monthlyHistory)) {
+    if (hasChronicBlackouts(state.monthlyHistory, state.difficulty)) {
       firedAtMonth = state.date.monthsElapsed;
       break;
     }

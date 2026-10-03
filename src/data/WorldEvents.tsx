@@ -499,43 +499,6 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
         };
       },
     },
-    {
-      id: "transition-audit",
-      schedule: { atMonth: 84 },
-      describe: ({ snapshot }) => {
-        const combustion = deliveredFrom(snapshot, [
-          "Coal",
-          "Natural Gas",
-          "Oil",
-          "Biomass",
-        ]);
-        const combustionShare = share(combustion, snapshot.demandWh12m);
-        const unservedShare = share(
-          snapshot.unservedWh12m,
-          snapshot.demandWh12m,
-        );
-        const onTrack =
-          unservedShare <= 0.001 &&
-          combustionShare < 0.5 &&
-          snapshot.netIncome12m > 0;
-        return {
-          title: "Clean-grid check-in",
-          message: onTrack
-            ? `Fuel-burning sources supplied ${percent(combustionShare)} of power last year while the grid met ${percent(1 - unservedShare)} of demand at a profit, putting the transition on track.`
-            : `Fuel-burning sources supplied ${percent(combustionShare)} of power last year while the grid met ${percent(1 - unservedShare)} of demand at a ${snapshot.netIncome12m >= 0 ? "profit" : "loss"}, leaving the transition short of its goals.`,
-          concept: "goal",
-          kind: "WORLD_EVENT",
-          importance: "NOTABLE",
-          actionTarget: SUPPLY_DEMAND_TARGET,
-          attributes: {
-            combustionShare,
-            reliability: 1 - unservedShare,
-            netIncome: snapshot.netIncome12m,
-          },
-          turningPointPriority: 100,
-        };
-      },
-    },
   ],
 };
 

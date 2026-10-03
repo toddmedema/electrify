@@ -37,14 +37,14 @@ const line = (
 /**
  * Reproducible CEO plans made from persistent, UI-legal commitments. Every plan contains exactly
  * ten material choices (including mandatory scenario responses) across at least four categories,
- * no more than one rate setting, and no
- * inverse action. Late operating/program changes still remain in force through a settlement.
+ * no more than one rate setting, and no inverse action. Capacity clears CEO's 95% three-month
+ * firing threshold. Late operating/program changes still remain in force through a settlement.
  */
 export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   100: {
     initialBuild: {
       name: "Natural Gas Peaker",
-      peakW: 150000000,
+      peakW: 300000000,
       financed: true,
     },
     sellFacilityId: 2,
@@ -80,7 +80,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   102: {
     initialBuild: {
       name: "Natural Gas Peaker",
-      peakW: 300000000,
+      peakW: 600000000,
       financed: true,
     },
     sellFacilityId: 1,
@@ -101,7 +101,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   103: {
     initialBuild: {
       name: "Natural Gas Peaker",
-      peakW: 600000000,
+      peakW: 800000000,
       financed: true,
     },
     sellFacilityId: 1,
@@ -141,7 +141,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   105: {
     // The gas replaces the island's oil as baseload, so it is a combined cycle: a peaker would
     // default below the oil plant and leave oil burning around the clock.
-    initialBuild: { name: "Natural Gas CC", peakW: 300000000, financed: true },
+    initialBuild: { name: "Natural Gas CC", peakW: 600000000, financed: true },
     sellFacilityId: 3,
     sellAtMonth: 39,
     scheduledActions: [

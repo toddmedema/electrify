@@ -98,6 +98,9 @@ for (const theme of ["light", "dark"]) {
     ).toBeVisible();
     await copySavedGame(page, original.metadata.id);
     await expect(page.locator("article.saveEntry")).toHaveCount(2);
+    await expect(
+      page.getByRole("textbox", { name: "Search saves" }),
+    ).toHaveCount(0);
     const records = await readSaveRecords(page);
     const copy = records.find(
       (record) => record.metadata.id !== original.metadata.id,
@@ -109,12 +112,32 @@ for (const theme of ["light", "dark"]) {
       .getByRole("textbox", { name: "Save name" })
       .fill("Low carbon utility");
     await rename.getByRole("textbox", { name: "Save name" }).press("Enter");
+    const extraIds = [
+      await copySavedGame(page, original.metadata.id),
+      await copySavedGame(page, original.metadata.id),
+    ];
+    await expect(page.locator("article.saveEntry")).toHaveCount(4);
     await page
       .getByRole("textbox", { name: "Search saves" })
       .fill("Low carbon");
     await expect(page.locator("article.saveEntry")).toHaveCount(1);
     await page.getByRole("textbox", { name: "Search saves" }).fill("");
+    await expect(page.locator("article.saveEntry")).toHaveCount(4);
+    for (const id of extraIds) {
+      await page
+        .locator(`[data-save-id="${id}"]`)
+        .getByRole("button", { name: /^Actions for/ })
+        .click();
+      await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+      await page
+        .getByRole("dialog", { name: "Delete saved game?" })
+        .getByRole("button", { name: "Delete", exact: true })
+        .click();
+    }
     await expect(page.locator("article.saveEntry")).toHaveCount(2);
+    await expect(
+      page.getByRole("textbox", { name: "Search saves" }),
+    ).toHaveCount(0);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,

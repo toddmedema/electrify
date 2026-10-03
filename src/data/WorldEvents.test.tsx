@@ -525,6 +525,22 @@ describe("California wildfire emergency", () => {
 });
 
 describe("remaining scored story arcs", () => {
+  it("keeps the carbon-fee increase as the only timeline event", () => {
+    const start = context(0, 100);
+    const upcoming = upcomingStoryPhases(start);
+    expect(upcoming.map((phase) => phase.key)).toEqual([
+      "story:100:carbon-fee-ratchet:ratchet-onset",
+    ]);
+    expect(resolveStoryAtDate(context(47, 100)).effects).toEqual({});
+    expect(resolveStoryAtDate(context(48, 100)).effects).toMatchObject({
+      carbonFeePerKgCO2e: CARBON_FEE_BALANCE.Manager / 1000,
+    });
+    expect(resolveStoryAtDate(context(84, 100)).occurrences).toEqual([]);
+    expect(resolveStoryAtDate(context(143, 100)).effects).toMatchObject({
+      carbonFeePerKgCO2e: CARBON_FEE_BALANCE.Manager / 1000,
+    });
+  });
+
   it("checks in exact Manager reference values and monotonic scaling", () => {
     expect(CARBON_FEE_BALANCE.Manager).toBe(100);
     expect(PARADISE_BALANCE.Manager).toEqual({

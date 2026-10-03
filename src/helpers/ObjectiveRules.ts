@@ -1,4 +1,4 @@
-import { MonthlyHistoryType, ScenarioType } from "../Types";
+import { DifficultyType, MonthlyHistoryType, ScenarioType } from "../Types";
 import {
   bestReachableCustomers,
   CUSTOMER_MARKET_MULTIPLIER,
@@ -23,10 +23,21 @@ export function reliabilityMonths(
   );
 }
 /** The same three completed-month firing rule used by the game and headless playtests. */
-export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
+export const blackoutFiringThreshold = (difficulty: DifficultyType): number =>
+  difficulty === "CEO" ? 0.95 : 0.9;
+
+export function hasChronicBlackouts(
+  history: MonthlyHistoryType[],
+  difficulty: DifficultyType,
+): boolean {
   return (
     history.length >= 3 &&
-    history.slice(0, 3).every((month) => month.supplyWh < month.demandWh * 0.9)
+    history
+      .slice(0, 3)
+      .every(
+        (month) =>
+          month.supplyWh < month.demandWh * blackoutFiringThreshold(difficulty),
+      )
   );
 }
 

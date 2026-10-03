@@ -151,6 +151,30 @@ test("survival is chronological completed evidence and ignores current partial h
   ).toBe("unknown");
 });
 
+test("Expert survival text and verdict use the 95% firing threshold", () => {
+  const game = createNextState(fixture(29), (g) => {
+    g.difficulty = "CEO";
+    g.monthlyHistory = [
+      monthRow(2024, 5, 92),
+      monthRow(2024, 4, 92),
+      monthRow(2024, 3, 92),
+    ];
+  });
+  expect(requirement(game, "survival")).toMatchObject({
+    status: "failed",
+    target: "Ends if under 95% served 3 months in a row",
+    compact: "Avoid 3 consecutive months < 95% served (92%, 92%, 92%)",
+  });
+  expect(
+    requirement(
+      createNextState(game, (g) => {
+        g.difficulty = "VP";
+      }),
+      "survival",
+    ).status,
+  ).toBe("in-progress");
+});
+
 test("retention shows current customers against final target while recoverable", () => {
   const scenario = SCENARIOS.find(
     (s) => s.minimumCustomerRetention !== undefined && s.ownership === "Public",

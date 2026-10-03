@@ -250,10 +250,13 @@ describe("ending a scenario from inside the reducer", () => {
       { ...blackoutMonth, month: 1 },
     ];
     expect(
-      hasChronicBlackouts([
-        { ...blackoutMonth, month: 4, supplyWh: 100 },
-        ...state.monthlyHistory,
-      ]),
+      hasChronicBlackouts(
+        [
+          { ...blackoutMonth, month: 4, supplyWh: 100 },
+          ...state.monthlyHistory,
+        ],
+        state.difficulty,
+      ),
     ).toBe(false);
     state.facilities.forEach((facility) => {
       facility.paused = true;

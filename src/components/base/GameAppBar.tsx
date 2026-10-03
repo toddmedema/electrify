@@ -115,7 +115,7 @@ export function getGridHealth(
     return {
       state: "low-reserve",
       label: "Low reserve",
-      metric: `+${formatWatts(reserveW)} reserve (${reservePercent}%)`,
+      metric: `${formatWatts(reserveW)} reserve (${reservePercent}%)`,
       announcement: "Low reserve.",
     };
   }
@@ -123,7 +123,7 @@ export function getGridHealth(
   return {
     state: "stable",
     label: "Stable",
-    metric: `+${formatWatts(reserveW)} reserve`,
+    metric: `${formatWatts(reserveW)} reserve`,
     announcement: "Grid stable.",
   };
 }

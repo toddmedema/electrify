@@ -137,7 +137,8 @@ export default function SavedGames(): React.JSX.Element {
     inGame &&
     !saves.entries.some((entry) => entry.id === saves.activeId);
   const entries = sortSaves(saves.entries);
-  const query = search.trim().toLocaleLowerCase();
+  const showSearch = entries.length > 3;
+  const query = showSearch ? search.trim().toLocaleLowerCase() : "";
   const filtered = entries.filter((entry) =>
     `${entry.name} ${entry.scenarioName}`.toLocaleLowerCase().includes(query),
   );
@@ -161,7 +162,7 @@ export default function SavedGames(): React.JSX.Element {
           }}
         >
           <CloudSaveStatus />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          {showSearch && (
             <TextField
               fullWidth
               size="small"
@@ -169,7 +170,7 @@ export default function SavedGames(): React.JSX.Element {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-          </Stack>
+          )}
           {error && !deleting && (
             <Alert severity="error" role="alert" onClose={() => setError("")}>
               {error}
