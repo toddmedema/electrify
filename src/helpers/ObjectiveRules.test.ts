@@ -2,10 +2,11 @@ import { SCENARIOS } from "../data/Scenarios";
 import { runSimulation } from "../testing/Simulator";
 import { MonthlyHistoryType, ScenarioType } from "../Types";
 import { bestReachableCustomers, nextCustomerCount } from "./Customers";
-import { TICKS_PER_MONTH } from "../Constants";
+import { DIFFICULTY_IDS, TICKS_PER_MONTH } from "../Constants";
 import {
   decidedObjectiveFailure,
   formatRequiredShare,
+  hasChronicBlackouts,
   retentionBaseline,
   scenarioObjectiveFailure,
 } from "./ObjectiveRules";
@@ -25,6 +26,30 @@ const row = (
     supplyWh: 1000 * served,
     customers,
   }) as MonthlyHistoryType;
+
+it.each(DIFFICULTY_IDS)(
+  "fires below the completed-month threshold on %s",
+  (difficulty) => {
+    const threshold = difficulty === "CEO" ? 0.95 : 0.9;
+    const rows = (served: number) =>
+      [3, 2, 1].map((month) => row(2026, month, served));
+    expect(hasChronicBlackouts(rows(threshold - 0.001), difficulty)).toBe(true);
+    expect(hasChronicBlackouts(rows(threshold), difficulty)).toBe(false);
+    expect(hasChronicBlackouts(rows(0.92), difficulty)).toBe(
+      difficulty === "CEO",
+    );
+    expect(hasChronicBlackouts(rows(0.8).slice(0, 2), difficulty)).toBe(false);
+    expect(
+      hasChronicBlackouts([row(2026, 4, 1), ...rows(0.8)], difficulty),
+    ).toBe(false);
+    expect(
+      hasChronicBlackouts(
+        rows(0).map((month) => ({ ...month, demandWh: 0 })),
+        difficulty,
+      ),
+    ).toBe(false);
+  },
+);
 
 it("requires 80% retention without requiring a grid investment", () => {
   expect(

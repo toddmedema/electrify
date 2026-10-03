@@ -117,7 +117,7 @@ describe("GameAppBar", () => {
     expect(reserveCapacityW(game, now)).toBe(now.reserveW);
     renderAppBar({ game: { ...game, inGame: true } });
     expect(screen.getByText("Stable")).toBeInTheDocument();
-    expect(screen.getByText(/\+.*W reserve/)).toBeInTheDocument();
+    expect(screen.getByText(/^\d.*W reserve$/)).toBeInTheDocument();
   });
 
   it("warns when reachable reserve falls to five percent of demand", () => {

@@ -603,7 +603,7 @@ test("completed saves remain writable and historical results leave the current r
   const victory = page.getByRole("dialog", { name: "Mission complete" });
   await expect(victory).toBeVisible();
   await victory
-    .getByRole("button", { name: "Review grid", exact: true })
+    .getByRole("button", { name: "Keep playing", exact: true })
     .click();
   await page
     .getByRole("button", { name: "pause", exact: true })

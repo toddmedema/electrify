@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Button } from "@mui/material";
-import { ScenarioType } from "../../Types";
+import { DifficultyType, ScenarioType } from "../../Types";
 import DecisionDialog from "./DecisionDialog";
 import VictoryConditions from "./VictoryConditions";
 
@@ -9,6 +9,7 @@ export interface VictoryConditionsDialogProps {
   onClose: () => void;
   title: React.ReactNode;
   scenario: ScenarioType;
+  difficulty: DifficultyType;
 }
 
 /** What a scenario counts as a win, shown before the player commits to it. */
@@ -17,6 +18,7 @@ export default function VictoryConditionsDialog({
   onClose,
   title,
   scenario,
+  difficulty,
 }: VictoryConditionsDialogProps): React.JSX.Element {
   return (
     <DecisionDialog
@@ -31,6 +33,7 @@ export default function VictoryConditionsDialog({
       }
     >
       <VictoryConditions
+        difficulty={difficulty}
         ownership={scenario.ownership}
         dollarsPerkWh={scenario.dollarsPerkWh}
         startingCustomers={scenario.startingCustomers}

@@ -199,7 +199,7 @@ describe("VictoryDialog", () => {
     expect(screen.getByRole("button", { name: "New game" })).toHaveClass(
       "MuiButton-contained",
     );
-    await userEvent.click(screen.getByText("Review grid"));
+    await userEvent.click(screen.getByText("Keep playing"));
     expect(onClose).toHaveBeenCalled();
     await userEvent.click(screen.getByText("New game"));
     expect(onQuit).toHaveBeenCalled();
@@ -224,7 +224,7 @@ describe("VictoryDialog", () => {
       expect(
         screen.getByLabelText("Final score 812 points"),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Review grid")).not.toBeInTheDocument();
+      expect(screen.queryByText("Keep playing")).not.toBeInTheDocument();
       const retry = screen.getByRole("button", { name: "Try again" });
       expect(retry).toHaveClass("MuiButton-contained");
       expect(screen.getByRole("button", { name: "New game" })).toHaveClass(

@@ -12,6 +12,7 @@ import {
   formatRequiredShare,
   reliabilityMonths,
   hasChronicBlackouts,
+  blackoutFiringThreshold,
   retentionBaseline,
   retentionUnreachable,
 } from "./ObjectiveRules";
@@ -152,6 +153,9 @@ export function getMissionStatus(game: GameType) {
     deadline: currentMonth + 1,
   });
   const latest = history.slice(0, 3);
+  const firingThreshold = formatRequiredShare(
+    blackoutFiringThreshold(game.difficulty),
+  );
   const consecutive =
     latest.length === 3 &&
     latest.every(
@@ -161,7 +165,7 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "survival",
     label: "Avoid chronic blackouts",
-    compact: `Avoid 3 consecutive months < 90% served (${
+    compact: `Avoid 3 consecutive months < ${firingThreshold} served (${
       latest.length
         ? latest
             .slice()
@@ -177,11 +181,11 @@ export function getMissionStatus(game: GameType) {
           .map((row) => formatServed(demandServed(row)))
           .join(" · ")}`
       : "No completed months",
-    target: "Ends if under 90% served 3 months in a row",
+    target: `Ends if under ${firingThreshold} served 3 months in a row`,
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive
-      ? hasChronicBlackouts(latest)
+      ? hasChronicBlackouts(latest, game.difficulty)
         ? "failed"
         : "in-progress"
       : "unknown",

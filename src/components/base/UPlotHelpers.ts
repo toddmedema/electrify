@@ -355,6 +355,48 @@ export function splitPastProjected(
 }
 
 /**
+ * Start the dash pattern at the first chart point, then clip away the recorded portion.
+ * Starting the path at the moving forecast boundary resets its dash phase on every tick.
+ * The paired rows retain their nulls for tooltips, summaries and scale calculations.
+ */
+export function anchoredForecastPaths(
+  pastSeriesIdx: number,
+): uPlot.Series.PathBuilder {
+  return (u, seriesIdx) => {
+    const minutes = u.data[0];
+    const past = u.data[pastSeriesIdx];
+    const projected = u.data[seriesIdx];
+    const firstProjected = projected.findIndex((value) => value != null);
+    if (firstProjected < 0) return null;
+
+    const stroke = new Path2D();
+    const yScale = u.series[seriesIdx].scale || "y";
+    let connected = false;
+    for (let i = 0; i < minutes.length; i++) {
+      const value = projected[i] ?? past[i];
+      if (value == null) {
+        connected = false;
+        continue;
+      }
+      const x = Math.round(u.valToPos(minutes[i], "x", true));
+      const y = Math.round(u.valToPos(value, yScale, true));
+      if (connected) stroke.lineTo(x, y);
+      else stroke.moveTo(x, y);
+      connected = true;
+    }
+
+    const clip = new Path2D();
+    const { left, top, width, height } = u.bbox;
+    const start = Math.max(
+      left,
+      Math.round(u.valToPos(minutes[firstProjected], "x", true)),
+    );
+    clip.rect(start, top, Math.max(0, left + width - start), height);
+    return { stroke, clip };
+  };
+}
+
+/**
  * Spans where a series sits below a threshold, for the red bands a negative cash or loss gets.
  *
  * A below-threshold stretch runs from the crossing into it to the crossing out of it, so a band

@@ -221,7 +221,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           )}
           {!failed && (
             <Button color="primary" onClick={onClose}>
-              Review grid
+              Keep playing
             </Button>
           )}
         </div>

@@ -981,6 +981,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
         onClose={() => setVictoryDialogOpen(false)}
         title={`Victory Conditions: ${scenario.ownership}-Owned`}
         scenario={scenario}
+        difficulty={game.difficulty}
       />
 
       <InfoDialog

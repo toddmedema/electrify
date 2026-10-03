@@ -9,6 +9,7 @@ it.each(["Public", "Investor"] as const)(
       <VictoryConditions
         ownership={ownership}
         dollarsPerkWh={0.1}
+        difficulty="Manager"
         minimumCustomerRetention={0.9}
         startingCustomers={16500}
         reliabilityObjective={{
@@ -30,7 +31,13 @@ it.each(["Public", "Investor"] as const)(
 );
 
 it("keeps internal decision tracking out of player victory conditions", () => {
-  render(<VictoryConditions ownership="Public" dollarsPerkWh={0.1} />);
+  render(
+    <VictoryConditions
+      ownership="Public"
+      dollarsPerkWh={0.1}
+      difficulty="Manager"
+    />,
+  );
   expect(
     screen.queryByTestId("meaningful-decision-progress"),
   ).not.toBeInTheDocument();
@@ -39,5 +46,18 @@ it("keeps internal decision tracking out of player victory conditions", () => {
   ).not.toBeInTheDocument();
   expect(screen.getByText(/In all scenarios, you fail/)).toHaveTextContent(
     "In all scenarios, you fail if you go bankrupt or serve less than 90% of demand in three consecutive months.",
+  );
+});
+
+it("explains the stricter Expert blackout limit", () => {
+  render(
+    <VictoryConditions
+      ownership="Public"
+      dollarsPerkWh={0.1}
+      difficulty="CEO"
+    />,
+  );
+  expect(screen.getByText(/In all scenarios, you fail/)).toHaveTextContent(
+    "serve less than 95% of demand in three consecutive months",
   );
 });

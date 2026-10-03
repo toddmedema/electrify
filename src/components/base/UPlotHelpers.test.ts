@@ -1,10 +1,80 @@
 import uPlot from "uplot";
 import {
+  anchoredForecastPaths,
   baselinePlugin,
   eventMarkersPlugin,
   spansBelow,
   splitPastProjected,
 } from "./UPlotHelpers";
+
+describe("anchored forecast dashes", () => {
+  class RecordedPath {
+    commands: Array<[string, ...number[]]> = [];
+    moveTo(x: number, y: number) {
+      this.commands.push(["move", x, y]);
+    }
+    lineTo(x: number, y: number) {
+      this.commands.push(["line", x, y]);
+    }
+    rect(x: number, y: number, width: number, height: number) {
+      this.commands.push(["rect", x, y, width, height]);
+    }
+  }
+  const originalPath = window.Path2D;
+  beforeEach(() => {
+    window.Path2D = RecordedPath as unknown as typeof Path2D;
+  });
+  afterEach(() => {
+    window.Path2D = originalPath;
+  });
+  const plot = (past: Array<number | null>, projected: Array<number | null>) =>
+    ({
+      data: [[0, 1, 2, 3], past, projected],
+      series: [{}, {}, { scale: "energy" }],
+      bbox: { left: 20, top: 10, width: 30, height: 100 },
+      valToPos: (value: number, scale: string, canvas: boolean) => {
+        expect(canvas).toBe(true);
+        return scale === "x" ? 20 + value * 10 : value * 10;
+      },
+    }) as unknown as uPlot;
+  const commands = (path: unknown) => (path as RecordedPath).commands;
+
+  it("keeps the identical stroke when time advances and only moves the forecast clip", () => {
+    const first = plot([1, 2, null, null], [null, 2, 3, 4]);
+    const next = plot([1, 2, 3, null], [null, null, 3, 4]);
+    const paths = anchoredForecastPaths(1);
+    const initial = paths(first, 2, 1, 3)!;
+    const advanced = paths(next, 2, 2, 3)!;
+    expect(commands(initial.stroke)).toEqual([
+      ["move", 20, 10],
+      ["line", 30, 20],
+      ["line", 40, 30],
+      ["line", 50, 40],
+    ]);
+    expect(commands(advanced.stroke)).toEqual(commands(initial.stroke));
+    expect(commands(initial.clip)).toEqual([["rect", 30, 10, 20, 100]]);
+    expect(commands(advanced.clip)).toEqual([["rect", 40, 10, 10, 100]]);
+    expect(next.data[2]).toEqual([null, null, 3, 4]);
+  });
+
+  it("preserves real gaps and draws nothing for a wholly recorded series", () => {
+    const paths = anchoredForecastPaths(1);
+    const result = paths(
+      plot([1, null, 3, null], [null, null, 3, 4]),
+      2,
+      2,
+      3,
+    )!;
+    expect(commands(result.stroke)).toEqual([
+      ["move", 20, 10],
+      ["move", 40, 30],
+      ["line", 50, 40],
+    ]);
+    expect(
+      paths(plot([1, 2, 3, 4], [null, null, null, null]), 2, 0, 3),
+    ).toBeNull();
+  });
+});
 
 it("draws the baseline solid after a dashed forecast across the whole plot", () => {
   let dash = [8, 4];

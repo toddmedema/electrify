@@ -1,10 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import savesReducer, {
   initialSaveLibrary,
   SaveLibraryState,
+  libraryLoaded,
 } from "../../SaveLibrary";
 import { SaveMetadata, SavedRunResult } from "../../Types";
 import {
@@ -61,20 +62,35 @@ function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
       },
     },
   });
-  return render(
-    <Provider store={testStore}>
-      <SavedGames />
-    </Provider>,
-  );
+  return {
+    ...render(
+      <Provider store={testStore}>
+        <SavedGames />
+      </Provider>,
+    ),
+    testStore,
+  };
 }
 
 beforeEach(() => jest.clearAllMocks());
 
-it("searches names and scenarios without opening a save", async () => {
+it.each([0, 1, 2, 3])("hides search for a library with %i saves", (count) => {
   renderLibrary({
+    entries: Array.from({ length: count }, (_, i) => entry({ id: String(i) })),
+  });
+  expect(
+    screen.queryByRole("textbox", { name: "Search saves" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryAllByRole("article")).toHaveLength(count);
+});
+
+it("searches names and scenarios without opening a save", async () => {
+  const { testStore } = renderLibrary({
     entries: [
       entry(),
       entry({ id: "second", name: "Backup", scenarioName: "Deregulation" }),
+      entry({ id: "third", name: "Solar experiment" }),
+      entry({ id: "fourth", name: "Gas experiment" }),
     ],
   });
   await userEvent.type(
@@ -86,6 +102,15 @@ it("searches names and scenarios without opening a save", async () => {
   ).not.toBeInTheDocument();
   expect(screen.getByRole("article", { name: "Backup" })).toBeInTheDocument();
   expect(resumeSavedGame).not.toHaveBeenCalled();
+  act(() => {
+    testStore.dispatch(
+      libraryLoaded([entry(), entry({ id: "third" }), entry({ id: "fourth" })]),
+    );
+  });
+  expect(
+    screen.queryByRole("textbox", { name: "Search saves" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getAllByRole("article")).toHaveLength(3);
 });
 
 it("offers Load for both the active game and other playable saves", async () => {

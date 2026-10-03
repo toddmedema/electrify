@@ -1,13 +1,17 @@
 import * as React from "react";
-import { ScenarioType } from "../../Types";
+import { DifficultyType, ScenarioType } from "../../Types";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 import { scoreRuleText } from "../../helpers/Scoring";
-import { formatRequiredShare } from "../../helpers/ObjectiveRules";
+import {
+  blackoutFiringThreshold,
+  formatRequiredShare,
+} from "../../helpers/ObjectiveRules";
 
 export interface Props {
   ownership: ScenarioType["ownership"];
   dollarsPerkWh: number;
+  difficulty: DifficultyType;
   startingCustomers?: number;
   minimumCustomerRetention?: number;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
@@ -31,7 +35,8 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   const requiredObjectives = (
     <>
       <p>
-        In all scenarios, you fail if you go bankrupt or serve less than 90% of
+        In all scenarios, you fail if you go bankrupt or serve less than{" "}
+        {formatRequiredShare(blackoutFiringThreshold(props.difficulty))} of
         demand in three consecutive months.
       </p>
       {reliabilityObjective !== undefined && (

@@ -27,7 +27,7 @@ npm run sim -- --scenario 103 --strategy keepUp
 which prints a month by month table (customers, demand, supplied, unserved, cash, net worth,
 profit, emissions), the number of recorded player actions, totals for the run, the fleet it
 finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
-or fired after three consecutive months below 90% supplied.
+or fired after three consecutive months below 90% supplied (95% on CEO difficulty).
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
 One explicit storage decision can be replayed with, for example,
 `--build Battery --build-mwh 800 --finance`; generator builds use `--build-mw`.
