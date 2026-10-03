@@ -3310,6 +3310,58 @@
       "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Melbourne": {
+      "id": "Melbourne",
+      "name": "Melbourne, Australia",
+      "region": "Oceania",
+      "country": "Australia",
+      "lat": -37.8136,
+      "long": 144.9631,
+      "timeZone": "Australia/Melbourne",
+      "elevation": 19,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Brisbane": {
+      "id": "Brisbane",
+      "name": "Brisbane, Australia",
+      "region": "Oceania",
+      "country": "Australia",
+      "lat": -27.4698,
+      "long": 153.0251,
+      "timeZone": "Australia/Brisbane",
+      "elevation": 18,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Perth": {
+      "id": "Perth",
+      "name": "Perth, Australia",
+      "region": "Oceania",
+      "country": "Australia",
+      "lat": -31.9505,
+      "long": 115.8605,
+      "timeZone": "Australia/Perth",
+      "elevation": 19,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Adelaide": {
+      "id": "Adelaide",
+      "name": "Adelaide, Australia",
+      "region": "Oceania",
+      "country": "Australia",
+      "lat": -34.9285,
+      "long": 138.6007,
+      "timeZone": "Australia/Adelaide",
+      "elevation": 46,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }
