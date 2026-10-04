@@ -3412,6 +3412,58 @@
       "elevation": 581,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Auckland": {
+      "id": "Auckland",
+      "name": "Auckland, New Zealand",
+      "region": "Oceania",
+      "country": "New Zealand",
+      "lat": -36.8485,
+      "long": 174.7633,
+      "timeZone": "Pacific/Auckland",
+      "elevation": 36,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Wellington": {
+      "id": "Wellington",
+      "name": "Wellington, New Zealand",
+      "region": "Oceania",
+      "country": "New Zealand",
+      "lat": -41.2865,
+      "long": 174.7762,
+      "timeZone": "Pacific/Auckland",
+      "elevation": 20,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Christchurch": {
+      "id": "Christchurch",
+      "name": "Christchurch, New Zealand",
+      "region": "Oceania",
+      "country": "New Zealand",
+      "lat": -43.5321,
+      "long": 172.6362,
+      "timeZone": "Pacific/Auckland",
+      "elevation": 9,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Queenstown": {
+      "id": "Queenstown",
+      "name": "Queenstown, New Zealand",
+      "region": "Oceania",
+      "country": "New Zealand",
+      "lat": -45.0312,
+      "long": 168.6626,
+      "timeZone": "Pacific/Auckland",
+      "elevation": 322,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }
