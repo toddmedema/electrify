@@ -86,6 +86,10 @@
   --warning-fill: #ffe082; /* amber200 */
   --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
+  // A badge too small to carry text: yellow for the warning, rimmed in deep amber so it still
+  // clears 3:1 against the white bar
+  --warning-dot: #ffc107; /* amber500 */
+  --warning-dot-rim: var(--warning-icon);
   --capacity-bar: #212121; /* grey900 */
   --facility-idle-opacity: 0.55;
   --shadow-ring: rgba(0, 0, 0, 0.15);
@@ -135,6 +139,8 @@
   --warning-fill: #6d4c00; /* text 6.6:1 */
   --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
+  --warning-dot: #ffd54f;
+  --warning-dot-rim: #ffd54f;
   --capacity-bar: #e0e0e0;
   --facility-idle-opacity: 0.7;
   --shadow-ring: rgba(0, 0, 0, 0.72);
@@ -705,18 +711,62 @@ $topbar_height: 56px;
   padding-right: env(safe-area-inset-right);
 }
 
+// The offline banner takes its own row above the app instead of floating over its top bar
+.appFrame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.appFrameBody {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .offlineBanner {
-  position: fixed;
-  top: 0;
-  left: env(safe-area-inset-left);
-  right: env(safe-area-inset-right);
-  z-index: 2000;
+  flex: 0 0 auto;
   padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
   background: var(--mark-bg);
   color: $font_color_primary;
   text-align: center;
   font-weight: 600;
   font-size: var(--font-size-body2);
+}
+
+// In a game the offline notice shrinks to a dot on the menu button, explained inside the menu
+.gameMenuButton {
+  position: relative;
+}
+
+.offlineDot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--warning-dot-rim);
+  background: var(--warning-dot);
+  pointer-events: none;
+}
+
+.gameMenuOffline.MuiMenuItem-root.Mui-disabled {
+  gap: 8px;
+  // Disabled only so it can't be chosen; the warning itself has to stay readable
+  opacity: 1;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-body2);
+
+  .offlineDot {
+    position: static;
+    flex: 0 0 auto;
+  }
 }
 
 // Never squeezed by whatever is below it, on either layout
