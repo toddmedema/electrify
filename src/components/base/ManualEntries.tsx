@@ -183,57 +183,57 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Sometimes the cheapest megawatt is the one you never generate. Set
-          these programs in Insights; changes start next month.
+          You can meet growing demand by building more power plants, or by
+          helping customers use less electricity. Set these programs in
+          Insights; changes start next month.
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Each is a
-          one-time, 48-month project with a fixed monthly cost that ends when
-          it's done. Pause installations and resume later. Both shrink your
-          sales, trading revenue for demand you no longer have to build for.
+          one-time project that takes 48 months, with a fixed monthly cost. You
+          can pause installations and resume later. Both reduce demand, saving
+          you from building more plants but also reducing your sales.
         </p>
         <p>
           Efficiency cuts home and business use by 10%, and heating and cooling
-          by 35%, saving the most in hot or cold places. Like real appliances,
-          it wears out: savings fade after 10 years and are gone after 20.
+          by 35%, saving the most in hot or cold places. Those improvements
+          don't last forever: savings fade after 10 years and are gone after 20.
         </p>
         <p>
           Rooftop solar cuts home and business daylight demand; you don't pay
-          for surplus, which is simply lost. Panels produce the most in sunny,
-          cooler places. Rebates cost several times more in the early 2000s than
-          today, because panel prices have fallen so far.
+          for any surplus electricity, which goes unused. Panels do best with
+          plenty of sun and cooler temperatures. Rebates cost several times more
+          in the early 2000s than today, because panel prices have fallen.
         </p>
         <p>
           <strong>Time-of-use tariff:</strong> Hourly prices nudge people to
-          shift their use. Half of homes move 20% of their use from your chosen
-          four-hour window to the next three hours, without changing their
-          total. They pay 30% above the base rate in the window, 10% below it
-          for the next three hours, and the base rate otherwise. Aim it at your
-          daily peak.
+          shift when they use electricity. Half of homes move 20% of their use
+          from your chosen four-hour window to the next three hours. Total
+          energy use stays the same. They pay 30% above the base rate during the
+          window, 10% below it for the next three hours, and the base rate
+          otherwise. Choose the hours when your grid is busiest.
         </p>
         <p>
           <strong>Peak curtailment contracts:</strong> Half of industrial and
-          data-center demand trades flexibility for a discount, cutting use by
-          20% during a separate four-hour window, even when supply is
-          sufficient. That use is canceled, not delayed. Participants get 10%
-          off electricity delivered all day.
+          data-center demand participates, cutting use by 20% during a separate
+          four-hour window, even when supply is sufficient. They use less energy
+          overall. Participants get 10% off electricity delivered all day.
         </p>
         <p>
           <strong>Wildfire preparedness:</strong> In custom games in fire-prone
           areas, fund crews, inspections and vegetation clearing year-round, as
-          California utilities do. The budget stays fixed while active and is
-          billed monthly, with no upfront payment or annual renewal. Protection
-          builds to full strength over 12 months. Turning it off stops spending
-          immediately, and protection fades over 12 months; restarting builds
-          from whatever is left.
+          California utilities do. You pay a fixed monthly cost while the
+          program is active, with no upfront payment or annual renewal. It takes
+          12 months to reach full protection. Turn it off and spending stops
+          immediately, but protection fades over the next 12 months. Restarting
+          builds on whatever protection remains.
         </p>
         <p>
           Full protection halves customer disconnections from safety shutoffs
-          and output losses at affected generators; partial protection scales
-          those benefits. It doesn't prevent fires or restoration costs. The
-          program preview models a typical fire next season using the protection
-          projected for that month. Fires already burning keep their original
-          response.
+          and output losses at affected generators. Partial protection gives
+          smaller benefits. You still face fires and restoration costs. The
+          preview estimates a typical fire next season, using the protection
+          you'll have by then. Changing the program won't affect a fire that's
+          already burning.
         </p>
       </div>
     ),
@@ -252,9 +252,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           You're the CEO of an electric utility, the company that keeps a
-          region's lights on. Meet customers' demand with generators, stored
-          energy or imports. Fall short and you'll cause blackouts; overspend
-          and you'll run out of cash.
+          region's lights on. Your job: supply the electricity customers need
+          without running out of money. Build generators, store extra energy and
+          trade with neighboring grids. Fall short and you'll cause blackouts.
         </p>
         <p>
           <strong>Facilities:</strong> Build and manage your plants here.
@@ -288,30 +288,27 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           <strong>Baseload</strong> is the demand that's there around the clock,
-          even at 3am. Nuclear and coal plants often cover it because they're
-          costly or slow to start and stop, so they earn their keep running
-          steadily.
+          even at 3am. Nuclear and coal plants often cover it. They're slow or
+          costly to start and stop, so it makes sense to keep them running.
         </p>
         <p>
           <strong>Peakers</strong>, usually gas turbines, start quickly to cover
           short peaks like hot summer evenings. They're cheap to build but burn
-          expensive fuel, so real ones sit idle most of the year. That can still
-          be cheaper than a blackout.
+          expensive fuel. Keeping one ready for a few critical hours can be
+          cheaper than a blackout, even if it sits idle most of the year.
         </p>
         <p>
           Gas comes in both roles. A <strong>Natural Gas Peaker</strong> is a
           single turbine that starts in minutes. A{" "}
           <strong>Natural Gas CC</strong> (combined cycle) reuses the turbine's
-          hot exhaust to raise steam for a second turbine, so it burns about a
-          third less gas per MWh. It starts slowly, though, so it suits steady,
-          mid-merit demand: the hours between the overnight low and the peaks. A
-          new gas peaker joins the dispatch order below your other generators;
-          other new plants join at the top.
+          hot exhaust to drive a second, steam-powered turbine. It burns about a
+          third less gas per MWh, but takes longer to start, so it's better for
+          demand that lasts several hours. A new gas peaker joins the dispatch
+          order below your other generators; other new plants join at the top.
         </p>
         <p>
-          Most grids need both steady and flexible plants. These are roles, not
-          technologies: hydro, for example, can run steadily or change output
-          quickly.
+          Most grids need both steady and flexible plants. Hydro can do either
+          job: run steadily or change output quickly.
         </p>
       </div>
     ),
@@ -322,10 +319,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Grids store almost no energy, so supply must match demand every
-          second. A blackout happens when demand rises above your available
-          supply. Outages hurt customer numbers, revenue, score and job
-          security: too many and you're fired.
+          Electricity has to be supplied as it's used. A blackout happens when
+          demand exceeds your available supply, including storage and imports.
+          Outages cost you customers, revenue and points. Your job security is
+          at stake too: too many blackouts and you're fired.
         </p>
       </div>
     ),
@@ -337,11 +334,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          A British thermal unit (Btu) measures heat energy, about what one
-          kitchen match gives off. Fuel is priced per MMBtu: a million Btu, or
-          about 293 kWh of heat. Generators turn only part of that into
-          electricity, from about a third (old coal) to over half (combined
-          cycle gas).
+          A British thermal unit (Btu) measures heat energy, roughly what one
+          kitchen match gives off. Fuel prices use MMBtu: a million Btu, or
+          about 293 kWh of heat. A generator turns only some of that heat into
+          electricity: about a third for old coal plants, over half for
+          combined-cycle gas plants.
         </p>
       </div>
     ),
@@ -353,10 +350,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Capacity factor is actual energy output divided by what a plant could
-          produce at full power over the same period. A 100 MW plant at 45%
-          averages 45 MW; it may run flat out, then idle. US nuclear plants run
-          about 90%; wind and solar, under 30%:
+          A 100 MW plant won't produce 100 MW all the time. Its capacity factor
+          compares the energy it actually produces with what it could produce
+          running at full power. At 45%, it averages 45 MW over that period.
+          This chart shows how much that varied by technology and region in
+          2008–2012; wind and solar are grouped together:
         </p>
         <Figure
           src="/images/manual-capacity-factors.webp"
@@ -370,10 +368,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         />
         <p>
           The build screen uses expected capacity factor to estimate cost per
-          MWh: the less a plant runs, the more each MWh must pay back. Fuel
-          costs and your choices affect how often coal and gas run. Wind and
-          solar follow the weather; hot panels make less power from the same
-          sunlight.
+          MWh. The less it runs, the fewer MWh you have to spread its build cost
+          over. Fuel costs and your choices affect how often coal and gas run.
+          Wind and solar follow the weather; hot panels produce less power from
+          the same sunlight.
         </p>
         <p>
           Wind estimates use simplified weather calculations. Real output also
@@ -395,9 +393,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           run than gas.
         </p>
         <p>
-          The fee appears as an operating expense. Imports add emissions to your
-          score but pay no separate local fee: their cost is in the wholesale
-          bill.
+          You'll find the fee in operating expenses. Imported electricity adds
+          emissions to your score, but isn't charged a separate local carbon
+          fee. You pay the wholesale price.
         </p>
       </div>
     ),
@@ -413,13 +411,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Hydroelectric dams release stored water through turbines. Rain and
           melting snow refill the reservoir from its watershed: the land that
           drains into it. In effect, a dam is a battery the weather recharges.
-          Generating lowers the reservoir, drought limits supply, and excess
-          water spills.
+          Generating uses up stored water. Drought leaves you with less to
+          generate, while a full reservoir spills any extra.
         </p>
         <p>
           Once you own hydro, the <strong>Water</strong> chart shows
-          precipitation, snow and reservoir levels. Winter snow may not reach
-          you until it melts in spring, as in California:
+          precipitation, snow and reservoir levels. Snow falling in winter won't
+          refill your reservoir until it melts. California's hydro output rises
+          after the spring melt:
         </p>
         <Figure
           src="/images/manual-hydro-snowpack.webp"
@@ -442,10 +441,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           minimum generating level, required water bypasses the turbines.
         </p>
         <p>
-          Reservoir sizes are simplified game assumptions. Pumped Hydro is
-          separate storage: it uses electricity to pump water uphill, then lets
-          it flow back down when you need power. It gets no river or rain inflow
-          in the game, and loses stored energy to evaporation.
+          The game simplifies reservoir sizes. Pumped Hydro works differently:
+          you use electricity to pump water uphill, then let it flow back down
+          when you need power. In Electrify, it gets no river or rain inflow and
+          loses stored energy to evaporation.
         </p>
       </div>
     ),
@@ -459,8 +458,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Homes, businesses and factories use electricity at different times.
-          More customers raise demand; weather and routines change when it
-          peaks. Homes swing most, since heating and cooling follow the weather.
+          More customers mean more demand, but the busiest hours depend on their
+          routines and the weather. Home demand varies the most because of
+          heating and cooling.
         </p>
         <Figure
           src="/images/manual-demand-customer-types.webp"
@@ -504,33 +504,33 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           CO2e means carbon dioxide equivalent: a common scale for the warming
-          effect of different greenhouse gases. Methane, for example, traps far
-          more heat than CO2, so a little methane counts as a lot of CO2e.
-          Plants list emissions in <MassUnitName /> per megawatt-hour (MWh).
+          effect of different greenhouse gases. A kilogram of methane causes
+          more warming than a kilogram of CO2, so it counts as more CO2e. Plants
+          list emissions in <MassUnitName /> per megawatt-hour (MWh).
         </p>
         <p>
           Your total includes your own generation and the electricity you buy.
-          Insights shows them separately, and Interties lists import estimates,
-          with sources in the Interties entry. Import emissions per MWh stay
-          fixed rather than tracking each hour's generation.
+          Insights shows them separately. Find each neighbor's emissions
+          estimate in Interties, with sources in its manual entry. Import
+          emissions per MWh use annual estimates, rather than changing hourly.
         </p>
         <p>
           Local estimates count CO2 from burning fuel, including biomass, with
           no credit for regrowth. Most import estimates also count CO2; Québec's
           counts all greenhouse gases as CO2e. Fuel supply and land use are left
-          out, so zero reported emissions doesn't mean zero environmental
+          out. A zero here doesn't mean the electricity has no environmental
           impact.
         </p>
         <p>
-          Construction emits too, through materials like steel and concrete, and
-          drilling. Each build card shows the total, spread evenly over
-          construction. That's why wind, solar, nuclear and storage are
-          low-carbon, not carbon-free. These emissions carry no carbon fee in
-          the game; the fee applies only to burning fuel locally.
+          Making steel and concrete and drilling wells also cause emissions.
+          Each build card shows the total, spread evenly over construction. Even
+          wind, solar, nuclear and storage have construction emissions. These
+          carry no carbon fee in the game; the fee applies only to burning fuel
+          locally.
         </p>
         <p>
-          Counting the whole lifecycle, fuel supply included, the gap is still
-          huge:
+          Even counting fuel supply and construction, wind, solar and nuclear
+          produce far fewer emissions per unit of electricity than coal or gas:
         </p>
         <Figure
           src="/images/manual-lifecycle-emissions.webp"
@@ -561,17 +561,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Insights shows what happens if you make no further changes: a
-          forecast, not a promise. Choose a preset or select Layers. Charts
-          share a time range and marker; pausing or reordering plants updates
-          them, so you can test a decision for free.
+          Insights estimates what will happen if you make no more changes.
+          Choose a preset or select Layers to compare charts over the same time
+          range. Pause or reorder plants and the forecasts update, so you can
+          see the effect before running the clock.
         </p>
         <p>
           <strong>Supply &amp; Demand:</strong> Shading marks predicted
           blackouts, with the missing energy and the largest power shortage.
-          Timing tells you what to build: brief evening gaps need something
-          fast, season-long ones steady generation. Unserved energy is scaled to
-          a month; shaded hours aren't a real outage's duration.
+          Check when the gaps happen before choosing what to build. Missing
+          energy is scaled to a month, because one simulated day represents a
+          month. Shaded hours don't show a real outage's duration.
         </p>
         <p>
           <strong>Supply by Fuel:</strong> Local generation appears in dispatch
@@ -587,8 +587,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Prices can jump, so check before building fuel-burning plants.{" "}
           <strong>Compare possible costs in five years</strong> applies 0.5%,
           2.5% or 4.5% yearly growth to this month's fuel bill times 12. It
-          holds fuel use and facilities fixed, assigns no probabilities and
-          changes no loans or settings.
+          assumes the same facilities and fuel use. These examples don't
+          estimate how likely each cost is or change your loans or settings.
         </p>
         <p>
           <strong>Temperature</strong> and{" "}
@@ -623,15 +623,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Plants higher in Facilities are asked to run first. This is the{" "}
+          Move a plant higher in Facilities to have it run first. This is the{" "}
           <strong>dispatch order</strong>, or merit order. Real markets run the
           cheapest plants first, and often the last plant needed sets the price
           for everyone. In Electrify you choose the order yourself.
         </p>
         <p>
-          Plants lower down cover remaining demand. Minimum output and ramp rate
-          limit their response; wind and solar follow weather. Startups and
-          shutdowns are automatic.
+          Plants lower down cover the demand that's left. They still need time
+          to change output, and some can't run below a minimum level. Wind and
+          solar depend on the weather. Plants start and stop automatically.
         </p>
         <p>
           This 2008 chart from PJM, an eastern US market, ranks generators by
@@ -670,10 +670,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           paying to restart.
         </p>
         <p>
-          Response time decides which demand a plant can follow: fast plants
-          cover short peaks, slow ones steady hours. California's &ldquo;duck
-          curve,&rdquo; where solar fades as people get home, needs fast plants
-          and batteries:
+          A slow plant can't help much with a sudden jump in demand.
+          California's &ldquo;duck curve&rdquo; shows the problem: solar output
+          falls just as people get home and use more electricity. Other plants
+          and batteries have to make up the difference quickly:
         </p>
         <Figure
           src="/images/manual-duck-curve.webp"
@@ -738,10 +738,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           leave. The market rate rises with inflation; switching takes months.
         </p>
         <p>
-          <strong>Publicly owned:</strong> Customers can't switch away, so
-          you're judged on affordability, not profit. Set your rate in Insights.
-          A lifetime average below the scenario's target earns points; above it
-          loses points.
+          <strong>Publicly owned:</strong> Customers can't switch to another
+          utility. Your score rewards affordable power: a lifetime average rate
+          below the scenario's target earns points; above it loses points. You
+          still need enough revenue to cover costs. Set your rate in Insights.
         </p>
       </div>
     ),
@@ -789,15 +789,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Reserve is extra demand you could cover within 15 minutes. It counts
-          power plants and storage can add, plus charging you could stop or
-          exports you could redirect. Unused import promises don't count.
+          Reserve is how much extra demand you could cover within 15 minutes. It
+          includes extra output from your plants and storage, charging you could
+          stop, and exports you could redirect to your customers. Unused import
+          access doesn't count.
         </p>
         <p>
-          Real grids keep reserve because plants trip offline and forecasts
-          miss. A low-reserve warning flags hours when demand is close to
-          available supply. The game's 10% threshold is a teaching guide, not a
-          real reliability standard or a blackout guarantee.
+          Real grids keep reserve for plant failures and unexpected demand. A
+          low-reserve warning marks hours when demand is close to available
+          supply. The game's 10% threshold isn't a real reliability standard;
+          staying above it doesn't guarantee you'll avoid blackouts.
         </p>
       </div>
     ),
@@ -816,14 +817,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Interties are transmission lines to neighboring grids, letting you buy
-          power when short and sell extra. Your trading rule buys during
+          power when you're short and sell extra. Your trading rule buys during
           shortages and sells surplus after serving customers and charging
           storage. You buy access to a limited share of a regional connection,
-          not the whole neighboring grid. A wider wire can&rsquo;t create more
-          generation next door; multiple paths share the same neighbor&rsquo;s
-          spare supply and export demand.
+          not the whole neighboring grid. A bigger line only helps if the
+          neighbor has power to sell or wants to buy yours. Multiple paths to
+          the same neighbor share its spare supply and demand for exports.
         </p>
-        <p>The US mainland itself runs as three largely separate grids:</p>
+        <p>
+          Most of the mainland US belongs to one of three largely separate
+          grids:
+        </p>
         <Figure
           src="/images/manual-interconnections.webp"
           alt="Map of the Lower 48 US states divided into three interconnections: the Western Interconnection from the Rockies to the Pacific, the Eastern Interconnection covering everything east of the Rockies, and ERCOT covering most of Texas. Circles mark the 66 balancing authorities, including CISO in California, ERCO in Texas, and SWPP, MISO, PJM, TVA, SOCO, NYIS and ISNE in the east."
@@ -835,11 +839,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          In missions, higher tiers buy more import access along with a wider
-          connection. Both arrive when construction finishes; export access
-          stays the same. The review shows your import access before and after
-          an upgrade. Custom games already include the full regional allocation,
-          so their upgrades only widen the connection.
+          In missions, upgrades give you more import access and a bigger
+          connection when construction finishes. Export access stays the same.
+          Review an upgrade to see your import access before and after. Custom
+          games already give you the full regional allocation, so upgrades only
+          expand the connection.
         </p>
         <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s
@@ -848,31 +852,29 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           estimates of how much of the line it can fill.
         </p>
         <p>
-          &ldquo;At your peak&rdquo; matters most: it&rsquo;s how much the
-          neighbor can usually send during your highest-demand hours, when a
-          shortage would hurt. Heat waves and cold snaps rarely stop at the
-          border, so neighbors that share yours have less to spare right when
-          you need it, and even less on harder difficulties.
+          Check &ldquo;At your peak&rdquo;: how much the neighbor can usually
+          send during your busiest hours. A heat wave or cold snap can hit both
+          grids at once, leaving your neighbor with less to spare when you need
+          it most. On harder difficulties, they have even less available.
         </p>
         <p>
           Imports come from the cheapest available neighbor first, and exports
           go to whoever pays best. Hot, sunny weather can also reduce line
-          capacity, since hot wires sag and must carry less. Build details show
-          typical import availability and price, including how much of the line
-          is available at your peak. Live line details show whether your wire,
-          the neighbor, or your own demand and trading rule is limiting the
-          flow.
+          capacity: hot wires sag, so carrying less power helps keep them clear
+          of the ground. Build details show typical import availability and
+          price, including how much of the line is available at your peak. Live
+          line details show whether the line, the neighbor, or your own demand
+          and trading rule is limiting the flow.
         </p>
         <p>
-          Neighbors change with the era. Each one follows a researched trend of
-          its grid&rsquo;s carbon intensity and wholesale price from about 1990,
-          with official stated-policy outlooks to 2050 and flat estimates
-          beyond. Purchased electricity adds that year&rsquo;s estimated
-          emissions to your score, and imports get pricier or cheaper as the
-          neighbor&rsquo;s market did, such as during the 2022 energy crisis.
-          You can only build a connection once its real path existed. These are
-          annual averages, not a model of the full transmission network. The
-          source families below document their basis.
+          Neighbors' prices and emissions change over time. The game uses
+          historical data from about 1990 and official projections based on
+          announced policies through 2050. After that, estimates stay flat.
+          You'll see events like the 2022 energy crisis affect import prices,
+          and each year's estimated emissions count toward your score. You can
+          only build a connection once it existed in the real world. The game
+          uses annual averages and simplifies the transmission network. Here are
+          the sources:
         </p>
         <IntertieTrendSources />
       </div>
@@ -889,23 +891,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Round-trip efficiency is the share of charging energy returned as
-          electricity. At 80%, charging with 10 MWh leaves 8 MWh to use.
-          Electrify deducts this loss on charging; the energy bar shows what
-          remains. Batteries return about 85%, pumped hydro about 80%.
+          Round-trip efficiency tells you how much charging energy you get back.
+          At 80%, charging with 10 MWh leaves 8 MWh to use. Electrify deducts
+          the loss when you charge; the energy bar shows what's left. Batteries
+          return about 85%, pumped hydro about 80%.
         </p>
         <p>
-          Charging needs surplus power and can't exceed the storage power
-          rating. That electricity can't also serve customers or be exported.
+          Charging needs spare power and can't exceed the storage facility's
+          power rating. Electricity used to charge it can't also serve customers
+          or be exported.
         </p>
         <p>
           Pausing storage stops charging and discharging. Self-discharge or
           evaporation still drains stored energy until you pause the game clock.
         </p>
         <p>
-          Even counting losses and construction cost, storage can beat expensive
-          generation. California's batteries now soak up midday solar for the
-          evening peak:
+          Why store energy if you lose some? Saving midday solar can cost less
+          than running a gas plant in the evening, even with storage losses and
+          construction costs. Here it is in California:
         </p>
         <Figure
           src="/images/manual-battery-evening.webp"
@@ -928,7 +931,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Your term as CEO ends with a score. Check{" "}
+          Your score tracks how you do as CEO. Check{" "}
           <strong>Victory conditions</strong> for reliability and customer
           goals; tutorial missions have their own objectives.
         </p>
@@ -937,14 +940,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           of demand three months in a row (95% on Expert difficulty).
         </p>
         <p>
-          The tables below score your term; reliability, costs and emissions are
-          shown separately. Logged-in players submit scores and replays to the
-          leaderboard, where a play button opens a replay. Try to beat your
-          best!
+          The tables below show how points add up, with reliability, costs and
+          emissions shown separately. Log in to submit your score and replay.
+          Use the leaderboard's play buttons to see how others beat your score!
         </p>
         <p>
-          Saves and replays need compatible game rules. Older runs need their
-          original game version; their files stay unchanged.
+          Saves and replays need matching game rules. After a rules update,
+          older runs need their original game version. The saved file stays
+          unchanged.
         </p>
         <p>Investor-owned points:</p>
         <table className="points">
@@ -1015,8 +1018,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Operations and maintenance (O&amp;M) means upkeep like staff and
-          repairs, excluding fuel, carbon fees and loans.
+          Operations and maintenance (O&amp;M) covers staff, repairs and other
+          upkeep. Some costs continue even when the plant isn't generating.
+          Fuel, carbon fees and loans are separate.
         </p>
         <ul>
           <li>
@@ -1029,12 +1033,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             <strong>Variable:</strong> Cost per MWh generated.
           </li>
           <li>
-            <strong>Non-fuel start cost:</strong> Maintenance charged each
-            startup, since heating up strains equipment.
+            <strong>Non-fuel start cost:</strong> Maintenance charged each time
+            the plant starts, because heating up strains equipment.
           </li>
         </ul>
         <p>
-          The annual estimate assumes expected output and 365 yearly starts;
+          The annual estimate assumes expected output and 365 starts per year;
           actual costs depend on how you run it. Oil plants pay fixed and
           variable O&amp;M; pausing halves the fixed charge and stops the
           variable one.
@@ -1062,9 +1066,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           </li>
           <li>
             <strong>Extreme cold:</strong> Gas plants colder than their rating
-            lose output for the month, as frozen equipment did in Texas in 2021;
-            a cold-weather package halves the loss. A deep regional freeze also
-            raises gas prices, since everyone is burning more for heat.
+            lose output for the month. Frozen equipment caused these kinds of
+            failures in Texas in 2021. A cold-weather package halves the loss. A
+            regional freeze also raises gas prices as demand for heating rises.
           </li>
         </ul>
         <p>
@@ -1078,8 +1082,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Solar trackers, available from 2014, turn panels to follow the sun for
-          more morning and evening power, about 20% more a year, and stow
-          steeply to cut hail damage. They can only be added when building.
+          more morning and evening power, about 20% more a year. They also tilt
+          panels steeply to reduce hail damage. You can only add them when
+          building.
         </p>
       </div>
     ),
@@ -1092,9 +1097,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          The fuel quote is cost per MWh at current prices and this plant's
-          efficiency, or heat rate. Efficient plants burn less fuel per MWh, so
-          two gas plants can have very different fuel costs.
+          The fuel cost shown is what a plant would spend to produce one MWh at
+          current fuel prices. Its heat rate measures how much fuel energy it
+          needs to do that. A more efficient plant needs less fuel, so two gas
+          plants can have very different costs.
         </p>
       </div>
     ),
@@ -1108,23 +1114,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           The accounting lifetime is the number of years a plant's construction
-          cost is spread over in your books. Real utilities depreciate power
-          plants the same way: book value declines year by year over an expected
-          useful life, even while the plant keeps running. Depreciation is an
-          accounting allocation, not a cash payment.
+          cost is spread over in your books. As with real utilities, its book
+          value falls each year even while it keeps running. This is called
+          depreciation; it doesn't take money out of your cash balance.
         </p>
         <p>
-          In Electrify it sets the horizon for cost estimates: lifetime cost and
-          levelized cost of energy divide construction, upkeep and fuel by the
-          energy expected over those years. It also sets resale value: a plant's
-          book value declines evenly to zero over its accounting lifetime, so
-          selling early returns more of the build cost. Any outstanding loan is
-          paid off from the sale first.
+          Electrify uses those years to estimate lifetime cost and cost per MWh,
+          including construction, upkeep and fuel. It also sets resale value: a
+          plant's book value declines evenly to zero over its accounting
+          lifetime, so selling early returns more of the build cost. Any
+          outstanding loan is paid off from the sale first.
         </p>
         <p>
-          Plants can run well past their accounting lifetime (some real hydro
-          dams are over a century old), though some technologies lose a little
-          output each year as they age.
+          Reaching the end of its accounting lifetime doesn't retire a plant.
+          Some real hydro dams are over a century old. Some technologies do lose
+          a little output each year as they age.
         </p>
       </div>
     ),
@@ -1137,12 +1141,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Hydro and geothermal need the right geography; good sites run out.
-          Each project uses one site. Hydro takes the smallest remaining site
-          that fits, including unused capacity. Sites can't be combined.
-          Cancelling before completion frees the site; sale or retirement
-          doesn't. Missing site research blocks new Hydro, but an empty
-          inventory doesn't prove there's no hydro potential.
+          You can't put a dam or geothermal plant just anywhere. Each needs a
+          suitable site. Hydro uses the smallest remaining site that fits your
+          project; any unused capacity goes with it. You can't combine sites.
+          Cancel before construction finishes to free the site; selling or
+          retiring a plant won't free it.
+        </p>
+        <p>
+          You can only build new Hydro where we've researched available sites.
+          An empty list doesn't necessarily mean the area has no hydro
+          potential.
         </p>
       </div>
     ),
@@ -1158,9 +1166,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Total cost of energy, or levelized cost of energy (LCOE), estimates
           average cost per MWh over a plant's accounting lifetime. It includes
           construction, upkeep, startups, fuel and carbon fees; loan interest is
-          separate. It lets you compare solar (costly to build, free to fuel)
-          with a gas peaker, the opposite. Solar's real cost fell about 90% in
-          15 years:
+          separate. Use it to compare a solar farm's upfront cost with a gas
+          peaker's ongoing fuel bills.
+        </p>
+        <p>
+          Those costs change over time. The global average cost of power from
+          new solar farms fell about 90% between 2010 and 2025:
         </p>
         <Figure
           src="/images/manual-lcoe.webp"
