@@ -18,6 +18,7 @@ import {
 import { connectToStore } from "./ConnectToStore";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
+import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
@@ -143,6 +144,7 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
+  const online = useOnline();
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
       onEvidenceAcknowledged?.(evidenceRequest);
@@ -209,12 +211,13 @@ export function GameAppBar(props: Props) {
           data-saves-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
-          aria-label="menu"
+          aria-label={online ? "menu" : "menu, offline"}
           edge="start"
           color="primary"
           size="large"
         >
           <MoreVertIcon />
+          {!online && <span className="offlineDot" aria-hidden="true" />}
         </IconButton>
         <Menu
           id="gameCardMenu"
@@ -223,6 +226,13 @@ export function GameAppBar(props: Props) {
           open={Boolean(menuAnchorEl)}
           onClose={handleMenuClose}
         >
+          {/* The app-wide offline banner would cover the game, so it is said here instead */}
+          {!online && (
+            <MenuItem disabled className="gameMenuOffline">
+              <span className="offlineDot" aria-hidden="true" />
+              Offline: saving to this device only
+            </MenuItem>
+          )}
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Settings</MenuItem>
           <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
@@ -249,6 +259,7 @@ export function GameAppBar(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       menuAnchorEl,
+      online,
       onManual,
       onSettings,
       props.onSavedGames,

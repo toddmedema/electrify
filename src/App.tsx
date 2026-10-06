@@ -23,6 +23,9 @@ import {
 } from "./ScenarioUrl";
 import { startSaveSessions } from "./SaveSession";
 import { startCloudSaves } from "./CloudSaves";
+import { startEventToasts } from "./EventToasts";
+import { NAV_CARDS } from "./Constants";
+import { useOnline } from "./components/base/OnlineStatus";
 import CloudSavePrompt from "./components/base/CloudSavePrompt";
 import SharedGameDialog from "./components/base/SharedGameDialog";
 import { store, useAppSelector } from "./Store";
@@ -161,18 +164,20 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   );
 }
 
+/**
+ * Sits in the page flow above everything else, so it pushes the app down rather than covering
+ * its navigation. A game screen has no room to give up, so there the menu button carries a dot
+ * and the menu itself says why (see GameAppBar).
+ */
 function OfflineNotice(): React.JSX.Element | null {
-  const [online, setOnline] = useState(() => navigator.onLine);
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-  return online ? null : (
+  const online = useOnline();
+  const onGameScreen = useAppSelector(
+    (state) =>
+      state.game.inGame &&
+      (NAV_CARDS.includes(state.card.name) ||
+        state.card.name.startsWith("BUILD_")),
+  );
+  return online || onGameScreen ? null : (
     <div className="offlineBanner" role="status">
       Offline — saves use this device’s browser storage. Online features will
       reconnect automatically.
@@ -308,6 +313,7 @@ export default function App() {
 
     const stopSaveSessions = startSaveSessions(store);
     const stopCloudSaves = startCloudSaves(store);
+    const stopEventToasts = startEventToasts(store);
 
     // Returns its own unsubscribe, which was previously dropped on the floor
     const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
@@ -352,6 +358,7 @@ export default function App() {
       window.removeEventListener("resize", onResize);
       stopSaveSessions();
       stopCloudSaves();
+      stopEventToasts();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);
       teardownDevice?.();
@@ -364,13 +371,17 @@ export default function App() {
         {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
               settings change that did not also change the card */}
         <InstallPromptProvider>
-          <OfflineNotice />
-          <UnitsProvider>
-            <CompositorContainer store={store} />
-            <ScenarioChoiceDialog />
-            <CloudSavePrompt />
-            <SharedGameDialog />
-          </UnitsProvider>
+          <div className="appFrame">
+            <OfflineNotice />
+            <UnitsProvider>
+              <div className="appFrameBody">
+                <CompositorContainer store={store} />
+              </div>
+              <ScenarioChoiceDialog />
+              <CloudSavePrompt />
+              <SharedGameDialog />
+            </UnitsProvider>
+          </div>
         </InstallPromptProvider>
       </ThemedApp>
     </StyledEngineProvider>

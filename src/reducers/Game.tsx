@@ -610,8 +610,8 @@ export function logFuelCrossovers(state: GameType) {
         {
           importance: "NOTABLE",
           actionTarget: { card: "FACILITIES", view: "FLEET" },
+          // News rather than a turning point: the UI toasts it, the clock keeps running
           reportedKey: `fuel-crossover:${fuel}`,
-          pause: true,
         },
       );
     },
@@ -695,7 +695,11 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       storyPhaseKey: occurrence.key,
       turningPointPriority: occurrence.turningPointPriority,
       reportedKey: occurrence.key,
-      pause: occurrence.importance === "CRITICAL",
+      // The timeline showed these coming, so their arrival is the decision point the player was
+      // waiting for. A phase the timeline never announced only stops the clock if it's critical
+      pause:
+        occurrence.forecastable !== false ||
+        occurrence.importance === "CRITICAL",
     });
   });
   if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {

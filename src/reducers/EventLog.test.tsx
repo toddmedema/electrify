@@ -157,7 +157,8 @@ describe("the event log", () => {
       card: "FACILITIES",
       view: "FLEET",
     });
-    expect(game.speed).toEqual("PAUSED");
+    // Small news is toasted by the UI; only the timeline's big events stop the clock
+    expect(game.speed).toEqual("FAST");
 
     // Even after recreating the same edge, the persistent per-fuel key suppresses it.
     game.fuelCostSnapshot = { [dearer]: 1, [cheaper]: 1000 };
