@@ -34,6 +34,19 @@ describe("module import order", () => {
     expect(require("../Store").store.getState().game.inGame).toBe(false);
   });
 
+  it("loads scenario data for simulation workers without Material UI", () => {
+    // Scenario data is shared with every forecasting worker. A presentation dependency here
+    // also ships the component library and its styling runtime to those workers.
+    jest.doMock("@mui/material", () => {
+      throw new Error("Scenario data must not load Material UI");
+    });
+    try {
+      expect(require("../data/Scenarios").SCENARIOS.length).toBeGreaterThan(0);
+    } finally {
+      jest.dontMock("@mui/material");
+    }
+  });
+
   it("builds the store when it is loaded first", () => {
     expect(require("../Store").store.getState().card.name).toBe("MAIN_MENU");
   });

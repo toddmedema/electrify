@@ -147,7 +147,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     durationMonths: 1,
     endTitle: "Mission complete!",
-    endMessage: "You kept the grid running for a full day.",
+    endMessage: "You kept the lights on for a full day.",
     facilities: [
       // Coal rather than gas: it cannot turn down below its minimum output, so the midday sun
       // pushes supply visibly above demand instead of hiding the supply line under it. Sized so
@@ -328,7 +328,7 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 6,
     endTitle: "Mission complete!",
     endMessage:
-      "You stored extra energy and used the facility order to control the grid.",
+      "You stored extra energy and put it to work when customers needed it.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 500000000, initialAgeYears: 35 },
       { fuel: "Coal", peakW: 480000000, initialAgeYears: 25 },
@@ -447,7 +447,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.03,
     durationMonths: 1,
     endTitle: "Mission complete!",
-    endMessage: "You read the books and tracked how the company makes money.",
+    endMessage:
+      "You raised enough revenue to cover costs and keep the lights on.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
       { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
@@ -533,7 +534,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage: "You grew your customer base while keeping demand in view.",
+    endMessage: "You won more customers while keeping the business profitable.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
       { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
@@ -617,7 +618,7 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 12,
     endTitle: "Mission complete!",
     endMessage:
-      "You used forecasts to plan ahead. You're ready for a full scenario.",
+      "You used the forecast to prevent a blackout. Time to run your own grid!",
     facilities: [{ fuel: "Coal", peakW: 450000000, initialAgeYears: 20 }],
     tutorialSteps: [
       {
@@ -803,7 +804,7 @@ export const SCENARIOS: ScenarioType[] = [
     intertiesEnabled: true,
     endTitle: "Mission complete!",
     endMessage:
-      "You used a limited grid connection to cover shortages and sell only safe surplus.",
+      "You bought power when you needed it and sold extra without leaving customers short.",
     facilities: [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
       // much nameplate to create observable daytime surplus after customer demand.
@@ -1028,15 +1029,16 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Carbon Fee",
     icon: "carbon fee",
     locationId: "SF",
-    summary: "Pollution now costs money. Can you replace your aging plants?",
+    summary: "Coal was cheap. Now there's a bill for the pollution.",
     themes: ["Energy transition"],
     recommendationOrder: 3,
     briefing: {
       tone: "transition",
-      fantasy: "Modernize an aging grid as pollution gets more expensive.",
+      fantasy: "Replace aging plants while keeping the business running.",
       objective:
-        "Stay solvent and keep the lights on for 12 years while coal pays a carbon fee. Retain at least 80% of your starting customers.",
-      threat: "Old coal plants and tight finances leave little room for delay.",
+        "Stay solvent and keep the lights on for 12 years under a carbon fee. Retain at least 80% of your starting customers.",
+      threat:
+        "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
@@ -1061,14 +1063,14 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The Shale Boom",
     icon: "the shale boom",
     locationId: "PIT",
-    summary: "Local gas is suddenly cheap—but the boom may not last.",
+    summary: "Fracking made gas cheap. How much are you willing to bet on it?",
     themes: ["Rapid growth"],
     briefing: {
       tone: "boom",
-      fantasy: "Turn a cheap-gas boom into lasting success.",
+      fantasy: "Grow your utility while local gas is cheap.",
       objective:
         "Stay solvent for 20 years through a gas boom and whatever follows. Retain at least 80% of your starting customers.",
-      threat: "Gas prices may rebound before new plants pay off.",
+      threat: "Gas prices can rise long before a new plant pays for itself.",
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
@@ -1084,14 +1086,15 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Paradise",
     icon: "paradise",
     locationId: "HNL",
-    summary: "Power an island where every shipment and outage matters.",
+    summary: "Sun, wind and imported oil. Keep Hawaii powered on its own.",
     themes: ["Energy transition"],
     briefing: {
       tone: "island",
-      fantasy: "Keep an island paradise bright without outside backup.",
+      fantasy: "Power an island that can't import electricity.",
       objective:
         "Keep the island supplied and solvent as oil prices swing. Retain at least 80% of your starting customers.",
-      threat: "One weak link can leave the whole island in the dark.",
+      threat:
+        "If your plants can't meet demand, there's no neighboring grid to help.",
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
@@ -1111,7 +1114,7 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Rise of Renewables",
     icon: "rise of renewables",
     locationId: "SF",
-    summary: "New clean technologies are arriving fast. Choose when to invest.",
+    summary: "Clean power keeps getting cheaper. When do you make the switch?",
     themes: ["Energy transition"],
     briefing: {
       tone: "innovation",
@@ -1119,7 +1122,7 @@ export const SCENARIOS: ScenarioType[] = [
       objective:
         "Stay solvent and keep up with demand as clean technology gets cheaper. Retain at least 80% of your starting customers.",
       threat:
-        "Invest too early and overpay; wait too long and demand may exceed supply.",
+        "Build now and you may overpay. Wait too long and you may not have enough power.",
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
@@ -1138,14 +1141,15 @@ export const SCENARIOS: ScenarioType[] = [
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
-    summary: "Prepare an island grid for storms and costly fuel.",
+    summary:
+      "Hurricanes are coming to Puerto Rico. Build a grid that can take the hit.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
-      fantasy: "Protect an island grid through years of fierce storms.",
-      objective:
-        "Build a grid that keeps demand supplied during severe storms.",
-      threat: "A major storm can overwhelm a small backup margin.",
+      fantasy: "Keep Puerto Rico powered through years of hurricanes.",
+      objective: "Keep customers supplied during severe storms.",
+      threat:
+        "Storms can damage several plants at once. A little spare capacity may not be enough.",
     },
     ownership: "Public",
     startingYear: 2000,
@@ -1172,14 +1176,15 @@ export const SCENARIOS: ScenarioType[] = [
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
-    summary: "Your coal company must adapt to a changing power market.",
+    summary: "Your company was built on coal. What comes next?",
     themes: ["Energy transition"],
     briefing: {
       tone: "legacy",
       fantasy: "Decide what comes after a century of coal.",
       objective:
-        "Build a new business before old coal plants hold you back. Retain at least 80% of your starting customers.",
-      threat: "Old plants, new rivals, and slow construction punish delay.",
+        "Stay solvent as your coal fleet ages. Retain at least 80% of your starting customers.",
+      threat:
+        "Your plants are aging and competitors are moving in. Replacements take years to build.",
     },
     ownership: "Investor",
     minimumCustomerRetention: 0.8,
@@ -1210,15 +1215,17 @@ export const SCENARIOS: ScenarioType[] = [
       long: -77.4753,
       timeZone: "America/New_York",
     },
-    summary: "Prepare for data-center growth without pricing out residents.",
+    summary:
+      "Data centers want power. Residents want affordable bills. You have to deliver both.",
     themes: ["Rapid growth"],
     recommendationOrder: 2,
     briefing: {
       tone: "boom",
-      fantasy: "Guide a small city grid through explosive growth.",
+      fantasy: "Prepare a small city's grid for a surge in demand.",
       objective:
-        "Build dependable generation and storage before Data Centers connect.",
-      threat: "New demand will overwhelm the grid if you build too late.",
+        "Build dependable generation and storage before the data centers connect in 2026.",
+      threat:
+        "Data centers need power around the clock. If you wait until they arrive to build, you'll be too late.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -1255,9 +1262,9 @@ export const SCENARIOS: ScenarioType[] = [
         demandType: "Data Centers",
       },
     ],
-    endTitle: "The municipal grid, transformed",
+    endTitle: "A bigger city, a bigger grid",
     endMessage:
-      "Sixteen years tested whether a small public utility could prepare for growth without leaving residents behind.",
+      "The data centers are connected. See how your grid handled the demand, and what residents paid for it.",
   },
   {
     id: 107,
@@ -1274,7 +1281,7 @@ export const SCENARIOS: ScenarioType[] = [
       long: -97.7431,
       timeZone: "America/Chicago",
     },
-    summary: "Prepare Austin's grid for a historic winter emergency.",
+    summary: "Austin is about to freeze. The grid was built for heat.",
     themes: ["Extreme weather"],
     recommendationOrder: 1,
     briefing: {
@@ -1283,7 +1290,7 @@ export const SCENARIOS: ScenarioType[] = [
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
       threat:
-        "Extreme cold will cut supplies just as demand surges. In January 2020, choose winterization or preserve your construction budget.",
+        "Heating demand surges while frozen equipment cuts power and gas supplies. In January 2020, choose whether to fund winterization or keep the money for construction.",
     },
     ownership: "Public",
     seed: 268107,
@@ -1315,7 +1322,8 @@ export const SCENARIOS: ScenarioType[] = [
       { fuel: "Wind", peakW: 1200000000 },
     ],
     endTitle: "After the thaw",
-    endMessage: "The storm tested every choice you made to prepare Austin.",
+    endMessage:
+      "The freeze is over. How well did your winter preparations hold up?",
   },
   {
     id: 108,
@@ -1334,15 +1342,16 @@ export const SCENARIOS: ScenarioType[] = [
       watershedName: "Spanish river basins",
       resources: { hydro: true },
     },
-    summary: "Keep Spain powered through a worsening heatwave and drought.",
+    summary:
+      "Spain needs more power to keep cool, just as drought leaves less water to generate it.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
-      fantasy:
-        "Guide Spain's renewable-rich grid through a summer of heat and drought.",
+      fantasy: "Keep Spain powered through a hot, dry summer.",
       objective:
-        "Serve every customer through three months of rising demand and falling water availability.",
-      threat: "Rising heat will cut hydro inflow and nuclear output.",
+        "Serve every customer through three months of rising cooling demand and shrinking water supplies.",
+      threat:
+        "Drought leaves less water for hydro. Hot river water also limits reactor cooling, cutting nuclear output.",
     },
     ownership: "Public",
     startingYear: 2023,
@@ -1385,7 +1394,7 @@ export const SCENARIOS: ScenarioType[] = [
     ],
     endTitle: "The heat finally breaks",
     endMessage:
-      "The long hot summer tested whether your mix of generators and storage could save energy for the days it mattered most.",
+      "The summer is over. How much backup power did you need when the water ran low?",
   },
   {
     id: 110,
@@ -1402,16 +1411,16 @@ export const SCENARIOS: ScenarioType[] = [
       timeZone: "Europe/Paris",
       resources: { hydro: false },
     },
-    summary: "Cover an unexpected nuclear shutdown in France.",
+    summary:
+      "Your biggest reactor will shut down without warning. Have a backup ready.",
     themes: ["Energy transition"],
     briefing: {
       tone: "legacy",
-      fantasy:
-        "Keep France's grid steady when its largest generator suddenly disappears.",
+      fantasy: "Keep the lights on when your largest generator shuts down.",
       objective:
-        "Build a mix of resources that can replace the main nuclear unit if it shuts down.",
+        "Have enough generation and storage ready to cover the main reactor's shutdown.",
       threat:
-        "The shutdown date is hidden, and the reactor will remain offline for the rest of the mission.",
+        "You won't know the shutdown date in advance, and the reactor will stay offline for the rest of the mission.",
     },
     ownership: "Public",
     startingYear: 2023,
@@ -1447,25 +1456,25 @@ export const SCENARIOS: ScenarioType[] = [
       },
       { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
     ],
-    endTitle: "Reserve proved its value",
+    endTitle: "After the shutdown",
     endMessage:
-      "The sudden shutdown tested the backup capacity your normal plan rarely needed.",
+      "Losing your biggest reactor left the rest of the grid to cover the gap. See how your backup plan held up.",
   },
   {
     id: 111,
     name: "Wildfire Emergency",
     icon: "wildfire emergency",
     locationId: "LA",
-    summary: "Prepare Los Angeles for the January 2025 firestorm.",
+    summary:
+      "Wildfires are coming to Los Angeles. Prepare for power shutoffs and costly repairs.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
-      fantasy:
-        "Guide Los Angeles through extreme fire weather and a long restoration effort.",
+      fantasy: "Keep Los Angeles supplied while crews repair the grid.",
       objective:
         "Keep all connected customers supplied during the January and February 2025 wildfire emergency.",
       threat:
-        "Safety shutoffs will cut sales, constrain part of the fleet, and raise restoration costs.",
+        "Safety shutoffs help prevent sparks in high winds. They cut sales and generator output while restoration costs mount.",
     },
     ownership: "Public",
     startingYear: 2022,
@@ -1505,7 +1514,7 @@ export const SCENARIOS: ScenarioType[] = [
     ],
     endTitle: "After the firestorm",
     endMessage:
-      "The emergency tested whether backup power and financial reserves could carry Los Angeles through shutoffs and restoration.",
+      "Power shutoffs and repairs put pressure on both your generators and your budget. How much did you keep in reserve?",
   },
   {
     id: 113,
@@ -1530,9 +1539,9 @@ export const SCENARIOS: ScenarioType[] = [
       fantasy:
         "Run South Africa's coal-heavy grid as its oldest stations start failing.",
       objective:
-        "Keep customers supplied through five years of falling coal availability.",
+        "Keep customers supplied through five years of coal plant breakdowns.",
       threat:
-        "Unplanned breakdowns take more of the coal fleet offline every year, and the diesel peakers that cover them burn cash.",
+        "More coal plants break down each year. Diesel generators can cover the gap, but the fuel bill adds up fast.",
     },
     ownership: "Public",
     startingYear: 2016,
@@ -1572,9 +1581,9 @@ export const SCENARIOS: ScenarioType[] = [
       { fuel: "Wind", peakW: 20000000, initialAgeYears: 4 },
       { fuel: "Sun", peakW: 15000000, initialAgeYears: 3 },
     ],
-    endTitle: "The lights stayed on, or they didn't",
+    endTitle: "Five years of breakdowns",
     endMessage:
-      "Five years of breakdowns tested whether new capacity could be built faster than the old fleet gave out.",
+      "New plants took years to build while old ones kept failing. Your results show whether you kept up.",
   },
   {
     id: 114,
@@ -1597,16 +1606,16 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: true, geothermal: false },
     },
     summary:
-      "Nearly all your power comes from one river, and the rains failed.",
+      "Nearly all your power comes from one river. The rains have failed.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
       fantasy:
-        "Run a nearly all-hydro grid as an El Nino drought drains the reservoir.",
+        "Run a nearly all-hydro grid as an El Niño drought drains the reservoir.",
       objective:
-        "Serve Zambia's customers through two years of collapsing inflow to Kariba.",
+        "Serve Zambia's customers through two years of falling water inflow to Kariba.",
       threat:
-        "Reservoir inflow falls year after year, and a fleet with no other firm generation has nothing to fall back on.",
+        "Less water reaches the reservoir each year. Your small diesel plant can't replace the dam's output.",
     },
     ownership: "Public",
     startingYear: 2012,
@@ -1673,9 +1682,9 @@ export const SCENARIOS: ScenarioType[] = [
       { fuel: "Oil", peakW: 16000000, initialAgeYears: 15 },
       { fuel: "Sun", peakW: 6000000, initialAgeYears: 1 },
     ],
-    endTitle: "The rains returned",
+    endTitle: "Two dry years",
     endMessage:
-      "The drought tested whether a grid built on one river could find firm power anywhere else in time.",
+      "A grid built on one river needed another source of power. Did you find it before the water ran out?",
   },
   {
     id: 115,
@@ -1695,16 +1704,15 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: false, geothermal: false },
     },
     summary:
-      "Each summer peaks higher than the last, and 2024 breaks the record.",
+      "Each summer needs more power than the last. Then comes the record heat of 2024.",
     themes: ["Extreme weather", "Rapid growth"],
     briefing: {
       tone: "storm",
-      fantasy:
-        "Supply one of the world's hottest large cities through four rising summers.",
+      fantasy: "Keep Delhi supplied as each summer's demand exceeds the last.",
       objective:
         "Meet four rising summer peaks, ending with the record heat of May and June 2024.",
       threat:
-        "Extreme heat raises demand and cuts thermal output. A late monsoon prolongs the strain.",
+        "Air-conditioning demand rises while heat cuts power plant output. The monsoon arrives late, delaying relief.",
     },
     ownership: "Public",
     startingYear: 2018,
@@ -1744,7 +1752,7 @@ export const SCENARIOS: ScenarioType[] = [
     ],
     endTitle: "The monsoon finally arrived",
     endMessage:
-      "Four summers tested whether a grid could grow fast enough to stay ahead of its own peak.",
+      "Four summers pushed demand higher and higher. See how your grid handled the peak, and what it cost.",
   },
 ];
 
