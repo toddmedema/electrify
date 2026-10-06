@@ -140,7 +140,9 @@ run `node scripts/compress-manual-images.js` (requires `cwebp`: `brew install we
 reference the `.webp` from `src/components/base/ManualEntries.tsx` with its real `width` and
 `height`. JPEG charts are re-encoded at WebP quality 88 (about 60-70% smaller, SSIM ≥ 0.993 and
 indistinguishable at 3x zoom); PNGs are re-encoded losslessly. Always encode from the originals
-so losses never compound. `src/ManualFigures.test.ts` checks the two stay in step.
+so losses never compound. `src/ManualFigures.test.ts` checks the two stay in step. A diagram
+drawn for the game keeps its SVG source beside it; render that to a PNG at its own size (for
+example with a headless browser) and compress the PNG like any other original.
 
 ### Release checklist
 

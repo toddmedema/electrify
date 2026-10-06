@@ -121,14 +121,14 @@ export interface ManualEntryType {
 
 // The source line for an image, shown to the player rather than hidden in the alt attribute:
 // on an educational game a citation is worth reading, and alt text is for describing the
-// picture to someone who can't see it
+// picture to someone who can't see it. A diagram drawn for the game (its source is in
+// design/manual/) has nothing to cite, so it leaves the source out.
 interface FigureProps {
   src: string;
   alt: string;
   width: number;
   height: number;
-  sourceName: string;
-  sourceUrl: string;
+  source?: { name: string; url: string };
 }
 
 function Figure(props: FigureProps): React.JSX.Element {
@@ -143,12 +143,14 @@ function Figure(props: FigureProps): React.JSX.Element {
         height={props.height}
         loading="lazy"
       />
-      <figcaption>
-        Source:{" "}
-        <a href={props.sourceUrl} target="_blank" rel="noreferrer">
-          {props.sourceName}
-        </a>
-      </figcaption>
+      {props.source && (
+        <figcaption>
+          Source:{" "}
+          <a href={props.source.url} target="_blank" rel="noreferrer">
+            {props.source.name}
+          </a>
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -354,8 +356,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Capacity factor is actual energy output divided by what a plant could
           produce at full power over the same period. A 100 MW plant at 45%
           averages 45 MW; it may run flat out, then idle. US nuclear plants run
-          above 90%, solar farms about 25%.
+          about 90%; wind and solar, under 30%:
         </p>
+        <Figure
+          src="/images/manual-capacity-factors.webp"
+          alt="Bar chart of average electric generator capacity factors from 2008 to 2012 for 16 countries and regions, in four columns: nuclear, fossil fuels, hydropower, and solar and wind. US nuclear runs at 90%, US fossil fuels at 41%, US hydropower at 40% and US solar and wind at 27%. Solar and wind stay below 30% in every region."
+          width={579}
+          height={292}
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=22832",
+          }}
+        />
         <p>
           The build screen uses expected capacity factor to estimate cost per
           MWh: the less a plant runs, the more each MWh must pay back. Fuel
@@ -407,8 +419,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Once you own hydro, the <strong>Water</strong> chart shows
           precipitation, snow and reservoir levels. Winter snow may not reach
-          you until it melts in spring. Select a dam to see what limits its
-          output and its reservoir forecast for the next year.
+          you until it melts in spring, as in California:
+        </p>
+        <Figure
+          src="/images/manual-hydro-snowpack.webp"
+          alt="Two line charts by month. Left: California snow water equivalent, which builds from January to a peak in March or April and is gone by June; the 2017 line reaches 46 inches by March, far above the 2001 to 2010 average of about 25. Right: California net hydroelectric generation, which climbs from about 2 million megawatt-hours in winter to a peak near 3.9 million in May to July before falling back by autumn."
+          width={573}
+          height={290}
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=30452",
+          }}
+        />
+        <p>
+          Select a dam to see what limits its output and its reservoir forecast
+          for the next year.
         </p>
         <p>
           <strong>Water rights</strong> require releases for farms, cities and
@@ -442,8 +467,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           alt="Three charts of monthly US retail electricity sales from 2009 to 2012. Residential sales swing hardest, peaking each summer and winter; commercial sales follow the same shape but with about half the swing; industrial sales stay nearly flat all year."
           width={576}
           height={288}
-          sourceName="U.S. Energy Information Administration"
-          sourceUrl="https://www.eia.gov/todayinenergy/detail.php?id=10211"
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=10211",
+          }}
         />
         <p>
           A <strong>load shape</strong> shows demand over time. Notice the daily
@@ -454,8 +481,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           alt="Hourly electricity load across a week in the PJM Mid-Atlantic region, plotted for a hot week, a cold week and a mild week of 2009. All three rise and fall once a day and drop over the weekend; the hot week peaks around 50,000 MW, roughly 20,000 MW above the mild week's overnight low."
           width={834}
           height={560}
-          sourceName="Penn State, EBF 200"
-          sourceUrl="https://www.e-education.psu.edu/ebf200/node/151"
+          source={{
+            name: "Penn State, EBF 200",
+            url: "https://www.e-education.psu.edu/ebf200/node/151",
+          }}
         />
         <p>
           In investor-owned scenarios, you compete for a limited market. Lower
@@ -499,6 +528,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           low-carbon, not carbon-free. These emissions carry no carbon fee in
           the game; the fee applies only to burning fuel locally.
         </p>
+        <p>
+          Counting the whole lifecycle, fuel supply included, the gap is still
+          huge:
+        </p>
+        <Figure
+          src="/images/manual-lifecycle-emissions.webp"
+          alt="Horizontal bar chart of lifecycle greenhouse gas emissions per gigawatt-hour of electricity, in tonnes of CO2-equivalent: coal 970, oil 720, natural gas 440, biomass 78 to 230, solar 53 (8 to 83 depending on technology and location), hydropower 24, wind 11 and nuclear 6."
+          width={820}
+          height={481}
+          source={{
+            name: "Our World in Data (CC BY), cropped",
+            url: "https://ourworldindata.org/safest-sources-of-energy",
+          }}
+        />
         <p>
           Emissions affect your fees and score, but don't change local weather
           in the game.
@@ -599,8 +642,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           alt="Scatter chart of PJM generation capacity sorted from cheapest to most expensive. Renewables and nuclear supply the first 40 GW at under $20/MWh, coal carries the next 60 GW below $50/MWh, natural gas climbs steeply from there, and oil tops out around $300/MWh for the last few GW."
           width={825}
           height={471}
-          sourceName="Penn State, EBF 200"
-          sourceUrl="https://www.e-education.psu.edu/ebf200/node/151"
+          source={{
+            name: "Penn State, EBF 200",
+            url: "https://www.e-education.psu.edu/ebf200/node/151",
+          }}
         />
       </div>
     ),
@@ -628,8 +673,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Response time decides which demand a plant can follow: fast plants
           cover short peaks, slow ones steady hours. California's &ldquo;duck
           curve,&rdquo; where solar fades as people get home, needs fast plants
-          and batteries.
+          and batteries:
         </p>
+        <Figure
+          src="/images/manual-duck-curve.webp"
+          alt="Line chart of California's net load, meaning demand minus wind and solar, on the lowest spring day of each year from 2015 to 2023. Every year dips at midday and climbs steeply in the evening, and the dip deepens each year: in 2015 it bottoms near 13 GW, while in 2022 and 2023 it falls almost to zero before rising to about 20 GW by 8 PM."
+          width={609}
+          height={283}
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=56880",
+          }}
+        />
       </div>
     ),
   },
@@ -712,6 +767,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           hours, allowing for storage losses. Holding 80 MWh does not let it
           supply 80 MW.
         </p>
+        <Figure
+          src="/images/manual-power-energy.webp"
+          alt="Diagram of two batteries that each store 80 MWh. The 20 MW battery has a narrow outlet and lasts about 4 hours; the 80 MW battery has a wide outlet and lasts about 1 hour. Caption: energy is how much is stored, and power is how fast it flows."
+          width={720}
+          height={360}
+        />
       </div>
     ),
   },
@@ -762,6 +823,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           generation next door; multiple paths share the same neighbor&rsquo;s
           spare supply and export demand.
         </p>
+        <p>The US mainland itself runs as three largely separate grids:</p>
+        <Figure
+          src="/images/manual-interconnections.webp"
+          alt="Map of the Lower 48 US states divided into three interconnections: the Western Interconnection from the Rockies to the Pacific, the Eastern Interconnection covering everything east of the Rockies, and ERCOT covering most of Texas. Circles mark the 66 balancing authorities, including CISO in California, ERCO in Texas, and SWPP, MISO, PJM, TVA, SOCO, NYIS and ISNE in the east."
+          width={576}
+          height={288}
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=27152",
+          }}
+        />
         <p>
           In missions, higher tiers buy more import access along with a wider
           connection. Both arrive when construction finishes; export access
@@ -831,10 +903,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           evaporation still drains stored energy until you pause the game clock.
         </p>
         <p>
-          Even counting losses and construction cost, storage can beat running
-          expensive generation: fill up when power is cheap and use it when it's
-          scarce.
+          Even counting losses and construction cost, storage can beat expensive
+          generation. California's batteries now soak up midday solar for the
+          evening peak:
         </p>
+        <Figure
+          src="/images/manual-battery-evening.webp"
+          alt="Three line charts of average hourly California grid generation in May and June of 2020, 2022 and 2025. Solar peaks at midday, growing from about 10 GW to 20 GW. Batteries barely register in 2020; by 2025 they charge up to about 6 GW at midday, shown below zero, and discharge about 8 GW around 7 PM as solar fades, while natural gas dips at midday and rises again in the evening."
+          width={600}
+          height={318}
+          source={{
+            name: "U.S. Energy Information Administration",
+            url: "https://www.eia.gov/todayinenergy/detail.php?id=66704",
+          }}
+        />
       </div>
     ),
   },
@@ -1077,8 +1159,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           average cost per MWh over a plant's accounting lifetime. It includes
           construction, upkeep, startups, fuel and carbon fees; loan interest is
           separate. It lets you compare solar (costly to build, free to fuel)
-          with a gas peaker, the opposite.
+          with a gas peaker, the opposite. Solar's real cost fell about 90% in
+          15 years:
         </p>
+        <Figure
+          src="/images/manual-lcoe.webp"
+          alt="Line chart of the worldwide levelized cost of energy for new renewable plants in constant 2025 US dollars per kilowatt-hour. Solar photovoltaic falls from about $0.41 in 2010 to about $0.04 in 2025, and onshore wind from $0.37 in 1984 to about $0.03, both now below the fossil fuel range of roughly $0.05 to $0.18. Hydropower, geothermal, bioenergy, offshore wind and concentrated solar power are also shown."
+          width={850}
+          height={600}
+          source={{
+            name: "Our World in Data (CC BY), IRENA data",
+            url: "https://ourworldindata.org/grapher/levelized-cost-of-energy",
+          }}
+        />
         <p>
           The estimate depends on expected output and quoted fuel prices. Actual
           bills depend on how you run the plant; fixed and variable O&amp;M are

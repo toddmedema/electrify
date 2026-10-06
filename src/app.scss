@@ -2951,7 +2951,7 @@ $pane_header_height: 48px;
 
     img {
       // Sized from the intrinsic width/height on the tag, shrinking to fit a narrow phone but
-      // never stretching past the file's own resolution - the source charts are 576-834px
+      // never stretching past the file's own resolution - the source charts are 573-850px
       // wide, and blowing them up to fill a desktop pane just blurs them
       max-width: 100%;
       height: auto;
