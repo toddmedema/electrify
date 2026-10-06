@@ -35,7 +35,7 @@ describe("researched transmission profiles", () => {
     );
 
     const downloadedIds = Object.keys(weatherIndex.cities);
-    expect(downloadedIds).toHaveLength(282);
+    expect(downloadedIds).toHaveLength(283);
     expect(
       downloadedIds.every((id) => id in LOCATION_TRANSMISSION_PROFILE_IDS),
     ).toBe(true);

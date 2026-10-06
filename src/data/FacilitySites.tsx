@@ -102,6 +102,7 @@ export const PUMPED_HYDRO_SITES_BY_LOCATION: Readonly<Record<string, number>> =
     HoChiMinhCity: 0,
     HongKong: 0,
     Hobart: 0,
+    Honiara: 0,
     Hyderabad: 0,
     Islamabad: 0,
     Jakarta: 0,

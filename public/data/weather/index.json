@@ -3516,6 +3516,19 @@
       "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
+    },
+    "Honiara": {
+      "id": "Honiara",
+      "name": "Honiara, Solomon Islands",
+      "region": "Oceania",
+      "country": "Solomon Islands",
+      "lat": -9.4456,
+      "long": 159.9729,
+      "timeZone": "Pacific/Guadalcanal",
+      "elevation": 56,
+      "offshore": true,
+      "startingYear": 1980,
+      "endingYear": 2025
     }
   }
 }

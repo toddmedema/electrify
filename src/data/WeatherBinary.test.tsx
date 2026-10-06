@@ -237,6 +237,7 @@ describe("the shipped weather files", () => {
     "Guangzhou",
     "HongKong",
     "Hobart",
+    "Honiara",
     "HoChiMinhCity",
     "Hanoi",
     "Jakarta",
