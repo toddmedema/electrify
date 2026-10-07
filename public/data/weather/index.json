@@ -640,6 +640,7 @@
       "long": -123.1207,
       "timeZone": "America/Vancouver",
       "elevation": 40,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -706,6 +707,7 @@
       "long": -68.517,
       "timeZone": "America/Iqaluit",
       "elevation": 17,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -754,6 +756,7 @@
       "long": -117.0382,
       "timeZone": "America/Tijuana",
       "elevation": 119,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -766,6 +769,7 @@
       "long": -86.8515,
       "timeZone": "America/Cancun",
       "elevation": 11,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -778,6 +782,7 @@
       "long": -82.3666,
       "timeZone": "America/Havana",
       "elevation": 9,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -790,6 +795,7 @@
       "long": -69.9312,
       "timeZone": "America/Santo_Domingo",
       "elevation": 50,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -802,6 +808,7 @@
       "long": -72.3074,
       "timeZone": "America/Port-au-Prince",
       "elevation": 16,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -814,6 +821,7 @@
       "long": -76.7931,
       "timeZone": "America/Jamaica",
       "elevation": 13,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
