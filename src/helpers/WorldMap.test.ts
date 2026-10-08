@@ -5,7 +5,9 @@ import {
   panViewport,
   pointInViewport,
   projectLocation,
+  screenPointInViewport,
   zoomViewportAt,
+  zoomViewportToCluster,
   nearestGeographicLocation,
 } from "./WorldMap";
 
@@ -62,6 +64,38 @@ it("zooms around a screen point and keeps its world location stationary", () => 
   expect(zoomed).toEqual({ center: { x: 0.625, y: 0.375 }, zoom: 1 });
   expect(pointInViewport({ x: 0.75, y: 0.25 }, zoomed)).toEqual(anchor);
   expect(zoomViewportAt(zoomed, 99, anchor).zoom).toBe(4);
+});
+
+it("zooms into a corner cluster where it already sits instead of re-centering on it", () => {
+  const margin = { x: 0.05, y: 0.05 };
+  const bubble = { x: 0.9, y: 0.3 };
+  const members = [
+    { x: 0.88, y: 0.29 },
+    { x: 0.92, y: 0.31 },
+  ];
+  const zoomed = zoomViewportToCluster(world, bubble, members, margin);
+
+  expect(zoomed.zoom).toBe(1);
+  expect(screenPointInViewport(bubble, zoomed).x).toBeCloseTo(0.9);
+  expect(screenPointInViewport(bubble, zoomed).y).toBeCloseTo(0.3);
+});
+
+it("pans a zoomed cluster only as far as needed to keep its members on screen", () => {
+  const margin = { x: 0.05, y: 0.05 };
+  const members = [
+    { x: 0.9, y: 0.5 },
+    { x: 0.97, y: 0.5 },
+  ];
+  const zoomed = zoomViewportToCluster(
+    world,
+    { x: 0.935, y: 0.5 },
+    members,
+    margin,
+  );
+
+  expect(screenPointInViewport(members[1], zoomed).x).toBeCloseTo(0.95);
+  expect(screenPointInViewport(members[0], zoomed).x).toBeGreaterThan(0.8);
+  expect(zoomed).toEqual(clampViewport(zoomed));
 });
 
 it("clusters close locations deterministically but keeps selection visible", () => {

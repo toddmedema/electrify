@@ -27,7 +27,9 @@ import {
   MAP_ZOOM_SCALES,
   panViewport,
   projectLocation,
+  screenPointInViewport,
   zoomViewportAt,
+  zoomViewportToCluster,
   nearestGeographicLocation,
 } from "../../helpers/WorldMap";
 
@@ -253,20 +255,24 @@ export default function LocationPicker({
       return;
     }
     if (viewport.zoom < MAX_ZOOM) {
-      setZoom(
-        viewport.zoom + 1,
-        projectLocation({
-          lat:
-            control.locations.reduce((sum, location) => sum + location.lat, 0) /
-            control.locations.length,
-          long:
-            control.locations.reduce(
-              (sum, location) => sum + location.long,
-              0,
-            ) / control.locations.length,
-        }),
-        true,
+      // The bubble is drawn at its members' centroid, so anchoring on it rather than on the exact
+      // click point gives mouse, touch, and keyboard the same zoom
+      const current = viewportRef.current;
+      const scale = MAP_ZOOM_SCALES[current.zoom];
+      const bubble = {
+        x: current.center.x + (control.x - 0.5) / scale,
+        y: current.center.y + (control.y - 0.5) / scale,
+      };
+      const inset = markerSize / 2 + 8;
+      const next = zoomViewportToCluster(
+        current,
+        control,
+        control.locations.map(projectLocation),
+        { x: inset / mapSize.width, y: inset / mapSize.height },
       );
+      applyViewport(next);
+      announceZoom(next.zoom);
+      setFocusAfterZoom(screenPointInViewport(bubble, next));
       return;
     }
     setMenuLocations(control.locations);

@@ -965,13 +965,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
               <td>per TWh supplied</td>
             </tr>
             <tr>
-              <td>-2</td>
+              <td>−2</td>
               <td>
                 per <EmissionsPerPoint /> of CO2e emitted
               </td>
             </tr>
             <tr>
-              <td>-8</td>
+              <td>−8</td>
               <td>per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>
@@ -991,13 +991,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
               <td>per TWh supplied</td>
             </tr>
             <tr>
-              <td>-5</td>
+              <td>−5</td>
               <td>
                 per <EmissionsPerPoint /> of CO2e emitted
               </td>
             </tr>
             <tr>
-              <td>-10</td>
+              <td>−10</td>
               <td>per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>

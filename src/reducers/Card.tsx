@@ -3,6 +3,7 @@ import type { AppStateType } from "../Types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { getHistoryApi, logEvent } from "../Globals";
 import { NAVIGATION_DEBOUNCE_MS } from "../Constants";
+import { isDataCenterSetupSearch } from "../DataCenterUrl";
 import { CardNameType, CardType, NavigateActionType } from "../Types";
 import {
   launchRun,
@@ -25,9 +26,28 @@ export const initialCard: CardType = {
   toPrevious: false,
 };
 
+/**
+ * A visitor following the data-center guide's link opens directly on its setup. Navigating there
+ * after mount would first paint the main menu and then slide it away, which reads as a stray page
+ * between the guide and the tool. The menu stays one step back, as it would after an in-app visit.
+ */
+function startupCard(): CardType {
+  if (
+    typeof window === "undefined" ||
+    !isDataCenterSetupSearch(window.location.search)
+  ) {
+    return initialCard;
+  }
+  return {
+    ...initialCard,
+    name: "DATA_CENTER_SETUP",
+    history: ["DATA_CENTER_SETUP", "MAIN_MENU"],
+  };
+}
+
 export const cardSlice = createSlice({
   name: "card",
-  initialState: initialCard,
+  initialState: startupCard,
   reducers: {
     navigate: (
       state,

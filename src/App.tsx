@@ -216,13 +216,8 @@ export default function App() {
       }
       const dataCenterSetup =
         !challenge && isDataCenterSetupSearch(window.location.search);
-      if (dataCenterSetup) {
-        // This visitor came from the guide, so preserve that document as the
-        // browser's Back destination instead of inserting the game catalog.
-        store.dispatch(
-          navigate({ name: "DATA_CENTER_SETUP", skipBrowserHistory: true }),
-        );
-      }
+      // A data-center visitor already starts on its setup (see startupCard in reducers/Card), and
+      // the guide stays the browser's Back destination because no catalog entry is pushed.
       const customEvent =
         !challenge &&
         !dataCenterSetup &&

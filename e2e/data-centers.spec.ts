@@ -542,7 +542,7 @@ for (const [city, accounts, energy, territory] of [
     await expect(grid).toContainText(territory);
     const assumptions = page.locator(".dataCenterSetupAssumptions").filter({
       has: page.locator("summary", {
-        hasText: "Power sources and assumptions",
+        hasText: "Assumptions",
       }),
     });
     await assumptions.locator("summary").click();

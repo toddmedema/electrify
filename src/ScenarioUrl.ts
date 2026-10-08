@@ -3,10 +3,7 @@ import { ScenarioType } from "./Types";
 
 type LocationParts = Pick<Location, "pathname" | "search">;
 
-/** Dedicated, guided setup for visitors exploring data-center growth. */
-export function isDataCenterSetupSearch(search: string): boolean {
-  return new URLSearchParams(search).get("dataCenters") === "1";
-}
+export { isDataCenterSetupSearch } from "./DataCenterUrl";
 
 /** Opens custom setup with one supported scenario event selected. */
 export function customEventFromSearch(search: string): number | undefined {
