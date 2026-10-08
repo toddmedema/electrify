@@ -302,12 +302,9 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                     <summary>
                       {accountsInput !== undefined
                         ? "Your grid size"
-                        : customerProfile.basis === "reference-utility"
-                          ? "Example grid size"
-                          : "Grid size"}
-                      :{" "}
-                      {validAccounts ? formatCount(startingCustomers!) : "edit"}{" "}
-                      accounts · edit
+                        : "Grid size"}
+                      {validAccounts &&
+                        `: ${formatCount(startingCustomers!)} accounts`}
                     </summary>
                     <TextField
                       label="Homes and businesses served"
@@ -412,106 +409,164 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                     </Typography>
                   )}
                   <details className="dataCenterSetupAssumptions">
-                    <summary>Power sources and assumptions</summary>
-                    <Typography variant="body2">
-                      {customerProfile?.annualMWh ? (
-                        <>
-                          Background electricity use is sized to{" "}
-                          {(customerProfile.annualMWh / 1000000).toFixed(2)} TWh
-                          per year for {customerProfile.serviceArea}, using{" "}
-                          <a
-                            href={
-                              customerProfile.energySourceUrl ||
-                              customerProfile.sourceUrl
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            published {customerProfile.energySourceYear}{" "}
-                            electricity sales
-                          </a>
-                          . Changing the account count scales this total.
-                        </>
-                      ) : (
-                        <>
-                          Annual electricity use has no verified local
-                          reference; demand per account uses the game’s regional
-                          assumptions.
-                        </>
-                      )}{" "}
-                      Published totals include existing data centers. Their
-                      share and future growth use regional model assumptions,
-                      rather than a measured local inventory. Starting years use
-                      the same published snapshot, shaped by local weather.
-                      {customerProfile?.observedPeakW &&
-                        " The demand curve also matches the territory’s reported annual peak."}
-                    </Typography>
-                    <Typography variant="body2">
-                      Explore {growthScenario.startingYear}–
-                      {growthScenario.startingYear +
-                        (scenario || growthScenario).durationMonths / 12}
-                      .
-                    </Typography>
-                    <Typography variant="body2">
-                      Power mix based on{" "}
-                      {powerMix && (
-                        <a
-                          href={powerMix.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {powerMix.geography} capacity data ({powerMix.year})
-                        </a>
-                      )}
-                      . Uses the region’s mix of power-generating equipment, not
-                      its electricity output or your city’s actual power plants.
-                      {powerMix && startingYear > powerMix.year
-                        ? " Later starts use the latest available mix, not a prediction."
-                        : ""}
-                    </Typography>
-                    <Typography variant="body2">
-                      {powerMix?.geothermalSourceUrl && (
-                        <>
-                          <a
-                            href={powerMix.geothermalSourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            IRENA geothermal capacity data
-                          </a>{" "}
-                          supplements the regional source.{" "}
-                        </>
-                      )}
-                      The model sizes the starting power plants to serve
-                      existing demand with a 5% model supply margin, before your
-                      new data centers arrive. This is an opening-year
-                      allowance; growing background demand can require more
-                      infrastructure. Hydro is limited to known sites, and
-                      geothermal to suitable locations; those limits can change
-                      the regional mix. Gas is split between steady and
-                      quick-start plants. Storage and unclassified sources are
-                      excluded.
-                    </Typography>
-                    <ul>
-                      {growthScenario.facilities.map((facility, index) => (
-                        <li key={`${facility.name}-${index}`}>
-                          {facility.label
-                            ? `${facility.label} (${facility.name})`
-                            : facility.name ||
-                              (facility.fuel === "Sun"
-                                ? "Solar"
-                                : facility.fuel === "Uranium"
-                                  ? "Nuclear"
-                                  : facility.fuel)}
-                          : {formatWatts(facility.peakW || 0)}
-                        </li>
-                      ))}
-                    </ul>
-                    <Typography variant="body2">
-                      Uses the model’s full costs and construction times.
+                    <summary>Assumptions</summary>
+                    <dl className="dataCenterSetupFacts">
+                      <div>
+                        <dt>Period</dt>
+                        <dd className="dataCenterSetupFactsYears">
+                          {growthScenario.startingYear}–
+                          {growthScenario.startingYear +
+                            (scenario || growthScenario).durationMonths / 12}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Demand</dt>
+                        <dd>
+                          <p>
+                            {customerProfile?.annualMWh ? (
+                              <>
+                                Background electricity use is sized to{" "}
+                                {(customerProfile.annualMWh / 1000000).toFixed(
+                                  2,
+                                )}{" "}
+                                TWh per year for {customerProfile.serviceArea},
+                                using{" "}
+                                <a
+                                  href={
+                                    customerProfile.energySourceUrl ||
+                                    customerProfile.sourceUrl
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  published {customerProfile.energySourceYear}{" "}
+                                  electricity sales
+                                </a>
+                                . Changing the account count scales this total.
+                              </>
+                            ) : (
+                              <>
+                                Annual electricity use has no verified local
+                                reference; demand per account uses the game’s
+                                regional assumptions.
+                              </>
+                            )}
+                          </p>
+                          <p className="dataCenterSetupNote">
+                            Published totals include existing data centers.
+                            Their share and future growth use regional model
+                            assumptions, rather than a measured local inventory.
+                            Starting years use the same published snapshot,
+                            shaped by local weather.
+                            {customerProfile?.observedPeakW &&
+                              " The demand curve also matches the territory’s reported annual peak."}
+                          </p>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Power mix</dt>
+                        <dd>
+                          {powerMix && (
+                            <p>
+                              Based on{" "}
+                              <a
+                                href={powerMix.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {powerMix.geography} capacity data (
+                                {powerMix.year})
+                              </a>
+                              {powerMix.geothermalSourceUrl && (
+                                <>
+                                  , supplemented by{" "}
+                                  <a
+                                    href={powerMix.geothermalSourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    IRENA geothermal capacity data
+                                  </a>
+                                </>
+                              )}
+                              .
+                            </p>
+                          )}
+                          <p className="dataCenterSetupNote">
+                            Uses the region’s mix of power-generating equipment,
+                            not its electricity output or your city’s actual
+                            power plants.
+                            {powerMix && startingYear > powerMix.year
+                              ? " Later starts use the latest available mix, not a prediction."
+                              : ""}
+                          </p>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Starting plants</dt>
+                        <dd>
+                          <p>
+                            Sized to serve existing demand with a 5% model
+                            supply margin, before your new data centers arrive.
+                            Gas is split between steady and quick-start plants.
+                            Storage and unclassified sources are excluded.
+                          </p>
+                          <table className="dataCenterSetupPlants">
+                            <thead>
+                              <tr>
+                                <th scope="col">Source</th>
+                                <th scope="col">Capacity</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {growthScenario.facilities.map(
+                                (facility, index) => (
+                                  <tr key={`${facility.name}-${index}`}>
+                                    <td>
+                                      {facility.label
+                                        ? `${facility.label} (${facility.name})`
+                                        : facility.name ||
+                                          (facility.fuel === "Sun"
+                                            ? "Solar"
+                                            : facility.fuel === "Uranium"
+                                              ? "Nuclear"
+                                              : facility.fuel)}
+                                    </td>
+                                    <td>{formatWatts(facility.peakW || 0)}</td>
+                                  </tr>
+                                ),
+                              )}
+                            </tbody>
+                          </table>
+                          <p className="dataCenterSetupNote">
+                            This is an opening-year allowance; growing
+                            background demand can require more infrastructure.
+                          </p>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Limits</dt>
+                        <dd>
+                          <p>
+                            Hydro is limited to known sites, and geothermal to
+                            suitable locations; those limits can change the
+                            regional mix.
+                          </p>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Costs</dt>
+                        <dd>
+                          <p>
+                            Uses the model’s full costs and construction times.
+                          </p>
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="dataCenterSetupNote dataCenterSetupClosing">
                       Results help you explore tradeoffs, rather than predict a
                       specific project’s impact.
-                    </Typography>
+                    </p>
                   </details>
                 </>
               )}

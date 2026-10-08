@@ -112,6 +112,60 @@ export function zoomViewportAt(
   });
 }
 
+/**
+ * Zooms one step into a cluster without re-centering on it: the cluster stays where it was on
+ * screen, as it does in common map apps, and the view pans only as far as needed to keep every
+ * member inside the screen-space margin. Re-centering made a corner cluster leap across the map.
+ */
+export function zoomViewportToCluster(
+  viewport: MapViewport,
+  anchor: MapPoint,
+  members: MapPoint[],
+  margin: MapPoint,
+): MapViewport {
+  const anchored = zoomViewportAt(viewport, viewport.zoom + 1, anchor);
+  if (members.length === 0) return anchored;
+  const scale = MAP_ZOOM_SCALES[anchored.zoom];
+  const fit = (center: number, values: number[], inset: number) => {
+    const low = (Math.min(...values) - center) * scale + 0.5;
+    const high = (Math.max(...values) - center) * scale + 0.5;
+    if (high - low > 1 - 2 * inset) {
+      return (Math.min(...values) + Math.max(...values)) / 2;
+    }
+    if (low < inset) return center + (low - inset) / scale;
+    if (high > 1 - inset) return center + (high - (1 - inset)) / scale;
+    return center;
+  };
+  return clampViewport({
+    zoom: anchored.zoom,
+    center: {
+      x: fit(
+        anchored.center.x,
+        members.map((point) => point.x),
+        margin.x,
+      ),
+      y: fit(
+        anchored.center.y,
+        members.map((point) => point.y),
+        margin.y,
+      ),
+    },
+  });
+}
+
+/** Where a world point sits on screen, in the same 0-1 units, even outside the visible area. */
+export function screenPointInViewport(
+  point: MapPoint,
+  viewport: MapViewport,
+): MapPoint {
+  const clamped = clampViewport(viewport);
+  const scale = MAP_ZOOM_SCALES[clamped.zoom];
+  return {
+    x: (point.x - clamped.center.x) * scale + 0.5,
+    y: (point.y - clamped.center.y) * scale + 0.5,
+  };
+}
+
 /** Moves a zoomed viewport by screen pixels, clamping it at the edge of the world. */
 export function panViewport(
   viewport: MapViewport,
@@ -138,10 +192,7 @@ export function pointInViewport(
   point: MapPoint,
   viewport: MapViewport,
 ): MapPoint | undefined {
-  const clamped = clampViewport(viewport);
-  const scale = MAP_ZOOM_SCALES[clamped.zoom];
-  const x = (point.x - clamped.center.x) * scale + 0.5;
-  const y = (point.y - clamped.center.y) * scale + 0.5;
+  const { x, y } = screenPointInViewport(point, viewport);
   if (x < 0 || x > 1 || y < 0 || y > 1) {
     return undefined;
   }

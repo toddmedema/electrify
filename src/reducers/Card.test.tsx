@@ -21,6 +21,18 @@ describe("card reducer", () => {
     expect(state.history).toEqual(["NEW_GAME", "MAIN_MENU"]);
   });
 
+  it("opens a data-center guide link on its setup, with the title screen one step back", () => {
+    window.history.replaceState(null, "", "/?dataCenters=1");
+    const state = cardReducer(undefined, { type: "@@INIT" });
+    expect(state.name).toBe("DATA_CENTER_SETUP");
+    expect(state.ts).toBe(0);
+    expect(cardReducer(state, navigateBack()).name).toBe("MAIN_MENU");
+    // Quitting a run started from there still lands on the title screen
+    expect(cardReducer(state, quit()).name).toBe("MAIN_MENU");
+    window.history.replaceState(null, "", "/");
+    expect(cardReducer(undefined, { type: "@@INIT" }).name).toBe("MAIN_MENU");
+  });
+
   it("writes a public URL for routed cards", () => {
     window.history.replaceState(null, "", "/");
     cardReducer(

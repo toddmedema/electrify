@@ -2039,6 +2039,10 @@ $pane_header_height: 48px;
   }
 }
 
+.base_main.pageEnter {
+  animation: fadein 400ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2510,7 +2514,7 @@ $pane_header_height: 48px;
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);
     background: var(--bg-raised);
-    font-family: monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.85em;
     line-height: 1.5;
     text-align: center;
@@ -4996,10 +5000,95 @@ $sizemap: (
 .manual-related {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  // Baseline, so the "Related entries" label sits on the same line as the link text inside
+  // the taller buttons rather than riding above it
+  align-items: baseline;
   gap: 4px;
   border-top: 1px solid var(--border-subtle);
   padding-top: 8px;
+
+  // Each link's box hangs out by its own padding, so a wrapped row's text starts on the label's
+  // left edge instead of 8px in; the label's end margin restores the gap the first link loses
+  > .MuiTypography-root {
+    margin-inline-end: 8px;
+  }
+
+  > .manual-related-link.MuiButton-root {
+    margin-inline: -8px 8px;
+  }
+}
+// Manual prose, in the full manual and the help popover alike: a line height and half-line
+// paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
+// windows don't stretch lines past comfortable reading, and links in the interaction blue
+// rather than the browser's default (which falls to dark navy on the dark page). Figures and
+// tables keep their own width; only running text is capped.
+#manual .manual-entry .MuiAccordionDetails-root,
+.manual-popover-body {
+  // On the text itself, not the container, so composed pieces like the symbol legend keep
+  // their own vertical centring
+  p,
+  ul,
+  ol {
+    max-width: 70ch;
+    line-height: 1.5;
+  }
+
+  p {
+    margin: 0 0 $space-3;
+  }
+
+  > div > :first-child {
+    margin-top: 0;
+  }
+
+  > div > :last-child {
+    margin-bottom: 0;
+  }
+
+  a {
+    color: var(--interactive-strong);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  // The source line is a citation: secondary text, but its link keeps full link contrast,
+  // which the old 0.7 opacity took away from both
+  figcaption {
+    opacity: 1;
+    color: var(--font-color-faded);
+  }
+
+  // Tables follow the text's left edge instead of floating in the middle of a wide card. The
+  // points column right-aligns on tabular figures so +4 and -10 line up by digit, and cells
+  // sit on a shared baseline so a wrapped description stays level with its value
+  .points,
+  .shortcuts {
+    margin: 0 0 $space-4;
+
+    td,
+    th {
+      vertical-align: baseline;
+    }
+
+    tr > :first-child {
+      padding-left: 0;
+    }
+  }
+
+  .points td:first-child {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .manual-related {
+    margin-top: $space-4;
+  }
+}
+// The first paragraph's margin used to be the gap under an open entry's title divider, so
+// entries that open on a table or legend started flush against it. The gap lives here now.
+#manual .manual-entry .MuiAccordionDetails-root {
+  padding-top: $space-4;
 }
 @media (pointer: coarse) {
   .manual-link-text,
@@ -6661,22 +6750,136 @@ $programs_column: 800px;
     margin-top: var(--space-4);
     border-top: 1px solid var(--border-subtle);
 
-    summary {
+    > summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
       min-height: var(--control-size);
-      align-content: center;
       cursor: pointer;
+      list-style: none;
       color: var(--interactive-strong);
       font-weight: var(--font-weight-emphasis);
     }
 
-    summary:focus-visible {
+    > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    // A chevron that turns down when open, so the row reads as a disclosure rather than a link
+    > summary::before {
+      content: "";
+      flex: none;
+      width: 7px;
+      height: 7px;
+      margin: 0 var(--space-1);
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+      transition: transform 150ms ease;
+    }
+
+    &[open] > summary::before {
+      transform: rotate(45deg);
+    }
+
+    > summary:focus-visible {
       outline: 2px solid var(--focus-ring);
       outline-offset: 2px;
     }
 
-    ul {
-      padding-left: var(--space-5);
-      font-size: var(--font-size-body2);
+    @media (prefers-reduced-motion: reduce) {
+      > summary::before {
+        transition: none;
+      }
+    }
+
+    p {
+      margin: 0;
+    }
+
+    a {
+      color: var(--interactive-strong);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+  }
+
+  // Assumptions read as labelled facts: a short label column beside a capped measure, so each
+  // group is scannable and long sentences stay near 70 characters.
+  .dataCenterSetupFacts {
+    display: grid;
+    gap: var(--space-4);
+    margin: var(--space-1) 0 0;
+    font-size: var(--font-size-body2);
+    line-height: 1.5;
+
+    > div {
+      display: grid;
+      grid-template-columns: 8rem minmax(0, 70ch);
+      gap: var(--space-4);
+    }
+
+    dt {
+      font-weight: var(--font-weight-emphasis);
+    }
+
+    dd {
+      display: grid;
+      gap: var(--space-2);
+      margin: 0;
+      justify-items: start;
+    }
+
+    @media (max-width: 599px) {
+      > div {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-1);
+      }
+    }
+  }
+
+  .dataCenterSetupFactsYears {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dataCenterSetupNote {
+    color: var(--font-color-faded);
+  }
+
+  .dataCenterSetupClosing {
+    margin: var(--space-4) 0 var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--font-size-body2);
+    line-height: 1.5;
+  }
+
+  // Names stay regular weight so the right-aligned, tabular capacities carry the eye
+  .dataCenterSetupPlants {
+    width: 100%;
+    max-width: 24rem;
+    margin: 0;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+
+    th,
+    td {
+      padding: var(--space-1) 0;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+      vertical-align: baseline;
+    }
+
+    th {
+      padding-top: 0;
+      color: var(--font-color-faded);
+      font-size: var(--font-size-caption-sm);
+    }
+
+    :is(th, td):last-child {
+      padding-left: var(--space-4);
+      text-align: right;
+      white-space: nowrap;
     }
   }
 
@@ -6699,6 +6902,10 @@ $programs_column: 800px;
   .dataCenterSetupGridSize {
     margin-top: 0;
     border-top: 0;
+
+    > .MuiFormControl-root {
+      margin-top: var(--space-2);
+    }
 
     > .MuiTypography-root {
       margin-top: var(--space-2);

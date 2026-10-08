@@ -693,7 +693,17 @@ export default class Compositor extends React.Component<Props, {}> {
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <main className="base_main" ref={transitionNodeRef}>
+            <main
+              className={`base_main${
+                // The guide is a separate document, so a slide can't continue from it. The
+                // setup it links to fades in on that first load instead (ts 0 is the startup card)
+                this.props.card.ts === 0 &&
+                this.props.card.name === "DATA_CENTER_SETUP"
+                  ? " pageEnter"
+                  : ""
+              }`}
+              ref={transitionNodeRef}
+            >
               {this.renderCard()}
             </main>
           </CSSTransition>
