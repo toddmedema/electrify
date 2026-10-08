@@ -1,6 +1,5 @@
 import { ScenarioType } from "../Types";
 import { HYDRO_SITES } from "../data/HydroSites";
-import { getDataCenterCustomerProfile } from "../data/DataCenterCustomers";
 import {
   forecastCustomGameTimeline,
   summarizeYearOneOutlook,
@@ -28,14 +27,14 @@ const forecast = (scenario: ScenarioType) =>
 export function calibrateDataCenterScenario({
   location,
   startingYear,
-  startingCustomers,
+  customerProfile: profile,
+  startingCustomers = profile.customers,
 }: Omit<DataCenterSetupRequest, "requestId">): ScenarioType {
   let scenario = createDataCenterScenario(
     location,
     startingYear,
     startingCustomers,
   );
-  const profile = getDataCenterCustomerProfile(location);
   if (profile.annualMWh) {
     if (profile.observedPeakW) {
       const targetRatio =

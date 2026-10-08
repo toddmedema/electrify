@@ -7,7 +7,6 @@ import {
   ScenarioFacilityType,
   ScenarioType,
 } from "../Types";
-import { getDataCenterCustomerProfile } from "../data/DataCenterCustomers";
 import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
 import { HYDRO_SITES, resolveHydroInventory } from "../data/HydroSites";
 
@@ -60,7 +59,7 @@ export function configureDataCenterGrowth(
 export function createDataCenterScenario(
   location: LocationType,
   startingYear: number,
-  customers?: number,
+  startingCustomers: number,
 ): ScenarioType {
   const researched = SCENARIOS.find(
     (scenario) =>
@@ -68,8 +67,6 @@ export function createDataCenterScenario(
       scenario.locationId === location.id &&
       scenario.startingDemandScale,
   );
-  const startingCustomers =
-    customers ?? getDataCenterCustomerProfile(location).customers;
   if (
     !Number.isInteger(startingCustomers) ||
     startingCustomers < 1 ||
