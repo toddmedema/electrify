@@ -1,4 +1,5 @@
 import { LOCATIONS } from "../Constants";
+import { LocationType } from "../Types";
 import { REGION_ORDER } from "./Cities";
 import { getDataCenterCustomerProfile } from "./DataCenterCustomers";
 
@@ -47,4 +48,45 @@ describe("data-center customer source boundaries", () => {
       expect(profile.note).toContain("No verified local account count");
     },
   );
+});
+
+test("Las Vegas uses its own utility instead of the North America example", () => {
+  expect(
+    getDataCenterCustomerProfile({
+      ...LOCATIONS.PIT,
+      id: "LasVegas",
+      name: "Las Vegas, NV",
+    }),
+  ).toMatchObject({
+    basis: "local-utility",
+    serviceArea: "NV Energy (Nevada Power), southern Nevada",
+    customers: 1035139,
+    sourceYear: 2024,
+  });
+});
+
+test("every catalog location has a well-formed customer profile", () => {
+  const {
+    cities,
+  }: {
+    cities: Record<string, LocationType & { region: string }>;
+  } = require("../../public/data/weather/index.json");
+  const profiles = Object.values(cities).map(getDataCenterCustomerProfile);
+  profiles.forEach((profile) => {
+    expect(Number.isInteger(profile.customers)).toBe(true);
+    expect(profile.customers).toBeGreaterThan(0);
+    expect(profile.sourceUrl).toMatch(/^https?:\/\//);
+    expect(profile.serviceArea).not.toMatch(/[^\x20-\x7e]|\.$/);
+  });
+  const local = profiles.filter(({ basis }) => basis === "local-utility");
+  expect(local.length).toBeGreaterThan(profiles.length / 2);
+  local.forEach(({ note }) => expect(note.length).toBeLessThanOrEqual(140));
+  local
+    .filter(({ annualMWh }) => annualMWh)
+    .forEach(({ annualMWh, customers, energySourceYear }) => {
+      expect(energySourceYear).toBeDefined();
+      // Retail sales per account stay between a few hundred kWh and a few hundred MWh.
+      expect(annualMWh! / customers).toBeGreaterThan(0.3);
+      expect(annualMWh! / customers).toBeLessThan(200);
+    });
 });

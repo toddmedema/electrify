@@ -129,10 +129,9 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   expect(request.startingYear).toBe(new Date().getFullYear());
   const growth = preparedScenario();
   reply(growth);
-  const comparison = screen.getByText(/To compare the difference/);
-  expect(comparison).toHaveTextContent(
-    "Uses local weather and a regional power mix.",
-  );
+  expect(
+    screen.getByText(/Uses local weather and a regional power mix\./),
+  ).toBeInTheDocument();
   expect(startButton()).toBeEnabled();
   expect(
     screen.getByRole("heading", { name: "How much extra power?" }),

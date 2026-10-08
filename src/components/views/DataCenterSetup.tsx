@@ -353,11 +353,10 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                     color="textSecondary"
                     className="dataCenterSetupComparison"
                   >
-                    To compare the difference, run again with 0 power needed.{" "}
                     Uses local weather and a regional power mix. This is an
                     example grid, not a forecast of your utility’s plans. Your
-                    selected power is a steady total load, including cooling,
-                    added to existing demand and its growth.
+                    selected power is a steady total load added to existing
+                    demand and its growth.
                   </Typography>
                   {growthScenario.facilities.some(
                     (facility) =>

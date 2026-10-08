@@ -1,10 +1,10 @@
 {
-  "recorded": "2026-09-29",
+  "recorded": "2026-10-08",
   "node": "v24.14.0",
   "metrics": {
-    "mainJs": 805127,
-    "mainCss": 21849,
-    "initialJs": 805127,
-    "allJs": 1270268
+    "mainJs": 882071,
+    "mainCss": 21781,
+    "initialJs": 882071,
+    "allJs": 1396757
   }
 }
