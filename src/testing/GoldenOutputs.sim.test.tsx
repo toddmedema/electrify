@@ -3,7 +3,8 @@
  * just run-to-run agreement. Each scenario runs the same way `npm run sim -- --all` runs it
  * (default difficulty, duration and strategy; the scenario's own seed, else the simulator's
  * default 12345), and its oldest-first monthly history plus a small final-state summary is
- * hashed.
+ * hashed. Every one of those runs must also hold the economy's invariants, which the CLI sweep only
+ * prints.
  *
  * Every finite number is rounded to 10 significant digits before hashing, so last-bit libm or
  * V8 drift doesn't flake the gate while any real behavior change still moves the hash. The
@@ -18,6 +19,7 @@
 import { createHash } from "crypto";
 import { SCENARIOS } from "../data/Scenarios";
 import { ScenarioType } from "../Types";
+import { expectNoViolations } from "./SimulationTestHelpers";
 import { runSimulation } from "./Simulator";
 
 jest.setTimeout(600000);
@@ -53,6 +55,7 @@ function canonicalize(value: unknown): unknown {
 
 function goldenHash(scenario: ScenarioType): string {
   const result = runSimulation({ scenarioId: scenario.id, scenario });
+  expectNoViolations(result);
   const summary = {
     outcome: result.outcome,
     finalMonth: result.months.length,

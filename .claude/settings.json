@@ -11,6 +11,7 @@
       "Bash(npm run format:check)",
       "Bash(npm run test:once:*)",
       "Bash(npm run test:ci:*)",
+      "Bash(npm run test:sim:*)",
       "Bash(npm run sim:*)",
       "Bash(npm run build)",
       "Bash(npm run compatibility:generate)",

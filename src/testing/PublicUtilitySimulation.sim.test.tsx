@@ -229,7 +229,8 @@ describe("researched public-utility scenarios", () => {
   const operatingDifficulties = difficulties.filter(
     (difficulty) => difficulty !== "CEO",
   );
-  // Intern plays this exact build in SimulationEconomics.test.tsx, which asserts the same outcome
+  // Intern plays this exact build in SimulationEconomics.sim.test.tsx, which asserts the same
+  // outcome
   it.each(
     operatingDifficulties.filter((difficulty) => difficulty !== "Intern"),
   )(

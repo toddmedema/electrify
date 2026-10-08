@@ -8,19 +8,22 @@ files are large, so broad rewrites create expensive review diffs.
 
 - Use Node 24 and install exactly the lockfile with `npm ci`.
 - Run `npm run check` before handing work off (about a minute). It runs the same gates as CI:
-  types (including `e2e/`), lint, formatting, the covered Jest suite, and every scenario through
-  the headless simulation. It reports every failing step at once, prints only
+  types (including `e2e/`), lint, formatting, the covered Jest suite, the long simulation suites
+  (`npm run test:sim`, which includes every scenario through the headless simulation), and a
+  short run of the simulation CLI. It reports every failing step at once, prints only
   failing output, and ends with a one-line-per-step summary and fix commands.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
   interactive watch mode and never exits in a non-interactive shell. Coverage thresholds apply
-  only to `test:ci`.
+  only to `test:ci`, which skips `*.sim.test.tsx`. Name a suite that way when it plays long
+  simulations and isn't needed for coverage: `test:sim` runs those without instrumentation in a
+  separate CI job.
 - Iterate on game economics with `npm run sim -- --scenario <id>`. See `src/testing/README.md`
   for simulation flags and traps.
 - Performance work starts from `docs/perf-plan.md`. `npm run perf:bench` reports tick and
   rollover cost and gates same-process ratios; `npm run perf:bundle` gates gzip bytes after a
-  build; `src/testing/GoldenOutputs.test.tsx` pins every scenario's output. Rebaseline all of
+  build; `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output. Rebaseline all of
   them with `npm run perf:rebaseline`, last, and explain the move in the PR. Append `?perf=1`
   to a dev URL for the frame-budget overlay.
 - Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and

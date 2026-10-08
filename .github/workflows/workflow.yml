@@ -12,28 +12,22 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# Three jobs run side by side, each a few minutes, instead of one job running every check in turn.
+# Within a job, each check runs even if an earlier one failed, so one PR run reports every problem
+# rather than only the first. The `check` job at the end is the required status check.
 jobs:
-  check:
+  unit:
+    name: Types, lint and unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
         with:
           lfs: true
 
-      - name: Setup Node.js environment
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.14.0
-          cache: npm
+      - uses: ./.github/actions/install
 
-      # ci, not install: installs exactly what package-lock.json pins, so a run
-      # can't pass on a dependency tree nobody has locally.
-      - run: npm ci
-
-      # Each check runs even if an earlier one failed, so one PR run reports
-      # every problem rather than only the first.
       - name: Types
         if: '!cancelled()'
         run: npm run typecheck
@@ -46,28 +40,89 @@ jobs:
         if: '!cancelled()'
         run: npm run format:check
 
-      # No --passWithNoTests: if the jest config ever breaks so that no test
-      # matches, that should fail the build rather than report success.
+      # Jest's cache holds compiled sources and each file's last duration. Without the durations
+      # it schedules the smallest files last, whatever they cost. Caches are scoped to the PR, so a
+      # later push or re-run restores the previous run's.
+      - name: Restore Jest cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      # Coverage floors apply here. The long simulations live in *.sim.test.tsx and run in the
+      # simulation job instead: instrumenting them makes them about half again as slow, and these
+      # suites meet the floors without them. No --passWithNoTests: if the jest config ever breaks so
+      # that no test matches, that should fail the build rather than report success.
       - name: Tests
         if: '!cancelled()'
-        run: npm run test:ci
+        run: npm run test:ci -- --cacheDirectory="$RUNNER_TEMP/jest-cache"
 
-      # The headless simulation asserts the economy's invariants across every
-      # scenario. Simulation.test.tsx covers this too, but running the CLI keeps
-      # the entry point itself honest.
-      - name: Simulation
+      - name: Save Jest cache
         if: '!cancelled()'
-        run: npm run sim -- --all
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  simulation:
+    name: Simulation and performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - uses: ./.github/actions/install
+
+      - name: Restore Jest cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      # Economics, balance and golden-output suites. GoldenOutputs runs every scenario the way
+      # `npm run sim -- --all` does and fails on any invariant violation.
+      - name: Simulation tests
+        if: '!cancelled()'
+        run: npm run test:sim -- --cacheDirectory="$RUNNER_TEMP/jest-cache"
+
+      - name: Save Jest cache
+        if: '!cancelled()'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # One short run keeps the CLI entry point itself honest; the scenario sweep is covered above.
+      - name: Simulation CLI
+        if: '!cancelled()'
+        run: npm run sim -- --scenario 101 --months 12
 
       # Same-process ratios (Immer overhead, month rollover vs an ordinary tick) cancel runner
       # speed, so they can gate; the milliseconds are reported only. See docs/perf-plan.md.
+      # Runs after the tests so nothing else competes for the CPU.
       - name: Tick performance ratios
         if: '!cancelled()'
         run: npm run perf:bench
 
+  browser:
+    name: Build and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - uses: ./.github/actions/install
+
       - name: Production build
         id: build
-        if: '!cancelled()'
         run: npm run build
 
       # Gzip bytes gate at 10% over the recorded ceilings.
@@ -99,3 +154,22 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # The one required status check on master. It passes only when every job above succeeded, so a
+  # failed, cancelled or timed-out job blocks the merge.
+  check:
+    if: '!cancelled()'
+    needs: [unit, simulation, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          UNIT: ${{ needs.unit.result }}
+          SIMULATION: ${{ needs.simulation.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          echo "Types, lint and unit tests: $UNIT"
+          echo "Simulation and performance: $SIMULATION"
+          echo "Build and browser tests:    $BROWSER"
+          [ "$UNIT" = success ] && [ "$SIMULATION" = success ] && [ "$BROWSER" = success ]

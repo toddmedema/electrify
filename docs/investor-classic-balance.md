@@ -21,6 +21,6 @@ while keeping their replacement generation. Carbon Fee and Paradise retain
 their existing investment plans. These are reproducible examples, not the
 only allowed strategies.
 
-Validation lives in `InvestorObjectives.test.tsx` (high-price attrition and viable price-only play),
-`SimulationEconomics.test.tsx` (Intern accessibility), and the CEO economics
+Validation lives in `InvestorObjectives.sim.test.tsx` (high-price attrition and viable price-only play),
+`SimulationEconomics.sim.test.tsx` (Intern accessibility), and the CEO economics
 suites (active playbooks and seeds 1, 7, 20).

@@ -11,7 +11,12 @@ const steps = [
   { name: "Lint", script: "lint", fix: "npm run lint:fix" },
   { name: "Formatting", script: "format:check", fix: "npm run format" },
   { name: "Tests", script: "test:ci" },
-  { name: "Simulation", script: "sim", args: ["--", "--all"] },
+  { name: "Simulation tests", script: "test:sim" },
+  {
+    name: "Simulation CLI",
+    script: "sim",
+    args: ["--", "--scenario", "101", "--months", "12"],
+  },
 ];
 
 function run(step) {
@@ -41,13 +46,12 @@ function run(step) {
 }
 
 async function main() {
-  // The static checks take a few seconds each and barely contend with one another; Jest and the
-  // simulation each use every core, so they run alone.
-  const results = [
-    ...(await Promise.all(steps.slice(0, 3).map(run))),
-    await run(steps[3]),
-    await run(steps[4]),
-  ];
+  // The static checks take a few seconds each and barely contend with one another; each Jest run
+  // uses every core, so they run alone.
+  const results = [...(await Promise.all(steps.slice(0, 3).map(run)))];
+  for (const step of steps.slice(3)) {
+    results.push(await run(step));
+  }
   for (const result of results.filter((r) => !r.ok)) {
     console.error(
       `\n===== ${result.name} failed =====\n${result.output.trimEnd()}`,

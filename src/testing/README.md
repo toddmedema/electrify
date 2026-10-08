@@ -34,7 +34,7 @@ One explicit storage decision can be replayed with, for example,
 Pass `--without-stories` to run the same playthrough as an authored-effects control, and
 `--without-hazards` to switch off hail and extreme cold (`weatherHazardsEnabled: false` in
 `runSimulation`). When hazards fire, the totals add a "Weather hazards" line: storms, facility
-hits, repair costs, cold snaps and derated plant-months. `WeatherHazardBalance.test.tsx` runs a
+hits, repair costs, cold snaps and derated plant-months. `WeatherHazardBalance.sim.test.tsx` runs a
 solar-and-gas fleet for twenty years at Denver, Dallas, SF, PIT and Reykjavik and bounds the
 storm counts; `reducers/WeatherHazard.test.tsx` covers onset, repair costs, repair, retrofits,
 save/resume and replay.
@@ -105,18 +105,20 @@ code rather than a vibe.
 | Weather hazards     | Each month, new hail and cold derates stay within (0, 1], hail only hits operating solar and charges exactly its repair cost, cold only derates gas plants rated warmer than the month's minimum, and gas price spikes are at least 1x                                                                                                           |
 
 `Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
-`SimulationEconomics*.test.tsx` cover difficulty, player strategies, price competition, and
+`SimulationEconomics*.sim.test.tsx` cover difficulty, player strategies, price competition, and
 economic identities; the CEO matrix is split across several of these files only so it runs in
 parallel. Tests in one file that need the same playthrough can share it through
-`runSimulationOnce` in `SimulationTestHelpers.ts`. `PublicUtilitySimulation.test.tsx` covers the researched public utilities.
+`runSimulationOnce` in `SimulationTestHelpers.ts`. `PublicUtilitySimulation.sim.test.tsx` covers the researched public utilities.
 Keeping these independent groups in separate files lets Jest run the long simulations in parallel.
+Suites named `*.sim.test.tsx` run through `npm run test:sim`, without coverage, in their own CI job;
+`npm run test:ci` skips them.
 
 The CEO matrix retains complete winning playbooks and multiple seeds. Decision-count and category
 targets in `DecisionBenchmarks.ts` measure those internal playbooks only; they never determine a
 player's outcome. `helpers/MeaningfulDecisions.test.ts` checks action accounting, while
-`ScenarioChoiceBalance.test.tsx` checks physical economic outcomes and customer retention.
+`ScenarioChoiceBalance.sim.test.tsx` checks physical economic outcomes and customer retention.
 
-Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
+Customer program balance coverage lives in `PolicyBalance.sim.test.tsx`. The simulator accepts
 `initialPrograms: { efficiency: "On", solar: "On" }` and schedules each through the real
 reducer for month two; `scheduledActions` can start a program later. The matrix compares Off,
 efficiency-only, solar-only, combined, and a late efficiency start through a full 48-month
