@@ -739,10 +739,6 @@ a:hover {
   border-top: 1px solid var(--border);
 }
 
-.community-next-step p {
-  max-width: 48rem;
-}
-
 .community-next-step .community-model-note {
   margin-top: 1.5rem;
   font-size: 0.9375rem;
