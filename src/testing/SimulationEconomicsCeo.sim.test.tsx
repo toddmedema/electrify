@@ -10,8 +10,8 @@ import { runSimulation } from "./Simulator";
 
 jest.setTimeout(120000);
 
-// The economics matrix is split across SimulationEconomics*.test.tsx so that Jest, which runs
-// files rather than tests in parallel, can spread its long simulations over every CI core.
+// The economics matrix is split across SimulationEconomics*.sim.test.tsx so that Jest, which
+// runs files rather than tests in parallel, can spread its long simulations over every CI core.
 describe("simulation economics on CEO", () => {
   const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
     100: [

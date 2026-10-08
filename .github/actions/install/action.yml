@@ -1,0 +1,41 @@
+name: Install dependencies
+description: >
+  Sets up Node and installs exactly what package-lock.json pins, restoring node_modules from the
+  cache when the lockfile and Node version are unchanged.
+inputs:
+  node-version:
+    description: Node version; keep in step with deploy-prod.yml.
+    default: 24.14.0
+runs:
+  using: composite
+  steps:
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache/restore@v6
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ inputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+    # npm's download cache only helps when npm ci runs, so skip restoring it on a hit.
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ steps.modules.outputs.cache-hit != 'true' && 'npm' || '' }}
+
+    # ci, not install: installs exactly what package-lock.json pins, so a run can't pass on a
+    # dependency tree nobody has locally.
+    - name: Install packages
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci
+
+    # Saved straight after the install, before any job writes build or lint caches under
+    # node_modules/.cache, so every job restores the same pristine tree. Parallel jobs race to
+    # save the same key; the losers only log a warning.
+    - name: Save node_modules
+      if: steps.modules.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: node_modules
+        key: ${{ steps.modules.outputs.cache-primary-key }}
