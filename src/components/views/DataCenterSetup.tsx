@@ -10,7 +10,11 @@ import {
 import { sliderTickToW, wToSliderTick } from "../../helpers/BuildSizing";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CityType, getCities, initCities } from "../../data/Cities";
-import { getDataCenterCustomerProfile } from "../../data/DataCenterCustomers";
+import {
+  DataCenterCustomerSources,
+  getDataCenterCustomerProfile,
+  initDataCenterCustomers,
+} from "../../data/DataCenterCustomers";
 import { getDataCenterPowerMix } from "../../data/DataCenterPowerMix";
 import {
   configureDataCenterGrowth,
@@ -82,9 +86,14 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
   const [demandTick, setDemandTick] = React.useState(wToSliderTick(100e6));
   const [accountsInput, setAccountsInput] = React.useState<string>();
   const [attempt, setAttempt] = React.useState(0);
-  const customerProfile = location
-    ? getDataCenterCustomerProfile(location)
-    : undefined;
+  const [customerSources, setCustomerSources] =
+    React.useState<DataCenterCustomerSources>();
+  const [customerError, setCustomerError] = React.useState(false);
+  const [customerAttempt, setCustomerAttempt] = React.useState(0);
+  const customerProfile =
+    location && customerSources
+      ? getDataCenterCustomerProfile(location, customerSources)
+      : undefined;
   const powerMix =
     location && validStartingYear(startingYear)
       ? getDataCenterPowerMix(location, startingYear)
@@ -117,11 +126,29 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
   }, []);
 
   React.useEffect(() => {
+    let active = true;
+    setCustomerError(false);
+    initDataCenterCustomers()
+      .then((loaded) => {
+        if (active) setCustomerSources(loaded);
+      })
+      .catch(() => {
+        if (active) setCustomerError(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [customerAttempt]);
+
+  React.useEffect(() => {
     if (location) void prefetchScenarioData(location);
   }, [location]);
 
   const preparation = useWorkerRequest(
-    location && validStartingYear(startingYear) && validAccounts
+    location &&
+      customerProfile &&
+      validStartingYear(startingYear) &&
+      validAccounts
       ? {
           key: `${location.id}:${startingYear}:${startingCustomers}:${attempt}`,
           scope: location,
@@ -129,6 +156,7 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
             requestId,
             location,
             startingYear,
+            customerProfile,
             startingCustomers,
           }),
         }
@@ -227,7 +255,23 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
               or reload to try again.
             </Alert>
           )}
-          {preparation.status === "loading" && (
+          {location && customerError && (
+            <Alert
+              severity="error"
+              action={
+                <Button
+                  onClick={() => setCustomerAttempt((value) => value + 1)}
+                >
+                  Retry
+                </Button>
+              }
+            >
+              We couldn’t load local utility data. Check your connection and
+              retry.
+            </Alert>
+          )}
+          {(preparation.status === "loading" ||
+            (location && !customerSources && !customerError)) && (
             <div className="dataCenterSetupProgress" role="status">
               <CircularProgress size={24} />
               <Typography>Preparing your example grid…</Typography>

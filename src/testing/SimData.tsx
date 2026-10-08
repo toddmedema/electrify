@@ -1,6 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import { LOCATIONS } from "../Constants";
+import {
+  DataCenterCustomerSources,
+  parseDataCenterCustomerSources,
+} from "../data/DataCenterCustomers";
 import { initEconomyFromCsv } from "../data/Economy";
 import { initFuelPricesFromCsv } from "../data/FuelPrices";
 import { initWeatherFromBinary } from "../data/Weather";
@@ -12,6 +16,22 @@ const DATA_DIR = path.resolve(__dirname, "..", "..", "public", "data");
 const WEATHER_DIR = path.join(DATA_DIR, "weather");
 
 let downloaded: { [id: string]: LocationType } | undefined;
+let dataCenterCustomers: DataCenterCustomerSources | undefined;
+
+/** The data-center setup's customer sources, read from the file the browser downloads. */
+export function loadDataCenterCustomerSources(): DataCenterCustomerSources {
+  if (!dataCenterCustomers) {
+    dataCenterCustomers = parseDataCenterCustomerSources(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(DATA_DIR, "data-center-customers.json"),
+          "utf8",
+        ),
+      ),
+    );
+  }
+  return dataCenterCustomers;
+}
 
 /**
  * The cities whose weather has been downloaded, read from the same index the picker uses.

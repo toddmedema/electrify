@@ -2,7 +2,10 @@
 
 Researched September 30, 2026. The old builder reused authored-scenario customer counts or
 continent-wide round numbers. Neither is a researched inventory of the selected city's grid.
-The dedicated builder now reads `src/data/DataCenterCustomers.ts` instead.
+The dedicated builder now reads `public/data/data-center-customers.json` instead. The setup
+screen downloads it on open, like the weather catalog, so it stays out of the app bundle; the
+main thread resolves the selected location's profile and sends it with each worker request.
+`src/data/DataCenterCustomers.ts` validates the file and applies the regional examples below.
 
 ## What these numbers describe
 

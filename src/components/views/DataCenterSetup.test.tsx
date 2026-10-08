@@ -8,7 +8,11 @@ import {
   within,
 } from "@testing-library/react";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
-import { getDataCenterCustomerProfile } from "../../data/DataCenterCustomers";
+import {
+  getDataCenterCustomerProfile,
+  initDataCenterCustomers,
+} from "../../data/DataCenterCustomers";
+import { loadDataCenterCustomerSources } from "../../testing/SimData";
 import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient";
 import { DataCenterSetupRequest } from "../../helpers/DataCenterSetup";
 import { ScenarioType } from "../../Types";
@@ -32,6 +36,14 @@ jest.mock("../../data/Cities", () => {
   return { getCities: () => cities, initCities: () => Promise.resolve(cities) };
 });
 
+jest.mock("../../data/DataCenterCustomers", () => ({
+  ...jest.requireActual("../../data/DataCenterCustomers"),
+  initDataCenterCustomers: jest.fn(),
+}));
+
+const mockInitCustomers = initDataCenterCustomers as jest.MockedFunction<
+  typeof initDataCenterCustomers
+>;
 let worker: Worker;
 let request: DataCenterSetupRequest;
 const mockCreateWorker = createDataCenterSetupWorker as jest.MockedFunction<
@@ -48,6 +60,7 @@ beforeEach(() => {
     terminate: jest.fn(),
   } as unknown as Worker;
   mockCreateWorker.mockReturnValue(worker);
+  mockInitCustomers.mockResolvedValue(loadDataCenterCustomerSources());
 });
 
 function preparedScenario(): ScenarioType {
@@ -262,7 +275,10 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   await chooseCity("Los Angeles");
   expectStartHidden();
   expect(request.startingCustomers).toBe(
-    getDataCenterCustomerProfile(request.location).customers,
+    getDataCenterCustomerProfile(
+      request.location,
+      loadDataCenterCustomerSources(),
+    ).customers,
   );
   reply(preparedScenario());
   expect(
@@ -287,4 +303,23 @@ it("blocks starting and offers retry after a worker error", async () => {
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
   expect(startButton()).toBeEnabled();
+});
+
+it("offers retry when local utility data cannot load", async () => {
+  mockInitCustomers.mockRejectedValueOnce(new Error("offline"));
+  render(<DataCenterSetup onBack={jest.fn()} onStart={jest.fn()} />);
+  const input = screen.getByRole("combobox", { name: "Select a city" });
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "San Francisco" } });
+  fireEvent.click(await screen.findByRole("option", { name: /San Francisco/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "We couldn’t load local utility data",
+  );
+  expect(worker.postMessage).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(1));
+  expect(request.customerProfile.serviceArea).toBe(
+    "CleanPowerSF customers in San Francisco",
+  );
+  expect(request.startingCustomers).toBe(request.customerProfile.customers);
 });

@@ -1,8 +1,15 @@
-import { getDataCenterCustomerProfile } from "../data/DataCenterCustomers";
+import {
+  DataCenterCustomerProfile,
+  getDataCenterCustomerProfile,
+} from "../data/DataCenterCustomers";
 import { DAYS_PER_YEAR } from "../Constants";
 import { demandByTypeAt } from "../data/DemandProfiles";
 import { getDateFromMinute } from "./DateTime";
-import { getSimLocation, loadSimData } from "../testing/SimData";
+import {
+  getSimLocation,
+  loadDataCenterCustomerSources,
+  loadSimData,
+} from "../testing/SimData";
 import { createGame } from "../testing/Simulator";
 import { parseSave, serializeSave } from "../SaveGame";
 import { calibrateDataCenterScenario } from "./DataCenterCalibration";
@@ -17,15 +24,22 @@ import {
   DATA_CENTER_SEED,
   withoutDataCenterGrowth,
 } from "./DataCenterScenario";
+import { LocationType } from "../Types";
+
+const profileFor = (location: LocationType): DataCenterCustomerProfile =>
+  getDataCenterCustomerProfile(location, loadDataCenterCustomerSources());
+const accountsFor = (location: LocationType) => profileFor(location).customers;
 
 it("derives reproducible local assumptions and keeps a full current year", () => {
   const sf = getSimLocation("SF")!;
-  const scenario = createDataCenterScenario(sf, 2026);
-  expect(createDataCenterScenario(sf, 2026)).toEqual(scenario);
+  const scenario = createDataCenterScenario(sf, 2026, accountsFor(sf));
+  expect(createDataCenterScenario(sf, 2026, accountsFor(sf))).toEqual(scenario);
   expect(
-    createDataCenterScenario(getSimLocation("HNL")!, 2026).facilities.some(
-      (plant) => plant.fuel === "Geothermal",
-    ),
+    createDataCenterScenario(
+      getSimLocation("HNL")!,
+      2026,
+      accountsFor(getSimLocation("HNL")!),
+    ).facilities.some((plant) => plant.fuel === "Geothermal"),
   ).toBe(false);
   expect(scenario.startingYear).toBe(2026);
   expect(scenario.loadAdditions?.[0].startsYear).toBe(2032);
@@ -44,6 +58,7 @@ it("derives reproducible local assumptions and keeps a full current year", () =>
         resources: { geothermal: false },
       },
       2026,
+      accountsFor(sf),
     ).facilities,
   ).not.toEqual(scenario.facilities);
 });
@@ -51,7 +66,7 @@ it("derives reproducible local assumptions and keeps a full current year", () =>
 it("honors adjustable demand and arrival through game initialization and saves", () => {
   const location = getSimLocation("SF")!;
   loadSimData(location);
-  const base = createDataCenterScenario(location, 2010);
+  const base = createDataCenterScenario(location, 2010, accountsFor(location));
   for (const [peakW, arrival] of [
     [0, 2011],
     [234000000, 2028],
@@ -99,9 +114,12 @@ it("honors adjustable demand and arrival through game initialization and saves",
     expect(afterGrowth - afterBaseline).toBeCloseTo(peakW);
   }
   expect(
-    createDataCenterScenario(location, 2049).loadAdditions?.[0].startsYear,
+    createDataCenterScenario(location, 2049, accountsFor(location))
+      .loadAdditions?.[0].startsYear,
   ).toBe(2050);
-  expect(() => createDataCenterScenario(location, 2050)).toThrow(RangeError);
+  expect(() =>
+    createDataCenterScenario(location, 2050, accountsFor(location)),
+  ).toThrow(RangeError);
   for (const [peakW, arrival] of [
     [-1, 2020],
     [NaN, 2020],
@@ -118,7 +136,11 @@ it("honors adjustable demand and arrival through game initialization and saves",
 
 it("pairs ordinary demand exactly before the new campus and preserves zero-load baseline saves", () => {
   const location = getSimLocation("SF")!;
-  const scenario = createDataCenterScenario(location, 2026);
+  const scenario = createDataCenterScenario(
+    location,
+    2026,
+    accountsFor(location),
+  );
   const baseline = withoutDataCenterGrowth(scenario);
   for (const minute of [0, 60 * 24 * 30, 60 * 24 * DAYS_PER_YEAR * 5]) {
     const date = getDateFromMinute(minute, 2026);
@@ -213,9 +235,11 @@ it.each([
   (id) => {
     const location = getSimLocation(id)!;
     loadSimData(location);
+    const profile = profileFor(location);
     const scenario = calibrateDataCenterScenario({
       location,
       startingYear: 2026,
+      customerProfile: profile,
     });
     const timeline = forecastCustomGameTimeline(
       scenario,
@@ -238,7 +262,6 @@ it.each([
     expect(summarizeYearOneOutlook(stressed).worstShortfallW).toBeGreaterThan(
       0,
     );
-    const profile = getDataCenterCustomerProfile(location);
     if (!profile.annualMWh) return;
     const actualMWh =
       ((timeline.reduce((sum, tick) => sum + tick.demandW, 0) /
@@ -259,6 +282,7 @@ it("calibrates ordinary demand before the latest allowed opening year", () => {
   const ready = calibrateDataCenterScenario({
     location,
     startingYear: 2049,
+    customerProfile: profileFor(location),
     startingCustomers: 50000,
   });
   const baseline = configureDataCenterGrowth(ready, 0, 2050);
