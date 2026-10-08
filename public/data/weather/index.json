@@ -962,6 +962,7 @@
       "long": -66.9036,
       "timeZone": "America/Caracas",
       "elevation": 882,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -986,6 +987,7 @@
       "long": -79.8891,
       "timeZone": "America/Guayaquil",
       "elevation": 10,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -998,6 +1000,7 @@
       "long": -77.0428,
       "timeZone": "America/Lima",
       "elevation": 139,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1022,6 +1025,7 @@
       "long": -70.6693,
       "timeZone": "America/Santiago",
       "elevation": 538,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1034,6 +1038,7 @@
       "long": -58.3816,
       "timeZone": "America/Argentina/Buenos_Aires",
       "elevation": 18,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1070,6 +1075,7 @@
       "long": -68.303,
       "timeZone": "America/Argentina/Ushuaia",
       "elevation": 48,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1082,6 +1088,7 @@
       "long": -56.1645,
       "timeZone": "America/Montevideo",
       "elevation": 51,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1106,6 +1113,7 @@
       "long": -46.6333,
       "timeZone": "America/Sao_Paulo",
       "elevation": 758,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
