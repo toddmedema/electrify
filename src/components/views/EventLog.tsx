@@ -53,6 +53,15 @@ const CHANGE_LABELS: Partial<Record<GameEventKindType, string>> = {
   SELL: "Facility sold",
 };
 
+function changeLabel(event: GameEventType): string | undefined {
+  if (event.title) return event.title;
+  // BUILD records cancellations as well as approvals; retain that distinction in the heading.
+  if (event.kind === "BUILD" && event.message.startsWith("Cancelled ")) {
+    return "Project cancelled";
+  }
+  return CHANGE_LABELS[event.kind];
+}
+
 type EventHistoryFilterType =
   "WORLD" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
 
@@ -440,9 +449,9 @@ export default function EventLog(props: Props): React.JSX.Element {
                   />
                 </span>
                 <span>
-                  {(event.title || CHANGE_LABELS[event.kind]) && (
+                  {changeLabel(event) && (
                     <strong className="eventChangeTitle">
-                      {event.title || CHANGE_LABELS[event.kind]}
+                      {changeLabel(event)}
                     </strong>
                   )}
                   <span className="eventLogCopy">

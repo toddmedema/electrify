@@ -4,6 +4,51 @@ import { openPane } from "./layout";
 import { editSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
+  test(`cancelled projects retain an accurate history heading in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(page.locator("#appbar:visible").first()).toBeVisible();
+    await editSavedGame(page, (save) => {
+      const id = (save.game.eventLog[0]?.id ?? 0) + 1;
+      save.game.eventLog.unshift({
+        id,
+        kind: "BUILD",
+        label: `${save.game.date.month} ${save.game.date.year}`,
+        message: "Cancelled construction of Natural Gas CC",
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const pane = page.locator(".eventLog:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Events", exact: true }),
+    );
+    const cancellation = pane.locator(".eventLogItem").filter({
+      hasText: "Cancelled construction of Natural Gas CC",
+    });
+    await expect(cancellation.locator(".eventChangeTitle")).toHaveText(
+      "Project cancelled",
+    );
+    expect(
+      await cancellation.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await page.mouse.move(0, 0);
+    await page.screenshot({
+      path: info.outputPath(`project-cancelled-${theme}.png`),
+    });
+  });
+}
+
+for (const theme of ["light", "dark"]) {
   test(`weather recovery remains explicit with reduced motion in ${theme}`, async ({
     page,
   }, info) => {

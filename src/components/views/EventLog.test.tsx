@@ -9,6 +9,23 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 
 describe("EventLog", () => {
   beforeEach(() => localStorage.clear());
+  it.each([
+    "Cancelled construction of Natural Gas CC",
+    "Cancelled construction of Pacific Northwest",
+    "Cancelled cold-weather package on Natural Gas CC; refunded $1M.",
+  ])("identifies the cancelled project in %s", (message) => {
+    render(
+      <EventLog
+        events={[{ id: 1, kind: "BUILD", label: "Jan 2024", message }]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("Project cancelled")).toBeVisible();
+    expect(screen.queryByText("Project started")).toBeNull();
+    expect(screen.getByText(message)).toBeVisible();
+  });
+
   it("distinguishes a grid shortage, recovery and project completion while retaining their consequences", () => {
     render(
       <EventLog

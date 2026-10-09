@@ -31,7 +31,16 @@ export function FacilityFeedbackProvider({
     Partial<Record<number, Milestone>>
   >({});
   const [arriving, setArriving] = React.useState<number>();
-  const [announcement, setAnnouncement] = React.useState("");
+  const [announcement, setAnnouncement] = React.useState({
+    message: "",
+    sequence: 0,
+  });
+  const announce = React.useCallback((message: string) => {
+    setAnnouncement((current) => ({
+      message,
+      sequence: current.sequence + 1,
+    }));
+  }, []);
   const consumedArrival = React.useRef<number>();
   const timers = React.useRef(new Map<number, number>());
   const readOnly = !!game.replayPlayback;
@@ -62,7 +71,7 @@ export function FacilityFeedbackProvider({
     }
     previous.current = next;
     if (!changes.length) return;
-    setAnnouncement(changes.map((change) => change.message).join(" "));
+    announce(changes.map((change) => change.message).join(" "));
     setMilestones((current) => ({
       ...current,
       ...Object.fromEntries(changes.map((change) => [change.id, change.label])),
@@ -81,7 +90,7 @@ export function FacilityFeedbackProvider({
         }, 6000),
       );
     }
-  }, [game, readOnly]);
+  }, [game, readOnly, announce]);
 
   React.useEffect(() => {
     if (!readOnly) return;
@@ -89,8 +98,8 @@ export function FacilityFeedbackProvider({
     timers.current.clear();
     setMilestones({});
     setArriving(undefined);
-    setAnnouncement("");
-  }, [readOnly]);
+    announce("");
+  }, [readOnly, announce]);
 
   React.useEffect(() => {
     if (
@@ -105,11 +114,11 @@ export function FacilityFeedbackProvider({
     if (!facility) return;
     consumedArrival.current = arrivingFacilityId;
     setArriving(facility.id);
-    setAnnouncement(
+    announce(
       `${facility.name}: ${facility.yearsToBuildLeft > 0 ? "construction started." : "added to the fleet."}`,
     );
     onArrivalShown?.(facility.id);
-  }, [arrivingFacilityId, game.facilities, onArrivalShown, readOnly]);
+  }, [arrivingFacilityId, game.facilities, onArrivalShown, readOnly, announce]);
 
   React.useEffect(() => {
     if (arriving === undefined) return;
@@ -133,7 +142,11 @@ export function FacilityFeedbackProvider({
         aria-live="polite"
         aria-atomic="true"
       >
-        {readOnly ? "" : announcement}
+        {/* Repeated recoveries can have identical copy. Replace the text node so the existing
+            live region still observes each new transition, including at fast game speeds. */}
+        <React.Fragment key={announcement.sequence}>
+          {readOnly ? "" : announcement.message}
+        </React.Fragment>
       </span>
       {children}
     </Context.Provider>
