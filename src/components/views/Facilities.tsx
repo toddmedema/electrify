@@ -736,6 +736,7 @@ export interface DispatchProps {
     sourceIndex: number,
     destinationIndex: number | null,
     resumeSpeed: GameType["speed"],
+    intertie?: boolean,
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
@@ -821,6 +822,15 @@ export default class Facilities extends React.Component<Props> {
 
   public onDragEnd(result: DropResult) {
     this.dragging = false;
+    if (result.source.droppableId === "interties") {
+      this.props.onFacilityDragEnd(
+        result.source.index,
+        result.destination?.index ?? null,
+        this.speedBeforeDrag,
+        true,
+      );
+      return;
+    }
     this.props.onFacilityDragEnd(
       result.source.index,
       result.destination?.index ?? null,
@@ -940,6 +950,8 @@ export default class Facilities extends React.Component<Props> {
                   onCancel={this.props.onTransmissionCancel}
                   onPause={this.props.onTransmissionPause}
                   onPolicy={onTradingPolicy}
+                  onBeforeDragStart={this.onBeforeDragStart}
+                  onDragEnd={this.onDragEnd}
                 />
               )}
             </List>

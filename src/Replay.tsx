@@ -74,6 +74,7 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "upgradeTransmissionLine",
   "cancelTransmissionLine",
   "togglePauseTransmissionLine",
+  "reprioritizeTransmissionLine",
   "setTradingPolicy",
   "retrofitFacility",
   "cancelRetrofit",
@@ -214,6 +215,18 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       !(Number.isSafeInteger(action.payload) && (action.payload as number) > 0)
     )
       return null;
+    if (action.type === "reprioritizeTransmissionLine") {
+      const move = action.payload as {
+        spotInList?: unknown;
+        delta?: unknown;
+      } | null;
+      if (
+        !Number.isSafeInteger(move?.spotInList) ||
+        (move!.spotInList as number) < 0 ||
+        !Number.isSafeInteger(move?.delta)
+      )
+        return null;
+    }
     if (action.type === "buildTransmissionLine") {
       const tier = (action.payload as { tier?: unknown }).tier;
       if (

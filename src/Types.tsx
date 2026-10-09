@@ -320,6 +320,7 @@ export type ReplayActionNameType =
   | "upgradeTransmissionLine"
   | "cancelTransmissionLine"
   | "togglePauseTransmissionLine"
+  | "reprioritizeTransmissionLine"
   | "setTradingPolicy"
   | "retrofitFacility"
   | "cancelRetrofit"

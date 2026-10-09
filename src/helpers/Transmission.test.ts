@@ -576,7 +576,7 @@ describe("adjacent market prices", () => {
   });
 });
 
-describe("intertie merit order", () => {
+describe("intertie trading order", () => {
   const offer = (
     pricePerMWh: number,
     importLimitW = 100,
@@ -587,10 +587,10 @@ describe("intertie merit order", () => {
     exportLimitW,
   });
 
-  it("imports from the cheapest neighbour first", () => {
+  it("imports in line order even when a later neighbour is cheaper", () => {
     expect(
       allocateIntertieFlows([offer(50), offer(30), offer(40)], 150, 0),
-    ).toEqual({ importedW: [0, 100, 50], exportedW: [0, 0, 0] });
+    ).toEqual({ importedW: [100, 50, 0], exportedW: [0, 0, 0] });
   });
 
   it("respects each line's import limit and never invents flow", () => {
@@ -602,17 +602,17 @@ describe("intertie merit order", () => {
     expect(capped).toEqual([40, 100, 0]);
   });
 
-  it("sells exports to the best-paying neighbour first", () => {
+  it("exports in line order even when a later neighbour pays more", () => {
     expect(
       allocateIntertieFlows(
         [offer(50), offer(30, 100, 500), offer(70, 100, 60)],
         0,
         150,
       ),
-    ).toEqual({ importedW: [0, 0, 0], exportedW: [90, 0, 60] });
+    ).toEqual({ importedW: [0, 0, 0], exportedW: [100, 50, 0] });
   });
 
-  it("breaks price ties by line order in both directions", () => {
+  it("uses the same line order in both directions when prices are equal", () => {
     const tied = [offer(40), offer(40), offer(40)];
     expect(allocateIntertieFlows(tied, 150, 0).importedW).toEqual([100, 50, 0]);
     expect(allocateIntertieFlows(tied, 0, 150).exportedW).toEqual([100, 50, 0]);

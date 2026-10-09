@@ -249,14 +249,14 @@ describe("shared neighbor supply and export demand", () => {
       pricePerMWh: 50,
     },
   ];
-  it("exhausts each market only once, in import and export merit order", () => {
+  it("exhausts each market only once, in the player's trading order", () => {
     expect(allocateIntertieFlows(offers, Infinity, 0).importedW).toEqual([
-      30, 70, 40,
+      70, 30, 40,
     ]);
     expect(allocateIntertieFlows(offers, 0, Infinity).exportedW).toEqual([
       70, 20, 30,
     ]);
-    expect(allocateIntertieFlows(offers, 90, 0).importedW).toEqual([0, 70, 20]);
+    expect(allocateIntertieFlows(offers, 90, 0).importedW).toEqual([70, 20, 0]);
   });
   it("breaks equal-price ties in stable line order without duplicating the budget", () => {
     const tied = offers

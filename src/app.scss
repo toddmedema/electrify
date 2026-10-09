@@ -2354,7 +2354,8 @@ $pane_header_height: 48px;
   }
 }
 
-.facilityRow.dragging {
+.facilityRow.dragging,
+.transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
   border-radius: var(--radius-sm);
@@ -3473,7 +3474,8 @@ $pane_header_height: 48px;
     }
   }
 
-  .facilityRow.selected {
+  .facilityRow.selected,
+  .transmissionLine.selected {
     background: var(--bg-selected);
   }
 
@@ -5116,7 +5118,6 @@ $sizemap: (
   }
 }
 .transmissionLine {
-  border-top: 1px solid var(--border-subtle);
   > summary {
     display: flex;
     align-items: center;
@@ -5464,13 +5465,12 @@ $sizemap: (
 .transmissionFleet {
   margin-top: 0;
 }
-.transmissionLine > .facilityDisclosure {
-  &:hover {
-    background: var(--bg-raised);
-  }
+.transmissionLine > .facilityRowHeader > .facilityDisclosure {
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid var(--border-subtle);
+}
+.transmissionLine .facilityDragHandle + .facilityDisclosure {
+  padding-left: 8px;
 }
 .transmissionLine .transmissionListIcon {
   margin-right: 8px;
@@ -5848,7 +5848,7 @@ $programs_column: 800px;
     > .MuiTypography-caption:last-child:not(:first-child) {
     grid-column: 1;
   }
-  .transmissionLine > .facilityDisclosure {
+  .transmissionLine > .facilityRowHeader > .facilityDisclosure {
     flex-wrap: wrap;
   }
   .transmissionLine .transmissionLineText {
@@ -5912,7 +5912,7 @@ $programs_column: 800px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
-.transmissionLine > .facilityDisclosure {
+.transmissionLine > .facilityRowHeader > .facilityDisclosure {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) 20px;
   align-items: center;

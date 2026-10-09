@@ -731,7 +731,10 @@ describe("unified connections", () => {
     const connections = document.querySelectorAll(".transmissionLine");
     expect(connections).toHaveLength(2);
     expect(document.querySelectorAll(".tradingControls")).toHaveLength(1);
-    expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
+    expect(connections[0]).toHaveAttribute("data-rfd-draggable-id", "t1");
+    expect(
+      connections[0].querySelector(".facilityDragHandle"),
+    ).toHaveAccessibleName("Reorder " + game.transmission!.lines[0].name);
     /* eslint-enable testing-library/no-node-access */
     // A built line reports the power actually moving over it, signed, instead of a static
     // "Connected" that never changes
@@ -783,6 +786,7 @@ describe("unified connections", () => {
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
     expect(screen.getByText("No power flowing")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Trading rule" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
     expect(
       screen.getByText("Trading rule: Buy for shortages, sell extra"),
     ).toBeInTheDocument();

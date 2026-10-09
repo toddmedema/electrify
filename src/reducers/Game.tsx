@@ -305,7 +305,7 @@ interface BuildFacilityAction {
   financed: boolean;
 }
 
-interface ReprioritizeFacilityAction {
+interface ReprioritizeAction {
   spotInList: number;
   delta: number;
 }
@@ -1852,6 +1852,21 @@ export const gameSlice = createSlice({
           action.payload,
         );
     },
+    reprioritizeTransmissionLine: (
+      state,
+      action: PayloadAction<ReprioritizeAction>,
+    ) => {
+      if (
+        !state.replayPlayback &&
+        applyReprioritizeTransmissionLine(state, action.payload)
+      ) {
+        recordReplayAction(
+          state,
+          "reprioritizeTransmissionLine",
+          action.payload,
+        );
+      }
+    },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
@@ -1877,7 +1892,7 @@ export const gameSlice = createSlice({
     },
     reprioritizeFacility: (
       state,
-      action: PayloadAction<ReprioritizeFacilityAction>,
+      action: PayloadAction<ReprioritizeAction>,
     ) => {
       if (applyReprioritizeFacility(state, action.payload)) {
         recordReplayAction(state, "reprioritizeFacility", action.payload);
@@ -2192,6 +2207,7 @@ export const {
   upgradeTransmissionLine,
   cancelTransmissionLine,
   togglePauseTransmissionLine,
+  reprioritizeTransmissionLine,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -2350,7 +2366,7 @@ function applyTogglePauseFacility(state: GameType, id: number): boolean {
 
 function applyReprioritizeFacility(
   state: GameType,
-  payload: ReprioritizeFacilityAction,
+  payload: ReprioritizeAction,
 ): boolean {
   const destination = payload.spotInList + payload.delta;
   if (
@@ -2386,6 +2402,36 @@ const TRADING_POLICIES: readonly TradingPolicyType[] = [
   "SURPLUS_ONLY",
   "CLOSED",
 ];
+
+function applyReprioritizeTransmissionLine(
+  state: GameType,
+  payload: ReprioritizeAction,
+): boolean {
+  const lines = state.transmission?.lines;
+  const destination = payload?.spotInList + payload?.delta;
+  if (
+    !lines ||
+    !Number.isSafeInteger(payload?.spotInList) ||
+    !Number.isSafeInteger(payload?.delta) ||
+    payload.delta === 0 ||
+    payload.spotInList < 0 ||
+    payload.spotInList >= lines.length ||
+    destination < 0 ||
+    destination >= lines.length
+  )
+    return false;
+  const moved = lines[payload.spotInList];
+  arrayMove(lines, payload.spotInList, destination);
+  recordMeaningfulDecision(state, {
+    lever: `trading-order:${moved.id}`,
+    label: `Set ${moved.name} trading priority`,
+    kind: "trading",
+    before: String(payload.spotInList),
+    after: String(destination),
+  });
+  state.timeline = reforecastSupply(state);
+  return true;
+}
 
 function applyTradingPolicy(state: GameType, policy: unknown): boolean {
   if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
@@ -2955,10 +3001,14 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
         applyTogglePauseFacility(state, payload);
       }
       break;
+    case "reprioritizeTransmissionLine": {
+      applyReprioritizeTransmissionLine(state, payload as ReprioritizeAction);
+      break;
+    }
     case "reprioritizeFacility": {
-      const move = payload as Partial<ReprioritizeFacilityAction>;
+      const move = payload as Partial<ReprioritizeAction>;
       if (Number.isFinite(move?.spotInList) && Number.isFinite(move?.delta)) {
-        applyReprioritizeFacility(state, move as ReprioritizeFacilityAction);
+        applyReprioritizeFacility(state, move as ReprioritizeAction);
       }
       break;
     }
@@ -4324,7 +4374,7 @@ function updateSupplyFacilitiesFinances(
     policy: transmission.tradingPolicy,
   });
   const { importedW, exportedW } = clearing;
-  // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
+  // The player gives earlier interties the first chance to import or export.
   const flows = allocateIntertieFlows(offers, importedW, exportedW);
   // Keep the row readings aligned with the aggregate flow written to this tick, including
   // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
