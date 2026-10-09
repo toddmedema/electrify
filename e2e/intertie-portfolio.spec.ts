@@ -29,6 +29,37 @@ for (const theme of ["light", "dark"] as const) {
     });
     const card = page.locator(".transmissionProject").filter({ has: review });
     await expect(card).toContainText("$1.8M");
+    const metrics = card.locator(".buildOptionMetrics");
+    const cells = metrics.locator(":scope > .buildOptionMetric");
+    await expect(cells).toHaveCount(6);
+    const metricBoxes = await cells.evaluateAll((elements) =>
+      elements.map((element) => {
+        const cell = element.getBoundingClientRect();
+        const label = element.children[0].getBoundingClientRect();
+        const value = element.children[1].getBoundingClientRect();
+        return {
+          x: cell.x,
+          y: cell.y,
+          width: cell.width,
+          labelBottom: label.bottom,
+          valueTop: value.top,
+        };
+      }),
+    );
+    expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
+      true,
+    );
+    if (testInfo.project.use.viewport!.width < 600) {
+      expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
+      expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
+      expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
+      expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
+      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
+    } else if (testInfo.project.use.viewport!.width >= 1280) {
+      expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
+        true,
+      );
+    }
     await expect(card).not.toContainText("Portfolio outlook");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
@@ -42,7 +73,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     const chart = card.locator(".intertieAvailability");
     const details = card.locator(".intertieDetailMetrics");
-    await expect(details.locator(".buildOptionMetric")).toHaveCount(4);
+    await expect(details.locator(".buildOptionMetric")).toHaveCount(3);
     await expect(card).not.toContainText("Purchase cost change / year");
     await expect(card).not.toContainText("If open with your current fleet");
     const chartBox = (await chart.boundingBox())!;
@@ -101,7 +132,10 @@ for (const theme of ["light", "dark"] as const) {
     await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
-    await expect(dialog).toContainText("5MW access · Ready in 12 months");
+    await expect(dialog).toContainText("Ready in 12 months.");
+    await expect(dialog).not.toContainText("Line capacity");
+    await expect(dialog).toContainText(/Import capacity\s*4MW/);
+    await expect(dialog).toContainText(/Export capacity\s*5MW/);
     const cashFact = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: "Cash purchase" });

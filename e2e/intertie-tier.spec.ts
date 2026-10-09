@@ -25,11 +25,19 @@ for (const theme of ["light", "dark"] as const) {
     const card = page.getByTestId("transmission-project-california-north");
     const importAccess = card
       .locator(".buildOptionMetric")
-      .filter({ hasText: "Import access" });
+      .filter({ hasText: "Import capacity" });
+    const exportAccess = card
+      .locator(".buildOptionMetric")
+      .filter({ hasText: "Export capacity" });
+    const importRating = importAccess.locator(":scope > div").nth(1);
+    const exportRating = exportAccess.locator(":scope > div").nth(1);
+    await expect(importAccess).toBeVisible();
+    await expect(exportAccess).toBeVisible();
+    const baseExportAccess = await exportRating.innerText();
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    const baseAccess = await importAccess.innerText();
+    const baseAccess = await importRating.innerText();
     await card
       .getByRole("button", { name: "Hide Pacific Northwest details" })
       .click();
@@ -85,15 +93,13 @@ for (const theme of ["light", "dark"] as const) {
     await slider.focus();
     await slider.press("End");
     await expect(slider).toHaveAttribute("aria-valuenow", "4");
-    await expect(card).toContainText("17MW");
+    await expect(card).not.toContainText("Line capacity");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    await expect(importAccess).not.toHaveText(baseAccess);
-    const selectedAccess = await importAccess
-      .locator(":scope > div")
-      .nth(1)
-      .innerText();
+    await expect(importRating).not.toHaveText(baseAccess);
+    await expect(exportRating).toHaveText(baseExportAccess);
+    const selectedAccess = await importRating.innerText();
     // Keep only the neighbor’s supply-risk summary.
     await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
     expect(
@@ -106,12 +112,17 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Tier 4");
-    await expect(dialog).toContainText("17MW access");
+    await expect(dialog).not.toContainText("Line capacity");
     await expect(
       dialog
         .locator(".decisionImpactFact")
-        .filter({ hasText: "Import access" }),
-    ).toContainText(`Up to ${selectedAccess}`);
+        .filter({ hasText: "Import capacity" }),
+    ).toContainText(selectedAccess);
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: "Export capacity" }),
+    ).toContainText("5MW");
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(
       page

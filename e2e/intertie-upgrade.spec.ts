@@ -54,7 +54,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Inspect Northern intertie" })
       .click();
     const review = line.getByRole("button", {
-      name: /^Upgrade Northern intertie/,
+      name: "Review upgrade of Northern intertie",
     });
     await expect(review).toBeVisible();
     expect((await review.boundingBox())!.height).toBeGreaterThanOrEqual(
@@ -68,15 +68,18 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toContainText("Upkeep after upgrade");
     const importAccess = dialog
       .locator(".decisionImpactFact")
-      .filter({ hasText: /^Import access/ });
-    await expect(importAccess).toContainText("Export access is unchanged");
+      .filter({ hasText: /^Import capacity/ });
+    const exportAccess = dialog
+      .locator(".decisionImpactFact")
+      .filter({ hasText: /^Export capacity/ });
+    await expect(exportAccess).toContainText("150MW → 150MW · Unchanged");
     const rights = (await importAccess.innerText()).match(
       /([\d.]+)MW → ([\d.]+)MW/,
     );
     expect(rights).not.toBeNull();
     expect(Number(rights![2])).toBeGreaterThan(Number(rights![1]));
     await dialog.getByRole("button", { name: "close", exact: true }).click();
-    await expect(line.getByText(/Upgrading to/)).toHaveCount(0);
+    await expect(line.getByText(/^Upgrading ·/)).toHaveCount(0);
     await review.click();
     for (const button of await dialog
       .locator(".MuiDialogActions-root button")
@@ -108,8 +111,11 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       })
       .click();
-    await expect(line).toContainText("Upgrading to 225MW");
-    await expect(line).toContainText("keeps carrying 150MW");
+    await expect(line).toContainText("Upgrading ·");
+    await expect(line).toContainText(
+      "Current capacities stay in use until completion",
+    );
+    await expect(line).toContainText(/Import capacity\s*150MW/);
     // Exercise the actual autosave and resume path while the upgrade is in progress.
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
     await page.goto("/");
@@ -118,18 +124,18 @@ for (const theme of ["light", "dark"] as const) {
     await line
       .getByRole("button", { name: "Inspect Northern intertie" })
       .click();
-    await expect(line).toContainText("Upgrading to 225MW");
+    await expect(line).toContainText("Upgrading ·");
     await speed("fast speed").click();
-    await expect(line).not.toContainText("Upgrading to", { timeout: 45000 });
+    await expect(line).not.toContainText("Upgrading ·", { timeout: 45000 });
     await speed("pause").click();
-    // The collapsed reading uses the weather-dependent operating rating, not nameplate
-    // capacity. Verify the purchased nameplate in the expanded details instead.
-    await expect(line.locator(".transmissionLineDetails")).toContainText(
-      "225MW rated capacity",
-    );
+    // Verify the purchased directional capacities in the expanded details.
+    const metrics = line.locator(".transmissionMetrics");
+    await expect(metrics).not.toContainText("Line capacity");
+    await expect(metrics).toContainText(/Import capacity\s*210MW/);
+    await expect(metrics).toContainText(/Export capacity\s*150MW/);
     await expect(
       line.getByRole("button", {
-        name: "Upgrade Northern intertie to 338MW",
+        name: "Review upgrade of Northern intertie",
       }),
     ).toBeVisible();
     expect(

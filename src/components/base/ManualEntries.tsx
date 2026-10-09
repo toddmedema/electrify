@@ -816,13 +816,25 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Interties are transmission lines to neighboring grids, letting you buy
-          power when you're short and sell extra. Your trading rule buys during
+          Interties connect neighboring grids. Your trading rule buys during
           shortages and sells surplus after serving customers and charging
-          storage. You buy access to a limited share of a regional connection,
-          not the whole neighboring grid. A bigger line only helps if the
-          neighbor has power to sell or wants to buy yours. Multiple paths to
-          the same neighbor share its spare supply and demand for exports.
+          storage.
+        </p>
+        <p>
+          <strong>Import capacity</strong> is the maximum power you can buy;{" "}
+          <strong>export capacity</strong> is the maximum surplus power you can
+          sell. Weather and the neighbor’s spare supply determine what is
+          available now.
+        </p>
+        <p>
+          These capacities combine two underlying limits.{" "}
+          <strong>Line capacity</strong> is the maximum power the line can
+          carry; <strong>import access</strong> and{" "}
+          <strong>export access</strong> are the trading allowances in each
+          direction. Each directional capacity is the lower of the line capacity
+          and its access allowance. Weather reduces the physical line’s
+          capacity. Multiple paths share the same neighbor’s supply and export
+          demand.
         </p>
         <p>
           Most of the mainland US belongs to one of three largely separate
@@ -839,17 +851,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          In missions, upgrades give you more import access and a bigger
-          connection when construction finishes. Export access stays the same.
-          Review an upgrade to see your import access before and after. Custom
-          games already give you the full regional allocation, so upgrades only
-          expand the connection.
+          Mission tiers purchase import access as well as line capacity. Custom
+          games start with full regional access, so upgrades only widen the
+          line. Export access stays the same, but a wider line can increase
+          export capacity until it reaches that allowance. The upgrade review
+          compares import and export capacity before and after construction.
         </p>
         <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s
           build card names the neighboring grid type, such as seasonal hydro or
           solar surplus. Open Show details for a description and monthly
-          estimates of how much of the line it can fill.
+          estimates of how much import capacity is available.
         </p>
         <p>
           Check &ldquo;At your peak&rdquo;: how much the neighbor can usually

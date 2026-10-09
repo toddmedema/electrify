@@ -9,6 +9,7 @@ import { MINUTES_PER_MONTH } from "./DateTime";
 import {
   adjacentMarketPricePerMWh,
   intertieImportLimitW,
+  intertieDirectionalCapacities,
   IntertieContext,
 } from "./Transmission";
 
@@ -27,7 +28,8 @@ export type DayPeriod = "overnight" | "morning" | "midday" | "evening";
 
 export interface IntertieOutlook {
   archetype: IntertieArchetypeType;
-  /** Jan..Dec, 0..1 typical share of the line's capacity the neighbour can fill with imports */
+  importCapacityW: number;
+  /** Jan..Dec, 0..1 typical share of import capacity the neighbour can fill */
   monthly: number[];
   mean: number;
   lowMonth: number; // 0..11
@@ -84,6 +86,12 @@ export function intertieOutlook(
   if (!market || !corridor || corridor.capacityW <= 0) return undefined;
   const ticks = timeline.filter((tick) => tick.minute >= nowMinute);
   const line = { corridorId, capacityW: capacityW ?? corridor.capacityW };
+  const { importCapacityW } = intertieDirectionalCapacities(
+    corridorId,
+    context,
+    line.capacityW,
+  );
+  if (importCapacityW <= 0) return undefined;
   // Average luck, not this run's next wet/dry years: most lines take years to build, and a
   // "typical year" that shifted every January would describe the dice rather than the neighbour.
   const typical = { ...context, expectedLuck: true };
@@ -96,7 +104,7 @@ export function intertieOutlook(
   );
   ticks.forEach((tick) => {
     const share =
-      intertieImportLimitW(line, typical, tick.minute, tick) / line.capacityW;
+      intertieImportLimitW(line, typical, tick.minute, tick) / importCapacityW;
     const price = adjacentMarketPricePerMWh(
       corridorId,
       typical,
@@ -135,6 +143,7 @@ export function intertieOutlook(
 
   return {
     archetype: INTERTIE_ARCHETYPES[market.archetype],
+    importCapacityW,
     monthly,
     mean: average(monthly),
     lowMonth,
