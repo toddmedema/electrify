@@ -104,16 +104,15 @@ for (const theme of ["light", "dark"] as const) {
     await page.screenshot({ path: testInfo.outputPath("intertie-paused.png") });
     const metrics = line.locator(".transmissionMetrics");
     await expect(metrics.locator("dt")).toHaveText([
-      "Line capacity",
-      "Import access",
-      "Export access",
+      "Import capacity",
+      "Export capacity",
       "Price now",
       "Import available now",
       "Emissions (CO2e)",
       "Typical price",
       "Loan balance",
     ]);
-    // Operational metrics retain the shared grid; access ratings stack separately on phones.
+    // Operational metrics retain the shared grid; directional capacities stack on phones.
     const facility = pane.locator(".facilityRow").first();
     await facility.locator(".facilityDisclosure").click();
     const facilityDetails = facility.locator(".facilityDetails");
@@ -132,7 +131,7 @@ for (const theme of ["light", "dark"] as const) {
             const grid = container.querySelector(".facilityStats")!;
             const cells = Array.from(grid.children)
               .filter(
-                (cell) => !cell.classList.contains("intertieAccessMetric"),
+                (cell) => !cell.classList.contains("intertieCapacityMetric"),
               )
               .map((cell) => cell.getBoundingClientRect());
             const style = getComputedStyle(grid);

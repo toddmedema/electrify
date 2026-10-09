@@ -18,6 +18,7 @@ import {
   importAvailabilityFraction,
   IntertieContext,
   intertieContextForGame,
+  intertieDirectionalCapacities,
   loadStress,
   neighbourLullFactor,
   neighbourYearFactor,
@@ -25,6 +26,48 @@ import {
 } from "./Transmission";
 
 const line = { corridorId: "california-north", capacityW: 500000000 };
+
+describe("directional capacities", () => {
+  it("caps exports at the line rating, then at the fixed allowance after an upgrade", () => {
+    const access = { scenarioId: 115, locationId: "Delhi" };
+    expect(
+      intertieDirectionalCapacities("india-bangladesh-upgrade", access, 70e6),
+    ).toEqual({
+      importCapacityW: 25e6,
+      exportCapacityW: 70e6,
+    });
+    expect(
+      intertieDirectionalCapacities("india-bangladesh-upgrade", access, 105e6),
+    ).toEqual({
+      importCapacityW: 30e6,
+      exportCapacityW: 100e6,
+    });
+  });
+
+  it("caps mission imports at the line rating and custom-game capacities at regional access", () => {
+    expect(
+      intertieDirectionalCapacities(
+        "california-north",
+        { scenarioId: 100, locationId: "SF" },
+        150e6,
+      ),
+    ).toEqual({
+      importCapacityW: 150e6,
+      exportCapacityW: 150e6,
+    });
+    const market = adjacentMarketForCorridor("california-north")!;
+    expect(
+      intertieDirectionalCapacities(
+        "california-north",
+        { locationId: "SF" },
+        2e9,
+      ),
+    ).toEqual({
+      importCapacityW: market.availableSupplyW,
+      exportCapacityW: market.availableDemandW,
+    });
+  });
+});
 
 const MINUTES_PER_MONTH = DAYS_PER_MONTH * 1440;
 const MINUTES_PER_YEAR = DAYS_PER_YEAR * 1440;

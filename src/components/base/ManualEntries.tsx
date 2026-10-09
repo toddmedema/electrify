@@ -821,13 +821,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           storage.
         </p>
         <p>
-          Each connection has three limits: <strong>line capacity</strong> is
-          the maximum power the line can carry; <strong>import access</strong>{" "}
-          is the maximum power you can buy; <strong>export access</strong> is
-          the maximum surplus power you can sell. Trade cannot exceed line
-          capacity. Weather reduces line capacity, and the neighbor’s spare
-          supply determines available imports. Multiple paths share the same
-          neighbor’s supply and export demand.
+          <strong>Import capacity</strong> is the maximum power you can buy;{" "}
+          <strong>export capacity</strong> is the maximum surplus power you can
+          sell. Weather and the neighbor’s spare supply determine what is
+          available now.
+        </p>
+        <p>
+          These capacities combine two underlying limits.{" "}
+          <strong>Line capacity</strong> is the maximum power the line can
+          carry; <strong>import access</strong> and{" "}
+          <strong>export access</strong> are the trading allowances in each
+          direction. Each directional capacity is the lower of the line capacity
+          and its access allowance. Weather reduces the physical line’s
+          capacity. Multiple paths share the same neighbor’s supply and export
+          demand.
         </p>
         <p>
           Most of the mainland US belongs to one of three largely separate
@@ -846,14 +853,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Mission tiers purchase import access as well as line capacity. Custom
           games start with full regional access, so upgrades only widen the
-          line. Export access stays the same. The upgrade review shows all three
-          limits before and after construction.
+          line. Export access stays the same, but a wider line can increase
+          export capacity until it reaches that allowance. The upgrade review
+          compares import and export capacity before and after construction.
         </p>
         <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s
           build card names the neighboring grid type, such as seasonal hydro or
           solar surplus. Open Show details for a description and monthly
-          estimates of how much of the line it can fill.
+          estimates of how much import capacity is available.
         </p>
         <p>
           Check &ldquo;At your peak&rdquo;: how much the neighbor can usually

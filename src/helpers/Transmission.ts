@@ -44,6 +44,19 @@ export interface TransmissionConditions {
   solarIrradianceWM2: number;
 }
 
+/** Directional nameplate limits, before weather and neighbor availability. */
+export function intertieDirectionalCapacities(
+  corridorId: string,
+  context: IntertieAccessContext,
+  capacityW: number,
+): { importCapacityW: number; exportCapacityW: number } {
+  const access = effectiveMarket(corridorId, context, capacityW);
+  return {
+    importCapacityW: Math.min(capacityW, access?.availableSupplyW || 0),
+    exportCapacityW: Math.min(capacityW, access?.availableDemandW || 0),
+  };
+}
+
 /**
  * A compact dynamic line rating: hot conductors shed less heat, while direct sun adds heat.
  * It is intentionally bounded so weather changes capacity without making a built line vanish.

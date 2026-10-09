@@ -1273,16 +1273,16 @@ $pane_header_height: 48px;
     }
   }
 
-  .intertieAccessMetrics {
+  .intertieCapacityMetrics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     flex: 1 1 100%;
     gap: 12px;
   }
 }
 
 @media (max-width: 599px) {
-  .build-list-item.buildOption.transmissionProject .intertieAccessMetrics {
+  .build-list-item.buildOption.transmissionProject .intertieCapacityMetrics {
     grid-template-columns: 1fr;
     gap: 8px;
 
@@ -1294,7 +1294,7 @@ $pane_header_height: 48px;
     }
   }
 
-  .transmissionMetrics.facilityStats > .intertieAccessMetric {
+  .transmissionMetrics.facilityStats > .intertieCapacityMetric {
     grid-column: 1 / -1;
     display: flex;
     justify-content: space-between;

@@ -11,7 +11,11 @@ import {
   intertieOutlook,
   pricePeriodCaption,
 } from "./IntertieOutlook";
-import { IntertieContext, intertieImportLimitW } from "./Transmission";
+import {
+  IntertieContext,
+  intertieImportLimitW,
+  intertieDirectionalCapacities,
+} from "./Transmission";
 
 const intern: IntertieContext = {
   scenarioId: 112,
@@ -50,7 +54,7 @@ function corridorWithArchetype(archetype: string) {
 }
 
 describe("intertie outlook", () => {
-  it("uses the upgraded rating when expressing neighbor supply as a share of the line", () => {
+  it("uses import capacity as the forecast denominator, preserving available watts after an upgrade", () => {
     const ticks = year();
     const capacityW = 2e9;
     const outlook = intertieOutlook(
@@ -70,12 +74,12 @@ describe("intertie outlook", () => {
             tick.minute,
             tick,
           ) /
-            capacityW,
+            outlook.importCapacityW,
         0,
       ) / ticks.length;
     expect(outlook.mean).toBeCloseTo(expected, 12);
-    expect(outlook.mean).toBeLessThan(
-      intertieOutlook("california-north", intern, ticks)!.mean,
+    expect(outlook.importCapacityW).toBeGreaterThan(
+      intertieOutlook("california-north", intern, ticks)!.importCapacityW,
     );
   });
 
@@ -131,7 +135,8 @@ describe("intertie outlook", () => {
         0,
       ) /
       january.length /
-      line.capacityW;
+      intertieDirectionalCapacities(line.corridorId, intern, line.capacityW)
+        .importCapacityW;
     expect(expected).toBeGreaterThan(0);
     expect(
       intertieOutlook("california-south", intern, ticks)!.monthly[0],

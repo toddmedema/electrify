@@ -96,15 +96,18 @@ for (const theme of ["light", "dark"] as const) {
     const cash = game.timeline.find(
       (tick) => tick.minute === game.date.minute,
     )!.cash;
+    await expect(
+      card.locator(".intertieCapacityMetrics > .buildOptionMetric"),
+    ).toHaveCount(2);
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
     await expect(dialog).toContainText("Ready in 12 months.");
-    await expect(dialog).toContainText(/Line capacity\s*5MW/);
-    await expect(dialog).toContainText(/Import access\s*4MW/);
-    await expect(dialog).toContainText(/Export access\s*5MW/);
+    await expect(dialog).not.toContainText("Line capacity");
+    await expect(dialog).toContainText(/Import capacity\s*4MW/);
+    await expect(dialog).toContainText(/Export capacity\s*5MW/);
     const cashFact = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: "Cash purchase" });
