@@ -5,6 +5,13 @@ scene is authored in `public/images/power-system.svg`; the title is derived from
 `public/images/logo-home.svg` wordmark, with its final marketing-tagline path removed. No
 external illustrations, fonts, or AI-generated assets are used.
 
+In-game briefings also use three companion SVGs in `public/images/`: frozen infrastructure for
+Deep Freeze, city/data-center development for the authored Rapid growth family, and changing
+generation for the Energy transition family. Other missions keep the connected-grid fallback;
+their existing scenario icons remain the identifying feature. These thematic illustrations do
+not represent a live fleet or alter scenario inputs. The title screen and Steam capsules keep
+the common connected-grid composition.
+
 After `npm ci`, run `node scripts/export-steam-art.js`. The script uses the lockfile’s
 Playwright Chromium to regenerate the title-only logo, self-contained capsule SVGs, and PNGs:
 

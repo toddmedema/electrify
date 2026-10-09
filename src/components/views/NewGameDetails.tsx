@@ -361,7 +361,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
-            <ScenarioArtwork icon={scenario.icon} name={scenario.name} />
+            <ScenarioArtwork scenario={scenario} />
             <div className="scenarioDossierCopy">
               <Typography
                 id="scenario-title"
