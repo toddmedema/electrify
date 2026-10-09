@@ -41,7 +41,9 @@ for (const theme of ["light", "dark"]) {
     await expect(hud.locator(".gridHealth")).not.toHaveClass(
       /gridHealth-blackout/,
     );
-    await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
+    await expect(
+      page.locator(".fleetGrid, #chartSupplyDemand").first(),
+    ).toBeInViewport();
     await page.waitForTimeout(400);
     const clips = await hud.evaluate((element) =>
       Array.from(
