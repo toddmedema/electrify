@@ -239,6 +239,8 @@ describe("the shipped weather files", () => {
     "Ushuaia",
     "Montevideo",
     "SaoPaulo",
+    "Salvador",
+    "Recife",
     "NewYork",
     "Philadelphia",
     "Boston",
