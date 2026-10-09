@@ -204,15 +204,14 @@ it.each([
     expect(within(node).getByText(`Reservoir ${text}`)).toHaveClass(
       "fleetGridStored",
     );
-    if (low) {
-      expect(node).toHaveAccessibleName(/reservoir \d+% low/);
-      expect(within(node).getByText(`Reservoir ${text}`)).toHaveClass(
-        "fleetGridReservoirLow",
-      );
-    } else {
-      expect(within(node).getByText(`Reservoir ${text}`)).not.toHaveClass(
-        "fleetGridReservoirLow",
-      );
-    }
+    expect(node).toHaveAccessibleName(
+      new RegExp(
+        `reservoir ${Math.round(Number(percent))}%${low ? " low" : ""}$`,
+      ),
+    );
+    expect(within(node).getByText(`Reservoir ${text}`)).toHaveAttribute(
+      "class",
+      low ? "fleetGridStored fleetGridReservoirLow" : "fleetGridStored",
+    );
   },
 );

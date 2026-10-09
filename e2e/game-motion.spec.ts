@@ -31,6 +31,11 @@ for (const theme of ["light", "dark"]) {
       .getByRole("dialog")
       .getByRole("button", { name: "Pay cash" })
       .click();
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute(
       "data-motion-seen",
       /facilityArrival/,
@@ -53,6 +58,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     await expect(pane.locator(".facilityReadyLabel")).toHaveCount(0);
     await expect(page.locator("html")).not.toHaveAttribute(
       "data-motion-seen",
