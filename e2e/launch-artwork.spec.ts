@@ -14,9 +14,11 @@ for (const theme of ["light", "dark"]) {
     ).toBeInViewport();
     const scene = page.locator(".titleArtwork img");
     await expect(scene).toBeVisible();
-    expect(
-      await scene.evaluate((image) => (image as HTMLImageElement).naturalWidth),
-    ).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        scene.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
     await expect(page.locator(".titleArtwork")).toHaveAttribute(
       "aria-hidden",
       "true",
@@ -35,11 +37,13 @@ for (const theme of ["light", "dark"]) {
         "src",
         `/images/${sceneName}.svg`,
       );
-      expect(
-        await illustration.evaluate(
-          (image) => (image as HTMLImageElement).naturalWidth,
-        ),
-      ).toBeGreaterThan(0);
+      await expect
+        .poll(() =>
+          illustration.evaluate(
+            (image) => (image as HTMLImageElement).naturalWidth,
+          ),
+        )
+        .toBeGreaterThan(0);
       await expect(page.getByAltText(`${name} icon`)).toBeVisible();
       const start = page.getByRole("button", {
         name: "Start game",
@@ -67,3 +71,43 @@ test("short windows reserve space for the home actions", async ({ page }) => {
     page.getByRole("button", { name: "Start playing", exact: true }),
   ).toBeInViewport();
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`home actions stay in place while artwork loads in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    let releaseArtwork!: () => void;
+    const artworkReady = new Promise<void>((resolve) => {
+      releaseArtwork = resolve;
+    });
+    await page.route("**/images/power-system.svg", async (route) => {
+      await artworkReady;
+      await route.continue();
+    });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const start = page.getByRole("button", {
+      name: "Start playing",
+      exact: true,
+    });
+    await expect(start).toBeInViewport();
+    const artwork = page.locator(".titleArtwork img");
+    const unloadedHeight = (await artwork.boundingBox())!.height;
+    const unloadedActionY = (await start.boundingBox())!.y;
+    releaseArtwork();
+    await expect
+      .poll(() =>
+        artwork.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    expect(unloadedHeight).toBeGreaterThan(0);
+    expect((await artwork.boundingBox())!.height).toBeCloseTo(
+      unloadedHeight,
+      0,
+    );
+    expect((await start.boundingBox())!.y).toBeCloseTo(unloadedActionY, 0);
+  });
+}

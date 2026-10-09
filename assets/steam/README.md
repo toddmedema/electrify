@@ -12,8 +12,9 @@ their existing scenario icons remain the identifying feature. These thematic ill
 not represent a live fleet or alter scenario inputs. The title screen and Steam capsules keep
 the common connected-grid composition.
 
-After `npm ci`, run `node scripts/export-steam-art.js`. The script uses the lockfile’s
-Playwright Chromium to regenerate the title-only logo, self-contained capsule SVGs, and PNGs:
+After `npm ci`, run `npx playwright install chromium` once to install the lockfile’s
+Playwright Chromium browser, then run `node scripts/export-steam-art.js` to regenerate the
+title-only logo, self-contained capsule SVGs, and PNGs:
 
 | File | Pixels | Use |
 | --- | --- | --- |

@@ -5,7 +5,7 @@ import { ScenarioType } from "../../Types";
 export function TitleArtwork(): React.JSX.Element {
   return (
     <div className="titleArtwork" aria-hidden="true">
-      <img src="/images/power-system.svg" alt="" />
+      <img src="/images/power-system.svg" width={1200} height={360} alt="" />
     </div>
   );
 }
@@ -35,6 +35,8 @@ export function ScenarioArtwork(props: {
       <img
         className="scenarioArtworkWorld"
         src={`/images/${scene}.svg`}
+        width={1200}
+        height={360}
         alt=""
         aria-hidden="true"
       />
