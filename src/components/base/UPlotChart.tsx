@@ -3,6 +3,10 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
+import {
+  getInterfaceSize,
+  subscribeInterfaceSize,
+} from "../../InterfaceSizing";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 import {
   ChartViewportContext,
@@ -225,6 +229,11 @@ export default function UPlotChart<S>(
       active = false;
     };
   }, [fontReady]);
+  const interfaceSize = React.useSyncExternalStore(
+    subscribeInterfaceSize,
+    getInterfaceSize,
+    getInterfaceSize,
+  );
 
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
@@ -333,7 +342,7 @@ export default function UPlotChart<S>(
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion, fontReady]);
+  }, [width, height, structureKey, themeVersion, fontReady, interfaceSize]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {

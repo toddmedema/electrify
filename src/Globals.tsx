@@ -11,6 +11,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
+import { getInterfaceScale } from "./InterfaceSizing";
 
 const firebaseApp = initializeApp({
   // Set by CI from a repo secret; falls back to the placeholder for local dev
@@ -132,13 +133,9 @@ let cachedViewportHeight: number | null = null;
 
 function getViewportWidth(): number {
   if (cachedViewportWidth === null) {
-    cachedViewportWidth = Math.max(
-      document.body.scrollWidth,
-      document.documentElement.scrollWidth,
-      document.body.offsetWidth,
-      document.documentElement.offsetWidth,
-      document.documentElement.clientWidth,
-    );
+    // Content overflow must not masquerade as a wider window and select more columns.
+    cachedViewportWidth =
+      window.innerWidth || document.documentElement.clientWidth;
   }
   return cachedViewportWidth;
 }
@@ -161,15 +158,15 @@ if (typeof window !== "undefined") {
 }
 
 export function isBigScreen(): boolean {
-  return getViewportWidth() > 650;
+  return getViewportWidth() / getInterfaceScale() > 650;
 }
 
 /**
  * Wide enough to show Facilities and Insights side by side without the bottom navigation.
- * Keep in sync with $desktop_breakpoint in app.scss.
+ * App stamps the result onto html so CSS and the compositor use the same logical width.
  */
 export function isDesktopScreen(): boolean {
-  return getViewportWidth() >= 1300;
+  return getViewportWidth() / getInterfaceScale() >= 1300;
 }
 
 /**
@@ -177,18 +174,19 @@ export function isDesktopScreen(): boolean {
  * desktop breakpoint the bottom nav, supplied by the layout around them -- rather than as one
  * full-screen card carrying its own chrome.
  *
- * True from $pane_breakpoint up: between there and the desktop breakpoint the layout is
+ * True from 1024 logical pixels up: between there and the desktop breakpoint the layout is
  * Facilities pinned beside Insights or Events. Narrower portrait tablets keep the single-pane
  * navigation because a facility row and its controls do not fit in the default split. Unfolded
  * foldables are the exception: at least 700x600 and near-square, each pane still gets about a
- * phone's width. Keep in sync with $pane_media in app.scss.
+ * phone's width. App stamps this result onto html for the pane rules in app.scss.
  */
 export function isPaneLayout(): boolean {
-  const width = getViewportWidth();
+  const scale = getInterfaceScale();
+  const width = getViewportWidth() / scale;
   if (width >= 1024) {
     return true;
   }
-  const height = getViewportHeight();
+  const height = getViewportHeight() / scale;
   const aspectRatio = width / height;
   return (
     width >= 700 &&

@@ -4,7 +4,12 @@ import { navigate, navigateBack } from "../../reducers/Card";
 import { change as changeSettings } from "../../reducers/Settings";
 import { delta as userDelta, logout } from "../../reducers/User";
 import { login } from "../../Globals";
-import { AppStateType, ThemeChoiceType, UnitSystemType } from "../../Types";
+import {
+  AppStateType,
+  InterfaceSizeType,
+  ThemeChoiceType,
+  UnitSystemType,
+} from "../../Types";
 import Settings, { DispatchProps, StateProps } from "./Settings";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -44,6 +49,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     // place that can also hear the system changing its mind while the game is open
     onThemeChange: (v: ThemeChoiceType) => {
       dispatch(changeSettings({ theme: v }));
+    },
+    onInterfaceSizeChange: (v: InterfaceSizeType) => {
+      dispatch(changeSettings({ interfaceSize: v }));
     },
     onManageSaves: () => {
       dispatch(navigate("SAVED_GAMES"));

@@ -31,6 +31,31 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
+  it("pauses the menu and resumes the speed that was running before it opened", () => {
+    const game = createGame({ scenarioId: 101 });
+    const onSpeedChange = jest.fn();
+    renderAppBar({
+      game: { ...game, inGame: true, speed: "FAST" },
+      onSpeedChange,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    expect(onSpeedChange).toHaveBeenLastCalledWith("PAUSED");
+    expect(screen.getByText("Game paused")).toBeVisible();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resume game" }));
+    expect(onSpeedChange).toHaveBeenLastCalledWith("FAST");
+  });
+  it("restores speed before Settings so the blocking screen can remember it", () => {
+    const game = createGame({ scenarioId: 101 });
+    const actions: string[] = [];
+    renderAppBar({
+      game: { ...game, inGame: true, speed: "SLOW" },
+      onSpeedChange: (speed) => actions.push(speed),
+      onSettings: () => actions.push("Settings"),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Settings" }));
+    expect(actions).toEqual(["PAUSED", "SLOW", "Settings"]);
+  });
   it.each(["idle", "saving", "saved"] as const)(
     "keeps routine %s indicators off the game screen",
     (saveState) => {

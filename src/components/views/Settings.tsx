@@ -15,7 +15,12 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronDownGlyph } from "../base/Glyphs";
-import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
+import {
+  InterfaceSizeType,
+  SettingsType,
+  ThemeChoiceType,
+  UnitSystemType,
+} from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
@@ -23,6 +28,8 @@ import ScreenHeader from "../base/ScreenHeader";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
+import FullscreenButton from "../base/FullscreenButton";
+import { INTERFACE_SIZES } from "../../InterfaceSizing";
 
 export interface StateProps {
   settings: SettingsType;
@@ -40,6 +47,7 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
+  onInterfaceSizeChange: (change: InterfaceSizeType) => void;
   onManageSaves: () => void;
   onBack: () => void;
 }
@@ -207,6 +215,47 @@ export default function Settings(props: Props): React.JSX.Element {
             boxSizing: "border-box",
           }}
         >
+          <SettingsGroup id="display-settings" title="Display">
+            <Stack divider={<Divider flexItem />}>
+              <SettingRow
+                label="Text and controls"
+                description="Larger increases text by 25% and gives controls more room."
+                stackOnMobile
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={props.settings.interfaceSize}
+                  aria-label="Text and controls"
+                  onChange={(
+                    _e: React.MouseEvent<HTMLElement>,
+                    value: InterfaceSizeType | null,
+                  ) => value && props.onInterfaceSizeChange(value)}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    "& .MuiToggleButton-root": {
+                      flex: { xs: 1, sm: "0 0 auto" },
+                      minWidth: 88,
+                    },
+                  }}
+                >
+                  {INTERFACE_SIZES.map((size) => (
+                    <ToggleButton key={size} value={size}>
+                      {size === "normal" ? "Normal" : "Larger"}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </SettingRow>
+              <SettingRow
+                label="Fullscreen"
+                description="Uses the whole screen. Press Esc to leave."
+                stackOnMobile
+              >
+                <FullscreenButton />
+              </SettingRow>
+            </Stack>
+          </SettingsGroup>
+
           <SettingsGroup id="preferences-settings" title="Preferences">
             <Stack divider={<Divider flexItem />}>
               <SettingRow

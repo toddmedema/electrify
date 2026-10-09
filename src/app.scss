@@ -241,16 +241,8 @@ $absmaxdimension: 1025px;
 // Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
 // isDesktopScreen() in Globals.tsx. Below this, panes render too narrow to be worth it.
 $desktop_breakpoint: 1300px;
-// Below this, the default two-pane split makes a facility row narrower than its data and controls.
-// Keep in sync with isPaneLayout() in Globals.tsx.
-$pane_breakpoint: 1024px;
-// Unfolded foldables (Galaxy Z Fold ~707x823, Pixel Fold ~841x701) are narrower than that but
-// nearly square, so each pane still gets a phone's width. The aspect ratio window leaves out
-// portrait tablets (3:4 and taller) and landscape phones. Keep in sync with isPaneLayout().
-$fold_pane_min_width: 700px;
-$fold_pane_min_height: 600px;
-$pane_media: "screen and (min-width: #{$pane_breakpoint}), screen and (min-width: #{$fold_pane_min_width}) and (min-height: #{$fold_pane_min_height}) and (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4)";
-$single_pane_media: "screen and (max-width: #{$fold_pane_min_width - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-height: #{$fold_pane_min_height - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-aspect-ratio: 799/1000), screen and (max-width: #{$pane_breakpoint - 1px}) and (min-aspect-ratio: 1251/1000)";
+// Pane rules use the layout flags stamped by App from Globals.tsx. Larger text therefore uses
+// the same logical width in the compositor and CSS instead of crowding an unscaled breakpoint.
 
 $sizemap: (
   large: 6vmin,
@@ -355,8 +347,8 @@ button,
   .MuiButton-root,
   .MuiIconButton-root,
   .MuiToggleButton-root {
-    min-width: 44px !important;
-    min-height: 44px !important;
+    min-width: max(44px, var(--control-size)) !important;
+    min-height: max(44px, var(--control-size)) !important;
   }
 }
 
@@ -1128,7 +1120,7 @@ $topbar_height: 56px;
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
-@media #{$pane_media} {
+:where(:root[data-pane-layout="true"]) {
   .gameStatusBar {
     display: flex;
     align-items: stretch;
@@ -1162,7 +1154,7 @@ $topbar_height: 56px;
 
 // Phones and narrow tablets keep the readout in its own intentional row: state on the left,
 // operational cushion on the right.
-@media #{$single_pane_media} {
+:where(:root[data-pane-layout="false"]) {
   .gridHealth {
     box-sizing: border-box;
     min-height: $topbar_height;
@@ -3259,7 +3251,7 @@ $pane_header_height: 48px;
     text-align: center;
   }
 
-  @media #{$pane_media} {
+  :where(:root[data-pane-layout="true"]) {
     .customSetupColumns {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4587,7 +4579,7 @@ $sizemap: (
 // destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
 // ===============================================
 
-@media #{$pane_media} {
+:where(:root[data-pane-layout="true"]) {
   .desktop-layout,
   .pane-layout {
     height: 100%;
@@ -6560,7 +6552,7 @@ $programs_column: 800px;
 // the mission and its info button on the right) instead of two 56px rows, so the game starts
 // higher up the screen. When the grid readout also carries an event chip there isn't room for
 // both, and the mission wraps onto its own row as before.
-@media #{$single_pane_media} {
+:where(:root[data-pane-layout="false"]) {
   .gameStatusBar {
     display: flex;
     flex-wrap: wrap;
@@ -6628,7 +6620,7 @@ $programs_column: 800px;
   }
 }
 
-@media #{$single_pane_media} {
+:where(:root[data-pane-layout="false"]) {
   // A mission row with a named risk needs its full width to say what the risk is, so it keeps
   // its own (44px) row under the grid readout rather than truncating to a letter
   .gameStatusBar .missionSummary:has(.missionRiskButton) {

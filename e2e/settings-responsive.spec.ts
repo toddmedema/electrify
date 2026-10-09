@@ -72,9 +72,9 @@ test("settings controls are flush with each row's right edge", async ({
     return out;
   });
 
-  // Five rows (Appearance, Sound, Units, Leaderboard, Saved game) plus two volume sliders; an empty
+  // Display, preference and account rows plus two volume sliders; an empty
   // result would otherwise pass without checking anything
-  expect(offsets).toHaveLength(7);
+  expect(offsets).toHaveLength(9);
   for (const { control, offset } of offsets) {
     expect(Math.abs(offset), control).toBeLessThanOrEqual(2);
   }

@@ -9,6 +9,7 @@ import { SettingsType } from "../Types";
 import { pause, resume } from "../data/Audio";
 import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
+import { INTERFACE_SIZES } from "../InterfaceSizing";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
@@ -25,6 +26,7 @@ export const initialSettings: SettingsType = {
   // Following the OS is the only default that is right for both kinds of player without being
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
+  interfaceSize: getStorageChoice("interfaceSize", INTERFACE_SIZES, "normal"),
 };
 
 export const settingsSlice = createSlice({

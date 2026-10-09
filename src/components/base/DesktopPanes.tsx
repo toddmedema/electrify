@@ -1,5 +1,6 @@
 import * as React from "react";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
+import { getInterfaceScale } from "../../InterfaceSizing";
 
 /**
  * The desktop column layout: the panes side by side, with a splitter the player can drag
@@ -69,7 +70,10 @@ export function constrainedPaneWidths(
   weights: number[],
   total: number,
 ): number[] {
-  const minimum = Math.min(MIN_PANE_PX, total / weights.length);
+  const minimum = Math.min(
+    MIN_PANE_PX * getInterfaceScale(),
+    total / weights.length,
+  );
   const result = new Array(weights.length).fill(0);
   let remaining = weights.map((_, index) => index);
   let available = total;

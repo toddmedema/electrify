@@ -19,6 +19,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
       soundEffectsVolume: 1,
       units: "metric",
       theme: "system",
+      interfaceSize: "normal",
     },
     loggedIn: false,
     onLogin: () => undefined,
@@ -29,6 +30,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
+    onInterfaceSizeChange: () => undefined,
     onManageSaves: () => undefined,
     onBack: () => undefined,
     ...overrides,
@@ -59,6 +61,7 @@ describe("Settings", () => {
         soundEffectsVolume: 0.4,
         units: "metric",
         theme: "system",
+        interfaceSize: "normal",
       },
       onMusicVolumeChange,
       onSoundEffectsVolumeChange,
@@ -90,6 +93,7 @@ describe("Settings", () => {
         soundEffectsVolume: 1,
         units: "metric",
         theme: "system",
+        interfaceSize: "normal",
       },
     });
 

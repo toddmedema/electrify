@@ -1,0 +1,36 @@
+// Text stays in normal document flow. A canvas keeps its true pointer coordinates.
+:root[data-interface-size="larger"] {
+  --control-size: 48px;
+
+  .MuiButton-root,
+  .MuiToggleButton-root,
+  .MuiIconButton-root,
+  .MuiInputBase-root,
+  .MuiMenuItem-root {
+    min-height: 48px;
+  }
+
+  .MuiToggleButton-root,
+  .MuiIconButton-root {
+    min-width: 48px;
+  }
+
+  #speedChangeButtons .MuiToggleButton-root {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  #navfooter {
+    height: auto;
+    min-height: 64px;
+  }
+
+  .MuiBottomNavigationAction-label {
+    font-size: var(--font-size-caption);
+  }
+}
+
+// Desktop navigation follows the same logical width as the compositor at either text size.
+:root[data-desktop-layout="false"] #navfooter {
+  display: block;
+}

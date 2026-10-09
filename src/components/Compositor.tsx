@@ -98,6 +98,9 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    // Dialogs and the pause menu own their keys. Global shortcuts must not change play behind them.
+    if (document.querySelector('.MuiModal-root:not([aria-hidden="true"])'))
+      return true;
     if (document.querySelector('[data-data-center-guide="true"]')) return true;
     if (document.querySelector('[data-scenario-choice="true"]')) return true;
     if (document.querySelector('[data-manual-help="true"]')) return true;
@@ -106,6 +109,9 @@ configure({
       return false;
     }
     const target = event.target as HTMLElement | null;
+    // Space activates a focused button. Keep the pause shortcut for the play surface itself.
+    if (event.key === " " && target?.closest('button, [role="button"]'))
+      return true;
     const tagName = target?.tagName?.toLowerCase();
     if (!tagName) {
       return false;
@@ -289,6 +295,16 @@ const shortcutHandlers = {
   // follow their Back button through history.
   ESCAPE: () => {
     const { card, game } = store.getState();
+    // Let the browser consume the first Esc in fullscreen; it is a window action.
+    if (document.fullscreenElement) return;
+    if (game.inGame && isNavCard(card.name) && !uiHidden("menu")) {
+      const trigger = document.querySelector<HTMLElement>(
+        "[data-game-menu-trigger]",
+      );
+      trigger?.focus();
+      trigger?.click();
+      return;
+    }
     if (game.inGame && !isNavCard(card.name)) {
       store.dispatch(
         card.name.startsWith("BUILD_")

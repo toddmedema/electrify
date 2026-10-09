@@ -37,6 +37,9 @@ import {
 } from "./Theme";
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
+import { setInterfaceSize } from "./InterfaceSizing";
+import { isDesktopScreen, isPaneLayout } from "./Globals";
+import "./Display.scss";
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -101,6 +104,18 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
+  const interfaceSize = useAppSelector((state) => state.settings.interfaceSize);
+  useLayoutEffect(() => {
+    setInterfaceSize(interfaceSize);
+    const syncLayout = () => {
+      document.documentElement.dataset.paneLayout = String(isPaneLayout());
+      document.documentElement.dataset.desktopLayout =
+        String(isDesktopScreen());
+    };
+    syncLayout();
+    window.addEventListener("resize", syncLayout);
+    return () => window.removeEventListener("resize", syncLayout);
+  }, [interfaceSize]);
   // "System" is a standing instruction rather than a value, and the system can change its mind
   // while the game is open - at sunset, on a schedule, or because the player just flipped it
   const [systemDark, setSystemDark] = useState(prefersDarkMode);

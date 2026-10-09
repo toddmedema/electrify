@@ -1265,6 +1265,8 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
+export type InterfaceSizeType = "normal" | "larger";
+
 export interface SettingsType {
   audioEnabled?: boolean;
   // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
@@ -1273,6 +1275,7 @@ export interface SettingsType {
   soundEffectsVolume: number;
   units: UnitSystemType;
   theme: ThemeChoiceType;
+  interfaceSize: InterfaceSizeType;
 }
 
 export interface DialogType {

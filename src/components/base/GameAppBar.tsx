@@ -1,6 +1,13 @@
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
-import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
+import {
+  IconButton,
+  ListSubheader,
+  Menu,
+  MenuItem,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
@@ -145,6 +152,9 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
+  const speedBeforeMenu = React.useRef<SpeedType>("PAUSED");
+  const currentSpeed = React.useRef(game.speed);
+  currentSpeed.current = game.speed;
   const online = useOnline();
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
@@ -166,9 +176,26 @@ export function GameAppBar(props: Props) {
   // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
   // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!scenario?.tutorialSteps;
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    speedBeforeMenu.current = currentSpeed.current;
+    onSpeedChange("PAUSED");
     setMenuAnchorEl(event.currentTarget);
-  const handleMenuClose = () => setMenuAnchorEl(null);
+  };
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    onSpeedChange(speedBeforeMenu.current);
+  };
+  const handleResume = () => {
+    setMenuAnchorEl(null);
+    onSpeedChange(
+      speedBeforeMenu.current === "PAUSED" ? "NORMAL" : speedBeforeMenu.current,
+    );
+  };
+  const visitFromMenu = (visit: (() => void) | undefined) => {
+    // Restore before navigating so the existing blocking-card pause remembers the real speed.
+    handleMenuClose();
+    visit?.();
+  };
   const handleQuit = React.useCallback(() => {
     setMenuAnchorEl(null);
     onQuit();
@@ -209,10 +236,14 @@ export function GameAppBar(props: Props) {
       <>
         <IconButton
           data-settings-trigger
+          data-game-menu-trigger
           data-saves-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label={online ? "menu" : "menu, offline"}
+          title="Pause and options (Esc)"
+          aria-expanded={Boolean(menuAnchorEl)}
+          aria-controls={menuAnchorEl ? "gameCardMenu" : undefined}
           edge="start"
           color="primary"
           size="large"
@@ -227,6 +258,15 @@ export function GameAppBar(props: Props) {
           open={Boolean(menuAnchorEl)}
           onClose={handleMenuClose}
         >
+          <ListSubheader component="li" disableSticky>
+            Game paused
+          </ListSubheader>
+          <MenuItem
+            onClick={handleResume}
+            sx={{ fontWeight: 600, color: "primary.main" }}
+          >
+            Resume game
+          </MenuItem>
           {/* The app-wide offline banner would cover the game, so it is said here instead */}
           {!online && (
             <MenuItem disabled className="gameMenuOffline">
@@ -234,9 +274,13 @@ export function GameAppBar(props: Props) {
               Offline: saving to this device only
             </MenuItem>
           )}
-          <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Settings</MenuItem>
-          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          <MenuItem onClick={() => visitFromMenu(onSettings)}>
+            Settings
+          </MenuItem>
+          <MenuItem onClick={() => visitFromMenu(onManual)}>Manual</MenuItem>
+          <MenuItem onClick={() => visitFromMenu(props.onSavedGames)}>
+            Saved games
+          </MenuItem>
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
@@ -263,6 +307,7 @@ export function GameAppBar(props: Props) {
       online,
       onManual,
       onSettings,
+      onSpeedChange,
       props.onSavedGames,
       onNextTutorial,
       handleQuit,
