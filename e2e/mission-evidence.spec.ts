@@ -382,6 +382,22 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Shortfall expected later today/,
   );
+  // The default Grid must retain Dispatch after the request is acknowledged, including focus.
+  await page
+    .locator(".facilities:visible")
+    .getByRole("button", { name: "Grid", exact: true })
+    .click();
+  await expect(page.locator("#chartSupplyDemand")).toHaveCount(0);
+  await page.locator(".missionRiskButton:visible").click();
+  await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
+  await expect(page.locator(".operatingEvidence")).toBeFocused();
+  await expect(
+    page
+      .locator(".facilities:visible")
+      .getByRole("button", { name: "Dispatch", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: info.outputPath("fleet-evidence.png") });
   await scrollChartAway(page, chartPinned);
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator("#chartSupplyDemand")).toBeVisible();

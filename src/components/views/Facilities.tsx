@@ -856,6 +856,11 @@ export default class Facilities extends React.Component<Props, State> {
       )
     )
       return;
+    if (request.target === "supply-demand" && this.state.view !== "dispatch") {
+      // Keep the requested chart mounted after focus acknowledges and clears the request.
+      this.setState({ view: "dispatch" });
+      return;
+    }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 

@@ -18,7 +18,11 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType } from "../../Types";
+import {
+  EvidenceRequestType,
+  FacilityOperatingType,
+  GameType,
+} from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
@@ -77,6 +81,7 @@ function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
   fleetView: "grid" | "dispatch" = "dispatch",
+  initialEvidenceRequest?: EvidenceRequestType,
 ): Handlers & { rerenderGame: (next: GameType, runId?: number) => void } {
   const handlers: Handlers = {
     onPause: jest.fn(),
@@ -95,10 +100,18 @@ function renderFacilities(
     runId?: number;
   }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
+    const [evidenceRequest, setEvidenceRequest] = React.useState(
+      initialEvidenceRequest,
+    );
     return (
       <Facilities
         game={state}
         feedbackRunId={runId}
+        evidenceRequest={evidenceRequest}
+        onEvidenceReady={(_request, element) => {
+          element?.focus();
+          setEvidenceRequest(undefined);
+        }}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
         onTransmissionUpgrade={() => undefined}
@@ -211,6 +224,26 @@ describe("the fleet list", () => {
     rerenderGame(completed, 1);
     expect(screen.queryByText(/Commissioned/)).toBeNull();
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("keeps supply and demand evidence mounted and focused after acknowledging a request from Grid", () => {
+    renderFacilities(game, null, "grid", {
+      id: 1,
+      runId: 0,
+      target: "supply-demand",
+    });
+    expect(screen.getByLabelText("Supply and demand")).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Dispatch" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Live power grid" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(
+      screen.getByRole("region", { name: "Live power grid" }),
+    ).toBeVisible();
   });
 
   it.each([
