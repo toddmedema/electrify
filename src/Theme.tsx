@@ -12,6 +12,9 @@ import {
   ThemeModeType,
 } from "./Types";
 
+// Also declared by --font-family in app.scss; bundled in public/fonts/inter.
+export const INTERFACE_FONT_FAMILY = 'Inter, "Segoe UI", Arial, sans-serif';
+
 /**
  * The game's two palettes.
  *
@@ -310,11 +313,32 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         mode === "dark"
           ? { default: "#0b1016", paper: "#111820" }
           : { default: "#ffffff", paper: "#ffffff" },
+      text:
+        mode === "dark"
+          ? { primary: "#e6edf5", secondary: "#9aa9ba" }
+          : { primary: "#172334", secondary: "#576574" },
     },
     typography: {
-      fontFamily: "Roboto, Arial, sans-serif",
+      fontFamily: INTERFACE_FONT_FAMILY,
       fontSize: 14,
-      h6: { fontSize: "1.25rem", fontWeight: 600, lineHeight: 1.3 },
+      h4: {
+        fontSize: "2rem",
+        fontWeight: 700,
+        lineHeight: 1.2,
+        letterSpacing: "-0.025em",
+      },
+      h5: {
+        fontSize: "1.5rem",
+        fontWeight: 650,
+        lineHeight: 1.25,
+        letterSpacing: "-0.02em",
+      },
+      h6: {
+        fontSize: "1.25rem",
+        fontWeight: 650,
+        lineHeight: 1.3,
+        letterSpacing: "-0.02em",
+      },
       subtitle1: { fontSize: "1rem", fontWeight: 600, lineHeight: 1.4 },
       subtitle2: { fontSize: "1rem", fontWeight: 600, lineHeight: 1.4 },
       body1: { fontSize: "0.9375rem", lineHeight: 1.45 },
@@ -341,6 +365,19 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             fontWeight: 600,
             textTransform: "none",
             touchAction: "manipulation",
+            "&.MuiButton-contained.MuiButton-colorPrimary:not(.Mui-disabled)": {
+              // A deeper interaction blue carries small white labels in light mode.
+              backgroundColor:
+                mode === "light" ? primaryDarkColor : palette.interactive,
+              "&:hover": {
+                backgroundColor: mode === "light" ? blue[900] : "#7eaee9",
+              },
+            },
+            "&.MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled), &.MuiButton-outlined.MuiButton-colorPrimary:not(.Mui-disabled)":
+              {
+                color:
+                  mode === "light" ? primaryDarkColor : palette.interactive,
+              },
           },
         },
       },
@@ -428,6 +465,22 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           root: {
             backgroundImage: "none",
           },
+        },
+      },
+      MuiMenu: {
+        styleOverrides: {
+          paper: {
+            border: mode === "dark" ? "1px solid #2b3948" : "1px solid #d5dde6",
+            boxShadow:
+              mode === "dark"
+                ? "0 8px 24px rgba(0,0,0,0.24)"
+                : "0 8px 24px rgba(23,35,52,0.1)",
+          },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: { textTransform: "none", fontWeight: 600 },
         },
       },
     },

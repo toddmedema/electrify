@@ -15,6 +15,7 @@
 
 :root {
   --control-size: 40px;
+  --font-family: "Inter", "Segoe UI", Arial, sans-serif;
   // One corner scale for the whole app. Chips, badges and inline marks take sm; buttons, inputs,
   // rows and cards take md (MUI's theme.shape.borderRadius); grouped lists, dialogs and sheets
   // take lg. RepositoryHygiene.test.ts rejects a raw pixel radius anywhere else in this sheet.
@@ -40,11 +41,11 @@
   --font-weight-regular: 400;
   --font-weight-emphasis: 600;
   --bg-primary: #ffffff;
-  --bg-raised: #fafafa; /* grey50 - hover, one step off the page */
-  --bg-sunken: #eceff1; /* blueGray50 - behind lists of cards */
-  --bg-selected: #e3f2fd; /* blue50 */
-  --border-selected: #bbdefb; /* blue100 */
-  --border-subtle: #eeeeee; /* grey200 */
+  --bg-raised: #f5f7fa;
+  --bg-sunken: #edf1f5;
+  --bg-selected: #e9f3fe;
+  --border-selected: #aaccec;
+  --border-subtle: #dfe5ec;
   /* The diagonal on a reverse-flow row bar. It is the channel that tells a reverse bar from
      a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
      Nothing that dark can sit under the row's label, which is why the hatch is confined to a
@@ -52,10 +53,10 @@
   --flow-hatch: rgba(0, 132, 248, 0.8);
   // Forward flow behind every fleet row: one neutral tint, so rows read as one system
   --flow-fill: color-mix(in srgb, var(--font-color-primary) 7%, transparent);
-  --border-strong: #bdbdbd; /* grey400 */
-  --border-tile: #e0e0e0; /* grey300 */
-  --font-color-primary: #000000;
-  --font-color-faded: #666666;
+  --border-strong: #a4b0bd;
+  --border-tile: #d5dde6;
+  --font-color-primary: #172334;
+  --font-color-faded: #576574;
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-contrast: #f5f5f5;
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
@@ -293,7 +294,9 @@ html[data-theme="dark"] {
 }
 
 body {
-  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+  font-family: var(--font-family);
+  font-optical-sizing: auto;
+  line-height: 1.45;
   background-color: $bg_primary;
   // MUI colours its own components off the theme, but the plain markup between them inherits
   // from here - and the browser default is black, which on a dark page is a blank screen
@@ -446,6 +449,33 @@ button,
   font-weight: 600;
 }
 
+// Keep changing amounts steady without turning prose into a numeric readout.
+.gameStatusValue,
+.constructionCash,
+.constructionCapacity,
+.buildOptionMetric,
+.facilityStatus,
+.facilityStatusDetail,
+.insightsRateMetricValue,
+table,
+.chartTooltip {
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: normal;
+}
+
+.screenHeaderTitle,
+.paneHeader h6,
+.insightsHeader h6,
+.constructionTitle .iconLabel {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.buildOptionMetric > .MuiTypography-body2 {
+  font-size: var(--font-size-body1);
+  font-weight: 650;
+}
+
 .srOnly {
   position: absolute !important;
   width: 1px !important;
@@ -573,6 +603,9 @@ $topbar_height: 56px;
 
   #topbar .constructionTitleBar .constructionCash {
     font-size: var(--font-size-caption-sm);
+    // A negative balance can wrap before "cash" while the clock keeps its touch targets.
+    max-width: calc(100% - var(--space-1));
+    white-space: normal;
   }
 
   #topbar .constructionTitleBar .iconLabel > svg {
@@ -811,7 +844,7 @@ $topbar_height: 56px;
   // carries the interactive blue, as the active-events chip beside it does.
   .missionRiskEvent .conceptIcon {
     color: $interactive_blue;
-    // Roboto's capitals sit above the middle of their line box; lift the calendar's box outline
+    // Capitals sit above the middle of their line box; lift the calendar's box outline
     // onto their centre so it doesn't read as sagging below the label.
     transform: translateY(-0.5px);
   }
@@ -4134,7 +4167,7 @@ $pane_header_height: 48px;
 .tutorialHud .tutorialPrompt {
   margin: 4px 0 0;
   color: $font_color_primary;
-  font-family: "Roboto", "Arial", sans-serif;
+  font-family: var(--font-family);
   font-size: var(--font-size-body1);
   font-weight: 400;
   line-height: 20px;
@@ -5371,6 +5404,25 @@ $sizemap: (
     display: inline;
   }
 }
+// A narrow fleet row has room for the build percentage or remaining time on each line.
+@container (max-width: 199px) {
+  .facilityDisclosure
+    .facilityText:has(> .constructionProgress)
+    .MuiListItemText-secondary {
+    flex-wrap: wrap;
+  }
+  .facilityDisclosure
+    .facilityText:has(> .constructionProgress)
+    .facilityStatusDetail {
+    flex-basis: 100%;
+    flex-shrink: 0;
+  }
+  .facilityDisclosure
+    .facilityText:has(> .constructionProgress)
+    .facilityStatusSeparator {
+    display: none;
+  }
+}
 .base_main .facilityRow {
   container: facility-row / inline-size;
 }
@@ -6019,6 +6071,12 @@ $programs_column: 800px;
   .generatorDetails .generatorDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
+  }
+}
+@media (max-width: 359px) {
+  .generatorDetails .generatorDetailLabel {
+    // Reserve a full numeric/unit column; longer labels wrap at word boundaries.
+    width: 40%;
   }
 }
 @media (pointer: coarse) {
