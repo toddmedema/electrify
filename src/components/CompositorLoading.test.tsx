@@ -9,6 +9,7 @@ jest.mock("./base/VictoryDialogContainer", () => () => null);
 jest.mock("./base/SaveTransitionDialog", () => () => null);
 jest.mock("./base/DisplayNameDialogContainer", () => () => null);
 jest.mock("./base/DataCenterGuide", () => () => null);
+jest.mock("./base/LowCashWarning", () => () => null);
 
 it("starts a fresh loader when retry occurs before the previous loader exits", () => {
   jest.useFakeTimers();

@@ -214,20 +214,17 @@ function WeatherResilienceSection(props: {
           </Typography>
         </div>
       )}
+      {facility.resilience?.solarTrackers && (
+        <div className="facilityResilienceSummary">
+          <Typography variant="body2" className="facilityStatValue">
+            Solar trackers
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            More morning and evening power. Trackers stow ahead of hail.
+          </Typography>
+        </div>
+      )}
       <dl className="facilityResilienceFacts">
-        {facility.resilience?.solarTrackers && (
-          <Stat
-            label="Mounting"
-            value={
-              <>
-                Solar trackers
-                <span className="facilityStatNote">
-                  More morning and evening power. Trackers stow ahead of hail.
-                </span>
-              </>
-            }
-          />
-        )}
         {installing && (
           <Stat
             label="Upgrade"
