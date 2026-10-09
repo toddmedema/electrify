@@ -27,9 +27,6 @@ for (const theme of ["light", "dark"] as const) {
     await expect(hydro).toContainText("largest:");
     const slider = page.getByRole("slider");
     const before = await slider.getAttribute("aria-valuenow");
-    await hydro.getByRole("button", { name: "Use site maximum" }).click();
-    // The shortcut sizes the catalog to the largest open site, which is below the default
-    await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
     const reviewBounds = (await hydro
       .getByRole("button", { name: "Review purchase of Hydro" })
       .boundingBox())!;
@@ -50,6 +47,12 @@ for (const theme of ["light", "dark"] as const) {
     expect(maximumBounds.height).toBeGreaterThanOrEqual(
       testInfo.project.name.startsWith("mobile") ? 44 : 40,
     );
+    await hydro.getByRole("button", { name: "Use site maximum" }).click();
+    // The shortcut sizes the catalog to the largest open site, then removes itself at that size.
+    await expect(slider).not.toHaveAttribute("aria-valuenow", before!);
+    await expect(
+      hydro.getByRole("button", { name: "Use site maximum" }),
+    ).toHaveCount(0);
 
     await expect(hydro).toContainText("Site:");
     await expect(page.locator(".buildPrimer")).toContainText(
