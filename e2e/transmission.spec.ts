@@ -66,12 +66,12 @@ test("California players can build and understand an intertie", async ({
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
     .click();
-  await facilities
-    .getByRole("button", { name: "Dispatch", exact: true })
-    .click();
   await expect(
     page.getByText("Intertie approved — power can flow in 1 year."),
   ).toBeVisible();
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   await expect(
     facilities.locator("#your-interties-title", { hasText: "Interties" }),
   ).toBeVisible();

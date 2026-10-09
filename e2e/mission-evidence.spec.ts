@@ -271,6 +271,8 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
       tick.cash = -100;
       tick.supplyW = Math.max(tick.supplyW, tick.demandW);
     }
+    // This fixture inspects negative-cash evidence after the month's rate offer was acknowledged.
+    save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
