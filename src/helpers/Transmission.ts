@@ -466,9 +466,8 @@ export interface IntertieOffer {
 }
 
 /**
- * Splits a cleared total across lines in merit order: imports come from the cheapest neighbour
- * first and exports go to the best-paying one first, so which interties you own changes what
- * trading costs, not just how much can flow.
+ * Splits a cleared total in the player's trading order. Earlier lines get the first chance to
+ * import or export, within the shared corridor and neighbour limits.
  */
 export function allocateIntertieFlows(
   offers: readonly IntertieOffer[],
@@ -478,19 +477,12 @@ export function allocateIntertieFlows(
   const imports = offers.map(() => 0);
   const exports = offers.map(() => 0);
   const indexed = offers.map((offer, index) => ({ offer, index }));
-  // Equal prices keep line order both ways, so a tie never depends on the direction of trade.
-  const cheapestFirst = [...indexed].sort(
-    (a, b) => a.offer.pricePerMWh - b.offer.pricePerMWh || a.index - b.index,
-  );
-  const dearestFirst = [...indexed].sort(
-    (a, b) => b.offer.pricePerMWh - a.offer.pricePerMWh || a.index - b.index,
-  );
   const importUsed = new Map<string, number>();
   const exportUsed = new Map<string, number>();
   const accessImportsUsed = new Map<string, number>();
   const accessExportsUsed = new Map<string, number>();
   let remaining = importedW;
-  for (const { offer, index } of cheapestFirst) {
+  for (const { offer, index } of indexed) {
     if (remaining <= 0) break;
     imports[index] = Math.min(
       remaining,
@@ -519,7 +511,7 @@ export function allocateIntertieFlows(
       );
   }
   remaining = exportedW;
-  for (const { offer, index } of dearestFirst) {
+  for (const { offer, index } of indexed) {
     if (remaining <= 0) break;
     exports[index] = Math.min(
       remaining,

@@ -6,6 +6,7 @@ import {
   setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
+  reprioritizeTransmissionLine,
   retrofitFacility,
   cancelRetrofit,
   buildTransmissionLine,
@@ -80,11 +81,16 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         dispatch(setSpeed("PAUSED"));
       }
     },
-    onFacilityDragEnd: (sourceIndex, destinationIndex, resumeSpeed) => {
+    onFacilityDragEnd: (
+      sourceIndex,
+      destinationIndex,
+      resumeSpeed,
+      intertie,
+    ) => {
       dispatch(setFacilityDragActive(false));
       if (destinationIndex !== null) {
         dispatch(
-          reprioritizeFacility({
+          (intertie ? reprioritizeTransmissionLine : reprioritizeFacility)({
             spotInList: sourceIndex,
             delta: destinationIndex - sourceIndex,
           }),

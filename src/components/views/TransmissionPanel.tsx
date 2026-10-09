@@ -10,6 +10,13 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
+import {
+  DragDropContext,
+  Draggable,
+  Droppable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   Box,
@@ -510,6 +517,8 @@ function IntertieUpgradeControl(props: {
 }
 
 export interface TransmissionPanelProps {
+  onBeforeDragStart?: () => void;
+  onDragEnd?: (result: DropResult) => void;
   onCancel?: (id: number) => void;
   onPause?: (id: number, name: string, paused: boolean) => void;
   game: GameType;
@@ -534,8 +543,7 @@ function tradingFlowText(game: GameType): string | null {
   return "No power flowing";
 }
 
-// The rule is the only trading decision, so it stays editable in place rather than behind a
-// disclosure that repeats the current choice as a label.
+// Keep the trading rule editable beside the ordered connections it governs.
 function TradingControls({
   game,
   onPolicy,
@@ -581,6 +589,8 @@ export default function TransmissionPanel({
   onPolicy,
   onCancel,
   onPause,
+  onBeforeDragStart,
+  onDragEnd,
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
@@ -692,8 +702,12 @@ export default function TransmissionPanel({
           >
             Interties
             <span className="facilitySectionMeta">
+              <span>Trading order</span>
               {flowText && (
-                <span className="networkTradingFlow">{flowText}</span>
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="networkTradingFlow">{flowText}</span>
+                </>
               )}
             </span>
           </Typography>
@@ -707,304 +721,377 @@ export default function TransmissionPanel({
               No connections yet. Choose Build to connect a nearby grid.
             </Typography>
           )}
-          {state.lines.map((line) => {
-            const market = adjacentMarketForCorridor(line.corridorId);
-            const rating = now
-              ? transmissionRatingW(line, now)
-              : line.capacityW;
-            const building = line.yearsToBuildLeft > 0;
-            // Remaining time plus elapsed simulation time preserves the original build duration.
-            const elapsedYears =
-              (Math.max(0, game.date.minute - line.minuteCreated) /
-                TICK_MINUTES) *
-              YEARS_PER_TICK;
-            const builtFraction = building
-              ? elapsedYears / (elapsedYears + line.yearsToBuildLeft)
-              : 1;
-            const monthsLeft = Math.ceil(line.yearsToBuildLeft * 12);
-            const constructionLabel = `Building ${Math.round(builtFraction * 100)}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
-            const constructionStyle = building
-              ? { opacity: theme.palette.action.disabledOpacity }
-              : undefined;
-            const importableW = now
-              ? intertieImportLimitW(line, intertieContext, now.minute, now)
-              : rating;
-            const outlook =
-              selectedLine === line.id
-                ? outlookFor(line.corridorId, line.capacityW)
-                : undefined;
-            // Signed against the line's current rating, so the row reads the same way a
-            // facility row does: positive is power arriving, negative is power being sold.
-            const flowW = building ? 0 : line.currentFlowW || 0;
-            const flowFraction =
-              rating > 0 ? Math.max(-1, Math.min(1, flowW / rating)) : 0;
-            const flowLabel = formatSignedWattsOfPeak(flowW, rating);
-            // aria-label replaces a button's descendant content for its accessible name, so a
-            // visually hidden span inside the row would never be announced. The reading and the
-            // direction the bar and the sign carry visually have to be in the label itself.
-            const flowDescription = building
-              ? constructionLabel
-              : flowW > 0
-                ? `importing ${formatWatts(flowW)} of ${formatWatts(rating)}`
-                : flowW < 0
-                  ? `selling ${formatWatts(-flowW)} of ${formatWatts(rating)}`
-                  : line.paused
-                    ? "paused"
-                    : "no power flowing";
-            return (
-              <div key={line.id} className="transmissionLine">
-                <button
-                  type="button"
-                  className="facilityDisclosure"
-                  aria-label={`Inspect ${line.name}, ${flowDescription}`}
-                  aria-expanded={selectedLine === line.id}
-                  onClick={() =>
-                    setSelectedLine(selectedLine === line.id ? null : line.id)
-                  }
-                >
-                  {!building && <FlowBar fraction={flowFraction} />}
-                  <img
-                    className="transmissionListIcon"
-                    style={constructionStyle}
-                    src="/images/transmission.svg"
-                    alt=""
-                  />
-                  <span className="transmissionLineText">
-                    <span style={constructionStyle}>{line.name}</span>
-                    <Typography
-                      component="span"
-                      variant="body2"
-                      color="textSecondary"
-                      style={constructionStyle}
-                    >
-                      {building ? (
-                        constructionLabel
-                      ) : (
-                        <span className="transmissionLineFlow">
-                          {line.paused ? "Paused" : flowLabel}
-                        </span>
-                      )}
-                    </Typography>
-                    {building && (
-                      <span
-                        className="constructionProgress"
-                        data-paused={game.speed === "PAUSED"}
-                        aria-hidden
+          <DragDropContext
+            onBeforeDragStart={onBeforeDragStart}
+            onDragEnd={onDragEnd ?? (() => undefined)}
+          >
+            <Droppable droppableId="interties">
+              {(droppable) => (
+                <div ref={droppable.innerRef} {...droppable.droppableProps}>
+                  {state.lines.map((line, index) => {
+                    const market = adjacentMarketForCorridor(line.corridorId);
+                    const rating = now
+                      ? transmissionRatingW(line, now)
+                      : line.capacityW;
+                    const building = line.yearsToBuildLeft > 0;
+                    // Remaining time plus elapsed simulation time preserves the original build duration.
+                    const elapsedYears =
+                      (Math.max(0, game.date.minute - line.minuteCreated) /
+                        TICK_MINUTES) *
+                      YEARS_PER_TICK;
+                    const builtFraction = building
+                      ? elapsedYears / (elapsedYears + line.yearsToBuildLeft)
+                      : 1;
+                    const monthsLeft = Math.ceil(line.yearsToBuildLeft * 12);
+                    const constructionLabel = `Building ${Math.round(builtFraction * 100)}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+                    const constructionStyle = building
+                      ? { opacity: theme.palette.action.disabledOpacity }
+                      : undefined;
+                    const importableW = now
+                      ? intertieImportLimitW(
+                          line,
+                          intertieContext,
+                          now.minute,
+                          now,
+                        )
+                      : rating;
+                    const outlook =
+                      selectedLine === line.id
+                        ? outlookFor(line.corridorId, line.capacityW)
+                        : undefined;
+                    // Signed against the line's current rating, so the row reads the same way a
+                    // facility row does: positive is power arriving, negative is power being sold.
+                    const flowW = building ? 0 : line.currentFlowW || 0;
+                    const flowFraction =
+                      rating > 0
+                        ? Math.max(-1, Math.min(1, flowW / rating))
+                        : 0;
+                    const flowLabel = formatSignedWattsOfPeak(flowW, rating);
+                    // aria-label replaces a button's descendant content for its accessible name, so a
+                    // visually hidden span inside the row would never be announced. The reading and the
+                    // direction the bar and the sign carry visually have to be in the label itself.
+                    const flowDescription = building
+                      ? constructionLabel
+                      : flowW > 0
+                        ? `importing ${formatWatts(flowW)} of ${formatWatts(rating)}`
+                        : flowW < 0
+                          ? `selling ${formatWatts(-flowW)} of ${formatWatts(rating)}`
+                          : line.paused
+                            ? "paused"
+                            : "no power flowing";
+                    return (
+                      <Draggable
+                        key={line.id}
+                        draggableId={`t${line.id}`}
+                        index={index}
+                        isDragDisabled={readOnly}
+                        disableInteractiveElementBlocking
                       >
-                        <span
-                          className="constructionProgressFill"
-                          style={{
-                            width: `${builtFraction * 100}%`,
-                            background: "var(--interactive-blue)",
-                          }}
-                        />
-                      </span>
-                    )}
-                  </span>
-                  <ChevronDownGlyph className="facilityChevron" aria-hidden />
-                </button>
-                {selectedLine === line.id && (
-                  <div className="transmissionLineDetails">
-                    {!readOnly && (
-                      <div className="facilityActions intertieActions">
-                        {building && onCancel && (
-                          <Button
-                            className="facilityCancelConstruction"
-                            startIcon={<CancelIcon />}
-                            aria-label={`Cancel construction of ${line.name}`}
-                            onClick={() => setCancelLine(line)}
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            style={{
+                              userSelect: "none",
+                              ...provided.draggableProps.style,
+                            }}
+                            className={`transmissionLine${selectedLine === line.id ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
                           >
-                            <span className="facilityActionLabel">
-                              Cancel construction
-                            </span>
-                          </Button>
-                        )}
-                        {!building && onPause && (
-                          <Button
-                            startIcon={
-                              <ConceptIcon
-                                concept={line.paused ? "play" : "pause"}
-                              />
-                            }
-                            aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
-                            onClick={() =>
-                              onPause(line.id, line.name, !!line.paused)
-                            }
-                          >
-                            <span className="facilityActionLabel">
-                              {line.paused ? "Resume" : "Pause"}
-                            </span>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                    {cancelLine?.id === line.id && (
-                      <ConfirmDialog
-                        open
-                        title={`Cancel construction of ${line.name}?`}
-                        cancelLabel="Nevermind"
-                        confirmLabel="Cancel construction"
-                        onCancel={() => setCancelLine(null)}
-                        onConfirm={() => {
-                          onCancel?.(line.id);
-                          setCancelLine(null);
-                        }}
-                      >
-                        <Typography>
-                          Receive{" "}
-                          {formatMoneyConcise(
-                            line.buildCost - line.loanAmountLeft,
-                          )}{" "}
-                          back
-                          {line.loanAmountLeft > 0
-                            ? " after settling the outstanding loan"
-                            : ""}
-                          .
-                        </Typography>
-                      </ConfirmDialog>
-                    )}
-                    {outlook && (
-                      <div className="transmissionArchetype">
-                        <Typography variant="body2" color="textSecondary">
-                          {outlook.archetype.summary}
-                        </Typography>
-                      </div>
-                    )}
-                    <dl className="transmissionMetrics facilityStats">
-                      <div className="facilityStat">
-                        <dt>Rated capacity</dt>
-                        <dd className="facilityStatValue">
-                          {formatWatts(line.capacityW, 3)}
-                        </dd>
-                      </div>
-                      {!building && now && (
-                        <>
-                          <div className="facilityStat">
-                            <dt>Price now</dt>
-                            <dd className="facilityStatValue">
-                              {formatMoneyConcise(
-                                adjacentMarketPricePerMWh(
-                                  line.corridorId,
-                                  intertieContext,
-                                  now.minute,
-                                  now,
-                                ),
+                            <div className="facilityRowHeader">
+                              {!building && <FlowBar fraction={flowFraction} />}
+                              {!readOnly && (
+                                <button
+                                  type="button"
+                                  {...provided.dragHandleProps}
+                                  className="facilityDragHandle"
+                                  aria-label={`Reorder ${line.name}`}
+                                >
+                                  <DragIndicatorIcon aria-hidden />
+                                </button>
                               )}
-                              /MWh
-                            </dd>
-                          </div>
-                          <div className="facilityStat">
-                            <dt>Available for import</dt>
-                            <dd className="facilityStatValue">
-                              {formatWatts(importableW)} of{" "}
-                              {formatWatts(rating)}
-                            </dd>
-                          </div>
-                        </>
-                      )}
-                      {market && (
-                        <div className="facilityStat">
-                          <dt>Emissions (CO2e)</dt>
-                          <dd className="facilityStatValue">
-                            {formatMass(
-                              importEmissionsKgco2ePerMWh(
-                                market.id,
-                                game.date.year,
-                              ),
-                              units,
+                              <button
+                                type="button"
+                                className="facilityDisclosure"
+                                aria-label={`Inspect ${line.name}, ${flowDescription}`}
+                                aria-expanded={selectedLine === line.id}
+                                onClick={() =>
+                                  setSelectedLine(
+                                    selectedLine === line.id ? null : line.id,
+                                  )
+                                }
+                              >
+                                <img
+                                  className="transmissionListIcon"
+                                  style={constructionStyle}
+                                  src="/images/transmission.svg"
+                                  alt=""
+                                />
+                                <span className="transmissionLineText">
+                                  <span style={constructionStyle}>
+                                    {line.name}
+                                  </span>
+                                  <Typography
+                                    component="span"
+                                    variant="body2"
+                                    color="textSecondary"
+                                    style={constructionStyle}
+                                  >
+                                    {building ? (
+                                      constructionLabel
+                                    ) : (
+                                      <span className="transmissionLineFlow">
+                                        {line.paused ? "Paused" : flowLabel}
+                                      </span>
+                                    )}
+                                  </Typography>
+                                  {building && (
+                                    <span
+                                      className="constructionProgress"
+                                      data-paused={game.speed === "PAUSED"}
+                                      aria-hidden
+                                    >
+                                      <span
+                                        className="constructionProgressFill"
+                                        style={{
+                                          width: `${builtFraction * 100}%`,
+                                          background: "var(--interactive-blue)",
+                                        }}
+                                      />
+                                    </span>
+                                  )}
+                                </span>
+                                <ChevronDownGlyph
+                                  className="facilityChevron"
+                                  aria-hidden
+                                />
+                              </button>
+                            </div>
+                            {selectedLine === line.id && (
+                              <div className="transmissionLineDetails">
+                                {!readOnly && (
+                                  <div className="facilityActions intertieActions">
+                                    {building && onCancel && (
+                                      <Button
+                                        className="facilityCancelConstruction"
+                                        startIcon={<CancelIcon />}
+                                        aria-label={`Cancel construction of ${line.name}`}
+                                        onClick={() => setCancelLine(line)}
+                                      >
+                                        <span className="facilityActionLabel">
+                                          Cancel construction
+                                        </span>
+                                      </Button>
+                                    )}
+                                    {!building && onPause && (
+                                      <Button
+                                        startIcon={
+                                          <ConceptIcon
+                                            concept={
+                                              line.paused ? "play" : "pause"
+                                            }
+                                          />
+                                        }
+                                        aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
+                                        onClick={() =>
+                                          onPause(
+                                            line.id,
+                                            line.name,
+                                            !!line.paused,
+                                          )
+                                        }
+                                      >
+                                        <span className="facilityActionLabel">
+                                          {line.paused ? "Resume" : "Pause"}
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                                {cancelLine?.id === line.id && (
+                                  <ConfirmDialog
+                                    open
+                                    title={`Cancel construction of ${line.name}?`}
+                                    cancelLabel="Nevermind"
+                                    confirmLabel="Cancel construction"
+                                    onCancel={() => setCancelLine(null)}
+                                    onConfirm={() => {
+                                      onCancel?.(line.id);
+                                      setCancelLine(null);
+                                    }}
+                                  >
+                                    <Typography>
+                                      Receive{" "}
+                                      {formatMoneyConcise(
+                                        line.buildCost - line.loanAmountLeft,
+                                      )}{" "}
+                                      back
+                                      {line.loanAmountLeft > 0
+                                        ? " after settling the outstanding loan"
+                                        : ""}
+                                      .
+                                    </Typography>
+                                  </ConfirmDialog>
+                                )}
+                                {outlook && (
+                                  <div className="transmissionArchetype">
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      {outlook.archetype.summary}
+                                    </Typography>
+                                  </div>
+                                )}
+                                <dl className="transmissionMetrics facilityStats">
+                                  <div className="facilityStat">
+                                    <dt>Rated capacity</dt>
+                                    <dd className="facilityStatValue">
+                                      {formatWatts(line.capacityW, 3)}
+                                    </dd>
+                                  </div>
+                                  {!building && now && (
+                                    <>
+                                      <div className="facilityStat">
+                                        <dt>Price now</dt>
+                                        <dd className="facilityStatValue">
+                                          {formatMoneyConcise(
+                                            adjacentMarketPricePerMWh(
+                                              line.corridorId,
+                                              intertieContext,
+                                              now.minute,
+                                              now,
+                                            ),
+                                          )}
+                                          /MWh
+                                        </dd>
+                                      </div>
+                                      <div className="facilityStat">
+                                        <dt>Available for import</dt>
+                                        <dd className="facilityStatValue">
+                                          {formatWatts(importableW)} of{" "}
+                                          {formatWatts(rating)}
+                                        </dd>
+                                      </div>
+                                    </>
+                                  )}
+                                  {market && (
+                                    <div className="facilityStat">
+                                      <dt>Emissions (CO2e)</dt>
+                                      <dd className="facilityStatValue">
+                                        {formatMass(
+                                          importEmissionsKgco2ePerMWh(
+                                            market.id,
+                                            game.date.year,
+                                          ),
+                                          units,
+                                        )}
+                                        /MWh
+                                      </dd>
+                                    </div>
+                                  )}
+                                  {outlook && <PriceMetric outlook={outlook} />}
+                                  {line.loanAmountLeft > 0 && (
+                                    <div className="facilityStat">
+                                      <dt>Loan balance</dt>
+                                      <dd className="facilityStatValue">
+                                        {formatMoneyConcise(
+                                          line.loanAmountLeft,
+                                        )}
+                                      </dd>
+                                    </div>
+                                  )}
+                                </dl>
+                                {!building && now && (
+                                  <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                  >
+                                    Limiting factor:{" "}
+                                    {line.paused
+                                      ? "paused"
+                                      : state.tradingPolicy === "CLOSED" ||
+                                          (state.tradingPolicy ===
+                                            "SURPLUS_ONLY" &&
+                                            flowW >= 0)
+                                        ? "trading rule"
+                                        : flowW < 0
+                                          ? Math.abs(flowW) >=
+                                            (effectiveMarket(
+                                              line.corridorId,
+                                              intertieContext,
+                                            )?.availableDemandW || 0) -
+                                              1
+                                            ? "neighbor export demand"
+                                            : Math.abs(flowW) >= rating - 1
+                                              ? "own line rating"
+                                              : "local surplus"
+                                          : Math.abs(flowW) < importableW - 1
+                                            ? "local need / trading rule"
+                                            : neighborImportSupplyW(
+                                                  line.corridorId,
+                                                  intertieContext,
+                                                  now.minute,
+                                                  now,
+                                                  line.capacityW,
+                                                ) < rating
+                                              ? "available import access"
+                                              : "own line rating"}
+                                    . Line rating {formatWatts(rating)};
+                                    available import access{" "}
+                                    {formatWatts(
+                                      neighborImportSupplyW(
+                                        line.corridorId,
+                                        intertieContext,
+                                        now.minute,
+                                        now,
+                                        line.capacityW,
+                                      ),
+                                    )}
+                                    ; neighbor export demand{" "}
+                                    {formatWatts(
+                                      effectiveMarket(
+                                        line.corridorId,
+                                        intertieContext,
+                                      )?.availableDemandW || 0,
+                                    )}
+                                    .
+                                  </Typography>
+                                )}
+                                {outlook && (
+                                  <IntertieYear
+                                    outlook={outlook}
+                                    capacityW={line.capacityW}
+                                  />
+                                )}
+                                {!building && (
+                                  <IntertieUpgradeControl
+                                    costIndex={getCostTableIndex(
+                                      game.date,
+                                      game.startingYear,
+                                      game.seed,
+                                    )}
+                                    line={line}
+                                    context={accessContextForGame(game)}
+                                    cash={now?.cash}
+                                    year={game.date.year}
+                                    interestRate={game.interestRate}
+                                    units={units}
+                                    readOnly={readOnly}
+                                    onUpgrade={onUpgrade}
+                                  />
+                                )}
+                              </div>
                             )}
-                            /MWh
-                          </dd>
-                        </div>
-                      )}
-                      {outlook && <PriceMetric outlook={outlook} />}
-                      {line.loanAmountLeft > 0 && (
-                        <div className="facilityStat">
-                          <dt>Loan balance</dt>
-                          <dd className="facilityStatValue">
-                            {formatMoneyConcise(line.loanAmountLeft)}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                    {!building && now && (
-                      <Typography variant="body2" color="textSecondary">
-                        Limiting factor:{" "}
-                        {line.paused
-                          ? "paused"
-                          : state.tradingPolicy === "CLOSED" ||
-                              (state.tradingPolicy === "SURPLUS_ONLY" &&
-                                flowW >= 0)
-                            ? "trading rule"
-                            : flowW < 0
-                              ? Math.abs(flowW) >=
-                                (effectiveMarket(
-                                  line.corridorId,
-                                  intertieContext,
-                                )?.availableDemandW || 0) -
-                                  1
-                                ? "neighbor export demand"
-                                : Math.abs(flowW) >= rating - 1
-                                  ? "own line rating"
-                                  : "local surplus"
-                              : Math.abs(flowW) < importableW - 1
-                                ? "local need / trading rule"
-                                : neighborImportSupplyW(
-                                      line.corridorId,
-                                      intertieContext,
-                                      now.minute,
-                                      now,
-                                      line.capacityW,
-                                    ) < rating
-                                  ? "available import access"
-                                  : "own line rating"}
-                        . Line rating {formatWatts(rating)}; available import
-                        access{" "}
-                        {formatWatts(
-                          neighborImportSupplyW(
-                            line.corridorId,
-                            intertieContext,
-                            now.minute,
-                            now,
-                            line.capacityW,
-                          ),
+                          </div>
                         )}
-                        ; neighbor export demand{" "}
-                        {formatWatts(
-                          effectiveMarket(line.corridorId, intertieContext)
-                            ?.availableDemandW || 0,
-                        )}
-                        .
-                      </Typography>
-                    )}
-                    {outlook && (
-                      <IntertieYear
-                        outlook={outlook}
-                        capacityW={line.capacityW}
-                      />
-                    )}
-                    {!building && (
-                      <IntertieUpgradeControl
-                        costIndex={getCostTableIndex(
-                          game.date,
-                          game.startingYear,
-                          game.seed,
-                        )}
-                        line={line}
-                        context={accessContextForGame(game)}
-                        cash={now?.cash}
-                        year={game.date.year}
-                        interestRate={game.interestRate}
-                        units={units}
-                        readOnly={readOnly}
-                        onUpgrade={onUpgrade}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      </Draggable>
+                    );
+                  })}
+                  {droppable.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </section>
       )}
 

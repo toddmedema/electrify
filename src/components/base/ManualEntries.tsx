@@ -858,13 +858,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           it most. On harder difficulties, they have even less available.
         </p>
         <p>
-          Imports come from the cheapest available neighbor first, and exports
-          go to whoever pays best. Hot, sunny weather can also reduce line
-          capacity: hot wires sag, so carrying less power helps keep them clear
-          of the ground. Build details show typical import availability and
-          price, including how much of the line is available at your peak. Live
-          line details show whether the line, the neighbor, or your own demand
-          and trading rule is limiting the flow.
+          Drag the handles beside your interties to set their trading order.
+          Imports and exports use the first available connection in that order.
+          Moving a cheaper neighbor first can lower import costs; moving a
+          higher-paying neighbor first can raise export revenue. Hot, sunny
+          weather can also reduce line capacity: hot wires sag, so carrying less
+          power helps keep them clear of the ground. Build details show typical
+          import availability and price, including how much of the line is
+          available at your peak. Live line details show whether the line, the
+          neighbor, or your own demand and trading rule is limiting the flow.
         </p>
         <p>
           Neighbors' prices and emissions change over time. The game uses
