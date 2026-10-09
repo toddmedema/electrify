@@ -78,12 +78,15 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );
-    // The announced fee takes the goal's place, keeping the tracker to one line.
-    await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
+    // Upcoming news keeps its own line so the goal remains visible.
+    await expect(page.locator(".missionRiskButton:visible")).toContainText(
       "Upcoming:",
     );
+    await expect(page.locator(".missionSummaryHeadline:visible")).toContainText(
+      "Goal",
+    );
     const copy = await page.locator(".missionSummary:visible").boundingBox();
-    expect(copy!.height).toBeLessThanOrEqual(56);
+    expect(copy!.height).toBeLessThanOrEqual(88);
     const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
@@ -121,8 +124,9 @@ for (const theme of ["light", "dark"]) {
             document.querySelector(selector)!.getBoundingClientRect().height,
         ),
       );
-      // Grid health and the mission share one 44px status row under the 56px app bar
-      expect(heights).toEqual([56, 44, 44]);
+      // Scenario context remains visible above two compact operating rows.
+      expect(heights[0]).toBeLessThanOrEqual(84);
+      expect(heights.slice(1)).toEqual([44, 44]);
     }
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
@@ -259,6 +263,8 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
   await waitForSave(page);
   // A saved-game fixture isolates the presentation warning from economic outcomes.
   await editSavedGame(page, (save) => {
+    // The cash warning dialog is covered separately; this fixture exercises its HUD link.
+    save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
     for (const tick of save.game.timeline) {
       tick.cash = -100;
       tick.supplyW = Math.max(tick.supplyW, tick.demandW);
@@ -363,6 +369,9 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   );
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Shortfall expected later today/,
+  );
+  await expect(page.locator(".missionRiskTimeframe:visible")).toContainText(
+    "Later today",
   );
   await scrollChartAway(page, chartPinned);
   await page.locator(".missionRiskButton:visible").click();

@@ -17,6 +17,14 @@ jest.mock("../../helpers/MissionStatus", () => ({
   getMissionStatus: () => ({
     monthsRemaining: 12,
     requirements: mockRequirements,
+    headline: {
+      id: "reliability",
+      label: "Keep the lights on",
+      compact: "Demand served ≥ 90% (pending)",
+      current: "No completed months",
+      target: "Every required month",
+      timing: "At month end",
+    },
   }),
   projectedShortfall: (...args: unknown[]) => mockProjectedShortfall(...args),
   selectMissionRisk: (...args: unknown[]) => mockSelectMissionRisk(...args),
@@ -209,4 +217,19 @@ it("marks an upcoming event as news rather than a warning", () => {
   expect(screen.getByRole("button", { name: /Cash/ })).not.toHaveClass(
     "missionRiskEvent",
   );
+});
+
+it("keeps the objective visible while labeling a future shortfall", () => {
+  mockSelectMissionRisk.mockReturnValue({
+    id: "projection:2006:2",
+    label: "Shortfall expected later today",
+    shortLabel: "Projected shortfall",
+    target: "supply-demand",
+  });
+  render(summary(makeGame(1)));
+  expect(screen.getByText("Demand served ≥ 90% (pending)")).toBeVisible();
+  expect(screen.getByText("Later today ·")).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "All requirements" }),
+  ).toBeVisible();
 });

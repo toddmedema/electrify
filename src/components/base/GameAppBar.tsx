@@ -21,6 +21,7 @@ import ConceptIcon from "./ConceptIcon";
 import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
+import "./OperatingHud.scss";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
@@ -161,10 +162,10 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
+  const scenario = getScenario(game.scenarioId, game.customScenario);
   // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
   // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
-  const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
-    ?.tutorialSteps;
+  const isTutorial = !!scenario?.tutorialSteps;
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
@@ -290,10 +291,21 @@ export function GameAppBar(props: Props) {
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
 
   return (
-    <div id="appbar">
+    <div id="appbar" className="operatingHud">
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
+          {!isTutorial && (
+            <div
+              className="gameOperatingContext"
+              aria-label="Current scenario and location"
+            >
+              <strong title={scenario?.name}>
+                {scenario?.name || "Custom game"}
+              </strong>
+              <span title={game.location.name}>{game.location.name}</span>
+            </div>
+          )}
           <Typography variant="h6" className="gameStatus">
             <span className="gameStatusValue">
               {formatMoneyStable(now.cash)}
@@ -337,6 +349,7 @@ export function GameAppBar(props: Props) {
         >
           <div className="gridHealthSummary">
             <span className="gridHealthState">
+              <span className="gridHealthTime">Now</span>
               <span className="statusIcon" aria-hidden="true">
                 <ConceptIcon
                   concept={

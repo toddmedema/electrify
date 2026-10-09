@@ -1,0 +1,186 @@
+// Scoped to the operating header, leaving the construction and tutorial controls intact.
+#appbar.operatingHud {
+  .gameOperatingContext {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    gap: 4px;
+    margin-right: 24px;
+    line-height: 1.25;
+
+    strong,
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      font-size: var(--font-size-body1);
+      font-weight: 600;
+    }
+
+    span {
+      color: var(--font-color-faded);
+      font-size: var(--font-size-caption);
+    }
+  }
+
+  .gameOperatingContext + .gameStatus {
+    flex: 0 0 auto;
+    margin-right: 24px;
+  }
+
+  #topbar .gameStatus .weak {
+    font-size: var(--font-size-body2);
+  }
+
+  .gameMenuButton {
+    color: var(--font-color-faded);
+  }
+
+  .gridHealthTime,
+  .missionSummaryGoalLabel,
+  .missionSummaryMonths,
+  .missionRiskTimeframe {
+    color: var(--font-color-faded);
+    font-weight: 400;
+    font-size: var(--font-size-caption);
+  }
+
+  .gridHealthTime {
+    margin-right: 4px;
+  }
+
+  .gridHealth .statusLabel {
+    font-weight: 600;
+  }
+
+  .missionSummary {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0;
+    background: var(--bg-raised);
+    color: var(--font-color-primary);
+    padding: 4px 16px;
+  }
+
+  .missionSummaryHeader {
+    position: relative;
+    min-height: 32px;
+    padding-right: 40px;
+    box-sizing: border-box;
+  }
+
+  .missionSummaryCopy {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .missionSummaryHeadline {
+    font-weight: 600;
+  }
+
+  .missionDetailsButton {
+    position: absolute;
+    top: 50%;
+    right: -8px;
+    transform: translateY(-50%);
+    color: var(--font-color-faded);
+  }
+
+  .missionRiskButton {
+    align-self: flex-start;
+    max-width: calc(100% + 8px);
+    min-height: 40px;
+    padding-block: 4px;
+    gap: 8px;
+    margin-block: 0;
+    color: var(--font-color-primary);
+  }
+
+  .missionRiskText {
+    font-weight: 400;
+  }
+
+  .missionSummary.statusWarning .missionRiskButton {
+    background: var(--warning-fill);
+  }
+
+  .missionRiskChevron {
+    flex: 0 0 auto;
+    color: var(--font-color-faded);
+  }
+}
+
+@media (max-width: 799px) {
+  #appbar.operatingHud {
+    #topbar .MuiToolbar-root:has(.gameOperatingContext) {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-rows: 56px auto;
+      column-gap: 0;
+    }
+
+    .gameMenuButton {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .gameOperatingContext {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 8px;
+      padding: 0 12px 8px;
+      margin: 0;
+
+      strong {
+        flex: 0 1 auto;
+        font-size: var(--font-size-caption);
+      }
+
+      span {
+        flex: 1 1 auto;
+      }
+    }
+
+    #topbar .gameOperatingContext + .gameStatus {
+      grid-column: 2;
+      grid-row: 1;
+      margin: 0;
+    }
+
+    #speedChangeButtons {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .gameStatusBar .missionSummary {
+      flex-basis: 100%;
+      padding: 4px 16px;
+      border-top: 1px solid var(--border-subtle);
+      min-height: 44px;
+    }
+
+    .missionSummaryCopy {
+      gap: 8px;
+    }
+  }
+}
+
+@media (pointer: coarse) {
+  #appbar.operatingHud {
+    .missionSummaryHeader {
+      padding-right: 44px;
+    }
+
+    .missionRiskButton {
+      min-height: 44px;
+    }
+  }
+}

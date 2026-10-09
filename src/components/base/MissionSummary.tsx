@@ -2,6 +2,7 @@ import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Button, IconButton, Tooltip } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
@@ -22,6 +23,16 @@ import {
 } from "./DeferredProjection";
 
 type MissionStatus = ReturnType<typeof getMissionStatus>;
+
+// Timeframes describe existing selector results; they never calculate another risk.
+function riskTimeframe(id: string): string | undefined {
+  if (id.startsWith("projection:")) return "Later today";
+  if (id === "cash-runway") return "Forecast";
+  // These labels already include Upcoming or Active.
+  if (id.startsWith("event:") || id.startsWith("active:")) return undefined;
+  if (id === "cash") return "Now";
+  return "Requirement";
+}
 
 // Risks selectMissionRisk returns before it reaches the cash runway, which is the only check that
 // reads the long-range projection
@@ -148,43 +159,17 @@ export default function MissionSummary({
     >
       <div className="missionSummaryHeader">
         <div className="missionSummaryCopy">
-          {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
-              itself is always one tap away in All requirements. */}
-          {shownRisk ? (
-            <Button
-              className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
-              color="inherit"
-              aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
-              title={shownRisk.label}
-              onClick={() =>
-                shownRisk.id.startsWith("active:")
-                  ? onActiveEvents?.()
-                  : onEvidence?.(shownRisk.target)
-              }
+          {mission.headline && (
+            <span
+              className="missionSummaryHeadline"
+              title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
             >
-              {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
-              <span className="statusIcon" aria-hidden="true">
-                <ConceptIcon
-                  concept={warning ? "danger" : "forecast"}
-                  fontSize="small"
-                />
-              </span>
-              <span className="missionRiskText statusLabel">
-                {shownRisk.shortLabel}
-              </span>
-            </Button>
-          ) : (
-            mission.headline &&
-            mission.headline.id !== "decisions" && (
-              <span
-                className="missionSummaryHeadline"
-                title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
-              >
-                {mission.headline.compact}
-              </span>
-            )
+              <span className="missionSummaryGoalLabel">Goal </span>
+              {mission.headline.id === "cash"
+                ? mission.headline.label
+                : mission.headline.compact}
+            </span>
           )}
-          {/* Leads with the goal or its risk, so a warning icon lines up with the grid readout's. */}
           <span className="missionSummaryMonths">
             {mission.monthsRemaining === 0
               ? "Term complete"
@@ -201,6 +186,36 @@ export default function MissionSummary({
           </IconButton>
         </Tooltip>
       </div>
+      {shownRisk && (
+        <Button
+          className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
+          color="inherit"
+          aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
+          title={shownRisk.label}
+          onClick={() =>
+            shownRisk.id.startsWith("active:")
+              ? onActiveEvents?.()
+              : onEvidence?.(shownRisk.target)
+          }
+        >
+          {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
+          <span className="statusIcon" aria-hidden="true">
+            <ConceptIcon
+              concept={warning ? "danger" : "forecast"}
+              fontSize="small"
+            />
+          </span>
+          <span className="missionRiskText statusLabel">
+            {riskTimeframe(shownRisk.id) && (
+              <span className="missionRiskTimeframe">
+                {riskTimeframe(shownRisk.id)} ·{" "}
+              </span>
+            )}
+            {shownRisk.shortLabel}
+          </span>
+          <ChevronRightIcon className="missionRiskChevron" fontSize="small" />
+        </Button>
+      )}
       <span className="srOnly" aria-live="polite">
         {announcement}
       </span>
