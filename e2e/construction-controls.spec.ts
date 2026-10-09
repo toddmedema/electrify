@@ -112,7 +112,7 @@ for (const theme of ["light", "dark"] as const) {
       "Typical price",
       "Loan balance",
     ]);
-    // Operational metrics retain the shared grid; directional capacities stack on phones.
+    // Directional capacities and operational metrics use the shared facility grid.
     const facility = pane.locator(".facilityRow").first();
     await facility.locator(".facilityDisclosure").click();
     const facilityDetails = facility.locator(".facilityDetails");
@@ -129,11 +129,9 @@ for (const theme of ["light", "dark"] as const) {
             container.style.width = panelWidth + "px";
             container.style.boxSizing = "border-box";
             const grid = container.querySelector(".facilityStats")!;
-            const cells = Array.from(grid.children)
-              .filter(
-                (cell) => !cell.classList.contains("intertieCapacityMetric"),
-              )
-              .map((cell) => cell.getBoundingClientRect());
+            const cells = Array.from(grid.children).map((cell) =>
+              cell.getBoundingClientRect(),
+            );
             const style = getComputedStyle(grid);
             const result = {
               columns: style.gridTemplateColumns.split(" ").length,

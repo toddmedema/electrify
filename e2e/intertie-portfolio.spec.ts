@@ -29,6 +29,37 @@ for (const theme of ["light", "dark"] as const) {
     });
     const card = page.locator(".transmissionProject").filter({ has: review });
     await expect(card).toContainText("$1.8M");
+    const metrics = card.locator(".buildOptionMetrics");
+    const cells = metrics.locator(":scope > .buildOptionMetric");
+    await expect(cells).toHaveCount(6);
+    const metricBoxes = await cells.evaluateAll((elements) =>
+      elements.map((element) => {
+        const cell = element.getBoundingClientRect();
+        const label = element.children[0].getBoundingClientRect();
+        const value = element.children[1].getBoundingClientRect();
+        return {
+          x: cell.x,
+          y: cell.y,
+          width: cell.width,
+          labelBottom: label.bottom,
+          valueTop: value.top,
+        };
+      }),
+    );
+    expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
+      true,
+    );
+    if (testInfo.project.use.viewport!.width < 600) {
+      expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
+      expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
+      expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
+      expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
+      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
+    } else if (testInfo.project.use.viewport!.width >= 1280) {
+      expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
+        true,
+      );
+    }
     await expect(card).not.toContainText("Portfolio outlook");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
@@ -96,9 +127,6 @@ for (const theme of ["light", "dark"] as const) {
     const cash = game.timeline.find(
       (tick) => tick.minute === game.date.minute,
     )!.cash;
-    await expect(
-      card.locator(".intertieCapacityMetrics > .buildOptionMetric"),
-    ).toHaveCount(2);
     await review.click();
     const dialog = page.getByRole("dialog");
     await expectContinuousDialogSurface(dialog);

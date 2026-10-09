@@ -316,16 +316,14 @@ function IntertieBuildItem(props: {
       }
       metrics={
         <>
-          <div className="intertieCapacityMetrics">
-            <BuildMetric
-              label="Import capacity"
-              value={formatWatts(props.importCapacityW)}
-            />
-            <BuildMetric
-              label="Export capacity"
-              value={formatWatts(props.exportCapacityW)}
-            />
-          </div>
+          <BuildMetric
+            label="Import capacity"
+            value={formatWatts(props.importCapacityW)}
+          />
+          <BuildMetric
+            label="Export capacity"
+            value={formatWatts(props.exportCapacityW)}
+          />
           <BuildMetric
             label="Build time"
             value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
@@ -970,7 +968,7 @@ export default function TransmissionPanel({
                                   </div>
                                 )}
                                 <dl className="transmissionMetrics facilityStats">
-                                  <div className="facilityStat intertieCapacityMetric">
+                                  <div className="facilityStat">
                                     <dt>Import capacity</dt>
                                     <dd className="facilityStatValue">
                                       {formatWatts(
@@ -979,7 +977,7 @@ export default function TransmissionPanel({
                                       )}
                                     </dd>
                                   </div>
-                                  <div className="facilityStat intertieCapacityMetric">
+                                  <div className="facilityStat">
                                     <dt>Export capacity</dt>
                                     <dd className="facilityStatValue">
                                       {formatWatts(
