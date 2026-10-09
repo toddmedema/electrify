@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import FleetGrid from "./FleetGrid";
 import { createGame } from "../../testing/Simulator";
 import { currentTick } from "../../helpers/GameSelectors";
@@ -43,6 +43,9 @@ it("distinguishes storage charge from grid flow, and connects selection to the f
   );
   const node = screen.getByRole("button", { name: /^Inspect Battery in grid/ });
   expect(node).toHaveTextContent("25% charged");
+  expect(
+    within(node).getByRole("meter", { name: "Battery charge" }),
+  ).toHaveAttribute("aria-valuenow", "25");
   expect(node).toHaveTextContent("Charging · 10MW");
   fireEvent.click(node);
   expect(onSelect).toHaveBeenLastCalledWith(battery.id);
@@ -79,6 +82,9 @@ it("labels unfinished facilities instead of presenting them as live output", () 
   expect(
     screen.getByRole("button", { name: /^Inspect Natural Gas CC in grid/ }),
   ).toHaveTextContent("50% builtBuilding · 12 months left");
+  expect(
+    screen.getByRole("meter", { name: "Natural Gas CC construction progress" }),
+  ).toHaveAttribute("aria-valuenow", "50");
 });
 
 it("uses real intertie direction and opens the existing trading controls", () => {
@@ -150,3 +156,63 @@ it("reports a weather outage without treating zero output as its cause", () => {
   );
   expect(node).toHaveTextContent("Paused");
 });
+
+it("puts the generator meter on an explicit current/rated power scale", () => {
+  const game = createGame({ scenarioId: 107 });
+  const wind = game.facilities.find((facility) => facility.fuel === "Wind")!;
+  wind.currentW = 600000000;
+  render(
+    <FleetGrid
+      game={game}
+      selectedFacilityId={null}
+      onSelect={jest.fn()}
+      onInspectInterties={jest.fn()}
+    />,
+  );
+  const node = screen.getByRole("button", { name: /^Inspect Wind in grid/ });
+  expect(node).toHaveTextContent("600MW/1.2GW output");
+  const meter = within(node).getByRole("meter", { name: "Wind output" });
+  expect(meter).toHaveAttribute("aria-valuenow", "50");
+  expect(meter).toHaveAttribute("aria-valuemin", "0");
+  expect(meter).toHaveAttribute("aria-valuemax", "100");
+  expect(meter).toHaveAttribute("aria-valuetext", "50% output");
+});
+
+it.each([
+  [75, "75%", false],
+  [19.49, "19% · Low", true],
+  [19.5, "20%", false],
+  [0, "0% · Low", true],
+])(
+  "reports reservoir %s%% using the fleet row's rounded warning threshold",
+  (percent, text, low) => {
+    const game = createGame({ scenarioId: 108 });
+    const hydro = game.facilities.find(
+      (facility) => facility.fuel === "Hydro",
+    )!;
+    hydro.reservoirWh = (hydro.reservoirCapacityWh! * Number(percent)) / 100;
+    render(
+      <FleetGrid
+        game={game}
+        selectedFacilityId={null}
+        onSelect={jest.fn()}
+        onInspectInterties={jest.fn()}
+      />,
+    );
+    const node = screen.getByRole("button", { name: /^Inspect Hydro in grid/ });
+    expect(node).toHaveTextContent(`Reservoir ${text}`);
+    expect(within(node).getByText(`Reservoir ${text}`)).toHaveClass(
+      "fleetGridStored",
+    );
+    if (low) {
+      expect(node).toHaveAccessibleName(/reservoir \d+% low/);
+      expect(within(node).getByText(`Reservoir ${text}`)).toHaveClass(
+        "fleetGridReservoirLow",
+      );
+    } else {
+      expect(within(node).getByText(`Reservoir ${text}`)).not.toHaveClass(
+        "fleetGridReservoirLow",
+      );
+    }
+  },
+);

@@ -113,6 +113,10 @@
   color: var(--warning-icon);
 }
 
+.fleetGridStored.fleetGridReservoirLow {
+  color: var(--blackout-red);
+}
+
 .fleetGridMeter {
   display: block;
   width: 100%;

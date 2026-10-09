@@ -1,5 +1,7 @@
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
+import { editSavedGame, readSaveRecords } from "./save-fixture";
+import { isStorage } from "../src/Types";
 
 for (const theme of ["light", "dark"] as const) {
   test(`the live grid connects facility inspection and dispatch in ${theme}`, async ({
@@ -23,6 +25,10 @@ for (const theme of ["light", "dark"] as const) {
     const nodes = grid.locator(".fleetGridNode");
     await expect(nodes).toHaveCount(4);
     for (const node of await nodes.all()) {
+      await expect(node.getByRole("meter")).toHaveAttribute(
+        "aria-valuemax",
+        "100",
+      );
       expect((await node.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       expect(
         await node
@@ -80,3 +86,84 @@ test("storage charge and direction remain visible in the live grid", async ({
   await expect(battery).toContainText(/stored/);
   await expect(battery).toContainText(/Standby|Charging|Supplying/);
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`reservoir and constrained facility states stay readable in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    const navigation = page.getByRole("button", {
+      name: "Facilities",
+      exact: true,
+    });
+    await openPane(pane, navigation);
+    const hydro = page.getByRole("button", { name: /^Inspect Hydro in grid/ });
+    await expect(hydro).toContainText(/Reservoir \d+%/);
+    await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
+    await editSavedGame(page, (save) => {
+      // Keep the fixture compact enough to inspect every relevant state in one phone pane.
+      save.game.facilities = save.game.facilities.filter(
+        (facility) => facility.fuel !== "Sun" && facility.fuel !== "Wind",
+      );
+      const hydro = save.game.facilities.find(
+        (facility) => facility.fuel === "Hydro",
+      )!;
+      hydro.reservoirWh = hydro.reservoirCapacityWh! * 0.1949;
+      const battery = save.game.facilities.find(isStorage)!;
+      battery.currentWh = battery.peakWh * 0.25;
+      const nuclear = save.game.facilities.find(
+        (facility) => facility.fuel === "Uranium",
+      )!;
+      nuclear.yearsToBuildLeft = nuclear.yearsToBuild / 2;
+      const gas = save.game.facilities.find(
+        (facility) => facility.fuel === "Natural Gas",
+      )!;
+      save.game.worldEvents.active.push({
+        key: `cold:${save.game.location.id}:0`,
+        definitionId: "weather-cold",
+        startsMinute: save.game.date.minute,
+        endsMinute: save.game.date.minute + 43800,
+        attributes: { hazard: "EXTREME_COLD" },
+        effects: { facilityOutputMultipliersById: { [String(gas.id)]: 0.55 } },
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await openPane(pane, navigation);
+    await expect(hydro).toContainText("Reservoir 19% · Low");
+    await expect(hydro).toHaveAccessibleName(/reservoir 19% low/);
+    await expect(
+      page.getByRole("button", { name: /^Inspect Battery in grid/ }),
+    ).toContainText("25% charged");
+    await expect(
+      page.getByRole("button", { name: /^Inspect Nuclear in grid/ }),
+    ).toContainText("50% built");
+    await expect(
+      page.getByRole("button", { name: /^Inspect Natural Gas CC in grid/ }),
+    ).toContainText("Extreme cold · 55% available");
+    const grid = pane.getByRole("region", { name: "Live power grid" });
+    for (const node of await grid.locator(".fleetGridNode").all()) {
+      expect(
+        await node.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    }
+    expect(
+      await grid.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await page.mouse.move(0, 0);
+    await page.screenshot({
+      path: info.outputPath(`fleet-constrained-${theme}.png`),
+      animations: "disabled",
+    });
+  });
+}

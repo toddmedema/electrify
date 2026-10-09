@@ -66,6 +66,7 @@ import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { activeScenario } from "../../helpers/GameSelectors";
 import FleetGrid from "./FleetGrid";
+import { facilityReservoirReading } from "../base/FacilityReservoir";
 
 interface FacilityListItemProps {
   reorderable?: boolean;
@@ -201,13 +202,6 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   CHARGING: "charging",
   DISCHARGING: "discharging",
 };
-
-// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
-// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
-// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
-// (HydroOutlook), which marks the point where output is already being held back and drives the
-// "Nearly empty." forecast lead -- the row warns before that bites.
-const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
@@ -424,14 +418,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
-    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-      const reservoirFraction =
-        (facility.reservoirWh || 0) / facility.reservoirCapacityWh;
-      const reservoirPercent = Math.round(reservoirFraction * 100);
+    const reservoir = facilityReservoirReading(facility);
+    if (reservoir) {
       // A dam this far down is heading for the minimum generating level, which is worth seeing
       // without opening the row. The reading turns red, and an off-screen "low" carries the
       // same message for anyone who can't use the colour.
-      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
+      const { percent: reservoirPercent, low } = reservoir;
       // Only one of these shows, picked by how wide the row is
       detail = (
         <span className={low ? "facilityStatusLow" : undefined}>

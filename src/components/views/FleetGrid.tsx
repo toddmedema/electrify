@@ -1,12 +1,17 @@
 import * as React from "react";
 import { FacilityOperatingType, GameType, isStorage } from "../../Types";
 import { currentTick } from "../../helpers/GameSelectors";
-import { formatWatts, formatWattHours } from "../../helpers/Format";
+import {
+  formatWatts,
+  formatWattHours,
+  formatWattsOfPeak,
+} from "../../helpers/Format";
 import { facilityHazardStatus, isUpgradingAt } from "../../helpers/Hazards";
 import { combineStoryEffects } from "../../data/WorldEvents";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import ConceptIcon from "../base/ConceptIcon";
 import "./FleetGrid.scss";
+import { facilityReservoirReading } from "../base/FacilityReservoir";
 
 interface Props {
   game: GameType;
@@ -32,6 +37,8 @@ function FacilityNode({
   const building = facility.yearsToBuildLeft > 0;
   const upgrading = isUpgradingAt(facility, game.date.minute);
   const hazard = facilityHazardStatus(game, facility);
+  const reservoir =
+    !building && !storage ? facilityReservoirReading(facility) : undefined;
   const icon =
     facility.fuel === "Uranium" ? "nuclear" : facility.name.toLowerCase();
   const charge = storage
@@ -67,13 +74,19 @@ function FacilityNode({
     ? `${Math.round(Math.max(0, fraction) * 100)}% built`
     : storage
       ? `${charge}% charged`
-      : `${formatWatts(facility.currentW)} output`;
+      : `${formatWattsOfPeak(facility.currentW, facility.peakW)} output`;
+  const meterPercent = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
+  const meterLabel = building
+    ? "construction progress"
+    : storage
+      ? "charge"
+      : "output";
 
   return (
     <button
       type="button"
       className="fleetGridNode"
-      aria-label={`Inspect ${facility.name} in grid, ${reading}, ${state}`}
+      aria-label={`Inspect ${facility.name} in grid, ${reading}, ${state}${reservoir ? `, reservoir ${reservoir.percent}%${reservoir.low ? " low" : ""}` : ""}`}
       aria-pressed={selected}
       onClick={() => onSelect(selected ? null : facility.id)}
     >
@@ -90,7 +103,22 @@ function FacilityNode({
           {formatWattHours(facility.currentWh)} stored
         </span>
       )}
-      <span className="fleetGridMeter" aria-hidden="true">
+      {reservoir && (
+        <span
+          className={`fleetGridStored${reservoir.low ? " fleetGridReservoirLow" : ""}`}
+        >
+          Reservoir {reservoir.percent}%{reservoir.low ? " · Low" : ""}
+        </span>
+      )}
+      <span
+        className="fleetGridMeter"
+        role="meter"
+        aria-label={`${facility.name} ${meterLabel}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={meterPercent}
+        aria-valuetext={`${meterPercent}% ${meterLabel}`}
+      >
         <span
           style={{ width: `${Math.max(0, Math.min(1, fraction)) * 100}%` }}
         />
