@@ -40,6 +40,7 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
   });
+  await insights.getByRole("button", { name: "Fit full timeline" }).click();
   await expect(eventRail).toContainText("Upcoming");
   await expect(eventRail).not.toContainText("Higher pollution fee begins");
   const eventButton = eventRail.getByRole("button", {
@@ -324,16 +325,10 @@ test("insights header controls stay aligned in one compact row", async ({
       const trackHeader = page.locator(
         '.insightsTrack[data-layer="supplyDemand"] .insightsTrackHeader',
       );
-      const [trackHeaderBox, trackActions] = await Promise.all([
-        trackHeader.boundingBox(),
-        trackHeader.locator(".insightsTrackActions").boundingBox(),
-      ]);
+      const trackHeaderBox = await trackHeader.boundingBox();
       expect(trackHeaderBox).not.toBeNull();
-      expect(trackActions).not.toBeNull();
+      await expect(trackHeader.locator(".insightsTrackActions")).toHaveCount(0);
       expect(trackHeaderBox!.height).toBeLessThanOrEqual(45);
-      expect(trackTitle!.x + trackTitle!.width).toBeLessThanOrEqual(
-        trackActions!.x + 0.5,
-      );
     }
   }
 

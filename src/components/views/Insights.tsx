@@ -141,6 +141,8 @@ import {
 } from "../base/ChartViewportContext";
 import PowerExchangeSummary from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
+import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import "./Insights.scss";
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -238,11 +240,11 @@ export const INSIGHT_PRESETS: Record<
   { label: string; layers: InsightLayerId[] }
 > = {
   // Each preset reads from the outcome a player is trying to protect into the causes they can
-  // act on. Overview is deliberately the five universal health signals: optional technologies
-  // belong in the diagnostic presets, not in the first view a new player sees.
+  // act on. Overview keeps reliability, affordability and climate impact together; the
+  // diagnostic presets explain the causes without filling the opening view with every metric.
   overview: {
     label: "Overview",
-    layers: ["supplyDemand", "cash", "profit", "customers", "emissions"],
+    layers: ["supplyDemand", "cash", "emissions"],
   },
   reliability: {
     label: "Reliability",
@@ -359,12 +361,19 @@ function scenarioEndMinute(game: GameType): number | undefined {
   return months ? months * MINUTES_PER_MONTH : undefined;
 }
 
-// The whole run is the question the player is answering, so open on scenario start to end.
+// Begin with the coming operating year. Whole-campaign planning remains one tap away.
 function initialViewport(game: GameType): ChartViewportRange {
   const bounds = forecastViewportBounds(game);
+  const monthStart = game.date.monthsElapsed * MINUTES_PER_MONTH;
   return clampChartViewport(
     bounds,
-    [bounds[0], scenarioEndMinute(game) ?? bounds[1]],
+    [
+      monthStart,
+      Math.min(
+        monthStart + 12 * MINUTES_PER_MONTH,
+        scenarioEndMinute(game) ?? bounds[1],
+      ),
+    ],
     MINUTES_PER_MONTH,
   );
 }
@@ -379,10 +388,16 @@ function advanceViewport(
   const bounds = forecastViewportBounds(game);
   const delta = elapsedMonths * MINUTES_PER_MONTH;
   const end = scenarioEndMinute(game);
+  const followsOperatingYear =
+    viewport[0] ===
+      (game.date.monthsElapsed - elapsedMonths) * MINUTES_PER_MONTH &&
+    viewport[1] - viewport[0] === 12 * MINUTES_PER_MONTH;
   return clampChartViewport(
     bounds,
     [
-      viewport[0] === bounds[0] ? bounds[0] : viewport[0] + delta,
+      viewport[0] === bounds[0] && !followsOperatingYear
+        ? bounds[0]
+        : viewport[0] + delta,
       viewport[1] === end ? end : viewport[1] + delta,
     ],
     MINUTES_PER_MONTH,
@@ -1504,6 +1519,14 @@ export default class Insights extends React.Component<Props, State> {
         className="insightsLayerPanel"
         aria-label="Data layers"
       >
+        <Typography
+          className="insightsLayerHint"
+          variant="body2"
+          color="textSecondary"
+        >
+          Choose charts below, then use each chart’s arrows to change their
+          order.
+        </Typography>
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
             (layer) =>
@@ -1828,17 +1851,47 @@ export default class Insights extends React.Component<Props, State> {
         case "supplyDemand":
           body = (
             <>
-              <ChartForecastSupplyDemand
-                height={140}
-                timeline={projection.supplyDemandTimeline}
-                blackouts={projection.blackouts}
-                domain={projection.domain}
-                startingYear={game.startingYear}
-                multiyear={multiyear}
-                // Cached simulated hours never become recorded observations as the clock advances.
-                currentMinute={projection.forecast[0]?.minute}
-                syncKey={SYNC_KEY}
+              <ChartLegend
+                items={[
+                  { name: "Supply", color: chartPalette().supply, dash: "20" },
+                  { name: "Demand", color: chartPalette().demand, dash: "20" },
+                ]}
               />
+              {projection.domain.x[1] - projection.domain.x[0] >
+              24 * MINUTES_PER_MONTH ? (
+                <ChartSupplyDemandRanges
+                  height={160}
+                  timeline={projection.supplyDemandTimeline}
+                  blackouts={projection.blackouts}
+                  domain={projection.domain}
+                  startingYear={game.startingYear}
+                  currentMinute={projection.forecast[0]?.minute}
+                  syncKey={SYNC_KEY}
+                />
+              ) : (
+                <ChartForecastSupplyDemand
+                  height={140}
+                  timeline={projection.supplyDemandTimeline}
+                  blackouts={projection.blackouts}
+                  domain={projection.domain}
+                  startingYear={game.startingYear}
+                  multiyear={multiyear}
+                  // Cached simulated hours never become recorded observations as the clock advances.
+                  currentMinute={projection.forecast[0]?.minute}
+                  syncKey={SYNC_KEY}
+                />
+              )}
+              {projection.domain.x[1] - projection.domain.x[0] >
+                24 * MINUTES_PER_MONTH && (
+                <Typography
+                  className="insightsChartExplanation"
+                  variant="caption"
+                  color="textSecondary"
+                >
+                  Monthly forecast ranges show lows and peaks. Recorded months
+                  show averages. Red marks forecast shortfalls.
+                </Typography>
+              )}
               {projection.shortfall && (
                 <Typography
                   className="insightsWarning"
@@ -2038,45 +2091,47 @@ export default class Insights extends React.Component<Props, State> {
       >
         <Toolbar className="insightsTrackHeader">
           <Typography variant="h6">{definition.label}</Typography>
-          <span className="insightsTrackActions">
-            <IconButton
-              size="small"
-              aria-label={`Move ${definition.label} up`}
-              disabled={!configured || !previousConfigured}
-              onClick={() =>
-                previousConfigured && this.moveLayer(id, previousConfigured)
-              }
-            >
-              <ArrowUpwardIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={`Move ${definition.label} down`}
-              disabled={!configured || !nextConfigured}
-              onClick={() =>
-                nextConfigured && this.moveLayer(id, nextConfigured)
-              }
-            >
-              <ArrowDownwardIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={
-                this.state.temporaryLayer === id &&
-                !this.state.layers.includes(id)
-                  ? `Keep ${definition.label}`
-                  : `Remove ${definition.label}`
-              }
-              disabled={requiredTutorialLayers(game.scenarioId).includes(id)}
-              onClick={() => this.toggleLayer(id)}
-            >
-              {this.state.temporaryLayer === id && !configured ? (
-                <AddIcon fontSize="small" />
-              ) : (
-                <CloseIcon fontSize="small" />
-              )}
-            </IconButton>
-          </span>
+          {this.state.layersOpen && (
+            <span className="insightsTrackActions">
+              <IconButton
+                size="small"
+                aria-label={`Move ${definition.label} up`}
+                disabled={!configured || !previousConfigured}
+                onClick={() =>
+                  previousConfigured && this.moveLayer(id, previousConfigured)
+                }
+              >
+                <ArrowUpwardIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                aria-label={`Move ${definition.label} down`}
+                disabled={!configured || !nextConfigured}
+                onClick={() =>
+                  nextConfigured && this.moveLayer(id, nextConfigured)
+                }
+              >
+                <ArrowDownwardIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                aria-label={
+                  this.state.temporaryLayer === id &&
+                  !this.state.layers.includes(id)
+                    ? `Keep ${definition.label}`
+                    : `Remove ${definition.label}`
+                }
+                disabled={requiredTutorialLayers(game.scenarioId).includes(id)}
+                onClick={() => this.toggleLayer(id)}
+              >
+                {this.state.temporaryLayer === id && !configured ? (
+                  <AddIcon fontSize="small" />
+                ) : (
+                  <CloseIcon fontSize="small" />
+                )}
+              </IconButton>
+            </span>
+          )}
         </Toolbar>
         {this.state.temporaryLayer === id &&
           !this.state.layers.includes(id) && (
@@ -2228,11 +2283,15 @@ export default class Insights extends React.Component<Props, State> {
       viewportSampleInterval,
       projection.projectionStepMinutes,
     );
-    const supplyDemandTimeline = sampleForecastTimeline(
-      viewportSupplyDemand,
-      viewportSampleInterval,
-      projection.projectionStepMinutes,
-    );
+    // Range bands must see every modeled hour so brief peaks and shortages survive aggregation.
+    const supplyDemandTimeline =
+      viewportRange[1] - viewportRange[0] > 24 * MINUTES_PER_MONTH
+        ? viewportSupplyDemand
+        : sampleForecastTimeline(
+            viewportSupplyDemand,
+            viewportSampleInterval,
+            projection.projectionStepMinutes,
+          );
     let viewportDomainMin = Number.POSITIVE_INFINITY;
     let viewportDomainMax = Number.NEGATIVE_INFINITY;
     for (const tick of supplyDemandTimeline) {
@@ -2408,7 +2467,9 @@ export default class Insights extends React.Component<Props, State> {
                   </IconButton>
                 </Tooltip>
               </div>
-              <Tooltip title={`Choose layers (${visible.length} shown)`}>
+              <Tooltip
+                title={`Customize charts: choose layers and reorder (${visible.length} shown)`}
+              >
                 <Button
                   id="insightsLayersButton"
                   className="insightsLayerControls"
@@ -2496,6 +2557,16 @@ export default class Insights extends React.Component<Props, State> {
             viewportRange,
             minViewportSpan,
           )}
+          <div className="insightsTimelineKey" aria-label="Chart time key">
+            <span>
+              <i aria-hidden="true" />
+              Recorded
+            </span>
+            <span>
+              <i className="forecast" aria-hidden="true" />
+              Forecast
+            </span>
+          </div>
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}
@@ -2525,7 +2596,7 @@ export default class Insights extends React.Component<Props, State> {
                 )}
                 {!visible.length && (
                   <Typography className="insightsEmpty" color="textSecondary">
-                    Choose Layers to build this view.
+                    Choose Layers to customize this view.
                   </Typography>
                 )}
               </div>

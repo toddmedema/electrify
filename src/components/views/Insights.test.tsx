@@ -187,6 +187,19 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
     );
   },
 }));
+jest.mock("../base/ChartSupplyDemandRanges", () => ({
+  __esModule: true,
+  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => (
+    <div
+      role="img"
+      data-testid="supply-demand-chart"
+      data-forecast-start={currentMinute}
+      data-sync-key={syncKey}
+      data-points={timeline?.length}
+      data-domain={domainValue(domain)}
+    />
+  ),
+}));
 jest.mock("../base/ChartForecastStorage", () => ({
   __esModule: true,
   default: ({ syncKey }: ChartMockProps) => (
@@ -305,6 +318,7 @@ it("reveals finance evidence temporarily and lets explicit selection own saved l
   rerender(<Insights {...props} evidenceRequest={{ ...request, id: 2 }} />);
   expect(screen.getByText(/Temporary evidence/)).toBeInTheDocument();
   rerender(<Insights {...props} />);
+  await user.click(screen.getByRole("button", { name: /Layers/ }));
   await user.click(
     screen.getByRole("button", { name: "Keep Finance details" }),
   );
@@ -340,6 +354,7 @@ it("reorders configured charts while ending temporary reveal without saving it",
       evidenceRequest={{ id: 1, runId: 0, target: "finances" }}
     />,
   );
+  await user.click(screen.getByRole("button", { name: /Layers/ }));
   expect(
     screen.getByRole("button", { name: "Move Finance details up" }),
   ).toBeDisabled();
@@ -476,7 +491,7 @@ describe("Insights layers", () => {
     ).toHaveAttribute("data-visible-title", "Interest rate");
   });
 
-  it("starts new players on the five-chart overview in priority order", () => {
+  it("starts new players on reliability, cash and climate impact without editing controls", async () => {
     renderInsights();
 
     expect(
@@ -487,14 +502,25 @@ describe("Insights layers", () => {
       "Insights",
       "Supply & Demand",
       "Cash",
-      "Profit",
-      "Customers",
       "Emissions (CO2e)",
     ];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
       expect(headings[index]).toHaveTextContent(label),
     );
+    expect(
+      screen.queryByRole("button", { name: "Remove Cash" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Chart time key")).toHaveTextContent(
+      "RecordedForecast",
+    );
+    await user.click(labelledButton(/Layers/));
+    expect(labelledButton("Remove Cash")).toBeEnabled();
+    expect(labelledButton("Move Cash up")).toBeEnabled();
+    await user.click(labelledButton("Done choosing layers"));
+    expect(
+      screen.queryByRole("button", { name: "Remove Cash" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the market benchmark without repeating the rate unit", () => {
@@ -798,7 +824,7 @@ describe("Insights layers", () => {
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
-      screen.getByLabelText("Displayed date range: 2023–28"),
+      screen.getByLabelText("Displayed date range: Apr–Sep 2020"),
     ).toBeVisible();
     expect(labelledButton("Pan earlier")).toBeEnabled();
     expect(labelledButton("Pan later")).toBeEnabled();
@@ -806,7 +832,7 @@ describe("Insights layers", () => {
     await user.click(labelledButton("Pan later"));
     expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
     await user.click(labelledButton("Fit full timeline"));
-    expect(supply).toHaveAttribute(
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
       "data-domain",
       JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
     );
@@ -815,13 +841,13 @@ describe("Insights layers", () => {
     ).toBeVisible();
   });
 
-  it("opens on the whole scenario and keeps it pinned as the game advances", () => {
+  it("opens on the operating year and follows it as the game advances", () => {
     const game = createGame({ scenarioId: 100 });
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
     );
 
     const nextGame = {
@@ -843,7 +869,7 @@ describe("Insights layers", () => {
 
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
+      JSON.stringify([MINUTES_PER_MONTH, 13 * MINUTES_PER_MONTH]),
     );
   });
 
@@ -852,14 +878,18 @@ describe("Insights layers", () => {
     game.facilities = [];
     renderInsights(100, game);
     const note = screen.getByRole("note", {
-      name: /^Forecast shortfall for 2020–31:/,
+      name: /^Forecast shortfall for Jan–Dec 2020:/,
     });
-    expect(note).toHaveTextContent(/^Shortfall, 2020–31:\s*~.+ unmet · peak ~/);
+    expect(note).toHaveTextContent(
+      /^Shortfall, Jan–Dec 2020:\s*~.+ unmet · peak ~/,
+    );
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));
     expect(
-      screen.getByRole("note", { name: /^Forecast shortfall for 2023–28:/ }),
+      screen.getByRole("note", {
+        name: /^Forecast shortfall for Apr–Sep 2020:/,
+      }),
     ).not.toHaveTextContent(wholeScenario!);
   });
 
