@@ -67,11 +67,14 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { activeScenario } from "../../helpers/GameSelectors";
 import FleetGrid from "./FleetGrid";
 import { facilityReservoirReading } from "../base/FacilityReservoir";
+import {
+  FacilityFeedbackProvider,
+  useFacilityFeedback,
+} from "../base/FacilityFeedback";
 
 interface FacilityListItemProps {
   reorderable?: boolean;
-  arriving: boolean;
-  onArrivalShown?: (id: number) => void;
+  showFeedback: boolean;
   facility: FacilityOperatingType;
   spotInList: number;
   game: GameType;
@@ -310,8 +313,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     storyOutputMultiplier,
     hazardStatus,
-    arriving: arrivalRequested,
-    onArrivalShown,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = underConstruction
@@ -321,63 +322,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   // Building and upgrading both hold the plant out of service behind a progress bar
   const offlineForWork = underConstruction || upgrading;
   const storage = isStorage(facility) ? facility : undefined;
-  const wasBuilding = React.useRef(underConstruction);
-  const hadWeatherOutage = React.useRef(!!hazardStatus);
-  const [arriving, setArriving] = React.useState(arrivalRequested);
-  const [ready, setReady] = React.useState<
-    "Commissioned" | "Outage ended" | null
-  >(null);
-  const [announcement, setAnnouncement] = React.useState("");
-  React.useEffect(() => {
-    if (arrivalRequested) {
-      setArriving(true);
-      if (!readOnly) {
-        setAnnouncement(`${facility.name}: construction started.`);
-      }
-      onArrivalShown?.(facility.id);
-    }
-  }, [arrivalRequested, onArrivalShown, facility.id, facility.name, readOnly]);
-  React.useEffect(() => {
-    if (!arriving) return;
-    // Also consume the cue when reduced motion prevents animationend from firing.
-    const timer = window.setTimeout(() => setArriving(false), 240);
-    return () => window.clearTimeout(timer);
-  }, [arriving]);
-  React.useEffect(() => {
-    if (wasBuilding.current && !underConstruction && !readOnly) {
-      setReady("Commissioned");
-      setAnnouncement(
-        `${facility.name}: construction complete. ${facility.paused ? "Operation is paused." : "Available for dispatch."}`,
-      );
-    }
-    wasBuilding.current = underConstruction;
-  }, [underConstruction, readOnly, facility.name, facility.paused]);
-  const weatherOutage = !!hazardStatus;
-  React.useEffect(() => {
-    if (
-      hadWeatherOutage.current &&
-      !weatherOutage &&
-      !readOnly &&
-      !underConstruction
-    ) {
-      setReady("Outage ended");
-      setAnnouncement(
-        `${facility.name}: weather outage ended. ${facility.paused ? "Operation is paused." : "Available for dispatch."}`,
-      );
-    }
-    hadWeatherOutage.current = weatherOutage;
-  }, [
-    weatherOutage,
-    readOnly,
-    underConstruction,
-    facility.name,
-    facility.paused,
-  ]);
-  React.useEffect(() => {
-    if (!ready) return;
-    const timer = window.setTimeout(() => setReady(null), 6000);
-    return () => window.clearTimeout(timer);
-  }, [ready]);
+  const feedback = useFacilityFeedback();
+  const arriving =
+    props.showFeedback && feedback.arrivingFacilityId === facility.id;
+  const ready = props.showFeedback
+    ? feedback.milestones[facility.id]
+    : undefined;
 
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
@@ -493,9 +443,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           <div
             className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
             data-storage={!!storage || undefined}
-            onAnimationEnd={(event) => {
-              if (event.animationName === "facilityArrival") setArriving(false);
-            }}
           >
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
@@ -635,14 +582,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </ListItem>
             </button>
           </div>
-          <span
-            className="srOnly"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {announcement}
-          </span>
           {open && (
             // Inside the row, so isolateClicks keeps every click in the confirmation dialog
             // from also landing on the row behind it and toggling the selection
@@ -741,6 +680,7 @@ function FacilitySupplyChart({
 }
 
 export interface StateProps {
+  feedbackRunId?: number;
   arrivingFacilityId?: number;
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
@@ -872,6 +812,7 @@ export default class Facilities extends React.Component<Props, State> {
       nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
+      nextProps.feedbackRunId !== this.props.feedbackRunId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -980,7 +921,12 @@ export default class Facilities extends React.Component<Props, State> {
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
-        <>
+        <FacilityFeedbackProvider
+          key={`${this.props.feedbackRunId ?? 0}:${game.scenarioId}:${game.seed}`}
+          game={game}
+          arrivingFacilityId={this.props.arrivingFacilityId}
+          onArrivalShown={this.props.onArrivalShown}
+        >
           {/* The pane's own header rather than a row inside the list, so it lines up with the
             other panes' headers and the build buttons stay put as the fleet scrolls */}
           <Toolbar className="paneHeader">
@@ -1058,8 +1004,7 @@ export default class Facilities extends React.Component<Props, State> {
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem
                             reorderable={!gridView}
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
+                            showFeedback={!gridView}
                             facility={g}
                             game={game}
                             key={g.id}
@@ -1110,7 +1055,7 @@ export default class Facilities extends React.Component<Props, State> {
                 )}
             </List>
           </div>
-        </>
+        </FacilityFeedbackProvider>
       </GameCard>
     );
   }

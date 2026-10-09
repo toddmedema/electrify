@@ -21,6 +21,9 @@ for (const colorScheme of ["light", "dark"] as const) {
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
+      await facilities
+        .getByRole("button", { name: "Dispatch", exact: true })
+        .click();
 
       // Hydro exercises long captions; gas adds upkeep/start costs; storage has charge/cycles.
       await facilities
@@ -178,6 +181,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     await pane.getByRole("button", { name: "Build", exact: true }).click();
     await page.locator(".button-buildGenerator").click();
     await page

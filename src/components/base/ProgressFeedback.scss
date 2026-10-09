@@ -2,6 +2,28 @@
   margin-top: 12px;
 }
 
+.fleetGridMilestoneLabel {
+  color: var(--delta-good);
+  font-weight: 600;
+}
+
+.fleetGridNode.fleetGridMilestone::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--delta-good);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: facilityCommissioned 700ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleetGridNode.fleetGridMilestone::before {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .eventHistory .eventChangeTitle {
   display: block;
   margin-bottom: 4px;

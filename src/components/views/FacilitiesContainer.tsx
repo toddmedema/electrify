@@ -33,6 +33,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     game: state.game,
     selectedFacilityId: state.ui.selectedFacilityId,
     arrivingFacilityId: state.ui.arrivingFacilityId,
+    feedbackRunId: state.ui.evidenceRunId,
   };
 };
 
