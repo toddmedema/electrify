@@ -283,13 +283,17 @@ const shortcutHandlers = {
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
-  // Every screen that isn't one of the three panes (Build Generator/Storage, Manual, Settings)
-  // is reached by a "back"/"close" control rather than tab navigation, and none of them
-  // responded to Escape -- this gives all of them one, without hardcoding which cards count
+  // Match each screen's close/back control. The build catalog closes to Facilities with a
+  // fade, even when opened from another pane or after switching categories; other screens
+  // follow their Back button through history.
   ESCAPE: () => {
     const { card, game } = store.getState();
     if (game.inGame && !isNavCard(card.name)) {
-      store.dispatch(navigateBack());
+      store.dispatch(
+        card.name.startsWith("BUILD_")
+          ? navigate("FACILITIES")
+          : navigateBack(),
+      );
     }
   },
   ...Object.fromEntries(
