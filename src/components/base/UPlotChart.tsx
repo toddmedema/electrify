@@ -358,7 +358,7 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion, fontReady]);
+  }, [viewport, width, height, structureKey, themeVersion, fontReady, interfaceSize]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -549,7 +549,15 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, height, structureKey, themeVersion, viewportEnabled, fontReady]);
+  }, [
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    fontReady,
+    interfaceSize,
+    viewportEnabled,
+  ]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();

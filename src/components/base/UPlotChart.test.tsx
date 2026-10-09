@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import UPlotChart from "./UPlotChart";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { setThemeMode } from "../../Theme";
+import { setInterfaceSize } from "../../InterfaceSizing";
 
 jest.mock("uplot", () => {
   const MockUPlot = jest.fn();
@@ -37,6 +38,7 @@ describe("UPlotChart resizing", () => {
     (uPlot as unknown as jest.Mock).mock.results.at(-1)?.value;
 
   beforeEach(() => {
+    act(() => setInterfaceSize("normal"));
     jest.useFakeTimers();
     jest.clearAllMocks();
     (uPlot as unknown as jest.Mock).mockImplementation(() =>
@@ -77,6 +79,7 @@ describe("UPlotChart resizing", () => {
   });
 
   afterEach(() => {
+    act(() => setInterfaceSize("normal"));
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
@@ -292,7 +295,7 @@ describe("UPlotChart resizing", () => {
     expect(pinched[1] - pinched[0]).toBeLessThan(50);
   });
 
-  it.each(["theme", "structure", "height"])(
+  it.each(["theme", "structure", "height", "interface size"])(
     "restores the viewport and gestures after a %s rebuild",
     (change) => {
       const onRangeChange = jest.fn();
@@ -325,9 +328,15 @@ describe("UPlotChart resizing", () => {
       const oldOver = currentPlot().over;
       uPlotPrototype.setScale.mockClear();
       if (change === "theme") act(() => setThemeMode("dark"));
+      else if (change === "interface size")
+        act(() => setInterfaceSize("larger"));
       else view.rerender(ui(true));
       const over = currentPlot().over;
       expect(over).not.toBe(oldOver);
+      // The size preference can rebuild a mounted canvas without a ResizeObserver width change.
+      expect((uPlot as unknown as jest.Mock).mock.calls.at(-1)?.[0].width).toBe(
+        400,
+      );
       expect(uPlotPrototype.setScale).toHaveBeenCalledWith("x", {
         min: 25,
         max: 75,

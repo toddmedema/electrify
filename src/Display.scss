@@ -20,6 +20,16 @@
     min-height: 48px;
   }
 
+  #appbar .missionRiskButton,
+  #appbar .missionDetailsButton {
+    min-height: var(--control-size);
+    min-width: var(--control-size);
+  }
+
+  #appbar.operatingHud .missionSummaryHeader {
+    padding-right: var(--control-size);
+  }
+
   #navfooter {
     height: auto;
     min-height: 64px;
@@ -27,6 +37,39 @@
 
   .MuiBottomNavigationAction-label {
     font-size: var(--font-size-caption);
+  }
+}
+
+@media (max-width: 799px) {
+  :root[data-interface-size="larger"] #appbar {
+    #topbar .gameStatus {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+      line-height: 1.2;
+    }
+
+    .missionSummaryCopy {
+      flex-wrap: wrap;
+      white-space: normal;
+      gap: 4px 8px;
+    }
+
+    .missionSummaryMonths {
+      margin-left: 0;
+    }
+
+    .missionRiskButton,
+    .missionSummaryHeadline,
+    .missionRiskText {
+      white-space: normal;
+    }
+
+    .missionSummaryHeadline,
+    .missionRiskText {
+      overflow: visible;
+      text-overflow: clip;
+    }
   }
 }
 

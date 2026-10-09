@@ -17,6 +17,48 @@ async function noOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function readablePhoneStatus(page: Page) {
+  const textBounds = await page.locator("#appbar").evaluate((bar) => {
+    const selectors =
+      ".gameStatusValue, .gridHealthState, .gridHealthMetric, .missionSummaryHeadline:not(:has(.missionGoalPhone)), .missionGoalPhone, .missionRiskText, .missionSummaryMonths:not(:has(.missionMonthsPhone)), .missionMonthsPhone";
+    return Array.from(bar.querySelectorAll<HTMLElement>(selectors)).flatMap(
+      (element) => {
+        const box = element.getBoundingClientRect();
+        if (
+          getComputedStyle(element).display === "none" ||
+          box.width <= 1 ||
+          box.height <= 1
+        )
+          return [];
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const outside = Array.from(range.getClientRects()).some(
+          (text) =>
+            text.left < box.left - 1 ||
+            text.right > box.right + 1 ||
+            text.top < bar.getBoundingClientRect().top - 1 ||
+            text.bottom > bar.getBoundingClientRect().bottom + 1,
+        );
+        return [{ label: element.textContent, outside }];
+      },
+    );
+  });
+  expect(textBounds.length).toBeGreaterThanOrEqual(5);
+  expect(textBounds.filter((text) => text.outside)).toEqual([]);
+  for (const name of ["pause", "slow speed", "normal speed", "fast speed"]) {
+    const control = page.getByRole("button", { name, exact: true });
+    await expect(control).toBeInViewport({ ratio: 0.99 });
+    const bounds = await control.boundingBox();
+    expect(bounds!.height).toBeGreaterThanOrEqual(48);
+    expect(bounds!.width).toBeGreaterThanOrEqual(48);
+  }
+  const detail = page.getByRole("button", {
+    name: "All requirements",
+    exact: true,
+  });
+  expect((await detail.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`larger display reflows, persists and keeps play usable in ${theme}`, async ({
     page,
@@ -62,6 +104,15 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "pause", exact: true }),
     ).toBeInViewport();
     const phone = testInfo.project.name === "mobile-390px";
+    if (phone) {
+      await readablePhoneStatus(page);
+      if (process.env.DISPLAY_SCREENSHOTS && theme === "light") {
+        await page.screenshot({
+          path: `${process.env.DISPLAY_SCREENSHOTS}/pr-display-phone.png`,
+          animations: "disabled",
+        });
+      }
+    }
     await expect(page.locator("html")).toHaveAttribute(
       "data-pane-layout",
       String(!phone),
