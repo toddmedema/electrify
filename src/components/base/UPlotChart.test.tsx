@@ -81,6 +81,41 @@ describe("UPlotChart resizing", () => {
     jest.useRealTimers();
   });
 
+  it("remeasures a plot when the bundled font finishes loading after its first draw", async () => {
+    const previous = Object.getOwnPropertyDescriptor(document, "fonts");
+    let finishLoading!: (fonts: FontFace[]) => void;
+    const loaded = new Promise<FontFace[]>((resolve) => {
+      finishLoading = resolve;
+    });
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { check: () => false, load: () => loaded },
+    });
+    try {
+      render(
+        <UPlotChart
+          ariaLabel="Delayed font chart"
+          state={{}}
+          data={[
+            [0, 1],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />,
+      );
+      expect(uPlot).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishLoading([]);
+        await loaded;
+      });
+      expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
+      expect(uPlot).toHaveBeenCalledTimes(2);
+    } finally {
+      if (previous) Object.defineProperty(document, "fonts", previous);
+      else Reflect.deleteProperty(document, "fonts");
+    }
+  });
+
   it("resizes the live canvas and rebuilds scaled options only after resizing settles", () => {
     render(
       <UPlotChart

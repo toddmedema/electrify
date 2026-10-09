@@ -206,6 +206,25 @@ export default function UPlotChart<S>(
     getThemeVersion,
     getThemeVersion,
   );
+  const [fontReady, setFontReady] = React.useState(
+    () => !document.fonts || document.fonts.check("14px Inter"),
+  );
+  React.useEffect(() => {
+    if (fontReady || !document.fonts) return;
+    let active = true;
+    // Re-measure canvas labels if the local font arrives after the first plot.
+    document.fonts
+      .load("14px Inter")
+      .then(() => {
+        if (active) setFontReady(true);
+      })
+      .catch(() => {
+        // A missing font keeps the readable system fallback and its measured plot.
+      });
+    return () => {
+      active = false;
+    };
+  }, [fontReady]);
 
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
@@ -314,7 +333,7 @@ export default function UPlotChart<S>(
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion]);
+  }, [width, height, structureKey, themeVersion, fontReady]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -330,7 +349,7 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion]);
+  }, [viewport, width, height, structureKey, themeVersion, fontReady]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -521,7 +540,7 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, height, structureKey, themeVersion, viewportEnabled]);
+  }, [width, height, structureKey, themeVersion, viewportEnabled, fontReady]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();
