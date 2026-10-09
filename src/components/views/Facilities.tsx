@@ -64,8 +64,11 @@ import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { activeScenario } from "../../helpers/GameSelectors";
+import FleetGrid from "./FleetGrid";
 
 interface FacilityListItemProps {
+  reorderable?: boolean;
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -452,7 +455,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       key={"f" + facility.id}
       draggableId={"f" + facility.id}
       index={props.spotInList}
-      isDragDisabled={readOnly}
+      isDragDisabled={readOnly || props.reorderable === false}
       disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
@@ -475,7 +478,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!offlineForWork && <FlowBar fraction={outputFraction} />}
-            {!readOnly && (
+            {!readOnly && props.reorderable !== false && (
               <button
                 type="button"
                 {...provided.dragHandleProps}
@@ -749,7 +752,12 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props> {
+interface State {
+  view: "grid" | "dispatch";
+}
+
+export default class Facilities extends React.Component<Props, State> {
+  state: State = { view: "grid" };
   constructor(props: Props) {
     super(props);
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -822,7 +830,7 @@ export default class Facilities extends React.Component<Props> {
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(nextProps: Props) {
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
     if (this.dragging) {
       return false;
     }
@@ -831,6 +839,8 @@ export default class Facilities extends React.Component<Props> {
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.game.speed !== this.props.game.speed ||
+      nextState.view !== this.state.view ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
@@ -844,9 +854,18 @@ export default class Facilities extends React.Component<Props> {
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate() {
+  public componentDidUpdate(previousProps: Props) {
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
+    if (
+      this.state.view === "grid" &&
+      this.props.selectedFacilityId !== null &&
+      previousProps.selectedFacilityId !== this.props.selectedFacilityId
+    ) {
+      this.scrollBody
+        ?.querySelector(".facilityRow.selected")
+        ?.scrollIntoView({ block: "nearest" });
+    }
   }
 
   public componentDidMount() {
@@ -908,6 +927,15 @@ export default class Facilities extends React.Component<Props> {
       selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
+    const tutorialSteps = activeScenario(game)?.tutorialSteps;
+    const tutorialActive = !!tutorialSteps?.[game.tutorialStep];
+    const gridView =
+      this.state.view === "grid" &&
+      !tutorialActive &&
+      this.props.evidenceRequest?.target !== "supply-demand";
+    const visibleFacilities = gridView
+      ? game.facilities.filter((facility) => facility.id === selectedFacilityId)
+      : game.facilities;
     const readOnly = !!game.replayPlayback;
     const intertiesAvailable = !!(
       game.transmission && corridorsForLocation(game.location).length
@@ -940,18 +968,56 @@ export default class Facilities extends React.Component<Props> {
               </Button>
             )}
           </Toolbar>
-          <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
-            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+          {!tutorialActive && (
+            <div className="fleetViewSwitch" aria-label="Fleet view">
+              <Button
+                aria-pressed={gridView}
+                onClick={() => this.setState({ view: "grid" })}
+              >
+                Grid
+              </Button>
+              <Button
+                aria-pressed={!gridView}
+                onClick={() => this.setState({ view: "dispatch" })}
+              >
+                Dispatch
+              </Button>
+            </div>
+          )}
+          <div
+            className={`scrollable facilitiesBody${gridView ? " fleetGridBody" : ""}`}
+            ref={this.setScrollBody}
+          >
+            {gridView ? (
+              <div ref={this.evidenceAnchor} tabIndex={-1}>
+                <FleetGrid
+                  game={game}
+                  selectedFacilityId={selectedFacilityId}
+                  onSelect={onSelect}
+                  onInspectInterties={() =>
+                    this.setState({ view: "dispatch" }, () => {
+                      this.scrollBody
+                        ?.querySelector(".transmissionFleet")
+                        ?.scrollIntoView({ block: "start" });
+                    })
+                  }
+                />
+              </div>
+            ) : (
+              <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+            )}
             <List dense className="scrollable unifiedFacilitiesList">
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <Typography
-                  id="dispatch-order"
-                  className="facilitySectionLabel"
-                  variant="overline"
-                >
-                  Plants & storage <span>Dispatch order</span>
-                </Typography>
-              )}
+              {!gridView &&
+                intertiesAvailable &&
+                !!game.transmission?.lines.length && (
+                  <Typography
+                    id="dispatch-order"
+                    className="facilitySectionLabel"
+                    variant="overline"
+                  >
+                    Plants & storage <span>Dispatch order</span>
+                  </Typography>
+                )}
               <DragDropContext
                 onBeforeDragStart={this.onBeforeDragStart}
                 onDragEnd={this.onDragEnd}
@@ -959,9 +1025,10 @@ export default class Facilities extends React.Component<Props> {
                 <Droppable droppableId="droppable">
                   {(provided) => (
                     <div {...provided.droppableProps} ref={provided.innerRef}>
-                      {game.facilities.map(
+                      {visibleFacilities.map(
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem
+                            reorderable={!gridView}
                             arriving={this.props.arrivingFacilityId === g.id}
                             onArrivalShown={this.props.onArrivalShown}
                             facility={g}
@@ -998,18 +1065,20 @@ export default class Facilities extends React.Component<Props> {
                   Choose Build to add a generator or storage.
                 </Typography>
               )}
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <TransmissionPanel
-                  game={game}
-                  onBuild={onTransmissionBuild}
-                  onUpgrade={onTransmissionUpgrade}
-                  onCancel={this.props.onTransmissionCancel}
-                  onPause={this.props.onTransmissionPause}
-                  onPolicy={onTradingPolicy}
-                  onBeforeDragStart={this.onBeforeDragStart}
-                  onDragEnd={this.onDragEnd}
-                />
-              )}
+              {!gridView &&
+                intertiesAvailable &&
+                !!game.transmission?.lines.length && (
+                  <TransmissionPanel
+                    game={game}
+                    onBuild={onTransmissionBuild}
+                    onUpgrade={onTransmissionUpgrade}
+                    onCancel={this.props.onTransmissionCancel}
+                    onPause={this.props.onTransmissionPause}
+                    onPolicy={onTradingPolicy}
+                    onBeforeDragStart={this.onBeforeDragStart}
+                    onDragEnd={this.onDragEnd}
+                  />
+                )}
             </List>
           </div>
         </>

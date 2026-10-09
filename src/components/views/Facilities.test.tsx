@@ -107,6 +107,10 @@ function renderFacilities(
   render(<ControlledFacilities />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
+  const dispatchView = screen.queryByRole("button", {
+    name: "Dispatch",
+  });
+  if (dispatchView) fireEvent.click(dispatchView);
   return handlers;
 }
 
@@ -272,6 +276,7 @@ describe("the fleet list", () => {
       </React.StrictMode>
     );
     const { rerender, unmount } = render(pane());
+    fireEvent.click(screen.getByRole("button", { name: "Dispatch" }));
     const list = screen.getByRole("list");
     list.style.overflowY = "auto";
     list.style.lineHeight = "24px";
@@ -350,13 +355,16 @@ describe("the fleet list", () => {
     ref.current!.onBeforeDragStart();
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
     expect(
-      ref.current!.shouldComponentUpdate({
-        ...props,
-        game: {
-          ...fast,
-          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...fast,
+            date: { ...fast.date, minute: fast.date.minute + 1_000 },
+          },
         },
-      }),
+        ref.current!.state,
+      ),
     ).toBe(false);
 
     ref.current!.onDragEnd({
@@ -369,7 +377,12 @@ describe("the fleet list", () => {
       combine: null,
     });
     expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
-    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
+    expect(
+      ref.current!.shouldComponentUpdate(
+        { ...props, game },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {
