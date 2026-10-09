@@ -124,6 +124,9 @@ for (const theme of ["light", "dark"] as const) {
         .filter({ hasText: "Export capacity" }),
     ).toContainText("5MW");
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
+    await facilities
+      .getByRole("button", { name: "Dispatch", exact: true })
+      .click();
     await expect(
       page
         .locator(".facilities:visible")

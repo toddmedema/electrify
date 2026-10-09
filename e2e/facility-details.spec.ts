@@ -23,6 +23,9 @@ for (const colorScheme of ["light", "dark"] as const) {
       );
 
       // Hydro exercises long captions; gas adds upkeep/start costs; storage has charge/cycles.
+      await facilities
+        .getByRole("button", { name: "Dispatch", exact: true })
+        .click();
       for (const name of ["Hydro", "Natural Gas CC", "Battery"]) {
         const row = facilities.locator(".facilityRow").filter({
           has: page.locator(".facilityName", {
@@ -118,6 +121,9 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const facilities = page.locator(".facilities:visible");
   await expect(facilities).toBeVisible();
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   const row = facilities.locator(".facilityRow").filter({
     has: page.locator(".facilityName", { hasText: /^Natural Gas CC$/ }),
   });
@@ -178,6 +184,7 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Review purchase of Solar", exact: true })
       .click();
     await page.getByRole("button", { name: "Pay cash", exact: true }).click();
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     const row = pane.locator('.facilityRow[data-facility="Solar"]');
     await row.locator(".facilityDisclosure").click();
     await expect(row).toContainText(/Building \d+%/);

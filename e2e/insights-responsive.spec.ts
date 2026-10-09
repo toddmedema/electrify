@@ -410,6 +410,9 @@ test("compact facility build buttons stay above the chart", async ({
     facilities,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   const buildButtons = [
     facilities.getByRole("button", { name: "Build", exact: true }),
   ];

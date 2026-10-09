@@ -93,6 +93,10 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildGenerator").click();
     await expect(hydro).toContainText(`${count - 1} sites left`);
     await page.getByRole("button", { name: "close", exact: true }).click();
+    await page
+      .locator(".facilities:visible")
+      .getByRole("button", { name: "Dispatch", exact: true })
+      .click();
     const plant = page
       .locator(".facilityRow")
       .filter({ has: page.locator(".facilityName", { hasText: /^Hydro$/ }) });

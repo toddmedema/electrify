@@ -21,6 +21,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     const rows = pane.locator(".facilityRow");
     const chart = pane.locator("#chartSupplyDemand");
     const phone = testInfo.project.name.startsWith("mobile-");

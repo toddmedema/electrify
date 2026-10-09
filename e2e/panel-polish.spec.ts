@@ -15,6 +15,9 @@ test("responsive controls and panel navigation keep their geometry", async ({
     facilities,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   await facilities.locator(".facilityDisclosure").first().click();
   const actions = facilities.locator(".facilityActions").first();
   await expect(actions).toBeVisible();

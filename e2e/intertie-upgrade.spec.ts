@@ -21,11 +21,15 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
-    const showFacilities = () =>
-      openPane(
+    const showFacilities = async () => {
+      await openPane(
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
+      await facilities
+        .getByRole("button", { name: "Dispatch", exact: true })
+        .click();
+    };
     await showFacilities();
     await facilities
       .getByRole("button", { name: "Build", exact: true })
@@ -40,6 +44,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
       .click();
+    await showFacilities();
     const line = facilities.locator(".transmissionLine").first();
     await expect(line).toContainText("Building");
     const speed = (name: string) =>

@@ -17,6 +17,7 @@ for (const theme of ["light", "dark"]) {
       fleet,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await fleet.getByRole("button", { name: "Dispatch", exact: true }).click();
     const row = fleet.locator(".facilityRow").filter({
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });

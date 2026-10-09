@@ -34,6 +34,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
 
+  await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
   const rows = pane.locator(".facilityRow");
   await expect(rows.getByText(/^Building \d+%/)).toBeVisible();
   await expect(
@@ -96,6 +97,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByText("Starting your mission…", { exact: true }),
     ).toBeHidden();
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     const hydro = pane.locator('.facilityRow[data-fuel="Hydro"]');
     const subtitle = hydro.locator(".MuiListItemText-secondary");
     await expect(subtitle).not.toContainText("running");

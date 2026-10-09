@@ -66,6 +66,9 @@ test("California players can build and understand an intertie", async ({
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
     .click();
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   await expect(
     page.getByText("Intertie approved — power can flow in 1 year."),
   ).toBeVisible();
@@ -143,6 +146,9 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const facilities = page.locator(".facilities:visible");
+  await facilities
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   const rows = facilities.locator(".facilityRow");
   await expect(rows).toHaveCount(2);
   const originalFirstId = await rows
@@ -214,6 +220,9 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
+      .click();
+    await facilities
+      .getByRole("button", { name: "Dispatch", exact: true })
       .click();
     const line = facilities.locator(".transmissionLine").first();
     await line.getByRole("button", { name: /^Inspect/ }).click();

@@ -106,6 +106,14 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
     await expect(details).toBeFocused();
+    await openPane(
+      page.locator(".facilities:visible"),
+      page.locator("#faciltiesNav"),
+    );
+    await page
+      .locator(".facilities:visible")
+      .getByRole("button", { name: "Dispatch", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
@@ -355,6 +363,14 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
+  await openPane(
+    page.locator(".facilities:visible"),
+    page.locator("#faciltiesNav"),
+  );
+  await page
+    .locator(".facilities:visible")
+    .getByRole("button", { name: "Dispatch", exact: true })
+    .click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();

@@ -31,6 +31,9 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
 
+    await facilities
+      .getByRole("button", { name: "Dispatch", exact: true })
+      .click();
     await expect(facilities.locator(".transmissionLine")).toBeVisible();
     await expect(page.locator(".cardTransitions > main")).toHaveCount(1);
     for (const [width, height] of [
@@ -50,6 +53,9 @@ for (const theme of ["light", "dark"] as const) {
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
+      await facilities
+        .getByRole("button", { name: "Dispatch", exact: true })
+        .click();
       const trading = facilities.getByRole("combobox", {
         name: "Trading rule",
       });
