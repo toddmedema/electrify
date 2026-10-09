@@ -603,6 +603,9 @@ $topbar_height: 56px;
 
   #topbar .constructionTitleBar .constructionCash {
     font-size: var(--font-size-caption-sm);
+    // A negative balance can wrap before "cash" while the clock keeps its touch targets.
+    max-width: calc(100% - var(--space-1));
+    white-space: normal;
   }
 
   #topbar .constructionTitleBar .iconLabel > svg {
@@ -6068,6 +6071,12 @@ $programs_column: 800px;
   .generatorDetails .generatorDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
+  }
+}
+@media (max-width: 359px) {
+  .generatorDetails .generatorDetailLabel {
+    // Reserve a full numeric/unit column; longer labels wrap at word boundaries.
+    width: 40%;
   }
 }
 @media (pointer: coarse) {
