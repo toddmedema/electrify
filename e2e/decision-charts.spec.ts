@@ -41,6 +41,8 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
     ),
   ).toBeLessThanOrEqual(1);
   await page.evaluate(() => document.fonts.ready);
+  await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+  await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
   if (process.env.REVIEW_SCREENSHOT_DIR) {
     await page.screenshot({
       path: path.join(
@@ -62,6 +64,15 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
   await expect(
     insights.getByRole("button", { name: "Move Cash up" }),
   ).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("insightsLayers")!)[0],
+    ),
+  ).toBe("cash");
+  // Keep screenshot comparisons in the authored Overview order after proving the edit persists.
+  await insights.getByRole("button", { name: /Layers \(/ }).click();
+  await insights.getByRole("button", { name: "Move Cash down" }).click();
+  await insights.getByRole("button", { name: "Done choosing layers" }).click();
   await insights.getByRole("button", { name: "Fit full timeline" }).click();
   await expect(
     insights.getByRole("img", {
@@ -71,9 +82,8 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
   await expect(insights.locator(".insightsChartExplanation")).toContainText(
     "lows and peaks",
   );
-  await insights
-    .locator('[data-layer="supplyDemand"]')
-    .scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   if (
     process.env.REVIEW_SCREENSHOT_DIR &&
     testInfo.project.name === "desktop-chromium"

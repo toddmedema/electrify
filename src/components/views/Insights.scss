@@ -26,10 +26,12 @@
 
   .insightsLayerHint {
     grid-column: 1 / -1;
+    color: var(--font-color-faded);
   }
 
   .insightsChartExplanation {
     display: block;
     margin: 4px 16px 8px;
+    color: var(--font-color-faded);
   }
 }

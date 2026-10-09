@@ -74,6 +74,14 @@ interface State {
   blackoutSpans: Array<[number, number]>;
 }
 
+function forecastRangePaths(pastIndex: number): uPlot.Series.PathBuilder {
+  const range = uPlot.paths.linear!();
+  const forecast = anchoredForecastPaths(pastIndex);
+  // Preserve uPlot's fill and band paths while keeping the shared, anchored forecast stroke.
+  // The stroke-only builder used by line charts cannot fill the area between two range edges.
+  return (...args) => ({ ...range(...args), ...forecast(...args) });
+}
+
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   const palette = chartPalette();
   const series: uPlot.Series[] = [{}];
@@ -91,7 +99,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
           stroke: color,
           width: color === palette.demand ? 2 : 1,
           dash: [4, 4],
-          paths: anchoredForecastPaths(pastIndex),
+          paths: forecastRangePaths(pastIndex),
           points: { show: false },
           spanGaps: false,
         },
