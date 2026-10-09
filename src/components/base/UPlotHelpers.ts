@@ -1,5 +1,5 @@
 import uPlot from "uplot";
-import { chartPalette, withAlpha } from "../../Theme";
+import { chartPalette, INTERFACE_FONT_FAMILY, withAlpha } from "../../Theme";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
 import {
   axisTicksAreYearly,
@@ -37,7 +37,7 @@ export function chartScale(width: number): number {
   return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE);
 }
 
-export const CHART_FONT_FAMILY = `Roboto, "Helvetica Neue", Helvetica, sans-serif`;
+export const CHART_FONT_FAMILY = INTERFACE_FONT_FAMILY;
 
 /**
  * The colour an axis labels itself in, read at the moment it is built.
