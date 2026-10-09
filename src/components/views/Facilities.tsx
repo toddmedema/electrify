@@ -757,6 +757,62 @@ export default class Facilities extends React.Component<Props> {
   }
 
   private throttle = new TickThrottle();
+  private scrollBody: HTMLDivElement | null = null;
+
+  // Native wheel movement can be abandoned while the live fleet repaints. Apply its delta
+  // directly to the current scroll region so ticking never interrupts the gesture.
+  private onWheel = (event: WheelEvent) => {
+    if (
+      event.defaultPrevented ||
+      !event.cancelable ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      !event.deltaY
+    )
+      return;
+    let node = event.target instanceof Element ? event.target : null;
+    while (node) {
+      if (
+        node instanceof HTMLElement &&
+        /(auto|scroll)/.test(getComputedStyle(node).overflowY)
+      ) {
+        const maximum = node.scrollHeight - node.clientHeight;
+        if (maximum > 0) {
+          const lineHeight =
+            parseFloat(getComputedStyle(node).lineHeight) || 16;
+          const unit =
+            event.deltaMode === WheelEvent.DOM_DELTA_LINE
+              ? lineHeight
+              : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? node.clientHeight
+                : 1;
+          const next = Math.max(
+            0,
+            Math.min(maximum, node.scrollTop + event.deltaY * unit),
+          );
+          if (next !== node.scrollTop) {
+            event.preventDefault();
+            node.scrollTop = next;
+          }
+          // Leave unconsumed gestures to the browser, including scroll chaining at an edge.
+          return;
+        }
+      }
+      node = node.parentElement;
+    }
+  };
+
+  private setScrollBody = (node: HTMLDivElement | null) => {
+    this.scrollBody?.removeEventListener("wheel", this.onWheel, true);
+    this.scrollBody = node;
+    // React's passive wheel listener cannot cancel the native delta after we consume it.
+    node?.addEventListener("wheel", this.onWheel, {
+      capture: true,
+      passive: false,
+    });
+  };
+
   // The drag library already animates every row while a reorder is active. Letting the 10ms
   // FAST clock replace the whole list underneath it adds a second stream of layout work and can
   // make the pointer fall seconds behind. The drag callbacks briefly suspend that clock too;
@@ -884,7 +940,7 @@ export default class Facilities extends React.Component<Props> {
               </Button>
             )}
           </Toolbar>
-          <div className="scrollable facilitiesBody">
+          <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             <List dense className="scrollable unifiedFacilitiesList">
               {intertiesAvailable && !!game.transmission?.lines.length && (

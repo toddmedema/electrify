@@ -242,6 +242,84 @@ describe("the fleet list", () => {
     ).toBeNull();
   });
 
+  it("scrolls live wheel input with its units while preserving zoom and edge gestures", () => {
+    const initial = cloneDeep(game);
+    initial.speed = "NORMAL";
+    initial.facilities[0].currentW = initial.facilities[0].peakW;
+    const noop = () => undefined;
+    const props: React.ComponentProps<typeof Facilities> = {
+      game: initial,
+      selectedFacilityId: null,
+      onGeneratorBuild: noop,
+      onStorageBuild: noop,
+      onTransmissionBuild: noop,
+      onTransmissionUpgrade: noop,
+      onTradingPolicy: noop,
+      onSell: noop,
+      onTogglePause: noop,
+      onPause: noop,
+      onReprioritize: noop,
+      onFacilityDragStart: noop,
+      onFacilityDragEnd: noop,
+      onSelect: noop,
+    };
+    const store = configureStore({ reducer: { ui: uiReducer } });
+    const pane = (nextGame = initial) => (
+      <React.StrictMode>
+        <Provider store={store}>
+          <Facilities {...props} game={nextGame} />
+        </Provider>
+      </React.StrictMode>
+    );
+    const { rerender, unmount } = render(pane());
+    const list = screen.getByRole("list");
+    list.style.overflowY = "auto";
+    list.style.lineHeight = "24px";
+    Object.defineProperties(list, {
+      clientHeight: { value: 200 },
+      scrollHeight: { value: 800 },
+    });
+    const status = screen.getByRole("button", {
+      name: /^Inspect Natural Gas CC/,
+    });
+    const wheel = (options: WheelEventInit) => {
+      const event = new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        ...options,
+      });
+      status.dispatchEvent(event);
+      return event;
+    };
+    expect(wheel({ deltaY: 120 }).defaultPrevented).toBe(true);
+    expect(list.scrollTop).toBe(120);
+    wheel({ deltaY: 2, deltaMode: WheelEvent.DOM_DELTA_LINE });
+    expect(list.scrollTop).toBe(168);
+    wheel({ deltaY: 1, deltaMode: WheelEvent.DOM_DELTA_PAGE });
+    expect(list.scrollTop).toBe(368);
+    list.scrollTop = 600;
+    expect(wheel({ deltaY: 100 }).defaultPrevented).toBe(false);
+    expect(wheel({ deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(false);
+    expect(wheel({ deltaY: -100, metaKey: true }).defaultPrevented).toBe(false);
+    expect(wheel({ deltaY: -100, shiftKey: true }).defaultPrevented).toBe(
+      false,
+    );
+    expect(wheel({ deltaY: -100, cancelable: false }).defaultPrevented).toBe(
+      false,
+    );
+    expect(list.scrollTop).toBe(600);
+    wheel({ deltaY: -500 });
+    expect(list.scrollTop).toBe(100);
+
+    const latest = cloneDeep(initial);
+    latest.date.minute += 15;
+    latest.facilities[0].currentW = 0;
+    rerender(pane(latest));
+    expect(status).toHaveTextContent("idle");
+    expect(list.scrollTop).toBe(100);
+    unmount();
+    expect(wheel({ deltaY: 100 }).defaultPrevented).toBe(false);
+  });
   it("keeps tick renders out of an active facility drag", () => {
     const fast = { ...game, speed: "FAST" as const };
     const ref = React.createRef<Facilities>();
