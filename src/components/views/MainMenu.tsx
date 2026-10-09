@@ -18,6 +18,7 @@ import {
   shareText,
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
+import { TitleArtwork } from "../base/LaunchArtwork";
 
 export interface StateProps {
   audioEnabled?: boolean;
@@ -97,6 +98,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           </svg>
         </div>
       </div>
+      <TitleArtwork />
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>

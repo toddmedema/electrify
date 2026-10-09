@@ -1,0 +1,66 @@
+// Artwork shares the game’s flat icon vocabulary. Its own pale fills preserve the black
+// outlines on both page palettes without adding a card, shadow, or competing action.
+.base_main #menuCard .titleArtwork {
+  flex: 0 0 auto;
+  width: min(680px, calc(100% - 48px));
+  margin: 12px auto 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.scenarioArtwork {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  width: min(100%, 480px);
+  margin: 0 auto 16px;
+
+  .scenarioDossierIcon {
+    width: 96px;
+    flex: 0 0 96px;
+    align-self: center;
+    margin: 0;
+  }
+
+  .scenarioArtworkWorld {
+    display: block;
+    width: calc(100% - 120px);
+    height: auto;
+  }
+}
+
+// The existing dark-mode facility icons use a light plate to retain their black boundary.
+// Give the scenic illustration the same treatment rather than letting its outlines disappear.
+[data-theme="dark"] .titleArtwork img,
+[data-theme="dark"] .scenarioArtworkWorld {
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--font-color-primary);
+}
+
+@media (max-width: 760px) {
+  .scenarioArtwork {
+    gap: 16px;
+    margin-bottom: 12px;
+
+    .scenarioDossierIcon {
+      width: 88px;
+      flex-basis: 88px;
+    }
+
+    .scenarioArtworkWorld {
+      width: calc(100% - 104px);
+    }
+  }
+}
+
+@media (max-height: 450px) {
+  .base_main #menuCard .titleArtwork {
+    display: none;
+  }
+}
