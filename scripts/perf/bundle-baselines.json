@@ -1,9 +1,9 @@
 {
-  "recorded": "2026-09-29",
+  "recorded": "2026-10-09",
   "node": "v24.14.0",
   "metrics": {
     "mainJs": 805127,
-    "mainCss": 21849,
+    "mainCss": 24604,
     "initialJs": 805127,
     "allJs": 1270268
   }
