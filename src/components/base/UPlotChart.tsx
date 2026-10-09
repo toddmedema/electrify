@@ -358,7 +358,15 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion, fontReady, interfaceSize]);
+  }, [
+    viewport,
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    fontReady,
+    interfaceSize,
+  ]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;

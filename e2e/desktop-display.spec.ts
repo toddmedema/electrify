@@ -18,6 +18,12 @@ async function noOverflow(page: Page) {
 }
 
 async function readablePhoneStatus(page: Page) {
+  await expect(page.locator(".missionGoalPhone")).toHaveText(
+    /Customers [\d,]+ \/ ≥[\d,]+/,
+  );
+  await expect(page.locator(".missionMonthsPhone")).toHaveText("240 mo");
+  await expect(page.locator(".gridHealthTime")).toHaveText("Now");
+  await expect(page.locator(".gridHealthState")).toContainText("Stable");
   const textBounds = await page.locator("#appbar").evaluate((bar) => {
     const selectors =
       ".gameStatusValue, .gridHealthState, .gridHealthMetric, .missionSummaryHeadline:not(:has(.missionGoalPhone)), .missionGoalPhone, .missionRiskText, .missionSummaryMonths:not(:has(.missionMonthsPhone)), .missionMonthsPhone";
@@ -86,6 +92,7 @@ for (const theme of ["light", "dark"] as const) {
         .boundingBox())!.height,
     ).toBeGreaterThanOrEqual(48);
     await noOverflow(page);
+    await page.evaluate(() => document.fonts.ready);
     if (process.env.DISPLAY_SCREENSHOTS && theme === "light") {
       await page.screenshot({
         path: `${process.env.DISPLAY_SCREENSHOTS}/${testInfo.project.name === "mobile-390px" ? "pr-display-phone" : "pr-display-settings"}.png`,
@@ -142,9 +149,18 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "pause", exact: true }).click();
     if (process.env.DISPLAY_SCREENSHOTS && theme === "dark" && !phone) {
+      await page.keyboard.press("Escape");
+      // Capture the completed pause menu, including its bundled font, after the opening transition.
+      await page.locator(".MuiMenu-paper").evaluate(async (menu) => {
+        await Promise.all(
+          menu.getAnimations().map((animation) => animation.finished),
+        );
+      });
       await page.screenshot({
         path: `${process.env.DISPLAY_SCREENSHOTS}/pr-display-game.png`,
+        animations: "disabled",
       });
+      await page.keyboard.press("Escape");
     }
     // A viewport narrower than the enlarged two-pane threshold must bring back one primary pane.
     if (!phone) {
