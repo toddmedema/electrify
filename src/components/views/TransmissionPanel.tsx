@@ -371,12 +371,6 @@ function IntertieBuildItem(props: {
               {INTERTIE_ARCHETYPES[market.archetype].summary}
             </Typography>
           )}
-          <Box className="buildOptionDetailBody">
-            <Typography variant="body2" color="textSecondary">
-              Import and export access are separate limits. Line capacity limits
-              both directions.
-            </Typography>
-          </Box>
           <Box className="intertieDetailMetrics">
             {outlook && (
               <>
