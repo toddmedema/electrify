@@ -1,0 +1,128 @@
+.facilityProject .facilityStats {
+  margin-top: 12px;
+}
+
+.fleetGridMilestoneLabel {
+  color: var(--delta-good);
+  font-weight: 600;
+}
+
+.fleetGridNode.fleetGridMilestone::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--delta-good);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: facilityCommissioned 700ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleetGridNode.fleetGridMilestone::before {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.eventHistory .eventChangeTitle {
+  display: block;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.eventHistory .kind-BLACKOUT .eventChangeTitle {
+  color: var(--blackout-red);
+}
+
+.eventHistory .kind-BLACKOUT_OVER,
+.eventHistory .kind-CONSTRUCTION {
+  .eventLogIcon,
+  .eventChangeTitle {
+    color: var(--delta-good);
+  }
+}
+
+.resultMission {
+  overflow-wrap: anywhere;
+}
+
+.victoryDebrief.resultDebrief {
+  display: block;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.resultMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+
+.resultMetric {
+  min-width: 0;
+
+  dt {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption-sm);
+  }
+
+  dd {
+    margin: 4px 0 0;
+    font-size: var(--font-size-subtitle);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .conceptIcon {
+    font-size: 16px;
+  }
+}
+
+.resultScenarioMetrics {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 8px;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  dt {
+    flex: 1;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption-sm);
+    overflow-wrap: anywhere;
+
+    .conceptIcon {
+      margin-right: 4px;
+      font-size: 16px;
+      vertical-align: text-bottom;
+    }
+  }
+
+  dd {
+    flex: 0 0 auto;
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (max-width: 599px) {
+  .resultMetrics {
+    gap: 16px;
+  }
+}

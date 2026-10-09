@@ -21,6 +21,7 @@ import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
+import "../base/ProgressFeedback.scss";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -42,6 +43,24 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
   FUEL_CROSSOVER: "fuel",
   WORLD_EVENT: "forecast",
 };
+
+// History keeps the simulation's exact consequence; these labels make its transition scannable.
+const CHANGE_LABELS: Partial<Record<GameEventKindType, string>> = {
+  BLACKOUT: "Power shortage",
+  BLACKOUT_OVER: "Power restored",
+  CONSTRUCTION: "Project complete",
+  BUILD: "Project started",
+  SELL: "Facility sold",
+};
+
+function changeLabel(event: GameEventType): string | undefined {
+  if (event.title) return event.title;
+  // BUILD records cancellations as well as approvals; retain that distinction in the heading.
+  if (event.kind === "BUILD" && event.message.startsWith("Cancelled ")) {
+    return "Project cancelled";
+  }
+  return CHANGE_LABELS[event.kind];
+}
 
 type EventHistoryFilterType =
   "WORLD" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
@@ -430,7 +449,11 @@ export default function EventLog(props: Props): React.JSX.Element {
                   />
                 </span>
                 <span>
-                  {event.title && <strong>{event.title}</strong>}
+                  {changeLabel(event) && (
+                    <strong className="eventChangeTitle">
+                      {changeLabel(event)}
+                    </strong>
+                  )}
                   <span className="eventLogCopy">
                     <Typography
                       variant="body2"

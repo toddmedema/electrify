@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { SavedRunResult } from "../../Types";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
+import { difficultyLabel } from "../../Constants";
 
 /** A historical result never dispatches game actions or enriches leaderboard state. */
 export default function SavedResultDialog(props: {
@@ -34,7 +35,7 @@ export default function SavedResultDialog(props: {
               {props.name}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {result.scenarioName} · {result.difficulty}
+              {result.scenarioName} · {difficultyLabel(result.difficulty)}
             </Typography>
             {result.endMessage && <Typography>{result.endMessage}</Typography>}
             <ResultScore result={result} />

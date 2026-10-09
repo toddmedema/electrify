@@ -51,6 +51,14 @@ jest.mock("../base/GameCard", () => ({
 // `delay: null` drops the timer userEvent otherwise waits on between the events of a click
 const user = userEvent.setup({ delay: null });
 
+beforeAll(() => {
+  // jsdom has no viewport scrolling; actual selection scrolling is verified in Playwright.
+  Element.prototype.scrollIntoView = jest.fn();
+});
+afterAll(() => {
+  delete (Element.prototype as Partial<Element>).scrollIntoView;
+});
+
 function playedGame(ticks: number): GameType {
   // Carbon Fee, which starts with two generators.
   const state = createGame({ scenarioId: 100 });
@@ -74,7 +82,7 @@ function renderFacilities(
   selectedFacilityId: number | null,
   fleetView: "grid" | "dispatch" = "dispatch",
   initialEvidenceRequest?: EvidenceRequestType,
-): Handlers {
+): Handlers & { rerenderGame: (next: GameType, runId?: number) => void } {
   const handlers: Handlers = {
     onPause: jest.fn(),
     onSelect: jest.fn(),
@@ -84,14 +92,21 @@ function renderFacilities(
     onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities() {
+  function ControlledFacilities({
+    state,
+    runId = 0,
+  }: {
+    state: GameType;
+    runId?: number;
+  }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
     const [evidenceRequest, setEvidenceRequest] = React.useState(
       initialEvidenceRequest,
     );
     return (
       <Facilities
-        game={game}
+        game={state}
+        feedbackRunId={runId}
         evidenceRequest={evidenceRequest}
         onEvidenceReady={(_request, element) => {
           element?.focus();
@@ -118,14 +133,18 @@ function renderFacilities(
       />
     );
   }
-  render(<ControlledFacilities />, {
+  const view = render(<ControlledFacilities state={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
   const dispatchView = screen.queryByRole("button", {
     name: "Dispatch",
   });
   if (dispatchView && fleetView === "dispatch") fireEvent.click(dispatchView);
-  return handlers;
+  return {
+    ...handlers,
+    rerenderGame: (next, runId) =>
+      view.rerender(<ControlledFacilities state={next} runId={runId} />),
+  };
 }
 
 // The row is the drag handle as well as the select target, so it is addressed by its own class
@@ -140,6 +159,72 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it.each(["grid", "dispatch"] as const)(
+    "announces commissioning once across views, preserving paused operation in %s",
+    (fleetView) => {
+      const building = createGame({ scenarioId: 100 });
+      building.facilities[0].yearsToBuildLeft = 1;
+      building.facilities[0].paused = true;
+      const { rerenderGame } = renderFacilities(building, null, fleetView);
+      expect(screen.queryByText(/^Commissioned/)).toBeNull();
+      const completed = cloneDeep(building);
+      completed.facilities[0].yearsToBuildLeft = 0;
+      rerenderGame(completed);
+      expect(screen.getByText(/^Commissioned/)).toBeVisible();
+      expect(
+        screen.getByText(
+          `${completed.facilities[0].name}: construction complete. Operation is paused.`,
+        ),
+      ).toHaveAttribute("role", "status");
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: fleetView === "grid" ? "Dispatch" : "Grid",
+        }),
+      );
+      expect(
+        screen.getAllByText("Commissioned", { exact: false }),
+      ).toHaveLength(1);
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+      fireEvent.click(
+        screen.getAllByRole("button", { name: /^Inspect .* in grid/ })[0],
+      );
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      cleanup();
+      renderFacilities(completed, null, fleetView);
+      expect(screen.queryByText(/^Commissioned/)).toBeNull();
+    },
+  );
+
+  it.each(["grid", "dispatch"] as const)(
+    "does not announce replay commissioning in %s",
+    (fleetView) => {
+      const game = createGame({ scenarioId: 100 });
+      game.facilities[0].yearsToBuildLeft = 1;
+      game.replayPlayback = { actions: [], index: 0 };
+      const { rerenderGame } = renderFacilities(game, null, fleetView);
+      const completed = cloneDeep(game);
+      completed.facilities[0].yearsToBuildLeft = 0;
+      rerenderGame(completed);
+      expect(screen.queryByText(/Commissioned/)).toBeNull();
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    },
+  );
+
+  it("clears observed cues when another save loads into the same pane", () => {
+    const game = createGame({ scenarioId: 100 });
+    game.facilities[0].yearsToBuildLeft = 1;
+    const { rerenderGame } = renderFacilities(game, null, "grid");
+    const completed = cloneDeep(game);
+    completed.facilities[0].yearsToBuildLeft = 0;
+    rerenderGame(completed);
+    expect(screen.getByText(/Commissioned/)).toBeVisible();
+    rerenderGame(completed, 1);
+    expect(screen.queryByText(/Commissioned/)).toBeNull();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
 
   it("keeps supply and demand evidence mounted and focused after acknowledging a request from Grid", () => {
     renderFacilities(game, null, "grid", {
@@ -498,6 +583,24 @@ describe("weather hazards in the fleet", () => {
       effects: { facilityOutputMultipliersById: { "3": availableFraction } },
     });
   }
+
+  it.each(["grid", "dispatch"] as const)(
+    "identifies weather recovery without claiming output in %s",
+    (fleetView) => {
+      const state = gameWithSolar();
+      hailOn(state, 0.72, 9);
+      const { rerenderGame } = renderFacilities(state, null, fleetView);
+      expect(screen.queryByText("Outage ended")).toBeNull();
+      const repaired = cloneDeep(state);
+      repaired.worldEvents.active = [];
+      repaired.facilities[2].paused = true;
+      rerenderGame(repaired);
+      expect(screen.getByText(/Outage ended/)).toBeVisible();
+      expect(
+        screen.getByText("Solar: weather outage ended. Operation is paused."),
+      ).toHaveAttribute("role", "status");
+    },
+  );
 
   it("shows an upgrading plant's progress and lets the player cancel it", async () => {
     const state = gameWithSolar();

@@ -21,6 +21,9 @@ for (const colorScheme of ["light", "dark"] as const) {
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
+      await facilities
+        .getByRole("button", { name: "Dispatch", exact: true })
+        .click();
 
       // Hydro exercises long captions; gas adds upkeep/start costs; storage has charge/cycles.
       await facilities
@@ -178,6 +181,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     await pane.getByRole("button", { name: "Build", exact: true }).click();
     await page.locator(".button-buildGenerator").click();
     await page
@@ -221,6 +225,10 @@ for (const theme of ["light", "dark"]) {
     );
     await expect(row.getByRole("region", { name: "Operation" })).toHaveCount(0);
     await expect(row.getByRole("region", { name: "Economics" })).toHaveCount(0);
+    await expect(
+      row.getByRole("region", { name: "Construction" }),
+    ).toContainText("No power until construction completes.");
+    await expect(row.getByText("Project cost", { exact: true })).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(page.locator(".snackbarContent")).toBeHidden();
     await row.scrollIntoViewIfNeeded();

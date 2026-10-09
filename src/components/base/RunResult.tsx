@@ -6,6 +6,7 @@ import { formatMoneyConcise, formatScore } from "../../helpers/Format";
 import { scoreLabel } from "../../helpers/Scoring";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import "./ProgressFeedback.scss";
 
 export function resultTitle(
   result: Pick<VictoryType, "outcome" | "endTitle">,
@@ -62,37 +63,52 @@ export function RunDebrief({
   const units = useUnits();
   const reliability = `${(debrief.reliability * 100).toFixed(debrief.reliability >= 0.999 ? 2 : 1)}%`;
   const metrics = [
-    { concept: "supply" as const, label: "served", value: reliability },
+    { concept: "supply" as const, label: "Demand served", value: reliability },
     {
       concept: "money" as const,
-      label: "cash",
+      label: "Ending cash",
       value: formatMoneyConcise(debrief.finalCash),
     },
     {
       concept: "customers" as const,
-      label: "customers",
+      label: "Customers",
       value: numbro(debrief.finalCustomers).format({ average: true }),
     },
     {
       concept: "danger" as const,
-      label: "emissions",
+      label: "Emissions",
       value: formatLargeMass(debrief.kgco2e, units),
     },
-    ...(debrief.scenarioMetrics || []).map((metric) => ({
-      concept: metric.concept,
-      label: metric.label,
-      value: metric.value,
-    })),
   ];
   return (
-    <section className="victoryDebrief" aria-label="Mission results">
-      {metrics.map((metric) => (
-        <div key={metric.label} className="victoryMetric">
-          <ConceptIcon concept={metric.concept} fontSize="small" />
-          <strong>{metric.value}</strong>
-          <span>{metric.label}</span>
-        </div>
-      ))}
+    <section
+      className="victoryDebrief resultDebrief"
+      aria-label="Mission results"
+    >
+      <dl className="resultMetrics">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="resultMetric">
+            <dt>
+              <ConceptIcon concept={metric.concept} fontSize="small" />
+              {metric.label}
+            </dt>
+            <dd>{metric.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {!!debrief.scenarioMetrics?.length && (
+        <dl className="resultScenarioMetrics">
+          {debrief.scenarioMetrics.map((metric) => (
+            <div key={metric.label}>
+              <dt>
+                <ConceptIcon concept={metric.concept} fontSize="small" />
+                {metric.label}
+              </dt>
+              <dd>{metric.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </section>
   );
 }

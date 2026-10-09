@@ -51,6 +51,7 @@ import {
 } from "../../Types";
 import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
+import "./ProgressFeedback.scss";
 
 /**
  * What a selected facility has actually been doing: how hard it has run, what a MWh out of it
@@ -349,6 +350,45 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           Hydro site:{" "}
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>
+      )}
+      {underConstruction && (
+        <section
+          className="facilityDetailSection facilityProject"
+          aria-label="Construction"
+        >
+          <Typography component="h3" className="facilityDetailHeading">
+            Construction underway
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Available in {Math.ceil(facility.yearsToBuildLeft * 12)}{" "}
+            {Math.ceil(facility.yearsToBuildLeft * 12) === 1
+              ? "month"
+              : "months"}
+            . No power until construction completes.
+          </Typography>
+          <dl className="facilityStats">
+            <Stat
+              label={
+                storage ? "Storage when complete" : "Capacity when complete"
+              }
+              value={
+                storage
+                  ? formatWattHours(storage.peakWh)
+                  : formatWatts(facility.peakW)
+              }
+            />
+            <Stat
+              label="Project cost"
+              value={formatMoneyConcise(facility.buildCost)}
+            />
+            {facility.loanAmountLeft > 0 && (
+              <Stat
+                label="Loan balance"
+                value={formatMoneyConcise(facility.loanAmountLeft)}
+              />
+            )}
+          </dl>
+        </section>
       )}
       {!underConstruction && (
         <section className="facilityDetailSection" aria-label="Operation">

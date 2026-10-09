@@ -12,6 +12,7 @@ import { storyOutputMultiplier } from "../../helpers/Story";
 import ConceptIcon from "../base/ConceptIcon";
 import "./FleetGrid.scss";
 import { facilityReservoirReading } from "../base/FacilityReservoir";
+import { useFacilityFeedback } from "../base/FacilityFeedback";
 
 interface Props {
   game: GameType;
@@ -34,6 +35,9 @@ function FacilityNode({
   outputLimit: number;
 }) {
   const storage = isStorage(facility);
+  const feedback = useFacilityFeedback();
+  const milestone = feedback.milestones[facility.id];
+  const arriving = feedback.arrivingFacilityId === facility.id;
   const building = facility.yearsToBuildLeft > 0;
   const upgrading = isUpgradingAt(facility, game.date.minute);
   const hazard = facilityHazardStatus(game, facility);
@@ -85,8 +89,8 @@ function FacilityNode({
   return (
     <button
       type="button"
-      className="fleetGridNode"
-      aria-label={`Inspect ${facility.name} in grid, ${reading}, ${state}${reservoir ? `, reservoir ${reservoir.percent}%${reservoir.low ? " low" : ""}` : ""}`}
+      className={`fleetGridNode${milestone ? " fleetGridMilestone" : ""}${arriving ? " facilityArrival" : ""}`}
+      aria-label={`Inspect ${facility.name} in grid, ${reading}, ${state}${milestone ? `, ${milestone}` : ""}${reservoir ? `, reservoir ${reservoir.percent}%${reservoir.low ? " low" : ""}` : ""}`}
       aria-pressed={selected}
       onClick={() => onSelect(selected ? null : facility.id)}
     >
@@ -96,6 +100,9 @@ function FacilityNode({
       <span
         className={`fleetGridState${(hazard || outputLimit < 1) && !building && !upgrading && !facility.paused ? " fleetGridWarning" : ""}`}
       >
+        {milestone && (
+          <strong className="fleetGridMilestoneLabel">{milestone} · </strong>
+        )}
         {state}
       </span>
       {storage && !building && (

@@ -67,11 +67,14 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { activeScenario } from "../../helpers/GameSelectors";
 import FleetGrid from "./FleetGrid";
 import { facilityReservoirReading } from "../base/FacilityReservoir";
+import {
+  FacilityFeedbackProvider,
+  useFacilityFeedback,
+} from "../base/FacilityFeedback";
 
 interface FacilityListItemProps {
   reorderable?: boolean;
-  arriving: boolean;
-  onArrivalShown?: (id: number) => void;
+  showFeedback: boolean;
   facility: FacilityOperatingType;
   spotInList: number;
   game: GameType;
@@ -310,8 +313,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     storyOutputMultiplier,
     hazardStatus,
-    arriving: arrivalRequested,
-    onArrivalShown,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = underConstruction
@@ -321,32 +322,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   // Building and upgrading both hold the plant out of service behind a progress bar
   const offlineForWork = underConstruction || upgrading;
   const storage = isStorage(facility) ? facility : undefined;
-  const wasBuilding = React.useRef(underConstruction);
-  const [arriving, setArriving] = React.useState(arrivalRequested);
-  const [ready, setReady] = React.useState(false);
-  React.useEffect(() => {
-    if (arrivalRequested) {
-      setArriving(true);
-      onArrivalShown?.(facility.id);
-    }
-  }, [arrivalRequested, onArrivalShown, facility.id]);
-  React.useEffect(() => {
-    if (!arriving) return;
-    // Also consume the cue when reduced motion prevents animationend from firing.
-    const timer = window.setTimeout(() => setArriving(false), 240);
-    return () => window.clearTimeout(timer);
-  }, [arriving]);
-  React.useEffect(() => {
-    if (wasBuilding.current && !underConstruction && !readOnly) {
-      setReady(true);
-    }
-    wasBuilding.current = underConstruction;
-  }, [underConstruction, readOnly]);
-  React.useEffect(() => {
-    if (!ready) return;
-    const timer = window.setTimeout(() => setReady(false), 2400);
-    return () => window.clearTimeout(timer);
-  }, [ready]);
+  const feedback = useFacilityFeedback();
+  const arriving =
+    props.showFeedback && feedback.arrivingFacilityId === facility.id;
+  const ready = props.showFeedback
+    ? feedback.milestones[facility.id]
+    : undefined;
 
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
@@ -462,9 +443,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           <div
             className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
             data-storage={!!storage || undefined}
-            onAnimationEnd={(event) => {
-              if (event.animationName === "facilityArrival") setArriving(false);
-            }}
           >
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
@@ -493,19 +471,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
-              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
-              all under-construction facilities need here. */}
+              {/* A project is inspectable while offline. Only its artwork is muted; progress
+              and timing stay readable rather than resembling disabled controls. */}
               <ListItem
                 className="facility"
                 sx={
                   offlineForWork
                     ? {
-                        // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
-                          {
-                            opacity: (theme) =>
-                              theme.palette.action.disabledOpacity,
-                          },
+                        "& .MuiListItemAvatar-root": {
+                          opacity: (theme) =>
+                            theme.palette.action.disabledOpacity,
+                        },
                       }
                     : undefined
                 }
@@ -551,7 +527,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <>
                         <span className="facilityName">{facility.name}</span>
                         {ready && (
-                          <span className="facilityReadyLabel">Ready</span>
+                          <span className="facilityReadyLabel">{ready}</span>
                         )}
                         {storyOutputMultiplier < 1 && (
                           <Chip
@@ -704,6 +680,7 @@ function FacilitySupplyChart({
 }
 
 export interface StateProps {
+  feedbackRunId?: number;
   arrivingFacilityId?: number;
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
@@ -835,6 +812,7 @@ export default class Facilities extends React.Component<Props, State> {
       nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
+      nextProps.feedbackRunId !== this.props.feedbackRunId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -948,7 +926,12 @@ export default class Facilities extends React.Component<Props, State> {
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
-        <>
+        <FacilityFeedbackProvider
+          key={`${this.props.feedbackRunId ?? 0}:${game.scenarioId}:${game.seed}`}
+          game={game}
+          arrivingFacilityId={this.props.arrivingFacilityId}
+          onArrivalShown={this.props.onArrivalShown}
+        >
           {/* The pane's own header rather than a row inside the list, so it lines up with the
             other panes' headers and the build buttons stay put as the fleet scrolls */}
           <Toolbar className="paneHeader">
@@ -1026,8 +1009,7 @@ export default class Facilities extends React.Component<Props, State> {
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem
                             reorderable={!gridView}
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
+                            showFeedback={!gridView}
                             facility={g}
                             game={game}
                             key={g.id}
@@ -1078,7 +1060,7 @@ export default class Facilities extends React.Component<Props, State> {
                 )}
             </List>
           </div>
-        </>
+        </FacilityFeedbackProvider>
       </GameCard>
     );
   }
