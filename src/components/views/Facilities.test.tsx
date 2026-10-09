@@ -18,7 +18,11 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType } from "../../Types";
+import {
+  EvidenceRequestType,
+  FacilityOperatingType,
+  GameType,
+} from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
@@ -68,6 +72,8 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
+  fleetView: "grid" | "dispatch" = "dispatch",
+  initialEvidenceRequest?: EvidenceRequestType,
 ): Handlers {
   const handlers: Handlers = {
     onPause: jest.fn(),
@@ -80,9 +86,17 @@ function renderFacilities(
   const store = configureStore({ reducer: { ui: uiReducer } });
   function ControlledFacilities() {
     const [selected, setSelected] = React.useState(selectedFacilityId);
+    const [evidenceRequest, setEvidenceRequest] = React.useState(
+      initialEvidenceRequest,
+    );
     return (
       <Facilities
         game={game}
+        evidenceRequest={evidenceRequest}
+        onEvidenceReady={(_request, element) => {
+          element?.focus();
+          setEvidenceRequest(undefined);
+        }}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
         onTransmissionUpgrade={() => undefined}
@@ -110,7 +124,7 @@ function renderFacilities(
   const dispatchView = screen.queryByRole("button", {
     name: "Dispatch",
   });
-  if (dispatchView) fireEvent.click(dispatchView);
+  if (dispatchView && fleetView === "dispatch") fireEvent.click(dispatchView);
   return handlers;
 }
 
@@ -126,6 +140,26 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it("keeps supply and demand evidence mounted and focused after acknowledging a request from Grid", () => {
+    renderFacilities(game, null, "grid", {
+      id: 1,
+      runId: 0,
+      target: "supply-demand",
+    });
+    expect(screen.getByLabelText("Supply and demand")).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Dispatch" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Live power grid" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(
+      screen.getByRole("region", { name: "Live power grid" }),
+    ).toBeVisible();
+  });
 
   it.each([
     [-500000, "charging"],
