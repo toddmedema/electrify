@@ -21,6 +21,7 @@ jest.mock("../../helpers/MissionStatus", () => ({
       id: "reliability",
       label: "Keep the lights on",
       compact: "Demand served ≥ 90% (pending)",
+      compactPhone: "Served ≥90% · pending",
       current: "No completed months",
       target: "Every required month",
       timing: "At month end",

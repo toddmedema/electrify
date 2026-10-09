@@ -28,6 +28,8 @@ export interface MissionRequirement {
   current: string;
   target: string;
   compact: string;
+  /** Short operating-header copy retaining the target and the observed value or status. */
+  compactPhone?: string;
   timing: string;
   status:
     "pending" | "in-progress" | "completed" | "failed" | "unknown" | "waived";
@@ -78,10 +80,15 @@ export function getMissionStatus(game: GameType) {
     const minimum = rows.length
       ? Math.min(...rows.map(demandServed))
       : undefined;
+    const incomplete = missing || (monthsRemaining === 0 && observed < count);
     requirements.push({
       id: "reliability",
       label: objective.label,
       compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compactPhone:
+        minimum === undefined
+          ? `Served ≥${formatRequiredShare(objective.minimumDemandServed)} · ${incomplete ? "unknown" : "pending"}`
+          : `Served ${formatServed(minimum)} / ≥${formatRequiredShare(objective.minimumDemandServed)}${incomplete ? " · unknown" : failed ? " · missed" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
@@ -126,6 +133,7 @@ export function getMissionStatus(game: GameType) {
       id: "retention",
       label: "Retain the community",
       compact: `Customers ≥ ${formatCount(Math.ceil(threshold))} (${now ? formatCount(now.customers) : "unavailable"})`,
+      compactPhone: `Customers ${now ? formatCount(now.customers) : "unknown"} / ≥${formatCount(Math.ceil(threshold))}${unreachable ? " · missed" : ""}`,
       current: now
         ? `${formatCount(now.customers)} current customers`
         : "Current customers unavailable",

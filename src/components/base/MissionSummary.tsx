@@ -164,16 +164,32 @@ export default function MissionSummary({
               className="missionSummaryHeadline"
               title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
             >
-              <span className="missionSummaryGoalLabel">Goal </span>
-              {mission.headline.id === "cash"
-                ? mission.headline.label
-                : mission.headline.compact}
+              <span className="srOnly">{`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}</span>
+              <span className="missionGoalFull" aria-hidden="true">
+                <span className="missionSummaryGoalLabel">Goal </span>
+                {mission.headline.id === "cash"
+                  ? mission.headline.label
+                  : mission.headline.compact}
+              </span>
+              <span className="missionGoalPhone" aria-hidden="true">
+                {mission.headline.compactPhone ||
+                  (mission.headline.id === "cash"
+                    ? mission.headline.label
+                    : mission.headline.compact)}
+              </span>
             </span>
           )}
           <span className="missionSummaryMonths">
-            {mission.monthsRemaining === 0
-              ? "Term complete"
-              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+            <span className="missionMonthsFull">
+              {mission.monthsRemaining === 0
+                ? "Term complete"
+                : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+            </span>
+            <span className="missionMonthsPhone" aria-hidden="true">
+              {mission.monthsRemaining === 0
+                ? "Complete"
+                : `${mission.monthsRemaining} mo`}
+            </span>
           </span>
         </div>
         <Tooltip title="All requirements">

@@ -62,11 +62,17 @@ const requirement = (game: GameType, id: string) =>
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
   expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
   expect(requirement(fixture(35), "reliability").status).toBe("pending");
+  expect(requirement(fixture(35), "reliability").compactPhone).toBe(
+    "Served ≥99.5% · pending",
+  );
   expect(requirement(fixture(36), "reliability").status).toBe("in-progress");
   const partial = createNextState(fixture(37), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 0), monthRow(2025, 1)];
   });
   expect(requirement(partial, "reliability").status).toBe("in-progress");
+  expect(requirement(partial, "reliability").compactPhone).toBe(
+    "Served 100% / ≥99.5%",
+  );
   expect(requirement(partial, "reliability").current).toContain(
     "1 of 2 months counted",
   );
@@ -78,6 +84,9 @@ test("wildfire window is pending, partial, complete or failed using completed mo
     g.monthlyHistory[0].supplyWh = 99;
   });
   expect(requirement(failed, "reliability").status).toBe("failed");
+  expect(requirement(failed, "reliability").compactPhone).toBe(
+    "Served 99% / ≥99.5% · missed",
+  );
   expect(getMissionStatus(failed).prominent?.id).toBe("reliability");
   expect(getMissionStatus(failed).headline?.compact).toContain("(99%)");
   expect(
@@ -92,6 +101,9 @@ test("empty and partial required history stay unknown even at term end without c
         g.monthlyHistory = rows;
       });
       expect(requirement(game, "reliability").status).toBe("unknown");
+      expect(requirement(game, "reliability").compactPhone).toContain(
+        "unknown",
+      );
       expect(requirement(game, "reliability").current).toContain(
         "not verifiable",
       );
@@ -188,6 +200,9 @@ test("retention shows current customers against final target while recoverable",
     g.timeline[0].customers = recoverable;
   });
   expect(requirement(low, "retention").status).toBe("in-progress");
+  expect(requirement(low, "retention").compactPhone).toBe(
+    `Customers ${recoverable.toLocaleString()} / ≥${Math.ceil(threshold).toLocaleString()}`,
+  );
   expect(getMissionStatus(low).headline?.id).toBe("retention");
   expect(getMissionStatus(low).headline?.compact).toMatch(
     new RegExp(`^Customers ≥ .* \\(${recoverable.toLocaleString()}\\)$`),

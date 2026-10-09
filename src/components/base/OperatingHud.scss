@@ -84,6 +84,11 @@
     font-weight: 600;
   }
 
+  .missionGoalPhone,
+  .missionMonthsPhone {
+    display: none;
+  }
+
   .missionDetailsButton {
     position: absolute;
     top: 50%;
@@ -169,6 +174,27 @@
 
     .missionSummaryCopy {
       gap: 8px;
+    }
+
+    .missionGoalPhone,
+    .missionMonthsPhone {
+      display: inline;
+    }
+
+    .missionGoalFull {
+      display: none;
+    }
+
+    // Keep the full countdown available to assistive technology; the phone saves its width
+    // for the objective's current value and target.
+    .missionMonthsFull {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
     }
   }
 }
