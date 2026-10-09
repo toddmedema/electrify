@@ -1,6 +1,6 @@
 import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
-import { quit, start } from "../../reducers/Game";
+import { delta, quit, start } from "../../reducers/Game";
 import { runSaveTransition } from "../../SaveSession";
 import { snackbarOpen, victoryClose } from "../../reducers/UI";
 import { login, logEvent } from "../../Globals";
@@ -14,7 +14,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onClose: () => {
       dispatch(victoryClose());
@@ -29,6 +29,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       void runSaveTransition(() => {
         dispatch(victoryClose());
         dispatch(quit());
+        dispatch(delta({ difficulty: victory.difficulty }));
         dispatch(start(victory.scenarioId));
       });
     },

@@ -12,6 +12,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=101");
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     // Move a real save to its final tick to exercise the actual completed-run flow.
     await editSavedGame(page, (save) => {
@@ -88,6 +89,67 @@ for (const theme of ["light", "dark"]) {
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
     const restarted = (await readSavedGame(page))!;
     expect(restarted.scenarioId).toBe(101);
+    expect(restarted.difficulty).toBe("VP");
     expect(restarted.date.monthsElapsed).toBe(0);
   });
 }
+
+test("retrying a failed scenario keeps its difficulty in the game and mission details", async ({
+  page,
+}, info) => {
+  const theme = info.project.use.hasTouch ? "dark" : "light";
+  await page.addInitScript((mode) => {
+    localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem("theme", mode);
+  }, theme);
+  await page.goto("/?scenario=101");
+  await page.getByRole("button", { name: "Expert", exact: true }).click();
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const requirements = page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "All requirements" })
+    .first();
+  const details = page.getByRole("dialog", { name: "Rise of Renewables" });
+  await requirements.click();
+  await expect(details.getByText("Expert", { exact: true })).toBeVisible();
+  await details.getByRole("button", { name: "Back to game" }).click();
+
+  // Force insolvency at the next month boundary through a real saved game.
+  await editSavedGame(page, (save) => {
+    const offset = 1440 - 15 - save.game.date.minute;
+    save.game.date.minute += offset;
+    for (const tick of save.game.timeline) {
+      tick.minute += offset;
+      tick.cash = -1000000000;
+    }
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "normal speed", exact: true })
+    .first()
+    .click();
+  const failure = page.getByRole("dialog", { name: "Bankrupt!" });
+  await expect(failure).toBeVisible();
+  await failure.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(failure).not.toBeVisible();
+  await expect(page.locator("#appbar:visible").first()).toBeVisible();
+
+  const restarted = (await readSavedGame(page))!;
+  expect(restarted.scenarioId).toBe(101);
+  expect(restarted.difficulty).toBe("CEO");
+  expect(restarted.date.monthsElapsed).toBe(0);
+  await requirements.click();
+  await expect(details.getByText("Expert", { exact: true })).toBeVisible();
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await expect(details.locator("..")).toHaveCSS("opacity", "1");
+    await page.mouse.move(0, 0);
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `retry-difficulty-${info.project.name}-${theme}.png`,
+      ),
+    });
+  }
+});
