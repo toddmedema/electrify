@@ -168,14 +168,11 @@ export default function MissionSummary({
               <span className="missionGoalFull" aria-hidden="true">
                 <span className="missionSummaryGoalLabel">Goal </span>
                 {mission.headline.id === "cash"
-                  ? mission.headline.label
+                  ? mission.headline.compactPhone || mission.headline.compact
                   : mission.headline.compact}
               </span>
               <span className="missionGoalPhone" aria-hidden="true">
-                {mission.headline.compactPhone ||
-                  (mission.headline.id === "cash"
-                    ? mission.headline.label
-                    : mission.headline.compact)}
+                {mission.headline.compactPhone || mission.headline.compact}
               </span>
             </span>
           )}

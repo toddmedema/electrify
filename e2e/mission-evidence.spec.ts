@@ -86,7 +86,7 @@ for (const theme of ["light", "dark"]) {
       "Goal",
     );
     const copy = await page.locator(".missionSummary:visible").boundingBox();
-    expect(copy!.height).toBeLessThanOrEqual(88);
+    expect(copy!.height).toBeLessThanOrEqual(100);
     const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
@@ -126,7 +126,8 @@ for (const theme of ["light", "dark"]) {
       );
       // Scenario context remains visible above two compact operating rows.
       expect(heights[0]).toBeLessThanOrEqual(84);
-      expect(heights.slice(1)).toEqual([44, 44]);
+      expect(heights[1]).toBe(44);
+      expect(heights[2]).toBeLessThanOrEqual(56);
     }
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {

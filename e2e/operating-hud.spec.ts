@@ -82,7 +82,7 @@ for (const state of [
   test(`phone goal preserves target and ${state} evidence without growing`, async ({
     page,
   }, info) => {
-    test.skip(info.project.name !== "mobile-390px");
+    test.skip(!info.project.name.startsWith("mobile-"));
     await page.addInitScript(() => {
       if (!sessionStorage.getItem("hud-state-fixture")) {
         localStorage.clear();
@@ -145,12 +145,79 @@ for (const state of [
         .locator(".missionSummaryHeadline")
         .evaluate((node) => node.scrollWidth - node.clientWidth),
     ).toBeLessThanOrEqual(1);
-    expect(
-      (await hud.locator(".missionSummaryHeader").boundingBox())!.height,
-    ).toBe(32);
-    expect((await hud.boundingBox())!.height).toBeLessThanOrEqual(212);
+    const header = (await hud.locator(".missionSummaryHeader").boundingBox())!;
+    const details = (await hud.locator(".missionDetailsButton").boundingBox())!;
+    // The whole touch target stays in its own row, away from the evidence link below.
+    expect(details.y).toBeGreaterThanOrEqual(header.y);
+    expect(details.y + details.height).toBeLessThanOrEqual(
+      header.y + header.height,
+    );
+    expect((await hud.boundingBox())!.height).toBeLessThanOrEqual(224);
     await expect(
       hud.getByRole("button", { name: "All requirements", exact: true }),
     ).toBeVisible();
   });
 }
+
+test("cash-only objectives keep the month-end target visible", async ({
+  page,
+}, info) => {
+  await page.addInitScript(
+    (theme) => {
+      localStorage.clear();
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("theme", theme);
+    },
+    info.project.name.startsWith("mobile-") ? "dark" : "light",
+  );
+  await page.goto("/?scenario=104");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const goal = page.locator(
+    ".missionGoalFull:visible, .missionGoalPhone:visible",
+  );
+  await expect(goal).toContainText("≥$0");
+  await expect(goal).toContainText("month end");
+  expect(
+    await page
+      .locator(".missionSummaryHeadline:visible")
+      .evaluate((node) => node.scrollWidth - node.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  const timeframe = page.locator(".missionRiskTimeframe:visible");
+  await expect(timeframe).toBeVisible();
+  const colors = await timeframe.evaluate((element) => ({
+    foreground: getComputedStyle(element).color,
+    background: getComputedStyle(element.closest("button")!).backgroundColor,
+  }));
+  const luminance = (color: string) => {
+    const channels = color
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map(Number)
+      .map((channel) => {
+        const value = channel / 255;
+        return value <= 0.04045
+          ? value / 12.92
+          : ((value + 0.055) / 1.055) ** 2.4;
+      });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const foreground = luminance(colors.foreground);
+  const background = luminance(colors.background);
+  expect(
+    (Math.max(foreground, background) + 0.05) /
+      (Math.min(foreground, background) + 0.05),
+  ).toBeGreaterThanOrEqual(4.5);
+  const screenshotDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (
+    screenshotDir &&
+    ["desktop-chromium", "mobile-390px"].includes(info.project.name)
+  ) {
+    await expect(page.locator("#chartSupplyDemand")).toBeVisible();
+    await expect(
+      page.getByText("Starting your mission…", { exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: path.join(screenshotDir, `pr-cash-goal-${info.project.name}.png`),
+    });
+  }
+});

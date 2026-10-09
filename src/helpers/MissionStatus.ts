@@ -151,6 +151,8 @@ export function getMissionStatus(game: GameType) {
     id: "cash",
     label: "Keep the utility solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
+    // The current balance is already beside the clock; keep the threshold and its timing visible.
+    compactPhone: "Cash ≥$0 at month end",
     current: now
       ? `$${formatCount(now.cash)} now (partial month)`
       : "Current cash unavailable",

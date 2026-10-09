@@ -70,7 +70,8 @@
 
   .missionSummaryHeader {
     position: relative;
-    min-height: 32px;
+    // Contain the entire details target so it cannot overlap the evidence row below.
+    min-height: 40px;
     padding-right: 40px;
     box-sizing: border-box;
   }
@@ -113,6 +114,11 @@
 
   .missionSummary.statusWarning .missionRiskButton {
     background: var(--warning-fill);
+
+    // The neutral caption color loses contrast against amber in both palettes.
+    .missionRiskTimeframe {
+      color: inherit;
+    }
   }
 
   .missionRiskChevron {
@@ -203,6 +209,7 @@
   #appbar.operatingHud {
     .missionSummaryHeader {
       padding-right: 44px;
+      min-height: 44px;
     }
 
     .missionRiskButton {

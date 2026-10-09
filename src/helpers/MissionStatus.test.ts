@@ -59,6 +59,12 @@ const monthRow = (
 const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
+test("cash-only missions preserve the threshold and month-end timing in their HUD goal", () => {
+  const mission = getMissionStatus(createGame({ scenarioId: 104 }));
+  expect(mission.headline?.id).toBe("cash");
+  expect(mission.headline?.compactPhone).toBe("Cash ≥$0 at month end");
+});
+
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
   expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
   expect(requirement(fixture(35), "reliability").status).toBe("pending");
