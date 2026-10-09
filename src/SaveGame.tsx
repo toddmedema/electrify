@@ -378,6 +378,14 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  if (
+    game.lowCashWarningMonth !== undefined &&
+    (!Number.isInteger(game.lowCashWarningMonth) ||
+      game.lowCashWarningMonth < 0 ||
+      game.lowCashWarningMonth > game.date.monthsElapsed)
+  ) {
+    return null;
+  }
   if (!Array.isArray(game.facilities) || !validHydroClaims(game as GameType)) {
     return null;
   }

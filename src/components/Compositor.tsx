@@ -31,6 +31,7 @@ import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
+import LowCashWarning from "./base/LowCashWarning";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -729,6 +730,7 @@ export default class Compositor extends React.Component<Props, {}> {
             />
           )}
         <DataCenterGuide />
+        <LowCashWarning />
         <ManualHelpPopover
           entry={ui.manualHelpEntry}
           onClose={() => store.dispatch(manualHelpClose())}

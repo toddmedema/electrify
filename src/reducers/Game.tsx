@@ -346,6 +346,7 @@ const TICK_SNAP = 0.25;
 // decide whether the tick loop needs restarting, since state.speed can change without going
 // through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
 let speedBeforeDialog = "PAUSED" as SpeedType;
+let dialogBlocksSpeed = false;
 // Same idea for full-screen decision cards over a game that would otherwise keep ticking.
 // Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
@@ -1114,7 +1115,7 @@ function recordColdSnap(
  * rollover meets that month's weather with its upgrade. Forecasts use isUpgradingAt for the outage
  * and install technology conversions on their private fleet in supplyForecastPass.
  */
-function completeRetrofits(state: GameType) {
+function completeRetrofits(state: GameType, simulated = false) {
   state.facilities.forEach((facility) => {
     const upgrade = upgradeInProgress(facility);
     if (!upgrade || state.date.minute < upgrade.completesMinute) return;
@@ -1127,6 +1128,7 @@ function completeRetrofits(state: GameType) {
         upgrade.upgrade,
       );
     delete facility.upgradeInProgress;
+    if (simulated) return;
     const message = `Upgrade complete: ${facility.name} is back online with ${retrofitLabel(upgrade.upgrade)}`;
     logGameEvent(state, "CONSTRUCTION", message, {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1586,6 +1588,7 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
+      delete state.lowCashWarningMonth;
       delete state.tutorialIntertieStress;
       delete state.policies;
       delete state.policyPause;
@@ -1928,7 +1931,8 @@ export const gameSlice = createSlice({
       // instructions frozen until the player actually closes the card. A backgrounded page
       // freezes the same way: pageVisible is the caller that resumes it.
       if (
-        ((speedBeforeBlockingCard !== undefined && !blockingCardAllowsSpeed) ||
+        (dialogBlocksSpeed ||
+          (speedBeforeBlockingCard !== undefined && !blockingCardAllowsSpeed) ||
           speedBeforeManualHelp !== undefined ||
           speedBeforeCloudSavePrompt !== undefined ||
           speedBeforeHidden !== undefined) &&
@@ -1972,6 +1976,7 @@ export const gameSlice = createSlice({
       speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
+      dialogBlocksSpeed = false;
       return {
         ...cloneDeep(initialGame),
         scenarioId: identity.scenarioId,
@@ -1999,6 +2004,7 @@ export const gameSlice = createSlice({
       // The tick loop's remaining module-level locals have to line up with restored state.
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
+      dialogBlocksSpeed = false;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
       speedBeforeCloudSavePrompt = undefined;
@@ -2024,6 +2030,7 @@ export const gameSlice = createSlice({
       speedBeforeCloudSavePrompt = undefined;
       speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
+      dialogBlocksSpeed = false;
       return {
         ...cloneDeep(initialGame),
         scenarioId: replay.scenarioId,
@@ -2066,6 +2073,7 @@ export const gameSlice = createSlice({
       state.inGame = true;
     });
     builder.addCase(quit, () => {
+      dialogBlocksSpeed = false;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
       speedBeforeCloudSavePrompt = undefined;
@@ -2131,12 +2139,14 @@ export const gameSlice = createSlice({
       speedBeforeHidden = undefined;
       ensureTicking(state);
     });
-    builder.addCase(dialogOpen, (state) => {
+    builder.addCase(dialogOpen, (state, action) => {
       delete state.policyPause;
+      dialogBlocksSpeed = !!action.payload.notCancellable;
       speedBeforeDialog = foregroundSpeed(state);
       setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(dialogClose, (state) => {
+      dialogBlocksSpeed = false;
       setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
@@ -4865,6 +4875,33 @@ function supplyForecastPass(
     prev = t;
     return t;
   });
+}
+
+/** Forecast a rate choice through the bankruptcy check at rollover, on a private copy. */
+export function forecastMonthClosingCashAtCustomerRate(
+  state: GameType,
+  dollarsPerkWh: number,
+): number {
+  const forecast = cloneDeep(state);
+  forecast.dollarsPerkWh = dollarsPerkWh;
+  forecast.timeline = reforecastSupply(forecast, true);
+  const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
+  for (
+    let minute = state.date.minute + TICK_MINUTES;
+    minute <= closesMinute;
+    minute += TICK_MINUTES
+  ) {
+    forecast.date = getDateFromMinute(minute, forecast.startingYear);
+    completeRetrofits(forecast, true);
+    const now = getTimeFromTimeline(minute, forecast.timeline);
+    const prev = getTimeFromTimeline(minute - TICK_MINUTES, forecast.timeline);
+    if (!now || !prev) return -Infinity;
+    updateSupplyFacilitiesFinances(forecast, prev, now, true);
+  }
+  // The real rollover books one more tick against the final forecast frame before checking cash.
+  return (
+    getTimeFromTimeline(closesMinute, forecast.timeline)?.cash ?? -Infinity
+  );
 }
 
 function reforecastSupply(

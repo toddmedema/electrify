@@ -1186,6 +1186,8 @@ export interface GameType {
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   // Customer price competition starts from the scenario's rate and half of this addressable pool.
+  /** The last month offered a cash warning; persisted so reloading cannot repeat it. */
+  lowCashWarningMonth?: number;
   // customerRate is the three-month bill average carried between monthly forecast windows.
   customerMarketSize: number;
   customerRate: number;
