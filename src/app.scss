@@ -1272,6 +1272,39 @@ $pane_header_height: 48px;
       min-width: 0;
     }
   }
+
+  .intertieAccessMetrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 1 1 100%;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 599px) {
+  .build-list-item.buildOption.transmissionProject .intertieAccessMetrics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+
+    > .buildOptionMetric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+  }
+
+  .transmissionMetrics.facilityStats > .intertieAccessMetric {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+
+    dt {
+      margin: 0;
+    }
+  }
 }
 
 // Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the

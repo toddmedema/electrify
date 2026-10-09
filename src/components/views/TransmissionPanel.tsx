@@ -118,6 +118,10 @@ function priceRange(outlook: IntertieOutlook): string {
   return low === high ? `${low}/MWh` : `${low}–${high.replace("$", "")}/MWh`;
 }
 
+function limitChangeText(before: number, after: number): string {
+  return `${formatWatts(before, 3)} → ${formatWatts(after, 3)}${before === after ? " · Unchanged" : ""}`;
+}
+
 /** Hourly steps keep every hour of the day while costing a quarter of a full-resolution forecast */
 const OUTLOOK_STEP_MINUTES = 60;
 const OUTLOOK_YEARS = 2;
@@ -251,7 +255,8 @@ function IntertieBuildItem(props: {
   readOnly: boolean;
   units: UnitSystemType;
   onReview: () => void;
-  spareCapacityW: number;
+  importAccessW: number;
+  exportAccessW: number;
   constructionKgco2eTotal: number;
   year: number;
 }): React.JSX.Element {
@@ -312,10 +317,20 @@ function IntertieBuildItem(props: {
       }
       metrics={
         <>
-          <BuildMetric
-            label="Connection bandwidth"
-            value={formatWatts(corridor.capacityW)}
-          />
+          <div className="intertieAccessMetrics">
+            <BuildMetric
+              label="Line capacity"
+              value={formatWatts(corridor.capacityW)}
+            />
+            <BuildMetric
+              label="Import access"
+              value={formatWatts(props.importAccessW)}
+            />
+            <BuildMetric
+              label="Export access"
+              value={formatWatts(props.exportAccessW)}
+            />
+          </div>
           <BuildMetric
             label="Build time"
             value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
@@ -356,6 +371,12 @@ function IntertieBuildItem(props: {
               {INTERTIE_ARCHETYPES[market.archetype].summary}
             </Typography>
           )}
+          <Box className="buildOptionDetailBody">
+            <Typography variant="body2" color="textSecondary">
+              Import and export access are separate limits. Line capacity limits
+              both directions.
+            </Typography>
+          </Box>
           <Box className="intertieDetailMetrics">
             {outlook && (
               <>
@@ -370,10 +391,6 @@ function IntertieBuildItem(props: {
                 />
               </>
             )}
-            <BuildMetric
-              label="Import access"
-              value={formatWatts(props.spareCapacityW)}
-            />
             <ConstructionEmissionsMetric
               kgco2eTotal={props.constructionKgco2eTotal}
               yearsToBuild={corridor.yearsToBuild}
@@ -448,6 +465,16 @@ function IntertieUpgradeControl(props: {
   const { downpayment } = purchaseTerms(quote.buildCost, true, interestRate);
   const shortfall = financingShortfallText(cash ?? 0, downpayment);
   const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
+  const accessBefore = effectiveMarket(
+    line.corridorId,
+    context,
+    line.capacityW,
+  );
+  const accessAfter = effectiveMarket(
+    line.corridorId,
+    context,
+    quote.targetCapacityW,
+  );
   return (
     <div className="transmissionUpgrade">
       {shortfall && (
@@ -478,17 +505,26 @@ function IntertieUpgradeControl(props: {
           leadingFacts={[
             {
               concept: "supply",
-              label: "Connection capacity",
-              value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
-              detail:
-                "Current capacity and import access stay in effect until construction finishes.",
+              label: "Line capacity",
+              value: limitChangeText(line.capacityW, quote.targetCapacityW),
+              detail: "New limits apply when construction finishes.",
             },
             {
               concept: "supply",
               label: "Import access",
-              value: `${formatWatts(effectiveMarket(line.corridorId, context, line.capacityW)?.availableSupplyW || 0)} → ${formatWatts(effectiveMarket(line.corridorId, context, quote.targetCapacityW)?.availableSupplyW || 0)}`,
-              detail:
-                "Maximum purchased supply; weather and the neighbor’s own demand still limit availability. Export access is unchanged.",
+              value: limitChangeText(
+                accessBefore?.availableSupplyW || 0,
+                accessAfter?.availableSupplyW || 0,
+              ),
+            },
+            {
+              concept: "supply",
+              label: "Export access",
+              value: limitChangeText(
+                accessBefore?.availableDemandW || 0,
+                accessAfter?.availableDemandW || 0,
+              ),
+              detail: "A wider line allows more exports up to this limit.",
             },
           ]}
           upkeepLabel="Upkeep after upgrade"
@@ -669,6 +705,8 @@ export default function TransmissionPanel({
       ? buildQuote(reviewId)
       : undefined;
   const reviewMarket = review && adjacentMarketForCorridor(review.id);
+  const reviewAccess =
+    review && effectiveMarket(review.id, intertieContext, review.capacityW);
   const approve = (financed: boolean) => {
     if (!review) return;
     onBuild(review.id, financed, tier);
@@ -730,6 +768,11 @@ export default function TransmissionPanel({
                 <div ref={droppable.innerRef} {...droppable.droppableProps}>
                   {state.lines.map((line, index) => {
                     const market = adjacentMarketForCorridor(line.corridorId);
+                    const access = effectiveMarket(
+                      line.corridorId,
+                      intertieContext,
+                      line.capacityW,
+                    );
                     const rating = now
                       ? transmissionRatingW(line, now)
                       : line.capacityW;
@@ -943,10 +986,26 @@ export default function TransmissionPanel({
                                   </div>
                                 )}
                                 <dl className="transmissionMetrics facilityStats">
-                                  <div className="facilityStat">
-                                    <dt>Rated capacity</dt>
+                                  <div className="facilityStat intertieAccessMetric">
+                                    <dt>Line capacity</dt>
                                     <dd className="facilityStatValue">
                                       {formatWatts(line.capacityW, 3)}
+                                    </dd>
+                                  </div>
+                                  <div className="facilityStat intertieAccessMetric">
+                                    <dt>Import access</dt>
+                                    <dd className="facilityStatValue">
+                                      {formatWatts(
+                                        access?.availableSupplyW || 0,
+                                      )}
+                                    </dd>
+                                  </div>
+                                  <div className="facilityStat intertieAccessMetric">
+                                    <dt>Export access</dt>
+                                    <dd className="facilityStatValue">
+                                      {formatWatts(
+                                        access?.availableDemandW || 0,
+                                      )}
                                     </dd>
                                   </div>
                                   {!building && now && (
@@ -966,10 +1025,9 @@ export default function TransmissionPanel({
                                         </dd>
                                       </div>
                                       <div className="facilityStat">
-                                        <dt>Available for import</dt>
+                                        <dt>Import available now</dt>
                                         <dd className="facilityStatValue">
-                                          {formatWatts(importableW)} of{" "}
-                                          {formatWatts(rating)}
+                                          {formatWatts(importableW)}
                                         </dd>
                                       </div>
                                     </>
@@ -1006,27 +1064,23 @@ export default function TransmissionPanel({
                                     variant="body2"
                                     color="textSecondary"
                                   >
-                                    Limiting factor:{" "}
+                                    Flow limited by:{" "}
                                     {line.paused
-                                      ? "paused"
+                                      ? "Paused"
                                       : state.tradingPolicy === "CLOSED" ||
                                           (state.tradingPolicy ===
                                             "SURPLUS_ONLY" &&
                                             flowW >= 0)
-                                        ? "trading rule"
+                                        ? "Trading rule"
                                         : flowW < 0
                                           ? Math.abs(flowW) >=
-                                            (effectiveMarket(
-                                              line.corridorId,
-                                              intertieContext,
-                                            )?.availableDemandW || 0) -
-                                              1
-                                            ? "neighbor export demand"
+                                            (access?.availableDemandW || 0) - 1
+                                            ? "Export access"
                                             : Math.abs(flowW) >= rating - 1
-                                              ? "own line rating"
-                                              : "local surplus"
+                                              ? "Line capacity"
+                                              : "Local surplus"
                                           : Math.abs(flowW) < importableW - 1
-                                            ? "local need / trading rule"
+                                            ? "Local demand or trading rule"
                                             : neighborImportSupplyW(
                                                   line.corridorId,
                                                   intertieContext,
@@ -1034,26 +1088,8 @@ export default function TransmissionPanel({
                                                   now,
                                                   line.capacityW,
                                                 ) < rating
-                                              ? "available import access"
-                                              : "own line rating"}
-                                    . Line rating {formatWatts(rating)};
-                                    available import access{" "}
-                                    {formatWatts(
-                                      neighborImportSupplyW(
-                                        line.corridorId,
-                                        intertieContext,
-                                        now.minute,
-                                        now,
-                                        line.capacityW,
-                                      ),
-                                    )}
-                                    ; neighbor export demand{" "}
-                                    {formatWatts(
-                                      effectiveMarket(
-                                        line.corridorId,
-                                        intertieContext,
-                                      )?.availableDemandW || 0,
-                                    )}
+                                              ? "Neighbor supply"
+                                              : "Line capacity"}
                                     .
                                   </Typography>
                                 )}
@@ -1124,12 +1160,19 @@ export default function TransmissionPanel({
                 <IntertieBuildItem
                   key={corridor.id}
                   corridor={corridor}
-                  spareCapacityW={
+                  importAccessW={
                     effectiveMarket(
                       corridor.id,
                       intertieContext,
                       corridor.capacityW,
                     )?.availableSupplyW || 0
+                  }
+                  exportAccessW={
+                    effectiveMarket(
+                      corridor.id,
+                      intertieContext,
+                      corridor.capacityW,
+                    )?.availableDemandW || 0
                   }
                   constructionKgco2eTotal={corridor.constructionKgco2eTotal}
                   year={game.date.year}
@@ -1179,17 +1222,26 @@ export default function TransmissionPanel({
           leadingFacts={[
             {
               concept: "supply",
+              label: "Line capacity",
+              value: formatWatts(review.capacityW),
+            },
+            {
+              concept: "supply",
               label: "Import access",
-              value: `Up to ${formatWatts(effectiveMarket(review.id, intertieContext, review.capacityW)?.availableSupplyW || 0)}`,
-              detail:
-                "Available after construction; seasonal supply and regional peaks can reduce imports.",
+              value: formatWatts(reviewAccess?.availableSupplyW || 0),
+              detail: "Maximum power you can buy.",
+            },
+            {
+              concept: "supply",
+              label: "Export access",
+              value: formatWatts(reviewAccess?.availableDemandW || 0),
+              detail: "Maximum surplus power you can sell.",
             },
           ]}
           preface={
             <Box sx={{ px: 2, pb: 1 }}>
               <Typography variant="body2">
-                {formatWatts(review.capacityW)} access · Ready in{" "}
-                {Math.round(review.yearsToBuild * 12)} months
+                Ready in {Math.round(review.yearsToBuild * 12)} months.
               </Typography>
               {game.date.monthsElapsed + review.yearsToBuild * 12 >=
                 (activeScenario(game)?.durationMonths ?? Infinity) && (

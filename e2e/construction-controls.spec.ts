@@ -80,7 +80,13 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).toHaveCount(0);
     await build();
     await speed("fast speed").click();
-    await expect(line).not.toContainText("Building", { timeout: 45000 });
+    // The rebuilt line can cross an event that pauses the clock before it finishes.
+    await expect(async () => {
+      if ((await speed("pause").getAttribute("aria-pressed")) === "true") {
+        await speed("fast speed").click();
+      }
+      await expect(line).not.toContainText("Building", { timeout: 1000 });
+    }).toPass({ timeout: 45000 });
     await speed("pause").click();
     await line.locator(".facilityDisclosure").click();
     await line
@@ -98,14 +104,16 @@ for (const theme of ["light", "dark"] as const) {
     await page.screenshot({ path: testInfo.outputPath("intertie-paused.png") });
     const metrics = line.locator(".transmissionMetrics");
     await expect(metrics.locator("dt")).toHaveText([
-      "Rated capacity",
+      "Line capacity",
+      "Import access",
+      "Export access",
       "Price now",
-      "Available for import",
+      "Import available now",
       "Emissions (CO2e)",
       "Typical price",
       "Loan balance",
     ]);
-    // Compare actual rendered grids on either side of the shared three-column threshold.
+    // Operational metrics retain the shared grid; access ratings stack separately on phones.
     const facility = pane.locator(".facilityRow").first();
     await facility.locator(".facilityDisclosure").click();
     const facilityDetails = facility.locator(".facilityDetails");
@@ -122,9 +130,11 @@ for (const theme of ["light", "dark"] as const) {
             container.style.width = panelWidth + "px";
             container.style.boxSizing = "border-box";
             const grid = container.querySelector(".facilityStats")!;
-            const cells = Array.from(grid.children).map((cell) =>
-              cell.getBoundingClientRect(),
-            );
+            const cells = Array.from(grid.children)
+              .filter(
+                (cell) => !cell.classList.contains("intertieAccessMetric"),
+              )
+              .map((cell) => cell.getBoundingClientRect());
             const style = getComputedStyle(grid);
             const result = {
               columns: style.gridTemplateColumns.split(" ").length,

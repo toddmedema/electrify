@@ -816,13 +816,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Interties are transmission lines to neighboring grids, letting you buy
-          power when you're short and sell extra. Your trading rule buys during
+          Interties connect neighboring grids. Your trading rule buys during
           shortages and sells surplus after serving customers and charging
-          storage. You buy access to a limited share of a regional connection,
-          not the whole neighboring grid. A bigger line only helps if the
-          neighbor has power to sell or wants to buy yours. Multiple paths to
-          the same neighbor share its spare supply and demand for exports.
+          storage.
+        </p>
+        <p>
+          Each connection has three limits: <strong>line capacity</strong> is
+          the maximum power the line can carry; <strong>import access</strong>{" "}
+          is the maximum power you can buy; <strong>export access</strong> is
+          the maximum surplus power you can sell. Trade cannot exceed line
+          capacity. Weather reduces line capacity, and the neighbor’s spare
+          supply determines available imports. Multiple paths share the same
+          neighbor’s supply and export demand.
         </p>
         <p>
           Most of the mainland US belongs to one of three largely separate
@@ -839,11 +844,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          In missions, upgrades give you more import access and a bigger
-          connection when construction finishes. Export access stays the same.
-          Review an upgrade to see your import access before and after. Custom
-          games already give you the full regional allocation, so upgrades only
-          expand the connection.
+          Mission tiers purchase import access as well as line capacity. Custom
+          games start with full regional access, so upgrades only widen the
+          line. Export access stays the same. The upgrade review shows all three
+          limits before and after construction.
         </p>
         <p>
           Neighbors differ in spare power and prices. Each intertie&rsquo;s

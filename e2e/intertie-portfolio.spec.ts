@@ -42,7 +42,7 @@ for (const theme of ["light", "dark"] as const) {
     );
     const chart = card.locator(".intertieAvailability");
     const details = card.locator(".intertieDetailMetrics");
-    await expect(details.locator(".buildOptionMetric")).toHaveCount(4);
+    await expect(details.locator(".buildOptionMetric")).toHaveCount(3);
     await expect(card).not.toContainText("Purchase cost change / year");
     await expect(card).not.toContainText("If open with your current fleet");
     const chartBox = (await chart.boundingBox())!;
@@ -101,7 +101,10 @@ for (const theme of ["light", "dark"] as const) {
     await expectContinuousDialogSurface(dialog);
     await expect(dialog).not.toContainText("Portfolio outlook");
     await expect(dialog).not.toContainText("Shortfall covered");
-    await expect(dialog).toContainText("5MW access · Ready in 12 months");
+    await expect(dialog).toContainText("Ready in 12 months.");
+    await expect(dialog).toContainText(/Line capacity\s*5MW/);
+    await expect(dialog).toContainText(/Import access\s*4MW/);
+    await expect(dialog).toContainText(/Export access\s*5MW/);
     const cashFact = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: "Cash purchase" });

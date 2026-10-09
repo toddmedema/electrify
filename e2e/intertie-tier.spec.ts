@@ -26,10 +26,18 @@ for (const theme of ["light", "dark"] as const) {
     const importAccess = card
       .locator(".buildOptionMetric")
       .filter({ hasText: "Import access" });
+    const exportAccess = card
+      .locator(".buildOptionMetric")
+      .filter({ hasText: "Export access" });
+    const importRating = importAccess.locator(":scope > div").nth(1);
+    const exportRating = exportAccess.locator(":scope > div").nth(1);
+    await expect(importAccess).toBeVisible();
+    await expect(exportAccess).toBeVisible();
+    const baseExportAccess = await exportRating.innerText();
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    const baseAccess = await importAccess.innerText();
+    const baseAccess = await importRating.innerText();
     await card
       .getByRole("button", { name: "Hide Pacific Northwest details" })
       .click();
@@ -89,11 +97,9 @@ for (const theme of ["light", "dark"] as const) {
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
       .click();
-    await expect(importAccess).not.toHaveText(baseAccess);
-    const selectedAccess = await importAccess
-      .locator(":scope > div")
-      .nth(1)
-      .innerText();
+    await expect(importRating).not.toHaveText(baseAccess);
+    await expect(exportRating).toHaveText(baseExportAccess);
+    const selectedAccess = await importRating.innerText();
     // Keep only the neighbor’s supply-risk summary.
     await expect(card.locator(".buildOptionDescription")).toHaveCount(1);
     expect(
@@ -106,12 +112,21 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Tier 4");
-    await expect(dialog).toContainText("17MW access");
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: "Line capacity" }),
+    ).toContainText("17MW");
     await expect(
       dialog
         .locator(".decisionImpactFact")
         .filter({ hasText: "Import access" }),
-    ).toContainText(`Up to ${selectedAccess}`);
+    ).toContainText(selectedAccess);
+    await expect(
+      dialog
+        .locator(".decisionImpactFact")
+        .filter({ hasText: "Export access" }),
+    ).toContainText("5MW");
     await dialog.getByRole("button", { name: "Pay cash", exact: true }).click();
     await expect(
       page

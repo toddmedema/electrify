@@ -69,7 +69,10 @@ for (const theme of ["light", "dark"] as const) {
     const importAccess = dialog
       .locator(".decisionImpactFact")
       .filter({ hasText: /^Import access/ });
-    await expect(importAccess).toContainText("Export access is unchanged");
+    const exportAccess = dialog
+      .locator(".decisionImpactFact")
+      .filter({ hasText: /^Export access/ });
+    await expect(exportAccess).toContainText("150MW → 150MW · Unchanged");
     const rights = (await importAccess.innerText()).match(
       /([\d.]+)MW → ([\d.]+)MW/,
     );
@@ -124,9 +127,10 @@ for (const theme of ["light", "dark"] as const) {
     await speed("pause").click();
     // The collapsed reading uses the weather-dependent operating rating, not nameplate
     // capacity. Verify the purchased nameplate in the expanded details instead.
-    await expect(line.locator(".transmissionLineDetails")).toContainText(
-      "225MW rated capacity",
-    );
+    const metrics = line.locator(".transmissionMetrics");
+    await expect(metrics).toContainText(/Line capacity\s*225MW/);
+    await expect(metrics).toContainText(/Import access\s*210MW/);
+    await expect(metrics).toContainText(/Export access\s*150MW/);
     await expect(
       line.getByRole("button", {
         name: "Upgrade Northern intertie to 338MW",

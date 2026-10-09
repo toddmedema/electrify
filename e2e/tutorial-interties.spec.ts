@@ -208,7 +208,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .click();
   await expect(facilities.locator(".transmissionLineDetails")).toBeVisible();
   await expect(facilities.locator(".transmissionLineDetails")).toContainText(
-    "available import access",
+    "Import available now",
   );
   // Inspection is safe even if the player tries to advance the clock before restoring backup.
   await page.getByRole("button", { name: "fast speed" }).click();
@@ -219,7 +219,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     process.env.REVIEW_SCREENSHOT_DIR &&
     testInfo.project.name === "desktop-chromium"
   ) {
-    await facilities.getByText(/^Limiting factor:/).scrollIntoViewIfNeeded();
+    await facilities.getByText(/^Flow limited by:/).scrollIntoViewIfNeeded();
     await page.screenshot({
       path: path.join(
         process.env.REVIEW_SCREENSHOT_DIR,

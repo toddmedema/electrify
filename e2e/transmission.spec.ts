@@ -220,7 +220,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(line).toContainText(/Building \d+% · \d+ months? left/);
     await expect(line.locator(".constructionProgress")).toBeVisible();
     await expect(line.locator(".transmissionMetrics")).toContainText(
-      "Rated capacity",
+      "Line capacity",
     );
     await expect(line.locator(".transmissionMetrics")).toContainText(
       "Emissions",
@@ -298,7 +298,7 @@ for (const theme of ["light", "dark"] as const) {
       );
       // The metric grid carries the decision; the archetype and outlook wait behind details
       await expect(
-        card.getByText("Connection bandwidth", { exact: true }),
+        card.getByText("Line capacity", { exact: true }),
       ).toBeVisible();
       await expect(card.getByText("Emissions", { exact: true })).toBeVisible();
       await expect(

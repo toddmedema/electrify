@@ -23,7 +23,11 @@ import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
-import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
+import {
+  adjacentMarketForCorridor,
+  TRANSMISSION_CORRIDORS,
+} from "../../data/AdjacentMarkets";
+import { SCENARIOS } from "../../data/Scenarios";
 import {
   COLD_DEFINITION_ID,
   HAIL_DEFINITION_ID,
@@ -637,7 +641,7 @@ describe("the interties view", () => {
       }),
     );
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("150MW access · Ready in 36 months");
+    expect(dialog).toHaveTextContent("Ready in 36 months.");
     expect(dialog).not.toHaveTextContent("Portfolio outlook");
     expect(dialog).not.toHaveTextContent("Typical price");
     expect(dialog).not.toHaveTextContent("backup is not guaranteed");
@@ -748,13 +752,19 @@ describe("the interties view", () => {
     renderProjects(createGame({ scenarioId: 111 }), onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
     const slider = screen.getByRole("slider");
+    expect(north).toHaveTextContent("Import access4MW");
+    expect(north).toHaveTextContent("Export access5MW");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
     expect(north).toHaveTextContent(formatWatts(5e6 * 1.5 ** 2));
+    expect(north).toHaveTextContent("Import access5MW");
+    expect(north).toHaveTextContent("Export access5MW");
     await user.click(
       within(north).getByRole("button", { name: /Review purchase/ }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Import access5MW");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Export access5MW");
     await user.click(screen.getByRole("button", { name: "Pay cash" }));
     expect(onBuild).toHaveBeenCalledWith("california-north", false, 3);
   });
@@ -828,7 +838,9 @@ describe("unified connections", () => {
     expect(connections[0]).toHaveTextContent("Loan balance");
     // The connected line reports what it can do right now beside its typical year
     expect(connections[0]).toHaveTextContent(/Price now\$\d+/);
-    expect(connections[0]).toHaveTextContent(/Available for import.+ of /);
+    expect(connections[0]).toHaveTextContent(/Import available now[\d.]+MW/);
+    expect(connections[0]).toHaveTextContent("Import access270MW");
+    expect(connections[0]).toHaveTextContent("Export access150MW");
     expect(connections[0]).toHaveTextContent(/Typical price\$\d+–\d+\/MWh/);
     expect(connections[0]).not.toHaveTextContent("At your peak");
     expect(connections[0]).toHaveTextContent("Emissions");
@@ -848,9 +860,11 @@ describe("unified connections", () => {
     const building = document.querySelectorAll(".transmissionLine")[1];
     expect(building).not.toHaveTextContent("Power can flow when construction");
     expect(building).toHaveTextContent("Building 50% · 12 months left");
-    expect(building).toHaveTextContent("Rated capacity");
+    expect(building).toHaveTextContent("Line capacity");
+    expect(building).toHaveTextContent("Import access180MW");
+    expect(building).toHaveTextContent("Export access150MW");
     expect(building).toHaveTextContent("Emissions");
-    expect(building).not.toHaveTextContent("Available for import");
+    expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
   });
 
@@ -923,6 +937,9 @@ describe("the intertie upgrade control", () => {
     expect(dialog).toHaveTextContent(/Construction emits.*CO2e/);
     expect(dialog).toHaveTextContent(/for 30 years/);
     expect(dialog).toHaveTextContent("Upkeep after upgrade");
+    expect(dialog).toHaveTextContent("Line capacity150MW → 225MW");
+    expect(dialog).toHaveTextContent("Import access180MW → 210MW");
+    expect(dialog).toHaveTextContent("Export access150MW → 150MW · Unchanged");
     await user.click(within(dialog).getByRole("button", { name: "Take loan" }));
     expect(handleUpgrade).toHaveBeenCalledWith(line.corridorId, true);
   });
@@ -952,6 +969,28 @@ describe("the intertie upgrade control", () => {
       game.transmission!.lines[0].corridorId,
       false,
     );
+  });
+
+  it("shows unchanged import and export access for custom-game upgrades", async () => {
+    const game = gameWithOpenIntertie();
+    game.customScenario = { ...SCENARIOS.find((s) => s.id === 100)!, id: -1 };
+    game.transmission!.lines[0].capacityW = 500e6;
+    renderFleet(game);
+    await user.click(
+      screen.getByLabelText(`Inspect ${game.transmission!.lines[0].name}`, {
+        exact: false,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /^Upgrade / }));
+    const dialog = screen.getByRole("dialog");
+    const market = adjacentMarketForCorridor("california-north")!;
+    expect(dialog).toHaveTextContent(
+      `Import access${formatWatts(market.availableSupplyW, 3)} → ${formatWatts(market.availableSupplyW, 3)} · Unchanged`,
+    );
+    expect(dialog).toHaveTextContent(
+      `Export access${formatWatts(market.availableDemandW, 3)} → ${formatWatts(market.availableDemandW, 3)} · Unchanged`,
+    );
+    expect(within(dialog).getAllByText(/· Unchanged$/)).toHaveLength(2);
   });
 
   it("says the line keeps running while the work is under way", async () => {
