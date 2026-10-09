@@ -322,14 +322,21 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const offlineForWork = underConstruction || upgrading;
   const storage = isStorage(facility) ? facility : undefined;
   const wasBuilding = React.useRef(underConstruction);
+  const hadWeatherOutage = React.useRef(!!hazardStatus);
   const [arriving, setArriving] = React.useState(arrivalRequested);
-  const [ready, setReady] = React.useState(false);
+  const [ready, setReady] = React.useState<
+    "Commissioned" | "Outage ended" | null
+  >(null);
+  const [announcement, setAnnouncement] = React.useState("");
   React.useEffect(() => {
     if (arrivalRequested) {
       setArriving(true);
+      if (!readOnly) {
+        setAnnouncement(`${facility.name}: construction started.`);
+      }
       onArrivalShown?.(facility.id);
     }
-  }, [arrivalRequested, onArrivalShown, facility.id]);
+  }, [arrivalRequested, onArrivalShown, facility.id, facility.name, readOnly]);
   React.useEffect(() => {
     if (!arriving) return;
     // Also consume the cue when reduced motion prevents animationend from firing.
@@ -338,13 +345,37 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }, [arriving]);
   React.useEffect(() => {
     if (wasBuilding.current && !underConstruction && !readOnly) {
-      setReady(true);
+      setReady("Commissioned");
+      setAnnouncement(
+        `${facility.name}: construction complete. ${facility.paused ? "Operation is paused." : "Available for dispatch."}`,
+      );
     }
     wasBuilding.current = underConstruction;
-  }, [underConstruction, readOnly]);
+  }, [underConstruction, readOnly, facility.name, facility.paused]);
+  const weatherOutage = !!hazardStatus;
+  React.useEffect(() => {
+    if (
+      hadWeatherOutage.current &&
+      !weatherOutage &&
+      !readOnly &&
+      !underConstruction
+    ) {
+      setReady("Outage ended");
+      setAnnouncement(
+        `${facility.name}: weather outage ended. ${facility.paused ? "Operation is paused." : "Available for dispatch."}`,
+      );
+    }
+    hadWeatherOutage.current = weatherOutage;
+  }, [
+    weatherOutage,
+    readOnly,
+    underConstruction,
+    facility.name,
+    facility.paused,
+  ]);
   React.useEffect(() => {
     if (!ready) return;
-    const timer = window.setTimeout(() => setReady(false), 2400);
+    const timer = window.setTimeout(() => setReady(null), 6000);
     return () => window.clearTimeout(timer);
   }, [ready]);
 
@@ -493,19 +524,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
-              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
-              all under-construction facilities need here. */}
+              {/* A project is inspectable while offline. Only its artwork is muted; progress
+              and timing stay readable rather than resembling disabled controls. */}
               <ListItem
                 className="facility"
                 sx={
                   offlineForWork
                     ? {
-                        // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
-                          {
-                            opacity: (theme) =>
-                              theme.palette.action.disabledOpacity,
-                          },
+                        "& .MuiListItemAvatar-root": {
+                          opacity: (theme) =>
+                            theme.palette.action.disabledOpacity,
+                        },
                       }
                     : undefined
                 }
@@ -551,7 +580,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <>
                         <span className="facilityName">{facility.name}</span>
                         {ready && (
-                          <span className="facilityReadyLabel">Ready</span>
+                          <span className="facilityReadyLabel">{ready}</span>
                         )}
                         {storyOutputMultiplier < 1 && (
                           <Chip
@@ -606,6 +635,14 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </ListItem>
             </button>
           </div>
+          <span
+            className="srOnly"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {announcement}
+          </span>
           {open && (
             // Inside the row, so isolateClicks keeps every click in the confirmation dialog
             // from also landing on the row behind it and toggling the selection

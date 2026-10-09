@@ -68,7 +68,7 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
-): Handlers {
+): Handlers & { rerenderGame: (next: GameType) => void } {
   const handlers: Handlers = {
     onPause: jest.fn(),
     onSelect: jest.fn(),
@@ -78,11 +78,11 @@ function renderFacilities(
     onCancelRetrofit: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  function ControlledFacilities() {
+  function ControlledFacilities({ state }: { state: GameType }) {
     const [selected, setSelected] = React.useState(selectedFacilityId);
     return (
       <Facilities
-        game={game}
+        game={state}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
         onTransmissionUpgrade={() => undefined}
@@ -104,14 +104,18 @@ function renderFacilities(
       />
     );
   }
-  render(<ControlledFacilities />, {
+  const view = render(<ControlledFacilities state={game} />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
   const dispatchView = screen.queryByRole("button", {
     name: "Dispatch",
   });
   if (dispatchView) fireEvent.click(dispatchView);
-  return handlers;
+  return {
+    ...handlers,
+    rerenderGame: (next) =>
+      view.rerender(<ControlledFacilities state={next} />),
+  };
 }
 
 // The row is the drag handle as well as the select target, so it is addressed by its own class
@@ -126,6 +130,26 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it("announces commissioning only when a mounted project completes, preserving paused operation", () => {
+    const building = createGame({ scenarioId: 100 });
+    building.facilities[0].yearsToBuildLeft = 1;
+    building.facilities[0].paused = true;
+    const { rerenderGame } = renderFacilities(building, null);
+    expect(screen.queryByText("Commissioned")).toBeNull();
+    const completed = cloneDeep(building);
+    completed.facilities[0].yearsToBuildLeft = 0;
+    rerenderGame(completed);
+    expect(screen.getByText("Commissioned")).toBeVisible();
+    expect(
+      screen.getByText(
+        `${completed.facilities[0].name}: construction complete. Operation is paused.`,
+      ),
+    ).toHaveAttribute("role", "status");
+    cleanup();
+    renderFacilities(completed, null);
+    expect(screen.queryByText("Commissioned")).toBeNull();
+  });
 
   it.each([
     [-500000, "charging"],
@@ -464,6 +488,21 @@ describe("weather hazards in the fleet", () => {
       effects: { facilityOutputMultipliersById: { "3": availableFraction } },
     });
   }
+
+  it("identifies repair after a weather outage ends without claiming the plant is producing", () => {
+    const state = gameWithSolar();
+    hailOn(state, 0.72, 9);
+    const { rerenderGame } = renderFacilities(state, null);
+    expect(screen.queryByText("Outage ended")).toBeNull();
+    const repaired = cloneDeep(state);
+    repaired.worldEvents.active = [];
+    repaired.facilities[2].paused = true;
+    rerenderGame(repaired);
+    expect(screen.getByText("Outage ended")).toBeVisible();
+    expect(
+      screen.getByText("Solar: weather outage ended. Operation is paused."),
+    ).toHaveAttribute("role", "status");
+  });
 
   it("shows an upgrading plant's progress and lets the player cancel it", async () => {
     const state = gameWithSolar();

@@ -21,6 +21,7 @@ import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
+import { difficultyLabel } from "../../Constants";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -132,8 +133,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         paper: {
           sx: {
             overflow: "hidden",
-            borderTop: "6px solid",
-            borderColor: failed ? "error.main" : "warning.main",
           },
         },
       }}
@@ -148,13 +147,21 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             />
           ) : (
             <EmojiEventsIcon
-              color="warning"
+              color="success"
               sx={{ fontSize: 44 }}
               aria-hidden
             />
           )}
           <Typography variant="h5" component="span" sx={{ fontWeight: 600 }}>
             {displayTitle}
+          </Typography>
+          <Typography
+            className="resultMission"
+            variant="body2"
+            color="text.secondary"
+            component="span"
+          >
+            {victory.scenarioName} · {difficultyLabel(victory.difficulty)}
           </Typography>
         </Stack>
       </DialogTitle>

@@ -9,6 +9,38 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 
 describe("EventLog", () => {
   beforeEach(() => localStorage.clear());
+  it("distinguishes a grid shortage, recovery and project completion while retaining their consequences", () => {
+    render(
+      <EventLog
+        events={[
+          {
+            id: 3,
+            kind: "CONSTRUCTION",
+            label: "Mar 2024",
+            message: "Intertie open: Pacific Northwest",
+          },
+          {
+            id: 2,
+            kind: "BLACKOUT_OVER",
+            label: "Feb 2024",
+            message: "Blackout ended after 2 hours.",
+          },
+          {
+            id: 1,
+            kind: "BLACKOUT",
+            label: "Feb 2024",
+            message: "Demand exceeds supply.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("Power shortage")).toBeVisible();
+    expect(screen.getByText("Power restored")).toBeVisible();
+    expect(screen.getByText("Project complete")).toBeVisible();
+    expect(screen.getByText("Intertie open: Pacific Northwest")).toBeVisible();
+  });
   it("retains an empty selection across remounts and restores all on request", async () => {
     const user = userEvent.setup();
     const props = {

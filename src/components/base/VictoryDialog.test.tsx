@@ -69,6 +69,7 @@ describe("VictoryDialog", () => {
    */
   it("shows the breakdown before any of the async data lands", () => {
     renderDialog();
+    expect(screen.getByText("Deregulation · Expert")).toBeVisible();
     expect(screen.getByLabelText("Final score 812 points")).toBeInTheDocument();
     // Gains carry an explicit "+", losses keep their "-", so the line reads as pluses and
     // minuses at a glance

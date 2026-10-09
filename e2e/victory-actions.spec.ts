@@ -14,6 +14,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=101");
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(page.locator("#appbar:visible").first()).toBeVisible();
     // Move a real save to its final tick to exercise the actual completed-run flow.
     await editSavedGame(page, (save) => {
       const offset = 144 * 1440 - 15 - save.game.date.minute;
@@ -42,6 +43,14 @@ for (const theme of ["light", "dark"]) {
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText("Rise of Renewables · Hard", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog
+        .getByRole("region", { name: "Mission results" })
+        .getByText("Demand served", { exact: true }),
+    ).toBeVisible();
     await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(dialog);
     const newGame = dialog.getByRole("button", {
@@ -125,6 +134,8 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
   });
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+  // Restoring negative cash first offers the existing last chance to change rates.
+  await page.getByRole("button", { name: "Go bankrupt", exact: true }).click();
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "normal speed", exact: true })

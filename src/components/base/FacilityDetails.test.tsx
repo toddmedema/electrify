@@ -107,6 +107,20 @@ function section() {
 }
 
 describe("weather resilience details", () => {
+  it("shows the committed project's cost and eventual capacity while it is offline", () => {
+    const game = carbonFee();
+    const plant = game.facilities[0];
+    plant.yearsToBuildLeft = 0.5;
+    showDetails(game, plant);
+    const construction = screen.getByRole("region", { name: "Construction" });
+    expect(construction).toHaveTextContent(
+      "Available in 6 months. No power until construction completes.",
+    );
+    expect(construction).toHaveTextContent("Project cost");
+    expect(construction).toHaveTextContent(formatMoneyConcise(plant.buildCost));
+    expect(construction).toHaveTextContent("Capacity when complete");
+    expect(screen.queryByRole("region", { name: "Operation" })).toBeNull();
+  });
   it("rates standard gas and offers the cold-weather package", () => {
     const game = coldGame();
     const gas = game.facilities[0];

@@ -221,6 +221,10 @@ for (const theme of ["light", "dark"]) {
     );
     await expect(row.getByRole("region", { name: "Operation" })).toHaveCount(0);
     await expect(row.getByRole("region", { name: "Economics" })).toHaveCount(0);
+    await expect(
+      row.getByRole("region", { name: "Construction" }),
+    ).toContainText("No power until construction completes.");
+    await expect(row.getByText("Project cost", { exact: true })).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(page.locator(".snackbarContent")).toBeHidden();
     await row.scrollIntoViewIfNeeded();

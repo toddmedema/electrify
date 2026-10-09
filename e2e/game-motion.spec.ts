@@ -73,7 +73,7 @@ for (const theme of ["light", "dark"]) {
     await page
       .getByRole("button", { name: "normal speed", exact: true })
       .click();
-    await expect(row.locator(".facilityReadyLabel")).toHaveText("Ready");
+    await expect(row.locator(".facilityReadyLabel")).toHaveText("Commissioned");
     await page.screenshot({
       path: info.outputPath(`commissioned-${theme}.png`),
     });
@@ -82,7 +82,9 @@ for (const theme of ["light", "dark"]) {
     expect(
       await row.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await expect(row.locator(".facilityReadyLabel")).toHaveCount(0);
+    await expect(row.locator(".facilityReadyLabel")).toHaveCount(0, {
+      timeout: 10000,
+    });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await row.locator(".facilityDisclosure").click();
     await row.locator(".facilityDisclosure").click();
