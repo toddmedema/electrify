@@ -21,6 +21,7 @@ import ShareSaveDialog from "./ShareSaveDialog";
 import SharedGameDialog from "./SharedGameDialog";
 import CloudSavePrompt, { CLOUD_PROMPT_KEY } from "./CloudSavePrompt";
 import CloudSaveStatus from "./CloudSaveStatus";
+import CloudSyncIndicator from "./CloudSyncIndicator";
 
 jest.mock("../../Store", () => {
   const redux = jest.requireActual("react-redux");
@@ -315,72 +316,141 @@ it("offers a one-click update for a game shared from a newer version", async () 
 });
 
 it.each([
-  ["synced", "Cloud backup up to date. Games load from this device."],
+  [
+    "synced",
+    "Cloud backup up to date",
+    "Cloud backup up to date. Games load from this device.",
+  ],
   [
     "offline",
+    "Cloud backup offline",
     "You're offline. Games save on this device; cloud backup resumes when you reconnect.",
   ],
-  ["syncing", "Syncing cloud backup. Games load from this device."],
+  [
+    "syncing",
+    "Syncing cloud backup",
+    "Syncing cloud backup. Games load from this device.",
+  ],
 ] as const)(
-  "describes %s cloud status without taking over local loading",
-  (cloudState, message) => {
-    renderWithSaves(<CloudSaveStatus />, { cloudState });
-    expect(screen.getByRole("status")).toHaveTextContent(message);
+  "condenses %s cloud status into one header icon that explains itself",
+  async (cloudState, label, message) => {
+    renderWithSaves(<CloudSyncIndicator />, { cloudState });
+    const icon = screen.getByLabelText(label);
+    // Assistive tech hears the whole explanation without opening anything
+    expect(icon).toHaveAccessibleDescription(message);
+    expect(icon).toHaveAttribute("aria-expanded", "false");
+    // Routine state stays silent
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await userEvent.hover(icon);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(message);
+    // Touch has no hover, so a tap pins the same explanation open
+    await userEvent.click(icon);
+    expect(icon).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("dialog")).toHaveTextContent(message);
+    expect(screen.queryByText("Retry now")).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(icon).toHaveFocus();
+    // Focus coming back after Escape doesn't bring the explanation straight back up
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   },
 );
 
-it("explains retained conflict copies and provides a cloud retry after failure", async () => {
-  renderWithSaves(<CloudSaveStatus />, {
+it.each([
+  ["signedOut", 1],
+  // Before sign-in is known, a spinner would flash at every signed-out player
+  ["initializing", 0],
+] as const)(
+  "shows nothing in the header while %s, leaving any invitation in the page",
+  (cloudState, invitations) => {
+    renderWithSaves(
+      <>
+        <CloudSyncIndicator />
+        <CloudSaveStatus />
+      </>,
+      { cloudState },
+    );
+    expect(
+      screen.queryByLabelText(/cloud backup/i, { selector: "button" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Sign in with Google")).toHaveLength(
+      invitations,
+    );
+  },
+);
+
+it("flags a failed sync with a warning that explains it, offers a retry and reports the outcome", async () => {
+  const { store } = renderWithSaves(<CloudSyncIndicator />, {
     cloudState: "failed",
-    cloudError:
-      "Cloud backup couldn't finish. Your device saves are still available.",
+    cloudError: "Some saves couldn't sync. We'll retry automatically.",
+  });
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Some saves couldn't sync",
+  );
+  await userEvent.click(screen.getByLabelText("Cloud backup couldn't finish"));
+  await userEvent.click(screen.getByText("Retry now"));
+  expect(retryCloudSync).toHaveBeenCalledTimes(1);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  act(() => {
+    store.dispatch(sessionChanged({ cloudState: "syncing" }));
+  });
+  expect(screen.getByLabelText("Syncing cloud backup")).toBeInTheDocument();
+  act(() => {
+    store.dispatch(
+      sessionChanged({ cloudState: "synced", cloudError: undefined }),
+    );
+  });
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Cloud backup up to date.",
+  );
+});
+
+it("explains retained conflict copies until dismissed", async () => {
+  renderWithSaves(<CloudSaveStatus />, {
+    cloudState: "synced",
     cloudConflicts: true,
   });
   expect(screen.getByRole("alert")).toHaveTextContent("Both copies were kept");
-  await userEvent.click(
-    screen.getByRole("button", { name: "Retry cloud backup" }),
-  );
-  expect(retryCloudSync).toHaveBeenCalledTimes(1);
   await userEvent.click(
     within(screen.getByRole("alert")).getByRole("button", { name: "Close" }),
   );
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
-it("offers a one-click update for backups from a newer version without a sync retry", async () => {
-  renderWithSaves(<CloudSaveStatus />, {
+it("keeps routine sync status out of the page", () => {
+  const { container } = renderWithSaves(<CloudSaveStatus />, {
     cloudState: "synced",
-    cloudUid: "alice",
-    incompatibleCloudSaves: [{ id: "old", version: "1" }],
   });
+  expect(container).toBeEmptyDOMElement();
+});
+
+it("offers a one-click update for backups from a newer version", async () => {
+  renderWithSaves(
+    <>
+      <CloudSyncIndicator />
+      <CloudSaveStatus />
+    </>,
+    {
+      cloudState: "synced",
+      cloudUid: "alice",
+      incompatibleCloudSaves: [{ id: "old", version: "1" }],
+    },
+  );
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Some backups need the latest version",
   );
   expect(screen.getByRole("alert")).toHaveTextContent("safe in your account");
-  expect(
-    screen.queryByRole("button", { name: "Retry cloud backup" }),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole("status")).toHaveTextContent(
+  await userEvent.click(screen.getByLabelText("Cloud backup up to date"));
+  expect(screen.getByRole("dialog")).toHaveTextContent(
     "Compatible cloud backups are up to date",
   );
-  await userEvent.click(
-    screen.getByRole("button", { name: "Refresh to update" }),
-  );
+  await userEvent.click(screen.getByText("Refresh to update"));
   expect(refreshToUpdate).toHaveBeenCalledTimes(1);
-});
-
-it("keeps a genuine sync retry alongside the update prompt", async () => {
-  renderWithSaves(<CloudSaveStatus />, {
-    cloudState: "failed",
-    cloudUid: "alice",
-    cloudError: "Some saves couldn't sync.",
-    incompatibleCloudSaves: [{ id: "old", version: "1" }],
-  });
-  await userEvent.click(
-    screen.getByRole("button", { name: "Retry cloud backup" }),
-  );
-  expect(retryCloudSync).toHaveBeenCalledTimes(1);
-  expect(refreshToUpdate).not.toHaveBeenCalled();
 });
 
 const existingSave = {

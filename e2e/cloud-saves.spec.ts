@@ -49,9 +49,44 @@ async function checkDialogLayout(page: Page, name: string, info: TestInfo) {
   }
 }
 
-async function screenshot(page: Page, info: TestInfo, name: string) {
+/** Dispatch a cloud sync result into the running app, as the sync service would. */
+async function setSaveLibrary(page: Page, payload: Record<string, unknown>) {
+  await page.evaluate((payload) => {
+    type FixtureStore = {
+      dispatch(action: { type: string; payload: unknown }): void;
+    };
+    const runtime = window as unknown as {
+      webpackChunkelectrify: {
+        push(
+          chunk: [
+            string[],
+            object,
+            (require: (id: string) => { store: FixtureStore }) => void,
+          ],
+        ): void;
+      };
+    };
+    runtime.webpackChunkelectrify.push([
+      [`cloud-save-ui-fixture-${Math.random()}`],
+      {},
+      (require) => {
+        require("./src/Store.tsx").store.dispatch({
+          type: "saves/sessionChanged",
+          payload,
+        });
+      },
+    ]);
+  }, payload);
+}
+
+async function screenshot(
+  page: Page,
+  info: TestInfo,
+  name: string,
+  parkMouse = true,
+) {
   if (!process.env.REVIEW_SCREENSHOT_DIR) return;
-  await page.mouse.move(0, 0);
+  if (parkMouse) await page.mouse.move(0, 0);
   await page.screenshot({
     path: path.join(process.env.REVIEW_SCREENSHOT_DIR, name),
     animations: "disabled",
@@ -97,6 +132,96 @@ test("a save from an earlier deploy upgrades silently and keeps its run", async 
 });
 
 for (const theme of ["light", "dark"]) {
+  test(`cloud status sits beside the title and explains itself in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
+    }, theme);
+    await startGame(page);
+    await openSaves(page);
+    const touch = !!info.project.use.hasTouch;
+    const title = page.getByRole("heading", {
+      name: "Saved games",
+      exact: true,
+    });
+    for (const [cloudState, label, message] of [
+      ["synced", "Cloud backup up to date", "Cloud backup up to date."],
+      ["syncing", "Syncing cloud backup", "Syncing cloud backup."],
+      ["offline", "Cloud backup offline", "You're offline."],
+      ["failed", "Cloud backup couldn't finish", "Some saves couldn't sync."],
+    ] as const) {
+      await setSaveLibrary(page, {
+        cloudUid: "review-fixture",
+        cloudState,
+        cloudError:
+          cloudState === "failed"
+            ? "Some saves couldn't sync. Your device copies are still available. We'll retry automatically."
+            : undefined,
+      });
+      const icon = page.getByRole("button", { name: label, exact: true });
+      await expect(icon).toBeVisible();
+      const titleBox = (await title.boundingBox())!;
+      const iconBox = (await icon.boundingBox())!;
+      expect(iconBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width - 1);
+      expect(
+        Math.abs(
+          iconBox.y + iconBox.height / 2 - (titleBox.y + titleBox.height / 2),
+        ),
+      ).toBeLessThanOrEqual(4);
+      expect(iconBox.height).toBeGreaterThanOrEqual(touch ? 44 : 40);
+      expect(iconBox.x + iconBox.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width,
+      );
+      // Routine state is only in the header; a failure is also announced
+      await expect(page.locator(".savedGames").getByText(message)).toHaveCount(
+        0,
+      );
+      const preview = page.getByRole("tooltip");
+      if (!touch) {
+        // A resting mouse previews the explanation without pinning anything
+        await icon.hover();
+        await expect(preview).toContainText(message);
+        if (cloudState === "synced" || cloudState === "failed")
+          await screenshot(
+            page,
+            info,
+            `cloud-status-${cloudState}-hover-${info.project.name}-${theme}.png`,
+            false,
+          );
+        await icon.click();
+      } else {
+        await icon.tap();
+      }
+      const popover = page.getByRole("dialog", { name: label });
+      await expect(popover).toContainText(message);
+      await expect(preview).toHaveCount(0);
+      const box = (await popover.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+      // The card hangs just below the header rather than across its divider
+      expect(box.y).toBeGreaterThanOrEqual(iconBox.y + iconBox.height);
+      await expect(
+        popover.getByRole("button", { name: "Retry now", exact: true }),
+      ).toHaveCount(cloudState === "failed" ? 1 : 0);
+      await screenshot(
+        page,
+        info,
+        `cloud-status-${cloudState}-${info.project.name}-${theme}.png`,
+      );
+      await page.keyboard.press("Escape");
+      await expect(popover).toBeHidden();
+      // Focus returns to the glyph without the preview popping straight back up
+      await expect(icon).toBeFocused();
+      await page.waitForTimeout(400);
+      await expect(preview).toHaveCount(0);
+      await icon.blur();
+      // The preview waits for the mouse to leave the glyph before it can open again
+      if (!touch) await page.mouse.move(0, 0);
+    }
+  });
+
   test(`incompatible backups stay separate from playable device saves in ${theme}`, async ({
     page,
   }, info) => {
@@ -111,38 +236,13 @@ for (const theme of ["light", "dark"]) {
     );
     // Seed the real view with a known sync result. Jest covers transport, account
     // changes and reconciliation; this fixture checks layout without a live account.
-    await page.evaluate(() => {
-      type FixtureStore = {
-        dispatch(action: { type: string; payload: unknown }): void;
-      };
-      const runtime = window as unknown as {
-        webpackChunkelectrify: {
-          push(
-            chunk: [
-              string[],
-              object,
-              (require: (id: string) => { store: FixtureStore }) => void,
-            ],
-          ): void;
-        };
-      };
-      runtime.webpackChunkelectrify.push([
-        ["cloud-save-ui-fixture"],
-        {},
-        (require) => {
-          require("./src/Store.tsx").store.dispatch({
-            type: "saves/sessionChanged",
-            payload: {
-              cloudUid: "review-fixture",
-              cloudState: "synced",
-              incompatibleCloudSaves: [
-                { id: "old-austin", version: "old" },
-                { id: "old-pittsburgh", version: "old" },
-              ],
-            },
-          });
-        },
-      ]);
+    await setSaveLibrary(page, {
+      cloudUid: "review-fixture",
+      cloudState: "synced",
+      incompatibleCloudSaves: [
+        { id: "old-austin", version: "old" },
+        { id: "old-pittsburgh", version: "old" },
+      ],
     });
     const warning = page.getByRole("alert");
     await expect(warning).toContainText("Some backups need the latest version");
