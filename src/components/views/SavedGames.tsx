@@ -33,7 +33,7 @@ import { SaveMetadata, SavedRunResult, SaveStatus } from "../../Types";
 import ScreenHeader from "../base/ScreenHeader";
 import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
-import { savedTime } from "../../helpers/SaveDisplay";
+import { saveTitle } from "../../helpers/SaveDisplay";
 import CloudSaveStatus from "../base/CloudSaveStatus";
 import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
@@ -311,6 +311,8 @@ export default function SavedGames(): React.JSX.Element {
             const current = save.id === saves.activeId && inGame;
             const resumable = isResumableStatus(save.status);
             const timestamp = new Date(save.savedAt).toLocaleString();
+            const title = saveTitle(save);
+            const subtitle = `${save.date.month} ${save.date.year} - ${save.difficulty} - ${save.locationName}`;
             return (
               <Paper
                 key={save.id}
@@ -319,7 +321,7 @@ export default function SavedGames(): React.JSX.Element {
                 className="saveEntry"
                 data-save-id={save.id}
                 data-current-save={current || undefined}
-                aria-label={save.name}
+                aria-label={title}
               >
                 <Box
                   sx={{
@@ -335,19 +337,11 @@ export default function SavedGames(): React.JSX.Element {
                       variant="h6"
                       sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
                     >
-                      {save.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      {save.scenarioName} · {save.locationName} ·{" "}
-                      {save.difficulty}
+                      {title}
                     </Typography>
                   </Box>
                   <IconButton
-                    aria-label={`Actions for ${save.name}`}
+                    aria-label={`Actions for ${title}`}
                     aria-haspopup="menu"
                     aria-expanded={menu?.save.id === save.id ? true : undefined}
                     disabled={busy}
@@ -358,6 +352,31 @@ export default function SavedGames(): React.JSX.Element {
                     <MoreVertIcon />
                   </IconButton>
                 </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  noWrap
+                  title={subtitle}
+                  sx={{ mt: 0.5 }}
+                >
+                  {subtitle}
+                </Typography>
+                <Typography
+                  component="div"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  <time
+                    dateTime={save.savedAt}
+                    title={timestamp}
+                    aria-label={`Saved ${timestamp}`}
+                  >
+                    {current && saves.saveState === "saving"
+                      ? "Saving…"
+                      : `Saved ${timestamp}`}
+                  </time>
+                </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
                   spacing={1.5}
@@ -368,31 +387,14 @@ export default function SavedGames(): React.JSX.Element {
                   }}
                 >
                   <Box>
-                    <Typography variant="body2">
-                      {save.date.month} {save.date.year} ·{" "}
-                      <Box
-                        component="span"
+                    {save.status !== "inProgress" && (
+                      <Typography
+                        variant="body2"
                         color={resumable ? "text.primary" : "error.main"}
                       >
                         {STATUS_LABELS[save.status]}
-                      </Box>
-                    </Typography>
-                    <Typography
-                      component="div"
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      <time
-                        dateTime={save.savedAt}
-                        title={timestamp}
-                        aria-label={`Saved ${timestamp}`}
-                      >
-                        {current && saves.saveState === "saving"
-                          ? "Saving…"
-                          : `Saved ${savedTime(save.savedAt)}`}
-                      </time>
-                    </Typography>
+                      </Typography>
+                    )}
                     {(saves.unavailable?.[save.id]?.message ||
                       unavailable[save.id]) && (
                       <Typography variant="body2" color="error.main">

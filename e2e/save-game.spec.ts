@@ -70,6 +70,27 @@ for (const theme of ["light", "dark"]) {
     const originalRow = page.locator(
       `[data-save-id="${original.metadata.id}"]`,
     );
+    await expect(originalRow.getByRole("heading")).toHaveText(
+      original.metadata.scenarioName,
+    );
+    const subtitle = originalRow.getByText(
+      `${original.metadata.date.month} ${original.metadata.date.year} - ${original.metadata.difficulty} - ${original.metadata.locationName}`,
+      { exact: true },
+    );
+    await expect(subtitle).toBeVisible();
+    expect(
+      await subtitle.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return (
+          element.getBoundingClientRect().height <=
+          parseFloat(style.lineHeight) + 1
+        );
+      }),
+    ).toBe(true);
+    await expect(originalRow.locator("time")).toHaveText(
+      `Saved ${new Date(original.metadata.savedAt).toLocaleString()}`,
+    );
+    await expect(originalRow).not.toContainText("In progress");
     await expect(page.getByText(/Currently open/)).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /^(Return to game|Resume)$/ }),
