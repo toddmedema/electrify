@@ -232,6 +232,7 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
       metadata: {
         id: head.id,
         name: file.name,
+        upgradedFromRules: file.save.game.upgradedFromRules,
         status: file.status,
         revision: 1,
         createdAt: metadata.createdAt,

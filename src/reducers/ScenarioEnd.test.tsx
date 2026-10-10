@@ -17,6 +17,7 @@ import {
 import { TICK_MS } from "../Constants";
 import { GameType, MonthlyHistoryType, ScenarioType } from "../Types";
 import * as User from "./User";
+import { parseSave, serializeSave } from "../SaveGame";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -209,6 +210,28 @@ describe("ending a scenario from inside the reducer", () => {
         score: victory?.score,
       }),
     );
+  });
+
+  it("finishes upgraded progress with a local score and no leaderboard or replay submission", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const original = createGame({ scenarioId: 100 });
+    original.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    const state = parseSave(serializeSave(original))!.game;
+    state.timeline.forEach((tick) => {
+      tick.cash = -1e10;
+    });
+    playOutOnTheStore(state, 1);
+    jest.runOnlyPendingTimers();
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toMatchObject({
+      scenarioId: 100,
+      ranked: false,
+      outcome: "bankrupt",
+    });
+    expect(victory?.runIdentity).toBeUndefined();
+    expect(victory?.challenge).toBeUndefined();
+    expect(submitHighscore).not.toHaveBeenCalled();
   });
 
   it("shows and submits a score after the player is fired", () => {

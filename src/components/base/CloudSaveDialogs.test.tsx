@@ -334,7 +334,7 @@ it("names incompatible backups and downloads recovery without offering a sync re
     cloudUid: "alice",
     incompatibleCloudSaves: [issue],
   });
-  expect(screen.getByRole("alert")).toHaveTextContent("can't be loaded here");
+  expect(screen.getByRole("alert")).toHaveTextContent("newer save format");
   expect(screen.getByRole("alert")).toHaveTextContent(
     "still stored in your account",
   );

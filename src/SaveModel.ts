@@ -7,7 +7,7 @@ import type {
   SaveStatus,
   VictoryType,
 } from "./Types";
-import manifest from "./data/RunCompatibility.json";
+import { SAVE_SCHEMA_VERSION } from "./SaveUpgrade";
 
 export type SaveErrorCode =
   "quota" | "unavailable" | "invalid" | "incompatible" | "missing" | "conflict";
@@ -336,30 +336,14 @@ export function validateSaveFileEnvelope(
     raw.result === undefined ? undefined : parseSavedRunResult(raw.result);
   if (
     !save &&
-    result !== null &&
-    object(raw.save.game) &&
-    object(raw.save.game.runIdentity) &&
-    typeof raw.save.game.runIdentity.compatibilityId === "string" &&
-    raw.save.game.runIdentity.compatibilityId !== manifest.compatibilityId
+    typeof raw.save.schemaVersion === "number" &&
+    Number.isInteger(raw.save.schemaVersion) &&
+    raw.save.schemaVersion > SAVE_SCHEMA_VERSION
   ) {
-    // Diagnose a build mismatch without accepting or rewriting the original run.
-    const withoutIdentity = parseSave({
-      ...raw.save,
-      game: { ...raw.save.game, runIdentity: undefined, challenge: undefined },
-    });
-    if (
-      withoutIdentity &&
-      !withoutIdentity.game.replayPlayback &&
-      validateStatusResult(
-        raw.status as SaveStatus,
-        result,
-        withoutIdentity.game,
-      )
-    )
-      throw new SaveRepositoryError(
-        "incompatible",
-        "This save was created with a different game version and cannot be opened here.",
-      );
+    throw new SaveRepositoryError(
+      "incompatible",
+      "This save needs a newer version of Electrify.",
+    );
   }
   if (
     !save ||

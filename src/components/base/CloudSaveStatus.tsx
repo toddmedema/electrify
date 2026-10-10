@@ -128,9 +128,9 @@ export default function CloudSaveStatus(): React.JSX.Element {
           severity="warning"
           sx={{ "& .MuiAlert-message": { width: "100%", minWidth: 0 } }}
         >
-          <AlertTitle>Backups from a different game version</AlertTitle>
+          <AlertTitle>Backups need a newer game version</AlertTitle>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            These backups can't be loaded here. They are still stored in your
+            These backups use a newer save format. They are still stored in your
             account. Download a recovery file to keep the original data; it
             won't make the game playable in this version.
           </Typography>

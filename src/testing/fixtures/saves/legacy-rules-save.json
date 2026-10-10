@@ -1,0 +1,113 @@
+{
+  "name": "Legacy renewables experiment",
+  "status": "inProgress",
+  "save": {
+    "savedAt": "2026-10-10T01:03:19.063Z",
+    "appVersion": "1.1.0",
+    "game": {
+      "scenarioId": 101,
+      "difficulty": "Employee",
+      "seed": 31337,
+      "startingYear": 2020,
+      "customerMarketSize": 2000000,
+      "customerRate": 0.081,
+      "startingDemandScale": 1,
+      "loadAdditions": [],
+      "location": {
+        "id": "SF",
+        "name": "San Francisco, CA",
+        "lat": 37.7749,
+        "long": -122.4194,
+        "timeZone": "America/Los_Angeles",
+        "region": "North America",
+        "country": "United States",
+        "admin": "CA",
+        "offshore": true,
+        "watershedId": "CAMountains",
+        "watershedName": "Sierra Nevada watershed",
+        "resources": {
+          "geothermal": true,
+          "hydro": true
+        }
+      },
+      "date": {
+        "minute": 267400,
+        "minuteOfDay": 1000,
+        "hourOfDay": 16,
+        "hourOfFullYear": 4336,
+        "percentOfMonth": 0.6944444444444444,
+        "percentOfYear": 0.47453703703703703,
+        "month": "Jun",
+        "monthNumber": 6,
+        "monthsElapsed": 185,
+        "year": 2035
+      },
+      "commissionedHydroSiteIds": [],
+      "facilities": [],
+      "timeline": {
+        "shapes": [],
+        "rows": []
+      },
+      "monthlyHistory": {
+        "shapes": [],
+        "rows": []
+      },
+      "eventLog": [],
+      "reportedEventKeys": [],
+      "eventLogReadThroughId": 0,
+      "worldEvents": {
+        "active": [],
+        "occurrences": [],
+        "checkedKeys": []
+      },
+      "meaningfulDecisions": [],
+      "meaningfulDecisionGateWaived": false,
+      "runIdentity": {
+        "scenarioId": 101,
+        "compatibilityId": "rules-1-0000000000000000000000000000000000000000000000000000000000000000",
+        "seed": 31337,
+        "difficulty": "Employee",
+        "origin": "authored",
+        "inputs": {
+          "scenario": "{\"briefing\":{\"fantasy\":\"Build the next generation of clean power.\",\"objective\":\"Stay solvent and keep up with demand as clean technology gets cheaper. Retain at least 80% of your starting customers.\",\"threat\":\"Build now and you may overpay. Wait too long and you may not have enough power.\",\"tone\":\"innovation\"},\"cash\":220000000,\"dollarsPerkWh\":0.07,\"durationMonths\":144,\"facilities\":[{\"fuel\":\"Uranium\",\"initialAgeYears\":15,\"peakW\":400000000},{\"fuel\":\"Oil\",\"initialAgeYears\":20,\"peakW\":100000000}],\"feePerKgCO2e\":0,\"icon\":\"rise of renewables\",\"id\":101,\"locationId\":\"SF\",\"minimumCustomerRetention\":0.8,\"name\":\"Rise of Renewables\",\"ownership\":\"Investor\",\"startingYear\":2002,\"summary\":\"Clean power keeps getting cheaper. When do you make the switch?\",\"themes\":[\"Energy transition\"]}",
+          "location": {
+            "id": "SF",
+            "name": "San Francisco, CA",
+            "lat": 37.7749,
+            "long": -122.4194,
+            "timeZone": "America/Los_Angeles",
+            "region": "North America",
+            "country": "United States",
+            "admin": "CA",
+            "offshore": true,
+            "watershedId": "CAMountains",
+            "watershedName": "Sierra Nevada watershed",
+            "resources": {
+              "geothermal": true,
+              "hydro": true
+            }
+          },
+          "facilities": [
+            {
+              "fuel": "Uranium",
+              "peakW": 400000000,
+              "initialAgeYears": 15
+            },
+            {
+              "fuel": "Oil",
+              "peakW": 100000000,
+              "initialAgeYears": 20
+            }
+          ],
+          "cash": 220000000,
+          "customers": 1000000,
+          "meaningfulDecisionGateWaived": false
+        }
+      },
+      "transmission": {
+        "tradingPolicy": "BALANCED",
+        "lines": []
+      }
+    }
+  }
+}

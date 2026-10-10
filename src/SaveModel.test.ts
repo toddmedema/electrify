@@ -1,6 +1,5 @@
 import {
   normalizeSaveName,
-  SaveRepositoryError,
   parseSavedRunResult,
   savedRunResult,
   selectContinueSave,
@@ -37,7 +36,7 @@ function summary(
 }
 
 describe("SaveModel", () => {
-  it("diagnoses an incompatible encoded run without accepting or mutating it", () => {
+  it("upgrades an older encoded run without mutating the original", () => {
     const file = fakeSaveFile();
     file.save.game.runIdentity = captureRunIdentity(
       getScenario(101)!,
@@ -48,17 +47,24 @@ describe("SaveModel", () => {
     const raw = encodeSaveFile(file);
     raw.save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
     const original = JSON.stringify(raw);
-    expect(() => validateSaveFileEnvelope(raw, parseSave)).toThrow(
-      new SaveRepositoryError(
-        "incompatible",
-        "This save was created with a different game version and cannot be opened here.",
-      ),
+    const upgraded = validateSaveFileEnvelope(raw, parseSave);
+    expect(upgraded.save.game.runIdentity).toBeUndefined();
+    expect(upgraded.save.game.upgradedFromRules).toBe(
+      raw.save.game.runIdentity!.compatibilityId,
     );
-    expect(parseSave(raw.save)).toBeNull();
+    expect(upgraded.save.game.facilities).toEqual(raw.save.game.facilities);
     expect(JSON.stringify(raw)).toBe(original);
     raw.save.game.customerRate = NaN;
     expect(() => validateSaveFileEnvelope(raw, parseSave)).toThrow(
       /isn't a valid/,
+    );
+  });
+
+  it("explains a save schema from a newer app without attempting a downgrade", () => {
+    const raw = encodeSaveFile(fakeSaveFile());
+    raw.save.schemaVersion = 999;
+    expect(() => validateSaveFileEnvelope(raw, parseSave)).toThrow(
+      /newer version/,
     );
   });
 

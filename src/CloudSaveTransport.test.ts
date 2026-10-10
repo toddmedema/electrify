@@ -23,6 +23,7 @@ import * as saveFiles from "./SaveFile";
 import { firebaseAppAuth } from "./Globals";
 import { fakeSaveFile } from "./testing/SaveTestHelpers";
 import type { SaveRecord } from "./Types";
+import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
 
 jest.mock("./Globals", () => ({
   getDb: () => ({}),
@@ -143,9 +144,7 @@ describe("CloudSaveTransport", () => {
 
   function incompatibleBackup() {
     const raw = encodeSaveFile(fakeSaveFile());
-    Object.assign(raw.save.game, {
-      runIdentity: { compatibilityId: `rules-1-${"0".repeat(64)}` },
-    });
+    raw.save.schemaVersion = 999;
     const head = {
       id: "old",
       version: OLD_VERSION,
@@ -164,7 +163,37 @@ describe("CloudSaveTransport", () => {
     };
   }
 
-  it("rejects incompatible cloud games while preserving their exact JSON for recovery", async () => {
+  it("upgrades real legacy cloud and shared payloads without rewriting their originals", async () => {
+    shared();
+    documents.get(`saveBlobs/${BLOB_ID}`)!.data = JSON.stringify(legacyFile);
+    const file = await loadSharedSave(SHARE_ID);
+    expect(file.save.game.upgradedFromRules).toBe(
+      legacyFile.save.game.runIdentity.compatibilityId,
+    );
+    expect(file.save.game.customerRate).toBe(0.081);
+    const record = await new FirebaseSaveTransport().read({
+      id: "legacy",
+      version: OLD_VERSION,
+      deleted: false,
+      chunks: [BLOB_ID],
+      metadata: {
+        id: "legacy",
+        createdAt: legacyFile.save.savedAt,
+        savedAt: legacyFile.save.savedAt,
+        scenarioName: "Rise of Renewables",
+      } as SaveRecord["metadata"],
+    });
+    expect(record.save.game.runIdentity).toBeUndefined();
+    expect(record.metadata.upgradedFromRules).toBe(
+      legacyFile.save.game.runIdentity.compatibilityId,
+    );
+    expect(documents.get(`saveBlobs/${BLOB_ID}`)?.data).toBe(
+      JSON.stringify(legacyFile),
+    );
+    expect(commits.flat().every((write) => write.kind === "update")).toBe(true);
+  });
+
+  it("rejects future save schemas while preserving their exact JSON for recovery", async () => {
     const { raw, head, issue } = incompatibleBackup();
     await expect(new FirebaseSaveTransport().read(head)).rejects.toMatchObject({
       code: "incompatible",

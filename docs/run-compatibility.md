@@ -26,14 +26,15 @@ simulation formulas. Because inputs are selected by directory, keep content that
 only the interface reads, such as manual entries or map artwork, under
 `src/components` rather than `src/data`, so editing it does not invalidate
 challenges. Ordinary scenario sharing remains available when a challenge
-is incompatible. No historical simulation runtime or migration is provided.
+is incompatible. No historical simulation runtime is provided. Ordinary saved games
+upgrade independently, as described in [save upgrades](save-upgrades.md).
 
 When changing simulation behavior outside these directories, add the source to
 the generator's inputs, or bump `rulesRevision` in the generator.
 Changes to the digest algorithm or input-selection policy also require a rules
 revision bump. Authored references carry the scenario, seed, difficulty and this
-single compatibility digest. There are no schema versions or historical format
-adapters: only the current reference and invitation shapes are accepted.
+single compatibility digest. Only the current challenge reference and invitation
+shapes are accepted; this restriction does not invalidate ordinary saved progress.
 
 The manifest also includes per-file fetch integrity metadata. Browser CSV and
 weather loads verify the actual response bytes, including offline-cache responses,

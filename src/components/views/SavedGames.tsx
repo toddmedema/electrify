@@ -395,6 +395,16 @@ export default function SavedGames(): React.JSX.Element {
                           unavailable[save.id]}
                       </Typography>
                     )}
+                    {save.upgradedFromRules && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                      >
+                        Updated for this game version. Progress kept;
+                        leaderboard and challenge comparisons are disabled.
+                      </Typography>
+                    )}
                   </Box>
                   <Button
                     variant="contained"
