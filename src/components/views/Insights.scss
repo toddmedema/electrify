@@ -1,0 +1,37 @@
+.insights {
+  .insightsTimelineKey {
+    display: flex;
+    gap: 16px;
+    max-width: 928px;
+    margin: 0 auto;
+    padding: 8px 16px 4px;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    i {
+      width: 20px;
+      border-top: 2px solid currentColor;
+
+      &.forecast {
+        border-top-style: dashed;
+      }
+    }
+  }
+
+  .insightsLayerHint {
+    grid-column: 1 / -1;
+    color: var(--font-color-faded);
+  }
+
+  .insightsChartExplanation {
+    display: block;
+    margin: 4px 16px 8px;
+    color: var(--font-color-faded);
+  }
+}

@@ -259,6 +259,8 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
   await waitForSave(page);
   // A saved-game fixture isolates the presentation warning from economic outcomes.
   await editSavedGame(page, (save) => {
+    // The cash warning dialog is covered separately; this fixture exercises its HUD link.
+    save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
     for (const tick of save.game.timeline) {
       tick.cash = -100;
       tick.supplyW = Math.max(tick.supplyW, tick.demandW);
