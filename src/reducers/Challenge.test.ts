@@ -106,14 +106,15 @@ it("preserves unranked saves without manufacturing identity and rejects contradi
   const game = createGame({ scenarioId: 101, seed: 42 });
   const unranked = { ...game, runIdentity: undefined };
   expect(parseSave(serializeSave(unranked))!.game.runIdentity).toBeUndefined();
+  // An earlier deploy's fingerprint carries forward rather than ending the run.
   expect(
     parseSave(
       serializeSave({
         ...game,
         runIdentity: { ...game.runIdentity!, compatibilityId: "old" },
       }),
-    ),
-  ).toBeNull();
+    )!.game.runIdentity,
+  ).toEqual(game.runIdentity);
   expect(
     parseSave(
       serializeSave({

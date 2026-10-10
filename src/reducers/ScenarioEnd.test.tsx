@@ -17,6 +17,9 @@ import {
 import { TICK_MS } from "../Constants";
 import { GameType, MonthlyHistoryType, ScenarioType } from "../Types";
 import * as User from "./User";
+import * as Globals from "../Globals";
+import { serializeReplay } from "../Replay";
+import { parseSave, serializeSave } from "../SaveGame";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -208,6 +211,80 @@ describe("ending a scenario from inside the reducer", () => {
         scenarioId: scenario.id,
         score: victory?.score,
       }),
+    );
+  });
+
+  it("ranks and submits a run carried forward from an earlier deploy", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const saved = serializeSave(createGame({ scenarioId: 100 }));
+    const current = saved.game.runIdentity!.compatibilityId;
+    saved.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    const state = parseSave(saved)!.game;
+    state.timeline.forEach((tick) => {
+      tick.cash = -1e10;
+    });
+    playOutOnTheStore(state, 1);
+    jest.runOnlyPendingTimers();
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toMatchObject({
+      scenarioId: 100,
+      ranked: true,
+      outcome: "bankrupt",
+    });
+    expect(victory?.runIdentity?.compatibilityId).toBe(current);
+    expect(submitHighscore).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a replay's recorded result even when this build plays it out differently", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    const logEvent = jest.spyOn(Globals, "logEvent");
+    getStore().dispatch(quit());
+    const state = createGame({ scenarioId: 100 });
+    state.replayPlayback = {
+      actions: [],
+      index: 0,
+      monthlyCash: [123],
+      result: { score: 777, breakdown: { supply: 777 }, outcome: "completed" },
+    };
+    state.timeline.forEach((tick) => {
+      tick.cash = -1e10;
+    });
+    while (state.date.monthsElapsed < 1) tickState(state);
+    jest.runOnlyPendingTimers();
+    expect(logEvent).toHaveBeenCalledWith("replay_diverged", {
+      scenarioId: 100,
+      month: 1,
+    });
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toMatchObject({
+      score: 777,
+      breakdown: { supply: 777 },
+      outcome: "completed",
+      ranked: false,
+    });
+    // The re-simulated bankruptcy's title would contradict the recorded completion
+    expect(victory?.endTitle).toBeUndefined();
+    expect(submitHighscore).not.toHaveBeenCalled();
+  });
+
+  it("plays a replay back without drift under the build that recorded it", () => {
+    const logEvent = jest.spyOn(Globals, "logEvent");
+    const original = createGame({ scenarioId: 101, seed: 7 });
+    while (original.date.monthsElapsed < 3) tickState(original);
+    const replay = serializeReplay(original)!;
+    const playback = createGame({ scenarioId: 101, seed: 7 });
+    playback.replayPlayback = {
+      actions: replay.actions,
+      index: 0,
+      monthlyCash: replay.monthlyCash,
+    };
+    while (playback.date.monthsElapsed < 3) tickState(playback);
+    expect(replay.monthlyCash).toHaveLength(3);
+    expect(playback.replayPlayback.diverged).toBeUndefined();
+    expect(logEvent).not.toHaveBeenCalledWith(
+      "replay_diverged",
+      expect.anything(),
     );
   });
 

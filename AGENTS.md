@@ -78,9 +78,12 @@ failures should be rare; agents without that hook should run `npm run format` be
 - `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
   Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
   screen from the card-navigation state.
-- Saves and replays only support the current data model; no backwards compatibility or schema
-  versioning is needed before release. Keep validation of untrusted imports and deterministic
-  replay behavior covered by tests.
+- Saves upgrade silently through the numbered migrations in `src/SaveUpgrade.ts`, which receive
+  decoded saves; a deploy that changes the rules fingerprint carries runs forward with their
+  challenge, replay and score (`carryRunForward`). Add a migration and regression fixture for
+  structural changes and validate the upgraded payload before use. Only tell players when their
+  app is too old, with a Refresh to update action. Keep untrusted-import validation and
+  deterministic replay behavior covered by tests.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),

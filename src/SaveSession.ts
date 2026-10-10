@@ -1,6 +1,7 @@
 import type { Middleware } from "@reduxjs/toolkit";
 import type { AppStore } from "./Store";
 import type {
+  DialogType,
   GameType,
   SaveFileType,
   SaveLease,
@@ -9,6 +10,7 @@ import type {
   VictoryType,
 } from "./Types";
 import { getStore } from "./StoreRegistry";
+import { refreshToUpdate } from "./helpers/Cache";
 import { getScenario } from "./data/Scenarios";
 import { parseSave, serializeSave } from "./SaveGame";
 import { SaveRepository } from "./SaveRepository";
@@ -93,6 +95,25 @@ function resumeToken(id: string): string {
   return newSaveToken();
 }
 
+/** A failed open; a save from a newer app offers the update that can open it. */
+function saveErrorDialog(
+  title: string,
+  error: unknown,
+  message = getSaveErrorMessage(error),
+): DialogType {
+  const newer =
+    error instanceof SaveRepositoryError && error.code === "incompatible";
+  return {
+    title,
+    message,
+    open: true,
+    closeText: newer ? "Not now" : "OK",
+    ...(newer
+      ? { action: refreshToUpdate, actionLabel: "Refresh to update" }
+      : {}),
+  };
+}
+
 export function getSaveErrorMessage(error: unknown): string {
   if (error instanceof SaveRepositoryError) {
     switch (error.code) {
@@ -104,6 +125,8 @@ export function getSaveErrorMessage(error: unknown): string {
         return "This save no longer exists. Export your current game to keep this progress.";
       case "invalid":
         return "This save cannot be opened because its contents are invalid.";
+      case "incompatible":
+        return error.message;
       default:
         return "Browser storage is unavailable. Enable storage for this site, or export your current game.";
     }
@@ -713,12 +736,7 @@ export async function resumeSavedGame(id: string): Promise<boolean> {
       noteUnavailable(id, error, revision);
       getStore().dispatch(navigate("SAVED_GAMES"));
       getStore().dispatch(
-        dialogOpen({
-          title: "Could not open this save",
-          message: getSaveErrorMessage(error),
-          open: true,
-          closeText: "OK",
-        }),
+        dialogOpen(saveErrorDialog("Could not open this save", error)),
       );
     }
     return false;
@@ -779,14 +797,15 @@ export async function failSaveLoading(
         replacing = false;
       }
       getStore().dispatch(
-        dialogOpen({
-          title: "Could not prepare this game",
-          message: error
-            ? getSaveErrorMessage(error)
-            : "The save remains in your library. Try opening it again.",
-          open: true,
-          closeText: "OK",
-        }),
+        dialogOpen(
+          saveErrorDialog(
+            "Could not prepare this game",
+            error,
+            error
+              ? getSaveErrorMessage(error)
+              : "The save remains in your library. Try opening it again.",
+          ),
+        ),
       );
     }
   }

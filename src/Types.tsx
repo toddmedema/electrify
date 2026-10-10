@@ -360,7 +360,16 @@ export interface ReplayType {
   location: LocationType;
   actions: ReplayActionType[];
   meaningfulDecisionGateWaived?: boolean;
+  // Month-end cash of the original run in cents, oldest first, so playback can tell when a later
+  // build re-simulates it differently. Absent on replays recorded before checkpoints existed
+  monthlyCash?: number[];
+  // What the original run actually scored, shown at the end even if playback drifts from it
+  result?: ReplayResultType;
 }
+
+export type ReplayResultType = Pick<VictoryType, "score" | "breakdown"> & {
+  outcome: NonNullable<VictoryType["outcome"]>;
+};
 
 /**
  * A replay on its way to or from Firestore. `actions` is a JSON string rather than a real array
@@ -375,6 +384,10 @@ export interface ReplayDocType extends Omit<ReplayType, "actions"> {
 export interface ReplayPlaybackType {
   actions: ReplayActionType[];
   index: number; // Next action to apply
+  monthlyCash?: number[];
+  result?: ReplayResultType;
+  // Set at the first month that no longer matches the original run
+  diverged?: boolean;
 }
 
 export interface LocalStoragePlayedType {
@@ -1341,6 +1354,8 @@ export type SaveId = string;
 export type SaveStatus = "inProgress" | "completed" | "bankrupt" | "fired";
 
 export interface SaveGameType {
+  /** Absent on legacy saves; upgraded before domain validation. */
+  schemaVersion?: number;
   savedAt: string;
   appVersion: string;
   game: GameType;
@@ -1359,6 +1374,12 @@ export type SavedRunResult = Pick<
   | "endMessage"
   | "debrief"
 > & { outcome: Exclude<SaveStatus, "inProgress"> };
+
+/** A cloud backup version in a newer save schema, retained in the account until an update. */
+export interface IncompatibleCloudSave {
+  id: SaveId;
+  version: string;
+}
 
 export interface SaveMetadata {
   cloud?: {

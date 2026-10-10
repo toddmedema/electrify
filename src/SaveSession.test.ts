@@ -365,6 +365,27 @@ test("an old rejected Resume cannot replace a newer accepted loading request wit
   await failSaveLoading(currentGeneration);
 });
 
+test("a save from a newer app offers a one-click update instead of calling it broken", async () => {
+  const repository = require("./SaveRepository").mockRepository;
+  repository.prepareResume.mockRejectedValueOnce(
+    new SaveRepositoryError(
+      "incompatible",
+      "This save needs a newer version of Electrify.",
+    ),
+  );
+  store.dispatch(quit());
+  store.dispatch(dialogClose());
+  expect(await resumeSavedGame("newer")).toBe(false);
+  expect(store.getState().ui.dialog).toMatchObject({
+    open: true,
+    title: "Could not open this save",
+    message: "This save needs a newer version of Electrify.",
+    actionLabel: "Refresh to update",
+    closeText: "Not now",
+  });
+  expect(store.getState().saves.unavailable?.newer).toBeUndefined();
+});
+
 test("a failed source lease release retains the live game and offers transition recovery", async () => {
   const repository = require("./SaveRepository").mockRepository;
   const target = record();

@@ -208,6 +208,31 @@ it("surfaces partial failures while preserving normal local save state", async (
   expect(store.getState().saves.saveState).toBe("idle");
 });
 
+it("shows incompatible backups separately and clears them on account changes", async () => {
+  const issues = [{ id: "old", version: "1" }];
+  mockSync.mockResolvedValueOnce({
+    conflicts: false,
+    deferred: false,
+    incompatibleCloudSaves: issues,
+  });
+  mockAuth({ uid: "alice" });
+  await settle();
+  expect(store.getState().saves).toMatchObject({
+    cloudState: "synced",
+    incompatibleCloudSaves: issues,
+  });
+  expect(store.getState().saves.cloudError).toBeUndefined();
+  mockSync.mockRejectedValueOnce(new Error("offline"));
+  retryCloudSync();
+  await settle();
+  expect(store.getState().saves.incompatibleCloudSaves).toEqual(issues);
+  mockAuth({ uid: "bob" });
+  await settle();
+  expect(store.getState().saves.incompatibleCloudSaves).toEqual([]);
+  mockAuth(null);
+  expect(store.getState().saves.incompatibleCloudSaves).toEqual([]);
+});
+
 it("unsubscribes listeners and invalidates unfinished work on teardown", async () => {
   let resolve!: (value: { conflicts: boolean; deferred: boolean }) => void;
   mockSync.mockImplementationOnce(

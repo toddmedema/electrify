@@ -6359,6 +6359,40 @@ $programs_column: 800px;
   }
 }
 
+// The cloud backup explanation beside the Saved games title (base/CloudSyncIndicator). The
+// hover preview and the pinned card share one surface and one position, so a click pins what
+// the mouse was already reading instead of swapping it for something else
+.cloudSyncCard.MuiPaper-root {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  box-sizing: border-box;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: $space-3 $space-4;
+  // The chart tooltip's surface: in dark the paper alone sank into the header it hangs from
+  border: 1px solid var(--tooltip-border);
+  background: var(--tooltip-bg);
+  box-shadow: 0 8px 24px var(--tooltip-shadow);
+}
+.cloudSyncCardPinned.MuiPaper-root {
+  margin-top: $space-1;
+}
+
+// Turns the sync arrows while a cloud backup is in flight; held still for reduced motion
+.cloudSyncSpin {
+  animation: cloudSyncSpin 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes cloudSyncSpin {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
 // List pages sit on the sunken surface so their grouped lists read as raised sections
 .screenCatalog,
 .screenManual,

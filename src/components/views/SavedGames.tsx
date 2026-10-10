@@ -35,6 +35,7 @@ import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
 import { savedTime } from "../../helpers/SaveDisplay";
 import CloudSaveStatus from "../base/CloudSaveStatus";
+import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
@@ -144,7 +145,11 @@ export default function SavedGames(): React.JSX.Element {
   );
   return (
     <div className="flexContainer" id="gameCard">
-      <ScreenHeader title="Saved games" onBack={onBack} />
+      <ScreenHeader
+        title="Saved games"
+        onBack={onBack}
+        trailing={<CloudSyncIndicator />}
+      />
       <Box
         className="scrollable"
         sx={{ width: "100%", overflowY: "auto", bgcolor: "var(--bg-sunken)" }}

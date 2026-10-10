@@ -1,5 +1,7 @@
 import type {
   GameType,
+  ReplayResultType,
+  ScoreBreakdownType,
   SaveFileType,
   SaveGameType,
   SaveMetadata,
@@ -7,9 +9,10 @@ import type {
   SaveStatus,
   VictoryType,
 } from "./Types";
+import { isFutureSave } from "./SaveUpgrade";
 
 export type SaveErrorCode =
-  "quota" | "unavailable" | "invalid" | "missing" | "conflict";
+  "quota" | "unavailable" | "invalid" | "incompatible" | "missing" | "conflict";
 
 export class SaveRepositoryError extends Error {
   constructor(
@@ -19,6 +22,15 @@ export class SaveRepositoryError extends Error {
     super(message);
     this.name = "SaveRepositoryError";
   }
+}
+
+/** A newer app wrote this save; keep it intact rather than call it corrupt. */
+export function assertSupportedSaveSchema(raw: unknown): void {
+  if (isFutureSave(raw))
+    throw new SaveRepositoryError(
+      "incompatible",
+      "This save needs a newer version of Electrify.",
+    );
 }
 
 export const SAVE_NAME_LIMIT = 60;
@@ -113,6 +125,26 @@ const categories = new Set([
   "emissions",
   "blackouts",
 ]);
+function validScoreBreakdown(raw: unknown): raw is ScoreBreakdownType {
+  return (
+    object(raw) &&
+    Object.entries(raw).every(
+      ([key, value]) => categories.has(key) && finite(value),
+    )
+  );
+}
+
+/** The original result a replay carries; presentation data, never a score submission. */
+export function validReplayResult(raw: unknown): raw is ReplayResultType {
+  return (
+    object(raw) &&
+    Object.keys(raw).sort().join() === "breakdown,outcome,score" &&
+    finite(raw.score) &&
+    outcomes.has(raw.outcome as string) &&
+    validScoreBreakdown(raw.breakdown)
+  );
+}
+
 const fuels = new Set([
   "Coal",
   "Biomass",
@@ -186,10 +218,7 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
     !difficulties.has(raw.difficulty as string) ||
     !finite(raw.score) ||
     !outcomes.has(raw.outcome as string) ||
-    !object(raw.breakdown) ||
-    Object.entries(raw.breakdown).some(
-      ([key, value]) => !categories.has(key) || !finite(value),
-    ) ||
+    !validScoreBreakdown(raw.breakdown) ||
     (raw.endTitle !== undefined && !text(raw.endTitle)) ||
     (raw.endMessage !== undefined && !text(raw.endMessage))
   )
@@ -330,6 +359,7 @@ export function validateSaveFileEnvelope(
     );
   }
   const name = normalizeSaveName(raw.name);
+  assertSupportedSaveSchema(raw.save);
   const save = parseSave(raw.save);
   const result =
     raw.result === undefined ? undefined : parseSavedRunResult(raw.result);

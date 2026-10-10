@@ -9,6 +9,7 @@ import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
   sameRunIdentity,
+  carryRunForward,
   expandAuthoredRunReference,
   normalizedInputs,
 } from "./helpers/RunIdentity";
@@ -21,6 +22,7 @@ import {
 } from "./helpers/Commitment";
 import packageJson from "../package.json";
 import { decodeSave } from "./SaveEncoding";
+import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
@@ -279,6 +281,7 @@ function validEmissions(raw: unknown): boolean {
 
 export function serializeSave(game: GameType): SaveGameType {
   return {
+    schemaVersion: SAVE_SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
@@ -292,7 +295,7 @@ export function serializeSave(game: GameType): SaveGameType {
  * malformed facility would otherwise crash the sim mid-tick.
  */
 export function parseSave(raw: unknown): SaveGameType | null {
-  raw = decodeSave(raw);
+  raw = upgradeSave(decodeSave(raw));
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
@@ -650,12 +653,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
-  const normalized = {
+  const normalized = carryRunForward({
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
-  };
+  });
   if (
     normalized.runIdentity &&
     (!validRunIdentity(normalized.runIdentity) ||

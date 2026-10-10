@@ -1,14 +1,20 @@
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, AlertTitle, Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
-import { retryCloudSync } from "../../CloudSaves";
+import { refreshToUpdate } from "../../helpers/Cache";
 
-export default function CloudSaveStatus(): React.JSX.Element {
+/**
+ * Cloud backup messages that need the player: the sign-in invitation and the alerts that ask
+ * for an action. Routine sync state lives in the header (CloudSyncIndicator).
+ */
+export default function CloudSaveStatus(): React.JSX.Element | null {
   const dispatch = useAppDispatch();
-  const { cloudState, cloudError, cloudConflicts } = useAppSelector(
-    (state) => state.saves,
-  );
+  const {
+    cloudState,
+    cloudConflicts,
+    incompatibleCloudSaves = [],
+  } = useAppSelector((state) => state.saves);
   if (cloudState === "signedOut" || !cloudState)
     return (
       <Stack
@@ -29,37 +35,31 @@ export default function CloudSaveStatus(): React.JSX.Element {
         </Button>
       </Stack>
     );
-  const message =
-    cloudState === "synced"
-      ? "Cloud backup up to date. Games load from this device."
-      : cloudState === "offline"
-        ? "You're offline. Games save on this device; cloud backup resumes when you reconnect."
-        : cloudState === "failed"
-          ? cloudError
-          : cloudState === "initializing"
-            ? "Saves stay on this device. Checking cloud sign-in…"
-            : "Syncing cloud backup. Games load from this device.";
+  if (!incompatibleCloudSaves.length && !cloudConflicts) return null;
   return (
     <Stack spacing={1}>
-      <Typography variant="body2" color="text.secondary" role="status">
-        {message}
-      </Typography>
-      {cloudState === "failed" && (
-        <Button
-          variant="outlined"
-          onClick={retryCloudSync}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          Retry cloud backup
-        </Button>
+      {!!incompatibleCloudSaves.length && (
+        <Alert severity="warning">
+          <AlertTitle>Some backups need the latest version</AlertTitle>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            A newer version of Electrify saved some of your cloud backups.
+            They're safe in your account. Refresh to update, and they'll load
+            normally.
+          </Typography>
+          <Button variant="contained" onClick={refreshToUpdate}>
+            Refresh to update
+          </Button>
+        </Alert>
       )}
       {cloudConflicts && (
         <Alert
           severity="info"
           onClose={() => dispatch(sessionChanged({ cloudConflicts: false }))}
         >
-          A game changed on two devices. Both copies were kept in your saved
-          games.
+          A game changed on two devices. Both copies were kept
+          {incompatibleCloudSaves.length
+            ? " on this device and in your account."
+            : " in your saved games."}
         </Alert>
       )}
     </Stack>

@@ -11,7 +11,8 @@ import {
 } from "@mui/material";
 import { loadSharedSave } from "../../CloudSaveTransport";
 import { importSavedGame, resumeSavedGame } from "../../SaveSession";
-import { isResumableStatus } from "../../SaveModel";
+import { isResumableStatus, SaveRepositoryError } from "../../SaveModel";
+import { refreshToUpdate } from "../../helpers/Cache";
 import { useAppDispatch } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import type { SaveFileType } from "../../Types";
@@ -23,6 +24,7 @@ export default function SharedGameDialog(): React.JSX.Element {
   );
   const [file, setFile] = useState<SaveFileType>();
   const [error, setError] = useState("");
+  const [needsUpdate, setNeedsUpdate] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -30,12 +32,22 @@ export default function SharedGameDialog(): React.JSX.Element {
     let current = true;
     setBusy(true);
     setError("");
+    setNeedsUpdate(false);
     void loadSharedSave(id)
       .then((save) => {
         if (current) setFile(save);
       })
       .catch((failure: unknown) => {
-        if (current)
+        if (!current) return;
+        const newer =
+          failure instanceof SaveRepositoryError &&
+          failure.code === "incompatible";
+        setNeedsUpdate(newer);
+        if (newer)
+          setError(
+            "This game was shared from a newer version of Electrify. Refresh to update, then open it.",
+          );
+        else
           setError(
             failure instanceof Error &&
               /expired|invalid|no longer available/.test(failure.message)
@@ -94,7 +106,12 @@ export default function SharedGameDialog(): React.JSX.Element {
         <Button onClick={close} disabled={busy}>
           Close
         </Button>
-        {!file && error && (
+        {!file && error && needsUpdate && (
+          <Button variant="contained" onClick={refreshToUpdate}>
+            Refresh to update
+          </Button>
+        )}
+        {!file && error && !needsUpdate && (
           <Button onClick={() => setAttempt(attempt + 1)}>Retry</Button>
         )}
         {file && (

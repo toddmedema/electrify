@@ -9,6 +9,9 @@ import {
 } from "./SaveModel";
 import { parseSave } from "./SaveGame";
 import { fakeSaveFile, fakeSavedResult } from "./testing/SaveTestHelpers";
+import { captureRunIdentity } from "./helpers/RunIdentity";
+import { getScenario } from "./data/Scenarios";
+import { encodeSaveFile } from "./SaveFile";
 import type { SaveMetadata, VictoryType } from "./Types";
 
 function summary(
@@ -33,6 +36,64 @@ function summary(
 }
 
 describe("SaveModel", () => {
+  it("upgrades an older encoded run without mutating the original", () => {
+    const file = fakeSaveFile();
+    file.save.game.runIdentity = captureRunIdentity(
+      getScenario(101)!,
+      31337,
+      "Employee",
+    );
+    file.save.game.location = file.save.game.runIdentity.inputs.location;
+    const current = JSON.parse(JSON.stringify(file.save.game.runIdentity));
+    const raw = JSON.parse(JSON.stringify(encodeSaveFile(file))) as ReturnType<
+      typeof encodeSaveFile
+    >;
+    raw.save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    const original = JSON.stringify(raw);
+    const upgraded = validateSaveFileEnvelope(raw, parseSave);
+    expect(upgraded.save.game.runIdentity).toEqual(current);
+    expect(upgraded.save.game.facilities).toEqual(raw.save.game.facilities);
+    expect(JSON.stringify(raw)).toBe(original);
+    raw.save.game.customerRate = NaN;
+    expect(() => validateSaveFileEnvelope(raw, parseSave)).toThrow(
+      /isn't a valid/,
+    );
+  });
+
+  it("explains a save schema from a newer app without attempting a downgrade", () => {
+    const raw = encodeSaveFile(fakeSaveFile());
+    raw.save.schemaVersion = 999;
+    expect(() => validateSaveFileEnvelope(raw, parseSave)).toThrow(
+      /newer version/,
+    );
+  });
+
+  it("keeps result and current-build identity failures invalid", () => {
+    const file = fakeSaveFile();
+    file.save.game.runIdentity = captureRunIdentity(
+      getScenario(101)!,
+      31337,
+      "Employee",
+    );
+    file.save.game.location = file.save.game.runIdentity.inputs.location;
+    expect(
+      validateSaveFileEnvelope(file, parseSave).save.game.runIdentity,
+    ).toEqual(file.save.game.runIdentity);
+    file.save.game.runIdentity.seed++;
+    expect(() => validateSaveFileEnvelope(file, parseSave)).toThrow(
+      /isn't a valid/,
+    );
+    file.save.game.runIdentity.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    file.status = "completed";
+    expect(() => validateSaveFileEnvelope(file, parseSave)).toThrow(
+      /isn't a valid/,
+    );
+    file.result = fakeSavedResult({ scenarioId: 102 });
+    expect(() => validateSaveFileEnvelope(file, parseSave)).toThrow(
+      /isn't a valid/,
+    );
+  });
+
   it("trims names and counts Unicode code points consistently", () => {
     expect(normalizeSaveName("  🌱 My grid  ")).toBe("🌱 My grid");
     expect(normalizeSaveName("🌱".repeat(60))).toHaveLength(120);

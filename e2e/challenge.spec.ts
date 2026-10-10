@@ -213,24 +213,18 @@ test("landing and history preserve a save, and a challenge creates another", asy
   );
 });
 
-test("incompatible invitations require an explicit ordinary mission choice", async ({
+test("an invitation from an earlier deploy opens as the same challenge", async ({
   page,
 }) => {
   const value = invitation();
   value.run.compatibilityId = "old-model";
   await page.goto(link(value));
   await expect(
-    page.getByRole("heading", { name: "Challenge unavailable" }),
+    page.getByRole("button", { name: "Start challenge", exact: true }),
   ).toBeVisible();
-  expect(await savedGame(page)).toBeUndefined();
-  await page
-    .getByRole("button", { name: "Open current mission", exact: true })
-    .click();
   await expect(
-    page.getByRole("button", { name: "Start game", exact: true }),
-  ).toBeVisible();
-  expect(page.url()).not.toContain("challenge=");
-  expect(await savedGame(page)).toBeUndefined();
+    page.getByRole("heading", { name: "Challenge unavailable" }),
+  ).toHaveCount(0);
 });
 
 test("mismatched market bytes cannot initialize an equivalent challenge", async ({

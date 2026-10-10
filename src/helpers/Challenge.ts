@@ -1,5 +1,6 @@
 import { ChallengeInvitation, VictoryType } from "../Types";
 import {
+  carryInvitationForward,
   expandAuthoredRunReference,
   projectAuthoredRunReference,
   sameRunIdentity,
@@ -32,8 +33,7 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   }
   if (!url.searchParams.has("challenge")) return;
   const failed: ChallengeRoute = {
-    error:
-      "This challenge link is invalid or uses different conditions. Choose a current mission.",
+    error: "This challenge link is invalid. Choose a current mission.",
   };
   if (
     href.length > MAX_CHALLENGE_URL ||
@@ -41,7 +41,9 @@ export function parseChallengeUrl(href: string): ChallengeRoute | undefined {
   )
     return failed;
   try {
-    const value: unknown = JSON.parse(url.searchParams.get("challenge")!);
+    const value = carryInvitationForward(
+      JSON.parse(url.searchParams.get("challenge")!),
+    );
     if (value && typeof value === "object") {
       const id = (value as ChallengeInvitation).run?.scenarioId;
       if (SCENARIOS.some((s) => s.id === id && !s.tutorialSteps))

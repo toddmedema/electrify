@@ -1,5 +1,6 @@
 import { encodeSave } from "./SaveEncoding";
 import {
+  assertSupportedSaveSchema,
   isResumableStatus,
   normalizeSaveName,
   parseSavedRunResult,
@@ -318,6 +319,7 @@ export class SaveRepository {
         "missing",
         "This saved game was deleted or is no longer available.",
       );
+    assertSupportedSaveSchema(payload.save);
     const save = this.parseSave(payload.save);
     const result =
       payload.result === undefined

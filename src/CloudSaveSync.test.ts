@@ -5,6 +5,7 @@ import { AUTO_CLOUD_SAVE_MS, CloudSaveSync } from "./CloudSaveSync";
 import { CloudConflict } from "./CloudSaveTransport";
 import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
 import { SaveRepository } from "./SaveRepository";
+import { SaveRepositoryError } from "./SaveModel";
 import { parseSave, serializeSave } from "./SaveGame";
 import { fakeSaveGame } from "./testing/SaveTestHelpers";
 import type { SaveRecord } from "./Types";
@@ -118,6 +119,107 @@ describe("CloudSaveSync", () => {
     );
     await repository.release(lease);
   }
+
+  it("identifies incompatible backups, keeps healthy uploads and skips unchanged payloads", async () => {
+    await create("old");
+    await sync.sync("alice");
+    await repository.delete("old");
+    // Model a backup from another device, with no local deletion queued for it.
+    for (const deletion of await repository.pendingCloudDeletes("alice"))
+      await repository.clearCloudDelete(deletion.key);
+    const read = jest
+      .spyOn(cloud, "read")
+      .mockRejectedValue(new SaveRepositoryError("incompatible", "old build"));
+    await create("healthy");
+    const result = await sync.sync("alice");
+    expect(result).toMatchObject({
+      failed: false,
+      incompatibleCloudSaves: [{ id: "old", version: "1" }],
+    });
+    expect(cloud.records.get("healthy")?.metadata.name).toBe("healthy");
+    expect(cloud.records.has("old")).toBe(true);
+    expect((await repository.list()).map((entry) => entry.id)).toEqual([
+      "healthy",
+    ]);
+    expect(await sync.sync("alice")).toMatchObject({
+      failed: false,
+      incompatibleCloudSaves: result.incompatibleCloudSaves,
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    // A newly committed cloud version is validated again and can be restored.
+    cloud.heads.get("old")!.version = "updated";
+    read.mockRestore();
+    expect((await sync.sync("alice")).incompatibleCloudSaves).toBeUndefined();
+    expect((await repository.list()).map((entry) => entry.name)).toContain(
+      "old",
+    );
+  });
+
+  it("retains the clean device copy when a newer cloud version is incompatible", async () => {
+    await create();
+    await sync.sync("alice");
+    cloud.heads.get("first")!.version = "newer";
+    cloud.heads.get("first")!.writerDeviceId = "another-device";
+    jest
+      .spyOn(cloud, "read")
+      .mockRejectedValue(new SaveRepositoryError("incompatible", "old build"));
+    expect(await sync.sync("alice")).toMatchObject({
+      failed: false,
+      incompatibleCloudSaves: [{ id: "first" }],
+    });
+    expect((await repository.read("first")).metadata.cloud?.version).toBe("1");
+    expect(cloud.heads.get("first")?.version).toBe("newer");
+    await repository.rename("first", "Offline progress");
+    expect(
+      await sync.sync("alice", undefined, { automatic: true }),
+    ).toMatchObject({
+      deferred: true,
+      incompatibleCloudSaves: [{ id: "first" }],
+    });
+    const result = await sync.sync("alice");
+    expect(result).toMatchObject({ conflicts: true, failed: false });
+    expect((await repository.list()).map((entry) => entry.name)).toContain(
+      "Offline progress",
+    );
+    expect(
+      Array.from(cloud.records.values()).map((entry) => entry.metadata.name),
+    ).toContain("Offline progress");
+    expect(cloud.heads.get("first")?.version).toBe("newer");
+  });
+
+  it("does not reuse an incompatible payload verdict across accounts", async () => {
+    cloud.heads.set("remote", {
+      id: "remote",
+      version: "1",
+      deleted: false,
+      chunks: [],
+    });
+    const read = jest
+      .spyOn(cloud, "read")
+      .mockRejectedValue(new SaveRepositoryError("incompatible", "old build"));
+    expect((await sync.sync("alice")).incompatibleCloudSaves).toEqual([
+      { id: "remote", version: "1" },
+    ]);
+    await sync.sync("bob");
+    expect(read).toHaveBeenCalledTimes(2);
+    cloud.heads.delete("remote");
+    expect((await sync.sync("bob")).incompatibleCloudSaves).toBeUndefined();
+  });
+
+  it("continues retrying transient cloud read failures", async () => {
+    cloud.heads.set("remote", {
+      id: "remote",
+      version: "1",
+      deleted: false,
+      chunks: [],
+    });
+    const read = jest
+      .spyOn(cloud, "read")
+      .mockRejectedValue(new Error("unavailable"));
+    expect((await sync.sync("alice")).failed).toBe(true);
+    expect((await sync.sync("alice")).failed).toBe(true);
+    expect(read).toHaveBeenCalledTimes(2);
+  });
 
   it("requires both five wall-clock minutes and a full game year for automatic uploads, even after reload", async () => {
     const clock = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
