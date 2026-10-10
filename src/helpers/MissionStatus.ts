@@ -18,7 +18,7 @@ import {
 } from "./ObjectiveRules";
 import { customerMarketSizeAt } from "./Customers";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
-import { TICK_MINUTES } from "../Constants";
+import { MONTHS, TICK_MINUTES } from "../Constants";
 import { formatMoneyConcise, formatCount } from "./Format";
 import { selectProjection } from "./Projection";
 
@@ -78,18 +78,28 @@ export function getMissionStatus(game: GameType) {
     const minimum = rows.length
       ? Math.min(...rows.map(demandServed))
       : undefined;
+    const last = first + count - 1;
+    const lastYear = Math.floor(last / 12);
+    const window =
+      objective.month === 1 && count === 12
+        ? `${objective.year}`
+        : count === 1
+          ? `${MONTHS[objective.month - 1]} ${objective.year}`
+          : objective.year === lastYear
+            ? `${MONTHS[objective.month - 1]}–${MONTHS[last % 12]} ${objective.year}`
+            : `${MONTHS[objective.month - 1]} ${objective.year}–${MONTHS[last % 12]} ${lastYear}`;
     requirements.push({
       id: "reliability",
       label: objective.label,
       compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
-          ? "No completed event months"
-          : `Lowest ${formatServed(minimum)} · ${observed} of ${count} months counted`) +
+          ? `0/${count} months completed`
+          : `Lowest ${formatServed(minimum)} · ${observed}/${count} months completed`) +
         (missing || (monthsRemaining === 0 && observed < count)
           ? " · history incomplete, not verifiable"
           : ""),
-      target: `Every required month needs ${formatRequiredShare(objective.minimumDemandServed)} served`,
+      target: `≥${formatRequiredShare(objective.minimumDemandServed)} of demand monthly · ${window}`,
       timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; a month below target ends the run`,
       status: missing
         ? "unknown"
@@ -127,9 +137,9 @@ export function getMissionStatus(game: GameType) {
       label: "Retain the community",
       compact: `Customers ≥ ${formatCount(Math.ceil(threshold))} (${now ? formatCount(now.customers) : "unavailable"})`,
       current: now
-        ? `${formatCount(now.customers)} current customers`
+        ? `${formatCount(now.customers)} customers now`
         : "Current customers unavailable",
-      target: `Keep ${formatCount(Math.ceil(threshold))} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
+      target: `Retain ≥${formatCount(Math.ceil(threshold))} customers at term end`,
       timing: unreachable
         ? `No longer reachable: at most ${formatCount(unreachable.bestCase)} customers by term end`
         : scenario.ownership === "Public"
@@ -143,10 +153,8 @@ export function getMissionStatus(game: GameType) {
     id: "cash",
     label: "Keep the utility solvent",
     compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
-    current: now
-      ? `$${formatCount(now.cash)} now (partial month)`
-      : "Current cash unavailable",
-    target: "Cash must be $0 or more at every month-end",
+    current: now ? `$${formatCount(now.cash)} now` : "Current cash unavailable",
+    target: "Cash ≥$0 at every month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",
@@ -181,7 +189,7 @@ export function getMissionStatus(game: GameType) {
           .map((row) => formatServed(demandServed(row)))
           .join(" · ")}`
       : "No completed months",
-    target: `Ends if under ${firingThreshold} served 3 months in a row`,
+    target: `Avoid 3 consecutive months <${firingThreshold} served`,
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive
