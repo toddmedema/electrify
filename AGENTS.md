@@ -78,10 +78,11 @@ failures should be rare; agents without that hook should run `npm run format` be
 - `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
   Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
   screen from the card-navigation state.
-- Ordinary saves upgrade through the numbered migrations in `src/SaveUpgrade.ts`. Keep save
-  schema versions independent of the simulation compatibility digest, add a migration and
-  regression fixture for structural changes, and validate the upgraded payload before use.
-  Challenges and replays still require matching rules. Keep untrusted-import validation and
+- Ordinary saves upgrade through the numbered migrations in `src/SaveUpgrade.ts`, which receive
+  decoded saves. Keep save schema versions independent of the simulation compatibility digest,
+  add a migration and regression fixture for structural changes, and validate the upgraded
+  payload before use. Each save records its `rulesId`; challenges and replays still require
+  matching rules. Keep untrusted-import validation and
   deterministic replay behavior covered by tests.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.

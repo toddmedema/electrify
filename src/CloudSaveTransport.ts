@@ -8,27 +8,17 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { firebaseAppAuth, getDb } from "./Globals";
-import {
-  downloadSaveRecovery,
-  encodeSaveFile,
-  MAX_SAVE_FILE_BYTES,
-} from "./SaveFile";
+import { getDb } from "./Globals";
+import { encodeSaveFile, MAX_SAVE_FILE_BYTES } from "./SaveFile";
 import { parseSave } from "./SaveGame";
 import { validateSaveFileEnvelope } from "./SaveModel";
 import { newSaveId } from "./SaveRepository";
-import type { SaveFileType, SaveId, SaveMetadata, SaveRecord } from "./Types";
+import type { SaveFileType, SaveMetadata, SaveRecord } from "./Types";
 
 export const SHARE_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
 export const SHARE_ID_PATTERN = /^[A-Za-z0-9]{10}$/;
 const CHUNK_CHARACTERS = 150_000;
 export class CloudConflict extends Error {}
-
-export interface IncompatibleCloudSave {
-  id: SaveId;
-  version: string;
-  name: string;
-}
 
 export interface CloudSaveHead {
   id: string;
@@ -161,29 +151,6 @@ async function readFile(chunks: string[]): Promise<SaveFileType> {
   return validateSaveFileEnvelope(await readRawFile(chunks), parseSave);
 }
 
-/** Preserve the original payload without importing it or changing the cloud backup. */
-export async function downloadCloudSaveRecovery(
-  uid: string,
-  issue: IncompatibleCloudSave,
-): Promise<void> {
-  if (firebaseAppAuth.currentUser?.uid !== uid)
-    throw new Error("Sign in to the account that owns this backup.");
-  const snapshot = await getDocFromServer(
-    doc(getDb(), "users", uid, "cloudSaves", issue.id),
-  );
-  const data = snapshot.data();
-  if (!data) throw new Error("This cloud backup is no longer available.");
-  const head = parseHead(issue.id, data);
-  if (head.deleted || head.version !== issue.version)
-    throw new Error(
-      "This backup changed. Refresh your saved games and try again.",
-    );
-  const raw = await readRawFile(head.chunks);
-  if (firebaseAppAuth.currentUser?.uid !== uid)
-    throw new Error("Sign in to the account that owns this backup.");
-  downloadSaveRecovery(issue.id, raw);
-}
-
 export class FirebaseSaveTransport implements CloudSaveTransport {
   async list(uid: string): Promise<CloudSaveHead[]> {
     const result = await getDocsFromServer(
@@ -248,6 +215,23 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
         },
       },
     };
+  }
+  /** The exact stored JSON of one backup version, without validating, importing or changing it. */
+  async readOriginal(
+    uid: string,
+    id: string,
+    version: string,
+  ): Promise<unknown> {
+    const data = (
+      await getDocFromServer(doc(getDb(), "users", uid, "cloudSaves", id))
+    ).data();
+    if (!data) throw new Error("This cloud backup is no longer available.");
+    const head = parseHead(id, data);
+    if (head.deleted || head.version !== version)
+      throw new Error(
+        "This backup changed. Refresh your saved games and try again.",
+      );
+    return readRawFile(head.chunks);
   }
   async write(
     uid: string,

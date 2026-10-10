@@ -16,11 +16,12 @@ See [save upgrades](save-upgrades.md) for the independent schema migration contr
 
 Backups using a future, unsupported save schema stay in the account and appear by
 name with recovery downloads. They do not block healthy backups or cause the generic
-automatic-retry warning. The client remembers each incompatible account, save and
-cloud version during the session, so unchanged payloads are not downloaded again at
-each checkpoint; a changed version is validated again. Other read and write failures
+automatic-retry warning. The client remembers each incompatible save and cloud version
+for the signed-in account, so unchanged payloads are not downloaded again at each
+checkpoint; a changed version, or signing in again, validates them again. Other read and write failures
 still retry normally. Recovery downloads preserve the bounded original JSON without
-importing, rewriting or deleting it, and require the same signed-in account. A recovery
+importing, rewriting or deleting it, and require the account to stay signed in until
+the payload arrives. A recovery
 file does not make a newer save schema playable in an older app.
 
 Each backup has an opaque version checked in a Firestore transaction. Concurrent

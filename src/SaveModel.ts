@@ -7,7 +7,7 @@ import type {
   SaveStatus,
   VictoryType,
 } from "./Types";
-import { SAVE_SCHEMA_VERSION } from "./SaveUpgrade";
+import { isFutureSave } from "./SaveUpgrade";
 
 export type SaveErrorCode =
   "quota" | "unavailable" | "invalid" | "incompatible" | "missing" | "conflict";
@@ -20,6 +20,15 @@ export class SaveRepositoryError extends Error {
     super(message);
     this.name = "SaveRepositoryError";
   }
+}
+
+/** A newer app wrote this save; keep it intact rather than call it corrupt. */
+export function assertSupportedSaveSchema(raw: unknown): void {
+  if (isFutureSave(raw))
+    throw new SaveRepositoryError(
+      "incompatible",
+      "This save needs a newer version of Electrify.",
+    );
 }
 
 export const SAVE_NAME_LIMIT = 60;
@@ -331,20 +340,10 @@ export function validateSaveFileEnvelope(
     );
   }
   const name = normalizeSaveName(raw.name);
+  assertSupportedSaveSchema(raw.save);
   const save = parseSave(raw.save);
   const result =
     raw.result === undefined ? undefined : parseSavedRunResult(raw.result);
-  if (
-    !save &&
-    typeof raw.save.schemaVersion === "number" &&
-    Number.isInteger(raw.save.schemaVersion) &&
-    raw.save.schemaVersion > SAVE_SCHEMA_VERSION
-  ) {
-    throw new SaveRepositoryError(
-      "incompatible",
-      "This save needs a newer version of Electrify.",
-    );
-  }
   if (
     !save ||
     result === null ||

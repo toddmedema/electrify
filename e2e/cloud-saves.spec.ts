@@ -72,6 +72,7 @@ for (const theme of ["light", "dark"]) {
       page,
       (save) => {
         delete save.schemaVersion;
+        delete save.rulesId;
         save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
         return save.game;
       },

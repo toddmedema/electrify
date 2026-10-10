@@ -1,12 +1,13 @@
-import type {
-  CloudSaveHead,
-  CloudSaveTransport,
-  IncompatibleCloudSave,
-} from "./CloudSaveTransport";
+import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
 import { CloudConflict } from "./CloudSaveTransport";
 import { newSaveId, SaveRepository } from "./SaveRepository";
 import { normalizeSaveName, SaveRepositoryError } from "./SaveModel";
-import type { SaveMetadata, SaveRecord } from "./Types";
+import type {
+  IncompatibleCloudSave,
+  SaveId,
+  SaveMetadata,
+  SaveRecord,
+} from "./Types";
 import { DAYS_PER_YEAR } from "./Constants";
 
 export const AUTO_CLOUD_SAVE_MS = 5 * 60 * 1000;
@@ -20,7 +21,9 @@ interface SyncResult {
 
 /** Reconcile backups without making cloud availability a dependency of loading or saving. */
 export class CloudSaveSync {
-  private incompatible = new Map<string, IncompatibleCloudSave>();
+  // Verdicts for the signed-in account, so unchanged payloads aren't downloaded each checkpoint.
+  private incompatible = new Map<SaveId, IncompatibleCloudSave>();
+  private incompatibleUid?: string;
 
   constructor(
     private repository: SaveRepository,
@@ -50,16 +53,15 @@ export class CloudSaveSync {
     const remote = new Map(
       (await this.transport.list(uid)).map((head) => [head.id, head]),
     );
+    if (this.incompatibleUid !== uid) {
+      this.incompatible.clear();
+      this.incompatibleUid = uid;
+    }
     const incompatibleCloudSaves: IncompatibleCloudSave[] = [];
-    for (const [key, issue] of this.incompatible) {
-      const head = remote.get(issue.id);
-      if (
-        !key.startsWith(`${uid}/`) ||
-        !head ||
-        head.deleted ||
-        head.version !== issue.version
-      )
-        this.incompatible.delete(key);
+    for (const [id, issue] of this.incompatible) {
+      const head = remote.get(id);
+      if (!head || head.deleted || head.version !== issue.version)
+        this.incompatible.delete(id);
       else incompatibleCloudSaves.push(issue);
     }
     let conflicts = false;
@@ -187,7 +189,7 @@ export class CloudSaveSync {
           if (!dirty) {
             const record = head.deleted
               ? null
-              : await this.read(uid, head, incompatibleCloudSaves);
+              : await this.read(head, incompatibleCloudSaves);
             if (!current()) return { conflicts, deferred };
             if (!head.deleted && !record) continue;
             if (
@@ -257,12 +259,10 @@ export class CloudSaveSync {
   }
 
   private async read(
-    uid: string,
     head: CloudSaveHead,
     issues: IncompatibleCloudSave[],
   ): Promise<SaveRecord | null> {
-    const key = `${uid}/${head.id}`;
-    let issue = this.incompatible.get(key);
+    let issue = this.incompatible.get(head.id);
     if (!issue || issue.version !== head.version) {
       try {
         return await this.transport.read(head);
@@ -280,7 +280,7 @@ export class CloudSaveSync {
           // A malformed display name must not hide the retained backup.
         }
         issue = { id: head.id, version: head.version, name };
-        this.incompatible.set(key, issue);
+        this.incompatible.set(head.id, issue);
       }
     }
     if (!issues.some((existing) => existing.id === issue.id))
@@ -294,7 +294,7 @@ export class CloudSaveSync {
     current: () => boolean,
     issues: IncompatibleCloudSave[],
   ): Promise<void> {
-    const record = await this.read(uid, head, issues);
+    const record = await this.read(head, issues);
     if (record && current())
       await this.repository.applyCloud(uid, head.id, head.version, record);
   }

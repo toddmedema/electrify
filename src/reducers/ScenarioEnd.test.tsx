@@ -215,9 +215,10 @@ describe("ending a scenario from inside the reducer", () => {
   it("finishes upgraded progress with a local score and no leaderboard or replay submission", () => {
     const submitHighscore = jest.spyOn(User, "submitHighscore");
     getStore().dispatch(quit());
-    const original = createGame({ scenarioId: 100 });
-    original.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
-    const state = parseSave(serializeSave(original))!.game;
+    const state = parseSave({
+      ...serializeSave(createGame({ scenarioId: 100 })),
+      rulesId: `rules-1-${"0".repeat(64)}`,
+    })!.game;
     state.timeline.forEach((tick) => {
       tick.cash = -1e10;
     });

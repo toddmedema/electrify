@@ -1345,6 +1345,8 @@ export type SaveStatus = "inProgress" | "completed" | "bankrupt" | "fired";
 export interface SaveGameType {
   /** Absent on legacy saves; upgraded before domain validation. */
   schemaVersion?: number;
+  /** The rules the save was written under; a mismatch ends competitive claims, not progress. */
+  rulesId?: string;
   savedAt: string;
   appVersion: string;
   game: GameType;
@@ -1363,6 +1365,13 @@ export type SavedRunResult = Pick<
   | "endMessage"
   | "debrief"
 > & { outcome: Exclude<SaveStatus, "inProgress"> };
+
+/** A cloud backup in a newer save schema, retained in the account for recovery. */
+export interface IncompatibleCloudSave {
+  id: SaveId;
+  version: string;
+  name: string;
+}
 
 export interface SaveMetadata {
   upgradedFromRules?: string;

@@ -2,11 +2,7 @@ import { configureStore, Middleware } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  createSharedSave,
-  downloadCloudSaveRecovery,
-  loadSharedSave,
-} from "../../CloudSaveTransport";
+import { createSharedSave, loadSharedSave } from "../../CloudSaveTransport";
 import { firebaseAppAuth, login } from "../../Globals";
 import {
   importSavedGame,
@@ -18,7 +14,7 @@ import savesReducer, {
   SaveLibraryState,
   sessionChanged,
 } from "../../SaveLibrary";
-import { retryCloudSync } from "../../CloudSaves";
+import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
 import ShareSaveDialog from "./ShareSaveDialog";
 import SharedGameDialog from "./SharedGameDialog";
 import CloudSavePrompt, { CLOUD_PROMPT_KEY } from "./CloudSavePrompt";
@@ -44,9 +40,11 @@ jest.mock("../../SaveSession", () => ({
 jest.mock("../../CloudSaveTransport", () => ({
   createSharedSave: jest.fn(),
   loadSharedSave: jest.fn(),
-  downloadCloudSaveRecovery: jest.fn(),
 }));
-jest.mock("../../CloudSaves", () => ({ retryCloudSync: jest.fn() }));
+jest.mock("../../CloudSaves", () => ({
+  downloadCloudRecovery: jest.fn(),
+  retryCloudSync: jest.fn(),
+}));
 jest.mock("../../reducers/Card", () => ({
   navigate: (payload: string) => ({ type: "card/navigate", payload }),
 }));
@@ -349,12 +347,12 @@ it("names incompatible backups and downloads recovery without offering a sync re
       name: `Download recovery file for ${issue.name}`,
     }),
   );
-  expect(downloadCloudSaveRecovery).toHaveBeenCalledWith("alice", issue);
+  expect(downloadCloudRecovery).toHaveBeenCalledWith(issue);
   expect(screen.getByText("Recovery file downloaded.")).toBeInTheDocument();
 });
 
 it("keeps genuine sync retries and recovery failures separate", async () => {
-  (downloadCloudSaveRecovery as jest.Mock).mockRejectedValueOnce(
+  (downloadCloudRecovery as jest.Mock).mockRejectedValueOnce(
     new Error("sensitive provider error"),
   );
   renderWithSaves(<CloudSaveStatus />, {

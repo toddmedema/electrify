@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import type { SaveMetadata } from "./Types";
-import type { IncompatibleCloudSave } from "./CloudSaveTransport";
+import type { IncompatibleCloudSave, SaveMetadata } from "./Types";
 
 export interface SaveLibraryState {
   entries: SaveMetadata[];

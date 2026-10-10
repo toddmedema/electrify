@@ -1,36 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Alert, AlertTitle, Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
-import { retryCloudSync } from "../../CloudSaves";
-import { downloadCloudSaveRecovery } from "../../CloudSaveTransport";
-import type { IncompatibleCloudSave } from "../../CloudSaveTransport";
+import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
+import type { IncompatibleCloudSave } from "../../Types";
 
 function RecoveryDownload({
-  uid,
   issue,
 }: {
-  uid: string;
   issue: IncompatibleCloudSave;
 }): React.JSX.Element {
   const [state, setState] = useState<
     "idle" | "downloading" | "downloaded" | "failed"
   >("idle");
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
   const download = async () => {
     setState("downloading");
     try {
-      await downloadCloudSaveRecovery(uid, issue);
-      if (mounted.current) setState("downloaded");
+      await downloadCloudRecovery(issue);
+      setState("downloaded");
     } catch {
-      if (mounted.current) setState("failed");
+      setState("failed");
     }
   };
   return (
@@ -74,7 +64,6 @@ export default function CloudSaveStatus(): React.JSX.Element {
     cloudState,
     cloudError,
     cloudConflicts,
-    cloudUid,
     incompatibleCloudSaves = [],
   } = useAppSelector((state) => state.saves);
   if (cloudState === "signedOut" || !cloudState)
@@ -123,7 +112,7 @@ export default function CloudSaveStatus(): React.JSX.Element {
           Retry cloud backup
         </Button>
       )}
-      {!!incompatibleCloudSaves.length && cloudUid && (
+      {!!incompatibleCloudSaves.length && (
         <Alert
           severity="warning"
           sx={{ "& .MuiAlert-message": { width: "100%", minWidth: 0 } }}
@@ -137,8 +126,7 @@ export default function CloudSaveStatus(): React.JSX.Element {
           <Stack spacing={2}>
             {incompatibleCloudSaves.map((issue) => (
               <RecoveryDownload
-                key={`${cloudUid}/${issue.id}/${issue.version}`}
-                uid={cloudUid}
+                key={`${issue.id}/${issue.version}`}
                 issue={issue}
               />
             ))}

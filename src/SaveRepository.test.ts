@@ -143,6 +143,21 @@ describe("SaveRepository", () => {
     );
   });
 
+  it("keeps a device save from a newer app intact and explains it", async () => {
+    await create();
+    await mutateStoredPayload((payload) => {
+      payload.save = {
+        ...(payload.save as object),
+        schemaVersion: SAVE_SCHEMA_VERSION + 1,
+      };
+    });
+    const original = await repository.readRaw("first");
+    await expect(repository.read("first")).rejects.toMatchObject({
+      code: "incompatible",
+    });
+    expect(await repository.readRaw("first")).toEqual(original);
+  });
+
   it("acquires metadata, payload and revision atomically and excludes other live writers", async () => {
     await create();
     await expect(other.prepareResume("first", "tab-two")).rejects.toMatchObject(

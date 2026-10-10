@@ -46,6 +46,7 @@ describe("SaveModel", () => {
     file.save.game.location = file.save.game.runIdentity.inputs.location;
     const raw = encodeSaveFile(file);
     raw.save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    raw.save.rulesId = raw.save.game.runIdentity!.compatibilityId;
     const original = JSON.stringify(raw);
     const upgraded = validateSaveFileEnvelope(raw, parseSave);
     expect(upgraded.save.game.runIdentity).toBeUndefined();
