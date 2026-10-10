@@ -14,7 +14,7 @@ import savesReducer, {
   SaveLibraryState,
   sessionChanged,
 } from "../../SaveLibrary";
-import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
+import { retryCloudSync } from "../../CloudSaves";
 import { refreshToUpdate } from "../../helpers/Cache";
 import { SaveRepositoryError } from "../../SaveModel";
 import ShareSaveDialog from "./ShareSaveDialog";
@@ -44,10 +44,7 @@ jest.mock("../../CloudSaveTransport", () => ({
   loadSharedSave: jest.fn(),
 }));
 jest.mock("../../helpers/Cache", () => ({ refreshToUpdate: jest.fn() }));
-jest.mock("../../CloudSaves", () => ({
-  downloadCloudRecovery: jest.fn(),
-  retryCloudSync: jest.fn(),
-}));
+jest.mock("../../CloudSaves", () => ({ retryCloudSync: jest.fn() }));
 jest.mock("../../reducers/Card", () => ({
   navigate: (payload: string) => ({ type: "card/navigate", payload }),
 }));
@@ -350,21 +347,16 @@ it("explains retained conflict copies and provides a cloud retry after failure",
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
-it("names incompatible backups and downloads recovery without offering a sync retry", async () => {
-  const issue = { id: "old", version: "1", name: "Deep Freeze — Austin, TX" };
+it("offers a one-click update for backups from a newer version without a sync retry", async () => {
   renderWithSaves(<CloudSaveStatus />, {
     cloudState: "synced",
     cloudUid: "alice",
-    incompatibleCloudSaves: [issue],
+    incompatibleCloudSaves: [{ id: "old", version: "1" }],
   });
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Some backups need the latest version",
   );
   expect(screen.getByRole("alert")).toHaveTextContent("safe in your account");
-  await userEvent.click(
-    screen.getByRole("button", { name: "Refresh to update" }),
-  );
-  expect(refreshToUpdate).toHaveBeenCalledTimes(1);
   expect(
     screen.queryByRole("button", { name: "Retry cloud backup" }),
   ).not.toBeInTheDocument();
@@ -372,33 +364,23 @@ it("names incompatible backups and downloads recovery without offering a sync re
     "Compatible cloud backups are up to date",
   );
   await userEvent.click(
-    screen.getByRole("button", {
-      name: `Download recovery file for ${issue.name}`,
-    }),
+    screen.getByRole("button", { name: "Refresh to update" }),
   );
-  expect(downloadCloudRecovery).toHaveBeenCalledWith(issue);
-  expect(screen.getByText("Recovery file downloaded.")).toBeInTheDocument();
+  expect(refreshToUpdate).toHaveBeenCalledTimes(1);
 });
 
-it("keeps genuine sync retries and recovery failures separate", async () => {
-  (downloadCloudRecovery as jest.Mock).mockRejectedValueOnce(
-    new Error("sensitive provider error"),
-  );
+it("keeps a genuine sync retry alongside the update prompt", async () => {
   renderWithSaves(<CloudSaveStatus />, {
     cloudState: "failed",
     cloudUid: "alice",
     cloudError: "Some saves couldn't sync.",
-    incompatibleCloudSaves: [{ id: "old", version: "1", name: "Old grid" }],
+    incompatibleCloudSaves: [{ id: "old", version: "1" }],
   });
-  await userEvent.click(
-    screen.getByRole("button", { name: "Download recovery file for Old grid" }),
-  );
-  expect(screen.getByText(/Couldn't download this backup/)).toBeInTheDocument();
-  expect(screen.queryByText(/sensitive provider/)).not.toBeInTheDocument();
   await userEvent.click(
     screen.getByRole("button", { name: "Retry cloud backup" }),
   );
   expect(retryCloudSync).toHaveBeenCalledTimes(1);
+  expect(refreshToUpdate).not.toHaveBeenCalled();
 });
 
 const existingSave = {

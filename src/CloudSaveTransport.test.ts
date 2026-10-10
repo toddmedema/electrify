@@ -144,7 +144,6 @@ describe("CloudSaveTransport", () => {
       deleted: false,
       chunks: [BLOB_ID],
     };
-    documents.set("users/creator/cloudSaves/old", head);
     documents.set(`saveBlobs/${BLOB_ID}`, {
       data: JSON.stringify(raw),
       uid: "creator",
@@ -179,37 +178,16 @@ describe("CloudSaveTransport", () => {
     expect(commits.flat().every((write) => write.kind === "update")).toBe(true);
   });
 
-  it("rejects future save schemas while preserving their exact JSON for recovery", async () => {
+  it("rejects future save schemas without changing the stored backup", async () => {
     const { raw, head } = incompatibleBackup();
-    const transport = new FirebaseSaveTransport();
-    await expect(transport.read(head)).rejects.toMatchObject({
+    await expect(new FirebaseSaveTransport().read(head)).rejects.toMatchObject({
       code: "incompatible",
     });
-    expect(await transport.readOriginal("creator", "old", OLD_VERSION)).toEqual(
-      raw,
-    );
     expect(documents.get(`saveBlobs/${BLOB_ID}`)?.data).toBe(
       JSON.stringify(raw),
     );
     expect(commits).toEqual([]);
   });
-
-  it.each(["missing", "deleted", "changed", "incomplete"])(
-    "does not read a %s recovery backup",
-    async (failure) => {
-      incompatibleBackup();
-      const manifest = documents.get("users/creator/cloudSaves/old")!;
-      if (failure === "missing")
-        documents.delete("users/creator/cloudSaves/old");
-      if (failure === "deleted") manifest.deleted = true;
-      if (failure === "changed") manifest.version = "c".repeat(32);
-      if (failure === "incomplete") documents.delete(`saveBlobs/${BLOB_ID}`);
-      await expect(
-        new FirebaseSaveTransport().readOriginal("creator", "old", OLD_VERSION),
-      ).rejects.toThrow();
-      expect(commits).toEqual([]);
-    },
-  );
 
   it("uses ten alphanumeric characters and rejects biased random bytes", () => {
     const random = jest.spyOn(crypto, "getRandomValues");

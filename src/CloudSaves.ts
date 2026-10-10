@@ -5,26 +5,14 @@ import { saveRepository } from "./SaveSession";
 import { AUTO_CLOUD_SAVE_MS, CloudSaveSync } from "./CloudSaveSync";
 import { FirebaseSaveTransport } from "./CloudSaveTransport";
 import { subscribeCloudSaveRequests } from "./SaveEffects";
-import { downloadSaveRecovery } from "./SaveFile";
-import type { IncompatibleCloudSave } from "./Types";
 
-const SIGN_IN_TO_RECOVER = "Sign in to the account that owns this backup.";
 let retry = () => {};
-let recover = (_issue: IncompatibleCloudSave): Promise<void> =>
-  Promise.reject(new Error(SIGN_IN_TO_RECOVER));
 export function retryCloudSync(): void {
   retry();
 }
-/** Download a retained backup exactly as stored, for the account that is still signed in. */
-export function downloadCloudRecovery(
-  issue: IncompatibleCloudSave,
-): Promise<void> {
-  return recover(issue);
-}
 
 export function startCloudSaves(store: AppStore): () => void {
-  const transport = new FirebaseSaveTransport();
-  const sync = new CloudSaveSync(saveRepository, transport);
+  const sync = new CloudSaveSync(saveRepository, new FirebaseSaveTransport());
   let uid: string | undefined;
   let generation = 0;
   let stopped = false;
@@ -169,15 +157,6 @@ export function startCloudSaves(store: AppStore): () => void {
     forceAll = true;
     void run();
   };
-  recover = async (issue) => {
-    const account = uid;
-    const request = generation;
-    if (!account) throw new Error(SIGN_IN_TO_RECOVER);
-    const raw = await transport.readOriginal(account, issue.id, issue.version);
-    // The account changed or cloud saves stopped while the payload was in flight.
-    if (stopped || request !== generation) throw new Error(SIGN_IN_TO_RECOVER);
-    downloadSaveRecovery(issue.id, raw);
-  };
   window.addEventListener("online", wake);
   window.addEventListener("offline", offline);
   window.addEventListener("focus", wake);
@@ -185,7 +164,6 @@ export function startCloudSaves(store: AppStore): () => void {
     stopped = true;
     generation++;
     retry = () => {};
-    recover = () => Promise.reject(new Error(SIGN_IN_TO_RECOVER));
     auth();
     unsubscribe();
     unsubscribeRequests();

@@ -1,7 +1,7 @@
 import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
 import { CloudConflict } from "./CloudSaveTransport";
 import { newSaveId, SaveRepository } from "./SaveRepository";
-import { normalizeSaveName, SaveRepositoryError } from "./SaveModel";
+import { SaveRepositoryError } from "./SaveModel";
 import type {
   IncompatibleCloudSave,
   SaveId,
@@ -272,14 +272,7 @@ export class CloudSaveSync {
           error.code !== "incompatible"
         )
           throw error;
-        let name = "Unnamed cloud backup";
-        try {
-          if (typeof head.metadata?.name === "string")
-            name = normalizeSaveName(head.metadata.name);
-        } catch {
-          // A malformed display name must not hide the retained backup.
-        }
-        issue = { id: head.id, version: head.version, name };
+        issue = { id: head.id, version: head.version };
         this.incompatible.set(head.id, issue);
       }
     }

@@ -9,11 +9,15 @@ import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
+import { validReplayResult } from "./SaveModel";
 import {
   GameType,
+  MonthlyHistoryType,
   ReplayActionNameType,
   ReplayActionType,
   ReplayDocType,
+  ReplayPlaybackType,
+  ReplayResultType,
   ReplayType,
 } from "./Types";
 
@@ -51,6 +55,9 @@ export const MAX_REPLAY_ACTIONS = 2000;
  * that somehow reaches it is dropped rather than failing the score write behind it.
  */
 export const MAX_REPLAY_BYTES = 800000;
+
+// Generous past the longest scenario, so a checkpoint list can't grow a replay without bound.
+const MAX_REPLAY_MONTHS = 2400;
 
 // Only the fields of a `delta` that change how the simulation runs. Everything else the action
 // carries -- the tutorial step, the custom scenario, the difficulty picked before the game began
@@ -138,11 +145,19 @@ export function recordReplayAction(
  * from inside the reducer: the game slice is an Immer draft, and it's revoked the moment the
  * reducer returns.
  */
-export function serializeReplay(game: GameType): ReplayType | undefined {
+export function serializeReplay(
+  game: GameType,
+  result?: ReplayResultType,
+): ReplayType | undefined {
   if (!game.replayLog) {
     return undefined;
   }
   return {
+    // History is newest first; checkpoints read in the order playback reaches them
+    monthlyCash: game.monthlyHistory
+      .map((month) => cents(month.cash))
+      .reverse(),
+    result: cloneDeep(result),
     appVersion: packageJson.version,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
@@ -155,7 +170,11 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
 }
 
 export function encodeReplay(replay: ReplayType): ReplayDocType {
-  return { ...replay, actions: JSON.stringify(replay.actions) };
+  // Firestore rejects undefined fields outright, and an optional field left undefined would
+  // otherwise drop the whole replay from the score it belongs to.
+  return JSON.parse(
+    JSON.stringify({ ...replay, actions: JSON.stringify(replay.actions) }),
+  );
 }
 
 /** Bytes the encoded replay will occupy, for checking against Firestore's document limit. */
@@ -164,6 +183,28 @@ export function replayByteLength(doc: ReplayDocType): number {
   return typeof TextEncoder === "undefined"
     ? json.length
     : new TextEncoder().encode(json).length;
+}
+
+function cents(dollars: number): number {
+  return Math.round(dollars * 100);
+}
+
+/**
+ * Compares the month playback just closed with the original run's. Playback re-simulates under
+ * whichever build is watching, and a later change to the rules can make the same actions play out
+ * differently. Returns true only at the first month that drifts, so it is reported once.
+ */
+export function replayDiverged(
+  playback: ReplayPlaybackType,
+  history: MonthlyHistoryType[],
+): boolean {
+  const expected = playback.monthlyCash?.[history.length - 1];
+  if (playback.diverged || expected === undefined || !history.length)
+    return false;
+  // A cent of slack absorbs rounding at the boundary; real drift is far larger
+  if (Math.abs(cents(history[0].cash) - expected) <= 1) return false;
+  playback.diverged = true;
+  return true;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -299,7 +340,12 @@ export function decodeReplay(raw: unknown): ReplayType | null {
       typeof doc.meaningfulDecisionGateWaived !== "boolean") ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
-    !isValidLocation(doc.location)
+    !isValidLocation(doc.location) ||
+    (doc.monthlyCash !== undefined &&
+      (!Array.isArray(doc.monthlyCash) ||
+        doc.monthlyCash.length > MAX_REPLAY_MONTHS ||
+        !doc.monthlyCash.every(Number.isSafeInteger))) ||
+    (doc.result !== undefined && !validReplayResult(doc.result))
   ) {
     return null;
   }
@@ -315,5 +361,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     location: doc.location,
     actions,
     meaningfulDecisionGateWaived: doc.meaningfulDecisionGateWaived || undefined,
+    monthlyCash: doc.monthlyCash,
+    result: doc.result,
   };
 }

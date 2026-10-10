@@ -1,5 +1,7 @@
 import type {
   GameType,
+  ReplayResultType,
+  ScoreBreakdownType,
   SaveFileType,
   SaveGameType,
   SaveMetadata,
@@ -123,6 +125,26 @@ const categories = new Set([
   "emissions",
   "blackouts",
 ]);
+function validScoreBreakdown(raw: unknown): raw is ScoreBreakdownType {
+  return (
+    object(raw) &&
+    Object.entries(raw).every(
+      ([key, value]) => categories.has(key) && finite(value),
+    )
+  );
+}
+
+/** The original result a replay carries; presentation data, never a score submission. */
+export function validReplayResult(raw: unknown): raw is ReplayResultType {
+  return (
+    object(raw) &&
+    Object.keys(raw).sort().join() === "breakdown,outcome,score" &&
+    finite(raw.score) &&
+    outcomes.has(raw.outcome as string) &&
+    validScoreBreakdown(raw.breakdown)
+  );
+}
+
 const fuels = new Set([
   "Coal",
   "Biomass",
@@ -196,10 +218,7 @@ export function parseSavedRunResult(raw: unknown): SavedRunResult | null {
     !difficulties.has(raw.difficulty as string) ||
     !finite(raw.score) ||
     !outcomes.has(raw.outcome as string) ||
-    !object(raw.breakdown) ||
-    Object.entries(raw.breakdown).some(
-      ([key, value]) => !categories.has(key) || !finite(value),
-    ) ||
+    !validScoreBreakdown(raw.breakdown) ||
     (raw.endTitle !== undefined && !text(raw.endTitle)) ||
     (raw.endMessage !== undefined && !text(raw.endMessage))
   )

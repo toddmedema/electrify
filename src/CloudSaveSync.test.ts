@@ -134,7 +134,7 @@ describe("CloudSaveSync", () => {
     const result = await sync.sync("alice");
     expect(result).toMatchObject({
       failed: false,
-      incompatibleCloudSaves: [{ id: "old", version: "1", name: "old" }],
+      incompatibleCloudSaves: [{ id: "old", version: "1" }],
     });
     expect(cloud.records.get("healthy")?.metadata.name).toBe("healthy");
     expect(cloud.records.has("old")).toBe(true);
@@ -197,9 +197,9 @@ describe("CloudSaveSync", () => {
     const read = jest
       .spyOn(cloud, "read")
       .mockRejectedValue(new SaveRepositoryError("incompatible", "old build"));
-    expect((await sync.sync("alice")).incompatibleCloudSaves?.[0].name).toBe(
-      "Unnamed cloud backup",
-    );
+    expect((await sync.sync("alice")).incompatibleCloudSaves).toEqual([
+      { id: "remote", version: "1" },
+    ]);
     await sync.sync("bob");
     expect(read).toHaveBeenCalledTimes(2);
     cloud.heads.delete("remote");

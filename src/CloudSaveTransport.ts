@@ -131,7 +131,7 @@ function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
   };
 }
 
-async function readRawFile(chunks: string[]): Promise<unknown> {
+async function readFile(chunks: string[]): Promise<SaveFileType> {
   const snapshots = await Promise.all(
     chunks.map((id) => getDocFromServer(doc(getDb(), "saveBlobs", id))),
   );
@@ -144,11 +144,7 @@ async function readRawFile(chunks: string[]): Promise<unknown> {
   }
   if (new TextEncoder().encode(json).length > MAX_SAVE_FILE_BYTES)
     throw new Error("This cloud save is too large.");
-  return JSON.parse(json);
-}
-
-async function readFile(chunks: string[]): Promise<SaveFileType> {
-  return validateSaveFileEnvelope(await readRawFile(chunks), parseSave);
+  return validateSaveFileEnvelope(JSON.parse(json), parseSave);
 }
 
 export class FirebaseSaveTransport implements CloudSaveTransport {
@@ -214,23 +210,6 @@ export class FirebaseSaveTransport implements CloudSaveTransport {
         },
       },
     };
-  }
-  /** The exact stored JSON of one backup version, without validating, importing or changing it. */
-  async readOriginal(
-    uid: string,
-    id: string,
-    version: string,
-  ): Promise<unknown> {
-    const data = (
-      await getDocFromServer(doc(getDb(), "users", uid, "cloudSaves", id))
-    ).data();
-    if (!data) throw new Error("This cloud backup is no longer available.");
-    const head = parseHead(id, data);
-    if (head.deleted || head.version !== version)
-      throw new Error(
-        "This backup changed. Refresh your saved games and try again.",
-      );
-    return readRawFile(head.chunks);
   }
   async write(
     uid: string,

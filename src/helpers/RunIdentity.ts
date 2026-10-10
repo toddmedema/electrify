@@ -100,6 +100,19 @@ export function projectAuthoredRunReference(
     : undefined;
 }
 /**
+ * Links outlive deploys: an invitation from an earlier build names the same scenario, seed and
+ * difficulty under the running rules. The rest of the invitation is validated as usual.
+ */
+export function carryInvitationForward(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const { run } = raw as { run?: unknown };
+  if (!run || typeof run !== "object" || Array.isArray(run)) return raw;
+  return {
+    ...raw,
+    run: { ...run, compatibilityId: manifest.compatibilityId },
+  };
+}
+/**
  * Carry an authored run saved under earlier rules forward to the running ones. Deploys change
  * the rules fingerprint several times a day, and that must not end a run, its challenge, its
  * replay or its score. A run whose scenario no longer describes the game keeps its progress

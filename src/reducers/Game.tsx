@@ -267,7 +267,12 @@ import {
 import { getStore } from "../StoreRegistry";
 import { start, loaded, quit, resume, startReplay } from "./GameActions";
 import { currentRunSaveEffects, RunSaveEffects } from "../SaveEffects";
-import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
+import {
+  recordReplayAction,
+  recordedDelta,
+  replayDiverged,
+  serializeReplay,
+} from "../Replay";
 import {
   ActiveWorldEventType,
   ConstructionEmissions,
@@ -2040,7 +2045,12 @@ export const gameSlice = createSlice({
         // which is what makes the replay run against the weather the original player saw
         location: cloneDeep(replay.location),
         meaningfulDecisionGateWaived: !!replay.meaningfulDecisionGateWaived,
-        replayPlayback: { actions: cloneDeep(replay.actions), index: 0 },
+        replayPlayback: {
+          actions: cloneDeep(replay.actions),
+          index: 0,
+          monthlyCash: cloneDeep(replay.monthlyCash),
+          result: cloneDeep(replay.result),
+        },
       };
     });
     builder.addCase(loaded, (state) => {
@@ -3261,6 +3271,11 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
 
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      if (state.replayPlayback && replayDiverged(state.replayPlayback, history))
+        logEvent("replay_diverged", {
+          scenarioId: state.scenarioId,
+          month: history.length,
+        });
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Once a month, not once a tick: a lender looks at a year of results, and a
       // rate that moved every tick would be unplannable.
@@ -3363,7 +3378,19 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
         const challenge = state.challenge
           ? cloneDeep(state.challenge)
           : undefined;
-        const replay = submitsScore ? serializeReplay(state) : undefined;
+        const replay = submitsScore
+          ? serializeReplay(state, {
+              score: finalScore,
+              breakdown: score,
+              outcome,
+            })
+          : undefined;
+        // Watching a run shows what it actually scored, even where a later build plays it out
+        // differently. Its re-simulated ending is shown only if it ends the same way.
+        const recorded = isReplay
+          ? cloneDeep(state.replayPlayback?.result)
+          : undefined;
+        const sameEnding = !recorded || recorded.outcome === outcome;
         const debrief = buildVictoryDebrief(
           scenario,
           summary,
@@ -3423,14 +3450,17 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
               scenarioId: scoredScenarioId,
               scenarioName,
               difficulty,
-              score: finalScore,
-              breakdown: score,
-              endTitle,
-              endMessage:
-                typeof endMessage === "function" ? endMessage() : endMessage,
+              score: recorded?.score ?? finalScore,
+              breakdown: recorded?.breakdown ?? score,
+              endTitle: sameEnding ? endTitle : undefined,
+              endMessage: !sameEnding
+                ? undefined
+                : typeof endMessage === "function"
+                  ? endMessage()
+                  : endMessage,
               ranked,
               previousBest,
-              outcome,
+              outcome: recorded?.outcome ?? outcome,
               debrief,
             }),
           );

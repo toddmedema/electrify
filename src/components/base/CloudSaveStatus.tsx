@@ -1,63 +1,9 @@
-import { useState } from "react";
 import { Alert, AlertTitle, Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
 import { refreshToUpdate } from "../../helpers/Cache";
-import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
-import type { IncompatibleCloudSave } from "../../Types";
-
-function RecoveryDownload({
-  issue,
-}: {
-  issue: IncompatibleCloudSave;
-}): React.JSX.Element {
-  const [state, setState] = useState<
-    "idle" | "downloading" | "downloaded" | "failed"
-  >("idle");
-  const download = async () => {
-    setState("downloading");
-    try {
-      await downloadCloudRecovery(issue);
-      setState("downloaded");
-    } catch {
-      setState("failed");
-    }
-  };
-  return (
-    <Stack spacing={1}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        sx={{ alignItems: { sm: "center" } }}
-      >
-        <Typography sx={{ flex: 1, overflowWrap: "anywhere", minWidth: 0 }}>
-          {issue.name}
-        </Typography>
-        <Button
-          variant="outlined"
-          disabled={state === "downloading"}
-          onClick={() => void download()}
-          aria-label={`Download recovery file for ${issue.name}`}
-          sx={{ flexShrink: 0 }}
-        >
-          {state === "downloading" ? "Downloading…" : "Download recovery file"}
-        </Button>
-      </Stack>
-      {state === "downloaded" && (
-        <Typography variant="body2" role="status">
-          Recovery file downloaded.
-        </Typography>
-      )}
-      {state === "failed" && (
-        <Typography variant="body2" role="alert">
-          Couldn't download this backup. Check your connection and account, then
-          try again.
-        </Typography>
-      )}
-    </Stack>
-  );
-}
+import { retryCloudSync } from "../../CloudSaves";
 
 export default function CloudSaveStatus(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -114,29 +60,16 @@ export default function CloudSaveStatus(): React.JSX.Element {
         </Button>
       )}
       {!!incompatibleCloudSaves.length && (
-        <Alert
-          severity="warning"
-          sx={{ "& .MuiAlert-message": { width: "100%", minWidth: 0 } }}
-        >
+        <Alert severity="warning">
           <AlertTitle>Some backups need the latest version</AlertTitle>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            A newer version of Electrify saved these games. They're safe in your
-            account. Refresh to update, and they'll load normally.
+            A newer version of Electrify saved some of your cloud backups.
+            They're safe in your account. Refresh to update, and they'll load
+            normally.
           </Typography>
-          <Button variant="contained" onClick={refreshToUpdate} sx={{ mb: 2 }}>
+          <Button variant="contained" onClick={refreshToUpdate}>
             Refresh to update
           </Button>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            If they still don't open, keep a copy of the original data:
-          </Typography>
-          <Stack spacing={2}>
-            {incompatibleCloudSaves.map((issue) => (
-              <RecoveryDownload
-                key={`${issue.id}/${issue.version}`}
-                issue={issue}
-              />
-            ))}
-          </Stack>
         </Alert>
       )}
       {cloudConflicts && (

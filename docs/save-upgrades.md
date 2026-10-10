@@ -31,8 +31,11 @@ player. If the scenario no longer describes the game (removed, or moved to anoth
 location), progress is kept without the shareable identity and challenge. A challenge
 that never matched its own run is still rejected as corrupt.
 
-Replays already re-simulate under whichever build plays them, so a run that spans
-deploys is no different from an older replay watched today.
+Replays re-simulate under whichever build plays them, so a run that spans deploys is
+no different from an older replay watched today. Each uploaded replay also records the
+original run's month-end cash and final result. Playback reports the first month that
+drifts (`replay_diverged` analytics) and the end screen always shows the score the
+run actually earned.
 
 The same boundary covers IndexedDB reads, cloud restore, shared snapshots and file
 imports. Reading a device save leaves the original stored payload intact; normal

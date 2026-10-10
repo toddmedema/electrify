@@ -1,10 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import savesReducer from "./SaveLibrary";
-import {
-  downloadCloudRecovery,
-  startCloudSaves,
-  retryCloudSync,
-} from "./CloudSaves";
+import { startCloudSaves, retryCloudSync } from "./CloudSaves";
 import type { AppStore } from "./Store";
 import { requestCloudSave } from "./SaveEffects";
 
@@ -12,8 +8,6 @@ let mockAuth: (user: { uid: string } | null) => void;
 let mockChanged: () => void;
 const mockSync = jest.fn();
 const mockList = jest.fn();
-const mockReadOriginal = jest.fn();
-const mockDownload = jest.fn();
 const mockUnsubscribeAuth = jest.fn();
 const mockUnsubscribeRepository = jest.fn();
 jest.mock("./Globals", () => ({
@@ -39,14 +33,7 @@ jest.mock("./CloudSaveSync", () => ({
     sync = mockSync;
   },
 }));
-jest.mock("./CloudSaveTransport", () => ({
-  FirebaseSaveTransport: class {
-    readOriginal = mockReadOriginal;
-  },
-}));
-jest.mock("./SaveFile", () => ({
-  downloadSaveRecovery: (...args: unknown[]) => mockDownload(...args),
-}));
+jest.mock("./CloudSaveTransport", () => ({ FirebaseSaveTransport: class {} }));
 
 const settle = async () => {
   for (let index = 0; index < 8; index++) await Promise.resolve();
@@ -222,7 +209,7 @@ it("surfaces partial failures while preserving normal local save state", async (
 });
 
 it("shows incompatible backups separately and clears them on account changes", async () => {
-  const issues = [{ id: "old", name: "Old grid", version: "1" }];
+  const issues = [{ id: "old", version: "1" }];
   mockSync.mockResolvedValueOnce({
     conflicts: false,
     deferred: false,
@@ -244,30 +231,6 @@ it("shows incompatible backups separately and clears them on account changes", a
   expect(store.getState().saves.incompatibleCloudSaves).toEqual([]);
   mockAuth(null);
   expect(store.getState().saves.incompatibleCloudSaves).toEqual([]);
-});
-
-it("downloads recovery only for the account still signed in", async () => {
-  const issue = { id: "old", name: "Old grid", version: "1" };
-  mockAuth(null);
-  await expect(downloadCloudRecovery(issue)).rejects.toThrow(/account/);
-  expect(mockReadOriginal).not.toHaveBeenCalled();
-  mockAuth({ uid: "alice" });
-  await settle();
-  mockReadOriginal.mockResolvedValueOnce({ save: "original" });
-  await downloadCloudRecovery(issue);
-  expect(mockReadOriginal).toHaveBeenCalledWith("alice", "old", "1");
-  expect(mockDownload).toHaveBeenCalledWith("old", { save: "original" });
-  let resolve!: (raw: unknown) => void;
-  mockReadOriginal.mockReturnValueOnce(
-    new Promise((done) => {
-      resolve = done;
-    }),
-  );
-  const pending = downloadCloudRecovery(issue);
-  mockAuth({ uid: "bob" });
-  resolve({ save: "alice" });
-  await expect(pending).rejects.toThrow(/account/);
-  expect(mockDownload).toHaveBeenCalledTimes(1);
 });
 
 it("unsubscribes listeners and invalidates unfinished work on teardown", async () => {

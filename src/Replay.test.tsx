@@ -6,8 +6,16 @@ import {
   recordedDelta,
   recordReplayAction,
   replayByteLength,
+  replayDiverged,
+  serializeReplay,
 } from "./Replay";
-import { GameType, ReplayActionType, ReplayType } from "./Types";
+import {
+  GameType,
+  MonthlyHistoryType,
+  ReplayActionType,
+  ReplayPlaybackType,
+  ReplayType,
+} from "./Types";
 
 const generatorQuote = {
   name: "Oil",
@@ -246,7 +254,70 @@ describe("recordReplayAction", () => {
   });
 });
 
+describe("replay checkpoints", () => {
+  const result = {
+    score: 640,
+    breakdown: { supply: 600, netWorth: 40 },
+    outcome: "completed" as const,
+  };
+  const months = (...cash: number[]) =>
+    cash.map((value) => ({ cash: value }) as MonthlyHistoryType);
+
+  it("records month-end cash oldest first, in cents, with the original result", () => {
+    const game = {
+      ...aGame(0, []),
+      scenarioId: 101,
+      difficulty: "Employee",
+      seed: 1,
+      location: LOCATIONS.SF,
+      // Newest first, the way the reducer keeps history
+      monthlyHistory: months(3.456, 2, 1.004),
+    } as GameType;
+    expect(serializeReplay(game, result)).toMatchObject({
+      monthlyCash: [100, 200, 346],
+      result,
+    });
+  });
+
+  it("reports the first month that no longer matches, once", () => {
+    const playback: ReplayPlaybackType = {
+      actions: [],
+      index: 0,
+      monthlyCash: [100, 200, 300],
+    };
+    expect(replayDiverged(playback, months(1))).toBe(false);
+    expect(replayDiverged(playback, months(2.01, 1))).toBe(false);
+    expect(replayDiverged(playback, months(9, 2, 1))).toBe(true);
+    expect(playback.diverged).toBe(true);
+    expect(replayDiverged(playback, months(8, 9, 2, 1))).toBe(false);
+    // Replays recorded before checkpoints existed have nothing to compare
+    expect(replayDiverged({ actions: [], index: 0 }, months(5))).toBe(false);
+  });
+
+  it("round trips checkpoints and rejects malformed ones", () => {
+    const replay = aReplay({ monthlyCash: [100, -250], result });
+    expect(decodeReplay(encodeReplay(replay))).toEqual(replay);
+    for (const patch of [
+      { monthlyCash: [1.5] },
+      { monthlyCash: "100" },
+      { monthlyCash: new Array(2401).fill(0) },
+      { result: { ...result, outcome: "won" } },
+      { result: { ...result, breakdown: { luck: 1 } } },
+      { result: { ...result, extra: true } },
+    ])
+      expect(decodeReplay({ ...encodeReplay(replay), ...patch })).toBeNull();
+  });
+});
+
 describe("encodeReplay", () => {
+  it("leaves out undefined fields, which Firestore rejects", () => {
+    const doc = encodeReplay(
+      aReplay({ meaningfulDecisionGateWaived: undefined, result: undefined }),
+    );
+    expect(Object.values(doc)).not.toContain(undefined);
+    expect("meaningfulDecisionGateWaived" in doc).toBe(false);
+  });
+
   it("stores the actions as JSON, so nothing nests inside a Firestore array", () => {
     const doc = encodeReplay(aReplay());
     expect(typeof doc.actions).toBe("string");

@@ -12,14 +12,12 @@ see the optional sign-in invitation only after their first successful Save & Qui
 Backups upgrade silently before validation and restore, including backups with an
 older rules fingerprint; see [save upgrades](save-upgrades.md).
 
-Backups using a future, unsupported save schema stay in the account and appear by
-name, with **Refresh to update** and recovery downloads. They do not block healthy backups or cause the generic
-automatic-retry warning. The client remembers each incompatible save and cloud version
-for the signed-in account, so unchanged payloads are not downloaded again at each
-checkpoint; a changed version, or signing in again, validates them again. Other read
-and write failures still retry normally. Recovery downloads preserve the bounded
-original JSON without importing, rewriting or deleting it, and require the account to
-stay signed in until the payload arrives.
+Backups using a future, unsupported save schema stay untouched in the account, and
+Saved games offers **Refresh to update**. They do not block healthy backups or cause the
+generic automatic-retry warning. The client remembers each incompatible save and cloud
+version for the signed-in account, so unchanged payloads are not downloaded again at
+each checkpoint; a changed version, or signing in again, validates them again. Other
+read and write failures still retry normally.
 
 Each backup has an opaque version checked in a Firestore transaction. Concurrent
 offline edits keep both copies; an active local writer is never replaced. Local

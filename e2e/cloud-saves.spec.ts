@@ -136,16 +136,8 @@ for (const theme of ["light", "dark"]) {
               cloudUid: "review-fixture",
               cloudState: "synced",
               incompatibleCloudSaves: [
-                {
-                  id: "old-austin",
-                  version: "old",
-                  name: "Deep Freeze — Austin, TX",
-                },
-                {
-                  id: "old-pittsburgh",
-                  version: "old",
-                  name: "Rise of Renewables — Pittsburgh, PA — planning experiment",
-                },
+                { id: "old-austin", version: "old" },
+                { id: "old-pittsburgh", version: "old" },
               ],
             },
           });
