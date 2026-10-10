@@ -1988,7 +1988,6 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(start, (state, action) => {
-      state.upgradedFromRules = undefined;
       state.runIdentity = undefined;
       state.challenge = undefined;
       state.scenarioId = action.payload;
@@ -3336,11 +3335,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
       // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
       // and rules the player gave themselves - would be scored against each other as if they
       // were the same scenario. Replays likewise belong to the original player, not the viewer.
-      // Progress continued across a rules update no longer has equivalent scoring conditions.
-      const ranked =
-        scenario.id !== CUSTOM_SCENARIO_ID &&
-        !isReplay &&
-        !state.upgradedFromRules;
+      const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
 
       /**
        * All non-tutorial endings use one scoring path. In particular, bankruptcy and firing used

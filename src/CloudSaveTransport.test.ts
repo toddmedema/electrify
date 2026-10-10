@@ -156,7 +156,7 @@ describe("CloudSaveTransport", () => {
     shared();
     documents.get(`saveBlobs/${BLOB_ID}`)!.data = JSON.stringify(legacyFile);
     const file = await loadSharedSave(SHARE_ID);
-    expect(file.save.game.upgradedFromRules).toBe(
+    expect(file.save.game.runIdentity?.compatibilityId).not.toBe(
       legacyFile.save.game.runIdentity.compatibilityId,
     );
     expect(file.save.game.customerRate).toBe(0.081);
@@ -172,10 +172,7 @@ describe("CloudSaveTransport", () => {
         scenarioName: "Rise of Renewables",
       } as SaveRecord["metadata"],
     });
-    expect(record.save.game.runIdentity).toBeUndefined();
-    expect(record.metadata.upgradedFromRules).toBe(
-      legacyFile.save.game.runIdentity.compatibilityId,
-    );
+    expect(record.save.game.runIdentity).toEqual(file.save.game.runIdentity);
     expect(documents.get(`saveBlobs/${BLOB_ID}`)?.data).toBe(
       JSON.stringify(legacyFile),
     );

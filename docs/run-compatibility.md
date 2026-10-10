@@ -26,8 +26,9 @@ simulation formulas. Because inputs are selected by directory, keep content that
 only the interface reads, such as manual entries or map artwork, under
 `src/components` rather than `src/data`, so editing it does not invalidate
 challenges. Ordinary scenario sharing remains available when a challenge
-is incompatible. No historical simulation runtime is provided. Ordinary saved games
-upgrade independently, as described in [save upgrades](save-upgrades.md).
+is incompatible. No historical simulation runtime is provided. Saved games, including
+challenged runs in progress, carry forward silently, as described in
+[save upgrades](save-upgrades.md).
 
 When changing simulation behavior outside these directories, add the source to
 the generator's inputs, or bump `rulesRevision` in the generator.

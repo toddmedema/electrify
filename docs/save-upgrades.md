@@ -1,10 +1,9 @@
 # Save upgrades
 
-Production deployments can change the broad challenge/replay rules fingerprint even
-when the save's structure is unchanged. That fingerprint must not be a gate for
-resuming ordinary progress. An open tab can also create a fresh save using the rules
-of an earlier deployment. `appVersion` identifies the app release; it does not define
-the save schema or establish equivalent simulation conditions.
+We deploy several times a day, and most deploys change the broad rules fingerprint
+(`compatibilityId`) even when nothing a player would notice has changed. A deploy is
+not a new game: saved progress upgrades silently and keeps everything it had. Players
+are only told when this app is too old for a save, and are offered a one-click update.
 
 ## Schema migrations
 
@@ -18,30 +17,29 @@ state are rejected rather than guessed at.
 
 A well-formed newer `schemaVersion` is reported as `incompatible`, not `invalid`, for
 device saves, cloud backups, shared snapshots and imported files alike. The original
-stays untouched; see [cloud saves](cloud-saves.md) for recovery downloads.
+stays untouched, and the message offers **Refresh to update**: page loads are
+network-first, so a reload picks up the deployed version.
 
 ## Rules changes
 
-Every save records the rules fingerprint it was written under as `rulesId`. The 0-to-1
-migration takes it from the run identity of an unversioned save, or `legacy` when the
-save has none. `parseSave` compares it with the running build. On a mismatch it
-preserves game progress, records `upgradedFromRules`, and drops the challenge,
-shareable run identity and replay action log. The discarded identity is not checked
-further: it can no longer authorize anything, so it must not decide whether progress
-loads. Continued play uses current rules and data. Scores remain visible locally, but
-upgraded runs cannot submit to leaderboards or claim equivalent challenge/replay
-conditions. Starting a new game clears this restriction. Current matching challenges
-and deterministic replays are unchanged.
+`parseSave` carries an authored run saved under an earlier fingerprint forward to the
+running rules (`carryRunForward` in `src/helpers/RunIdentity.ts`). It re-derives the run
+identity from the scenario, seed and difficulty, moves a matching friend challenge to
+the same reference, and keeps the replay log. The run still ranks, submits its score
+and its replay, and compares against the challenge target. Nothing is shown to the
+player. If the scenario no longer describes the game (removed, or moved to another
+location), progress is kept without the shareable identity and challenge. A challenge
+that never matched its own run is still rejected as corrupt.
+
+Replays already re-simulate under whichever build plays them, so a run that spans
+deploys is no different from an older replay watched today.
 
 The same boundary covers IndexedDB reads, cloud restore, shared snapshots and file
 imports. Reading a device save leaves the original stored payload intact; normal
-subsequent saves persist the current schema, rules and upgrade marker through existing
-atomic, revision-checked writes. Cloud restore stores the validated upgrade locally.
-Cloud replacement follows the normal explicit-save/checkpoint rules; loading never
-deletes the cloud original. Saved games identifies persisted upgrades and keeps Load
-enabled.
+subsequent saves persist the current schema through existing atomic, revision-checked
+writes. Cloud restore stores the validated upgrade locally. Cloud replacement follows
+the normal explicit-save/checkpoint rules; loading never deletes the cloud original.
 
 For every new structural migration, add an old-schema fixture, assertions that
 progress is retained, an idempotent current-schema round trip, malformed/future-schema
-rejections, and a resumed simulation check. Do not relax challenge or replay validators
-to make a save migration pass.
+rejections, and a resumed simulation check.

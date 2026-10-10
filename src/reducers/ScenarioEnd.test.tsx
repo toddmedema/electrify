@@ -212,13 +212,13 @@ describe("ending a scenario from inside the reducer", () => {
     );
   });
 
-  it("finishes upgraded progress with a local score and no leaderboard or replay submission", () => {
+  it("ranks and submits a run carried forward from an earlier deploy", () => {
     const submitHighscore = jest.spyOn(User, "submitHighscore");
     getStore().dispatch(quit());
-    const state = parseSave({
-      ...serializeSave(createGame({ scenarioId: 100 })),
-      rulesId: `rules-1-${"0".repeat(64)}`,
-    })!.game;
+    const saved = serializeSave(createGame({ scenarioId: 100 }));
+    const current = saved.game.runIdentity!.compatibilityId;
+    saved.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+    const state = parseSave(saved)!.game;
     state.timeline.forEach((tick) => {
       tick.cash = -1e10;
     });
@@ -227,12 +227,11 @@ describe("ending a scenario from inside the reducer", () => {
     const victory = getStore().getState().ui.victory;
     expect(victory).toMatchObject({
       scenarioId: 100,
-      ranked: false,
+      ranked: true,
       outcome: "bankrupt",
     });
-    expect(victory?.runIdentity).toBeUndefined();
-    expect(victory?.challenge).toBeUndefined();
-    expect(submitHighscore).not.toHaveBeenCalled();
+    expect(victory?.runIdentity?.compatibilityId).toBe(current);
+    expect(submitHighscore).toHaveBeenCalledTimes(1);
   });
 
   it("shows and submits a score after the player is fired", () => {

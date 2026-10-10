@@ -74,17 +74,6 @@ function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
 
 beforeEach(() => jest.clearAllMocks());
 
-it("explains upgraded progress while keeping Load available", async () => {
-  renderLibrary({
-    entries: [entry({ upgradedFromRules: `rules-1-${"0".repeat(64)}` })],
-  });
-  expect(screen.getByText(/Updated for this game version/)).toHaveTextContent(
-    "leaderboard and challenge comparisons are disabled",
-  );
-  await userEvent.click(screen.getByRole("button", { name: "Load" }));
-  expect(resumeSavedGame).toHaveBeenCalledWith("wind");
-});
-
 it.each([0, 1, 2, 3])("hides search for a library with %i saves", (count) => {
   renderLibrary({
     entries: Array.from({ length: count }, (_, i) => entry({ id: String(i) })),

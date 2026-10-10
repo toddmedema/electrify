@@ -121,7 +121,7 @@ describe("SaveRepository", () => {
     );
     expect(record.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(record.save.game.customerRate).toBe(0.081);
-    expect(record.metadata.upgradedFromRules).toBe(
+    expect(record.save.game.runIdentity?.compatibilityId).not.toBe(
       legacyFile.save.game.runIdentity.compatibilityId,
     );
     expect(await repository.readRaw("first")).toEqual(original);
@@ -133,14 +133,9 @@ describe("SaveRepository", () => {
     expect((await repository.readRaw("first")).payload).toMatchObject({
       save: {
         schemaVersion: SAVE_SCHEMA_VERSION,
-        game: {
-          upgradedFromRules: legacyFile.save.game.runIdentity.compatibilityId,
-        },
+        game: { runIdentity: record.save.game.runIdentity },
       },
     });
-    expect((await repository.list())[0].upgradedFromRules).toBe(
-      legacyFile.save.game.runIdentity.compatibilityId,
-    );
   });
 
   it("keeps a device save from a newer app intact and explains it", async () => {

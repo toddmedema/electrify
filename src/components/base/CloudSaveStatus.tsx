@@ -3,6 +3,7 @@ import { Alert, AlertTitle, Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
+import { refreshToUpdate } from "../../helpers/Cache";
 import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
 import type { IncompatibleCloudSave } from "../../Types";
 
@@ -117,11 +118,16 @@ export default function CloudSaveStatus(): React.JSX.Element {
           severity="warning"
           sx={{ "& .MuiAlert-message": { width: "100%", minWidth: 0 } }}
         >
-          <AlertTitle>Backups need a newer game version</AlertTitle>
+          <AlertTitle>Some backups need the latest version</AlertTitle>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            These backups use a newer save format. They are still stored in your
-            account. Download a recovery file to keep the original data; it
-            won't make the game playable in this version.
+            A newer version of Electrify saved these games. They're safe in your
+            account. Refresh to update, and they'll load normally.
+          </Typography>
+          <Button variant="contained" onClick={refreshToUpdate} sx={{ mb: 2 }}>
+            Refresh to update
+          </Button>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            If they still don't open, keep a copy of the original data:
           </Typography>
           <Stack spacing={2}>
             {incompatibleCloudSaves.map((issue) => (

@@ -15,6 +15,8 @@ import savesReducer, {
   sessionChanged,
 } from "../../SaveLibrary";
 import { downloadCloudRecovery, retryCloudSync } from "../../CloudSaves";
+import { refreshToUpdate } from "../../helpers/Cache";
+import { SaveRepositoryError } from "../../SaveModel";
 import ShareSaveDialog from "./ShareSaveDialog";
 import SharedGameDialog from "./SharedGameDialog";
 import CloudSavePrompt, { CLOUD_PROMPT_KEY } from "./CloudSavePrompt";
@@ -41,6 +43,7 @@ jest.mock("../../CloudSaveTransport", () => ({
   createSharedSave: jest.fn(),
   loadSharedSave: jest.fn(),
 }));
+jest.mock("../../helpers/Cache", () => ({ refreshToUpdate: jest.fn() }));
 jest.mock("../../CloudSaves", () => ({
   downloadCloudRecovery: jest.fn(),
   retryCloudSync: jest.fn(),
@@ -292,6 +295,28 @@ it("explains unavailable shared links and retries without importing anything", a
   expect(mockImport).not.toHaveBeenCalled();
 });
 
+it("offers a one-click update for a game shared from a newer version", async () => {
+  window.history.replaceState(null, "", "/?game=Abc123Xy90");
+  mockLoad.mockRejectedValueOnce(
+    new SaveRepositoryError(
+      "incompatible",
+      "This save needs a newer version of Electrify.",
+    ),
+  );
+  renderWithSaves(<SharedGameDialog />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "shared from a newer version of Electrify",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Retry" }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Refresh to update" }),
+  );
+  expect(refreshToUpdate).toHaveBeenCalledTimes(1);
+  expect(mockImport).not.toHaveBeenCalled();
+});
+
 it.each([
   ["synced", "Cloud backup up to date. Games load from this device."],
   [
@@ -332,10 +357,14 @@ it("names incompatible backups and downloads recovery without offering a sync re
     cloudUid: "alice",
     incompatibleCloudSaves: [issue],
   });
-  expect(screen.getByRole("alert")).toHaveTextContent("newer save format");
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "still stored in your account",
+    "Some backups need the latest version",
   );
+  expect(screen.getByRole("alert")).toHaveTextContent("safe in your account");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Refresh to update" }),
+  );
+  expect(refreshToUpdate).toHaveBeenCalledTimes(1);
   expect(
     screen.queryByRole("button", { name: "Retry cloud backup" }),
   ).not.toBeInTheDocument();

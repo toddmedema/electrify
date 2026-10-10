@@ -25,3 +25,8 @@ export async function clearAppCache(
   }
   reload();
 }
+
+/** Page loads are network-first, so a reload picks up the deployed version of the app. */
+export function refreshToUpdate(): void {
+  window.location.reload();
+}

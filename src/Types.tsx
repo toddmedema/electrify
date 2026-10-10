@@ -1168,8 +1168,6 @@ export interface PolicyChangeType {
   startHour?: number;
 }
 export interface GameType {
-  /** Continued under newer rules; no equivalent challenge, replay or leaderboard claim. */
-  upgradedFromRules?: string;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
   policies?: PoliciesType;
@@ -1345,8 +1343,6 @@ export type SaveStatus = "inProgress" | "completed" | "bankrupt" | "fired";
 export interface SaveGameType {
   /** Absent on legacy saves; upgraded before domain validation. */
   schemaVersion?: number;
-  /** The rules the save was written under; a mismatch ends competitive claims, not progress. */
-  rulesId?: string;
   savedAt: string;
   appVersion: string;
   game: GameType;
@@ -1374,7 +1370,6 @@ export interface IncompatibleCloudSave {
 }
 
 export interface SaveMetadata {
-  upgradedFromRules?: string;
   cloud?: {
     uid: string;
     id: string;

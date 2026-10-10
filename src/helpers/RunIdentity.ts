@@ -5,6 +5,7 @@ import { getStartingCustomers } from "../data/LocationProfiles";
 import { isValidDifficulty } from "./Difficulty";
 import {
   AuthoredRunReference,
+  GameType,
   RunIdentity,
   ScenarioType,
   DifficultyType,
@@ -97,6 +98,44 @@ export function projectAuthoredRunReference(
   return sameRunIdentity(identity, expandAuthoredRunReference(reference))
     ? reference
     : undefined;
+}
+/**
+ * Carry an authored run saved under earlier rules forward to the running ones. Deploys change
+ * the rules fingerprint several times a day, and that must not end a run, its challenge, its
+ * replay or its score. A run whose scenario no longer describes the game keeps its progress
+ * without the shareable identity and challenge. A challenge that never matched its own run is
+ * left unchanged for validation to reject.
+ */
+export function carryRunForward<
+  T extends Partial<Pick<GameType, "runIdentity" | "challenge" | "location">>,
+>(game: T): T {
+  const previous = game.runIdentity;
+  if (!previous || previous.compatibilityId === manifest.compatibilityId)
+    return game;
+  const { scenarioId, seed, difficulty } = previous;
+  const identity = expandAuthoredRunReference({
+    scenarioId,
+    seed,
+    difficulty,
+    compatibilityId: manifest.compatibilityId,
+  });
+  if (
+    !identity ||
+    normalizedInputs(identity.inputs.location) !==
+      normalizedInputs(game.location)
+  )
+    return { ...game, runIdentity: undefined, challenge: undefined };
+  const run = (game.challenge as { run?: Record<string, unknown> } | undefined)
+    ?.run;
+  const challenge =
+    game.challenge &&
+    run &&
+    (["scenarioId", "seed", "difficulty", "compatibilityId"] as const).every(
+      (key) => run[key] === previous[key],
+    )
+      ? { ...game.challenge, run: projectAuthoredRunReference(identity)! }
+      : game.challenge;
+  return { ...game, runIdentity: identity, challenge };
 }
 /** Only canonical authored runs carry a shareable identity. */
 export function validRunIdentity(raw: unknown): raw is RunIdentity {

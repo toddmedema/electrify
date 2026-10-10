@@ -58,66 +58,45 @@ async function screenshot(page: Page, info: TestInfo, name: string) {
   });
 }
 
-for (const theme of ["light", "dark"]) {
-  test(`a production-style legacy save upgrades, loads, and checkpoints in ${theme}`, async ({
-    page,
-  }, info) => {
-    await page.addInitScript((mode) => {
-      localStorage.setItem("theme", mode);
-      localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
-    }, theme);
-    await startGame(page);
-    const id = (await readSaveRecords(page))[0].metadata.id;
-    const original = await editSavedGame(
-      page,
-      (save) => {
-        delete save.schemaVersion;
-        delete save.rulesId;
-        save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
-        return save.game;
-      },
-      id,
-    );
-    await page.reload();
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page.locator("#appbar:visible")).toBeVisible();
-    const upgraded = (await readSavedGame(page, id))!;
-    expect(upgraded.upgradedFromRules).toBe(
-      original.runIdentity!.compatibilityId,
-    );
-    expect(upgraded.runIdentity).toBeUndefined();
-    expect(upgraded.date).toEqual(original.date);
-    expect(upgraded.facilities).toEqual(original.facilities);
-    expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
-    await openSaves(page);
-    const row = page.locator(`[data-save-id="${id}"]`);
-    await expect(row).toContainText(
-      "Updated for this game version. Progress kept",
-    );
-    await expect(row).toContainText(
-      "leaderboard and challenge comparisons are disabled",
-    );
-    await expect(
-      row.getByRole("button", { name: "Load", exact: true }),
-    ).toBeEnabled();
-    await expect(page.getByText(/Some saves couldn't sync/)).toHaveCount(0);
-    expect(
-      await row.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
-    expect((await readSaveRecords(page))[0].metadata.id).toBe(id);
-    if (
-      info.project.name === "desktop-chromium" ||
-      (theme === "dark" && info.project.name === "mobile-390px")
-    )
-      await screenshot(
-        page,
-        info,
-        `save-upgrade-${info.project.name}-${theme}.png`,
-      );
+test("a save from an earlier deploy upgrades silently and keeps its run", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
   });
+  await startGame(page);
+  const id = (await readSaveRecords(page))[0].metadata.id;
+  const original = await editSavedGame(
+    page,
+    (save) => {
+      delete save.schemaVersion;
+      save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
+      return save.game;
+    },
+    id,
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  const upgraded = (await readSavedGame(page, id))!;
+  expect(upgraded.runIdentity?.compatibilityId).not.toBe(
+    original.runIdentity!.compatibilityId,
+  );
+  expect(upgraded.runIdentity?.seed).toBe(original.runIdentity!.seed);
+  expect(upgraded.date).toEqual(original.date);
+  expect(upgraded.facilities).toEqual(original.facilities);
+  expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
+  await openSaves(page);
+  const row = page.locator(`[data-save-id="${id}"]`);
+  await expect(
+    row.getByRole("button", { name: "Load", exact: true }),
+  ).toBeEnabled();
+  await expect(row).not.toContainText(/updated|version/i);
+  await expect(page.getByText(/Some saves couldn't sync/)).toHaveCount(0);
+  expect((await readSaveRecords(page))[0].metadata.id).toBe(id);
+});
 
+for (const theme of ["light", "dark"]) {
   test(`incompatible backups stay separate from playable device saves in ${theme}`, async ({
     page,
   }, info) => {
@@ -174,9 +153,11 @@ for (const theme of ["light", "dark"]) {
       ]);
     });
     const warning = page.getByRole("alert");
-    await expect(warning).toContainText("Backups need a newer game version");
-    await expect(warning).toContainText("still stored in your account");
-    await expect(warning).toContainText("won't make the game playable");
+    await expect(warning).toContainText("Some backups need the latest version");
+    await expect(warning).toContainText("safe in your account");
+    await expect(
+      warning.getByRole("button", { name: "Refresh to update" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Retry cloud backup" }),
     ).toHaveCount(0);
@@ -201,6 +182,15 @@ for (const theme of ["light", "dark"]) {
     expect(
       (await readSaveRecords(page)).map((entry) => entry.metadata.id),
     ).toEqual(before);
+    if (
+      info.project.name === "desktop-chromium" ||
+      (theme === "dark" && info.project.name === "mobile-390px")
+    )
+      await screenshot(
+        page,
+        info,
+        `refresh-to-update-${info.project.name}-${theme}.png`,
+      );
   });
 
   test(`the cloud invitation is optional, once per device, and fits in ${theme}`, async ({

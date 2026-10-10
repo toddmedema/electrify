@@ -9,6 +9,7 @@ import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
   sameRunIdentity,
+  carryRunForward,
   expandAuthoredRunReference,
   normalizedInputs,
 } from "./helpers/RunIdentity";
@@ -21,8 +22,7 @@ import {
 } from "./helpers/Commitment";
 import packageJson from "../package.json";
 import { decodeSave } from "./SaveEncoding";
-import { isRulesId, SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
-import manifest from "./data/RunCompatibility.json";
+import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
@@ -282,7 +282,6 @@ function validEmissions(raw: unknown): boolean {
 export function serializeSave(game: GameType): SaveGameType {
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
-    rulesId: manifest.compatibilityId,
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
@@ -301,11 +300,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (
-    typeof save.savedAt !== "string" ||
-    typeof save.appVersion !== "string" ||
-    !isRulesId(save.rulesId)
-  ) {
+  if (typeof save.savedAt !== "string" || typeof save.appVersion !== "string") {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -658,30 +653,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
-  const normalized = {
+  const normalized = carryRunForward({
     ...game,
     policyPause: undefined,
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
-  };
-  if (save.rulesId !== manifest.compatibilityId) {
-    // An older rules fingerprint does not make progress corrupt. The run continues under
-    // these rules, but can no longer claim the conditions a challenge, replay or rank needs.
-    if (normalized.replayPlayback) return null;
-    normalized.upgradedFromRules ??= save.rulesId;
-    normalized.runIdentity = undefined;
-    normalized.challenge = undefined;
-    normalized.replayLog = undefined;
-  }
-  if (
-    normalized.upgradedFromRules !== undefined &&
-    (!isRulesId(normalized.upgradedFromRules) ||
-      normalized.runIdentity ||
-      normalized.challenge ||
-      normalized.replayLog ||
-      normalized.replayPlayback)
-  )
-    return null;
+  });
   if (
     normalized.runIdentity &&
     (!validRunIdentity(normalized.runIdentity) ||
@@ -719,11 +696,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       save.commitmentForecast,
     );
   }
-  return {
-    ...save,
-    rulesId: manifest.compatibilityId,
-    game: normalized,
-  } as SaveGameType;
+  return { ...save, game: normalized } as SaveGameType;
 }
 
 /**

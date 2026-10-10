@@ -1,10 +1,5 @@
 import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
-import {
-  isFutureSave,
-  LEGACY_RULES_ID,
-  SAVE_SCHEMA_VERSION,
-  upgradeSave,
-} from "./SaveUpgrade";
+import { isFutureSave, SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import manifest from "./data/RunCompatibility.json";
 import { parseSave, serializeSave } from "./SaveGame";
 import { encodeSaveFile } from "./SaveFile";
@@ -12,31 +7,45 @@ import { validateSaveFileEnvelope } from "./SaveModel";
 import { createGame } from "./testing/Simulator";
 import { runMonths } from "./testing/SimulationTestHelpers";
 import { projectAuthoredRunReference } from "./helpers/RunIdentity";
-import { validInvitation } from "./helpers/Challenge";
-import type { GameType } from "./Types";
-import gameReducer, { start } from "./reducers/Game";
+import { challengeComparison } from "./helpers/Challenge";
+import type { GameType, VictoryType } from "./Types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+const OLD_RULES = legacyFile.save.game.runIdentity.compatibilityId;
+
+/** A current run with a friend's challenge, saved as if by an earlier deploy. */
+function challengedSave() {
+  const game = createGame({ scenarioId: 101, seed: 31337 });
+  game.challenge = {
+    run: projectAuthoredRunReference(game.runIdentity)!,
+    target: 400,
+  };
+  const save = clone(serializeSave(game));
+  save.game.runIdentity!.compatibilityId = OLD_RULES;
+  save.game.challenge!.run.compatibilityId = OLD_RULES;
+  return { game, save };
+}
 
 describe("save upgrades", () => {
-  it("upgrades the unversioned fixture and preserves progress without touching its source", () => {
+  it("upgrades the unversioned fixture and carries its run forward without touching its source", () => {
     const raw = clone(legacyFile);
     const original = JSON.stringify(raw);
     const file = validateSaveFileEnvelope(raw, parseSave);
     expect(file.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-    expect(file.save.rulesId).toBe(manifest.compatibilityId);
     expect(file.name).toBe(raw.name);
     expect(file.save.savedAt).toBe(raw.save.savedAt);
     expect(file.save.game).toMatchObject({
-      upgradedFromRules: raw.save.game.runIdentity.compatibilityId,
       seed: raw.save.game.seed,
       date: raw.save.game.date,
       facilities: raw.save.game.facilities,
       customerRate: 0.081,
     });
-    expect(file.save.game.runIdentity).toBeUndefined();
-    expect(file.save.game.challenge).toBeUndefined();
-    expect(file.save.game.replayLog).toBeUndefined();
+    expect(projectAuthoredRunReference(file.save.game.runIdentity)).toEqual({
+      scenarioId: raw.save.game.scenarioId,
+      seed: raw.save.game.seed,
+      difficulty: raw.save.game.difficulty,
+      compatibilityId: manifest.compatibilityId,
+    });
     expect(JSON.stringify(raw)).toBe(original);
     expect(parseSave(encodeSaveFile(file).save)).toEqual(file.save);
   });
@@ -64,91 +73,49 @@ describe("save upgrades", () => {
     );
   });
 
-  it("does not repair corrupt progress or an unreadable rules fingerprint", () => {
-    for (const patch of [
-      { customerRate: NaN },
-      { facilities: [{}] },
-      { replayPlayback: {} },
-    ])
+  it("does not repair corrupt progress", () => {
+    for (const patch of [{ customerRate: NaN }, { facilities: [{}] }])
       expect(
         parseSave({
           ...legacyFile.save,
           game: { ...legacyFile.save.game, ...patch },
         }),
       ).toBeNull();
-    expect(
-      parseSave({
-        ...legacyFile.save,
-        game: {
-          ...legacyFile.save.game,
-          runIdentity: { compatibilityId: "old" },
-        },
-      }),
-    ).toBeNull();
   });
 
-  it("drops the old competitive identity without letting it gate progress", () => {
-    for (const patch of [
-      { seed: legacyFile.save.game.seed + 1 },
-      { meaningfulDecisionGateWaived: true },
-      { challenge: { run: {}, target: 10 } },
-    ]) {
-      const game = parseSave({
-        ...legacyFile.save,
-        game: { ...legacyFile.save.game, ...patch },
-      })!.game;
-      expect(game.upgradedFromRules).toBe(
-        legacyFile.save.game.runIdentity.compatibilityId,
-      );
-      expect(game.runIdentity).toBeUndefined();
-      expect(game.challenge).toBeUndefined();
-    }
-  });
-
-  it("marks progress without any recorded rules, so it cannot rank under current rules", () => {
-    const { runIdentity: _identity, ...game } = legacyFile.save.game;
-    expect(
-      parseSave({ ...legacyFile.save, game })!.game.upgradedFromRules,
-    ).toBe(LEGACY_RULES_ID);
-    // A current-schema run without a shareable identity still records its rules.
-    const unshared = serializeSave({
-      ...createGame({ scenarioId: 101 }),
-      runIdentity: undefined,
-    });
-    expect(parseSave(unshared)!.game.upgradedFromRules).toBeUndefined();
-    const oldId = legacyFile.save.game.runIdentity.compatibilityId;
-    expect(
-      parseSave({ ...unshared, rulesId: oldId })!.game.upgradedFromRules,
-    ).toBe(oldId);
-    expect(parseSave({ ...unshared, rulesId: "old" })).toBeNull();
-  });
-
-  it("keeps current challenges intact but upgrades old challenged progress without score equivalence", () => {
-    const game = createGame({ scenarioId: 101, seed: 31337 });
-    game.challenge = {
-      run: projectAuthoredRunReference(game.runIdentity)!,
-      target: 400,
-    };
+  it("carries a friend's challenge forward so the comparison still works", () => {
+    const { game, save } = challengedSave();
     expect(parseSave(serializeSave(game))!.game.challenge).toEqual(
       game.challenge,
     );
-    const old = clone(serializeSave(game));
-    const oldId = legacyFile.save.game.runIdentity.compatibilityId;
-    old.rulesId = oldId;
-    old.game.runIdentity!.compatibilityId = oldId;
-    old.game.challenge!.run.compatibilityId = oldId;
-    expect(validInvitation(old.game.challenge)).toBe(false);
-    const upgraded = parseSave(old)!.game;
-    expect(upgraded.challenge).toBeUndefined();
-    expect(upgraded.upgradedFromRules).toBe(oldId);
-    expect(projectAuthoredRunReference(upgraded.runIdentity)).toBeUndefined();
-    // A forged upgrade marker cannot coexist with a current competitive identity.
+    const carried = parseSave(save)!.game;
+    expect(carried.runIdentity).toEqual(game.runIdentity);
+    expect(carried.challenge).toEqual(game.challenge);
     expect(
-      parseSave(serializeSave({ ...game, upgradedFromRules: oldId })),
-    ).toBeNull();
+      challengeComparison({
+        runIdentity: carried.runIdentity,
+        challenge: carried.challenge,
+        score: 450,
+      } as VictoryType),
+    ).toBe("You beat the shared score by 50 points.");
   });
 
-  it("resumes an upgraded running game and round trips its next checkpoint", () => {
+  it("keeps progress but quietly drops a shareable run its scenario no longer describes", () => {
+    const { save } = challengedSave();
+    save.game.runIdentity!.seed = -1;
+    const game = parseSave(save)!.game;
+    expect(game.runIdentity).toBeUndefined();
+    expect(game.challenge).toBeUndefined();
+    expect(game.seed).toBe(31337);
+  });
+
+  it("still rejects a challenge that never matched its own run", () => {
+    const { save } = challengedSave();
+    save.game.challenge!.run.seed = 7;
+    expect(parseSave(save)).toBeNull();
+  });
+
+  it("resumes a running game from an earlier deploy and keeps recording its replay", () => {
     const game = createGame({ scenarioId: 107 });
     runMonths(game, 1);
     const raw = clone(
@@ -158,30 +125,30 @@ describe("save upgrades", () => {
         save: serializeSave(game),
       }),
     );
-    const original = parseSave(raw.save)!.game;
-    raw.save.rulesId = legacyFile.save.game.runIdentity.compatibilityId;
-    const upgraded = validateSaveFileEnvelope(raw, parseSave).save.game;
-    expect(upgraded.timeline).toEqual(original.timeline);
-    expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
-    expect(upgraded.facilities).toEqual(original.facilities);
-    const minute = upgraded.date.minute;
-    runMonths(upgraded, 1);
-    expect(upgraded.date.minute).toBeGreaterThan(minute);
-    expect(upgraded.replayLog).toBeUndefined();
-    expect(parseSave(serializeSave(upgraded))!.game.upgradedFromRules).toBe(
-      legacyFile.save.game.runIdentity.compatibilityId,
+    const original = clone(parseSave(raw.save)!.game);
+    raw.save.game.runIdentity!.compatibilityId = OLD_RULES;
+    const resumed = validateSaveFileEnvelope(raw, parseSave).save.game;
+    expect(resumed.timeline).toEqual(original.timeline);
+    expect(resumed.monthlyHistory).toEqual(original.monthlyHistory);
+    expect(resumed.facilities).toEqual(original.facilities);
+    expect(resumed.runIdentity).toEqual(original.runIdentity);
+    expect(resumed.replayLog).toEqual(original.replayLog);
+    expect(resumed.replayLog).toBeDefined();
+    const minute = resumed.date.minute;
+    runMonths(resumed, 1);
+    expect(resumed.date.minute).toBeGreaterThan(minute);
+    expect(parseSave(serializeSave(resumed))!.game.replayLog).toEqual(
+      resumed.replayLog,
     );
   });
 
-  it("leaves already current migrations idempotent", () => {
+  it("leaves already current saves idempotent", () => {
     const first = upgradeSave(legacyFile.save);
     expect(upgradeSave(first)).toEqual(first);
     const save = serializeSave({
       ...parseSave(legacyFile.save)!.game,
     } as GameType);
     expect(upgradeSave(save)).toEqual(save);
-    expect(
-      gameReducer(save.game, start(101)).upgradedFromRules,
-    ).toBeUndefined();
+    expect(parseSave(parseSave(save))).toEqual(parseSave(save));
   });
 });

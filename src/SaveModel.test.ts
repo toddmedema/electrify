@@ -44,15 +44,14 @@ describe("SaveModel", () => {
       "Employee",
     );
     file.save.game.location = file.save.game.runIdentity.inputs.location;
-    const raw = encodeSaveFile(file);
+    const current = JSON.parse(JSON.stringify(file.save.game.runIdentity));
+    const raw = JSON.parse(JSON.stringify(encodeSaveFile(file))) as ReturnType<
+      typeof encodeSaveFile
+    >;
     raw.save.game.runIdentity!.compatibilityId = `rules-1-${"0".repeat(64)}`;
-    raw.save.rulesId = raw.save.game.runIdentity!.compatibilityId;
     const original = JSON.stringify(raw);
     const upgraded = validateSaveFileEnvelope(raw, parseSave);
-    expect(upgraded.save.game.runIdentity).toBeUndefined();
-    expect(upgraded.save.game.upgradedFromRules).toBe(
-      raw.save.game.runIdentity!.compatibilityId,
-    );
+    expect(upgraded.save.game.runIdentity).toEqual(current);
     expect(upgraded.save.game.facilities).toEqual(raw.save.game.facilities);
     expect(JSON.stringify(raw)).toBe(original);
     raw.save.game.customerRate = NaN;

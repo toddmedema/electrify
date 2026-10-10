@@ -279,7 +279,6 @@ export class SaveRepository {
     return {
       ...metadata,
       savedAt: save.savedAt,
-      upgradedFromRules: save.game.upgradedFromRules,
       scenarioId: save.game.scenarioId,
       scenarioName,
       locationName: save.game.location.name,
@@ -341,11 +340,7 @@ export class SaveRepository {
         "This saved game is invalid and cannot be opened.",
       );
     }
-    return {
-      metadata: { ...metadata, upgradedFromRules: save.game.upgradedFromRules },
-      save,
-      ...(result === undefined ? {} : { result }),
-    };
+    return { metadata, save, ...(result === undefined ? {} : { result }) };
   }
 
   async create(options: CreateSaveOptions): Promise<SaveRecord> {
