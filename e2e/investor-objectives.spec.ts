@@ -33,7 +33,7 @@ for (const theme of ["light", "dark"]) {
       "Invest in the grid",
     );
     await expect(page.getByRole("dialog")).toContainText(
-      "80% of where you started",
+      "Retain ≥800,000 customers at term end",
     );
   });
 }

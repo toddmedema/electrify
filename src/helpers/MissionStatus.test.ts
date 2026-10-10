@@ -59,6 +59,36 @@ const monthRow = (
 const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
+test.each<[number, string]>([
+  [107, "Feb 2021"],
+  [108, "Jun–Aug 2026"],
+  [110, "Jul 2026–Dec 2027"],
+  [111, "Jan–Feb 2025"],
+  [113, "2022"],
+])(
+  "reliability copy names the full monthly window for scenario %s",
+  (id, window) => {
+    const game = createGame({ scenarioId: id });
+    const objective = SCENARIOS.find(
+      (scenario) => scenario.id === id,
+    )!.reliabilityObjective!;
+    expect(requirement(game, "reliability")).toMatchObject({
+      target: `≥99.5% of demand monthly · ${window}`,
+      current: `0/${objective.durationMonths || 1} months completed`,
+    });
+  },
+);
+
+test("reliability progress never rounds a failed month up to its target", () => {
+  const game = createNextState(fixture(37), (g) => {
+    g.monthlyHistory = [monthRow(2025, 1, 99.499, 100)];
+  });
+  expect(requirement(game, "reliability")).toMatchObject({
+    status: "failed",
+    current: "Lowest 99.4% · 1/2 months completed",
+  });
+});
+
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
   expect(getMissionStatus(fixture(35)).headline?.id).toBe("reliability");
   expect(requirement(fixture(35), "reliability").status).toBe("pending");
@@ -68,7 +98,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   });
   expect(requirement(partial, "reliability").status).toBe("in-progress");
   expect(requirement(partial, "reliability").current).toContain(
-    "1 of 2 months counted",
+    "1/2 months completed",
   );
   const completed = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [monthRow(2025, 2), monthRow(2025, 1)];
@@ -162,7 +192,7 @@ test("Expert survival text and verdict use the 95% firing threshold", () => {
   });
   expect(requirement(game, "survival")).toMatchObject({
     status: "failed",
-    target: "Ends if under 95% served 3 months in a row",
+    target: "Avoid 3 consecutive months <95% served",
     compact: "Avoid 3 consecutive months < 95% served (92%, 92%, 92%)",
   });
   expect(

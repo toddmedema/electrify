@@ -47,8 +47,10 @@ const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
   waived: "Waived",
 };
 
-function statusLabel(status: MissionRequirement["status"]): string {
-  return STATUS_LABELS[status];
+function statusLabel(requirement: MissionRequirement): string {
+  return requirement.id === "retention" && requirement.status === "failed"
+    ? "Out of reach"
+    : STATUS_LABELS[requirement.status];
 }
 
 /** An in-game reminder of the mission and its score through completed months. */
@@ -206,26 +208,24 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             <Box component="dl" className="missionRequirements">
               {mission.requirements.map((requirement) => (
                 <React.Fragment key={requirement.id}>
-                  <Typography component="dt" sx={{ mt: 2, fontWeight: 600 }}>
-                    {requirement.label}{" "}
+                  <Typography
+                    component="dt"
+                    variant="body2"
+                    sx={{ mt: 2, fontWeight: 600 }}
+                  >
+                    {requirement.target}
+                  </Typography>
+                  <Typography component="dd" variant="body2">
                     {requirement.status !== "unknown" &&
                       requirement.status !== "in-progress" && (
                         <span
                           className="missionRequirementStatus"
                           data-status={requirement.status}
                         >
-                          {statusLabel(requirement.status)}
+                          {statusLabel(requirement)}
                         </span>
-                      )}
-                  </Typography>
-                  <Typography component="dd">
-                    {requirement.current.replace(" (partial month)", "")}
-                  </Typography>
-                  <Typography
-                    component="dd"
-                    className="missionRequirementTarget"
-                  >
-                    {requirement.target}
+                      )}{" "}
+                    <span>{requirement.current}</span>
                   </Typography>
                 </React.Fragment>
               ))}

@@ -6187,25 +6187,18 @@ $programs_column: 800px;
   }
 }
 
-// Each requirement is a stacked block: the goal and its state on one line, then where it
-// stands, then what it takes. Before this the dt and both dds ran together as one paragraph.
+// Two lines per requirement: the rule, then its progress and any meaningful status.
+// Missing-history warnings can wrap so the evidence is never clipped.
 .missionRequirements {
   margin: 0;
 
-  dt {
+  dd {
+    margin: 4px 0 0;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 8px;
-  }
-
-  dd {
-    margin: 2px 0 0;
-  }
-
-  .missionRequirementTarget {
     color: $font_color_faded;
-    font-size: var(--font-size-body2);
   }
 }
 
@@ -6217,6 +6210,7 @@ $programs_column: 800px;
   background: var(--bg-raised);
   color: $font_color_faded;
   font-size: var(--font-size-caption-sm);
+  line-height: 1.25;
   font-weight: 600;
   white-space: nowrap;
 
