@@ -1594,6 +1594,7 @@
       "long": 12.5683,
       "timeZone": "Europe/Copenhagen",
       "elevation": 10,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1606,6 +1607,7 @@
       "long": 10.7522,
       "timeZone": "Europe/Oslo",
       "elevation": 21,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1618,6 +1620,7 @@
       "long": 5.3221,
       "timeZone": "Europe/Oslo",
       "elevation": 14,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1630,6 +1633,7 @@
       "long": 18.9553,
       "timeZone": "Europe/Oslo",
       "elevation": 16,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1642,6 +1646,7 @@
       "long": 18.0686,
       "timeZone": "Europe/Stockholm",
       "elevation": 24,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1654,6 +1659,7 @@
       "long": 11.9746,
       "timeZone": "Europe/Stockholm",
       "elevation": 13,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1666,6 +1672,7 @@
       "long": 24.9384,
       "timeZone": "Europe/Helsinki",
       "elevation": 8,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1787,6 +1794,7 @@
       "long": 23.7275,
       "timeZone": "Europe/Athens",
       "elevation": 92,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
