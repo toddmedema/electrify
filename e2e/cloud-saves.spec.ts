@@ -59,6 +59,102 @@ async function screenshot(page: Page, info: TestInfo, name: string) {
 }
 
 for (const theme of ["light", "dark"]) {
+  test(`incompatible backups stay separate from playable device saves in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
+    }, theme);
+    await startGame(page);
+    await openSaves(page);
+    const before = (await readSaveRecords(page)).map(
+      (entry) => entry.metadata.id,
+    );
+    // Seed the real view with a known sync result. Jest covers transport, account
+    // changes and reconciliation; this fixture checks layout without a live account.
+    await page.evaluate(() => {
+      type FixtureStore = {
+        dispatch(action: { type: string; payload: unknown }): void;
+      };
+      const runtime = window as unknown as {
+        webpackChunkelectrify: {
+          push(
+            chunk: [
+              string[],
+              object,
+              (require: (id: string) => { store: FixtureStore }) => void,
+            ],
+          ): void;
+        };
+      };
+      runtime.webpackChunkelectrify.push([
+        ["cloud-save-ui-fixture"],
+        {},
+        (require) => {
+          require("./src/Store.tsx").store.dispatch({
+            type: "saves/sessionChanged",
+            payload: {
+              cloudUid: "review-fixture",
+              cloudState: "synced",
+              incompatibleCloudSaves: [
+                {
+                  id: "old-austin",
+                  version: "old",
+                  name: "Deep Freeze — Austin, TX",
+                },
+                {
+                  id: "old-pittsburgh",
+                  version: "old",
+                  name: "Rise of Renewables — Pittsburgh, PA — planning experiment",
+                },
+              ],
+            },
+          });
+        },
+      ]);
+    });
+    const warning = page.getByRole("alert");
+    await expect(warning).toContainText(
+      "Backups from a different game version",
+    );
+    await expect(warning).toContainText("still stored in your account");
+    await expect(warning).toContainText("won't make the game playable");
+    await expect(
+      page.getByRole("button", { name: "Retry cloud backup" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Load", exact: true }),
+    ).toBeEnabled();
+    for (const button of await warning.getByRole("button").all()) {
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.height).toBeGreaterThanOrEqual(
+        info.project.use.hasTouch ? 44 : 40,
+      );
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width + 1,
+      );
+    }
+    expect(
+      await warning.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+    if (
+      info.project.name === "desktop-chromium" ||
+      (theme === "dark" && info.project.name === "mobile-390px")
+    )
+      await screenshot(
+        page,
+        info,
+        `incompatible-backups-${info.project.name}-${theme}.png`,
+      );
+    expect(
+      (await readSaveRecords(page)).map((entry) => entry.metadata.id),
+    ).toEqual(before);
+  });
+
   test(`the cloud invitation is optional, once per device, and fits in ${theme}`, async ({
     page,
   }, info) => {

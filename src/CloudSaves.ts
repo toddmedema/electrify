@@ -86,6 +86,7 @@ export function startCloudSaves(store: AppStore): () => void {
             cloudError: result.failed
               ? "Some saves couldn't sync. Your device copies are still available. We'll retry automatically."
               : undefined,
+            incompatibleCloudSaves: result.incompatibleCloudSaves || [],
             cloudConflicts:
               result.conflicts || store.getState().saves.cloudConflicts,
           }),
@@ -136,6 +137,7 @@ export function startCloudSaves(store: AppStore): () => void {
         cloudState: uid ? "syncing" : "signedOut",
         cloudError: undefined,
         cloudConflicts: false,
+        incompatibleCloudSaves: [],
       }),
     );
     if (uid) void run();

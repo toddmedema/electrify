@@ -9,6 +9,15 @@ reloads and tabs. Explicit save interactions (including Save & Quit and Share) b
 that cadence. No game waits for Firebase to load or save locally. Signed-out players
 see the optional sign-in invitation only after their first successful Save & Quit.
 
+Backups whose run identity belongs to a different compatibility manifest stay in the
+account and appear by name in Saved games. They do not block healthy backups or cause
+the generic automatic-retry warning. The client remembers each incompatible account,
+save and cloud version during the session, so unchanged payloads are not downloaded
+again at each checkpoint; a changed version is validated again. Other read and write
+failures still retry normally. Recovery downloads preserve the bounded original JSON
+without importing, rewriting or deleting it, and require the same signed-in account.
+A recovery file does not make an incompatible game playable in the current build.
+
 Each backup has an opaque version checked in a Firestore transaction. Concurrent
 offline edits keep both copies; an active local writer is never replaced. Local
 deletion queues a durable outbox entry in the same IndexedDB transaction. Cloud

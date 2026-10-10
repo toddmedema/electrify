@@ -10,6 +10,7 @@ import {
 import {
   CloudConflict,
   createSharedSave,
+  downloadCloudSaveRecovery,
   FirebaseSaveTransport,
   loadSharedSave,
   newShareId,
@@ -18,10 +19,15 @@ import {
   SHARE_LIFETIME_MS,
 } from "./CloudSaveTransport";
 import { encodeSaveFile } from "./SaveFile";
+import * as saveFiles from "./SaveFile";
+import { firebaseAppAuth } from "./Globals";
 import { fakeSaveFile } from "./testing/SaveTestHelpers";
 import type { SaveRecord } from "./Types";
 
-jest.mock("./Globals", () => ({ getDb: () => ({}) }));
+jest.mock("./Globals", () => ({
+  getDb: () => ({}),
+  firebaseAppAuth: { currentUser: { uid: "creator" } },
+}));
 jest.mock("firebase/firestore", () => {
   class MockTimestamp {
     constructor(private mockMillis: number) {}
@@ -76,6 +82,7 @@ describe("CloudSaveTransport", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(firebaseAppAuth, { currentUser: { uid: "creator" } });
     documents = new Map();
     commits = [];
     reads = jest.fn(async (path: string) => snapshot(documents.get(path)));
@@ -133,6 +140,88 @@ describe("CloudSaveTransport", () => {
     });
     return file;
   }
+
+  function incompatibleBackup() {
+    const raw = encodeSaveFile(fakeSaveFile());
+    Object.assign(raw.save.game, {
+      runIdentity: { compatibilityId: `rules-1-${"0".repeat(64)}` },
+    });
+    const head = {
+      id: "old",
+      version: OLD_VERSION,
+      deleted: false,
+      chunks: [BLOB_ID],
+    };
+    documents.set("users/creator/cloudSaves/old", head);
+    documents.set(`saveBlobs/${BLOB_ID}`, {
+      data: JSON.stringify(raw),
+      uid: "creator",
+    });
+    return {
+      raw,
+      head,
+      issue: { id: "old", version: OLD_VERSION, name: "Old grid" },
+    };
+  }
+
+  it("rejects incompatible cloud games while preserving their exact JSON for recovery", async () => {
+    const { raw, head, issue } = incompatibleBackup();
+    await expect(new FirebaseSaveTransport().read(head)).rejects.toMatchObject({
+      code: "incompatible",
+    });
+    const download = jest
+      .spyOn(saveFiles, "downloadSaveRecovery")
+      .mockImplementation(() => {});
+    await downloadCloudSaveRecovery("creator", issue);
+    expect(download).toHaveBeenCalledWith("old", raw);
+    expect(documents.get(`saveBlobs/${BLOB_ID}`)?.data).toBe(
+      JSON.stringify(raw),
+    );
+    expect(commits).toEqual([]);
+  });
+
+  it.each(["missing", "deleted", "changed", "incomplete"])(
+    "does not download a %s recovery backup",
+    async (failure) => {
+      const { issue } = incompatibleBackup();
+      const download = jest
+        .spyOn(saveFiles, "downloadSaveRecovery")
+        .mockImplementation(() => {});
+      const manifest = documents.get("users/creator/cloudSaves/old")!;
+      if (failure === "missing")
+        documents.delete("users/creator/cloudSaves/old");
+      if (failure === "deleted") manifest.deleted = true;
+      if (failure === "changed") manifest.version = "c".repeat(32);
+      if (failure === "incomplete") documents.delete(`saveBlobs/${BLOB_ID}`);
+      await expect(
+        downloadCloudSaveRecovery("creator", issue),
+      ).rejects.toThrow();
+      expect(download).not.toHaveBeenCalled();
+      expect(commits).toEqual([]);
+    },
+  );
+
+  it("guards the account before and after reading a recovery payload", async () => {
+    const { issue } = incompatibleBackup();
+    const download = jest
+      .spyOn(saveFiles, "downloadSaveRecovery")
+      .mockImplementation(() => {});
+    Object.assign(firebaseAppAuth, { currentUser: null });
+    await expect(downloadCloudSaveRecovery("creator", issue)).rejects.toThrow(
+      /account/,
+    );
+    expect(reads).not.toHaveBeenCalled();
+    Object.assign(firebaseAppAuth, { currentUser: { uid: "creator" } });
+    reads.mockImplementation(async (path: string) => {
+      if (path.startsWith("saveBlobs/"))
+        Object.assign(firebaseAppAuth, { currentUser: { uid: "other" } });
+      return snapshot(documents.get(path));
+    });
+    await expect(downloadCloudSaveRecovery("creator", issue)).rejects.toThrow(
+      /account/,
+    );
+    expect(download).not.toHaveBeenCalled();
+  });
 
   it("uses ten alphanumeric characters and rejects biased random bytes", () => {
     const random = jest.spyOn(crypto, "getRandomValues");

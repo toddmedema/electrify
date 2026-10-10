@@ -104,6 +104,8 @@ export function getSaveErrorMessage(error: unknown): string {
         return "This save no longer exists. Export your current game to keep this progress.";
       case "invalid":
         return "This save cannot be opened because its contents are invalid.";
+      case "incompatible":
+        return error.message;
       default:
         return "Browser storage is unavailable. Enable storage for this site, or export your current game.";
     }

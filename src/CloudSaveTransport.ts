@@ -8,17 +8,27 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { getDb } from "./Globals";
-import { encodeSaveFile, MAX_SAVE_FILE_BYTES } from "./SaveFile";
+import { firebaseAppAuth, getDb } from "./Globals";
+import {
+  downloadSaveRecovery,
+  encodeSaveFile,
+  MAX_SAVE_FILE_BYTES,
+} from "./SaveFile";
 import { parseSave } from "./SaveGame";
 import { validateSaveFileEnvelope } from "./SaveModel";
 import { newSaveId } from "./SaveRepository";
-import type { SaveFileType, SaveMetadata, SaveRecord } from "./Types";
+import type { SaveFileType, SaveId, SaveMetadata, SaveRecord } from "./Types";
 
 export const SHARE_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
 export const SHARE_ID_PATTERN = /^[A-Za-z0-9]{10}$/;
 const CHUNK_CHARACTERS = 150_000;
 export class CloudConflict extends Error {}
+
+export interface IncompatibleCloudSave {
+  id: SaveId;
+  version: string;
+  name: string;
+}
 
 export interface CloudSaveHead {
   id: string;
@@ -131,7 +141,7 @@ function parseHead(id: string, raw: Record<string, unknown>): CloudSaveHead {
   };
 }
 
-async function readFile(chunks: string[]): Promise<SaveFileType> {
+async function readRawFile(chunks: string[]): Promise<unknown> {
   const snapshots = await Promise.all(
     chunks.map((id) => getDocFromServer(doc(getDb(), "saveBlobs", id))),
   );
@@ -144,7 +154,34 @@ async function readFile(chunks: string[]): Promise<SaveFileType> {
   }
   if (new TextEncoder().encode(json).length > MAX_SAVE_FILE_BYTES)
     throw new Error("This cloud save is too large.");
-  return validateSaveFileEnvelope(JSON.parse(json), parseSave);
+  return JSON.parse(json);
+}
+
+async function readFile(chunks: string[]): Promise<SaveFileType> {
+  return validateSaveFileEnvelope(await readRawFile(chunks), parseSave);
+}
+
+/** Preserve the original payload without importing it or changing the cloud backup. */
+export async function downloadCloudSaveRecovery(
+  uid: string,
+  issue: IncompatibleCloudSave,
+): Promise<void> {
+  if (firebaseAppAuth.currentUser?.uid !== uid)
+    throw new Error("Sign in to the account that owns this backup.");
+  const snapshot = await getDocFromServer(
+    doc(getDb(), "users", uid, "cloudSaves", issue.id),
+  );
+  const data = snapshot.data();
+  if (!data) throw new Error("This cloud backup is no longer available.");
+  const head = parseHead(issue.id, data);
+  if (head.deleted || head.version !== issue.version)
+    throw new Error(
+      "This backup changed. Refresh your saved games and try again.",
+    );
+  const raw = await readRawFile(head.chunks);
+  if (firebaseAppAuth.currentUser?.uid !== uid)
+    throw new Error("Sign in to the account that owns this backup.");
+  downloadSaveRecovery(issue.id, raw);
 }
 
 export class FirebaseSaveTransport implements CloudSaveTransport {

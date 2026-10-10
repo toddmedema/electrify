@@ -2,7 +2,11 @@ import { configureStore, Middleware } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createSharedSave, loadSharedSave } from "../../CloudSaveTransport";
+import {
+  createSharedSave,
+  downloadCloudSaveRecovery,
+  loadSharedSave,
+} from "../../CloudSaveTransport";
 import { firebaseAppAuth, login } from "../../Globals";
 import {
   importSavedGame,
@@ -40,6 +44,7 @@ jest.mock("../../SaveSession", () => ({
 jest.mock("../../CloudSaveTransport", () => ({
   createSharedSave: jest.fn(),
   loadSharedSave: jest.fn(),
+  downloadCloudSaveRecovery: jest.fn(),
 }));
 jest.mock("../../CloudSaves", () => ({ retryCloudSync: jest.fn() }));
 jest.mock("../../reducers/Card", () => ({
@@ -320,6 +325,53 @@ it("explains retained conflict copies and provides a cloud retry after failure",
     within(screen.getByRole("alert")).getByRole("button", { name: "Close" }),
   );
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("names incompatible backups and downloads recovery without offering a sync retry", async () => {
+  const issue = { id: "old", version: "1", name: "Deep Freeze — Austin, TX" };
+  renderWithSaves(<CloudSaveStatus />, {
+    cloudState: "synced",
+    cloudUid: "alice",
+    incompatibleCloudSaves: [issue],
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent("can't be loaded here");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "still stored in your account",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Retry cloud backup" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Compatible cloud backups are up to date",
+  );
+  await userEvent.click(
+    screen.getByRole("button", {
+      name: `Download recovery file for ${issue.name}`,
+    }),
+  );
+  expect(downloadCloudSaveRecovery).toHaveBeenCalledWith("alice", issue);
+  expect(screen.getByText("Recovery file downloaded.")).toBeInTheDocument();
+});
+
+it("keeps genuine sync retries and recovery failures separate", async () => {
+  (downloadCloudSaveRecovery as jest.Mock).mockRejectedValueOnce(
+    new Error("sensitive provider error"),
+  );
+  renderWithSaves(<CloudSaveStatus />, {
+    cloudState: "failed",
+    cloudUid: "alice",
+    cloudError: "Some saves couldn't sync.",
+    incompatibleCloudSaves: [{ id: "old", version: "1", name: "Old grid" }],
+  });
+  await userEvent.click(
+    screen.getByRole("button", { name: "Download recovery file for Old grid" }),
+  );
+  expect(screen.getByText(/Couldn't download this backup/)).toBeInTheDocument();
+  expect(screen.queryByText(/sensitive provider/)).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Retry cloud backup" }),
+  );
+  expect(retryCloudSync).toHaveBeenCalledTimes(1);
 });
 
 const existingSave = {

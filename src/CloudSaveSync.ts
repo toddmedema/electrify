@@ -1,13 +1,27 @@
-import type { CloudSaveHead, CloudSaveTransport } from "./CloudSaveTransport";
+import type {
+  CloudSaveHead,
+  CloudSaveTransport,
+  IncompatibleCloudSave,
+} from "./CloudSaveTransport";
 import { CloudConflict } from "./CloudSaveTransport";
 import { newSaveId, SaveRepository } from "./SaveRepository";
+import { normalizeSaveName, SaveRepositoryError } from "./SaveModel";
 import type { SaveMetadata, SaveRecord } from "./Types";
 import { DAYS_PER_YEAR } from "./Constants";
 
 export const AUTO_CLOUD_SAVE_MS = 5 * 60 * 1000;
 
+interface SyncResult {
+  conflicts: boolean;
+  deferred: boolean;
+  failed?: boolean;
+  incompatibleCloudSaves?: IncompatibleCloudSave[];
+}
+
 /** Reconcile backups without making cloud availability a dependency of loading or saving. */
 export class CloudSaveSync {
+  private incompatible = new Map<string, IncompatibleCloudSave>();
+
   constructor(
     private repository: SaveRepository,
     private transport: CloudSaveTransport,
@@ -17,7 +31,7 @@ export class CloudSaveSync {
     uid: string,
     current: () => boolean = () => true,
     options: { automatic?: boolean; forceIds?: ReadonlySet<string> } = {},
-  ): Promise<{ conflicts: boolean; deferred: boolean; failed?: boolean }> {
+  ): Promise<SyncResult> {
     if (typeof navigator !== "undefined" && navigator.locks?.request) {
       return navigator.locks.request(`electrify-cloud-sync:${uid}`, () =>
         current()
@@ -32,10 +46,22 @@ export class CloudSaveSync {
     uid: string,
     current: () => boolean,
     options: { automatic?: boolean; forceIds?: ReadonlySet<string> },
-  ): Promise<{ conflicts: boolean; deferred: boolean; failed?: boolean }> {
+  ): Promise<SyncResult> {
     const remote = new Map(
       (await this.transport.list(uid)).map((head) => [head.id, head]),
     );
+    const incompatibleCloudSaves: IncompatibleCloudSave[] = [];
+    for (const [key, issue] of this.incompatible) {
+      const head = remote.get(issue.id);
+      if (
+        !key.startsWith(`${uid}/`) ||
+        !head ||
+        head.deleted ||
+        head.version !== issue.version
+      )
+        this.incompatible.delete(key);
+      else incompatibleCloudSaves.push(issue);
+    }
     let conflicts = false;
     let deferred = false;
     let failed = false;
@@ -161,8 +187,9 @@ export class CloudSaveSync {
           if (!dirty) {
             const record = head.deleted
               ? null
-              : await this.transport.read(head);
+              : await this.read(uid, head, incompatibleCloudSaves);
             if (!current()) return { conflicts, deferred };
+            if (!head.deleted && !record) continue;
             if (
               !(await this.repository.applyCloud(
                 uid,
@@ -183,7 +210,7 @@ export class CloudSaveSync {
             continue;
           }
           if (!head.deleted && current())
-            await this.restore(uid, head, current);
+            await this.restore(uid, head, current, incompatibleCloudSaves);
         } else if (dirty || !head) {
           try {
             if (
@@ -215,22 +242,60 @@ export class CloudSaveSync {
       }
       if (!head.deleted) {
         try {
-          await this.restore(uid, head, current);
+          await this.restore(uid, head, current, incompatibleCloudSaves);
         } catch {
           failed = true;
         }
       }
     }
-    return { conflicts, deferred, failed };
+    return {
+      conflicts,
+      deferred,
+      failed,
+      ...(incompatibleCloudSaves.length ? { incompatibleCloudSaves } : {}),
+    };
+  }
+
+  private async read(
+    uid: string,
+    head: CloudSaveHead,
+    issues: IncompatibleCloudSave[],
+  ): Promise<SaveRecord | null> {
+    const key = `${uid}/${head.id}`;
+    let issue = this.incompatible.get(key);
+    if (!issue || issue.version !== head.version) {
+      try {
+        return await this.transport.read(head);
+      } catch (error) {
+        if (
+          !(error instanceof SaveRepositoryError) ||
+          error.code !== "incompatible"
+        )
+          throw error;
+        let name = "Unnamed cloud backup";
+        try {
+          if (typeof head.metadata?.name === "string")
+            name = normalizeSaveName(head.metadata.name);
+        } catch {
+          // A malformed display name must not hide the retained backup.
+        }
+        issue = { id: head.id, version: head.version, name };
+        this.incompatible.set(key, issue);
+      }
+    }
+    if (!issues.some((existing) => existing.id === issue.id))
+      issues.push(issue);
+    return null;
   }
 
   private async restore(
     uid: string,
     head: CloudSaveHead,
     current: () => boolean,
+    issues: IncompatibleCloudSave[],
   ): Promise<void> {
-    const record = await this.transport.read(head);
-    if (current())
+    const record = await this.read(uid, head, issues);
+    if (record && current())
       await this.repository.applyCloud(uid, head.id, head.version, record);
   }
 
