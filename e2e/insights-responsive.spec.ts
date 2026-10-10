@@ -42,16 +42,16 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   });
   await insights.getByRole("button", { name: "Fit full timeline" }).click();
   await expect(eventRail).toContainText("Upcoming");
-  await expect(eventRail).not.toContainText("Higher pollution fee begins");
+  await expect(eventRail).not.toContainText("Pollution fees will rise");
   const eventButton = eventRail.getByRole("button", {
-    name: /Higher pollution fee begins/,
+    name: /Pollution fees will rise/,
   });
   await expect(eventButton).toBeVisible();
   await expect(eventButton).toHaveAttribute("aria-expanded", "false");
   await eventButton.click();
   await expect(eventButton).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("dialog")).toContainText(
-    "Polluting plants now pay",
+    "Coal and gas will cost more to run.",
   );
   await eventButton.click();
   await expect(eventButton).toHaveAttribute("aria-expanded", "false");
@@ -214,6 +214,37 @@ test("insights header controls stay aligned in one compact row", async ({
   );
   await expect(insights).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+
+  const expectChartHeaderSpacing = async () => {
+    const insets = await insights
+      .locator(".insightsTrack")
+      .evaluateAll((tracks) =>
+        tracks.map((track) => {
+          const header = track.querySelector(".insightsTrackHeader")!;
+          const headerBox = header.getBoundingClientRect();
+          const titleBox = header.querySelector("h6")!.getBoundingClientRect();
+          const actions = header.querySelector(".insightsTrackActions");
+          const contentBoxes = [
+            titleBox,
+            ...(actions ? [actions.getBoundingClientRect()] : []),
+          ];
+          return {
+            layer: track.getAttribute("data-layer"),
+            top:
+              Math.min(...contentBoxes.map((box) => box.top)) - headerBox.top,
+            bottom:
+              headerBox.bottom -
+              Math.max(...contentBoxes.map((box) => box.bottom)),
+          };
+        }),
+      );
+    expect(insets.length).toBeGreaterThan(1);
+    insets.forEach(({ layer, top, bottom }) => {
+      expect(top, `${layer} header top inset`).toBeGreaterThanOrEqual(8);
+      expect(bottom, `${layer} header bottom inset`).toBeGreaterThanOrEqual(8);
+    });
+  };
+  await expectChartHeaderSpacing();
 
   const [supplyPlot, cashPlot] = await Promise.all([
     insights
@@ -386,7 +417,14 @@ test("insights header controls stay aligned in one compact row", async ({
         (element) => element.scrollWidth > element.clientWidth,
       ),
     ).toBe(true);
+    await page.keyboard.press("Escape");
   }
+
+  await page.getByRole("button", { name: /^Layers \(/ }).click();
+  await expect(
+    insights.getByRole("button", { name: "Move Cash up", exact: true }),
+  ).toBeVisible();
+  await expectChartHeaderSpacing();
 });
 
 test("compact facility build buttons stay above the chart", async ({

@@ -96,8 +96,8 @@ test("scheduled data-center connections appear and update when the schedule chan
       expect.objectContaining({
         key: "load:manassas-data-centers",
         startsMinute: 72 * MINUTES_PER_MONTH,
-        title: "Data Centers online",
-        message: expect.stringContaining("100MW"),
+        title: "Data Centers will connect",
+        message: "Demand will rise as new load comes online.",
       }),
     ]),
   );
@@ -116,7 +116,11 @@ test("scheduled data-center connections appear and update when the schedule chan
   expect(phased.map((event) => event.startsMinute)).toEqual(
     [72, 96].map((month) => month * MINUTES_PER_MONTH),
   );
-  expect(phased.every((event) => event.message.includes("50MW"))).toBe(true);
+  expect(
+    phased.every(
+      (event) => event.message === "Demand will rise as new load comes online.",
+    ),
+  ).toBe(true);
   game.date = getDateFromMinute(72 * MINUTES_PER_MONTH, game.startingYear);
   expect(
     selectUpcomingStoryEvents({ game } as AppStateType)

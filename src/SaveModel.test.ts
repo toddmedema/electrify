@@ -104,14 +104,12 @@ describe("SaveModel", () => {
   });
 
   it("generates distinct bounded names even with long source labels", () => {
-    const base = suggestedSaveName("🌱".repeat(70), "Somewhere", []);
+    const base = suggestedSaveName("🌱".repeat(70), []);
     expect(Array.from(base)).toHaveLength(60);
-    const second = suggestedSaveName("🌱".repeat(70), "Somewhere", [base]);
+    const second = suggestedSaveName("🌱".repeat(70), [base]);
     expect(second).toMatch(/\(2\)$/);
     expect(Array.from(second)).toHaveLength(60);
-    expect(
-      suggestedSaveName("Grid", "City", ["Grid — City", "Grid — City (2)"]),
-    ).toBe("Grid — City (3)");
+    expect(suggestedSaveName("Grid", ["Grid", "Grid (2)"])).toBe("Grid (3)");
   });
 
   it("derives Continue from actual play, with deterministic ties and import fallback", () => {

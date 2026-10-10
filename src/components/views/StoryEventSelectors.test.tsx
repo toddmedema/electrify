@@ -1,7 +1,11 @@
+import { SCENARIOS } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { ActiveWorldEventType, AppStateType } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { selectActiveEventGroups } from "./StoryEventSelectors";
+import {
+  selectActiveEventGroups,
+  selectUpcomingStoryEvents,
+} from "./StoryEventSelectors";
 
 function event(
   key: string,
@@ -75,4 +79,32 @@ describe("active event groups", () => {
       selectActiveEventGroups(stateAt(14 * MINUTES_PER_MONTH, active)),
     ).toEqual([]);
   });
+});
+
+test("custom story forecasts appear without scheduled load additions", () => {
+  const source = SCENARIOS.find((scenario) => scenario.id === 100)!;
+  const game = createGame({
+    scenarioId: 999,
+    scenario: {
+      ...source,
+      id: 999,
+      eventScenarioIds: [100],
+      loadAdditions: [],
+    },
+  });
+  expect(game.loadAdditions).toEqual([]);
+
+  const upcoming = selectUpcomingStoryEvents({ game } as AppStateType);
+  expect(upcoming).toEqual([
+    expect.objectContaining({
+      key: "story:100:carbon-fee-ratchet:ratchet-onset",
+      title: "Pollution fees will rise",
+      message: "Coal and gas will cost more to run.",
+      label: `Expected Jan ${game.startingYear + 4}`,
+    }),
+  ]);
+  expect(upcoming[0].message).not.toMatch(/[\d%$]/);
+
+  game.customScenario = { ...game.customScenario!, eventScenarioIds: [] };
+  expect(selectUpcomingStoryEvents({ game } as AppStateType)).toEqual([]);
 });

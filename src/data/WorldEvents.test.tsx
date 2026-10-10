@@ -10,12 +10,14 @@ import {
   PARADISE_BALANCE,
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
+  resolveStoryPhase,
   resolveStoryScheduleMonth,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
+  WILDFIRE_DECISION_KEY,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
@@ -39,6 +41,7 @@ const definition: StoryArcDefinitionType = {
     {
       id: "warning",
       schedule: { atMonth: 2 },
+      preview: () => null,
       describe: () => ({ kind: "FUEL_PRICE", message: "Warning" }),
     },
     {
@@ -48,6 +51,7 @@ const definition: StoryArcDefinitionType = {
         randomKey: "onset-month",
       },
       durationMonths: 3,
+      preview: () => ({ message: "Prices will change." }),
       describe: (_context, random) => {
         const size = Math.round(10 + random("size") * 90);
         return {
@@ -122,6 +126,7 @@ describe("deterministic story schedules", () => {
             seededMonthRange: { firstMonth: 1, lastMonth: 20 },
             randomKey: "other",
           },
+          preview: () => ({ message: "Another change will arrive." }),
           describe: () => ({ kind: "FUEL_PRICE", message: "Other" }),
         },
       ],
@@ -264,13 +269,11 @@ describe("The Shale Boom pilot arc", () => {
     expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
       {
         title: "Gas prices will fall",
-        message:
-          "Local gas will sell 25% below the national price through Feb 2016.",
+        message: "A regional shale glut will make local gas cheaper.",
       },
       {
         title: "Winter freeze will hit",
-        message:
-          "Gas costs will spike and gas plants will be limited to 70% output for three months.",
+        message: "Gas costs will spike and gas plants will produce less.",
       },
       {
         title: "Gas output will recover",
@@ -302,6 +305,9 @@ describe("The Shale Boom pilot arc", () => {
       "contingency-review",
       "red-flag-warning",
       "restoration-complete",
+      "maintenance-backlog",
+      "poor-rains-forecast",
+      "summer-outlook",
     ]);
 
     STORY_ARC_DEFINITIONS.forEach((arc) => {
@@ -310,6 +316,145 @@ describe("The Shale Boom pilot arc", () => {
       );
       expect(upcomingIds.filter((id) => id && warningIds.has(id))).toEqual([]);
     });
+  });
+});
+
+describe("authored upcoming-event copy", () => {
+  it.each(STORY_ARC_DEFINITIONS.map((arc) => [arc.id, arc] as const))(
+    "%s has brief future-tense forecasts in native and custom games",
+    (_id, arc) => {
+      const difficulties: DifficultyType[] = [
+        "Intern",
+        "Employee",
+        "Manager",
+        "VP",
+        "CEO",
+      ];
+      for (const difficulty of difficulties) {
+        for (const scenarioId of [arc.scenarioId, 999]) {
+          const start = {
+            ...context(0, scenarioId),
+            difficulty,
+            customEvents:
+              scenarioId === 999
+                ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
+                : undefined,
+          };
+          const events = upcomingStoryPhases(start);
+          for (const event of events) {
+            expect(event.title).toMatch(/\b(will|may)\b/);
+            expect(event.message).toMatch(/\b(will|may)\b/);
+            expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
+            expect(event.message.split(/\s+/).length).toBeLessThanOrEqual(20);
+            expect(event.message).not.toMatch(
+              /\b(met|supplied|last year|is down|has ended)\b/,
+            );
+            expect(event.startsMinute).toBeGreaterThan(start.date.minute);
+          }
+          // Current results and plant names cannot stand in for a future event's outcome.
+          const withResults = upcomingStoryPhases({
+            ...start,
+            snapshot: {
+              ...EMPTY_SNAPSHOT,
+              deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
+              demandWh12m: 100,
+              unservedWh12m: 30,
+              netIncome12m: -100,
+              facilities: [
+                {
+                  id: 1,
+                  name: "Current coal plant",
+                  fuel: "Coal",
+                  ageYears: 40,
+                  peakW: 100,
+                  operational: true,
+                },
+              ],
+            },
+          });
+          expect(
+            withResults.map(({ key, title, message }) => ({
+              key,
+              title,
+              message,
+            })),
+          ).toEqual(
+            events.map(({ key, title, message }) => ({ key, title, message })),
+          );
+          const hiddenIds = arc.phases
+            .filter(
+              (phase) =>
+                phase.forecastable === false ||
+                phase.preview(start, () => 0.5) === null,
+            )
+            .map((phase) => phase.id);
+          expect(
+            events.filter((event) =>
+              hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
+            ),
+          ).toEqual([]);
+          const previews = arc.phases.flatMap((phase) => {
+            const preview = phase.preview(start, () => 0.5);
+            return preview ? [preview] : [];
+          });
+          for (const preview of previews) {
+            // Also review the opening phase, which may already be active at month zero.
+            expect(preview.title).toMatch(/\b(will|may)\b/);
+            expect(preview.message).toMatch(/\b(will|may)\b/);
+            expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
+          }
+        }
+      }
+    },
+  );
+
+  it("keeps load-shedding forecasts vague and exact reductions in live history", () => {
+    const start = { ...context(0, 113), difficulty: "Employee" as const };
+    const forecasts = upcomingStoryPhases(start);
+    expect(forecasts.map((event) => event.message)).toEqual([
+      "Coal output will decrease as running costs and diesel prices rise.",
+      ...Array(3).fill(
+        "Coal output will decrease further; running costs and diesel prices will rise again.",
+      ),
+    ]);
+    const arc = STORY_ARC_DEFINITIONS.find(
+      (story) => story.scenarioId === 113,
+    )!;
+    const phase = arc.phases[1];
+    const live = resolveStoryPhase(arc, phase, {
+      ...start,
+      date: context(12, 113).date,
+    });
+    expect(live.title).toBe("Breakdowns outpace repairs");
+    expect(live.message).toBe(
+      "Coal output is down to 67% of nominal for the year, coal running costs are 8% higher, and diesel for the peakers costs 10% more than normal.",
+    );
+    expect(live.effects).toMatchObject({
+      facilityOutputMultipliersByFuel: { Coal: 0.67 },
+    });
+    expect(
+      upcomingStoryPhases({ ...start, date: context(12, 113).date }),
+    ).toHaveLength(3);
+  });
+
+  it("describes future wildfire preparation without giving an exact damage reduction", () => {
+    const upcoming = upcomingStoryPhases({
+      ...context(0, 111),
+      occurrences: [
+        {
+          key: WILDFIRE_DECISION_KEY,
+          definitionId: "preparedness",
+          startsMinute: 0,
+          endsMinute: 0,
+          effects: {},
+          attributes: { choice: "prepare" },
+        },
+      ],
+    });
+    expect(upcoming).toHaveLength(1);
+    expect(upcoming[0].message).toBe(
+      "Safety shutoffs may disrupt supply; prepared crews will reduce generation losses.",
+    );
   });
 });
 

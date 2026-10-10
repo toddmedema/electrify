@@ -59,10 +59,9 @@ export function normalizeSaveName(input: string): string {
 
 export function suggestedSaveName(
   scenario: string,
-  location: string,
   existingNames: string[],
 ): string {
-  const clean = `${scenario} — ${location}`
+  const clean = scenario
     .replace(new RegExp(INVALID_NAME_CHARACTERS.source, "g"), " ")
     .trim();
   const base = Array.from(clean || "New game")

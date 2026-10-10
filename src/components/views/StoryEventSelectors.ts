@@ -14,7 +14,6 @@ import {
   wildfireRiskNotice,
   WildfireRiskNoticeType,
 } from "../../helpers/Wildfire";
-import { formatWatts } from "../../helpers/Format";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
 
@@ -39,9 +38,15 @@ export function selectUpcomingStoryEvents(
   state: AppStateType,
 ): UpcomingStoryEventType[] {
   const game = state.game;
+  const customEvents = customEventContext(game.customScenario);
   if (
     !game.loadAdditions?.length &&
-    !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === game.scenarioId)
+    !STORY_ARC_DEFINITIONS.some(
+      (arc) =>
+        arc.scenarioId === game.scenarioId ||
+        (game.scenarioId === 999 &&
+          customEvents?.some((event) => event.scenarioId === arc.scenarioId)),
+    )
   ) {
     return NO_UPCOMING;
   }
@@ -90,7 +95,7 @@ export function selectUpcomingStoryEvents(
       (event) => event.key === WILDFIRE_DECISION_KEY,
     )?.attributes.choice || "standard",
     JSON.stringify(game.loadAdditions),
-    JSON.stringify(customEventContext(game.customScenario)),
+    JSON.stringify(customEvents),
     historyKey,
     fleetKey,
   ].join("|");
@@ -100,7 +105,7 @@ export function selectUpcomingStoryEvents(
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
     seed: game.seed,
     scenarioId: game.scenarioId,
-    customEvents: customEventContext(game.customScenario),
+    customEvents,
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
@@ -129,8 +134,8 @@ export function selectUpcomingStoryEvents(
       key: `load:${addition.id}`,
       startsMinute,
       label: `Expected ${date.month} ${date.year}`,
-      title: `${addition.label} online`,
-      message: `${formatWatts(addition.peakW)} of new ${addition.demandType.toLowerCase()} demand comes online in ${date.month} ${date.year}.`,
+      title: `${addition.label} will connect`,
+      message: "Demand will rise as new load comes online.",
       concept: "demand",
       importance: "NOTABLE",
       actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },

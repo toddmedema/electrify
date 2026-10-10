@@ -1770,8 +1770,11 @@ $pane_header_height: 48px;
 }
 
 .base_main .MuiToolbar-root.insightsTrackHeader {
-  min-height: 38px;
-  padding-right: 8px;
+  // Keep every chart title clear of the preceding divider, including when its actions are
+  // hidden. Override the general toolbar reset so the shared minimum applies.
+  box-sizing: border-box;
+  min-height: var(--control-size) !important;
+  padding: $space-2 $space-4;
 }
 
 .insightsTrackActions {
@@ -5679,9 +5682,6 @@ $sizemap: (
 }
 .insights .insightsLevers {
   padding: 0 16px 12px;
-}
-.insights .insightsTrackHeader {
-  padding: 0 16px;
 }
 .insights .insightsTrackHeader > h6 {
   font-size: var(--font-size-subtitle);

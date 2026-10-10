@@ -74,6 +74,47 @@ function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
 
 beforeEach(() => jest.clearAllMocks());
 
+it("shows game date, difficulty and location above the saved date and time", () => {
+  renderLibrary();
+  const row = screen.getByRole("article", { name: "Wind experiment" });
+  expect(
+    within(row).getByText("Jun 2035 - Manager - Ontario"),
+  ).toBeInTheDocument();
+  expect(within(row).queryByText("Rise of Renewables")).not.toBeInTheDocument();
+  expect(within(row).queryByText("In progress")).not.toBeInTheDocument();
+  const time = within(row).getByLabelText(
+    `Saved ${new Date(entry().savedAt).toLocaleString()}`,
+  );
+  expect(time).toHaveAttribute("datetime", entry().savedAt);
+  expect(time).toHaveTextContent(
+    `Saved ${new Date(entry().savedAt).toLocaleString()}`,
+  );
+});
+
+it.each(["", " (2)", " (10)", " (23)"])(
+  "omits the location from legacy generated titles with suffix '%s'",
+  (suffix) => {
+    renderLibrary({
+      entries: [entry({ name: `Rise of Renewables — Ontario${suffix}` })],
+    });
+    expect(
+      screen.getByRole("heading", { name: `Rise of Renewables${suffix}` }),
+    ).toBeInTheDocument();
+  },
+);
+
+it("preserves player-authored titles and completed outcomes", () => {
+  renderLibrary({
+    entries: [
+      entry({ name: "Wind experiment — Ontario", status: "completed" }),
+    ],
+  });
+  expect(
+    screen.getByRole("heading", { name: "Wind experiment — Ontario" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Completed")).toBeInTheDocument();
+});
+
 it.each([0, 1, 2, 3])("hides search for a library with %i saves", (count) => {
   renderLibrary({
     entries: Array.from({ length: count }, (_, i) => entry({ id: String(i) })),
