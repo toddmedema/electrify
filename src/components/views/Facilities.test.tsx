@@ -161,6 +161,31 @@ describe("the fleet list", () => {
     ).toBeVisible();
   });
 
+  it("opens existing controls for the selected member of a repeated technology group", async () => {
+    const fleet = playedGame(1);
+    const coal = fleet.facilities.find((facility) => facility.name === "Coal")!;
+    fleet.facilities.push({ ...cloneDeep(coal), id: 500 });
+    const { onSelect, onPause } = renderFacilities(fleet, null, "grid");
+    await user.click(
+      screen.getByRole("button", { name: /^Inspect Coal group,/ }),
+    );
+    expect(rows()).toHaveLength(0);
+    await user.click(
+      screen.getByRole("button", { name: /^Inspect Coal #500 ·/ }),
+    );
+    expect(onSelect).toHaveBeenLastCalledWith(500);
+    expect(rows()).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Pause Coal" }));
+    expect(onPause).toHaveBeenLastCalledWith(500, "Coal");
+    await user.click(
+      screen.getByRole("button", { name: "Close facility group" }),
+    );
+    expect(rows()).toHaveLength(0);
+    expect(
+      screen.queryByRole("button", { name: /^Inspect Coal #500 ·/ }),
+    ).toBeNull();
+  });
+
   it.each([
     [-500000, "charging"],
     [500000, "discharging"],

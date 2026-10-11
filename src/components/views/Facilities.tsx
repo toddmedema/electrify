@@ -856,7 +856,7 @@ export default class Facilities extends React.Component<Props, State> {
     ) {
       this.scrollBody
         ?.querySelector(".facilityRow.selected")
-        ?.scrollIntoView({ block: "nearest" });
+        ?.scrollIntoView?.({ block: "nearest" });
     }
   }
 
@@ -946,6 +946,83 @@ export default class Facilities extends React.Component<Props, State> {
       ),
     );
 
+    const facilityList = (
+      <List dense className="scrollable unifiedFacilitiesList">
+        {!gridView &&
+          intertiesAvailable &&
+          !!game.transmission?.lines.length && (
+            <Typography
+              id="dispatch-order"
+              className="facilitySectionLabel"
+              variant="overline"
+            >
+              Plants & storage <span>Dispatch order</span>
+            </Typography>
+          )}
+        <DragDropContext
+          onBeforeDragStart={this.onBeforeDragStart}
+          onDragEnd={this.onDragEnd}
+        >
+          <Droppable droppableId="droppable">
+            {(provided) => (
+              <div {...provided.droppableProps} ref={provided.innerRef}>
+                {visibleFacilities.map(
+                  (g: FacilityOperatingType, i: number) => (
+                    <FacilityListItem
+                      reorderable={!gridView}
+                      arriving={this.props.arrivingFacilityId === g.id}
+                      onArrivalShown={this.props.onArrivalShown}
+                      facility={g}
+                      game={game}
+                      key={g.id}
+                      onSell={onSell}
+                      onTogglePause={onTogglePause}
+                      onPause={onPause}
+                      onRetrofit={this.props.onRetrofit}
+                      onCancelRetrofit={this.props.onCancelRetrofit}
+                      onSelect={onSelect}
+                      selected={selectedFacilityId === g.id}
+                      storyOutputMultiplier={storyOutputMultiplier(
+                        g,
+                        storyEffects,
+                      )}
+                      hazardStatus={facilityHazardStatus(game, g)}
+                      spotInList={i}
+                      readOnly={readOnly}
+                    />
+                  ),
+                )}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+        {facilitiesCount < 2 && !readOnly && (
+          <Typography
+            color="textSecondary"
+            variant="body2"
+            style={{ textAlign: "center", marginTop: "12px" }}
+          >
+            Choose Build to add a generator or storage.
+          </Typography>
+        )}
+        {!gridView &&
+          intertiesAvailable &&
+          !!game.transmission?.lines.length && (
+            <TransmissionPanel
+              game={game}
+              onBuild={onTransmissionBuild}
+              onUpgrade={onTransmissionUpgrade}
+              onCancel={this.props.onTransmissionCancel}
+              onPause={this.props.onTransmissionPause}
+              onPolicy={onTradingPolicy}
+              onBeforeDragStart={this.onBeforeDragStart}
+              onDragEnd={this.onDragEnd}
+            />
+          )}
+      </List>
+    );
+
     return (
       <GameCard className="facilities" id="facilitiesPane">
         <>
@@ -998,85 +1075,14 @@ export default class Facilities extends React.Component<Props, State> {
                         ?.scrollIntoView({ block: "start" });
                     })
                   }
-                />
+                >
+                  {facilityList}
+                </FleetGrid>
               </div>
             ) : (
               <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             )}
-            <List dense className="scrollable unifiedFacilitiesList">
-              {!gridView &&
-                intertiesAvailable &&
-                !!game.transmission?.lines.length && (
-                  <Typography
-                    id="dispatch-order"
-                    className="facilitySectionLabel"
-                    variant="overline"
-                  >
-                    Plants & storage <span>Dispatch order</span>
-                  </Typography>
-                )}
-              <DragDropContext
-                onBeforeDragStart={this.onBeforeDragStart}
-                onDragEnd={this.onDragEnd}
-              >
-                <Droppable droppableId="droppable">
-                  {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
-                      {visibleFacilities.map(
-                        (g: FacilityOperatingType, i: number) => (
-                          <FacilityListItem
-                            reorderable={!gridView}
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
-                            facility={g}
-                            game={game}
-                            key={g.id}
-                            onSell={onSell}
-                            onTogglePause={onTogglePause}
-                            onPause={onPause}
-                            onRetrofit={this.props.onRetrofit}
-                            onCancelRetrofit={this.props.onCancelRetrofit}
-                            onSelect={onSelect}
-                            selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplier(
-                              g,
-                              storyEffects,
-                            )}
-                            hazardStatus={facilityHazardStatus(game, g)}
-                            spotInList={i}
-                            readOnly={readOnly}
-                          />
-                        ),
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              {facilitiesCount < 2 && !readOnly && (
-                <Typography
-                  color="textSecondary"
-                  variant="body2"
-                  style={{ textAlign: "center", marginTop: "12px" }}
-                >
-                  Choose Build to add a generator or storage.
-                </Typography>
-              )}
-              {!gridView &&
-                intertiesAvailable &&
-                !!game.transmission?.lines.length && (
-                  <TransmissionPanel
-                    game={game}
-                    onBuild={onTransmissionBuild}
-                    onUpgrade={onTransmissionUpgrade}
-                    onCancel={this.props.onTransmissionCancel}
-                    onPause={this.props.onTransmissionPause}
-                    onPolicy={onTradingPolicy}
-                    onBeforeDragStart={this.onBeforeDragStart}
-                    onDragEnd={this.onDragEnd}
-                  />
-                )}
-            </List>
+            {!gridView && facilityList}
           </div>
         </>
       </GameCard>

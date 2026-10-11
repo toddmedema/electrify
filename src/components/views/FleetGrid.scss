@@ -2,8 +2,9 @@
   display: block;
   overflow-y: auto;
 
-  > .unifiedFacilitiesList {
+  .unifiedFacilitiesList {
     overflow: visible;
+    padding: 0;
   }
 }
 
@@ -31,71 +32,84 @@
   font-size: var(--font-size-body2);
 }
 
-.fleetGridHint {
-  margin: 0 0 12px;
-  color: var(--font-color-faded);
-}
+.fleetGridBalance {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-primary);
 
-.fleetGridDiagram {
-  border-right: 2px solid var(--border-strong);
-  padding-right: 12px;
-}
-
-.fleetGridRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 2px solid var(--border-strong);
-
-  &:first-child {
-    padding-top: 0;
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  span {
+    color: var(--font-color-faded);
+  }
+  .fleetGridDelivery {
+    margin-left: auto;
+    text-align: right;
+  }
+  &.fleetGridShortage .fleetGridDelivery strong {
+    color: var(--blackout-red);
   }
 }
 
-.fleetGridNode {
-  position: relative;
+.fleetGridDiagram {
+  padding-top: 12px;
+}
+
+.fleetGridGenerators,
+.fleetGridSupport {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fleetGridNode,
+.fleetGridInterties {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: stretch;
   gap: 4px;
-  padding: 12px 8px;
+  min-width: 0;
+  min-height: var(--control-size);
+  padding: 8px;
   border: 1px solid var(--border-tile);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
   color: inherit;
   font: inherit;
+  text-align: left;
   cursor: pointer;
-  text-align: center;
-  min-width: 0;
-
-  &::after {
-    content: "";
-    position: absolute;
-    height: 14px;
-    width: 2px;
-    background: var(--border-strong);
-    top: 100%;
-    left: calc(50% - 1px);
-  }
+  overflow-wrap: anywhere;
 
   &:hover {
     background: var(--bg-raised);
   }
-
-  &[aria-pressed="true"] {
+  &[aria-expanded="true"] {
     border-color: var(--interactive-strong);
     background: var(--bg-selected);
   }
-
   &:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
+}
 
+.fleetGridNodeHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
   img {
-    margin-bottom: 4px;
+    flex: 0 0 40px;
   }
 }
 
@@ -103,18 +117,21 @@
 .fleetGridReading {
   font-weight: var(--font-weight-emphasis);
 }
-
-.fleetGridState,
-.fleetGridStored {
+.fleetGridCount,
+.fleetGridStored,
+.fleetGridHint {
   color: var(--font-color-faded);
 }
-
-.fleetGridWarning {
-  color: var(--warning-icon);
+.fleetGridFlow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-
-.fleetGridStored.fleetGridReservoirLow {
-  color: var(--blackout-red);
+.fleetGridExceptions {
+  color: var(--warning-icon);
+  &.fleetGridReservoirLow {
+    color: var(--blackout-red);
+  }
 }
 
 .fleetGridMeter {
@@ -125,7 +142,6 @@
   background: var(--bg-sunken);
   border-radius: var(--radius-pill);
   overflow: hidden;
-
   > span {
     display: block;
     height: 100%;
@@ -133,64 +149,84 @@
   }
 }
 
-.fleetGridInterties {
+.fleetGridBus {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 0;
-  border: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 0;
+  border-top: 2px solid var(--border-strong);
   border-bottom: 2px solid var(--border-strong);
-  background: transparent;
+  > span[aria-hidden] {
+    color: var(--font-color-faded);
+  }
+}
+
+.fleetGridHint {
+  margin: 12px 0 0;
+}
+.fleetGridInspectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border-strong);
+  button {
+    flex-shrink: 0;
+    min-height: var(--control-size);
+    border: 0;
+    padding: 4px 8px;
+    background: transparent;
+    color: var(--interactive-strong);
+    font: inherit;
+    cursor: pointer;
+  }
+}
+.fleetGridMembers {
+  display: flex;
+  flex-direction: column;
+}
+.fleetGridInspection .facilityRow {
+  scroll-margin-top: 80px;
+}
+.fleetGridInspection,
+.fleetGridNode,
+.fleetGridInterties {
+  scroll-margin-top: 80px;
+}
+.fleetGridMember {
+  scroll-margin-top: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: var(--control-size);
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
   color: inherit;
   font: inherit;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
-
-  > span {
-    flex: 1;
-    min-width: 0;
+  &:hover {
+    background: var(--bg-raised);
   }
-
-  &:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
+  &[aria-pressed="true"] {
+    background: var(--bg-selected);
   }
 }
 
-.fleetGridIntertie {
-  display: block;
-  margin-top: 8px;
-
-  > span {
-    display: block;
-    color: var(--font-color-faded);
-  }
-}
-
-.fleetGridCustomers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 0 0;
-
-  > div {
-    display: flex;
-    flex-direction: column;
+@media (max-width: 600px) {
+  .fleetGridNodeHeading {
     gap: 4px;
-  }
-
-  span {
-    color: var(--font-color-faded);
-  }
-
-  .fleetGridDelivery {
-    margin-left: auto;
-    text-align: right;
-  }
-
-  &.fleetGridShortage .fleetGridDelivery strong {
-    color: var(--blackout-red);
+    min-height: 0;
+    img {
+      display: none;
+    }
   }
 }
