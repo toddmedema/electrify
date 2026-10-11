@@ -21,6 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import ScreenHeader from "../base/ScreenHeader";
+import { ScenarioArtwork } from "../base/LaunchArtwork";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -360,11 +361,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
-            <img
-              className="scenarioDossierIcon"
-              src={`/images/${scenario.icon.toLowerCase()}.svg`}
-              alt={`${scenario.name} icon`}
-            />
+            <ScenarioArtwork scenario={scenario} />
             <div className="scenarioDossierCopy">
               <Typography
                 id="scenario-title"
