@@ -1,7 +1,7 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import ChartLegend from "./ChartLegend";
+import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
   bandsPlugin,
@@ -23,9 +23,9 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
+import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
 import {
   chartPalette,
-  fuelColors,
   getThemeVersion,
   subscribeThemeMode,
   withAlpha,
@@ -56,7 +56,7 @@ export interface Props {
   legend?: boolean;
   timeline: ChartData[];
   startingYear: number;
-  /** Bottom-to-top dispatch order, shared with the facility list. */
+  /** Individual fuel details follow the dispatch order in the facility list. */
   fuelOrder?: FuelNameType[];
 }
 
@@ -74,6 +74,9 @@ interface State {
   bySource: number[][];
   supply: number[];
   totalDemand: number[];
+  loadStack: number[][];
+  fuels: FuelNameType[];
+  byFuel: number[][];
   startingYear: number;
 }
 
@@ -87,12 +90,19 @@ const SUPPLY_WIDTH = 1.5;
 const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
-type SupplySource = FuelNameType | "Storage discharge" | "Imports";
+type SupplySource = "Weather-driven" | "On-demand" | "Storage" | "Interties";
+
+function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
+  if (source === "Weather-driven") return "dots";
+  if (source === "Storage") return "hatch";
+  if (source === "Interties") return "vertical";
+  return undefined;
+}
 
 function sourceColor(source: SupplySource): string {
-  if (source === "Storage discharge") return chartPalette().storage;
-  if (source === "Imports") return chartPalette().intertie;
-  return fuelColors()[source];
+  if (source === "Weather-driven") return chartPalette().weatherDriven;
+  if (source === "On-demand") return chartPalette().onDemand;
+  return chartPalette().intertie;
 }
 
 export function productionStack(
@@ -123,20 +133,36 @@ export function supplyDemandStack(
   timeline: ChartData[],
   fuelOrder: FuelNameType[],
 ) {
-  const { fuels, byFuel, stacked, production } = productionStack(
-    timeline,
-    fuelOrder,
-  );
-  const sources: SupplySource[] = [...fuels];
-  const bySource = [...byFuel];
+  const { fuels, byFuel, production } = productionStack(timeline, fuelOrder);
+  const grouped = [timeline.map(() => 0), timeline.map(() => 0)];
+  fuels.forEach((fuel, i) => {
+    const group = WEATHER_DEPENDENT_FUELS.includes(fuel) ? 0 : 1;
+    byFuel[i].forEach((value, j) => (grouped[group][j] += value));
+  });
+  const sources: SupplySource[] = [];
+  const bySource: number[][] = [];
+  const stacked: number[][] = [];
+  const cumulative = timeline.map(() => 0);
+  (["Weather-driven", "On-demand"] as const).forEach((source, i) => {
+    if (!grouped[i].some((value) => value > 0)) return;
+    sources.push(source);
+    bySource.push(grouped[i]);
+    grouped[i].forEach((value, j) => (cumulative[j] += value));
+    stacked.push([...cumulative]);
+  });
   const supply = [...production];
   const flows: Array<[SupplySource, number[]]> = [
-    ["Storage discharge", timeline.map((tick) => tick.storageDischargeW || 0)],
-    ["Imports", timeline.map((tick) => tick.importedW || 0)],
+    ["Storage", timeline.map((tick) => tick.storageDischargeW || 0)],
+    ["Interties", timeline.map((tick) => tick.importedW || 0)],
   ];
   // Include a source throughout the displayed day, even when its current output is zero.
   flows.forEach(([source, values]) => {
-    if (!values.some((value) => value > 0)) return;
+    const outward = timeline.some((tick) =>
+      source === "Storage"
+        ? (tick.storageChargeW || 0) > 0
+        : (tick.exportedW || 0) > 0,
+    );
+    if (!outward && !values.some((value) => value > 0)) return;
     sources.push(source);
     bySource.push(values);
     values.forEach((value, i) => (supply[i] += value));
@@ -147,10 +173,30 @@ export function supplyDemandStack(
   const totalDemand = timeline.map(
     (tick) => tick.demandW + (tick.storageChargeW || 0) + (tick.exportedW || 0),
   );
-  return { sources, bySource, stacked, supply, totalDemand };
+  const loadStack = [
+    timeline.map((tick) => tick.demandW),
+    timeline.map((tick) => tick.demandW + (tick.storageChargeW || 0)),
+    totalDemand,
+  ];
+  return {
+    sources,
+    bySource,
+    stacked,
+    supply,
+    totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
+  };
 }
 
-function storageFill(): uPlot.Series["fill"] {
+function sourceFill(
+  source: SupplySource,
+  allocation = false,
+): uPlot.Series["fill"] {
+  const color = sourceColor(source);
+  const kind = sourcePattern(source);
+  if (!kind) return withAlpha(color, 0.16);
   let pattern: CanvasPattern | null = null;
   return (u) => {
     if (!pattern) {
@@ -159,26 +205,43 @@ function storageFill(): uPlot.Series["fill"] {
       tile.width = tile.height = 8 * ratio;
       const ctx = tile.getContext("2d")!;
       ctx.scale(ratio, ratio);
-      ctx.fillStyle = withAlpha(chartPalette().storage, 0.16);
+      // Loads allocate the production underneath them. A solid chart surface prevents the
+      // generation texture bleeding through and keeps each flow's appearance consistent.
+      if (allocation) {
+        ctx.fillStyle = chartPalette().background;
+        ctx.fillRect(0, 0, 8, 8);
+      }
+      ctx.fillStyle = withAlpha(color, 0.16);
       ctx.fillRect(0, 0, 8, 8);
-      ctx.strokeStyle = withAlpha(chartPalette().storage, 0.45);
+      ctx.strokeStyle = withAlpha(color, 0.6);
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(-4, 8);
-      ctx.lineTo(8, -4);
-      ctx.moveTo(4, 12);
-      ctx.lineTo(12, 4);
+      if (kind === "hatch") {
+        ctx.moveTo(-4, 8);
+        ctx.lineTo(8, -4);
+        ctx.moveTo(4, 12);
+        ctx.lineTo(12, 4);
+      } else if (kind === "vertical") {
+        ctx.moveTo(4, 0);
+        ctx.lineTo(4, 8);
+      } else {
+        ctx.fillStyle = withAlpha(color, 0.65);
+        ctx.arc(4, 4, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.stroke();
       pattern = u.ctx.createPattern(tile, "repeat");
     }
-    return pattern || withAlpha(chartPalette().storage, 0.16);
+    return pattern || withAlpha(color, 0.16);
   };
 }
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   const { sources } = getState();
-  const fuelLineStart = sources.length + 1;
-  const demandLineStart = fuelLineStart + sources.length * 2;
+  const loadBaseStart = sources.length + 1;
+  const fuelLineStart = loadBaseStart + 3;
+  const loadLineStart = fuelLineStart + sources.length * 2;
+  const demandLineStart = loadLineStart + 2;
   const linePair = (
     stroke: string,
     width: number,
@@ -237,13 +300,17 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     series: [
       {},
       ...sources.map((source) => ({
-        fill:
-          source === "Storage discharge"
-            ? storageFill()
-            : withAlpha(sourceColor(source), 0.16),
+        fill: sourceFill(source),
         width: 0,
         points: { show: false },
       })),
+      { width: 0, points: { show: false } },
+      { fill: sourceFill("Storage", true), width: 0, points: { show: false } },
+      {
+        fill: sourceFill("Interties", true),
+        width: 0,
+        points: { show: false },
+      },
       ...sources.flatMap((source, i) =>
         linePair(
           sourceColor(source),
@@ -254,12 +321,24 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       ),
       ...linePair(
         chartPalette().demand,
+        SUPPLY_WIDTH,
+        SUPPLY_FORECAST_DASH,
+        loadLineStart,
+      ),
+      ...linePair(
+        chartPalette().demand,
         DEMAND_WIDTH,
         DEMAND_FORECAST_DASH,
         demandLineStart,
       ),
     ],
-    bands: sources.slice(1).map((_source, i) => ({ series: [i + 2, i + 1] })),
+    bands: [
+      ...sources
+        .slice(1)
+        .map((_source, i) => ({ series: [i + 2, i + 1] as [number, number] })),
+      { series: [loadBaseStart + 1, loadBaseStart] },
+      { series: [loadBaseStart + 2, loadBaseStart + 1] },
+    ],
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
       baselinePlugin(chartPalette().axis),
@@ -304,6 +383,8 @@ export function formatProductionTooltip(
     | "bySource"
     | "supply"
     | "totalDemand"
+    | "fuels"
+    | "byFuel"
     | "startingYear"
   >,
 ): string {
@@ -316,17 +397,29 @@ export function formatProductionTooltip(
   const time = `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
   const loads: Array<[string, number | undefined]> = [
     ["Storage charging", d.storageChargeW],
-    ["Exports", d.exportedW],
+    ["Interties exporting", d.exportedW],
   ];
   return [
     time,
     `Total supply: ${formatWatts(state.supply[idx])}`,
-    ...state.sources.map(
-      (source, i) => `${source}: ${formatWatts(state.bySource[i][idx])}`,
+    ...state.sources
+      .filter((source) => source === "Weather-driven" || source === "On-demand")
+      .map(
+        (source) =>
+          `${source}: ${formatWatts(state.bySource[state.sources.indexOf(source)][idx])}`,
+      ),
+    ...state.fuels.map(
+      (fuel, i) => `${fuel}: ${formatWatts(state.byFuel[i][idx])}`,
     ),
+    ...(d.storageDischargeW
+      ? [`Storage discharging: ${formatWatts(d.storageDischargeW)}`]
+      : []),
+    ...(d.importedW
+      ? [`Interties importing: ${formatWatts(d.importedW)}`]
+      : []),
     "",
-    `Total demand: ${formatWatts(state.totalDemand[idx])}`,
-    `Customers: ${formatWatts(d.demandW)}`,
+    `Total load: ${formatWatts(state.totalDemand[idx])}`,
+    `Demand: ${formatWatts(d.demandW)}`,
     ...loads
       .filter(([_label, value]) => value && value > 0)
       .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
@@ -350,10 +443,16 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     location,
     fuelOrder = [],
   } = props;
-  const { sources, bySource, stacked, supply, totalDemand } = supplyDemandStack(
-    timeline,
-    fuelOrder,
-  );
+  const {
+    sources,
+    bySource,
+    stacked,
+    supply,
+    totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
+  } = supplyDemandStack(timeline, fuelOrder);
   // Figure out the boundaries of the chart data
   let domainMax = 0;
   const rangeMin = timeline[0].minute;
@@ -460,9 +559,16 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     const split = splitPastProjected(values, isForecast, { bridgeEnd: true });
     return [split.past, split.projected];
   });
-  const demand = splitPastProjected(totalDemand, isForecast, {
+  const load = splitPastProjected(totalDemand, isForecast, {
     bridgeEnd: true,
   });
+  const demand = splitPastProjected(
+    timeline.map((tick) => tick.demandW),
+    isForecast,
+    {
+      bridgeEnd: true,
+    },
+  );
   const minutes = new Array<number>(timeline.length);
   timeline.forEach((d: ChartData, i: number) => {
     minutes[i] = d.minute;
@@ -483,6 +589,9 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     bySource,
     supply,
     totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
     startingYear,
   };
 
@@ -491,17 +600,17 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       {legend && (
         <ChartLegend
           items={[
-            { name: "Total demand", color: chartPalette().demand, dash: "8,4" },
+            { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
               name: source,
               color: sourceColor(source),
-              hatch: source === "Storage discharge",
+              pattern: sourcePattern(source),
             })),
           ]}
         />
       )}
       <UPlotChart<State>
-        ariaLabel={`Chart of electricity supply and demand over the day. Supply stacks fuel production, storage discharge and imports; total demand includes customers, storage charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and On-demand. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveDetails
         formatSummaryValue={formatWatts}
         height={height}
@@ -509,13 +618,17 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         data={[
           minutes,
           ...stacked,
+          ...loadStack,
           ...fuelLines,
+          load.past,
+          load.projected,
           demand.past,
           demand.projected,
         ]}
         summaryData={[
           minutes,
           ...bySource,
+          ...byFuel,
           supply,
           timeline.map((tick) => tick.demandW),
           timeline.map((tick) => tick.storageChargeW || 0),
@@ -523,12 +636,19 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           totalDemand,
         ]}
         seriesLabels={[
-          ...sources,
+          ...sources.map((source) =>
+            source === "Storage"
+              ? "Storage discharging"
+              : source === "Interties"
+                ? "Interties importing"
+                : source,
+          ),
+          ...fuels,
           "Total supply",
-          "Customers",
+          "Demand",
           "Storage charging",
-          "Exports",
-          "Total demand",
+          "Interties exporting",
+          "Total load",
         ]}
         buildOptions={buildOptions}
         structureKey={sources.join(",")}

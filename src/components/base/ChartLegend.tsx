@@ -19,7 +19,7 @@ export interface LegendItemType {
   /** Faded back, for a series the chart itself is currently drawing faded back */
   muted?: boolean;
   /** Matches a patterned area without borrowing the line styles used for forecasts. */
-  hatch?: boolean;
+  pattern?: "hatch" | "dots" | "vertical";
 }
 
 export interface Props {
@@ -61,10 +61,12 @@ export default function ChartLegend(props: Props): React.JSX.Element {
             <span
               className={
                 "chartLegendSwatch" +
-                (item.hatch ? " chartLegendSwatch-hatch" : "")
+                (item.pattern
+                  ? ` chartLegendSwatch-pattern chartLegendSwatch-${item.pattern}`
+                  : "")
               }
               style={{
-                backgroundColor: item.hatch ? undefined : item.color,
+                backgroundColor: item.pattern ? undefined : item.color,
                 color: item.color,
               }}
             />

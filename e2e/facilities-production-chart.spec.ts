@@ -2,7 +2,6 @@ import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
-import { getDateFromMinute } from "../src/helpers/DateTime";
 
 for (const theme of ["light", "dark"]) {
   test(`storage and complete demand remain compact and inspectable in ${theme}`, async ({
@@ -21,52 +20,92 @@ for (const theme of ["light", "dark"]) {
       exact: true,
     });
     await openPane(pane, navigation);
-    // A balanced display fixture exercises both directions and cross-border loads in one day.
-    // The customer deficit remains identical to the gap between the stack and total demand.
+    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Review purchase of Portugal intertie",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Pay cash", exact: true })
+      .click();
+    // Complete the purchased connection, then let the real reducer dispatch every flow.
     await editSavedGame(page, (save) => {
-      save.game.date = getDateFromMinute(720, save.game.startingYear);
-      save.game.timeline.forEach((tick, i) => {
-        const generation = Object.values(tick.supplyByFuel).reduce(
-          (sum, output) => sum + (output || 0),
-          0,
-        );
-        tick.storageChargeW = i < 60 ? generation * 0.15 : 0;
-        tick.storageDischargeW = i >= 60 ? generation * 0.2 : 0;
-        tick.importedW = generation * 0.1;
-        tick.exportedW = i < 60 ? generation * 0.05 : 0;
-        tick.supplyW =
-          generation +
-          tick.storageDischargeW +
-          tick.importedW -
-          tick.storageChargeW -
-          tick.exportedW;
-      });
+      save.game.transmission!.lines[0].yearsToBuildLeft = 0;
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(pane, navigation);
+    await pane
+      .getByRole("button", { name: "Inspect Natural Gas CC", exact: true })
+      .click();
+    await pane
+      .getByRole("button", { name: "Pause Natural Gas CC", exact: true })
+      .click();
+    await pane
+      .getByRole("button", { name: "Inspect Natural Gas CC", exact: true })
+      .click();
+    const speed = page.locator("#appbar:visible");
+    await speed
+      .getByRole("button", { name: "normal speed", exact: true })
+      .first()
+      .click();
+    await expect
+      .poll(async () => (await readSavedGame(page))?.date.minute || 0, {
+        timeout: 30000,
+      })
+      .toBeGreaterThanOrEqual(720);
+    await speed
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
+    const game = (await readSavedGame(page))!;
+    const charging = game.timeline.findIndex(
+      (tick) => (tick.storageChargeW || 0) > 0,
+    );
+    const discharging = game.timeline.findIndex(
+      (tick) => (tick.storageDischargeW || 0) > 0,
+    );
+    const exporting = game.timeline.findIndex(
+      (tick) => (tick.exportedW || 0) > 0,
+    );
+    expect(charging).toBeGreaterThanOrEqual(0);
+    expect(discharging).toBeGreaterThanOrEqual(0);
+    expect(exporting).toBeGreaterThanOrEqual(0);
     const chart = pane.locator("#chartSupplyDemand");
     const image = chart.getByRole("img");
+    await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
+    await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
     await expect(
-      chart.getByText("Storage discharge", { exact: true }),
+      chart.getByText("Weather-driven", { exact: true }),
     ).toBeVisible();
-    await expect(chart.getByText("Imports", { exact: true })).toBeVisible();
+    await expect(chart.getByText("On-demand", { exact: true })).toBeVisible();
+    await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
     await expect(chart.locator(".chartLegendItem").first()).toHaveText(
-      "Total demand",
+      "Demand",
     );
     await expect(chart.locator(".chartLegendSwatch-hatch")).toHaveCount(1);
     await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
     await image.focus();
-    await image.press("Home");
+    const selectPoint = async (index: number) => {
+      await image.press("Home");
+      for (let i = 0; i < index; i++) await image.press("ArrowRight");
+    };
+    await selectPoint(charging);
     const details = chart.locator(".chartPointDetails");
     await expect(details).toContainText("Storage charging:");
-    await expect(details).toContainText("Exports:");
-    await expect(details).toContainText("Customers:");
+    await expect(details).toContainText("Demand:");
     const firstTime = await details.locator("strong").textContent();
     await image.press("ArrowRight");
     await expect(details.locator("strong")).not.toHaveText(firstTime!);
+    await selectPoint(exporting);
+    await expect(details).toContainText("Interties exporting:");
+    await selectPoint(discharging);
+    await expect(details).toContainText("Storage discharging:");
     await image.press("End");
-    await expect(details).toContainText("Storage discharge:");
     await image.press("Escape");
     await expect(details).toHaveCount(0);
     const plot = chart.locator(".u-over");
@@ -79,7 +118,7 @@ for (const theme of ["light", "dark"]) {
     await expect(details).toBeVisible();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await expect(details).toContainText("Total supply:");
-    await expect(details).toContainText("Total demand:");
+    await expect(details).toContainText("Total load:");
     const totals = details.locator(".chartPointDetailsTotal");
     await expect(totals).toHaveCount(2);
     for (const total of await totals.all()) {
@@ -157,8 +196,12 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Production by fuel", { exact: true }),
     ).toHaveCount(0);
-    await expect(chart.getByText("Sun", { exact: true })).toBeVisible();
-    await expect(chart.getByText("Wind", { exact: true })).toBeVisible();
+    await expect(
+      chart.getByText("Weather-driven", { exact: true }),
+    ).toBeVisible();
+    await expect(chart.getByText("On-demand", { exact: true })).toBeVisible();
+    await expect(chart.getByText("Sun", { exact: true })).toHaveCount(0);
+    await expect(chart.getByText("Wind", { exact: true })).toHaveCount(0);
     await expect(chart.getByRole("img")).toHaveAccessibleName(
       /Sun: latest .*Wind: latest/,
     );
@@ -198,7 +241,7 @@ for (const theme of ["light", "dark"]) {
       .first()
       .click();
     await expect(chart.getByRole("img")).toHaveAccessibleName(
-      /Total supply: latest .*Total demand: latest/,
+      /Total supply: latest .*Total load: latest/,
     );
     const plot = chart.locator(".u-over");
     const bounds = (await plot.boundingBox())!;
@@ -207,7 +250,7 @@ for (const theme of ["light", "dark"]) {
       bounds.y + bounds.height * 0.4,
     );
     await expect(chart.locator(".chartTooltip")).toContainText("Total supply:");
-    await expect(chart.locator(".chartTooltip")).toContainText("Total demand:");
+    await expect(chart.locator(".chartTooltip")).toContainText("Total load:");
     await page.mouse.move(0, 0);
     await chart.scrollIntoViewIfNeeded();
     await page.evaluate(() => document.fonts.ready);
@@ -298,7 +341,9 @@ test("blackout periods remain visible when imports supplement fuel production", 
       (bounds.width * (tick.minute - rangeMin)) / (rangeMax - rangeMin),
     bounds.y + 4,
   );
-  await expect(chart.locator(".chartTooltip")).toContainText("Imports:");
+  await expect(chart.locator(".chartTooltip")).toContainText(
+    "Interties importing:",
+  );
   await expect(chart.locator(".chartTooltip")).toContainText("Blackout:");
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
@@ -319,7 +364,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   }
 });
 
-test("a full fuel mix retains readable source keys on narrow screens", async ({
+test("a full fuel mix and concurrent flows retain readable source keys on narrow screens", async ({
   page,
 }, info) => {
   await page.addInitScript(() => {
@@ -346,7 +391,10 @@ test("a full fuel mix retains readable source keys on narrow screens", async ({
       };
       tick.storageDischargeW = 100e6;
       tick.importedW = 100e6;
-      tick.supplyW = 1300e6;
+      tick.storageChargeW = 180e6;
+      tick.exportedW = 20e6;
+      tick.demandW = 1250e6;
+      tick.supplyW = 1100e6;
     });
   });
   await page.reload();
@@ -357,7 +405,7 @@ test("a full fuel mix retains readable source keys on narrow screens", async ({
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
   const chart = pane.locator("#chartSupplyDemand");
-  await expect(chart.locator(".chartLegendItem")).toHaveCount(14);
+  await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
   const legendBounds = (await chart.locator(".chartLegend").boundingBox())!;
   for (const item of await chart.locator(".chartLegendItem").all()) {
     const bounds = (await item.boundingBox())!;
@@ -366,6 +414,29 @@ test("a full fuel mix retains readable source keys on narrow screens", async ({
       legendBounds.x + legendBounds.width + 1,
     );
   }
+  await chart.getByRole("img").focus();
+  await chart.getByRole("img").press("Home");
+  const details = chart.locator(".chartPointDetails");
+  for (const direction of [
+    "Storage discharging:",
+    "Storage charging:",
+    "Interties importing:",
+    "Interties exporting:",
+  ]) {
+    await expect(details).toContainText(direction);
+  }
+  await expect(details).toContainText("Blackout: 150MW unmet");
+  await chart.getByRole("img").press("Escape");
   await page.evaluate(() => document.fonts.ready);
-  await chart.screenshot({ path: info.outputPath("dense-source-legend.png") });
+  await chart.screenshot({
+    path: info.outputPath("concurrent-flow-fixture.png"),
+  });
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await chart.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `review-fixture-concurrent-${info.project.name}.png`,
+      ),
+    });
+  }
 });

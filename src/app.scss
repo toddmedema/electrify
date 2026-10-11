@@ -5281,13 +5281,26 @@ $sizemap: (
   padding: 8px 12px 0;
   gap: 4px 8px;
 }
-.chartLegendSwatch-hatch {
+.chartLegendSwatch-pattern {
   width: 12px;
   height: 10px;
   border-radius: 0;
   border: 1px solid currentColor;
+}
+.chartLegendSwatch-hatch {
   background: repeating-linear-gradient(
     135deg,
+    transparent 0 3px,
+    currentColor 3px 4px
+  );
+}
+.chartLegendSwatch-dots {
+  background: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+.chartLegendSwatch-vertical {
+  background: repeating-linear-gradient(
+    90deg,
     transparent 0 3px,
     currentColor 3px 4px
   );

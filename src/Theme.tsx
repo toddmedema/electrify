@@ -120,6 +120,9 @@ export const waterDashArrays = {
 };
 
 interface ChartPaletteType {
+  /** The two operating groups used by the compact Facilities chart. */
+  weatherDriven: string;
+  onDemand: string;
   /** Facilities that burn or catch nothing, which borrow the battery UI's blue */
   storage: string;
   /**
@@ -171,6 +174,8 @@ const LOGO_BLUE: { [mode in ThemeModeType]: string } = {
 
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
+    weatherDriven: FUEL_COLORS.light.Wind,
+    onDemand: FUEL_COLORS.light.Oil,
     storage: blue[800],
     intertie: "#455a64", // blueGrey800, 7.24:1 on white and clear of every fuel hue
     demand: grey[900],
@@ -197,6 +202,8 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     background: "#ffffff",
   },
   dark: {
+    weatherDriven: FUEL_COLORS.dark.Wind,
+    onDemand: FUEL_COLORS.dark.Oil,
     storage: blue[300],
     intertie: "#90a4ae", // blueGrey300, 7.37:1 on --bg-primary #0b1016 (7.02:1 on the #0f161f chart surface)
     // Near-white demand used to glare against the plot and visually overpower supply. This
