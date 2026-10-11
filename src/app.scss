@@ -5286,18 +5286,6 @@ $sizemap: (
   height: 8px;
   border-radius: var(--radius-sm);
 }
-.chartLegendSwatch-shape {
-  width: 12px;
-  height: 8px;
-  border-radius: 0;
-  overflow: visible;
-  circle,
-  rect {
-    fill: var(--chart-surface);
-    stroke: currentColor;
-    stroke-width: 1.25;
-  }
-}
 .chartLegendSwatch-hatch {
   background: repeating-linear-gradient(
     135deg,

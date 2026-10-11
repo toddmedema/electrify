@@ -88,6 +88,9 @@ for (const theme of ["light", "dark"]) {
       "Demand",
     );
     await expect(chart.locator(".chartLegendSwatch-hatch")).toHaveCount(1);
+    await expect(
+      chart.locator(".chartLegend circle, .chartLegend rect"),
+    ).toHaveCount(0);
     await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
     await image.focus();
     const selectPoint = async (index: number) => {

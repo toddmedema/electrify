@@ -22,8 +22,6 @@ export interface LegendItemType {
   pattern?: "hatch" | "vertical";
   /** Quiet base wash behind the pattern. */
   fill?: string;
-  /** Matches sparse boundary marks without covering an area in texture. */
-  shape?: "circle" | "square";
 }
 
 export interface Props {
@@ -61,27 +59,6 @@ export default function ChartLegend(props: Props): React.JSX.Element {
             </svg>
           ) : item.rule ? (
             <span className="chartLegendSwatch chartLegendSwatch-demand" />
-          ) : item.shape ? (
-            <svg
-              className="chartLegendSwatch chartLegendSwatch-shape"
-              viewBox="0 0 12 8"
-              aria-hidden="true"
-              style={{ color: item.color }}
-            >
-              <line
-                x1="0"
-                y1="4"
-                x2="12"
-                y2="4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              {item.shape === "circle" ? (
-                <circle cx="6" cy="4" r="2" />
-              ) : (
-                <rect x="4" y="2" width="4" height="4" />
-              )}
-            </svg>
           ) : (
             <span
               className={

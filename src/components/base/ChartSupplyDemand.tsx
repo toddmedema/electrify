@@ -93,12 +93,6 @@ function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   return undefined;
 }
 
-function sourceShape(source: SupplySource): LegendItemType["shape"] {
-  if (source === "Weather-driven") return "circle";
-  if (source === "On-demand") return "square";
-  return undefined;
-}
-
 function sourceColor(source: SupplySource): string {
   if (source === "Weather-driven") return chartPalette().weatherDriven;
   if (source === "On-demand") return chartPalette().onDemand;
@@ -233,64 +227,12 @@ function sourceFill(
   };
 }
 
-// A few matching circle/square marks identify the flat generation bands without relying on
-// hue or covering the chart in texture. Keep them away from zero, edges and nearby anchors.
-function drawGenerationMarks(u: uPlot, state: State) {
-  const ratio = uPlot.pxRatio;
-  const radius = 2 * ratio;
-  let indices = state.timeline.flatMap((tick, i) =>
-    [360, 720, 1080].includes(tick.minute % 1440) ? [i] : [],
-  );
-  const nowIndex =
-    state.currentMinute == null
-      ? -1
-      : state.timeline.findIndex((tick) => tick.minute >= state.currentMinute!);
-  if (nowIndex >= 0) {
-    const nowX = u.valToPos(state.timeline[nowIndex].minute, "x", true);
-    indices = indices.filter(
-      (i) =>
-        Math.abs(u.valToPos(state.timeline[i].minute, "x", true) - nowX) >=
-        16 * ratio,
-    );
-    indices.push(nowIndex);
-  }
-  u.ctx.save();
-  u.ctx.setLineDash([]);
-  u.ctx.lineWidth = 1.25 * ratio;
-  u.ctx.fillStyle = chartPalette().background;
-  state.sources.forEach((source, sourceIndex) => {
-    const shape = sourceShape(source);
-    if (!shape) return;
-    u.ctx.strokeStyle = sourceColor(source);
-    indices.forEach((idx) => {
-      if (state.bySource[sourceIndex][idx] <= 0) return;
-      const value = u.data[sourceIndex + 1][idx];
-      if (value == null) return;
-      const x = u.valToPos(state.timeline[idx].minute, "x", true);
-      const y = u.valToPos(value, "y", true);
-      const inset = radius + ratio;
-      if (
-        x < u.bbox.left + inset ||
-        x > u.bbox.left + u.bbox.width - inset ||
-        y < u.bbox.top + inset ||
-        y > u.bbox.top + u.bbox.height - inset
-      )
-        return;
-      u.ctx.beginPath();
-      if (shape === "circle") u.ctx.arc(x, y, radius, 0, Math.PI * 2);
-      else u.ctx.rect(x - radius, y - radius, radius * 2, radius * 2);
-      u.ctx.fill();
-      u.ctx.stroke();
-    });
-  });
-  u.ctx.restore();
-}
-
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   const { sources } = getState();
   const loadBaseStart = sources.length + 1;
   const fuelLineStart = loadBaseStart + 3;
-  const loadLineStart = fuelLineStart + sources.length * 2;
+  const chargingLineStart = fuelLineStart + sources.length * 2;
+  const loadLineStart = chargingLineStart + 2;
   const demandLineStart = loadLineStart + 2;
   const linePair = (
     stroke: string,
@@ -369,6 +311,13 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
           fuelLineStart + i * 2,
         ),
       ),
+      // Draw the charging/export divider after every fill so allocation bands cannot hide it.
+      ...linePair(
+        sourceColor("Storage"),
+        SUPPLY_WIDTH,
+        SUPPLY_FORECAST_DASH,
+        chargingLineStart,
+      ),
       ...linePair(
         chartPalette().demand,
         SUPPLY_WIDTH,
@@ -400,9 +349,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {
         hooks: {
           draw: (u) => {
-            const state = getState();
-            drawGenerationMarks(u, state);
-            const now = state.currentMinute;
+            const now = getState().currentMinute;
             if (now == null) return;
             const ratio = uPlot.pxRatio;
             u.ctx.save();
@@ -611,6 +558,15 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     const split = splitPastProjected(values, isForecast, { bridgeEnd: true });
     return [split.past, split.projected];
   });
+  const charging = splitPastProjected(
+    loadStack[1].map((value, i) =>
+      (timeline[i].storageChargeW || 0) > 0 && (timeline[i].exportedW || 0) > 0
+        ? value
+        : null,
+    ),
+    isForecast,
+    { bridgeEnd: true },
+  );
   const load = splitPastProjected(totalDemand, isForecast, {
     bridgeEnd: true,
   });
@@ -662,7 +618,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
               fill: sourcePattern(source)
                 ? chartPalette().powerFlowFill
                 : undefined,
-              shape: sourceShape(source),
             })),
           ]}
         />
@@ -678,6 +633,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           ...stacked,
           ...loadStack,
           ...fuelLines,
+          charging.past,
+          charging.projected,
           load.past,
           load.projected,
           demand.past,

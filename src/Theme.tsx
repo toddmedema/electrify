@@ -186,8 +186,8 @@ const GRID_STEEL = { light: "#455a64", dark: "#90a4ae" };
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     ...PRODUCTION_COLORS.light,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.2),
-    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.11),
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.24),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.132),
     powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
     storage: blue[800],
@@ -217,8 +217,8 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     ...PRODUCTION_COLORS.dark,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.18),
-    onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.12),
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.216),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.144),
     powerFlowFill: withAlpha(GRID_STEEL.dark, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.dark, 0.8),
     storage: blue[300],
