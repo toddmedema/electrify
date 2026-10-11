@@ -2312,12 +2312,56 @@ $pane_header_height: 48px;
   pointer-events: none;
   backdrop-filter: none;
 }
+.chartTooltip-breakdown {
+  width: 320px;
+  pointer-events: auto;
+  overscroll-behavior: contain;
+  .chartPointDetailsValues {
+    gap: 8px;
+    line-height: 1.45;
+  }
+}
 
 // The canvas is transparent, so one quiet surface behind it frames the axes and plot together.
 // Inset shadow behaves like a border without changing uPlot's measured width.
 .accessibleChart {
   width: 100%;
   min-width: 0;
+}
+.chartPointDetails {
+  margin: 0 12px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--radius-md);
+  background: var(--tooltip-bg);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+.chartPointDetailsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  button {
+    min-height: 44px;
+    padding: 0 8px;
+    color: var(--interactive-strong);
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+}
+.chartPointDetailsValues {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.chartPointDetailsTotal {
+  font-weight: 600;
 }
 
 .uplot {
@@ -5233,13 +5277,20 @@ $sizemap: (
 .facilitySupplyChart {
   flex: 0 0 auto;
 }
-.dailyProductionHeading {
-  padding: 8px 12px 4px;
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-}
 .dailyProductionChart .chartLegend {
-  padding: 0 12px;
+  padding: 8px 12px 0;
+  gap: 4px 8px;
+}
+.chartLegendSwatch-hatch {
+  width: 12px;
+  height: 10px;
+  border-radius: 0;
+  border: 1px solid currentColor;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    currentColor 3px 4px
+  );
 }
 @media (max-width: 599px) {
   .facilities .facilitiesBody {
