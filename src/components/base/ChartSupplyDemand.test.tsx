@@ -74,11 +74,14 @@ it("makes unstacked fuel output and blackout meaning readable without the canvas
   expect(chart).toHaveAccessibleName(/Sun: latest 40W, range 0W to 40W/);
   expect(chart).toHaveAccessibleName(/Total production: latest 120W/);
   expect(chart).toHaveAccessibleName(/Supply to customers: latest 110W/);
-  expect(screen.getByText("Blackout")).toBeVisible();
+  expect(chart).toHaveAccessibleName(/1 blackout period shaded/);
+  expect(screen.queryByText("Blackout")).not.toBeInTheDocument();
+  expect(screen.queryByText("Supply to customers")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Bands: fuel output/)).not.toBeInTheDocument();
   expect(screen.queryByText("Wind")).not.toBeInTheDocument();
 });
 
-it("keeps a demand chart with customer supply when no generators are producing", () => {
+it("keeps demand and accessible customer supply when no generators are producing", () => {
   render(
     <ChartSupplyDemand
       timeline={[{ minute: 0, supplyW: 50, demandW: 50, supplyByFuel: {} }]}
@@ -88,7 +91,8 @@ it("keeps a demand chart with customer supply when no generators are producing",
       legend
     />,
   );
-  expect(screen.getByText("Supply to customers")).toBeVisible();
+  expect(screen.getByText("Demand")).toBeVisible();
+  expect(screen.queryByText("Supply to customers")).not.toBeInTheDocument();
   expect(screen.getByRole("img")).toHaveAccessibleName(
     /Total production: latest 0W/,
   );

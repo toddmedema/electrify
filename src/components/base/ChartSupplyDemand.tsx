@@ -73,7 +73,6 @@ interface State {
   currentMinute: number | null;
   fuels: FuelNameType[];
   production: number[];
-  showCustomerSupply: boolean;
   startingYear: number;
 }
 
@@ -113,10 +112,9 @@ export function productionStack(
 }
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
-  const { fuels, showCustomerSupply } = getState();
+  const { fuels } = getState();
   const fuelLineStart = fuels.length + 1;
-  const supplyLineStart = fuelLineStart + fuels.length * 2;
-  const demandLineStart = supplyLineStart + (showCustomerSupply ? 2 : 0);
+  const demandLineStart = fuelLineStart + fuels.length * 2;
   const linePair = (
     stroke: string,
     width: number,
@@ -187,9 +185,6 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
           fuelLineStart + i * 2,
         ),
       ),
-      ...(showCustomerSupply
-        ? linePair(chartPalette().supply, 2, [6, 3, 2, 3], supplyLineStart)
-        : []),
       ...linePair(
         chartPalette().demand,
         DEMAND_WIDTH,
@@ -280,15 +275,12 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     timeline,
     fuelOrder,
   );
-  const showCustomerSupply = timeline.some(
-    (tick, i) => Math.abs(tick.supplyW - production[i]) > 1,
-  );
   // Figure out the boundaries of the chart data
   let domainMax = 0;
   const rangeMin = timeline[0].minute;
   const rangeMax = timeline[timeline.length - 1].minute;
   timeline.forEach((d: ChartData, i) => {
-    domainMax = Math.max(domainMax, production[i], d.supplyW, d.demandW);
+    domainMax = Math.max(domainMax, production[i], d.demandW);
   });
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
@@ -389,11 +381,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     const split = splitPastProjected(values, isForecast, { bridgeEnd: true });
     return [split.past, split.projected];
   });
-  const supply = splitPastProjected(
-    timeline.map((d: ChartData) => d.supplyW),
-    isForecast,
-    { bridgeEnd: true },
-  );
   const demand = splitPastProjected(
     timeline.map((d: ChartData) => d.demandW),
     isForecast,
@@ -417,7 +404,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         : currentMinute,
     fuels,
     production,
-    showCustomerSupply,
     startingYear,
   };
 
@@ -432,19 +418,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
                 name: fuel,
                 color: fuelColors()[fuel],
               })),
-              ...(showCustomerSupply
-                ? [
-                    {
-                      name: "Supply to customers",
-                      color: chartPalette().supply,
-                      dash: "6,3,2,3",
-                    },
-                  ]
-                : []),
               { name: "Demand", color: chartPalette().demand, dash: "8,4" },
-              ...(blackoutCount
-                ? [{ name: "Blackout", color: chartPalette().blackout }]
-                : []),
             ]}
           />
         </>
@@ -458,7 +432,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           minutes,
           ...stacked,
           ...fuelLines,
-          ...(showCustomerSupply ? [supply.past, supply.projected] : []),
           demand.past,
           demand.projected,
         ]}
@@ -476,15 +449,9 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           "Demand",
         ]}
         buildOptions={buildOptions}
-        structureKey={`${fuels.join(",")}|${showCustomerSupply}`}
+        structureKey={fuels.join(",")}
         tooltip={formatProductionTooltip}
       />
-      {legend && (
-        <div className="dailyProductionNote">
-          <div>Bands: fuel output · Top: total production</div>
-          <div>Solid: recorded · Dashed: forecast</div>
-        </div>
-      )}
     </div>
   );
 };

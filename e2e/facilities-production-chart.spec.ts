@@ -29,7 +29,12 @@ for (const theme of ["light", "dark"]) {
     await expect(chart.getByRole("img")).toHaveAccessibleName(
       /Sun: latest .*Wind: latest/,
     );
-    await expect(chart).toContainText("Top: total production");
+    await expect(chart).not.toContainText("Bands: fuel output");
+    await expect(chart).not.toContainText("Solid: recorded");
+    await expect(chart.locator(".chartLegend")).not.toContainText(
+      "Supply to customers",
+    );
+    await expect(chart.locator(".chartLegend")).not.toContainText("Blackout");
     expect(
       await pane.evaluate(
         (element) => element.scrollWidth - element.clientWidth,
@@ -144,8 +149,8 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await expect(chart.locator("canvas")).toBeVisible();
   await expect(
     chart.getByText("Supply to customers", { exact: true }),
-  ).toBeVisible();
-  await expect(chart.getByText("Blackout", { exact: true })).toBeVisible();
+  ).toHaveCount(0);
+  await expect(chart.getByText("Blackout", { exact: true })).toHaveCount(0);
   await expect(chart.getByRole("img")).toHaveAccessibleName(
     /blackout periods? shaded/,
   );

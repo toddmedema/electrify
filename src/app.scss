@@ -5241,12 +5241,6 @@ $sizemap: (
 .dailyProductionChart .chartLegend {
   padding: 0 12px;
 }
-.dailyProductionNote {
-  padding: 0 12px 8px;
-  color: $font_color_faded;
-  font-size: var(--font-size-caption);
-  line-height: 1.4;
-}
 @media (max-width: 599px) {
   .facilities .facilitiesBody {
     display: block;
