@@ -46,6 +46,7 @@ import {
   formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
@@ -720,6 +721,7 @@ function FacilitySupplyChart({
       <ChartSupplyDemand
         height={180}
         timeline={game.timeline}
+        fuelOrder={getDispatchOrderedFuels(game.facilities)}
         currentMinute={game.date.minute}
         location={game.location}
         legend

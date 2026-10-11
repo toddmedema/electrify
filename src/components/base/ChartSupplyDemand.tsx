@@ -1,12 +1,11 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
+import ChartLegend, { LegendItemType } from "./ChartLegend";
 import {
   anchoredForecastPaths,
   bandsPlugin,
   chartFont,
-  legendPlugin,
-  LegendItem,
   padRange,
   spansFromEdges,
   splitPastProjected,
@@ -17,7 +16,6 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 import {
-  formatHour,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
@@ -25,14 +23,21 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
-import { chartPalette } from "../../Theme";
-import { LocationType } from "../../Types";
+import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
+import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
+import { FuelNameType, LocationType, TickPresentFutureType } from "../../Types";
 
-interface ChartData {
-  minute: number;
-  supplyW: number;
-  demandW: number;
-}
+type ChartData = Pick<
+  TickPresentFutureType,
+  | "minute"
+  | "supplyW"
+  | "demandW"
+  | "supplyByFuel"
+  | "storageChargeW"
+  | "storageDischargeW"
+  | "importedW"
+  | "exportedW"
+>;
 
 interface BlackoutEdges {
   minute: number;
@@ -46,6 +51,8 @@ export interface Props {
   legend?: boolean;
   timeline: ChartData[];
   startingYear: number;
+  /** Individual fuel details follow the dispatch order in the facility list. */
+  fuelOrder?: FuelNameType[];
 }
 
 // Everything the plot's callbacks read. Rebuilt every render and handed to UPlotChart, which
@@ -58,7 +65,13 @@ interface State {
   sunTicks: number[];
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
-  legendItems: LegendItem[];
+  sources: SupplySource[];
+  bySource: number[][];
+  supply: number[];
+  totalDemand: number[];
+  loadStack: number[][];
+  fuels: FuelNameType[];
+  byFuel: number[][];
   startingYear: number;
 }
 
@@ -66,19 +79,181 @@ interface State {
 // set and change shape from one OS to the next
 const SUN_LABELS = ["Sunrise", "Noon", "Sunset"];
 
-// Supply and demand differ in width and dash as well as hue, so the lines stay distinct for a
-// colourblind player and in the tutorial's all-forecast first frame. Demand is the heavy line
-// the player has to meet; supply is the lighter, filled one. The legend draws these samples.
+// Fuel boundaries stay lighter than the demand the player has to meet. Solid records and
+// dashed forecasts meet at now; fills stay subtle so blackout shading remains visible.
 const SUPPLY_WIDTH = 1.5;
 const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
+type SupplySource = "Weather-driven" | "On-demand" | "Storage" | "Interties";
+
+function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
+  if (source === "Storage") return "hatch";
+  if (source === "Interties") return "vertical";
+  return undefined;
+}
+
+function sourceColor(source: SupplySource): string {
+  if (source === "Weather-driven") return chartPalette().weatherDriven;
+  if (source === "On-demand") return chartPalette().onDemand;
+  return chartPalette().intertie;
+}
+
+export function productionStack(
+  timeline: ChartData[],
+  fuelOrder: FuelNameType[],
+) {
+  const present = new Set<FuelNameType>();
+  timeline.forEach((tick) => {
+    (Object.keys(tick.supplyByFuel) as FuelNameType[]).forEach((fuel) => {
+      if ((tick.supplyByFuel[fuel] || 0) > 0) present.add(fuel);
+    });
+  });
+  const fuels = [...new Set([...fuelOrder, ...present])].filter((fuel) =>
+    present.has(fuel),
+  );
+  const byFuel = fuels.map((fuel) =>
+    timeline.map((tick) => tick.supplyByFuel[fuel] || 0),
+  );
+  const production = timeline.map(() => 0);
+  const stacked = byFuel.map((values) => {
+    values.forEach((value, i) => (production[i] += value));
+    return [...production];
+  });
+  return { fuels, byFuel, stacked, production };
+}
+
+export function supplyDemandStack(
+  timeline: ChartData[],
+  fuelOrder: FuelNameType[],
+) {
+  const { fuels, byFuel, production } = productionStack(timeline, fuelOrder);
+  const grouped = [timeline.map(() => 0), timeline.map(() => 0)];
+  fuels.forEach((fuel, i) => {
+    const group = WEATHER_DEPENDENT_FUELS.includes(fuel) ? 0 : 1;
+    byFuel[i].forEach((value, j) => (grouped[group][j] += value));
+  });
+  const sources: SupplySource[] = [];
+  const bySource: number[][] = [];
+  const stacked: number[][] = [];
+  const cumulative = timeline.map(() => 0);
+  (["Weather-driven", "On-demand"] as const).forEach((source, i) => {
+    if (!grouped[i].some((value) => value > 0)) return;
+    sources.push(source);
+    bySource.push(grouped[i]);
+    grouped[i].forEach((value, j) => (cumulative[j] += value));
+    stacked.push([...cumulative]);
+  });
+  const supply = [...production];
+  const flows: Array<[SupplySource, number[]]> = [
+    ["Storage", timeline.map((tick) => tick.storageDischargeW || 0)],
+    ["Interties", timeline.map((tick) => tick.importedW || 0)],
+  ];
+  // Include a source throughout the displayed day, even when its current output is zero.
+  flows.forEach(([source, values]) => {
+    const outward = timeline.some((tick) =>
+      source === "Storage"
+        ? (tick.storageChargeW || 0) > 0
+        : (tick.exportedW || 0) > 0,
+    );
+    if (!outward && !values.some((value) => value > 0)) return;
+    sources.push(source);
+    bySource.push(values);
+    values.forEach((value, i) => (supply[i] += value));
+    stacked.push([...supply]);
+  });
+  // Charging is the power drawn from the grid, before storage conversion losses. Stored Wh
+  // and those losses must not be added again to this power balance.
+  const totalDemand = timeline.map(
+    (tick) => tick.demandW + (tick.storageChargeW || 0) + (tick.exportedW || 0),
+  );
+  const loadStack = [
+    timeline.map((tick) => tick.demandW),
+    timeline.map((tick) => tick.demandW + (tick.storageChargeW || 0)),
+    totalDemand,
+  ];
+  return {
+    sources,
+    bySource,
+    stacked,
+    supply,
+    totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
+  };
+}
+
+function sourceFill(
+  source: SupplySource,
+  allocation = false,
+): uPlot.Series["fill"] {
+  const palette = chartPalette();
+  if (source === "Weather-driven") return palette.weatherDrivenFill;
+  if (source === "On-demand") return palette.onDemandFill;
+  const kind = sourcePattern(source);
+  let pattern: CanvasPattern | null = null;
+  return (u) => {
+    if (!pattern) {
+      const tile = document.createElement("canvas");
+      const ratio = uPlot.pxRatio;
+      tile.width = tile.height = 16 * ratio;
+      const ctx = tile.getContext("2d")!;
+      ctx.scale(ratio, ratio);
+      // Loads allocate the production underneath them. A solid chart surface prevents the
+      // generation tint bleeding through and keeps each flow's appearance consistent.
+      if (allocation) {
+        ctx.fillStyle = palette.background;
+        ctx.fillRect(0, 0, 16, 16);
+      }
+      ctx.fillStyle = palette.powerFlowFill;
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.strokeStyle = palette.powerFlowPattern;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (kind === "hatch") {
+        ctx.moveTo(-8, 16);
+        ctx.lineTo(16, -8);
+        ctx.moveTo(8, 16);
+        ctx.lineTo(16, 8);
+      } else {
+        ctx.moveTo(8.5, 0);
+        ctx.lineTo(8.5, 16);
+      }
+      ctx.stroke();
+      pattern = u.ctx.createPattern(tile, "repeat");
+    }
+    return pattern || palette.powerFlowFill;
+  };
+}
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  const { sources } = getState();
+  const loadBaseStart = sources.length + 1;
+  const fuelLineStart = loadBaseStart + 3;
+  const chargingLineStart = fuelLineStart + sources.length * 2;
+  const loadLineStart = chargingLineStart + 2;
+  const demandLineStart = loadLineStart + 2;
+  const linePair = (
+    stroke: string,
+    width: number,
+    dash: number[],
+    pastIndex: number,
+  ): uPlot.Series[] => [
+    { stroke, width, points: { show: false }, spanGaps: false },
+    {
+      stroke,
+      width,
+      dash,
+      paths: anchoredForecastPaths(pastIndex),
+      points: { show: false },
+      spanGaps: false,
+    },
+  ];
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [10 * scale, 5 * scale, 0, 0],
+    padding: [18 * scale, 5 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -116,66 +291,173 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     ],
     series: [
       {},
-      {
-        stroke: chartPalette().supply,
-        width: SUPPLY_WIDTH,
-        fill: chartPalette().historicFill,
+      ...sources.map((source) => ({
+        fill: sourceFill(source),
+        width: 0,
         points: { show: false },
-        spanGaps: false,
-      },
+      })),
+      { width: 0, points: { show: false } },
+      { fill: sourceFill("Storage", true), width: 0, points: { show: false } },
       {
-        stroke: chartPalette().supply,
-        width: SUPPLY_WIDTH,
-        dash: SUPPLY_FORECAST_DASH,
-        paths: anchoredForecastPaths(1),
+        fill: sourceFill("Interties", true),
+        width: 0,
         points: { show: false },
-        spanGaps: false,
       },
-      {
-        stroke: chartPalette().demand,
-        width: DEMAND_WIDTH,
-        points: { show: false },
-        spanGaps: false,
-      },
-      {
-        stroke: chartPalette().demand,
-        width: DEMAND_WIDTH,
-        dash: DEMAND_FORECAST_DASH,
-        paths: anchoredForecastPaths(3),
-        points: { show: false },
-        spanGaps: false,
-      },
+      ...sources.flatMap((source, i) =>
+        linePair(
+          sourceColor(source),
+          SUPPLY_WIDTH,
+          SUPPLY_FORECAST_DASH,
+          fuelLineStart + i * 2,
+        ),
+      ),
+      // Draw the charging/export divider after every fill so allocation bands cannot hide it.
+      ...linePair(
+        sourceColor("Storage"),
+        SUPPLY_WIDTH,
+        SUPPLY_FORECAST_DASH,
+        chargingLineStart,
+      ),
+      ...linePair(
+        chartPalette().demand,
+        SUPPLY_WIDTH,
+        SUPPLY_FORECAST_DASH,
+        loadLineStart,
+      ),
+      ...linePair(
+        chartPalette().demand,
+        DEMAND_WIDTH,
+        DEMAND_FORECAST_DASH,
+        demandLineStart,
+      ),
+    ],
+    bands: [
+      ...sources
+        .slice(1)
+        .map((_source, i) => ({ series: [i + 2, i + 1] as [number, number] })),
+      { series: [loadBaseStart + 1, loadBaseStart] },
+      { series: [loadBaseStart + 2, loadBaseStart + 1] },
     ],
     plugins: [
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
       baselinePlugin(chartPalette().axis),
       verticalLinePlugin(
         () => getState().currentMinute,
         chartPalette().axis,
-        0.5,
+        1,
       ),
-      // Flush with the plot's own right edge, wherever the y axis leaves it
-      legendPlugin(() => getState().legendItems, 0, 18, "right"),
+      {
+        hooks: {
+          draw: (u) => {
+            const now = getState().currentMinute;
+            if (now == null) return;
+            const ratio = uPlot.pxRatio;
+            u.ctx.save();
+            u.ctx.font = chartFont(ratio);
+            u.ctx.fillStyle = tickLabelFill();
+            u.ctx.textAlign = "center";
+            const halfWidth = u.ctx.measureText("Now").width / 2;
+            const x = Math.max(
+              u.bbox.left + halfWidth,
+              Math.min(
+                u.bbox.left + u.bbox.width - halfWidth,
+                u.valToPos(now, "x", true),
+              ),
+            );
+            u.ctx.fillText("Now", x, u.bbox.top - 4 * ratio);
+            u.ctx.restore();
+          },
+        },
+      },
     ],
   };
 }
 
-function tooltip(idx: number, state: State): string {
+export function formatProductionTooltip(
+  idx: number,
+  state: Pick<
+    State,
+    | "timeline"
+    | "sources"
+    | "bySource"
+    | "supply"
+    | "totalDemand"
+    | "fuels"
+    | "byFuel"
+    | "startingYear"
+  >,
+): string {
   const d = state.timeline[idx];
-  const time = formatHour(getDateFromMinute(d.minute, state.startingYear));
-  return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const date = getDateFromMinute(d.minute, state.startingYear);
+  const hour = Math.floor(date.minuteOfDay / 60);
+  const minute = Math.floor(date.minuteOfDay % 60)
+    .toString()
+    .padStart(2, "0");
+  const time = `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
+  const loads: Array<[string, number | undefined]> = [
+    ["Storage charging", d.storageChargeW],
+    ["Interties exporting", d.exportedW],
+  ];
+  return [
+    time,
+    `Total supply: ${formatWatts(state.supply[idx])}`,
+    ...state.sources
+      .filter((source) => source === "Weather-driven" || source === "On-demand")
+      .map(
+        (source) =>
+          `${source}: ${formatWatts(state.bySource[state.sources.indexOf(source)][idx])}`,
+      ),
+    ...state.fuels.map(
+      (fuel, i) => `${fuel}: ${formatWatts(state.byFuel[i][idx])}`,
+    ),
+    ...(d.storageDischargeW
+      ? [`Storage discharging: ${formatWatts(d.storageDischargeW)}`]
+      : []),
+    ...(d.importedW
+      ? [`Interties importing: ${formatWatts(d.importedW)}`]
+      : []),
+    "",
+    `Total load: ${formatWatts(state.totalDemand[idx])}`,
+    `Demand: ${formatWatts(d.demandW)}`,
+    ...loads
+      .filter(([_label, value]) => value && value > 0)
+      .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
+    ...(d.demandW > d.supplyW
+      ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
+      : []),
+  ].join("\n");
 }
 
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
-  const { startingYear, height, legend, timeline, location } = props;
+  React.useSyncExternalStore(
+    subscribeThemeMode,
+    getThemeVersion,
+    getThemeVersion,
+  );
+  const {
+    startingYear,
+    height,
+    legend,
+    timeline,
+    location,
+    fuelOrder = [],
+  } = props;
+  const {
+    sources,
+    bySource,
+    stacked,
+    supply,
+    totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
+  } = supplyDemandStack(timeline, fuelOrder);
   // Figure out the boundaries of the chart data
-  let domainMin = 999999999999;
   let domainMax = 0;
   const rangeMin = timeline[0].minute;
   const rangeMax = timeline[timeline.length - 1].minute;
-  timeline.forEach((d: ChartData) => {
-    domainMin = Math.min(domainMin, d.supplyW, d.demandW);
-    domainMax = Math.max(domainMax, d.supplyW, d.demandW);
+  timeline.forEach((_d: ChartData, i) => {
+    domainMax = Math.max(domainMax, supply[i], totalDemand[i]);
   });
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
@@ -245,7 +527,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       blackouts.push({ minute: intersectionTime, value: domainMax });
       isBlackout = true;
       blackoutCount++;
-    } else if (d.demandW < d.supplyW && isBlackout) {
+    } else if (d.demandW <= d.supplyW && isBlackout) {
       // Blackout ending: high then low edge
       const intersectionTime = getIntersectionX(
         prev.minute,
@@ -269,82 +551,125 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     value: isBlackout ? domainMax : 0,
   });
 
-  // Divide between historic and forecast. One aligned x per tick, with each series blanked out
-  // where it doesn't apply: the record draws solid (supply with its history wash) and the
-  // forecast dashed, so a line's style says what it is. Each half carries the other's boundary
-  // point, so the two meet at the current minute without a gap.
+  // Fill continuous bands, then draw each boundary as solid history and dashed forecast.
   const currentMinute = props.currentMinute || 0;
   const isForecast = timeline.map((d: ChartData) => d.minute >= currentMinute);
-  const supply = splitPastProjected(
-    timeline.map((d: ChartData) => d.supplyW),
+  const fuelLines = stacked.flatMap((values) => {
+    const split = splitPastProjected(values, isForecast, { bridgeEnd: true });
+    return [split.past, split.projected];
+  });
+  const charging = splitPastProjected(
+    loadStack[1].map((value, i) =>
+      (timeline[i].storageChargeW || 0) > 0 && (timeline[i].exportedW || 0) > 0
+        ? value
+        : null,
+    ),
     isForecast,
     { bridgeEnd: true },
   );
+  const load = splitPastProjected(totalDemand, isForecast, {
+    bridgeEnd: true,
+  });
   const demand = splitPastProjected(
-    timeline.map((d: ChartData) => d.demandW),
+    timeline.map((tick) => tick.demandW),
     isForecast,
-    { bridgeEnd: true },
+    {
+      bridgeEnd: true,
+    },
   );
   const minutes = new Array<number>(timeline.length);
   timeline.forEach((d: ChartData, i: number) => {
     minutes[i] = d.minute;
   });
 
-  // The blackout key only earns its place once there has been a blackout to explain
-  const legendItems: LegendItem[] = [];
-  if (legend) {
-    legendItems.push(
-      {
-        name: "Supply",
-        fill: chartPalette().supply,
-        line: { width: SUPPLY_WIDTH + 0.5, dash: SUPPLY_FORECAST_DASH },
-      },
-      {
-        name: "Demand",
-        fill: chartPalette().demand,
-        line: { width: DEMAND_WIDTH, dash: DEMAND_FORECAST_DASH },
-      },
-    );
-    if (blackoutCount > 0) {
-      legendItems.push({ name: "Blackout", fill: chartPalette().blackout });
-    }
-  }
-
   const state: State = {
     timeline,
-    domain: padRange(domainMin, domainMax),
+    domain: [0, padRange(0, domainMax)[1]],
     range: [rangeMin, rangeMax],
     hourTicks,
     sunTicks,
     blackoutSpans: spansFromEdges(blackouts),
-    currentMinute: currentMinute === rangeMax ? null : currentMinute,
-    legendItems,
+    currentMinute:
+      currentMinute <= rangeMin || currentMinute >= rangeMax
+        ? null
+        : currentMinute,
+    sources,
+    bySource,
+    supply,
+    totalDemand,
+    loadStack,
+    fuels,
+    byFuel,
     startingYear,
   };
 
   return (
-    <UPlotChart<State>
-      ariaLabel="Chart of electricity supply and demand over the day"
-      formatSummaryValue={formatWatts}
-      id="chartSupplyDemand"
-      height={height}
-      state={state}
-      data={[
-        minutes,
-        supply.past,
-        supply.projected,
-        demand.past,
-        demand.projected,
-      ]}
-      seriesLabels={[
-        "Past supply",
-        "Forecast supply",
-        "Past demand",
-        "Forecast demand",
-      ]}
-      buildOptions={buildOptions}
-      tooltip={tooltip}
-    />
+    <div id="chartSupplyDemand" className="dailyProductionChart">
+      {legend && (
+        <ChartLegend
+          items={[
+            { name: "Demand", color: chartPalette().demand, dash: "8,4" },
+            ...sources.map((source) => ({
+              name: source,
+              color: sourcePattern(source)
+                ? chartPalette().powerFlowPattern
+                : sourceColor(source),
+              pattern: sourcePattern(source),
+              fill: sourcePattern(source)
+                ? chartPalette().powerFlowFill
+                : undefined,
+            })),
+          ]}
+        />
+      )}
+      <UPlotChart<State>
+        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and On-demand. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        interactiveDetails
+        formatSummaryValue={formatWatts}
+        height={height}
+        state={state}
+        data={[
+          minutes,
+          ...stacked,
+          ...loadStack,
+          ...fuelLines,
+          charging.past,
+          charging.projected,
+          load.past,
+          load.projected,
+          demand.past,
+          demand.projected,
+        ]}
+        summaryData={[
+          minutes,
+          ...bySource,
+          ...byFuel,
+          supply,
+          timeline.map((tick) => tick.demandW),
+          timeline.map((tick) => tick.storageChargeW || 0),
+          timeline.map((tick) => tick.exportedW || 0),
+          totalDemand,
+        ]}
+        seriesLabels={[
+          ...sources.map((source) =>
+            source === "Storage"
+              ? "Storage discharging"
+              : source === "Interties"
+                ? "Interties importing"
+                : source,
+          ),
+          ...fuels,
+          "Total supply",
+          "Demand",
+          "Storage charging",
+          "Interties exporting",
+          "Total load",
+        ]}
+        buildOptions={buildOptions}
+        structureKey={sources.join(",")}
+        tooltip={formatProductionTooltip}
+      />
+    </div>
   );
 };
 export default React.memo(ChartSupplyDemand);

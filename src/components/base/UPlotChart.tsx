@@ -50,6 +50,8 @@ export interface UPlotChartProps<S> {
   structureKey?: string | number;
   /** One tooltip covering every series at the hovered x */
   tooltip?: (idx: number, state: S) => string;
+  /** Tap or use the keyboard to read a point's full breakdown below the plot. */
+  interactiveDetails?: boolean;
   /**
    * Charts sharing this key share a cursor: hovering one puts a crosshair at the same x on all
    * of them. Only for charts drawn against the same x scale, one above another. Numbers stay
@@ -68,12 +70,37 @@ const TOOLTIP_OFFSET = 8;
 // pointer move; uPlot can resize its existing canvas cheaply in the meantime.
 const RESIZE_SETTLE_MS = 120;
 
+function revealInScrollPane(element: HTMLElement | null) {
+  if (!element) return;
+  for (let pane = element.parentElement; pane; pane = pane.parentElement) {
+    if (
+      !/auto|scroll/.test(getComputedStyle(pane).overflowY) ||
+      pane.scrollHeight <= pane.clientHeight
+    )
+      continue;
+    const bounds = element.getBoundingClientRect();
+    const top = pane.getBoundingClientRect().top + pane.clientTop;
+    const bottom = top + pane.clientHeight;
+    if (bounds.height > pane.clientHeight || bounds.top < top) {
+      pane.scrollTop += bounds.top - top;
+    } else if (bounds.bottom > bottom) {
+      pane.scrollTop += bounds.bottom - bottom;
+    }
+    return;
+  }
+}
+
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
   hoverOnly: boolean,
+  hideTooltip: () => boolean,
+  interactiveDetails: boolean,
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
+  let header: HTMLDivElement;
+  let columns: Array<{ total: HTMLElement; rows: HTMLDivElement }>;
+  let dismiss: (event: KeyboardEvent) => void;
   // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
   // should not also open a tooltip over data the pointer isn't anywhere near
   let hovering = !hoverOnly;
@@ -83,6 +110,25 @@ function tooltipPlugin<S>(
         el = document.createElement("div");
         el.className = "chartTooltip";
         u.over.appendChild(el);
+        if (interactiveDetails) {
+          el.classList.add("chartTooltip-breakdown");
+          header = document.createElement("div");
+          const values = document.createElement("div");
+          values.className = "chartPointDetailsValues";
+          columns = [0, 1].map(() => {
+            const column = document.createElement("div");
+            const total = document.createElement("strong");
+            const rows = document.createElement("div");
+            column.append(total, rows);
+            values.appendChild(column);
+            return { total, rows };
+          });
+          el.append(header, values);
+          dismiss = (event) => {
+            if (event.key === "Escape") u.setCursor({ left: -10, top: -10 });
+          };
+          document.addEventListener("keydown", dismiss);
+        }
         if (hoverOnly) {
           u.over.addEventListener("mouseenter", () => {
             hovering = true;
@@ -98,14 +144,28 @@ function tooltipPlugin<S>(
       setCursor: (u: uPlot) => {
         const label = getLabel();
         const idx = u.cursor.idx;
-        if (!el || !label || idx == null || !hovering) {
+        if (!el || !label || idx == null || !hovering || hideTooltip()) {
           if (el) {
             el.style.display = "none";
           }
           return;
         }
-        el.textContent = label(idx, getState());
+        const text = label(idx, getState());
+        if (interactiveDetails) {
+          const groups = text.split("\n\n");
+          const [time, ...supply] = groups[0].split("\n");
+          header.textContent = time;
+          [supply, (groups[1] || "").split("\n")].forEach((rows, i) => {
+            columns[i].total.textContent = rows[0];
+            columns[i].rows.textContent = rows.slice(1).join("\n");
+          });
+          el.style.maxWidth = `${u.over.clientWidth}px`;
+        } else {
+          el.textContent = text;
+        }
         el.style.display = "block";
+        el.style.maxHeight = `${u.over.clientHeight}px`;
+        el.style.overflowY = "auto";
         // Kept inside the plot, the way Victory's constrainToVisibleArea tooltip was
         const left = u.cursor.left!;
         const top = u.cursor.top!;
@@ -113,8 +173,11 @@ function tooltipPlugin<S>(
           left + TOOLTIP_OFFSET + el.offsetWidth > u.over.clientWidth;
         const flipY =
           top + TOOLTIP_OFFSET + el.offsetHeight > u.over.clientHeight;
-        el.style.left = `${flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET}px`;
-        el.style.top = `${flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET}px`;
+        el.style.left = `${Math.max(0, Math.min(u.over.clientWidth - el.offsetWidth, flipX ? left - TOOLTIP_OFFSET - el.offsetWidth : left + TOOLTIP_OFFSET))}px`;
+        el.style.top = `${Math.max(0, Math.min(u.over.clientHeight - el.offsetHeight, flipY ? top - TOOLTIP_OFFSET - el.offsetHeight : top + TOOLTIP_OFFSET))}px`;
+      },
+      destroy: () => {
+        if (dismiss) document.removeEventListener("keydown", dismiss);
       },
     },
   };
@@ -130,6 +193,23 @@ export default function UPlotChart<S>(
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
+  const [selectedPoint, setSelectedPoint] = React.useState<number | null>(null);
+  const selectedPointRef = React.useRef(selectedPoint);
+  selectedPointRef.current = selectedPoint;
+  const detailsId = React.useId();
+  const instructionsId = React.useId();
+  const detailsRef = React.useRef<HTMLDivElement>(null);
+  const detailsWereOpen = React.useRef(false);
+  const detailsOpen = selectedPoint !== null;
+  React.useLayoutEffect(() => {
+    if (!props.interactiveDetails) return;
+    if (detailsOpen) {
+      revealInScrollPane(detailsRef.current);
+    } else if (detailsWereOpen.current) {
+      revealInScrollPane(rootRef.current?.parentElement?.parentElement || null);
+    }
+    detailsWereOpen.current = detailsOpen;
+  }, [detailsOpen, props.interactiveDetails]);
   const measuredWidthRef = React.useRef(0);
   const heightRef = React.useRef(height);
   heightRef.current = height;
@@ -318,7 +398,13 @@ export default function UPlotChart<S>(
             () => annotationsRef.current.events,
             () => annotationsRef.current.activeEventKey,
           ),
-          tooltipPlugin(getState, () => tooltipRef.current, !!syncKey),
+          tooltipPlugin(
+            getState,
+            () => tooltipRef.current,
+            !!syncKey,
+            () => selectedPointRef.current !== null,
+            !!props.interactiveDetails,
+          ),
         ],
       },
       dataRef.current,
@@ -546,13 +632,84 @@ export default function UPlotChart<S>(
     plotRef.current?.redraw();
   }, [annotations]);
 
+  const selectPoint = (index: number) => {
+    const plot = plotRef.current;
+    if (!plot || !data[0].length) return;
+    const point = Math.max(0, Math.min(data[0].length - 1, index));
+    selectedPointRef.current = point;
+    setSelectedPoint(point);
+    plot.setCursor({ left: plot.valToPos(data[0][point], "x"), top: 0 });
+  };
+  const closeDetails = () => {
+    selectedPointRef.current = null;
+    setSelectedPoint(null);
+    plotRef.current?.setCursor({ left: -10, top: -10 });
+    rootRef.current?.focus({ preventScroll: true });
+  };
+  const detail =
+    selectedPoint === null
+      ? undefined
+      : props.tooltip?.(Math.min(selectedPoint, data[0].length - 1), state);
+  const [detailTime, ...detailRows] = detail?.split("\n") || [];
+
   return (
     <div className="accessibleChart">
+      {props.interactiveDetails && (
+        <span id={instructionsId} className="srOnly">
+          Tap or press Enter to inspect a time. Use Left and Right arrows, Home
+          and End to read points. Escape closes details.
+        </span>
+      )}
       <div
         id={id}
         ref={rootRef}
         role="img"
         aria-label={accessibleLabel}
+        tabIndex={props.interactiveDetails ? 0 : undefined}
+        aria-describedby={props.interactiveDetails ? instructionsId : undefined}
+        onKeyDown={
+          props.interactiveDetails
+            ? (event) => {
+                const current =
+                  selectedPoint ?? plotRef.current?.cursor.idx ?? 0;
+                const points: Record<string, number> = {
+                  ArrowLeft: current - 1,
+                  ArrowRight: current + 1,
+                  Home: 0,
+                  End: data[0].length - 1,
+                  Enter: current,
+                };
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeDetails();
+                } else if (event.key in points) {
+                  event.preventDefault();
+                  selectPoint(points[event.key]);
+                }
+              }
+            : undefined
+        }
+        onClick={
+          props.interactiveDetails
+            ? (event) => {
+                const plot = plotRef.current;
+                if (!plot) return;
+                const bounds = plot.over.getBoundingClientRect();
+                if (
+                  event.clientX < bounds.left ||
+                  event.clientX > bounds.right ||
+                  event.clientY < bounds.top ||
+                  event.clientY > bounds.bottom
+                )
+                  return;
+                plot.setCursor({
+                  left: event.clientX - bounds.left,
+                  top: event.clientY - bounds.top,
+                });
+                selectPoint(plot.cursor.idx ?? 0);
+              }
+            : undefined
+        }
         data-viewport-min={viewport?.range[0]}
         data-viewport-max={viewport?.range[1]}
         style={{
@@ -562,6 +719,47 @@ export default function UPlotChart<S>(
           overflow: "hidden",
         }}
       />
+      {props.interactiveDetails && detail && (
+        <div className="chartPointDetails" id={detailsId} ref={detailsRef}>
+          <div className="chartPointDetailsHeader">
+            <strong>{detailTime}</strong>
+            <button
+              type="button"
+              aria-label="Close chart details"
+              onClick={closeDetails}
+            >
+              Close
+            </button>
+          </div>
+          <div
+            className="chartPointDetailsValues"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span className="srOnly">{detailTime}</span>
+            {detailRows
+              .join("\n")
+              .split("\n\n")
+              .map((group, i) => (
+                <div key={i}>
+                  {group.split("\n").map((row, j) => (
+                    <div
+                      key={j}
+                      className={
+                        row.startsWith("Total ")
+                          ? "chartPointDetailsTotal"
+                          : undefined
+                      }
+                    >
+                      {row}
+                    </div>
+                  ))}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -120,6 +120,13 @@ export const waterDashArrays = {
 };
 
 interface ChartPaletteType {
+  /** The two operating groups used by the compact Facilities chart. */
+  weatherDriven: string;
+  onDemand: string;
+  weatherDrivenFill: string;
+  onDemandFill: string;
+  powerFlowFill: string;
+  powerFlowPattern: string;
   /** Facilities that burn or catch nothing, which borrow the battery UI's blue */
   storage: string;
   /**
@@ -169,10 +176,22 @@ const LOGO_BLUE: { [mode in ThemeModeType]: string } = {
   dark: "#629be1",
 };
 
+// Wind's teal and nuclear's slate, softened for large chart fields rather than icon fills.
+const PRODUCTION_COLORS = {
+  light: { weatherDriven: "#007f73", onDemand: "#526776" },
+  dark: { weatherDriven: "#69c8b7", onDemand: "#a7b7c2" },
+};
+const GRID_STEEL = { light: "#455a64", dark: "#90a4ae" };
+
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
+    ...PRODUCTION_COLORS.light,
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.24),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.132),
+    powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
+    powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
     storage: blue[800],
-    intertie: "#455a64", // blueGrey800, 7.24:1 on white and clear of every fuel hue
+    intertie: GRID_STEEL.light, // blueGrey800, 7.24:1 on white and clear of every fuel hue
     demand: grey[900],
     supply: blue[600],
     historicFill: blue[50],
@@ -197,8 +216,13 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     background: "#ffffff",
   },
   dark: {
+    ...PRODUCTION_COLORS.dark,
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.216),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.144),
+    powerFlowFill: withAlpha(GRID_STEEL.dark, 0.08),
+    powerFlowPattern: withAlpha(GRID_STEEL.dark, 0.8),
     storage: blue[300],
-    intertie: "#90a4ae", // blueGrey300, 7.37:1 on --bg-primary #0b1016 (7.02:1 on the #0f161f chart surface)
+    intertie: GRID_STEEL.dark, // blueGrey300, 7.37:1 on --bg-primary #0b1016 (7.02:1 on the #0f161f chart surface)
     // Near-white demand used to glare against the plot and visually overpower supply. This
     // cooler off-white still clears 13:1 while behaving like a peer rather than a highlight.
     demand: "#dce6f0",
