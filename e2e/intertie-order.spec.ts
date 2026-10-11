@@ -55,6 +55,22 @@ for (const theme of ["light", "dark"] as const) {
         ),
       );
     const disclosure = rows.first().locator(".facilityDisclosure");
+    const layout = await disclosure.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const text = element
+        .querySelector(".transmissionLineText")!
+        .getBoundingClientRect();
+      const chevron = element
+        .querySelector(".facilityChevron")!
+        .getBoundingClientRect();
+      return {
+        width: bounds.width,
+        textWidth: text.width,
+        chevronInset: bounds.right - chevron.right,
+      };
+    });
+    expect(layout.textWidth).toBeGreaterThan(layout.width / 2);
+    expect(layout.chevronInset).toBeCloseTo(16, 0);
     await disclosure.focus();
     await page.keyboard.press("Enter");
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
@@ -92,10 +108,12 @@ for (const theme of ["light", "dark"] as const) {
     );
     await speed.getByRole("button", { name: "pause", exact: true }).click();
 
-    // Reorder back with the pointer on desktop and a long-press touch drag on phones.
+    // The icon itself reorders, using a pointer on desktop and a long press on phones.
     const handle = rows.last().locator(".facilityDragHandle");
     await handle.scrollIntoViewIfNeeded();
-    const start = (await handle.boundingBox())!;
+    const start = (await handle
+      .locator(".transmissionListIcon")
+      .boundingBox())!;
     const destination = (await rows
       .first()
       .locator(".facilityDragHandle")

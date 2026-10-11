@@ -615,6 +615,14 @@ export default function TransmissionPanel({
   const availableCorridors = corridorsForGame(game);
   const now = currentTick(game);
   const readOnly = !!game.replayPlayback;
+  const reorderDisabled =
+    readOnly ||
+    !!(
+      game.inGame &&
+      activeScenario(game)?.tutorialSteps?.[
+        game.tutorialStep
+      ]?.hideUi?.includes("facilityActions")
+    );
   const intertieContext = intertieContextForGame(game);
   const forecast = useIntertieForecast(
     game,
@@ -765,6 +773,14 @@ export default function TransmissionPanel({
                     const constructionStyle = building
                       ? { opacity: theme.palette.action.disabledOpacity }
                       : undefined;
+                    const icon = (
+                      <img
+                        className="transmissionListIcon facilityRowIcon"
+                        style={constructionStyle}
+                        src="/images/transmission.svg"
+                        alt=""
+                      />
+                    );
                     const importableW = now
                       ? intertieImportLimitW(
                           line,
@@ -809,7 +825,7 @@ export default function TransmissionPanel({
                         key={line.id}
                         draggableId={`t${line.id}`}
                         index={index}
-                        isDragDisabled={readOnly}
+                        isDragDisabled={reorderDisabled}
                         disableInteractiveElementBlocking
                       >
                         {(provided, snapshot) => (
@@ -824,14 +840,16 @@ export default function TransmissionPanel({
                           >
                             <div className="facilityRowHeader">
                               {!building && <FlowBar fraction={flowFraction} />}
-                              {!readOnly && (
+                              {!reorderDisabled && (
                                 <button
                                   type="button"
                                   {...provided.dragHandleProps}
                                   className="facilityDragHandle"
                                   aria-label={`Reorder ${line.name}`}
+                                  title="Drag to reorder"
                                 >
                                   <DragIndicatorIcon aria-hidden />
+                                  {icon}
                                 </button>
                               )}
                               <button
@@ -845,12 +863,7 @@ export default function TransmissionPanel({
                                   )
                                 }
                               >
-                                <img
-                                  className="transmissionListIcon"
-                                  style={constructionStyle}
-                                  src="/images/transmission.svg"
-                                  alt=""
-                                />
+                                {reorderDisabled && icon}
                                 <span className="transmissionLineText">
                                   <span style={constructionStyle}>
                                     {line.name}
