@@ -5313,14 +5313,14 @@ $sizemap: (
   padding: 12px 16px;
   gap: 8px;
 }
-// The grip already spaces the row from the edge
+// The combined grip and icon target already spaces the row from the edge.
 .base_main .facilityDragHandle + .facilityDisclosure .facility {
   padding-left: 8px;
 }
-.facilityDisclosure .MuiListItemAvatar-root {
+.facilityRowIcon.MuiListItemAvatar-root {
   min-width: 48px;
 }
-.facilityDisclosure .facilityIconIdle {
+.facilityRowIcon .facilityIconIdle {
   // Only quiet the illustration; reserve levels and state labels stay legible.
   opacity: var(--facility-idle-opacity);
 }
@@ -5462,24 +5462,40 @@ $sizemap: (
   }
 }
 
-// Every row carries its reorder grip on the leading edge, always visible, with no label
+// A compact grip shares its generous drag target with the facility or intertie icon.
 .base_main .facilityDragHandle {
   position: relative; // over the row's output bar
   appearance: none;
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
   align-self: stretch;
-  width: var(--control-size);
+  width: 72px;
   min-height: var(--control-size);
   margin: 0;
-  padding: 0 0 0 4px;
+  padding: 12px 0 12px 4px;
   border: 0;
   background: transparent;
   color: var(--font-color-faded);
   cursor: grab;
   touch-action: none;
+
+  > .MuiSvgIcon-root {
+    flex-shrink: 0;
+    width: 16px;
+    height: 20px;
+  }
+
+  &:active,
+  .dragging & {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    // The scroll pane clips outlines outside the leading edge.
+    outline-offset: -2px;
+  }
 }
 .facilityDisclosure .facilityText {
   display: flex;
@@ -5534,7 +5550,7 @@ $sizemap: (
 .transmissionLine .facilityDragHandle + .facilityDisclosure {
   padding-left: 8px;
 }
-.transmissionLine .transmissionListIcon {
+.transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
 }
 .transmissionLine .transmissionLineText > span:first-child {
@@ -5984,6 +6000,13 @@ $programs_column: 800px;
     position: relative;
     z-index: 1;
   }
+}
+.transmissionLine
+  > .facilityRowHeader
+  > .facilityDragHandle
+  + .facilityDisclosure {
+  // The icon is already inside the reorder target, leaving text and the chevron.
+  grid-template-columns: minmax(0, 1fr) 20px;
 }
 // Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
 .transmissionLineFlow {

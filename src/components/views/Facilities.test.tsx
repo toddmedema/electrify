@@ -110,9 +110,8 @@ function renderFacilities(
   return handlers;
 }
 
-// The row is the drag handle as well as the select target, so it is addressed by its own class
-// rather than by a role -- and asking testing-library for a role by name computes an accessible
-// name for every candidate, which over a rendered pane costs about a second a call
+// Address inspection targets by their class; asking for a role by name computes an accessible
+// name for every candidate, which over a rendered pane costs about a second a call.
 function rows(): HTMLElement[] {
   return Array.from(
     document.querySelectorAll<HTMLElement>(".facilityRow .facilityDisclosure"),
@@ -122,6 +121,19 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it("keeps facility icons inspectable while a tutorial hides reordering", async () => {
+    const tutorial = createGame({ scenarioId: 0 });
+    tutorial.inGame = true;
+    tutorial.tutorialStep = 0;
+    const { onSelect } = renderFacilities(tutorial, null);
+    expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
+    const icon = within(rows()[0]).getByRole("img", {
+      name: tutorial.facilities[0].name,
+    });
+    await user.click(icon);
+    expect(onSelect).toHaveBeenCalledWith(tutorial.facilities[0].id);
+  });
 
   it.each([
     [-500000, "charging"],

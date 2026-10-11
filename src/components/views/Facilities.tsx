@@ -28,6 +28,7 @@ import {
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
 import { TickThrottle } from "../../helpers/RenderThrottle";
+import { activeScenario } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
   FacilityOperatingType,
@@ -316,6 +317,15 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     arriving: arrivalRequested,
     onArrivalShown,
   } = props;
+  // Early walkthroughs hide reordering; keep the icon in their inspection target.
+  const reorderDisabled =
+    readOnly ||
+    !!(
+      game.inGame &&
+      activeScenario(game)?.tutorialSteps?.[
+        game.tutorialStep
+      ]?.hideUi?.includes("facilityActions")
+    );
   const underConstruction = facility.yearsToBuildLeft > 0;
   const installing = underConstruction
     ? undefined
@@ -447,12 +457,50 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       ? reading
       : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
+  const icon = (
+    <ListItemAvatar
+      className="facilityRowIcon"
+      sx={
+        offlineForWork
+          ? { opacity: (theme) => theme.palette.action.disabledOpacity }
+          : undefined
+      }
+    >
+      <div>
+        <Avatar
+          className={activity === "IDLE" ? "facilityIconIdle" : ""}
+          alt={facility.name}
+          src={`/images/${facilityIconName(facility)}.svg`}
+        />
+        {capacityFraction !== null && !underConstruction && (
+          <div className="capacityProgressBar" aria-hidden="true">
+            <div
+              className="capacityProgressBarFill"
+              style={{
+                transform: `scaleY(${capacityFraction})`,
+                backgroundColor:
+                  activity === "CHARGING" ? chartPalette().storage : undefined,
+              }}
+            />
+          </div>
+        )}
+        <div
+          className="facilityActivity"
+          role="img"
+          aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
+        >
+          {activityIcon(activity, accentColor)}
+        </div>
+      </div>
+    </ListItemAvatar>
+  );
+
   return (
     <Draggable
       key={"f" + facility.id}
       draggableId={"f" + facility.id}
       index={props.spotInList}
-      isDragDisabled={readOnly}
+      isDragDisabled={reorderDisabled}
       disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
@@ -475,14 +523,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!offlineForWork && <FlowBar fraction={outputFraction} />}
-            {!readOnly && (
+            {!reorderDisabled && (
               <button
                 type="button"
                 {...provided.dragHandleProps}
                 className="facilityDragHandle"
                 aria-label={"Reorder " + facility.name}
+                title="Drag to reorder"
               >
                 <DragIndicatorIcon aria-hidden />
+                {icon}
               </button>
             )}
             <button
@@ -506,7 +556,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   offlineForWork
                     ? {
                         // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
+                        "& .MuiListItemText-primary, & .MuiListItemText-secondary":
                           {
                             opacity: (theme) =>
                               theme.palette.action.disabledOpacity,
@@ -516,36 +566,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 }
                 component="span"
               >
-                <ListItemAvatar>
-                  <div>
-                    <Avatar
-                      className={activity === "IDLE" ? "facilityIconIdle" : ""}
-                      alt={facility.name}
-                      src={`/images/${facilityIconName(facility)}.svg`}
-                    />
-                    {capacityFraction !== null && !underConstruction && (
-                      <div className="capacityProgressBar" aria-hidden="true">
-                        <div
-                          className="capacityProgressBarFill"
-                          style={{
-                            transform: `scaleY(${capacityFraction})`,
-                            backgroundColor:
-                              activity === "CHARGING"
-                                ? chartPalette().storage
-                                : undefined,
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div
-                      className="facilityActivity"
-                      role="img"
-                      aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
-                    >
-                      {activityIcon(activity, accentColor)}
-                    </div>
-                  </div>
-                </ListItemAvatar>
+                {reorderDisabled && icon}
                 <span className="facilityText">
                   <ListItemText
                     slotProps={{
