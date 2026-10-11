@@ -24,12 +24,7 @@ import {
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import { WEATHER_DEPENDENT_FUELS } from "../../Constants";
-import {
-  chartPalette,
-  getThemeVersion,
-  subscribeThemeMode,
-  withAlpha,
-} from "../../Theme";
+import { chartPalette, getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { FuelNameType, LocationType, TickPresentFutureType } from "../../Types";
 
 type ChartData = Pick<
@@ -93,9 +88,14 @@ const DEMAND_FORECAST_DASH = [8, 4];
 type SupplySource = "Weather-driven" | "On-demand" | "Storage" | "Interties";
 
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
-  if (source === "Weather-driven") return "dots";
   if (source === "Storage") return "hatch";
   if (source === "Interties") return "vertical";
+  return undefined;
+}
+
+function sourceShape(source: SupplySource): LegendItemType["shape"] {
+  if (source === "Weather-driven") return "circle";
+  if (source === "On-demand") return "square";
   return undefined;
 }
 
@@ -194,46 +194,96 @@ function sourceFill(
   source: SupplySource,
   allocation = false,
 ): uPlot.Series["fill"] {
-  const color = sourceColor(source);
+  const palette = chartPalette();
+  if (source === "Weather-driven") return palette.weatherDrivenFill;
+  if (source === "On-demand") return palette.onDemandFill;
   const kind = sourcePattern(source);
-  if (!kind) return withAlpha(color, 0.16);
   let pattern: CanvasPattern | null = null;
   return (u) => {
     if (!pattern) {
       const tile = document.createElement("canvas");
       const ratio = uPlot.pxRatio;
-      tile.width = tile.height = 8 * ratio;
+      tile.width = tile.height = 16 * ratio;
       const ctx = tile.getContext("2d")!;
       ctx.scale(ratio, ratio);
       // Loads allocate the production underneath them. A solid chart surface prevents the
-      // generation texture bleeding through and keeps each flow's appearance consistent.
+      // generation tint bleeding through and keeps each flow's appearance consistent.
       if (allocation) {
-        ctx.fillStyle = chartPalette().background;
-        ctx.fillRect(0, 0, 8, 8);
+        ctx.fillStyle = palette.background;
+        ctx.fillRect(0, 0, 16, 16);
       }
-      ctx.fillStyle = withAlpha(color, 0.16);
-      ctx.fillRect(0, 0, 8, 8);
-      ctx.strokeStyle = withAlpha(color, 0.6);
+      ctx.fillStyle = palette.powerFlowFill;
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.strokeStyle = palette.powerFlowPattern;
       ctx.lineWidth = 1;
       ctx.beginPath();
       if (kind === "hatch") {
-        ctx.moveTo(-4, 8);
-        ctx.lineTo(8, -4);
-        ctx.moveTo(4, 12);
-        ctx.lineTo(12, 4);
-      } else if (kind === "vertical") {
-        ctx.moveTo(4, 0);
-        ctx.lineTo(4, 8);
+        ctx.moveTo(-8, 16);
+        ctx.lineTo(16, -8);
+        ctx.moveTo(8, 16);
+        ctx.lineTo(16, 8);
       } else {
-        ctx.fillStyle = withAlpha(color, 0.65);
-        ctx.arc(4, 4, 1, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(8.5, 0);
+        ctx.lineTo(8.5, 16);
       }
       ctx.stroke();
       pattern = u.ctx.createPattern(tile, "repeat");
     }
-    return pattern || withAlpha(color, 0.16);
+    return pattern || palette.powerFlowFill;
   };
+}
+
+// A few matching circle/square marks identify the flat generation bands without relying on
+// hue or covering the chart in texture. Keep them away from zero, edges and nearby anchors.
+function drawGenerationMarks(u: uPlot, state: State) {
+  const ratio = uPlot.pxRatio;
+  const radius = 2 * ratio;
+  let indices = state.timeline.flatMap((tick, i) =>
+    [360, 720, 1080].includes(tick.minute % 1440) ? [i] : [],
+  );
+  const nowIndex =
+    state.currentMinute == null
+      ? -1
+      : state.timeline.findIndex((tick) => tick.minute >= state.currentMinute!);
+  if (nowIndex >= 0) {
+    const nowX = u.valToPos(state.timeline[nowIndex].minute, "x", true);
+    indices = indices.filter(
+      (i) =>
+        Math.abs(u.valToPos(state.timeline[i].minute, "x", true) - nowX) >=
+        16 * ratio,
+    );
+    indices.push(nowIndex);
+  }
+  u.ctx.save();
+  u.ctx.setLineDash([]);
+  u.ctx.lineWidth = 1.25 * ratio;
+  u.ctx.fillStyle = chartPalette().background;
+  state.sources.forEach((source, sourceIndex) => {
+    const shape = sourceShape(source);
+    if (!shape) return;
+    u.ctx.strokeStyle = sourceColor(source);
+    indices.forEach((idx) => {
+      if (state.bySource[sourceIndex][idx] <= 0) return;
+      const value = u.data[sourceIndex + 1][idx];
+      if (value == null) return;
+      const x = u.valToPos(state.timeline[idx].minute, "x", true);
+      const y = u.valToPos(value, "y", true);
+      const inset = radius + ratio;
+      if (
+        x < u.bbox.left + inset ||
+        x > u.bbox.left + u.bbox.width - inset ||
+        y < u.bbox.top + inset ||
+        y > u.bbox.top + u.bbox.height - inset
+      )
+        return;
+      u.ctx.beginPath();
+      if (shape === "circle") u.ctx.arc(x, y, radius, 0, Math.PI * 2);
+      else u.ctx.rect(x - radius, y - radius, radius * 2, radius * 2);
+      u.ctx.fill();
+      u.ctx.stroke();
+    });
+  });
+  u.ctx.restore();
 }
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
@@ -340,7 +390,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { series: [loadBaseStart + 2, loadBaseStart + 1] },
     ],
     plugins: [
-      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.2),
       baselinePlugin(chartPalette().axis),
       verticalLinePlugin(
         () => getState().currentMinute,
@@ -350,7 +400,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {
         hooks: {
           draw: (u) => {
-            const now = getState().currentMinute;
+            const state = getState();
+            drawGenerationMarks(u, state);
+            const now = state.currentMinute;
             if (now == null) return;
             const ratio = uPlot.pxRatio;
             u.ctx.save();
@@ -603,8 +655,14 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
             ...sources.map((source) => ({
               name: source,
-              color: sourceColor(source),
+              color: sourcePattern(source)
+                ? chartPalette().powerFlowPattern
+                : sourceColor(source),
               pattern: sourcePattern(source),
+              fill: sourcePattern(source)
+                ? chartPalette().powerFlowFill
+                : undefined,
+              shape: sourceShape(source),
             })),
           ]}
         />

@@ -173,6 +173,33 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
+      await pane.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `pr-facilities-${info.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+      });
+      if (info.project.name === "mobile-320px") {
+        const vision = await page.context().newCDPSession(page);
+        for (const type of [
+          "achromatopsia",
+          "deuteranopia",
+          "protanopia",
+        ] as const) {
+          await vision.send("Emulation.setEmulatedVisionDeficiency", { type });
+          await chart.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `review-${type}-${theme}.png`,
+            ),
+          });
+        }
+        await vision.send("Emulation.setEmulatedVisionDeficiency", {
+          type: "none",
+        });
+        await vision.detach();
+      }
     }
   });
 

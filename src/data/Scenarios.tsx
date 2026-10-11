@@ -181,7 +181,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: MISSION_ONE_FIRST_LOOK,
         action: "Find the supply and demand lines",
         content: (
-          <TutorialPrompt text="The patterned band shows solar output and the plain band shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
+          <TutorialPrompt text="Weather-driven shows solar output; On-demand shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),
       },
       {

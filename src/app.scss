@@ -5283,26 +5283,33 @@ $sizemap: (
 }
 .chartLegendSwatch-pattern {
   width: 12px;
-  height: 10px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+}
+.chartLegendSwatch-shape {
+  width: 12px;
+  height: 8px;
   border-radius: 0;
-  border: 1px solid currentColor;
+  overflow: visible;
+  circle,
+  rect {
+    fill: var(--chart-surface);
+    stroke: currentColor;
+    stroke-width: 1.25;
+  }
 }
 .chartLegendSwatch-hatch {
   background: repeating-linear-gradient(
     135deg,
-    transparent 0 3px,
-    currentColor 3px 4px
+    transparent 0 5px,
+    currentColor 5px 6px
   );
-}
-.chartLegendSwatch-dots {
-  background: radial-gradient(currentColor 1px, transparent 1px);
-  background-size: 4px 4px;
 }
 .chartLegendSwatch-vertical {
   background: repeating-linear-gradient(
     90deg,
-    transparent 0 3px,
-    currentColor 3px 4px
+    transparent 0 5px,
+    currentColor 5px 6px
   );
 }
 @media (max-width: 599px) {
