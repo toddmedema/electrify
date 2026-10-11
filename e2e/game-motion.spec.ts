@@ -31,6 +31,10 @@ for (const theme of ["light", "dark"]) {
       .getByRole("dialog")
       .getByRole("button", { name: "Pay cash" })
       .click();
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     await expect(page.locator("html")).toHaveAttribute(
       "data-motion-seen",
       /facilityArrival/,

@@ -64,8 +64,12 @@ import { dayCount, resilienceName } from "../base/WeatherResilienceText";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { activeScenario } from "../../helpers/GameSelectors";
+import FleetGrid from "./FleetGrid";
+import { facilityReservoirReading } from "../base/FacilityReservoir";
 
 interface FacilityListItemProps {
+  reorderable?: boolean;
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -198,13 +202,6 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   CHARGING: "charging",
   DISCHARGING: "discharging",
 };
-
-// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
-// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
-// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
-// (HydroOutlook), which marks the point where output is already being held back and drives the
-// "Nearly empty." forecast lead -- the row warns before that bites.
-const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
@@ -421,14 +418,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
-    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-      const reservoirFraction =
-        (facility.reservoirWh || 0) / facility.reservoirCapacityWh;
-      const reservoirPercent = Math.round(reservoirFraction * 100);
+    const reservoir = facilityReservoirReading(facility);
+    if (reservoir) {
       // A dam this far down is heading for the minimum generating level, which is worth seeing
       // without opening the row. The reading turns red, and an off-screen "low" carries the
       // same message for anyone who can't use the colour.
-      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
+      const { percent: reservoirPercent, low } = reservoir;
       // Only one of these shows, picked by how wide the row is
       detail = (
         <span className={low ? "facilityStatusLow" : undefined}>
@@ -452,7 +447,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       key={"f" + facility.id}
       draggableId={"f" + facility.id}
       index={props.spotInList}
-      isDragDisabled={readOnly}
+      isDragDisabled={readOnly || props.reorderable === false}
       disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
@@ -475,7 +470,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!offlineForWork && <FlowBar fraction={outputFraction} />}
-            {!readOnly && (
+            {!readOnly && props.reorderable !== false && (
               <button
                 type="button"
                 {...provided.dragHandleProps}
@@ -679,9 +674,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   );
 }
 
-// Always drawn rather than behind a phone-only disclosure: on a phone the chart scrolls away
-// with the rest of the pane (see .facilitiesBody), the way Insights does, instead of pinning
-// 180px above the fleet or making the player open it first
+// Forecast is disclosed on demand, and remains open after evidence navigation acknowledges it.
 function FacilitySupplyChart({
   game,
   anchor,
@@ -749,7 +742,12 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props> {
+interface State {
+  forecastOpen: boolean;
+}
+
+export default class Facilities extends React.Component<Props, State> {
+  state: State = { forecastOpen: false };
   constructor(props: Props) {
     super(props);
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -822,7 +820,7 @@ export default class Facilities extends React.Component<Props> {
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(nextProps: Props) {
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
     if (this.dragging) {
       return false;
     }
@@ -831,6 +829,8 @@ export default class Facilities extends React.Component<Props> {
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.game.speed !== this.props.game.speed ||
+      nextState.forecastOpen !== this.state.forecastOpen ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
@@ -844,9 +844,17 @@ export default class Facilities extends React.Component<Props> {
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate() {
+  public componentDidUpdate(previousProps: Props) {
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
+    if (
+      this.props.selectedFacilityId !== null &&
+      previousProps.selectedFacilityId !== this.props.selectedFacilityId
+    ) {
+      this.scrollBody
+        ?.querySelector(".facilityRow.selected")
+        ?.scrollIntoView?.({ block: "nearest" });
+    }
   }
 
   public componentDidMount() {
@@ -854,6 +862,20 @@ export default class Facilities extends React.Component<Props> {
   }
 
   private evidenceAnchor = React.createRef<HTMLDivElement>();
+  private overviewAnchor = React.createRef<HTMLDivElement>();
+
+  private inspectFacility = (id: number) => {
+    this.props.onSelect(id);
+    requestAnimationFrame(() => {
+      const row = this.scrollBody?.querySelector<HTMLElement>(
+        `[data-rfd-draggable-id="f${id}"]`,
+      );
+      row?.scrollIntoView?.({ block: "start" });
+      row?.querySelector<HTMLButtonElement>(".facilityDisclosure")?.focus({
+        preventScroll: true,
+      });
+    });
+  };
 
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
@@ -867,7 +889,17 @@ export default class Facilities extends React.Component<Props> {
       )
     )
       return;
-    this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
+    if (request.target === "supply-demand" && !this.state.forecastOpen) {
+      // Keep the requested chart mounted after focus acknowledges and clears the request.
+      this.setState({ forecastOpen: true });
+      return;
+    }
+    this.props.onEvidenceReady?.(
+      request,
+      request.target === "supply-demand"
+        ? this.evidenceAnchor.current
+        : this.overviewAnchor.current || this.scrollBody,
+    );
   }
 
   public onBeforeDragStart() {
@@ -908,6 +940,9 @@ export default class Facilities extends React.Component<Props> {
       selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
+    const tutorialSteps = activeScenario(game)?.tutorialSteps;
+    const tutorialActive = !!tutorialSteps?.[game.tutorialStep];
+    const forecastOpen = tutorialActive || this.state.forecastOpen;
     const readOnly = !!game.replayPlayback;
     const intertiesAvailable = !!(
       game.transmission && corridorsForLocation(game.location).length
@@ -919,6 +954,77 @@ export default class Facilities extends React.Component<Props> {
           game.date.minute < event.endsMinute &&
           !isWeatherHazardEvent(event.definitionId),
       ),
+    );
+
+    const facilityList = (
+      <List dense className="scrollable unifiedFacilitiesList">
+        {intertiesAvailable && !!game.transmission?.lines.length && (
+          <Typography
+            id="dispatch-order"
+            className="facilitySectionLabel"
+            variant="overline"
+          >
+            Plants & storage <span>Dispatch order</span>
+          </Typography>
+        )}
+        <DragDropContext
+          onBeforeDragStart={this.onBeforeDragStart}
+          onDragEnd={this.onDragEnd}
+        >
+          <Droppable droppableId="droppable">
+            {(provided) => (
+              <div {...provided.droppableProps} ref={provided.innerRef}>
+                {game.facilities.map((g: FacilityOperatingType, i: number) => (
+                  <FacilityListItem
+                    reorderable
+                    arriving={this.props.arrivingFacilityId === g.id}
+                    onArrivalShown={this.props.onArrivalShown}
+                    facility={g}
+                    game={game}
+                    key={g.id}
+                    onSell={onSell}
+                    onTogglePause={onTogglePause}
+                    onPause={onPause}
+                    onRetrofit={this.props.onRetrofit}
+                    onCancelRetrofit={this.props.onCancelRetrofit}
+                    onSelect={onSelect}
+                    selected={selectedFacilityId === g.id}
+                    storyOutputMultiplier={storyOutputMultiplier(
+                      g,
+                      storyEffects,
+                    )}
+                    hazardStatus={facilityHazardStatus(game, g)}
+                    spotInList={i}
+                    readOnly={readOnly}
+                  />
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+        {facilitiesCount < 2 && !readOnly && (
+          <Typography
+            color="textSecondary"
+            variant="body2"
+            style={{ textAlign: "center", marginTop: "12px" }}
+          >
+            Choose Build to add a generator or storage.
+          </Typography>
+        )}
+        {intertiesAvailable && !!game.transmission?.lines.length && (
+          <TransmissionPanel
+            game={game}
+            onBuild={onTransmissionBuild}
+            onUpgrade={onTransmissionUpgrade}
+            onCancel={this.props.onTransmissionCancel}
+            onPause={this.props.onTransmissionPause}
+            onPolicy={onTradingPolicy}
+            onBeforeDragStart={this.onBeforeDragStart}
+            onDragEnd={this.onDragEnd}
+          />
+        )}
+      </List>
     );
 
     return (
@@ -940,77 +1046,39 @@ export default class Facilities extends React.Component<Props> {
               </Button>
             )}
           </Toolbar>
-          <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
-            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            <List dense className="scrollable unifiedFacilitiesList">
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <Typography
-                  id="dispatch-order"
-                  className="facilitySectionLabel"
-                  variant="overline"
-                >
-                  Plants & storage <span>Dispatch order</span>
-                </Typography>
-              )}
-              <DragDropContext
-                onBeforeDragStart={this.onBeforeDragStart}
-                onDragEnd={this.onDragEnd}
-              >
-                <Droppable droppableId="droppable">
-                  {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
-                      {game.facilities.map(
-                        (g: FacilityOperatingType, i: number) => (
-                          <FacilityListItem
-                            arriving={this.props.arrivingFacilityId === g.id}
-                            onArrivalShown={this.props.onArrivalShown}
-                            facility={g}
-                            game={game}
-                            key={g.id}
-                            onSell={onSell}
-                            onTogglePause={onTogglePause}
-                            onPause={onPause}
-                            onRetrofit={this.props.onRetrofit}
-                            onCancelRetrofit={this.props.onCancelRetrofit}
-                            onSelect={onSelect}
-                            selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplier(
-                              g,
-                              storyEffects,
-                            )}
-                            hazardStatus={facilityHazardStatus(game, g)}
-                            spotInList={i}
-                            readOnly={readOnly}
-                          />
-                        ),
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              {facilitiesCount < 2 && !readOnly && (
-                <Typography
-                  color="textSecondary"
-                  variant="body2"
-                  style={{ textAlign: "center", marginTop: "12px" }}
-                >
-                  Choose Build to add a generator or storage.
-                </Typography>
-              )}
-              {intertiesAvailable && !!game.transmission?.lines.length && (
-                <TransmissionPanel
+          <div
+            className="scrollable facilitiesBody"
+            ref={this.setScrollBody}
+            tabIndex={-1}
+          >
+            {!tutorialActive && (
+              <div ref={this.overviewAnchor} tabIndex={-1}>
+                <FleetGrid
                   game={game}
-                  onBuild={onTransmissionBuild}
-                  onUpgrade={onTransmissionUpgrade}
-                  onCancel={this.props.onTransmissionCancel}
-                  onPause={this.props.onTransmissionPause}
-                  onPolicy={onTradingPolicy}
-                  onBeforeDragStart={this.onBeforeDragStart}
-                  onDragEnd={this.onDragEnd}
+                  selectedFacilityId={selectedFacilityId}
+                  onSelect={this.inspectFacility}
+                  forecastOpen={forecastOpen}
+                  onToggleForecast={() =>
+                    this.setState({ forecastOpen: !forecastOpen })
+                  }
+                  onInspectInterties={() => {
+                    this.scrollBody
+                      ?.querySelector(".transmissionFleet")
+                      ?.scrollIntoView?.({ block: "start" });
+                  }}
                 />
+              </div>
+            )}
+            <div
+              id="facilityForecast"
+              className="facilityForecast"
+              hidden={!forecastOpen}
+            >
+              {forecastOpen && (
+                <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
               )}
-            </List>
+            </div>
+            {facilityList}
           </div>
         </>
       </GameCard>

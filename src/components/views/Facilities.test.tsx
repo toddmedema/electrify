@@ -18,7 +18,11 @@ import gameReducer, {
 } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { FacilityOperatingType, GameType } from "../../Types";
+import {
+  EvidenceRequestType,
+  FacilityOperatingType,
+  GameType,
+} from "../../Types";
 import Facilities from "./Facilities";
 import TransmissionPanel from "./TransmissionPanel";
 import * as transmission from "../../helpers/Transmission";
@@ -58,6 +62,7 @@ function playedGame(ticks: number): GameType {
 
 interface Handlers {
   onPause: jest.Mock;
+  onTogglePause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
   onSell: jest.Mock;
@@ -68,9 +73,11 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
+  initialEvidenceRequest?: EvidenceRequestType,
 ): Handlers {
   const handlers: Handlers = {
     onPause: jest.fn(),
+    onTogglePause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
@@ -80,9 +87,17 @@ function renderFacilities(
   const store = configureStore({ reducer: { ui: uiReducer } });
   function ControlledFacilities() {
     const [selected, setSelected] = React.useState(selectedFacilityId);
+    const [evidenceRequest, setEvidenceRequest] = React.useState(
+      initialEvidenceRequest,
+    );
     return (
       <Facilities
         game={game}
+        evidenceRequest={evidenceRequest}
+        onEvidenceReady={(_request, element) => {
+          element?.focus();
+          setEvidenceRequest(undefined);
+        }}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
         onTransmissionUpgrade={() => undefined}
@@ -90,7 +105,7 @@ function renderFacilities(
         onTransmissionBuild={() => undefined}
         onTradingPolicy={() => undefined}
         onSell={handlers.onSell}
-        onTogglePause={() => undefined}
+        onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
@@ -122,6 +137,38 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it("opens forecast evidence and keeps it mounted and focused after acknowledgment", () => {
+    renderFacilities(game, null, {
+      id: 1,
+      runId: 0,
+      target: "supply-demand",
+    });
+    expect(screen.getByLabelText("Supply and demand")).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Forecast" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(
+      screen.getByRole("region", { name: "Live power flow" }),
+    ).toBeVisible();
+  });
+
+  it("opens existing controls for the selected member of a repeated technology group", async () => {
+    const fleet = playedGame(1);
+    const coal = fleet.facilities.find((facility) => facility.name === "Coal")!;
+    fleet.facilities.push({ ...cloneDeep(coal), id: 500, paused: true });
+    const { onSelect, onTogglePause } = renderFacilities(fleet, null);
+    await user.click(
+      screen.getByRole("button", { name: /^Inspect Coal group,/ }),
+    );
+    expect(onSelect).toHaveBeenLastCalledWith(500);
+    expect(rows()).toHaveLength(fleet.facilities.length);
+    await user.click(screen.getByRole("button", { name: "Resume Coal" }));
+    expect(onTogglePause).toHaveBeenLastCalledWith(500);
+    expect(screen.queryByRole("button", { name: "Grid" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dispatch" })).toBeNull();
+  });
 
   it.each([
     [-500000, "charging"],
@@ -225,7 +272,8 @@ describe("the fleet list", () => {
 
   it("uses compact watt units in the accessible chart summary", () => {
     renderFacilities(game, null);
-
+    expect(screen.queryByLabelText("Supply and demand")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Forecast" }));
     expect(
       screen.getByRole("img", {
         name: /electricity supply and demand over the day/i,
@@ -280,7 +328,7 @@ describe("the fleet list", () => {
       scrollHeight: { value: 800 },
     });
     const status = screen.getByRole("button", {
-      name: /^Inspect Natural Gas CC/,
+      name: "Inspect Natural Gas CC",
     });
     const wheel = (options: WheelEventInit) => {
       const event = new WheelEvent("wheel", {
@@ -350,13 +398,16 @@ describe("the fleet list", () => {
     ref.current!.onBeforeDragStart();
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
     expect(
-      ref.current!.shouldComponentUpdate({
-        ...props,
-        game: {
-          ...fast,
-          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...fast,
+            date: { ...fast.date, minute: fast.date.minute + 1_000 },
+          },
         },
-      }),
+        ref.current!.state,
+      ),
     ).toBe(false);
 
     ref.current!.onDragEnd({
@@ -369,7 +420,12 @@ describe("the fleet list", () => {
       combine: null,
     });
     expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
-    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
+    expect(
+      ref.current!.shouldComponentUpdate(
+        { ...props, game },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {

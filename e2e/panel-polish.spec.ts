@@ -33,7 +33,12 @@ test("responsive controls and panel navigation keep their geometry", async ({
         };
       }),
     );
-    expect(new Set(buttons.map((button) => button.y)).size).toBe(2);
+    // Reordering uses the row's grip; Pause and Sell share a single touch-sized action row.
+    expect(buttons.map((button) => button.name)).toEqual([
+      "Pause Solar",
+      "Sell Solar",
+    ]);
+    expect(new Set(buttons.map((button) => button.y)).size).toBe(1);
     expect(
       new Set(buttons.map((button) => Math.round(button.width))).size,
     ).toBe(1);

@@ -1,0 +1,161 @@
+.facilities .facilitiesBody.scrollable {
+  display: block;
+  overflow-y: auto;
+  > .unifiedFacilitiesList {
+    overflow: visible;
+  }
+}
+.fleetPowerFlow {
+  padding: 8px 16px;
+  color: var(--font-color-primary);
+  font-size: var(--font-size-body2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fleetPowerFlowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.fleetPowerFlowBalance {
+  min-width: 0;
+}
+.fleetPowerFlowValues {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  span {
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
+  }
+  strong {
+    font-size: 20px;
+    font-weight: var(--font-weight-emphasis);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .fleetPowerFlowArrow {
+    font-size: 20px;
+  }
+}
+.fleetPowerFlowShortage {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--font-size-caption);
+  color: var(--blackout-red);
+  font-weight: var(--font-weight-emphasis);
+}
+.fleetPowerFlowForecast,
+.fleetPowerFlowSource,
+.fleetPowerFlowExceptions button {
+  border: 0;
+  min-height: var(--control-size);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+.fleetPowerFlowForecast {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 4px 0 4px 8px;
+  color: var(--font-color-faded);
+  svg {
+    font-size: 16px;
+    &.expanded {
+      transform: rotate(180deg);
+    }
+  }
+}
+.fleetPowerFlowMix {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--bg-sunken);
+  gap: 2px;
+  span {
+    min-width: 0;
+  }
+}
+.fleetPowerFlowSources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 8px;
+  margin-top: 4px;
+}
+.fleetPowerFlowSource {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  &:hover {
+    background: var(--bg-raised);
+  }
+  &[aria-pressed="true"] {
+    background: var(--bg-selected);
+  }
+}
+.fleetPowerFlowSourceName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fleetPowerFlowDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.fleetPowerFlowSourceReading {
+  font-weight: var(--font-weight-emphasis);
+}
+.fleetPowerFlowDirection {
+  white-space: nowrap;
+}
+.fleetPowerFlowCount {
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.fleetPowerFlowExceptions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  margin-top: 4px;
+  button {
+    padding: 0;
+    color: var(--warning-icon);
+    font-size: var(--font-size-caption);
+    &.urgent {
+      color: var(--blackout-red);
+    }
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+.facilityForecast {
+  padding-top: 8px;
+}
