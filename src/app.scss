@@ -5233,6 +5233,20 @@ $sizemap: (
 .facilitySupplyChart {
   flex: 0 0 auto;
 }
+.dailyProductionHeading {
+  padding: 8px 12px 4px;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+.dailyProductionChart .chartLegend {
+  padding: 0 12px;
+}
+.dailyProductionNote {
+  padding: 0 12px 8px;
+  color: $font_color_faded;
+  font-size: var(--font-size-caption);
+  line-height: 1.4;
+}
 @media (max-width: 599px) {
   .facilities .facilitiesBody {
     display: block;

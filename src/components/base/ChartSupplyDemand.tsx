@@ -1,12 +1,11 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
+import ChartLegend from "./ChartLegend";
 import {
   anchoredForecastPaths,
   bandsPlugin,
   chartFont,
-  legendPlugin,
-  LegendItem,
   padRange,
   spansFromEdges,
   splitPastProjected,
@@ -25,14 +24,26 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
-import { chartPalette } from "../../Theme";
-import { LocationType } from "../../Types";
+import {
+  chartPalette,
+  fuelColors,
+  getThemeVersion,
+  subscribeThemeMode,
+  withAlpha,
+} from "../../Theme";
+import { FuelNameType, LocationType, TickPresentFutureType } from "../../Types";
 
-interface ChartData {
-  minute: number;
-  supplyW: number;
-  demandW: number;
-}
+type ChartData = Pick<
+  TickPresentFutureType,
+  | "minute"
+  | "supplyW"
+  | "demandW"
+  | "supplyByFuel"
+  | "storageChargeW"
+  | "storageDischargeW"
+  | "importedW"
+  | "exportedW"
+>;
 
 interface BlackoutEdges {
   minute: number;
@@ -46,6 +57,8 @@ export interface Props {
   legend?: boolean;
   timeline: ChartData[];
   startingYear: number;
+  /** Bottom-to-top dispatch order, shared with the facility list. */
+  fuelOrder?: FuelNameType[];
 }
 
 // Everything the plot's callbacks read. Rebuilt every render and handed to UPlotChart, which
@@ -58,7 +71,9 @@ interface State {
   sunTicks: number[];
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
-  legendItems: LegendItem[];
+  fuels: FuelNameType[];
+  production: number[];
+  showCustomerSupply: boolean;
   startingYear: number;
 }
 
@@ -66,19 +81,62 @@ interface State {
 // set and change shape from one OS to the next
 const SUN_LABELS = ["Sunrise", "Noon", "Sunset"];
 
-// Supply and demand differ in width and dash as well as hue, so the lines stay distinct for a
-// colourblind player and in the tutorial's all-forecast first frame. Demand is the heavy line
-// the player has to meet; supply is the lighter, filled one. The legend draws these samples.
+// Fuel boundaries stay lighter than the demand the player has to meet. Solid records and
+// dashed forecasts meet at now; fills stay subtle so blackout shading remains visible.
 const SUPPLY_WIDTH = 1.5;
 const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
 
+export function productionStack(
+  timeline: ChartData[],
+  fuelOrder: FuelNameType[],
+) {
+  const present = new Set<FuelNameType>();
+  timeline.forEach((tick) => {
+    (Object.keys(tick.supplyByFuel) as FuelNameType[]).forEach((fuel) => {
+      if ((tick.supplyByFuel[fuel] || 0) > 0) present.add(fuel);
+    });
+  });
+  const fuels = [...new Set([...fuelOrder, ...present])].filter((fuel) =>
+    present.has(fuel),
+  );
+  const byFuel = fuels.map((fuel) =>
+    timeline.map((tick) => tick.supplyByFuel[fuel] || 0),
+  );
+  const production = timeline.map(() => 0);
+  const stacked = byFuel.map((values) => {
+    values.forEach((value, i) => (production[i] += value));
+    return [...production];
+  });
+  return { fuels, byFuel, stacked, production };
+}
+
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  const { fuels, showCustomerSupply } = getState();
+  const fuelLineStart = fuels.length + 1;
+  const supplyLineStart = fuelLineStart + fuels.length * 2;
+  const demandLineStart = supplyLineStart + (showCustomerSupply ? 2 : 0);
+  const linePair = (
+    stroke: string,
+    width: number,
+    dash: number[],
+    pastIndex: number,
+  ): uPlot.Series[] => [
+    { stroke, width, points: { show: false }, spanGaps: false },
+    {
+      stroke,
+      width,
+      dash,
+      paths: anchoredForecastPaths(pastIndex),
+      points: { show: false },
+      spanGaps: false,
+    },
+  ];
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [10 * scale, 5 * scale, 0, 0],
+    padding: [18 * scale, 5 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -116,66 +174,121 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     ],
     series: [
       {},
-      {
-        stroke: chartPalette().supply,
-        width: SUPPLY_WIDTH,
-        fill: chartPalette().historicFill,
+      ...fuels.map((fuel) => ({
+        fill: withAlpha(fuelColors()[fuel], 0.16),
+        width: 0,
         points: { show: false },
-        spanGaps: false,
-      },
-      {
-        stroke: chartPalette().supply,
-        width: SUPPLY_WIDTH,
-        dash: SUPPLY_FORECAST_DASH,
-        paths: anchoredForecastPaths(1),
-        points: { show: false },
-        spanGaps: false,
-      },
-      {
-        stroke: chartPalette().demand,
-        width: DEMAND_WIDTH,
-        points: { show: false },
-        spanGaps: false,
-      },
-      {
-        stroke: chartPalette().demand,
-        width: DEMAND_WIDTH,
-        dash: DEMAND_FORECAST_DASH,
-        paths: anchoredForecastPaths(3),
-        points: { show: false },
-        spanGaps: false,
-      },
+      })),
+      ...fuels.flatMap((fuel, i) =>
+        linePair(
+          fuelColors()[fuel],
+          SUPPLY_WIDTH,
+          SUPPLY_FORECAST_DASH,
+          fuelLineStart + i * 2,
+        ),
+      ),
+      ...(showCustomerSupply
+        ? linePair(chartPalette().supply, 2, [6, 3, 2, 3], supplyLineStart)
+        : []),
+      ...linePair(
+        chartPalette().demand,
+        DEMAND_WIDTH,
+        DEMAND_FORECAST_DASH,
+        demandLineStart,
+      ),
     ],
+    bands: fuels.slice(1).map((_fuel, i) => ({ series: [i + 2, i + 1] })),
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
       baselinePlugin(chartPalette().axis),
       verticalLinePlugin(
         () => getState().currentMinute,
         chartPalette().axis,
-        0.5,
+        1,
       ),
-      // Flush with the plot's own right edge, wherever the y axis leaves it
-      legendPlugin(() => getState().legendItems, 0, 18, "right"),
+      {
+        hooks: {
+          draw: (u) => {
+            const now = getState().currentMinute;
+            if (now == null) return;
+            const ratio = uPlot.pxRatio;
+            u.ctx.save();
+            u.ctx.font = chartFont(ratio);
+            u.ctx.fillStyle = tickLabelFill();
+            u.ctx.textAlign = "center";
+            const halfWidth = u.ctx.measureText("Now").width / 2;
+            const x = Math.max(
+              u.bbox.left + halfWidth,
+              Math.min(
+                u.bbox.left + u.bbox.width - halfWidth,
+                u.valToPos(now, "x", true),
+              ),
+            );
+            u.ctx.fillText("Now", x, u.bbox.top - 4 * ratio);
+            u.ctx.restore();
+          },
+        },
+      },
     ],
   };
 }
 
-function tooltip(idx: number, state: State): string {
+export function formatProductionTooltip(
+  idx: number,
+  state: Pick<State, "timeline" | "fuels" | "production" | "startingYear">,
+): string {
   const d = state.timeline[idx];
   const time = formatHour(getDateFromMinute(d.minute, state.startingYear));
-  return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const flows: Array<[string, number | undefined]> = [
+    ["Storage discharging", d.storageDischargeW],
+    ["Storage charging", d.storageChargeW],
+    ["Imports", d.importedW],
+    ["Exports", d.exportedW],
+  ];
+  return [
+    time,
+    ...state.fuels.map(
+      (fuel) => `${fuel}: ${formatWatts(d.supplyByFuel[fuel] || 0)}`,
+    ),
+    `Total production: ${formatWatts(state.production[idx])}`,
+    ...flows
+      .filter(([_label, value]) => value && value > 0)
+      .map(([label, value]) => `${label}: ${formatWatts(value!)}`),
+    `Supply to customers: ${formatWatts(d.supplyW)}`,
+    `Demand: ${formatWatts(d.demandW)}`,
+    ...(d.demandW > d.supplyW
+      ? [`Blackout: ${formatWatts(d.demandW - d.supplyW)} unmet`]
+      : []),
+  ].join("\n");
 }
 
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
-  const { startingYear, height, legend, timeline, location } = props;
+  React.useSyncExternalStore(
+    subscribeThemeMode,
+    getThemeVersion,
+    getThemeVersion,
+  );
+  const {
+    startingYear,
+    height,
+    legend,
+    timeline,
+    location,
+    fuelOrder = [],
+  } = props;
+  const { fuels, byFuel, stacked, production } = productionStack(
+    timeline,
+    fuelOrder,
+  );
+  const showCustomerSupply = timeline.some(
+    (tick, i) => Math.abs(tick.supplyW - production[i]) > 1,
+  );
   // Figure out the boundaries of the chart data
-  let domainMin = 999999999999;
   let domainMax = 0;
   const rangeMin = timeline[0].minute;
   const rangeMax = timeline[timeline.length - 1].minute;
-  timeline.forEach((d: ChartData) => {
-    domainMin = Math.min(domainMin, d.supplyW, d.demandW);
-    domainMax = Math.max(domainMax, d.supplyW, d.demandW);
+  timeline.forEach((d: ChartData, i) => {
+    domainMax = Math.max(domainMax, production[i], d.supplyW, d.demandW);
   });
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
@@ -269,12 +382,13 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     value: isBlackout ? domainMax : 0,
   });
 
-  // Divide between historic and forecast. One aligned x per tick, with each series blanked out
-  // where it doesn't apply: the record draws solid (supply with its history wash) and the
-  // forecast dashed, so a line's style says what it is. Each half carries the other's boundary
-  // point, so the two meet at the current minute without a gap.
+  // Fill continuous bands, then draw each boundary as solid history and dashed forecast.
   const currentMinute = props.currentMinute || 0;
   const isForecast = timeline.map((d: ChartData) => d.minute >= currentMinute);
+  const fuelLines = stacked.flatMap((values) => {
+    const split = splitPastProjected(values, isForecast, { bridgeEnd: true });
+    return [split.past, split.projected];
+  });
   const supply = splitPastProjected(
     timeline.map((d: ChartData) => d.supplyW),
     isForecast,
@@ -290,61 +404,88 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     minutes[i] = d.minute;
   });
 
-  // The blackout key only earns its place once there has been a blackout to explain
-  const legendItems: LegendItem[] = [];
-  if (legend) {
-    legendItems.push(
-      {
-        name: "Supply",
-        fill: chartPalette().supply,
-        line: { width: SUPPLY_WIDTH + 0.5, dash: SUPPLY_FORECAST_DASH },
-      },
-      {
-        name: "Demand",
-        fill: chartPalette().demand,
-        line: { width: DEMAND_WIDTH, dash: DEMAND_FORECAST_DASH },
-      },
-    );
-    if (blackoutCount > 0) {
-      legendItems.push({ name: "Blackout", fill: chartPalette().blackout });
-    }
-  }
-
   const state: State = {
     timeline,
-    domain: padRange(domainMin, domainMax),
+    domain: [0, padRange(0, domainMax)[1]],
     range: [rangeMin, rangeMax],
     hourTicks,
     sunTicks,
     blackoutSpans: spansFromEdges(blackouts),
-    currentMinute: currentMinute === rangeMax ? null : currentMinute,
-    legendItems,
+    currentMinute:
+      currentMinute <= rangeMin || currentMinute >= rangeMax
+        ? null
+        : currentMinute,
+    fuels,
+    production,
+    showCustomerSupply,
     startingYear,
   };
 
   return (
-    <UPlotChart<State>
-      ariaLabel="Chart of electricity supply and demand over the day"
-      formatSummaryValue={formatWatts}
-      id="chartSupplyDemand"
-      height={height}
-      state={state}
-      data={[
-        minutes,
-        supply.past,
-        supply.projected,
-        demand.past,
-        demand.projected,
-      ]}
-      seriesLabels={[
-        "Past supply",
-        "Forecast supply",
-        "Past demand",
-        "Forecast demand",
-      ]}
-      buildOptions={buildOptions}
-      tooltip={tooltip}
-    />
+    <div id="chartSupplyDemand" className="dailyProductionChart">
+      {legend && (
+        <>
+          <div className="dailyProductionHeading">Production by fuel</div>
+          <ChartLegend
+            items={[
+              ...fuels.map((fuel) => ({
+                name: fuel,
+                color: fuelColors()[fuel],
+              })),
+              ...(showCustomerSupply
+                ? [
+                    {
+                      name: "Supply to customers",
+                      color: chartPalette().supply,
+                      dash: "6,3,2,3",
+                    },
+                  ]
+                : []),
+              { name: "Demand", color: chartPalette().demand, dash: "8,4" },
+              ...(blackoutCount
+                ? [{ name: "Blackout", color: chartPalette().blackout }]
+                : []),
+            ]}
+          />
+        </>
+      )}
+      <UPlotChart<State>
+        ariaLabel={`Chart of electricity supply and demand over the day, with production stacked by fuel. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        formatSummaryValue={formatWatts}
+        height={height}
+        state={state}
+        data={[
+          minutes,
+          ...stacked,
+          ...fuelLines,
+          ...(showCustomerSupply ? [supply.past, supply.projected] : []),
+          demand.past,
+          demand.projected,
+        ]}
+        summaryData={[
+          minutes,
+          ...byFuel,
+          production,
+          timeline.map((tick) => tick.supplyW),
+          timeline.map((tick) => tick.demandW),
+        ]}
+        seriesLabels={[
+          ...fuels,
+          "Total production",
+          "Supply to customers",
+          "Demand",
+        ]}
+        buildOptions={buildOptions}
+        structureKey={`${fuels.join(",")}|${showCustomerSupply}`}
+        tooltip={formatProductionTooltip}
+      />
+      {legend && (
+        <div className="dailyProductionNote">
+          <div>Bands: fuel output · Top: total production</div>
+          <div>Solid: recorded · Dashed: forecast</div>
+        </div>
+      )}
+    </div>
   );
 };
 export default React.memo(ChartSupplyDemand);
