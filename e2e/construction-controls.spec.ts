@@ -30,7 +30,6 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("dialog")
         .getByRole("button", { name: "Take loan" })
         .click();
-      await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     };
     await build();
     const line = pane.locator(".transmissionLine").first();

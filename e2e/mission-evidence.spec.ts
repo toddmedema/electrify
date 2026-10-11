@@ -30,17 +30,15 @@ async function waitForSave(page: Page) {
   await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
 }
 
-// Brings the end of the fleet list into view. On a phone the whole Facilities body scrolls, so
-// that takes the supply chart off screen and a later request has to bring it back. A tall desktop
-// pane pins the chart above a list that scrolls on its own, so the chart must stay put there.
-// Asserted either way: a request to bring back a chart that never left would prove nothing.
-async function scrollChartAway(page: Page, chartPinned: boolean) {
+// Summary, forecast and dispatch rows share one scroll region on every layout.
+// A short fleet can only partially clip the chart; evidence must restore it fully.
+async function scrollChartAway(page: Page) {
   await page
     .locator(".unifiedFacilitiesList:visible [data-rfd-draggable-id]")
     .last()
     .scrollIntoViewIfNeeded();
   const chart = expect(page.locator("#chartSupplyDemand"));
-  await (chartPinned ? chart.toBeInViewport() : chart.not.toBeInViewport());
+  await chart.not.toBeInViewport({ ratio: 0.99 });
 }
 
 async function range(page: Page) {
@@ -112,7 +110,7 @@ for (const theme of ["light", "dark"]) {
     );
     await page
       .locator(".facilities:visible")
-      .getByRole("button", { name: "Dispatch", exact: true })
+      .getByRole("button", { name: "Forecast", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
@@ -351,7 +349,6 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   test.skip(
     !new Set(["desktop-chromium", "mobile-390px"]).has(info.project.name),
   );
-  const chartPinned = info.project.name === "desktop-chromium";
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
@@ -371,7 +368,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   );
   await page
     .locator(".facilities:visible")
-    .getByRole("button", { name: "Dispatch", exact: true })
+    .getByRole("button", { name: "Forecast", exact: true })
     .click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
@@ -382,31 +379,37 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Shortfall expected later today/,
   );
-  // The default Grid must retain Dispatch after the request is acknowledged, including focus.
+  // Evidence reopens a deliberately closed forecast and retains it after acknowledgment.
   await page
     .locator(".facilities:visible")
-    .getByRole("button", { name: "Grid", exact: true })
+    .getByRole("button", { name: "Forecast", exact: true })
     .click();
   await expect(page.locator("#chartSupplyDemand")).toHaveCount(0);
   await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
+  await expect(page.locator("#chartSupplyDemand")).toBeInViewport({
+    ratio: 0.99,
+  });
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(
     page
       .locator(".facilities:visible")
-      .getByRole("button", { name: "Dispatch", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+      .getByRole("button", { name: "Forecast", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await page.mouse.move(0, 0);
   await page.screenshot({ path: info.outputPath("fleet-evidence.png") });
-  await scrollChartAway(page, chartPinned);
+  await scrollChartAway(page);
   await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator("#chartSupplyDemand")).toBeVisible();
+  await expect(page.locator("#chartSupplyDemand")).toBeInViewport({
+    ratio: 0.99,
+  });
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   // Scroll the chart away so the second request has to bring it back
-  await scrollChartAway(page, chartPinned);
+  await scrollChartAway(page);
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
-  await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
+  await expect(page.locator("#chartSupplyDemand")).toBeInViewport({
+    ratio: 0.99,
+  });
   await expect(page.locator(".operatingEvidence")).toHaveAccessibleName(
     "Supply and demand",
   );

@@ -26,9 +26,6 @@ for (const theme of ["light", "dark"] as const) {
         facilities,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
-      await facilities
-        .getByRole("button", { name: "Dispatch", exact: true })
-        .click();
     };
     await showFacilities();
     await facilities

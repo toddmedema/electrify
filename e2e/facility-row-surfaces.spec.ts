@@ -74,7 +74,6 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     const row = pane.locator(".facilityRow").first();
     const header = row.locator(".facilityRowHeader");
     const grip = header.locator(".facilityDragHandle");

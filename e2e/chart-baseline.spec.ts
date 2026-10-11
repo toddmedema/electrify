@@ -58,7 +58,7 @@ for (const theme of ["light", "dark"]) {
     await openPane(page.locator(".facilities"), page.locator("#faciltiesNav"));
     await page
       .locator(".facilities:visible")
-      .getByRole("button", { name: "Dispatch", exact: true })
+      .getByRole("button", { name: "Forecast", exact: true })
       .click();
     const chart = page.locator("#chartSupplyDemand");
     await expect(chart.locator("canvas")).toBeVisible();

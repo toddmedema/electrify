@@ -35,7 +35,6 @@ for (const theme of ["light", "dark"] as const) {
         pane,
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
-      await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     }
     // The approval toast can cover a row on phones. Keep the pointer away so it dismisses.
     await page.mouse.move(0, 0);

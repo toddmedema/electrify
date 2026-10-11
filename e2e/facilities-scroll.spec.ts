@@ -33,7 +33,6 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(pane, navigation);
-    await pane.getByRole("button", { name: "Dispatch", exact: true }).click();
     await expect(page.locator("main.base_main")).toHaveCount(1);
     await expect(
       page.getByText("Starting your mission…", { exact: true }),

@@ -1,49 +1,30 @@
-.facilities .facilitiesBody.fleetGridBody {
+.facilities .facilitiesBody.scrollable {
   display: block;
   overflow-y: auto;
-
-  .unifiedFacilitiesList {
+  > .unifiedFacilitiesList {
     overflow: visible;
-    padding: 0;
   }
 }
-
-.fleetViewSwitch {
-  display: flex;
-  padding: 0 16px 8px;
-  gap: 4px;
-
-  .MuiButton-root {
-    min-height: var(--control-size);
-    padding: 4px 16px;
-    color: var(--font-color-faded);
-    background: transparent;
-
-    &[aria-pressed="true"] {
-      color: var(--font-color-primary);
-      background: var(--bg-selected);
-    }
-  }
-}
-
-.fleetGrid {
-  padding: 0 16px 16px;
+.fleetPowerFlow {
+  padding: 8px 16px;
   color: var(--font-color-primary);
   font-size: var(--font-size-body2);
+  border-bottom: 1px solid var(--border-subtle);
 }
-
-.fleetGridBalance {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+.fleetPowerFlowHeader {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 0 12px;
-  border-bottom: 1px solid var(--border-strong);
-  background: var(--bg-primary);
-
+  margin-bottom: 8px;
+}
+.fleetPowerFlowBalance {
+  min-width: 0;
+}
+.fleetPowerFlowValues {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   > div {
     display: flex;
     flex-direction: column;
@@ -51,168 +32,82 @@
   }
   span {
     color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
   }
-  .fleetGridDelivery {
-    margin-left: auto;
-    text-align: right;
+  strong {
+    font-size: 20px;
+    font-weight: var(--font-weight-emphasis);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
   }
-  &.fleetGridShortage .fleetGridDelivery strong {
-    color: var(--blackout-red);
+  .fleetPowerFlowArrow {
+    font-size: 20px;
   }
 }
-
-.fleetGridDiagram {
-  padding-top: 12px;
+.fleetPowerFlowShortage {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--font-size-caption);
+  color: var(--blackout-red);
+  font-weight: var(--font-weight-emphasis);
 }
-
-.fleetGridGenerators,
-.fleetGridSupport {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.fleetGridNode,
-.fleetGridInterties {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  min-width: 0;
+.fleetPowerFlowForecast,
+.fleetPowerFlowSource,
+.fleetPowerFlowExceptions button {
+  border: 0;
   min-height: var(--control-size);
-  padding: 8px;
-  border: 1px solid var(--border-tile);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
+  background: transparent;
   color: inherit;
   font: inherit;
-  text-align: left;
   cursor: pointer;
-  overflow-wrap: anywhere;
-
-  &:hover {
-    background: var(--bg-raised);
-  }
-  &[aria-expanded="true"] {
-    border-color: var(--interactive-strong);
-    background: var(--bg-selected);
-  }
+  border-radius: var(--radius-sm);
   &:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
 }
-
-.fleetGridNodeHeading {
+.fleetPowerFlowForecast {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  img {
-    flex: 0 0 40px;
-  }
-}
-
-.fleetGridName,
-.fleetGridReading {
-  font-weight: var(--font-weight-emphasis);
-}
-.fleetGridCount,
-.fleetGridStored,
-.fleetGridHint {
-  color: var(--font-color-faded);
-}
-.fleetGridFlow {
-  display: flex;
-  flex-direction: column;
+  flex-shrink: 0;
   gap: 4px;
-}
-.fleetGridExceptions {
-  color: var(--warning-icon);
-  &.fleetGridReservoirLow {
-    color: var(--blackout-red);
+  padding: 4px 0 4px 8px;
+  color: var(--font-color-faded);
+  svg {
+    font-size: 16px;
+    &.expanded {
+      transform: rotate(180deg);
+    }
   }
 }
-
-.fleetGridMeter {
-  display: block;
-  width: 100%;
-  height: 4px;
-  margin-top: auto;
-  background: var(--bg-sunken);
+.fleetPowerFlowMix {
+  display: flex;
+  height: 6px;
   border-radius: var(--radius-pill);
   overflow: hidden;
-  > span {
-    display: block;
-    height: 100%;
-    background: var(--capacity-bar);
+  background: var(--bg-sunken);
+  gap: 2px;
+  span {
+    min-width: 0;
   }
 }
-
-.fleetGridBus {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0;
-  padding: 8px 0;
-  border-top: 2px solid var(--border-strong);
-  border-bottom: 2px solid var(--border-strong);
-  > span[aria-hidden] {
-    color: var(--font-color-faded);
-  }
+.fleetPowerFlowSources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 8px;
+  margin-top: 4px;
 }
-
-.fleetGridHint {
-  margin: 12px 0 0;
-}
-.fleetGridInspectionHeading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  border-top: 1px solid var(--border-strong);
-  button {
-    flex-shrink: 0;
-    min-height: var(--control-size);
-    border: 0;
-    padding: 4px 8px;
-    background: transparent;
-    color: var(--interactive-strong);
-    font: inherit;
-    cursor: pointer;
-  }
-}
-.fleetGridMembers {
-  display: flex;
-  flex-direction: column;
-}
-.fleetGridInspection .facilityRow {
-  scroll-margin-top: 80px;
-}
-.fleetGridInspection,
-.fleetGridNode,
-.fleetGridInterties {
-  scroll-margin-top: 80px;
-}
-.fleetGridMember {
-  scroll-margin-top: 80px;
+.fleetPowerFlowSource {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 4px;
-  min-height: var(--control-size);
-  padding: 8px;
-  border: 0;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
-  color: inherit;
-  font: inherit;
+  padding: 4px 0;
+  min-width: 0;
   text-align: left;
+  line-height: 1.15;
   overflow-wrap: anywhere;
-  cursor: pointer;
   &:hover {
     background: var(--bg-raised);
   }
@@ -220,13 +115,47 @@
     background: var(--bg-selected);
   }
 }
-
-@media (max-width: 600px) {
-  .fleetGridNodeHeading {
-    gap: 4px;
-    min-height: 0;
-    img {
-      display: none;
+.fleetPowerFlowSourceName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fleetPowerFlowDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.fleetPowerFlowSourceReading {
+  font-weight: var(--font-weight-emphasis);
+}
+.fleetPowerFlowDirection {
+  white-space: nowrap;
+}
+.fleetPowerFlowCount {
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.fleetPowerFlowExceptions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  margin-top: 4px;
+  button {
+    padding: 0;
+    color: var(--warning-icon);
+    font-size: var(--font-size-caption);
+    &.urgent {
+      color: var(--blackout-red);
+    }
+    &:hover {
+      text-decoration: underline;
     }
   }
+}
+.facilityForecast {
+  padding-top: 8px;
 }

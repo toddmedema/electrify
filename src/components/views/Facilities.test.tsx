@@ -62,6 +62,7 @@ function playedGame(ticks: number): GameType {
 
 interface Handlers {
   onPause: jest.Mock;
+  onTogglePause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
   onSell: jest.Mock;
@@ -72,11 +73,11 @@ interface Handlers {
 function renderFacilities(
   game: GameType,
   selectedFacilityId: number | null,
-  fleetView: "grid" | "dispatch" = "dispatch",
   initialEvidenceRequest?: EvidenceRequestType,
 ): Handlers {
   const handlers: Handlers = {
     onPause: jest.fn(),
+    onTogglePause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
@@ -104,7 +105,7 @@ function renderFacilities(
         onTransmissionBuild={() => undefined}
         onTradingPolicy={() => undefined}
         onSell={handlers.onSell}
-        onTogglePause={() => undefined}
+        onTogglePause={handlers.onTogglePause}
         onPause={handlers.onPause}
         onReprioritize={handlers.onReprioritize}
         onRetrofit={handlers.onRetrofit}
@@ -121,10 +122,6 @@ function renderFacilities(
   render(<ControlledFacilities />, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
-  const dispatchView = screen.queryByRole("button", {
-    name: "Dispatch",
-  });
-  if (dispatchView && fleetView === "dispatch") fireEvent.click(dispatchView);
   return handlers;
 }
 
@@ -141,49 +138,36 @@ describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
 
-  it("keeps supply and demand evidence mounted and focused after acknowledging a request from Grid", () => {
-    renderFacilities(game, null, "grid", {
+  it("opens forecast evidence and keeps it mounted and focused after acknowledgment", () => {
+    renderFacilities(game, null, {
       id: 1,
       runId: 0,
       target: "supply-demand",
     });
     expect(screen.getByLabelText("Supply and demand")).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Dispatch" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("button", { name: "Forecast" })).toHaveAttribute(
+      "aria-expanded",
       "true",
     );
     expect(
-      screen.queryByRole("region", { name: "Live power grid" }),
-    ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
-    expect(
-      screen.getByRole("region", { name: "Live power grid" }),
+      screen.getByRole("region", { name: "Live power flow" }),
     ).toBeVisible();
   });
 
   it("opens existing controls for the selected member of a repeated technology group", async () => {
     const fleet = playedGame(1);
     const coal = fleet.facilities.find((facility) => facility.name === "Coal")!;
-    fleet.facilities.push({ ...cloneDeep(coal), id: 500 });
-    const { onSelect, onPause } = renderFacilities(fleet, null, "grid");
+    fleet.facilities.push({ ...cloneDeep(coal), id: 500, paused: true });
+    const { onSelect, onTogglePause } = renderFacilities(fleet, null);
     await user.click(
       screen.getByRole("button", { name: /^Inspect Coal group,/ }),
     );
-    expect(rows()).toHaveLength(0);
-    await user.click(
-      screen.getByRole("button", { name: /^Inspect Coal #500 ·/ }),
-    );
     expect(onSelect).toHaveBeenLastCalledWith(500);
-    expect(rows()).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Pause Coal" }));
-    expect(onPause).toHaveBeenLastCalledWith(500, "Coal");
-    await user.click(
-      screen.getByRole("button", { name: "Close facility group" }),
-    );
-    expect(rows()).toHaveLength(0);
-    expect(
-      screen.queryByRole("button", { name: /^Inspect Coal #500 ·/ }),
-    ).toBeNull();
+    expect(rows()).toHaveLength(fleet.facilities.length);
+    await user.click(screen.getByRole("button", { name: "Resume Coal" }));
+    expect(onTogglePause).toHaveBeenLastCalledWith(500);
+    expect(screen.queryByRole("button", { name: "Grid" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dispatch" })).toBeNull();
   });
 
   it.each([
@@ -288,7 +272,8 @@ describe("the fleet list", () => {
 
   it("uses compact watt units in the accessible chart summary", () => {
     renderFacilities(game, null);
-
+    expect(screen.queryByLabelText("Supply and demand")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Forecast" }));
     expect(
       screen.getByRole("img", {
         name: /electricity supply and demand over the day/i,
@@ -335,7 +320,6 @@ describe("the fleet list", () => {
       </React.StrictMode>
     );
     const { rerender, unmount } = render(pane());
-    fireEvent.click(screen.getByRole("button", { name: "Dispatch" }));
     const list = screen.getByRole("list");
     list.style.overflowY = "auto";
     list.style.lineHeight = "24px";
@@ -344,7 +328,7 @@ describe("the fleet list", () => {
       scrollHeight: { value: 800 },
     });
     const status = screen.getByRole("button", {
-      name: /^Inspect Natural Gas CC/,
+      name: "Inspect Natural Gas CC",
     });
     const wheel = (options: WheelEventInit) => {
       const event = new WheelEvent("wheel", {

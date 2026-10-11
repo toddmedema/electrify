@@ -8,204 +8,142 @@ import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { COLD_DEFINITION_ID } from "../../helpers/Hazards";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 
-function showGrid(game: GameType, selectedFacilityId: number | null = null) {
+function showSummary(game: GameType, selectedFacilityId: number | null = null) {
   const onSelect = jest.fn();
   const onInspectInterties = jest.fn();
-  const props = { game, selectedFacilityId, onSelect, onInspectInterties };
+  const onToggleForecast = jest.fn();
+  const props = {
+    game,
+    selectedFacilityId,
+    onSelect,
+    onInspectInterties,
+    forecastOpen: false,
+    onToggleForecast,
+  };
   return {
     ...render(<FleetGrid {...props} />),
     props,
     onSelect,
     onInspectInterties,
+    onToggleForecast,
   };
 }
-
 function group(name: string) {
   return screen.getByRole("button", {
-    name: new RegExp(`^Inspect ${name} group,`),
+    name: new RegExp("^Inspect " + name + " group,"),
   });
 }
-
-it("puts authoritative supply, demand and shortfall before the technology groups", () => {
+it("uses authoritative net supply and demand rather than the generation mix total", () => {
   const game = createGame({ scenarioId: 107 });
   const now = currentTick(game)!;
   now.supplyW = 500000000;
   now.demandW = 700000000;
-  showGrid(game);
+  showSummary(game);
   const balance = screen.getByLabelText("Current power balance");
   expect(balance).toHaveTextContent("200MW short");
-  expect(balance).toHaveTextContent("500MW grid supply");
-  expect(balance).toHaveTextContent("700MW demand now");
+  expect(balance).toHaveTextContent("Supply now500MW");
+  expect(balance).toHaveTextContent("Demand now700MW");
   expect(
     balance.compareDocumentPosition(group("Wind")) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
 });
-
-it("groups 30 repeated plants without inheriting dispatch order, and selects by unique ID", () => {
+it("groups a large fleet in stable technology order and navigates the existing dispatch rows", () => {
   const game = createGame({ scenarioId: 107 });
   const originals = game.facilities;
   game.facilities = Array.from({ length: 30 }, (_, index) => ({
     ...cloneDeep(originals[index % originals.length]),
     id: index + 100,
   }));
-  const { onSelect, rerender, props } = showGrid(game);
-  const nodes = screen.getAllByRole("button", { name: /^Inspect .* group,/ });
-  expect(nodes).toHaveLength(originals.length);
-  const names = nodes.map((node) => within(node).getByText(/×/).textContent);
-  const gas = group("Natural Gas CC");
-  fireEvent.click(gas);
-  const gasFacilities = game.facilities
-    .filter((facility) => facility.name === "Natural Gas CC")
-    .sort((a, b) => a.id - b.id);
-  expect(
-    screen.getAllByRole("button", { name: /^Inspect Natural Gas CC #/ }),
-  ).toHaveLength(gasFacilities.length);
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: new RegExp(`^Inspect Natural Gas CC #${gasFacilities[1].id} ·`),
-    }),
-  );
-  expect(onSelect).toHaveBeenLastCalledWith(gasFacilities[1].id);
+  const { onSelect, rerender, props } = showSummary(game);
+  const names = screen
+    .getAllByRole("button", { name: /^Inspect .* group,/ })
+    .map((node) => node.getAttribute("aria-label"));
+  expect(names).toHaveLength(originals.length);
+  const gas = game.facilities.find(
+    (facility) => facility.name === "Natural Gas CC",
+  )!;
+  fireEvent.click(group("Natural Gas CC"));
+  expect(onSelect).toHaveBeenLastCalledWith(gas.id);
   game.facilities.reverse();
-  rerender(<FleetGrid {...props} selectedFacilityId={gasFacilities[1].id} />);
+  rerender(<FleetGrid {...props} selectedFacilityId={gas.id} />);
   expect(
     screen
       .getAllByRole("button", { name: /^Inspect .* group,/ })
-      .map((node) => within(node).getByText(/×/).textContent),
+      .map((node) => node.getAttribute("aria-label")),
   ).toEqual(names);
-  expect(group("Natural Gas CC")).toHaveAttribute("aria-expanded", "true");
-  fireEvent.click(screen.getByRole("button", { name: "Close facility group" }));
-  expect(onSelect).toHaveBeenLastCalledWith(null);
+  expect(group("Natural Gas CC")).toHaveAttribute("aria-pressed", "true");
+  expect(
+    screen.queryByRole("button", { name: /^Inspect Natural Gas CC #/ }),
+  ).toBeNull();
 });
-
-it("keeps different gas technologies separate and sums output on a rated power scale", () => {
+it("keeps distinct gas technologies separate and excludes construction from current output", () => {
   const game = createGame({ scenarioId: 107 });
   const gas = game.facilities.find(
     (facility) => facility.name === "Natural Gas CC",
   )!;
   gas.currentW = 100000000;
-  gas.peakW = 200000000;
   game.facilities = [
     gas,
-    { ...cloneDeep(gas), id: 500, currentW: 200000000, peakW: 400000000 },
-    { ...cloneDeep(gas), id: 501, name: "Natural Gas Peaker" },
+    { ...cloneDeep(gas), id: 500, currentW: 200000000 },
+    { ...cloneDeep(gas), id: 501, yearsToBuildLeft: 1, currentW: 900000000 },
+    { ...cloneDeep(gas), id: 502, name: "Natural Gas Peaker" },
   ];
-  showGrid(game);
-  expect(group("Natural Gas CC")).toHaveTextContent("×2");
-  expect(group("Natural Gas CC")).toHaveTextContent("300/600MW output");
-  expect(within(group("Natural Gas CC")).getByRole("meter")).toHaveAttribute(
-    "aria-valuenow",
-    "50",
+  const { onSelect } = showSummary(game);
+  expect(group("Natural Gas CC")).toHaveAccessibleName(
+    /3 facilities, 300MW output/,
   );
-  expect(group("Natural Gas Peaker")).toHaveTextContent("×1");
+  expect(group("Natural Gas Peaker")).toHaveAccessibleName(
+    /1 facility, 100MW output/,
+  );
+  fireEvent.click(group("Natural Gas CC"));
+  expect(onSelect).toHaveBeenLastCalledWith(501);
 });
-
-it("keeps simultaneous charging and discharging visible and weights stored charge by capacity", () => {
+it("keeps simultaneous charging and discharging explicit without netting them", () => {
   const game = createGame({ scenarioId: 110 });
   const battery = game.facilities.find(isStorage)!;
-  battery.currentWh = 100000000;
-  battery.peakWh = 400000000;
   battery.currentW = -10000000;
   game.facilities = [
     battery,
-    {
-      ...cloneDeep(battery),
-      id: 500,
-      peakWh: 100000000,
-      currentWh: 100000000,
-      currentW: 5000000,
-    },
+    { ...cloneDeep(battery), id: 500, currentW: 5000000 },
   ];
-  const { onSelect } = showGrid(game);
-  const node = group("Battery");
-  expect(node).toHaveTextContent("Charging 10MW");
-  expect(node).toHaveTextContent("Discharging 5MW");
-  expect(node).toHaveTextContent("40% charged · 200MWh stored");
-  expect(
-    within(node).getByRole("meter", { name: "Battery charge" }),
-  ).toHaveAttribute("aria-valuenow", "40");
-  fireEvent.click(node);
-  expect(onSelect).toHaveBeenLastCalledWith(null);
-  expect(
-    screen.getByRole("button", { name: /^Inspect Battery #500/ }),
-  ).toHaveTextContent("Discharging · 5MW");
-});
-
-it("selects a single facility directly and preserves selection after a live tick", () => {
-  const game = createGame({ scenarioId: 110 });
-  const battery = game.facilities.find(isStorage)!;
-  const { onSelect, rerender, props } = showGrid(game);
-  fireEvent.click(group("Battery"));
-  expect(onSelect).toHaveBeenLastCalledWith(battery.id);
-  battery.currentW = 5000000;
-  rerender(<FleetGrid {...props} selectedFacilityId={battery.id} />);
-  expect(group("Battery")).toHaveAttribute("aria-expanded", "true");
-  expect(group("Battery")).toHaveTextContent("Discharging 5MW");
-  fireEvent.click(group("Battery"));
-  expect(onSelect).toHaveBeenLastCalledWith(null);
-});
-
-it("keeps a group open when deselecting a facility restored from Dispatch", () => {
-  const game = createGame({ scenarioId: 110 });
-  const battery = game.facilities.find(isStorage)!;
-  game.facilities.push({ ...cloneDeep(battery), id: 500 });
-  const { props, rerender, onSelect } = showGrid(game, battery.id);
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: new RegExp(`^Inspect Battery #${battery.id} ·`),
-    }),
+  showSummary(game);
+  expect(group("Battery")).toHaveTextContent("5MW out · 10MW in");
+  expect(group("Battery")).toHaveAccessibleName(
+    /discharging 5MW, charging 10MW/,
   );
-  expect(onSelect).toHaveBeenLastCalledWith(null);
-  rerender(<FleetGrid {...props} selectedFacilityId={null} />);
-  expect(group("Battery")).toHaveAttribute("aria-expanded", "true");
-  expect(
-    screen.getAllByRole("button", { name: /^Inspect Battery #/ }),
-  ).toHaveLength(2);
 });
-
-it("shows construction, paused and weather exceptions without counting future capacity", () => {
+it("shows counted exceptions and opens their affected facility", () => {
   const game = createGame({ scenarioId: 107 });
   const gas = game.facilities.find(
     (facility) => facility.name === "Natural Gas CC",
   )!;
-  gas.currentW = 100000000;
-  gas.peakW = 200000000;
-  const building = {
-    ...cloneDeep(gas),
-    id: 500,
-    yearsToBuild: 2,
-    yearsToBuildLeft: 1,
-    currentW: 900000000,
-  };
-  const paused = { ...cloneDeep(gas), id: 501, currentW: 0, paused: true };
-  game.facilities = [gas, building, paused];
+  game.facilities = [
+    gas,
+    { ...cloneDeep(gas), id: 500, yearsToBuildLeft: 1 },
+    { ...cloneDeep(gas), id: 501, paused: true, currentW: 0 },
+  ];
   game.worldEvents.active.push({
-    key: "grid-cold",
+    key: "summary-cold",
     definitionId: COLD_DEFINITION_ID,
     startsMinute: game.date.minute,
     endsMinute: game.date.minute + MINUTES_PER_MONTH,
     attributes: { hazard: "EXTREME_COLD" },
     effects: { facilityOutputMultipliersById: { [String(gas.id)]: 0.55 } },
   });
-  showGrid(game);
-  const node = group("Natural Gas CC");
-  expect(node).toHaveTextContent("100/400MW output");
-  expect(node).toHaveTextContent("1 extreme cold");
-  expect(node).toHaveTextContent("1 building");
-  expect(node).toHaveTextContent("1 paused");
-  fireEvent.click(node);
-  expect(
-    screen.getByRole("button", { name: /^Inspect Natural Gas CC #500/ }),
-  ).toHaveTextContent("Building · 12 months left");
-  expect(
-    screen.getByRole("button", {
-      name: new RegExp(`^Inspect Natural Gas CC #${gas.id} ·`),
+  const { onSelect } = showSummary(game);
+  const exceptions = screen.getByLabelText("Facility exceptions");
+  expect(exceptions).toHaveTextContent("1 building");
+  expect(exceptions).toHaveTextContent("1 paused");
+  expect(exceptions).toHaveTextContent("1 extreme cold");
+  fireEvent.click(
+    within(exceptions).getByRole("button", {
+      name: "Inspect 1 paused facility",
     }),
-  ).toHaveTextContent("Extreme cold · 55% available");
+  );
+  expect(onSelect).toHaveBeenLastCalledWith(501);
 });
-
-it("uses gross intertie directions, visible exceptions and the existing trading controls", () => {
+it("keeps gross intertie directions and construction exceptions linked to trading controls", () => {
   const game = cloneDeep(
     gameReducer(
       createGame({ scenarioId: 100 }),
@@ -227,17 +165,20 @@ it("uses gross intertie directions, visible exceptions and the existing trading 
       currentFlowW: 1000000000,
     },
   );
-  const { onInspectInterties } = showGrid(game);
+  const { onInspectInterties } = showSummary(game);
   const node = screen.getByRole("button", {
-    name: "Inspect interties and trading policy",
+    name: /^Inspect interties and trading policy,/,
   });
-  expect(node).toHaveTextContent("Importing 10MW");
-  expect(node).toHaveTextContent("Exporting 20MW");
-  expect(node).toHaveTextContent("1 building");
+  expect(node).toHaveTextContent("10MW in · 20MW out");
+  expect(node).toHaveAccessibleName(
+    /importing 10MW, exporting 20MW, 1 building/,
+  );
   fireEvent.click(node);
   expect(onInspectInterties).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText("Facility exceptions")).toHaveTextContent(
+    "1 intertie building",
+  );
 });
-
 it.each([
   [19.49, true],
   [19.5, false],
@@ -250,31 +191,41 @@ it.each([
       !isStorage(facility) && facility.fuel === "Hydro",
   )!;
   hydro.reservoirWh = (hydro.reservoirCapacityWh! * Number(percent)) / 100;
-  showGrid(game);
-  expect(group("Hydro")).toHaveTextContent(
-    `Reservoir ${Math.round(Number(percent))}%`,
-  );
-  expect(group("Hydro").textContent?.includes("1 low reservoir")).toBe(low);
+  showSummary(game);
+  expect(
+    Boolean(
+      screen.queryByRole("button", {
+        name: "Inspect 1 low reservoir facility",
+      }),
+    ),
+  ).toBe(low);
 });
-
-it("does not hide one low reservoir behind a healthy aggregate", () => {
+it("prioritizes one low reservoir without hiding it behind healthy group members", () => {
   const game = createGame({ scenarioId: 108 });
   const hydro = game.facilities.find(
     (facility): facility is GeneratorOperatingType =>
       !isStorage(facility) && facility.fuel === "Hydro",
   )!;
-  hydro.reservoirCapacityWh = 100000000;
-  hydro.reservoirWh = 10000000;
+  hydro.reservoirWh = hydro.reservoirCapacityWh! * 0.1;
   game.facilities = [
+    { ...cloneDeep(hydro), id: 500, reservoirWh: hydro.reservoirCapacityWh },
     hydro,
-    {
-      ...cloneDeep(hydro),
-      id: 500,
-      reservoirCapacityWh: 900000000,
-      reservoirWh: 900000000,
-    },
   ];
-  showGrid(game);
-  expect(group("Hydro")).toHaveTextContent("Reservoir 91%");
-  expect(group("Hydro")).toHaveTextContent("1 low reservoir");
+  const { onSelect } = showSummary(game);
+  expect(screen.getByLabelText("Facility exceptions")).toHaveTextContent(
+    "1 low reservoir",
+  );
+  fireEvent.click(group("Hydro"));
+  expect(onSelect).toHaveBeenLastCalledWith(hydro.id);
+});
+it("discloses forecast with an accessible expanded state", () => {
+  const { props, rerender, onToggleForecast } = showSummary(
+    createGame({ scenarioId: 107 }),
+  );
+  const forecast = screen.getByRole("button", { name: "Forecast" });
+  expect(forecast).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(forecast);
+  expect(onToggleForecast).toHaveBeenCalledTimes(1);
+  rerender(<FleetGrid {...props} forecastOpen />);
+  expect(forecast).toHaveAttribute("aria-expanded", "true");
 });
