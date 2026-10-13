@@ -3,6 +3,22 @@
 A mobile-friendly tycoon game about electricity markets. Play it at
 [electrifygame.com](https://electrifygame.com).
 
+## License
+
+Electrify is source available under the [MIT License with Commons Clause](LICENSE.md).
+The Commons Clause is a condition on the MIT License, not an alternative license.
+
+You can use, study, modify, and share Electrify subject to these terms. The license
+does not permit selling the software as defined by the Commons Clause: providing
+a product or service for a fee or other consideration whose value derives entirely
+or substantially from Electrify, including paid hosting and related consulting or
+support services. See the [full license](LICENSE.md) and
+[Commons Clause FAQ](https://commonsclause.com/) for the scope of this restriction.
+
+Versions containing this license notice use the combined license. Versions
+previously distributed under MIT retain their MIT permissions. Third-party
+components and assets with separate license notices retain their own licenses.
+
 ## Getting started
 
 ### Setup

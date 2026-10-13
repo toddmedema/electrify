@@ -1,7 +1,7 @@
 {
   "name": "electrify",
   "description": "A mobile-friendly web game that teaches about the electricity markets in the style of a Tycoon game. Hosted at https://electrifygame.com",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE.md",
   "version": "1.1.0",
   "private": true,
   "dependencies": {
