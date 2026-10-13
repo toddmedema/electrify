@@ -28,7 +28,14 @@ function run(label, command, args, env = {}) {
 run(
   "Golden outputs",
   "npx",
-  ["react-scripts", "test", "--watchAll=false", "GoldenOutputs", "-u"],
+  [
+    "react-scripts",
+    "test",
+    "--watchAll=false",
+    "--testMatch",
+    "**/src/testing/GoldenOutputs.sim.test.tsx",
+    "-u",
+  ],
   { CI: "true" },
 );
 run("Tick bench", "node", ["scripts/perf/bench.js", "--update"]);

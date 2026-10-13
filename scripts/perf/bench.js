@@ -22,9 +22,10 @@ const path = require("path");
 const ROOT = path.resolve(__dirname, "..", "..");
 const BASELINES = path.join(__dirname, "bench-baselines.json");
 const DEFAULT_TOLERANCE = 0.25;
-// The worst rollover is one maximum that a GC pause can double, so it is reported; the median
-// rollover held within ±5% run to run and is what gates.
-const GATED = ["immerOverheadRatio", "typicalRolloverRatio"];
+// The worst rollover is one maximum that a GC pause can double, so it is reported. Compare
+// median draft/plain rollovers of the same workload; a faster ordinary tick must not make an
+// improved rollover fail its gate just because rollover/ordinary grows.
+const GATED = ["immerOverheadRatio", "rolloverImmerRatio"];
 
 const USAGE = `
 Usage: npm run perf:bench -- [--runs <n>] [--months <n>] [--json] [--update]

@@ -84,7 +84,7 @@ interface StatProps {
   tone?: "good" | "bad";
 }
 
-function Stat(props: StatProps): React.JSX.Element {
+const Stat = React.memo(function Stat(props: StatProps): React.JSX.Element {
   return (
     <div className="facilityStat">
       <Typography variant="caption" color="textSecondary" component="dt">
@@ -99,7 +99,7 @@ function Stat(props: StatProps): React.JSX.Element {
       </Typography>
     </div>
   );
-}
+});
 
 /**
  * The last year of this fuel's price, oldest first. Empty when the game hasn't been running long

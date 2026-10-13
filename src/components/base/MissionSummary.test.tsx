@@ -62,6 +62,39 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 
+it("does not synchronously simulate or show a runway warning while its first worker forecast is pending", () => {
+  const originalWorker = global.Worker;
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  mockSelectMissionRisk.mockReturnValue(runway(6));
+  try {
+    const view = render(summary(makeGame(31)));
+    expect(screen.queryByText("Cash out in ~6 mo")).not.toBeInTheDocument();
+    expect(mockSelectMissionRisk).not.toHaveBeenCalled();
+    expect(mockSelectProjection).not.toHaveBeenCalled();
+    act(() => jest.runAllTimers());
+    expect(mockSelectProjection).not.toHaveBeenCalled();
+    view.unmount();
+  } finally {
+    global.Worker = originalWorker;
+  }
+});
+
+it("clears the previous run's pending warning when a matching-calendar save is imported", () => {
+  mockSelectMissionRisk.mockReturnValue(runway(6));
+  const first = makeGame(32);
+  const view = render(summary(first));
+  expect(screen.getByText("Cash out in ~6 mo")).toBeInTheDocument();
+  const originalWorker = global.Worker;
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  try {
+    view.rerender(summary({ ...first, monthlyHistory: [] }));
+    expect(screen.queryByText("Cash out in ~6 mo")).not.toBeInTheDocument();
+    view.unmount();
+  } finally {
+    global.Worker = originalWorker;
+  }
+});
+
 it("keeps the runway warning off the frame that makes the projection stale", () => {
   mockSelectMissionRisk.mockReturnValue(runway(6));
   const view = render(summary(makeGame(1)));

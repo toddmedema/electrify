@@ -4,6 +4,13 @@ const mockEconomy = jest.fn();
 const mockFuelPrices = jest.fn();
 const mockWeather = jest.fn();
 const mockProjection = jest.fn();
+const mockPackProjection = jest.fn((projection: unknown) => ({
+  transport: projection,
+  transfers: [],
+}));
+jest.mock("../components/base/ProjectionTransport", () => ({
+  packProjection: (projection: unknown) => mockPackProjection(projection),
+}));
 jest.mock("../data/Economy", () => ({
   initEconomy: (done: (error?: string) => void) => mockEconomy(done),
 }));
@@ -28,6 +35,10 @@ beforeEach(() => {
   mockFuelPrices.mockReset().mockImplementation((done) => done());
   mockWeather.mockReset().mockImplementation((_location, done) => done());
   mockProjection.mockReset().mockReturnValue({ forecast: [] });
+  mockPackProjection.mockReset().mockImplementation((projection) => ({
+    transport: projection,
+    transfers: [],
+  }));
   reply = jest.spyOn(worker, "postMessage").mockImplementation(() => undefined);
   jest.isolateModules(() => require("./Projection.worker"));
 });
@@ -55,6 +66,11 @@ it("keeps initialized data and its forecast caches between requests for the same
   expect(mockFuelPrices).toHaveBeenCalledTimes(1);
   expect(mockWeather).toHaveBeenCalledTimes(1);
   expect(mockProjection).toHaveBeenCalledTimes(2);
+  expect(mockPackProjection).toHaveBeenCalledTimes(2);
+  expect(reply).toHaveBeenLastCalledWith(
+    { requestId, transport: { forecast: [] } },
+    [],
+  );
 });
 
 it("reloads weather when either the city or watershed changes", async () => {

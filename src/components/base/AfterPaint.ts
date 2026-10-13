@@ -57,18 +57,22 @@ export function afterPaint(callback: () => void): () => void {
 export function useAfterPaintValue<T>(
   key: string | undefined,
   compute: () => T,
+  scope?: unknown,
 ): T | undefined {
-  const cache = React.useRef<{ key: string; value: T }>();
+  const cache = React.useRef<{ key: string; value: T; scope: unknown }>();
   // Whether the last committed render showed a value. When it didn't, there's nothing stale to
   // keep on screen, so a changed key computes now rather than after paint.
   const showing = React.useRef(false);
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
 
+  // A save import is a new source even when its string key matches the previous run.
+  if (cache.current && cache.current.scope !== scope) cache.current = undefined;
+
   if (
     key !== undefined &&
     (!cache.current || (!showing.current && cache.current.key !== key))
   ) {
-    cache.current = { key, value: compute() };
+    cache.current = { key, value: compute(), scope };
   }
   const stale = key !== undefined && cache.current?.key !== key;
 
@@ -78,12 +82,12 @@ export function useAfterPaintValue<T>(
   React.useEffect(() => {
     if (!stale || key === undefined) return undefined;
     return afterPaint(() => {
-      cache.current = { key, value: compute() };
+      cache.current = { key, value: compute(), scope };
       landed();
     });
     // Deliberately keyed on the key alone: the closure from the first render that saw this key
     // holds exactly the inputs the synchronous computation would have used
-  }, [key, stale]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, stale, scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return key === undefined ? undefined : cache.current?.value;
 }

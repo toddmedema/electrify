@@ -43,13 +43,18 @@ export interface FrameStats {
 
 /** Stats over rAF timestamps (ms, ascending) within the last second before `now`. */
 export function frameStats(timestamps: number[], now: number): FrameStats {
-  const recent = timestamps.filter((t) => t > now - WINDOW_MS);
+  const firstRecent = timestamps.findIndex((t) => t > now - WINDOW_MS);
+  const recent = firstRecent < 0 ? [] : timestamps.slice(firstRecent);
+  // A stall can start outside this window and finish inside it. Keep the preceding frame
+  // when computing the worst gap, otherwise a >1 s hitch appears as a perfect 0 ms frame.
+  const precedingGap =
+    firstRecent > 0 ? timestamps[firstRecent] - timestamps[firstRecent - 1] : 0;
   const deltas: number[] = [];
   for (let i = 1; i < recent.length; i++) {
     deltas.push(recent[i] - recent[i - 1]);
   }
   if (!deltas.length) {
-    return { fps: recent.length, refreshHz: 0, worstGapMs: 0 };
+    return { fps: recent.length, refreshHz: 0, worstGapMs: precedingGap };
   }
   const sorted = [...deltas].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -58,7 +63,7 @@ export function frameStats(timestamps: number[], now: number): FrameStats {
   return {
     fps: recent.length,
     refreshHz: median > 0 ? 1000 / median : 0,
-    worstGapMs: sorted[sorted.length - 1],
+    worstGapMs: Math.max(precedingGap, sorted[sorted.length - 1]),
   };
 }
 
@@ -117,9 +122,15 @@ export function mountPerfOverlay(): () => void {
 
   let lastPaint = 0;
   let frame = 0;
+  const resetFrames = () => {
+    // Background suspension is not a visible game hitch.
+    timestamps.length = 0;
+  };
+  document.addEventListener("visibilitychange", resetFrames);
   const loop = (now: number) => {
     timestamps.push(now);
-    while (timestamps.length && timestamps[0] <= now - WINDOW_MS) {
+    // Retain the frame immediately preceding the window for a gap that crosses its edge.
+    while (timestamps.length > 1 && timestamps[1] <= now - WINDOW_MS) {
       timestamps.shift();
     }
     if (now - lastPaint >= PAINT_INTERVAL_MS) {
@@ -150,6 +161,7 @@ export function mountPerfOverlay(): () => void {
   return () => {
     cancelAnimationFrame(frame);
     observer?.disconnect();
+    document.removeEventListener("visibilitychange", resetFrames);
     panel.remove();
   };
 }

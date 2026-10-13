@@ -81,3 +81,12 @@ jest.mock("./components/base/ProjectionWorkerClient", () => ({
     terminate: () => undefined,
   }),
 }));
+
+jest.mock("./components/base/OutlookWorkerClient", () => ({
+  createOutlookWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));

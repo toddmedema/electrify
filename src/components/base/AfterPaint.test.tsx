@@ -39,6 +39,21 @@ describe("afterPaint", () => {
 });
 
 describe("useAfterPaintValue", () => {
+  it("rebuilds a matching key immediately when a save import changes its scope", () => {
+    function Scoped(props: { scope: object; value: string }) {
+      return (
+        <span data-testid="scope">
+          {useAfterPaintValue("month 1", () => props.value, props.scope)}
+        </span>
+      );
+    }
+    const first = {};
+    const view = render(<Scoped scope={first} value="first run" />);
+    view.rerender(<Scoped scope={first} value="ordinary tick" />);
+    expect(screen.getByTestId("scope")).toHaveTextContent("first run");
+    view.rerender(<Scoped scope={{}} value="imported run" />);
+    expect(screen.getByTestId("scope")).toHaveTextContent("imported run");
+  });
   function Probe(props: {
     valueKey: string | undefined;
     compute: (key: string) => string;

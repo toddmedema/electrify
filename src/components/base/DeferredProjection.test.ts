@@ -13,6 +13,10 @@ import {
 const mockSelectProjection = jest.fn();
 const mockCacheProjection = jest.fn();
 const mockCreateWorker = jest.fn();
+const mockDecodeProjection = jest.fn();
+jest.mock("./ProjectionTransport", () => ({
+  projectionDecoder: (transport: unknown) => mockDecodeProjection(transport),
+}));
 jest.mock("./ProjectionWorkerClient", () => ({
   createProjectionWorker: () => mockCreateWorker(),
 }));
@@ -37,6 +41,9 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockSelectProjection.mockReset();
   mockCacheProjection.mockReset();
+  mockDecodeProjection
+    .mockReset()
+    .mockImplementation((projection) => () => projection);
   mockSelectProjection.mockImplementation((game: GameType) => ({
     month: game.date.monthsElapsed,
   }));
@@ -121,7 +128,11 @@ describe("worker forecasts", () => {
     expect(mockSelectProjection).not.toHaveBeenCalled();
     const request = worker.postMessage.mock.calls[0][0];
     const projection = { month: 5 };
-    worker.onmessage?.({ data: { requestId: request.requestId, projection } });
+    worker.onmessage?.({
+      data: { requestId: request.requestId, transport: projection },
+    });
+    expect(mockCacheProjection).not.toHaveBeenCalled();
+    jest.runAllTimers();
     expect(mockCacheProjection).toHaveBeenCalledWith(game, projection);
     expect(projectionReady(game)).toBe(true);
     expect(changed).toHaveBeenCalledTimes(1);
@@ -142,14 +153,15 @@ describe("worker forecasts", () => {
     jest.runAllTimers();
     expect(worker.postMessage).toHaveBeenCalledTimes(1);
     worker.onmessage?.({
-      data: { requestId: first.requestId, projection: {} },
+      data: { requestId: first.requestId, transport: {} },
     });
     expect(changed).not.toHaveBeenCalled();
     expect(mockCacheProjection).not.toHaveBeenCalled();
     expect(worker.postMessage).toHaveBeenCalledTimes(2);
     const last = worker.postMessage.mock.calls[1][0];
-    expect(last.game).toBe(latest);
-    worker.onmessage?.({ data: { requestId: last.requestId, projection: {} } });
+    expect(last.game).toMatchObject(latest);
+    worker.onmessage?.({ data: { requestId: last.requestId, transport: {} } });
+    jest.runAllTimers();
     expect(projectionReady(latest)).toBe(true);
     expect(changed).toHaveBeenCalledTimes(1);
     unsubscribe();
@@ -166,5 +178,104 @@ describe("worker forecasts", () => {
     expect(mockSelectProjection).toHaveBeenCalledWith(game, now);
     expect(projectionReady(game)).toBe(true);
     unsubscribe();
+  });
+
+  it("yields decoding and cancels a partly decoded reply when a new month replaces it", () => {
+    const decode = jest
+      .fn()
+      .mockReturnValueOnce(undefined)
+      .mockReturnValue({ month: 10 });
+    mockDecodeProjection.mockReturnValueOnce(decode);
+    const changed = jest.fn();
+    const unsubscribe = subscribeProjection(changed);
+    requestProjection(makeGame(10), now);
+    jest.runAllTimers();
+    const first = worker.postMessage.mock.calls[0][0];
+    worker.onmessage?.({ data: { requestId: first.requestId, transport: {} } });
+    jest.runOnlyPendingTimers();
+    jest.runOnlyPendingTimers();
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(changed).not.toHaveBeenCalled();
+    const next = makeGame(11);
+    requestProjection(next, now);
+    jest.runAllTimers();
+    expect(decode).toHaveBeenCalledTimes(1);
+    const last = worker.postMessage.mock.calls[1][0];
+    worker.onmessage?.({
+      data: { requestId: last.requestId, transport: { month: 11 } },
+    });
+    jest.runAllTimers();
+    expect(mockCacheProjection).toHaveBeenCalledWith(next, { month: 11 });
+    expect(changed).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("cancels partial decoding when a same-calendar imported run replaces the source", () => {
+    const decode = jest.fn().mockReturnValue(undefined);
+    mockDecodeProjection.mockReturnValueOnce(decode);
+    const changed = jest.fn();
+    const unsubscribe = subscribeProjection(changed);
+    const original = makeGame(12);
+    requestProjection(original, now);
+    jest.runAllTimers();
+    const first = worker.postMessage.mock.calls[0][0];
+    worker.onmessage?.({ data: { requestId: first.requestId, transport: {} } });
+    jest.runOnlyPendingTimers();
+    jest.runOnlyPendingTimers();
+    const imported = makeGame(12);
+    requestProjection(imported, now);
+    jest.runAllTimers();
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(mockCacheProjection).not.toHaveBeenCalled();
+    const last = worker.postMessage.mock.calls[1][0];
+    worker.onmessage?.({
+      data: { requestId: last.requestId, transport: { imported: true } },
+    });
+    jest.runAllTimers();
+    expect(mockCacheProjection).toHaveBeenCalledWith(imported, {
+      imported: true,
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("falls back after paint if decoding a worker reply fails", () => {
+    mockDecodeProjection.mockReturnValueOnce(() => {
+      throw new Error("decode");
+    });
+    const unsubscribe = subscribeProjection(jest.fn());
+    const game = makeGame(13);
+    requestProjection(game, now);
+    jest.runAllTimers();
+    const request = worker.postMessage.mock.calls[0][0];
+    worker.onmessage?.({
+      data: { requestId: request.requestId, transport: {} },
+    });
+    expect(mockSelectProjection).not.toHaveBeenCalled();
+    jest.runAllTimers();
+    expect(mockSelectProjection).toHaveBeenCalledWith(game, now);
+    expect(projectionReady(game)).toBe(true);
+    unsubscribe();
+  });
+
+  it("cancels partial decoding when the last reader unmounts", () => {
+    const decode = jest.fn().mockReturnValue(undefined);
+    mockDecodeProjection.mockReturnValueOnce(decode);
+    const changed = jest.fn();
+    const unsubscribe = subscribeProjection(changed);
+    requestProjection(makeGame(14), now);
+    jest.runAllTimers();
+    const request = worker.postMessage.mock.calls[0][0];
+    worker.onmessage?.({
+      data: { requestId: request.requestId, transport: {} },
+    });
+    jest.runOnlyPendingTimers();
+    jest.runOnlyPendingTimers();
+    expect(decode).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    jest.runAllTimers();
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(changed).not.toHaveBeenCalled();
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,7 +4,10 @@ Performance goals, lab benchmarks, and the workflow to climb them. One developer
 every measurement is lab-based (benches, CI, local runs on the M5 MacBook, manual device checks). No
 field telemetry, no staged rollouts.
 
-This revision corrects the first draft against the code. The changes that matter most:
+The foundation measurements below describe the earlier implementation; the audit and current
+status at the end of this document supersede completed roadmap items.
+
+The initial revision corrected the first draft against the code. The changes that matter most:
 
 - The headless sim calls `tickState` on a plain object (`src/testing/Simulator.tsx`); the browser
   runs it inside RTK's Immer draft. Headless-only numbers miss proxy and finalize cost, so every
@@ -17,14 +20,14 @@ This revision corrects the first draft against the code. The changes that matter
 - Weather is already memoized: `getWeather` reads a cached row array and extrapolates each day once.
   "Load weather up front" is not a lever.
 - `TICK_MS` lives in `src/Constants.tsx` and the tick loop in `src/reducers/Game.tsx`, both inside
-  the run-compatibility hash. Pacing changes are not free: every regenerated manifest invalidates
-  outstanding challenge links. Batch reducer-touching perf work into as few releases as practical.
+  the run-compatibility hash. Pacing changes affect the rules fingerprint. Compatible saves carry their run, challenge, replay
+  and score forward through `carryRunForward`; keep reducer changes together and prove parity.
 - Valgrind instruction counting is demoted to a timeboxed experiment. The repo already has a better
   pattern: `--benchmark-stories` gates on a ratio of two measurements in the same process, which
   cancels machine speed.
 - Merge to master is a prod deploy, so no automated job may commit ratchet updates to master.
 
-## First measurements
+## Foundation measurements (historical)
 
 From `npm run perf:bench` on the M5 (Node 24.14, median of three warmed runs):
 
@@ -60,9 +63,10 @@ And the month-keyed screen forecasts cost several times the reducer's rollover.
   with tick + commit cost around half the budget. CI proxy: deterministic commit and mutation counts
   on the mobile-390px project. Truth: manual play on a real phone with the dev readout.
 - **G2: 120 Hz on the M5 MacBook.** No frame over 8.33 ms, with updates landing on ProMotion frames.
-  Today the loop reschedules through `setTimeout(max(TICK_MS, 1000 / 60))` (`MAX_PRESENTATION_FPS`
-  in `Game.tsx`), which caps presentation at 60 Hz regardless of display. At 120 Hz, FAST's 10 ms
-  step yields 0.83 ticks per frame, so some frames get none (beat judder).
+  Presentation now follows `requestAnimationFrame`. FAST (12x) uses `1000 / 60` ms steps; ULTRA
+  (24x), offered at desktop widths, uses `1000 / 120` ms steps. `TickCadence.test.tsx` pins their
+  jittered 60/120 Hz cadence and accumulated time. This proves scheduling, while actual frame
+  deadlines still require measurements on the M5.
 - **G3: No visible hiccup at month and year boundaries.** The rollover frame does two kinds of work.
   In the reducer: summarize the month, reprice credit, resolve world events and wildfire hazards,
   advance policies, regenerate the 96-tick timeline (deep-cloned fleet), and run four pre-roll
@@ -118,8 +122,8 @@ ends the run early. It reports, as a median of warmed runs:
 - total ms per simulated year.
 
 Wall-clock numbers are reported, not gated. Two ratios are gated, because a ratio measured in one
-process cancels machine speed (the `--benchmark-stories` pattern): the Immer overhead ratio, and the
-typical rollover ratio from B7. Their ceilings sit in `scripts/perf/bench-baselines.json` with a
+process cancels machine speed (the `--benchmark-stories` pattern): the overall draft/plain tick
+ratio and the paired draft/plain median rollover ratio from B7. Their ceilings sit in `scripts/perf/bench-baselines.json` with a
 generous tolerance (25%). Measured spread: the typical rollover ratio stays within ±5% run to run
 and the Immer ratio within about ±10%, so both can tighten once CI's spread is known. Runtime is
 about 80 s.
@@ -134,16 +138,24 @@ likely failure point. Otherwise drop it.
 ### B7: Rollover cost (G3)
 
 - **Headless (in `perf:bench`):** per-tick cost across the run on the Immer path. Report the median
-  ordinary tick, the median and worst month rollover, and the worst January. The gate is the typical
-  rollover ratio (median rollover ÷ median ordinary tick). The worst-rollover ratio is only
-  reported: it is a single maximum that a GC pause can double, and it ranged 116–355 across runs.
+  ordinary tick, the median and worst month rollover, and the worst January. The gate compares
+  median draft rollover with median plain rollover in the same workload. The former
+  rollover/ordinary ratio remains reported: gating it penalized improvements to ordinary ticks
+  even when rollover time fell. The worst-rollover ratio is also reported, since a single
+  maximum is sensitive to GC pauses.
 - **UI forecasts (in `perf:bench`):** time the forecasts the mounted screens rebuild, each called
   exactly as the screen does: the shared twenty-year projection, the hydro outlook, and the intertie
   outlook (month-keyed, now computed after paint), plus the BuildGenerators three-year quote (catalog
   open). These are reported in ms and as multiples of the reducer rollover. Each is still one long
   task wherever it runs, so they remain the attribution for the rest of G3.
-- **Browser:** at FAST under Playwright's clock, record the longest rAF gap spanning each month
-  boundary. Local only at first.
+- **Browser:** `e2e/frame-budget.spec.ts` records real compositor frames at 12x on 390 px and
+  24x on 1440 px, including rendered month and January boundaries and the surrounding forecast,
+  story and autosave work. Its JSON attachments report ordinary/month/year gaps, missed display
+  frames, long tasks and the host's idle cadence. No fake clock or development hook is needed.
+  Point `E2E_BASE_URL` at an already-served production build and use `--workers=1` for timing
+  evidence; otherwise the normal development server is used. Functional progress is asserted,
+  while timings remain reports. A 60 Hz host cannot verify the 120 Hz target, and viewport
+  emulation cannot verify a real phone.
 - **Manual:** play through a boundary on a real phone with the dev overlay.
 
 ### B3/B4: React commit and DOM census per tick batch
@@ -187,42 +199,15 @@ the truth for manual phone and ProMotion checks. It has no CI timing gate.
 
 ## Climbing the goals
 
-Every change lands with B2 unchanged, or rebaselined with a PR note that explains the move. The
-order is G3 first, then G2, then G1.
+The October audit below completes the planned rAF scheduling, plain working-state ticks, and
+worker forecasts. The next climb needs measurements on the target hardware. Use the production
+frame journey on an actual 60 Hz phone at 12x and a headed browser on the M5's active 120 Hz display
+at 24x. Record ordinary frames, all month transitions, January, and a developed save separately.
 
-**G3: kill the rollover hiccup.** Attribute with B7. The likely order:
-
-1. **Take UI forecasts off the rollover frame (done, see Sequence).** Month-keyed screen forecasts
-   now run after paint while the previous month's stay on screen.
-2. **Shrink reducer rollover work:** the deep clone, per-tick object churn, and the four pre-roll
-   passes. These are hashed inputs, so batch them into one release and prove B2 holds.
-3. **Shrink the rollover commit:** stable references and memoized chart props, measured with the
-   B3/B4 month-boundary numbers.
-4. **Move the shared projection to a worker.** No longer an escalation: after step 1 it is still a
-   single long task of about 85 ms (dev build, `longtask` observer) in the frame after the rollover, which drops that frame. Screen
-   forecasts are pure functions of state, so this is safer than moving the reducer's own rollover.
-
-**G2: 120 Hz.**
-
-- (a) Drive presentation from rAF instead of `setTimeout(1000 / 60)`. The accumulator already makes
-  the simulation independent of dispatch cadence, so scheduling from rAF changes pacing only.
-  Measure the refresh rate while playing, never at load, because ProMotion idles low. This touches
-  `Game.tsx`, so it ships in a release that already regenerates the manifest.
-- The accumulator compares floats. When a 16.67 ms timer lands exactly on a multiple of the 10 ms
-  FAST step, rounding decides whether that tick runs in this frame or the next, and the result
-  depends on how long the page has been open. It is harmless today, but the rAF loop should
-  accumulate in integer microseconds or add an epsilon. The census spec pins the clock origin to
-  stay deterministic.
-- (b) Decide on `TICK_MS.FAST`. Changing it to 25/3 ms makes FAST 20% faster in real time and
-  touches a hashed constant. The alternative is to interpolate the clock and chart viewport.
-- (c) Climb B1 at the 8.33 ms budget.
-
-**G1: 60 Hz on phones.** The same climbs at 16.7 ms, verified by manual play on a real phone.
-Rollover frames and chart-heavy screens are the likely offenders. The largest per-tick lever is the
-Immer tax: an ordinary tick costs 0.5 ms in a draft against 17 µs on a plain object. Candidates
-include running `tickState` on a plain working copy of the hot subtrees and assigning the results
-back once per batch, and keeping `timeline` from being proxied and frozen on every tick. This
-touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hold.
+On the lab host, chart text/axes painting remains a substantial desktop cost. Profile the whole
+presentation, including React, workers' replies and saves, before changing chart behavior. The
+shared projection's decoder yields between rows against a 3 ms deadline; one row and final assembly
+can overshoot that deadline, so it is a slicing budget rather than a guaranteed task maximum.
 
 ## Workflow
 
@@ -248,14 +233,15 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
   changes behavior fails loudly.
 - **Manifest.** Perf work that touches `src/data`, `src/helpers`, `src/reducers`,
   `src/Constants.tsx`, or `src/Types.tsx` changes the generated (git-ignored) `RunCompatibility.json`
-  hash. That invalidates live challenge links, so batch such changes.
+  hash. Preserve the compatible-run carry-forward path and prove that simulation outputs stay
+  identical; do not commit the generated manifest.
 - **Determinism.** Seeded paths use only the `src/helpers/Math.tsx` seed helpers.
 - **No flaky ms gates.** CI gates only counts, bytes, hashes, and same-process ratios.
 - Visual regression is out of scope.
 
 ## Sequence
 
-- **Foundation PR (this one).** B2 golden snapshots and `perf:rebaseline`, the `perf:bench` harness
+- **Done: foundation PR.** B2 golden snapshots and `perf:rebaseline`, the `perf:bench` harness
   (B1, headless B7 and UI forecasts, with ratio ceilings), B5 bundle size in CI, the B3/B4 census
   module, spec, and ceilings, the B6 overlay, and this plan.
 - **Done: G3 thread 1** (UI-only, no manifest). Month-keyed forecasts are computed after paint
@@ -287,23 +273,172 @@ touches `Game.tsx`, so it ships in the batched manifest release, and B2 must hol
     successfully return multiple month forecasts, without falling back, while animation frames
     continue. Unit tests cover coalescing edits, rejecting stale results, cache adoption,
     cleanup, and the error fallback.
-  - Remaining limits: the first projection on mount is synchronous, as is the recovery when
+  - Limits at the time of that change (addressed by the October audit below): the first projection
+    on mount was synchronous, as was the recovery when
     Insights has no suitable previous forecast. The reducer rollover, hydro and intertie
     outlooks, worker-message cloning, and chart commits still use the main thread. The local
     reducer benchmark measured a 34.51 ms median and 44.48 ms worst rollover; this change does
     not claim to meet the 16.7 ms budget yet. Precomputing the reducer's next month would require
     invalidating its exact state and side effects; it is unnecessary for isolating this larger,
     pure UI forecast and was deliberately not introduced here.
-- **Then:** one manifest-regenerating release that bundles the Immer tax, the reducer-side rollover
-  savings, the G2 rAF presentation loop, and the `TICK_MS.FAST` decision.
+- **Done: October frame audit.** Plain working-state ticks, forecast startup and outlook workers,
+  transferable projection replies, stable leaf rendering and production frame evidence are
+  documented below. Existing rAF scheduling and the 12x/24x speed constants remain unchanged.
 - **Timeboxed spike:** Valgrind feasibility, kept only if it passes its criteria.
 
 ## Open questions
 
-- `TICK_MS.FAST` 10 → 25/3 ms: FAST runs 20% faster in real time and a hashed constant changes.
-  Todd's taste call before the G2 thread.
-- rAF-driven presentation while the page is hidden. The page already pauses when hidden; confirm the
-  rAF loop hands off to that pause cleanly.
+- Scheduling and 12x/24x cadence are implemented; the remaining evidence is actual phone/M5
+  production play at the target refresh rate, including both sparse and developed fleets.
+- Worker failures retain the after-paint main-thread fallback, which preserves functionality
+  but cannot promise the same frame budget as successful worker computation.
 - Tolerances for the B1/B7 ratio ceilings: they start at 25% and tighten once CI spread is known.
-  The ceilings were recorded on darwin-arm64, and the Linux x64 CI runner may land elsewhere. If the
-  first CI run disagrees, rebaseline from CI output rather than loosening the tolerance.
+  The current ceilings are recorded on win32-x64; confirm their spread on the Linux x64 CI runner
+  before changing the tolerance.
+
+## October 2026 frame audit
+
+This audit compares the unchanged production build at the master merge of PR #528 with the
+optimized build. Lab host: Windows x64, Node 24.14.0, Chromium 151, headless, observed idle cadence
+59.88 Hz. Desktop uses 1440 px at 24x; phone uses 390 px at 12x. Viewport emulation and the page's
+4x CDP CPU slowdown are proxies: they do not reproduce a physical phone, worker/GPU speed,
+thermals or battery constraints. This host cannot establish the M5's 8.33 ms frame deadline.
+
+### Changes and behavior preservation
+
+- Live reducer batches create one plain working state from the untouched Immer draft, isolate
+  each settled timeline frame and mutable fleet fields, and adopt once. Month inputs are copied
+  only at rollover. Unchanged history/events retain their references; replay actions retain the
+  original draft path. Reusing resolved story effects removes repeated price/fee lookups.
+- The initial shared projection and month-keyed hydro/intertie outlooks run in persistent workers.
+  Results are scoped to the exact run and request; stale/imported results are rejected, rapid
+  requests coalesce, data loads remain retryable, and failures retain the after-paint fallback.
+- Projection replies transfer numeric buffers instead of deserializing thousands of rich tick
+  objects in one message task. Decoding yields between rows against a 3 ms deadline and preserves
+  values, optional-field presence, deferred-load queues and aliases. History comes from the
+  pending snapshot. Cancellation also covers a reply that is still being decoded.
+- Insights keeps a suitable forecast while refreshing, shows a loading label on first mount,
+  separates the live exchange summary from the chart, and avoids persisting a redundant automatic
+  viewport shift. Stable facility/hydro statistic leaves skip unchanged renders. The frame overlay
+  retains long stalls rather than discarding gaps over one second.
+
+Full-state parity covers every scenario and standard CEO balance playbooks through the real draft
+wrapper. Focused tests cover real multi-step presentation batches across normal/month/January
+boundaries, pause and replay, exact worker transport, cancellation, failures and visible forecast
+publication. Golden outputs did not change. No simulation constants, economics, authored data or
+seeded outcomes changed.
+
+### Reducer and size evidence
+
+The same 240-month bench workload (scenario 103, seed 12345, three warmed runs, financed battery at
+month 36) ran without concurrent browser/build/check work. These are local costs, not device
+frame guarantees; a browser dispatch can settle several simulation steps and also render/save.
+
+| Draft tick metric              |     Before |      After |
+| ------------------------------ | ---------: | ---------: |
+| Ordinary median                |  0.2065 ms |  0.0384 ms |
+| Month median                   | 14.5563 ms |  6.3483 ms |
+| Worst month                    | 22.7706 ms | 10.9907 ms |
+| Worst January                  | 18.0013 ms |  9.6746 ms |
+| Whole-run draft/plain ratio    |      4.113 |      1.352 |
+| Paired draft/plain month ratio |      2.240 |      1.062 |
+
+The month median fell 56%; ordinary ticks fell 81%. The final independent benchmark passes the
+new ceilings. The shared forecast still costs about 440 ms in the Jest bench when invoked
+synchronously, which explains why scheduling it off the presentation thread matters.
+
+Rebaselining was performed last with the golden snapshot unchanged. The old month/ordinary gate
+penalized a faster ordinary tick even when month time fell, so it is replaced by paired draft/plain
+month medians. The unchanged-build paired ratio was 2.240 (a 2.800 ceiling with 25% tolerance).
+The rebaseline tightens that ceiling to 1.315 and the whole-run draft/plain ceiling from 5.022
+to 1.632. Both are overhead gates: a shared algorithm slowdown can escape the ratio, so absolute
+browser and bench evidence remains necessary. The golden-suite selector now also works in a
+Windows managed worktree.
+
+Production gzip: main JS 882.69 -> 884.47 kB; all JS 1388.28 -> 1394.20 kB; CSS 23.36 kB unchanged.
+The existing bundle ceilings and browser census ceilings are preserved. The final desktop and
+phone census pass, with one commit per dispatch during ordinary play and six commits across six
+dispatches in the rollover window.
+
+### Browser frame evidence
+
+One sequential sample per journey/build, with the same seeded new game, production data and normal
+local saves. Each observes at least twelve rendered month boundaries including January, plus a
+350 ms tail. Month/year windows include the 100 ms before and 250 ms after a rendered boundary;
+January is a subset of month windows. Ordinary samples contain everything else, including late
+worker replies. Callback gaps are measured, while skipped idle-cadence intervals are estimated.
+The report uses a 0.5 ms budget tolerance to accommodate timestamp/cadence jitter.
+
+Triples below are **ordinary / month / January worst callback gaps, in ms**. All final native
+samples have zero long tasks. Desktop main also mounts Insights, so its duplicate is omitted.
+
+| Native journey               |              Before |              After | Estimated skipped intervals before -> after (ordinary / month / January) |
+| ---------------------------- | ------------------: | -----------------: | -----------------------------------------------------------------------: |
+| Phone 12x main panes         |  16.8 / 16.8 / 16.8 | 16.8 / 16.8 / 16.8 |                                                   0 / 0 / 0 -> 0 / 0 / 0 |
+| Phone 12x Insights           |  16.8 / 33.3 / 16.7 | 16.8 / 16.8 / 16.8 |                                                   0 / 1 / 0 -> 0 / 0 / 0 |
+| Desktop 24x main panes       |  16.8 / 33.4 / 33.4 | 16.8 / 16.8 / 16.8 |                                                   0 / 2 / 1 -> 0 / 0 / 0 |
+| Phone 12x hydro outlook      |  16.8 / 66.7 / 50.0 | 16.8 / 16.8 / 16.7 |                                                  0 / 21 / 2 -> 0 / 0 / 0 |
+| Desktop 24x hydro outlook    | 50.0 / 100.0 / 83.3 | 33.4 / 33.4 / 33.3 |                                               31 / 69 / 6 -> 20 / 31 / 3 |
+| Phone 12x intertie outlook   |  16.8 / 16.8 / 16.8 | 16.8 / 16.8 / 16.7 |                                                   0 / 0 / 0 -> 0 / 0 / 0 |
+| Desktop 24x intertie outlook |  33.4 / 50.0 / 50.0 | 33.4 / 33.3 / 16.8 |                                                  9 / 28 / 3 -> 2 / 1 / 0 |
+
+All four native phone-layout runs hold the lab's 60 Hz callback cadence. Desktop Hydro still skips
+idle-cadence intervals despite removing its long tasks; this is an improvement, not stutter-free
+or 120 Hz evidence. The host's 16.7 ms cadence already exceeds the 8.33 ms desktop target.
+
+The page/main-thread 4x slowdown still misses the smoothness goal:
+
+| Phone 12x, CPU 4x |     Worst gaps before |     Worst gaps after | Long tasks before -> after | Worst long task before -> after |
+| ----------------- | --------------------: | -------------------: | -------------------------: | ------------------------------: |
+| Insights          | 116.7 / 133.2 / 116.7 |   83.3 / 83.3 / 83.2 |                   24 -> 12 |                    127 -> 95 ms |
+| hydro outlook     | 166.7 / 483.3 / 333.4 | 116.6 / 200.0 / 66.7 |                   87 -> 48 |                   400 -> 149 ms |
+
+Hydro's January worst falls from 333.4 to 66.7 ms, but its ordinary skipped-interval estimate rises
+from 435 to 482; month windows fall from 375 to 179 and January from 29 to 12. The proxy remains
+unsmooth and is not uniformly improved. Profiles before the final catch-up/transport fixes identify
+chart axis/text painting and React presentation as substantial costs. The daily chart intentionally
+repaints its moving Now marker and history/forecast boundary; its options and uPlot instance are
+already reused. Save serialization was small in the first-year profile;
+the developed-save comparison below checks a longer history separately. Profiled runs add overhead
+and are used for attribution only, not the timing table.
+
+### Developed-save evidence
+
+A genuine reducer playthrough, not synthetic appended history: scenario 103, CEO, seed 1,
+`STANDARD_BALANCE_PLAYS[103]` plus the `keepUp` strategy through 227 months. The December 2024 save
+contains five operating gas plants, 13 actions, $617M cash, 227 monthly records and no invariant
+violations, bankruptcy or firing. Its encoded JSON is 328,122 bytes. Both production builds load
+the identical fixture through the normal saved-game slot/Continue path with matching difficulty.
+This lab fixture stays out of the repository's generated artifacts.
+
+Both modes observe eleven transitions through November 2025, including January 2025, and the same
+350 ms tail. The shorter window leaves headroom before the authored month-240 scenario ending.
+Triples retain the ordinary / month / January ordering. All four matched runs have zero long tasks.
+
+| Developed save, native CPU |  Worst gaps before |   Worst gaps after | Estimated skipped intervals before -> after |
+| -------------------------- | -----------------: | -----------------: | ------------------------------------------: |
+| Desktop 24x                | 33.4 / 50.0 / 33.3 | 33.4 / 33.3 / 33.3 |                    11 / 10 / 1 -> 4 / 1 / 1 |
+| Phone 12x                  | 16.8 / 16.8 / 16.8 | 16.8 / 16.8 / 16.8 |                      0 / 0 / 0 -> 0 / 0 / 0 |
+
+The phone layout holds lab cadence with the longer history on both builds. Desktop month stalls
+improve, while isolated 33 ms gaps remain. This checks history/autosave growth separately from the
+Hydro/intertie scenes; a five-plant gas fleet does not cover every possible late-game fleet.
+
+**Goal status:** the native phone-layout proxy holds 60 Hz cadence, but a physical phone still
+needs verification. The 120 Hz M5 goal is unverified on this 60 Hz host. The no-stutter goal remains
+unmet in desktop Hydro and the CPU4 proxy, even though the worst rollover stalls are much smaller.
+For the next device check, serve a production build, set `E2E_BASE_URL`, and run the frame spec with
+`--project=desktop-1440px --workers=1 --headed` on the M5's active 120 Hz display. Repeat the same
+scenes on the target phone with browser performance recording. The dev-only overlay helps
+attribution; viewport emulation remains a separate lab proxy.
+
+### Validation
+
+Node 24 and exact-lockfile install; full `npm run check` (types including e2e, lint, formatting,
+covered Jest tests, all simulation suites and CLI); `npm run sim -- --all` (all invariants hold);
+CI production build; independent final `perf:bench` and `perf:bundle`; unchanged
+goldens through `perf:rebaseline`; desktop/phone census; 18 production browser functional tests
+for worker publication, build options and tutorial exit. The final code-review agent completed
+three feedback rounds with no remaining actionable findings; its refresh-test proof issue was
+corrected by holding
+the second worker reply until the viewport settles, then requiring publication to change the UI.

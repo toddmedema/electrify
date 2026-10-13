@@ -69,14 +69,27 @@ describe("PerfOverlay", () => {
   });
 
   it("derives fps, refresh rate and the worst gap from the last second", () => {
-    // The first stamp is over a second old and drops out of the window
-    const stamps = [0, 1100, 1108, 1116, 1141, 1149];
+    // Older frames don't count toward fps, but the gap finishing inside the window does.
+    const stamps = [0, 1092, 1100, 1108, 1116, 1141, 1149];
     expect(frameStats(stamps, 1200)).toEqual({
-      fps: 5,
+      fps: 6,
       refreshHz: 125,
-      worstGapMs: 25,
+      worstGapMs: 1092,
     });
     expect(frameStats([], 0)).toEqual({ fps: 0, refreshHz: 0, worstGapMs: 0 });
+  });
+
+  it("reports a stall longer than the measurement window on the first returning frame", () => {
+    expect(frameStats([0, 2000], 2000)).toEqual({
+      fps: 1,
+      refreshHz: 0,
+      worstGapMs: 2000,
+    });
+    expect(frameStats([0, 10], 2000)).toEqual({
+      fps: 0,
+      refreshHz: 0,
+      worstGapMs: 0,
+    });
   });
 
   it("labels frame gaps against both budgets", () => {

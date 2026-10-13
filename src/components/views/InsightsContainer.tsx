@@ -23,6 +23,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   evidenceRunId: state.ui.evidenceRunId,
   activeCard: state.card.name,
   game: state.game,
+  live: true,
   selectedFacilityId: state.ui.selectedFacilityId,
   facilityDragActive: state.ui.facilityDragActive,
   upcomingEvents: selectUpcomingStoryEvents(state),

@@ -68,7 +68,8 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
  * computed in a worker. Until it arrives after a rollover or a rate change, only what comes
  * after the early checks can be stale: the runway warning, and the upcoming-event notice it would
  * otherwise give way to. A previous early risk that has since cleared is not kept, since it is no
- * longer true; it clears while the worker computes its replacement. The first render computes now.
+ * longer true; it clears while the worker computes its replacement. On first render the
+ * headline remains visible while the worker prepares the runway forecast.
  *
  * earlyRiskDue mirrors selectMissionRisk's early checks. If those ever change without it, the
  * cost is a stale frame or a synchronous projection, never a wrong settled result.
@@ -78,21 +79,29 @@ function useMissionRisk(
   mission: MissionStatus,
   upcoming: UpcomingStoryEventType[],
 ): MissionRisk | undefined {
-  const last = React.useRef<{ risk: MissionRisk | undefined }>();
+  const scope = game.runIdentity ?? game.location ?? game.monthlyHistory;
+  const last = React.useRef<{
+    risk: MissionRisk | undefined;
+    scope: unknown;
+    month: number;
+  }>();
   const [, landed] = React.useReducer((count: number) => count + 1, 0);
   React.useEffect(() => subscribeProjection(landed), []);
   const now = currentTick(game);
   const defer =
     !!now &&
-    !!last.current &&
+    (!!last.current || typeof Worker !== "undefined") &&
     !projectionReady(game) &&
     !earlyRiskDue(game, mission);
-  const previousRisk = readsProjection(last.current?.risk)
-    ? last.current?.risk
-    : undefined;
+  const previousRisk =
+    last.current?.scope === scope &&
+    last.current.month <= game.date.monthsElapsed &&
+    readsProjection(last.current?.risk)
+      ? last.current?.risk
+      : undefined;
   const risk = defer ? previousRisk : selectMissionRisk(game, upcoming);
   React.useEffect(() => {
-    last.current = { risk };
+    last.current = { risk, scope, month: game.date.monthsElapsed };
     if (defer && now) requestProjection(game, now);
   });
   return risk;

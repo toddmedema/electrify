@@ -1,7 +1,7 @@
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
 import { Typography } from "@mui/material";
-import { MONTH_NAMES, MONTHS, TICKS_PER_YEAR } from "../../Constants";
+import { MONTH_NAMES, MONTHS } from "../../Constants";
 import { MANUAL_ENTRY } from "./ManualEntries";
 import {
   formatPercent,
@@ -11,43 +11,31 @@ import {
 import {
   describeHydroStatus,
   ReservoirOutlookPoint,
-  reservoirOutlook,
 } from "../../helpers/HydroOutlook";
-import { generateNewTimeline } from "../../reducers/Game";
 import { FacilityOperatingType, GameType } from "../../Types";
 import ManualLink from "./ManualLink";
-import { useAfterPaintValue } from "./AfterPaint";
+import { useOutlookWorker } from "./useOutlookWorker";
+import { signature } from "./DeferredProjection";
 import Sparkline from "./Sparkline";
 
 /**
  * The year ahead only changes meaningfully when the month or the operating fleet does, so the
  * forecast is kept until one of those moves rather than re-simulated on every throttled render.
- * A new one is computed after paint, so the month rollover's frame keeps last month's outlook.
+ * Refreshes run in a worker, so month rollover and the following frame both stay responsive.
  */
 function useReservoirOutlook(
   game: GameType,
 ): ReservoirOutlookPoint[] | undefined {
-  const key = [
-    game.date.year,
-    game.date.monthNumber,
-    game.facilities
-      .filter((f) => f.fuel === "Hydro" && f.yearsToBuildLeft === 0)
-      .map((f) => f.id)
-      .join(","),
-  ].join("|");
-  return useAfterPaintValue(key, () => {
-    const now = currentTick(game);
-    return now
-      ? reservoirOutlook(
-          now,
-          generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR),
-          game.startingYear,
-        )
-      : undefined;
-  });
+  const enabled = game.facilities.some(
+    (f) => f.fuel === "Hydro" && f.yearsToBuildLeft === 0,
+  );
+  return useOutlookWorker("hydro", enabled ? signature(game) : undefined, game);
 }
 
-function Stat(props: { label: string; value: React.ReactNode }) {
+const Stat = React.memo(function Stat(props: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="facilityStat">
       <Typography variant="caption" color="textSecondary" component="dt">
@@ -58,7 +46,7 @@ function Stat(props: { label: string; value: React.ReactNode }) {
       </Typography>
     </div>
   );
-}
+});
 
 /** Why a dam is producing what it is, and where its water is heading, beside the dam itself. */
 export default function HydroWaterSection(props: {

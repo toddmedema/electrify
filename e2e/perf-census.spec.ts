@@ -29,7 +29,7 @@ const ORDINARY_STEPS = 30;
 // Steps either side of the step whose ticks cross into a new month
 const ROLLOVER_BEFORE = 2;
 const ROLLOVER_AFTER = 3;
-// One month is ~960 virtual ms at FAST; allow two
+// One month is 96 ticks (~1,600 virtual ms) at FAST; allow a full month plus margin.
 const MAX_STEPS_TO_ROLLOVER = 120;
 const CATALOG_STEPS = 40;
 // performance.now() at which every run starts measuring; see the pause below
@@ -253,9 +253,8 @@ test("B3/B4 commit, mutation and dispatch census at FAST", async ({
     .toBe(true);
 
   // Freeze time, then jump to the same performance.now() in every run. The tick loop
-  // accumulates fractional 16.67 ms timer gaps against 10 ms steps and hits exact ties every
-  // third timer; whether floating-point rounding lands a tie on one side or the other depends on
-  // the magnitude of the clock value, so a varying start shifts ticks between steps. The jump
+  // accumulates fractional display-frame gaps against 16.67 ms FAST steps; rounding of ties
+  // depends on the magnitude of the clock value, so a varying start shifts ticks between steps. The jump
   // also fires every start-of-game timer before measuring.
   const now = await page.evaluate(() => Date.now());
   await page.clock.pauseAt(now + 1_000);
