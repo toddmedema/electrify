@@ -11,6 +11,8 @@ import {
 } from "../../Types";
 import { afterPaint } from "./AfterPaint";
 import { createProjectionWorker } from "./ProjectionWorkerClient";
+import { forecastWorkerSnapshot } from "./ForecastWorkerSnapshot";
+import { projectionDecoder, ProjectionTransport } from "./ProjectionTransport";
 
 /**
  * Takes the game's long-range projection off the frame that invalidates it.
@@ -44,6 +46,16 @@ let worker: Worker | undefined;
 let workerUnavailable = false;
 let nextRequestId = 0;
 let inFlight: number | undefined;
+let decoding = false;
+const DECODE_BUDGET_MS = 3;
+
+function cancelPending(): void {
+  pending?.cancel();
+  if (decoding) {
+    decoding = false;
+    inFlight = undefined;
+  }
+}
 
 function publish(game: GameType, projection: ProjectionView): void {
   cacheProjection(game, projection);
@@ -53,6 +65,7 @@ function publish(game: GameType, projection: ProjectionView): void {
 }
 
 function fallback(): void {
+  cancelPending();
   worker?.terminate();
   worker = undefined;
   inFlight = undefined;
@@ -78,19 +91,43 @@ function dispatchPending(): void {
       worker.onmessage = (
         event: MessageEvent<{
           requestId: number;
-          projection?: ProjectionView;
+          transport?: ProjectionTransport;
           error?: boolean;
         }>,
       ) => {
         if (event.data.requestId !== inFlight) return;
-        inFlight = undefined;
         if (pending?.requestId === event.data.requestId) {
-          if (event.data.error || !event.data.projection) {
+          if (event.data.error || !event.data.transport) {
             fallback();
             return;
           }
-          publish(pending.game, event.data.projection);
+          const request = pending;
+          const decode = projectionDecoder(
+            event.data.transport,
+            request.game,
+            request.now,
+          );
+          decoding = true;
+          const step = () => {
+            if (pending !== request) return;
+            try {
+              const projection = decode(performance.now() + DECODE_BUDGET_MS);
+              if (!projection) {
+                request.cancel = afterPaint(step);
+                return;
+              }
+              decoding = false;
+              inFlight = undefined;
+              publish(request.game, projection);
+              dispatchPending();
+            } catch (_error) {
+              fallback();
+            }
+          };
+          request.cancel = afterPaint(step);
+          return;
         }
+        inFlight = undefined;
         // Only the newest edit is queued; old replies never replace current forecasts.
         dispatchPending();
       };
@@ -100,7 +137,7 @@ function dispatchPending(): void {
     inFlight = pending.requestId;
     worker.postMessage({
       requestId: pending.requestId,
-      game: pending.game,
+      game: forecastWorkerSnapshot(pending.game),
       now: pending.now,
     });
   } catch (_error) {
@@ -136,7 +173,7 @@ export function readProjection(
 ): ProjectionView {
   const projection = selectProjection(game, now);
   // A synchronous initial/new-run render supersedes any older worker snapshot too.
-  pending?.cancel();
+  cancelPending();
   pending = undefined;
   ready = { key: signature(game), history: game.monthlyHistory };
   return projection;
@@ -154,7 +191,7 @@ export function requestProjection(
   const key = signature(game);
   const history = game.monthlyHistory;
   if (pending && pending.key === key && pending.history === history) return;
-  pending?.cancel();
+  cancelPending();
   pending = {
     key,
     history,
@@ -172,7 +209,7 @@ export function subscribeProjection(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
     if (!listeners.size) {
-      pending?.cancel();
+      cancelPending();
       pending = undefined;
       worker?.terminate();
       worker = undefined;

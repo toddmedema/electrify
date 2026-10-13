@@ -32,7 +32,6 @@ import {
   MONTH_NAMES,
   MONTHS,
   TICK_MINUTES,
-  TICKS_PER_YEAR,
   YEARS_PER_TICK,
 } from "../../Constants";
 import {
@@ -68,11 +67,9 @@ import {
   IntertieOutlook,
   pricePeriodCaption,
 } from "../../helpers/IntertieOutlook";
-import { generateNewTimeline } from "../../reducers/Game";
 import { purchaseTerms } from "../../helpers/Financials";
 import {
   GameType,
-  TickPresentFutureType,
   TradingPolicyType,
   TransmissionCorridorDefinitionType,
   TransmissionLineOperatingType,
@@ -90,7 +87,11 @@ import PurchaseReviewDialog, {
   financingShortfallText,
 } from "../base/PurchaseReviewDialog";
 import Sparkline from "../base/Sparkline";
-import { useAfterPaintValue } from "../base/AfterPaint";
+import { useOutlookWorker } from "../base/useOutlookWorker";
+import {
+  forecastCutoffIndex,
+  IntertieForecastTick,
+} from "../base/OutlookForecast";
 import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -122,46 +123,20 @@ function limitChangeText(before: number, after: number): string {
   return `${formatWatts(before, 3)} → ${formatWatts(after, 3)}${before === after ? " · Unchanged" : ""}`;
 }
 
-/** Hourly steps keep every hour of the day while costing a quarter of a full-resolution forecast */
-const OUTLOOK_STEP_MINUTES = 60;
-const OUTLOOK_YEARS = 2;
-
 /**
  * A two-year hourly forecast, refreshed each month and whenever a portfolio, policy or story
  * decision changes its inputs. Excludes unfinished assets. Undefined while disabled or before
  * the first tick exists. A refresh is
- * computed after paint, so the month rollover's frame keeps drawing last month's outlook.
+ * computed in a worker, so monthly refreshes never block the game's animation frames.
  */
 function useIntertieForecast(
   game: GameType,
   enabled: boolean,
-): TickPresentFutureType[] | undefined {
-  return useAfterPaintValue(
+): IntertieForecastTick[] | undefined {
+  return useOutlookWorker(
+    "intertie",
     enabled ? intertieForecastKey(game) : undefined,
-    () => {
-      const now = currentTick(game);
-      return now
-        ? generateNewTimeline(
-            {
-              ...game,
-              facilities: game.facilities.filter(
-                (f) => f.yearsToBuildLeft <= 0,
-              ),
-              transmission: {
-                tradingPolicy: game.transmission?.tradingPolicy || "BALANCED",
-                lines: (game.transmission?.lines || [])
-                  .filter((l) => l.yearsToBuildLeft <= 0)
-                  .map((l) => ({ ...l, upgrade: undefined })),
-              },
-            },
-            now.cash,
-            now.customers,
-            (TICKS_PER_YEAR * OUTLOOK_YEARS * TICK_MINUTES) /
-              OUTLOOK_STEP_MINUTES,
-            OUTLOOK_STEP_MINUTES,
-          )
-        : undefined;
-    },
+    game,
   );
 }
 
@@ -628,15 +603,27 @@ export default function TransmissionPanel({
     game,
     projectsOnly || selectedLine !== null,
   );
-  const outlookFor = (corridorId: string, capacityW?: number) =>
-    forecast &&
-    intertieOutlook(
+  const contextKey = JSON.stringify(intertieContext);
+  const cutoff = forecast ? forecastCutoffIndex(forecast, game.date.minute) : 0;
+  const outlookCache = React.useMemo(
+    () => new Map<string, IntertieOutlook | undefined>(),
+    // These inputs invalidate the cache populated by outlookFor below.
+    [forecast, contextKey, cutoff], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const outlookFor = (corridorId: string, capacityW?: number) => {
+    if (!forecast) return undefined;
+    const key = `${corridorId}|${capacityW ?? "default"}`;
+    if (outlookCache.has(key)) return outlookCache.get(key);
+    const outlook = intertieOutlook(
       corridorId,
       intertieContext,
       forecast,
       game.date.minute,
       capacityW,
     );
+    outlookCache.set(key, outlook);
+    return outlook;
+  };
   const flowText = tradingFlowText(game);
   // The guided mission names the northern project. Showing only that choice until it is approved
   // makes an exploratory tap recoverable instead of letting a much dearer three-year project

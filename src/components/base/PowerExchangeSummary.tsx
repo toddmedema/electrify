@@ -7,6 +7,15 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { GameType, TickPresentFutureType } from "../../Types";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import { useAppSelector } from "../../Store";
+import { currentTick } from "../../helpers/GameSelectors";
+
+/** Only this small live readout subscribes to ticks; the forecast workbench stays month-keyed. */
+export function LivePowerExchangeSummary() {
+  const game = useAppSelector((state) => state.game);
+  const now = currentTick(game);
+  return now ? <PowerExchangeSummary game={game} now={now} /> : null;
+}
 
 export default function PowerExchangeSummary({
   game,

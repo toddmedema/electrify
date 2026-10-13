@@ -1383,9 +1383,10 @@ function effectiveCarbonFee(date: DateType, state: GameType): number {
 function getEffectiveFuelPrices(
   date: DateType,
   state: GameType,
+  effects = storyEffectsAt(date, state),
 ): FuelPricesType {
   const prices = getFuelPricesPerMBTU(date, state.seed, state.location);
-  const multipliers = storyEffectsAt(date, state).fuelPriceMultipliers;
+  const multipliers = effects.fuelPriceMultipliers;
   if (!multipliers) {
     return prices;
   }
@@ -1534,18 +1535,30 @@ export const gameSlice = createSlice({
       );
       previousTickMs = nowMs;
       const simulationStepMs = TICK_MS[state.speed];
+      // Catch-up ticks share one private state. Snapshotting the modified draft again for every
+      // step recursively copied the whole forecast and fleet, magnifying a dropped frame into
+      // a more expensive next frame. Replays retain Immer because their actions can edit any root.
+      const snapshot =
+        !state.replayPlayback &&
+        accumulatedTickMs + simulationStepMs * TICK_SNAP >= simulationStepMs
+          ? current(state)
+          : undefined;
+      const working = snapshot ? tickWorkingState(snapshot) : state;
       while (
         accumulatedTickMs + simulationStepMs * TICK_SNAP >=
         simulationStepMs
       ) {
-        tickState(state, currentRunSaveEffects());
+        if (snapshot) tickWorkingStateStep(working, currentRunSaveEffects());
+        else tickState(working, currentRunSaveEffects());
         accumulatedTickMs -= simulationStepMs;
-        if (!state.inGame || (state.speed as SpeedType) === "PAUSED") {
+        if (!working.inGame || (working.speed as SpeedType) === "PAUSED") {
+          if (snapshot) adoptTickWorkingState(state, snapshot, working);
           tickLoopRunning = false;
           return;
         }
       }
 
+      if (snapshot) adoptTickWorkingState(state, snapshot, working);
       scheduleTick(state.speed);
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
@@ -3173,10 +3186,100 @@ export function tutorialCompleteDialog({
   });
 }
 
+/**
+ * Give a live tick private mutable outputs while keeping its large read-only inputs plain. Only
+ * the frame being settled is written; copying a whole month's forecast would throw away the
+ * benefit and invalidate every chart row. Replay actions can write any frame or root, so they
+ * keep the normal Immer path instead.
+ */
+function tickWorkingState(state: GameType): GameType {
+  return {
+    ...state,
+    timeline: [...state.timeline],
+    facilities: state.facilities.map((facility) => ({ ...facility })),
+    ...(state.transmission && {
+      transmission: state.transmission.lines.length
+        ? {
+            ...state.transmission,
+            lines: state.transmission.lines.map((line) => ({
+              ...line,
+              ...(line.upgrade && { upgrade: { ...line.upgrade } }),
+            })),
+          }
+        : state.transmission,
+    }),
+    eventLog: [...state.eventLog],
+    reportedEventKeys: [...state.reportedEventKeys],
+    commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
+    ...(state.blackout && { blackout: { ...state.blackout } }),
+    ...(state.tutorialIntertieStress && {
+      tutorialIntertieStress: { ...state.tutorialIntertieStress },
+    }),
+  };
+}
+
+/** Isolate each frame just before it is settled, including frames after a batch rolls over. */
+function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
+  const minute = state.date.minute + TICK_MINUTES;
+  const frame = getTimeFromTimeline(minute, state.timeline);
+  if (frame) {
+    const copy = { ...frame };
+    copyCommitmentMetadata(frame, copy);
+    state.timeline[state.timeline.indexOf(frame)] = copy;
+  }
+  if (state.monthlyHistory.length < Math.floor(minute / MINUTES_PER_MONTH)) {
+    state.monthlyHistory = [...state.monthlyHistory];
+    if (state.policies) state.policies = cloneDeep(state.policies);
+    state.worldEvents = {
+      ...state.worldEvents,
+      active: [...state.worldEvents.active],
+      occurrences: [...state.worldEvents.occurrences],
+      checkedKeys: [...state.worldEvents.checkedKeys],
+    };
+  }
+  tickState(state, saveEffects);
+}
+
+function adoptTickWorkingState(
+  draft: GameType,
+  snapshot: GameType,
+  working: GameType,
+) {
+  // An ordinary tick does not change these append-only records. Keep their references stable
+  // for selectors and mounted event/history panes, just as Immer's original path did.
+  if (
+    working.eventLog.length === snapshot.eventLog.length &&
+    working.eventLog[0] === snapshot.eventLog[0]
+  )
+    working.eventLog = snapshot.eventLog;
+  if (working.reportedEventKeys.length === snapshot.reportedEventKeys.length)
+    working.reportedEventKeys = snapshot.reportedEventKeys;
+  if (
+    working.commissionedHydroSiteIds.length ===
+    snapshot.commissionedHydroSiteIds.length
+  )
+    working.commissionedHydroSiteIds = snapshot.commissionedHydroSiteIds;
+  // A pending choice can pause immediately before a rollover. No monthly inputs changed then.
+  if (working.monthlyHistory.length === snapshot.monthlyHistory.length) {
+    working.monthlyHistory = snapshot.monthlyHistory;
+    working.worldEvents = snapshot.worldEvents;
+    if (snapshot.policies) working.policies = snapshot.policies;
+  }
+  if (snapshot.blackout && !working.blackout) delete draft.blackout;
+  Object.assign(draft, working);
+}
+
 // Ticks the state forward in place
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
 export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
+  if (isDraft(state) && !state.replayPlayback) {
+    const snapshot = current(state);
+    const working = tickWorkingState(snapshot);
+    tickWorkingStateStep(working, saveEffects);
+    adoptTickWorkingState(state, snapshot, working);
+    return;
+  }
   if (
     state.tutorialIntertieStress?.active &&
     !state.replayPlayback &&
@@ -3756,8 +3859,8 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather(date, state.seed);
-      const fuelPrices = getEffectiveFuelPrices(date, state);
       const effects = storyEffectsAt(date, state);
+      const fuelPrices = getEffectiveFuelPrices(date, state, effects);
       const hydroKey = `${date.year}-${date.monthNumber}`;
       let hydrology = hydrologyByMonth.get(hydroKey);
       if (!hydrology) {
@@ -3868,10 +3971,9 @@ function minimumStableOperatingCost(
   const minimumW = generator.peakW * (generator.minimumStableOutput || 0);
   const generatedWh = (minimumW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const tickDate = getDateFromMinute(tick.minute, state.startingYear);
+  const effects = storyEffectsAt(tickDate, state);
   const operatingCostMultiplier =
-    storyEffectsAt(tickDate, state).operatingCostMultipliersByFuel?.[
-      generator.fuel
-    ] || 1;
+    effects.operatingCostMultipliersByFuel?.[generator.fuel] || 1;
   const variableOM =
     (generatedWh / 1000000) *
     (generator.variableOperatingCostPerMWh || 0) *
@@ -3888,7 +3990,7 @@ function minimumStableOperatingCost(
   const carbonCost =
     fuelBtu *
     feeableKgCO2ePerBtu(generator.fuel) *
-    effectiveCarbonFee(tickDate, state);
+    (effects.carbonFeePerKgCO2e ?? state.feePerKgCO2e);
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -4084,6 +4186,7 @@ function updateSupplyFacilitiesFinances(
   let hydroMandatedReleaseW = 0;
   const startedFacilityIds = new Set<number>();
   const tickStoryEffects = storyEffectsAt(tickDate, state);
+  const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
     // Commitment is only read or written behind hasMinimumStableOutput, which storage never has
@@ -4541,7 +4644,11 @@ function updateSupplyFacilitiesFinances(
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
-  const fuelPrices = getEffectiveFuelPrices(date, state);
+  const fuelPrices = getEffectiveFuelPrices(
+    date,
+    state,
+    date.minute === now.minute ? tickStoryEffects : undefined,
+  );
   // Attribute sales proportionally to gross local output and imports. Using net supply
   // after charging or exports would credit local facilities with more than the company earned.
   // The imported share remains outside local facility lifetime revenue.
@@ -4605,9 +4712,7 @@ function updateSupplyFacilitiesFinances(
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
         feeableKgco2e += facilityFeeableKgco2e;
-        facilityExpenses +=
-          facilityFuel +
-          effectiveCarbonFee(tickDate, state) * facilityFeeableKgco2e;
+        facilityExpenses += facilityFuel + carbonFee * facilityFeeableKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -4711,7 +4816,7 @@ function updateSupplyFacilitiesFinances(
     transmissionPrincipalRepayment += paymentPrincipal;
     line.loanAmountLeft -= paymentPrincipal;
   });
-  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * feeableKgco2e;
+  const expensesCarbonFee = carbonFee * feeableKgco2e;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough

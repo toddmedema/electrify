@@ -53,6 +53,64 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+it("keeps first worker startup and long worker recovery out of the Insights render", () => {
+  const game = createGame({ scenarioId: 103, seed: 91 });
+  const props = {
+    game,
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    props: typeof props;
+    getProjection: (now: TickPresentFutureType) => unknown;
+  };
+  const originalWorker = global.Worker;
+  const generate = jest.spyOn(GameModule, "generateNewTimeline");
+  global.Worker = jest.fn() as unknown as typeof Worker;
+  try {
+    expect(internals.getProjection(game.timeline[0])).toBeUndefined();
+    expect(generate).not.toHaveBeenCalled();
+    global.Worker = originalWorker;
+    const previous = internals.getProjection(game.timeline[0]);
+    global.Worker = jest.fn() as unknown as typeof Worker;
+    generate.mockClear();
+    internals.props = {
+      ...props,
+      game: { ...game, date: { ...game.date, monthsElapsed: 3 } },
+    };
+    expect(internals.getProjection(game.timeline[0])).toBe(previous);
+    expect(generate).not.toHaveBeenCalled();
+    internals.props = { ...props, game: cloneDeep(game) };
+    expect(internals.getProjection(game.timeline[0])).toBeUndefined();
+    expect(generate).not.toHaveBeenCalled();
+  } finally {
+    global.Worker = originalWorker;
+    generate.mockRestore();
+  }
+});
+
+it("keeps a connected live exchange's tick updates out of forecast-chart renders", () => {
+  const game = createGame({ scenarioId: 112, seed: 92 });
+  const props = {
+    game,
+    live: true,
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+  };
+  const insights = new Insights(props);
+  const next = {
+    ...game,
+    date: { ...game.date, minute: game.date.minute + 15 },
+    speed: "FAST" as const,
+  };
+  expect(
+    insights.shouldComponentUpdate({ ...props, game: next }, insights.state),
+  ).toBe(false);
+});
+
 it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
   const game = createGame({ scenarioId: 106, seed: 4 });
   const props = {
@@ -928,10 +986,10 @@ describe("Insights layers", () => {
     );
   });
 
-  it("saves a month's viewport once while a lower-priority update is pending", async () => {
+  it("follows a month without another Redux save and restores that range after remounting", async () => {
     // React keeps derived state out of the update queue's base state while the component has
     // pending work, so every synchronous render until that work lands derives the month's
-    // viewport again. Saving it back into props must not turn that into a render loop.
+    // viewport again. Automatic following needs no Redux update, even with pending work.
     const game = createGame({ scenarioId: 100 });
     const nextMonth = {
       ...game,
@@ -963,8 +1021,8 @@ describe("Insights layers", () => {
         />
       );
     }
-    render(<Host />);
-    // Unpinned, so the month moves the viewport and it is saved once
+    const view = render(<Host />);
+    // The player's edit is saved; following the month can later be derived from that saved month.
     await user.click(labelledButton("Zoom in"));
     const zoomed = saves.at(-1)!;
     saves.length = 0;
@@ -974,15 +1032,36 @@ describe("Insights layers", () => {
       flushSync(() => setGame(nextMonth));
     });
 
-    expect(saves).toEqual([
-      {
-        viewport: zoomed.viewport.map((minute) => minute + MINUTES_PER_MONTH),
-        month: nextMonth.date.monthsElapsed,
-      },
-    ]);
+    const advanced = zoomed.viewport.map(
+      (minute) => minute + MINUTES_PER_MONTH,
+    );
+    expect(saves).toEqual([]);
     expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
       "data-domain",
-      JSON.stringify(saves[0].viewport),
+      JSON.stringify(advanced),
+    );
+    view.unmount();
+    const onViewportChange = jest.fn();
+    render(
+      <Insights
+        game={nextMonth}
+        savedViewport={zoomed}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+        onViewportChange={onViewportChange}
+      />,
+    );
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify(advanced),
+    );
+    await user.click(labelledButton("Zoom in"));
+    const edited = onViewportChange.mock.calls.at(-1)![0];
+    expect(edited.month).toBe(nextMonth.date.monthsElapsed);
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify(edited.viewport),
     );
   });
 

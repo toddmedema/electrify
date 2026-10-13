@@ -338,6 +338,11 @@ it("perf bench", () => {
   const typicalRolloverRatios = measured.map(
     (r) => r.medianRolloverMs / r.medianOrdinaryMs,
   );
+  // Pair the same month-forecast workload on the plain and draft paths. Dividing rollover
+  // by an ordinary tick penalizes improvements to ordinary ticks even when both get faster.
+  const rolloverImmerRatios = measured.map(
+    (r) => r.medianRolloverMs / r.plainMedianRolloverMs,
+  );
   const medianRolloverMs = pick("medianRolloverMs");
   const worstRolloverMs = pick("worstRolloverMs");
 
@@ -373,12 +378,14 @@ it("perf bench", () => {
       ordinaryTickImmerRatio: median(ordinaryImmerRatios),
       rolloverRatio: median(rolloverRatios),
       typicalRolloverRatio: median(typicalRolloverRatios),
+      rolloverImmerRatio: median(rolloverImmerRatios),
     },
     perRun: {
       immerOverheadRatio: immerRatios,
       ordinaryTickImmerRatio: ordinaryImmerRatios,
       rolloverRatio: rolloverRatios,
       typicalRolloverRatio: typicalRolloverRatios,
+      rolloverImmerRatio: rolloverImmerRatios,
     },
     forecastMonth: forecastState ? WORKLOAD.forecastMonth : null,
     forecasts,
@@ -431,8 +438,12 @@ it("perf bench", () => {
     `${f(result.ratios.rolloverRatio, 1)}  runs: ${rolloverRatios.map((r) => f(r, 1)).join(" ")}`,
   );
   row(
-    "Typical rollover ratio (gated)",
+    "Typical rollover ratio (rollover/ordinary)",
     `${f(result.ratios.typicalRolloverRatio, 1)}  runs: ${typicalRolloverRatios.map((r) => f(r, 1)).join(" ")}`,
+  );
+  row(
+    "Rollover Immer overhead ratio (gated)",
+    `${f(result.ratios.rolloverImmerRatio, 2)}  runs: ${rolloverImmerRatios.map((r) => f(r, 2)).join(" ")}`,
   );
   if (forecasts.length) {
     write("");

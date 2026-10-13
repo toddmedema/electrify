@@ -139,7 +139,9 @@ import {
   rangesEqual,
   zoomChartViewport,
 } from "../base/ChartViewportContext";
-import PowerExchangeSummary from "../base/PowerExchangeSummary";
+import PowerExchangeSummary, {
+  LivePowerExchangeSummary,
+} from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
 import "./Insights.scss";
@@ -313,6 +315,8 @@ export interface StateProps {
   evidenceRunId?: number;
   activeCard?: import("../../Types").CardNameType;
   game: GameType;
+  /** The connected game reads the live exchange from its own subscription. */
+  live?: boolean;
   selectedFacilityId: number | null;
   facilityDragActive: boolean;
   focusLayer?: InsightLayerId;
@@ -685,6 +689,7 @@ export default class Insights extends React.Component<Props, State> {
     scenarioId: number;
     seed: number;
     monthsElapsed: number;
+    scope: unknown;
   };
   private unsubscribeProjection?: () => void;
 
@@ -734,7 +739,8 @@ export default class Insights extends React.Component<Props, State> {
   // While a lower-priority update is pending (a landed projection, a resize), React keeps
   // derived state out of the queue's base state, so every synchronous render until then
   // derives the same month again from the older state. That must stay idempotent: the result
-  // is the same range each time, and componentDidUpdate saves only a range that changed.
+  // is the same range each time. Automatic following can be restored from an older saved month;
+  // only player/evidence viewport changes need a Redux update.
   public static getDerivedStateFromProps(
     props: Props,
     state: State,
@@ -778,7 +784,8 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
-      (this.state.layers.includes("powerExchange") &&
+      (!nextProps.live &&
+        this.state.layers.includes("powerExchange") &&
         (nextProps.game.date.minute !== this.props.game.date.minute ||
           nextProps.game.speed !== this.props.game.speed)) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
@@ -824,8 +831,19 @@ export default class Insights extends React.Component<Props, State> {
     const { viewport } = this.state;
     const month = this.props.game.date.monthsElapsed;
     const saved = this.props.savedViewport;
+    const automaticallyAdvanced =
+      month !== previousState.viewportMonth &&
+      rangesEqual(
+        viewport,
+        advanceViewport(
+          this.props.game,
+          previousState.viewport,
+          month - previousState.viewportMonth,
+        ),
+      );
     if (
       !rangesEqual(viewport, previousState.viewport) &&
+      !automaticallyAdvanced &&
       !(saved && saved.month === month && rangesEqual(saved.viewport, viewport))
     ) {
       this.props.onViewportChange?.({ viewport: [...viewport], month });
@@ -877,7 +895,9 @@ export default class Insights extends React.Component<Props, State> {
       if (this.selectedEventRequest !== request) {
         const now = currentTick(this.props.game);
         if (!now) return;
-        const bounds = this.getProjection(now).domain.x;
+        const projection = this.getProjection(now);
+        if (!projection) return;
+        const bounds = projection.domain.x;
         const minSpan = Math.min(bounds[1] - bounds[0], MINUTES_PER_MONTH);
         this.selectedEventRequest = request;
         this.setState({
@@ -1191,11 +1211,13 @@ export default class Insights extends React.Component<Props, State> {
    *
    * When a month rollover or a decision has made it stale, the pane keeps drawing the one it
    * already has, and componentDidUpdate asks for the new one after paint (see
-   * DeferredProjection). That keeps the twenty-year simulation out of the rollover frame. A
-   * projection from another run, or from more than a month back, is never shown in its place.
-   * With nothing to keep, such as on mount, the projection is computed now.
+   * DeferredProjection). That keeps the twenty-year simulation out of the rollover frame.
+   * Another run's projection is never shown. With nothing to keep, the pane shows a loading
+   * state while the worker starts; a slow worker never triggers a synchronous recovery.
    */
-  private getProjection(now: TickPresentFutureType): ProjectionView {
+  private getProjection(
+    now: TickPresentFutureType,
+  ): ProjectionView | undefined {
     const { game } = this.props;
     const shown = this.shownProjection;
     const monthsBehind = shown && game.date.monthsElapsed - shown.monthsElapsed;
@@ -1203,17 +1225,23 @@ export default class Insights extends React.Component<Props, State> {
       shown &&
       shown.scenarioId === game.scenarioId &&
       shown.seed === game.seed &&
-      (monthsBehind === 0 || monthsBehind === 1) &&
+      shown.scope ===
+        (game.runIdentity ?? game.location ?? game.monthlyHistory) &&
+      monthsBehind !== undefined &&
+      monthsBehind >= 0 &&
       !projectionReady(game)
     ) {
       return shown.projection;
     }
+    if (!projectionReady(game) && typeof Worker !== "undefined")
+      return undefined;
     const projection = readProjection(game, now);
     this.shownProjection = {
       projection,
       scenarioId: game.scenarioId,
       seed: game.seed,
       monthsElapsed: game.date.monthsElapsed,
+      scope: game.runIdentity ?? game.location ?? game.monthlyHistory,
     };
     return projection;
   }
@@ -1291,9 +1319,8 @@ export default class Insights extends React.Component<Props, State> {
     // year, even near the end of a run, so the figure means the same thing every time. The
     // sign is the sign of target minus rate: a rate above target reads as a loss every year it
     // is in force, no matter what the lifetime average did last period.
-    const upcoming = investor
-      ? []
-      : this.getProjection(now).financeProjected.slice(0, 12);
+    const projection = investor ? undefined : this.getProjection(now);
+    const upcoming = projection?.financeProjected.slice(0, 12) || [];
     const pastTotals = summarizeHistory(game.monthlyHistory);
     const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
     const rateScore = (rate: number) =>
@@ -1304,7 +1331,9 @@ export default class Insights extends React.Component<Props, State> {
         rate,
         inflationIndex,
       );
-    const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
+    const formattedRateScore = projection
+      ? formatRateScore(rateScore(game.dollarsPerkWh))
+      : "Calculating…";
     const marks = investor
       ? [
           { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
@@ -1350,7 +1379,7 @@ export default class Insights extends React.Component<Props, State> {
     );
     const rateSummary = investor
       ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} over the next year at this rate. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${projection ? `rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
     const rateScoreClass = `insightsRateScore ${
       rateScore(game.dollarsPerkWh) > 0
         ? "good"
@@ -1911,7 +1940,11 @@ export default class Insights extends React.Component<Props, State> {
           );
           break;
         case "powerExchange":
-          body = <PowerExchangeSummary game={game} now={currentTick(game)!} />;
+          body = this.props.live ? (
+            <LivePowerExchangeSummary />
+          ) : (
+            <PowerExchangeSummary game={game} now={currentTick(game)!} />
+          );
           break;
         case "demandByType": {
           const demandTypes = demandTypesBySizeAtStart(
@@ -2255,6 +2288,24 @@ export default class Insights extends React.Component<Props, State> {
       return <span />;
     }
     const projection = this.getProjection(now);
+    if (!projection) {
+      return (
+        <GameCard className="insights" id="insightsPane">
+          <div className="scrollable" ref={this.paneRef}>
+            <div className="insightsStickyHeader">
+              <Toolbar className="paneHeader insightsTitle">
+                <Typography variant="h6">Insights</Typography>
+                <CustomerPrograms game={game} />
+              </Toolbar>
+              {this.renderLevers(now)}
+            </div>
+            <Typography role="status" sx={{ padding: 2 }}>
+              Calculating forecast…
+            </Typography>
+          </div>
+        </GameCard>
+      );
+    }
     const viewportBounds = projection.domain.x;
     const minViewportSpan = Math.min(
       viewportBounds[1] - viewportBounds[0],

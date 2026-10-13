@@ -3,7 +3,9 @@ import { defineConfig } from "@playwright/test";
 // Not 3000: with reuseExistingServer, a local `npm start` there would be reused without the
 // e2e environment below.
 const port = process.env.E2E_PORT || "3100";
-const baseURL = `http://127.0.0.1:${port}`;
+// Reuse an explicitly hosted production build for real frame measurements. The default
+// remains the development server so the normal UI suite still gets its e2e environment.
+const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: ".",
@@ -63,17 +65,19 @@ export default defineConfig({
       use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
     },
   ],
-  webServer: {
-    command: "npm start",
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-    env: {
-      BROWSER: "none",
-      HOST: "127.0.0.1",
-      PORT: port,
-      // Hide only chunk-load failures from the dev runtime-error overlay (see scripts/start.js)
-      ELECTRIFY_E2E: "1",
-    },
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "npm start",
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+        env: {
+          BROWSER: "none",
+          HOST: "127.0.0.1",
+          PORT: port,
+          // Hide only chunk-load failures from the dev runtime-error overlay (see scripts/start.js)
+          ELECTRIFY_E2E: "1",
+        },
+      },
 });

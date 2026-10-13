@@ -4,14 +4,14 @@
     "node": "v24.14.0",
     "platform": "win32-x64",
     "runs": 3,
-    "date": "2026-09-29"
+    "date": "2026-10-13"
   },
   "measured": {
-    "immerOverheadRatio": 4.018,
-    "typicalRolloverRatio": 101.458
+    "immerOverheadRatio": 1.305,
+    "rolloverImmerRatio": 1.052
   },
   "ceilings": {
-    "immerOverheadRatio": 5.022,
-    "typicalRolloverRatio": 126.822
+    "immerOverheadRatio": 1.632,
+    "rolloverImmerRatio": 1.315
   }
 }
