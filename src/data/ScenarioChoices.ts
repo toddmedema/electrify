@@ -29,17 +29,16 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         upfrontGrant: (difficulty) => DATA_CENTER_GRANT[difficulty],
         description: "Receive {grant} to connect all 100 MW in January 2026.",
-        message:
-          "Funding received for your commitment to connect 100 MW in January 2026.",
+        message: "Funding received. Connect 100 MW in January 2026.",
       },
       {
         id: "phased",
         label: "Require phased connections",
         cost: () => 0,
         description:
-          "Forgo funding and delay half the demand and sales: connect 50 MW in January 2026 and 50 MW in January 2028.",
+          "Forgo funding. Connect 50 MW in January 2026 and 50 MW in January 2028, delaying half the sales.",
         message:
-          "Phased connection agreed: 50 MW in January 2026 and 50 MW in January 2028, with no funding.",
+          "Connect 50 MW in January 2026 and 50 MW in January 2028. No funding received.",
         loadAdditions: [
           {
             id: "manassas-data-centers-phase-one",
@@ -66,8 +65,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     scenarioId: 107,
     atMonth: 36,
     title: "Prepare for the deep freeze",
-    message:
-      "February demand and gas prices will spike, so every lost megawatt-hour costs more.",
+    message: "February demand and gas prices will spike as plant output falls.",
     options: [
       {
         id: "winterize",
@@ -76,7 +74,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         description:
           "Halve February’s output losses at gas, coal, nuclear, and wind plants.",
         message:
-          "Winterization halves February 2021 plant output losses, but demand and gas prices still surge.",
+          "Winterization halves February 2021 output losses. Demand and gas prices still surge.",
       },
       {
         id: "standard",
@@ -86,7 +84,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         description:
           "Save cash for construction and accept February’s full output losses, including a 38% drop at gas plants.",
         message:
-          "Construction funds are preserved, with full plant output losses and surging demand and gas prices in February 2021.",
+          "Construction budget kept. February 2021 output losses apply in full.",
       },
     ],
   },
@@ -96,7 +94,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Before Santa Ana wind events, utilities patrol lines and pre-position repair crews and equipment.",
+      "Prepare crews and equipment for January's Santa Ana winds, or keep cash.",
     options: [
       {
         id: "prepare",
@@ -105,7 +103,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         description:
           "Halve customer disconnections and generator output losses in January and February.",
         message:
-          "Preparedness halves January and February customer disconnections and generator output losses, with restoration costs unchanged.",
+          "Preparedness halves January–February disconnections and output losses. Repair costs stay the same.",
       },
       {
         id: "standard",
@@ -115,7 +113,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         description:
           "Save cash and accept January and February’s full customer disconnections and generator output losses.",
         message:
-          "Cash is preserved, with the full January and February outage impact and restoration costs.",
+          "Cash kept. January–February disconnections, output losses and repair costs apply in full.",
       },
     ],
   },

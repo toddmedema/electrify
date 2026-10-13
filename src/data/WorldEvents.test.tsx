@@ -412,10 +412,8 @@ describe("authored upcoming-event copy", () => {
     const start = { ...context(0, 113), difficulty: "Employee" as const };
     const forecasts = upcomingStoryPhases(start);
     expect(forecasts.map((event) => event.message)).toEqual([
-      "Coal output will decrease as running costs and diesel prices rise.",
-      ...Array(3).fill(
-        "Coal output will decrease further; running costs and diesel prices will rise again.",
-      ),
+      "Coal output will decrease.",
+      ...Array(3).fill("Coal output will decrease further."),
     ]);
     const arc = STORY_ARC_DEFINITIONS.find(
       (story) => story.scenarioId === 113,
@@ -426,11 +424,11 @@ describe("authored upcoming-event copy", () => {
       date: context(12, 113).date,
     });
     expect(live.title).toBe("Breakdowns outpace repairs");
-    expect(live.message).toBe(
-      "Coal output is down to 67% of nominal for the year, coal running costs are 8% higher, and diesel for the peakers costs 10% more than normal.",
-    );
+    expect(live.message).toBe("Coal output is down to 67%.");
     expect(live.effects).toMatchObject({
       facilityOutputMultipliersByFuel: { Coal: 0.67 },
+      operatingCostMultipliersByFuel: { Coal: 1.08 },
+      fuelPriceMultipliers: { Oil: 1.1 },
     });
     expect(
       upcomingStoryPhases({ ...start, date: context(12, 113).date }),

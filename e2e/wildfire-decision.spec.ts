@@ -5,6 +5,8 @@ for (const theme of ["light", "dark"]) {
   test(`wildfire response is actionable and persistent in ${theme}`, async ({
     page,
   }, testInfo) => {
+    // The choice arrives 35 game months in, about a minute at fast speed.
+    test.setTimeout(120000);
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
@@ -25,7 +27,7 @@ for (const theme of ["light", "dark"]) {
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Paused");
     await expect(region).not.toContainText("Spend $2M");
-    await expect(region).toContainText("pre-position repair crews");
+    await expect(region).toContainText("Prepare crews and equipment");
     await expect(region).not.toContainText("Cash available");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")

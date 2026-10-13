@@ -47,7 +47,7 @@ it("balances charging, discharging, imports and exports without netting away sto
   const stack = supplyDemandStack(ticks, ["Sun", "Coal"]);
   expect(stack.sources).toEqual([
     "Weather-driven",
-    "On-demand",
+    "Dispatchable",
     "Storage",
     "Interties",
   ]);
@@ -77,7 +77,7 @@ it("handles older records without optional flow fields and omits unused source k
     ],
     ["Coal", "Sun"],
   );
-  expect(stack.sources).toEqual(["On-demand"]);
+  expect(stack.sources).toEqual(["Dispatchable"]);
   expect(stack.supply).toEqual([50, 0]);
   expect(stack.totalDemand).toEqual([40, 40]);
 });
@@ -175,7 +175,7 @@ it("groups every solar and wind variant separately from other generation", () =>
     ],
     ["Hydro", "Sun", "Wind"],
   );
-  expect(stack.sources).toEqual(["Weather-driven", "On-demand"]);
+  expect(stack.sources).toEqual(["Weather-driven", "Dispatchable"]);
   expect(stack.bySource).toEqual([[40], [60]]);
   expect(stack.stacked).toEqual([[40], [100]]);
   expect(stack.fuels).toContain("Hydro");
@@ -195,7 +195,7 @@ it("retains generic flow keys on days that only charge or export", () => {
     ],
     ["Coal"],
   );
-  expect(stack.sources).toEqual(["On-demand", "Storage", "Interties"]);
+  expect(stack.sources).toEqual(["Dispatchable", "Storage", "Interties"]);
   expect(stack.supply).toEqual([100]);
   expect(stack.totalDemand).toEqual([100]);
   expect(stack.loadStack).toEqual([[70], [90], [100]]);
