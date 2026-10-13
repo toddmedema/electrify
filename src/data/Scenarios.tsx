@@ -1290,7 +1290,7 @@ export const SCENARIOS: ScenarioType[] = [
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
       threat:
-        "Heating demand surges while frozen equipment cuts power and gas supplies. In January 2020, choose whether to fund winterization or keep the money for construction.",
+        "Heating demand surges as equipment freezes. In January 2020, fund winterization or keep cash for construction.",
     },
     ownership: "Public",
     seed: 268107,

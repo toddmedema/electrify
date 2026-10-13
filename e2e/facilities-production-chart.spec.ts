@@ -82,7 +82,9 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Weather-driven", { exact: true }),
     ).toBeVisible();
-    await expect(chart.getByText("On-demand", { exact: true })).toBeVisible();
+    await expect(
+      chart.getByText("Dispatchable", { exact: true }),
+    ).toBeVisible();
     await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
     await expect(chart.locator(".chartLegendItem").first()).toHaveText(
       "Demand",
@@ -229,7 +231,9 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Weather-driven", { exact: true }),
     ).toBeVisible();
-    await expect(chart.getByText("On-demand", { exact: true })).toBeVisible();
+    await expect(
+      chart.getByText("Dispatchable", { exact: true }),
+    ).toBeVisible();
     await expect(chart.getByText("Sun", { exact: true })).toHaveCount(0);
     await expect(chart.getByText("Wind", { exact: true })).toHaveCount(0);
     await expect(chart.getByRole("img")).toHaveAccessibleName(

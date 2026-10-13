@@ -85,7 +85,7 @@ const SUPPLY_WIDTH = 1.5;
 const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
-type SupplySource = "Weather-driven" | "On-demand" | "Storage" | "Interties";
+type SupplySource = "Weather-driven" | "Dispatchable" | "Storage" | "Interties";
 
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   if (source === "Storage") return "hatch";
@@ -95,7 +95,7 @@ function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
 
 function sourceColor(source: SupplySource): string {
   if (source === "Weather-driven") return chartPalette().weatherDriven;
-  if (source === "On-demand") return chartPalette().onDemand;
+  if (source === "Dispatchable") return chartPalette().onDemand;
   return chartPalette().intertie;
 }
 
@@ -137,7 +137,7 @@ export function supplyDemandStack(
   const bySource: number[][] = [];
   const stacked: number[][] = [];
   const cumulative = timeline.map(() => 0);
-  (["Weather-driven", "On-demand"] as const).forEach((source, i) => {
+  (["Weather-driven", "Dispatchable"] as const).forEach((source, i) => {
     if (!grouped[i].some((value) => value > 0)) return;
     sources.push(source);
     bySource.push(grouped[i]);
@@ -190,7 +190,7 @@ function sourceFill(
 ): uPlot.Series["fill"] {
   const palette = chartPalette();
   if (source === "Weather-driven") return palette.weatherDrivenFill;
-  if (source === "On-demand") return palette.onDemandFill;
+  if (source === "Dispatchable") return palette.onDemandFill;
   const kind = sourcePattern(source);
   let pattern: CanvasPattern | null = null;
   return (u) => {
@@ -402,7 +402,9 @@ export function formatProductionTooltip(
     time,
     `Total supply: ${formatWatts(state.supply[idx])}`,
     ...state.sources
-      .filter((source) => source === "Weather-driven" || source === "On-demand")
+      .filter(
+        (source) => source === "Weather-driven" || source === "Dispatchable",
+      )
       .map(
         (source) =>
           `${source}: ${formatWatts(state.bySource[state.sources.indexOf(source)][idx])}`,
@@ -623,7 +625,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         />
       )}
       <UPlotChart<State>
-        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and On-demand. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveDetails
         formatSummaryValue={formatWatts}
         height={height}

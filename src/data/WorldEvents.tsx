@@ -243,7 +243,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
           balance.boomGasMultiplier * balance.freezeSurcharge;
         return {
           title: "Winter freeze",
-          message: `The freeze has pushed gas prices ${Math.round(Math.abs(effectiveMultiplier - 1) * 100)}% ${effectiveMultiplier >= 1 ? "above" : "below"} normal and cut gas plants to ${Math.round(balance.freezeGasOutput * 100)}% output.`,
+          message: `Gas prices are ${Math.round(Math.abs(effectiveMultiplier - 1) * 100)}% ${effectiveMultiplier >= 1 ? "above" : "below"} normal; gas output is down to ${Math.round(balance.freezeGasOutput * 100)}%.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -284,8 +284,8 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
         return {
           title: "Gas boom ends",
           message: resilient
-            ? `Gas prices return to normal after gas supplied ${percent(gasShare)} of power last year, while your diverse grid stayed reliable and met ${percent(reliability)} of demand.`
-            : `Gas prices return to normal after gas supplied ${percent(gasShare)} of power last year, exposing its dependence on gas as the grid met ${percent(reliability)} of demand.`,
+            ? `Gas prices return to normal. Gas supplied ${percent(gasShare)} of last year's power; your grid stayed reliable.`
+            : `Gas prices return to normal. Gas supplied ${percent(gasShare)} of last year's power; the grid met ${percent(reliability)} of demand.`,
           concept: "fuel",
           kind: "WORLD_EVENT",
           importance: "ROUTINE",
@@ -470,7 +470,7 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
         const feePerTon = CARBON_FEE_BALANCE[difficulty];
         return {
           title: "Higher pollution fee announced",
-          message: `The pollution fee rises to $${feePerTon} per ton in January 2024, with coal facing the biggest cost increase.`,
+          message: `The pollution fee rises to $${feePerTon} per ton in January 2024. Coal faces the biggest increase.`,
           concept: "goal",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -491,7 +491,7 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
         const feePerTon = CARBON_FEE_BALANCE[difficulty];
         return {
           title: "Higher pollution fee begins",
-          message: `Polluting plants now pay $${feePerTon} per ton through the end of the mission, making coal and gas power more expensive to run.`,
+          message: `The pollution fee is now $${feePerTon} per ton, raising coal and gas running costs.`,
           concept: "goal",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -550,7 +550,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Fuel delivery warning",
-        message: `A late fuel shipment could raise oil prices ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% this fall, so prepare local generation or stored energy before September.`,
+        message: `Oil prices may rise ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% this fall. Prepare local generation or storage before September.`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -621,8 +621,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
           title: "Island power check-in",
           message:
             reliability >= 0.999 && shippedShare < 0.5
-              ? `Local sources supplied most power last year while the island met ${percent(reliability)} of demand.`
-              : `Shipped fuels supplied ${percent(shippedShare)} of power last year while the island met ${percent(reliability)} of demand, showing continued fuel dependence or reliability problems.`,
+              ? `Local sources supplied most of last year's power. The island met ${percent(reliability)} of demand.`
+              : `Shipped fuels supplied ${percent(shippedShare)} of last year's power. The island met ${percent(reliability)} of demand.`,
           concept: "goal",
           kind: "WORLD_EVENT",
           importance: "ROUTINE",
@@ -667,7 +667,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
           title: "Discounted gas plants",
-          message: `New gas plants cost ${percent(balance.bridgeGasBuildCost)} of their normal price through the end of the mission, while projects already being built keep their original price.`,
+          message: `New gas projects cost ${Math.round((1 - balance.bridgeGasBuildCost) * 100)}% less through mission end. Existing projects keep their price.`,
           concept: "build",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -691,7 +691,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
           title: "Cheaper solar and wind forecast",
-          message: `Solar and wind prices will fall in January 2009 to ${percent(balance.solarBuildCost)} and ${percent(balance.windBuildCost)} of today's cost, while projects already being built keep their original price.`,
+          message: `From January 2009, new solar projects will cost ${Math.round((1 - balance.solarBuildCost) * 100)}% less and wind ${Math.round((1 - balance.windBuildCost) * 100)}% less. Existing projects keep their price.`,
           concept: "build",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -712,7 +712,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
           title: "Solar and wind prices fall",
-          message: `New solar plants cost ${Math.round((1 - balance.solarBuildCost) * 100)}% less and new wind farms cost ${Math.round((1 - balance.windBuildCost) * 100)}% less through mission end, with discounts applying only to new projects.`,
+          message: `New solar projects cost ${Math.round((1 - balance.solarBuildCost) * 100)}% less and wind ${Math.round((1 - balance.windBuildCost) * 100)}% less through mission end.`,
           concept: "build",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -794,8 +794,8 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
           title: "Clean-power check-in",
           message:
             reliability >= 0.999 && coverage >= 0.75
-              ? `Wind and solar supplied ${percent(variableShare)} of power last year while backup kept the grid meeting ${percent(reliability)} of demand.`
-              : `Wind and solar supplied ${percent(variableShare)} of power last year while the grid met ${percent(reliability)} of demand, but backup still trails peak needs.`,
+              ? `Wind and solar supplied ${percent(variableShare)} of last year's power; the grid met ${percent(reliability)} of demand.`
+              : `Wind and solar supplied ${percent(variableShare)} of last year's power; the grid met ${percent(reliability)} of demand. Backup still trails peak needs.`,
           concept: "goal",
           kind: "WORLD_EVENT",
           importance: "ROUTINE",
@@ -822,7 +822,7 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
         const balance = HURRICANE_BALANCE[difficulty];
         return {
           title: "2008 hurricane outlook",
-          message: `Forecasters expect a ${balance.severity.toLowerCase()} hurricane in 2008 that may cut output at several plants for ${balance.durationMonths} months and raise oil prices ${Math.round((balance.oilMultiplier - 1) * 100)}%, so add backup power and storage. ${buildLeadTimeHint(difficulty)}`,
+          message: `A ${balance.severity.toLowerCase()} hurricane in 2008 may cut plant output for ${balance.durationMonths} months and raise oil prices. Add backup power. ${buildLeadTimeHint(difficulty)}`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -877,8 +877,8 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
           title: `${balance.severity} hurricane hits`,
           message:
             selectedNames.length > 0
-              ? `${selectedNames.join(", ")} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} of normal maximum output until repairs finish while oil prices rise ${Math.round((balance.oilMultiplier - 1) * 100)}%, though storage remains available.`
-              : `No plant is operating and oil prices rise ${Math.round((balance.oilMultiplier - 1) * 100)}%, though storage remains available.`,
+              ? `${selectedNames.join(", ")}: output is down to ${percent(balance.outputMultiplier)} for ${balance.durationMonths} months. Oil prices rise ${Math.round((balance.oilMultiplier - 1) * 100)}%.`
+              : `Oil prices rise ${Math.round((balance.oilMultiplier - 1) * 100)}% for ${balance.durationMonths} months. No operating plants were damaged.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -927,7 +927,7 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
           []) as string[];
         return {
           title: "Storm repairs complete",
-          message: `${selectedNames.length ? `${selectedNames.join(", ")} ${selectedNames.length === 1 ? "is" : "are"}` : "Plant output is"} restored, oil prices are back to normal, and the grid met ${percent(reliability)} of demand during the storm.`,
+          message: `${selectedNames.length ? `${selectedNames.join(", ")}: output` : "Plant output"} and oil prices return to normal. The grid met ${percent(reliability)} of demand during the storm.`,
           concept: "supply",
           kind: "WORLD_EVENT",
           importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
@@ -954,7 +954,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
         );
         return {
           title: "Aging coal warning",
-          message: `${selected.length} coal ${selected.length === 1 ? "plant will" : "plants will"} be at least 30 years old by January 1986, cutting their output to ${percent(END_OF_ERA_BALANCE[difficulty].oldCoalOutput)} for two years.`,
+          message: `From January 1986, ${selected.length} aging coal ${selected.length === 1 ? "plant will" : "plants will"} drop to ${percent(END_OF_ERA_BALANCE[difficulty].oldCoalOutput)} output for two years.`,
           concept: "generator",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -984,7 +984,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
         );
         return {
           title: "Aging coal slowdown",
-          message: `${selected.length} aging coal ${selected.length === 1 ? "plant is" : "plants are"} limited to ${percent(outputMultiplier)} of normal maximum output through December 1987.`,
+          message: `${selected.length} aging coal ${selected.length === 1 ? "plant is" : "plants are"} down to ${percent(outputMultiplier)} output through December 1987.`,
           concept: "generator",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1010,7 +1010,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "New coal rules announced",
-        message: `Operating costs for old and new coal plants will rise ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
+        message: `Coal running costs will rise ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1045,7 +1045,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
         const { coalOM, complianceCoalOutput } = END_OF_ERA_BALANCE[difficulty];
         return {
           title: "New coal rules begin",
-          message: `Coal costs ${Math.round((coalOM - 1) * 100)}% more to run and can produce only ${percent(complianceCoalOutput)} of normal output.`,
+          message: `Coal running costs rise ${Math.round((coalOM - 1) * 100)}%; output is limited to ${percent(complianceCoalOutput)}.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1095,8 +1095,8 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
           title: "New-grid check-in",
           message:
             reliability >= 0.999 && snapshot.netIncome12m > 0 && coalShare < 0.5
-              ? `Coal supplied ${percent(coalShare)} of power last year while the grid met ${percent(reliability)} of demand at a profit, showing a successful transition.`
-              : `Coal supplied ${percent(coalShare)} of power last year while the grid met ${percent(reliability)} of demand at a ${snapshot.netIncome12m >= 0 ? "profit" : "loss"}, leaving the transition short of its goals.`,
+              ? `Coal supplied ${percent(coalShare)} of last year's power. Your grid stayed reliable and profitable.`
+              : `Coal supplied ${percent(coalShare)} of last year's power. The grid met ${percent(reliability)} of demand at a ${snapshot.netIncome12m >= 0 ? "profit" : "loss"}.`,
           concept: "goal",
           kind: "WORLD_EVENT",
           importance: "ROUTINE",
@@ -1181,7 +1181,7 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
         const demandMultiplier = TEXAS_DEEP_FREEZE_DEMAND[difficulty];
         return {
           title: "The deep freeze",
-          message: `${winterized ? "Your funded winterization halves plant output losses. " : "Without funded winterization, the full plant output losses apply. "}Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
+          message: `Cold strains power supplies across Texas: demand is up ${Math.round((demandMultiplier - 1) * 100)}%, plant output falls and gas prices spike.${winterized ? " Your funded winterization halves output losses." : ""}`,
           concept: "blackout",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1215,16 +1215,16 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
         const event = periodSnapshots?.[1];
         const unservedWh = event?.unservedWh || 0;
         const preparation = deepFreezeWinterized(occurrences)
-          ? "Your funded winterization halved plant output losses. "
-          : "Your construction budget was preserved, with full plant output losses. ";
+          ? "Winterization halved output losses. "
+          : "";
         return {
           title: "The thaw",
           message:
             event === undefined
-              ? "The freeze ends next month, restoring normal plant output and gas prices."
+              ? "The freeze ends next month. Plant output and gas prices return to normal."
               : unservedWh > 0
-                ? `${preparation}The freeze has ended, leaving the grid with a difficult recovery after blackouts.`
-                : `${preparation}The freeze has ended, and your preparations kept every customer supplied.`,
+                ? `${preparation}The freeze ends. Recovery follows blackouts.`
+                : `${preparation}The freeze ends with every customer supplied.`,
           concept: "weather",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1290,7 +1290,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "A hot, dry summer ahead",
-        message: `Forecasters expect June–August 2026 heat to raise demand while drought limits hydro and nuclear output. Add heat-ready generation and storage. ${buildLeadTimeHint(difficulty)}`,
+        message: `June–August 2026 heat will raise demand while drought cuts hydro and nuclear output. Build generation and storage. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1327,7 +1327,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
               : index === 1
                 ? "Rivers keep falling"
                 : "Peak heat and drought",
-          message: `Demand is ${Math.round((demandMultiplier - 1) * 100)}% above normal as hydro inflows fall to ${Math.round(hydroRunoffMultiplier * 100)}%, limiting hydro output to ${Math.round(hydroOutputMultiplier * 100)}% and nuclear output to ${Math.round(nuclearOutputMultiplier * 100)}% of normal.`,
+          message: `Demand is up ${Math.round((demandMultiplier - 1) * 100)}%. Hydro output is down to ${Math.round(hydroOutputMultiplier * 100)}%; nuclear to ${Math.round(nuclearOutputMultiplier * 100)}%.`,
           concept: "weather" as const,
           kind: "WORLD_EVENT" as const,
           importance:
@@ -1446,7 +1446,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "After a dry fall, extreme Santa Ana winds are forecast for January. Fund inspections, backup equipment and response crews, or keep cash. Choose to resume the game.",
+          "Extreme Santa Ana winds are forecast for January. Fund preparedness or keep cash; choose to resume.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "CRITICAL",
@@ -1504,10 +1504,10 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
         const selectedNames = selected.map((facility) => facility.name);
         const affectedFacilities = selectedNames.length
           ? selectedNames.join(", ")
-          : "No operating generators";
+          : "No operating generators are affected";
         return {
           title: "Wildfire emergency",
-          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${balance.restorationCostPerMonth / 1000000}M per month through February.`,
+          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer demand is disconnected. ${affectedFacilities}${selectedNames.length ? `: output is down to ${percent(balance.outputMultiplier)}` : ""}. Repairs cost $${balance.restorationCostPerMonth / 1000000}M/month through February.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1548,7 +1548,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
           []) as string[];
         return {
           title: "Wildfire restoration complete",
-          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved physical disconnections and generator output losses during the emergency. " : "The standard response preserved your preparedness budget. "}Safety shutoffs are lifted, ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal, and the grid met ${percent(reliability)} of connected demand during the emergency.`,
+          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved disconnections and output losses. " : ""}Safety shutoffs end and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal. The grid met ${percent(reliability)} of connected demand.`,
           concept: "supply",
           kind: "WORLD_EVENT",
           importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
@@ -1572,7 +1572,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Backup-power review",
-        message: `The regulator warns of a possible reactor shutdown between July 2026 and January 2027. Can backup replace your largest generator? ${buildLeadTimeHint(difficulty)}`,
+        message: `Your largest reactor may shut down between July 2026 and January 2027. Build backup power. ${buildLeadTimeHint(difficulty)}`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1672,7 +1672,7 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "The maintenance backlog is growing",
         message:
-          "Coal breakdowns and missed maintenance are rising. Expect less output each year; build replacement capacity before shortages begin.",
+          "Coal output will fall each year. Build replacement capacity before shortages begin.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1692,8 +1692,8 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
         ][index],
         message:
           index === 0
-            ? "Coal output will decrease as running costs and diesel prices rise."
-            : "Coal output will decrease further; running costs and diesel prices will rise again.",
+            ? "Coal output will decrease."
+            : "Coal output will decrease further.",
       }),
       describe: ({ difficulty }: StoryContextType) => {
         const balance = LOAD_SHEDDING_BALANCE[difficulty];
@@ -1707,7 +1707,7 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
             "The fleet is running on borrowed time",
             "Availability at its lowest",
           ][index],
-          message: `Coal output is down to ${Math.round(output * 100)}% of nominal for the year, coal running costs are ${Math.round((operating - 1) * 100)}% higher, and diesel for the peakers costs ${Math.round((diesel - 1) * 100)}% more than normal.`,
+          message: `Coal output is down to ${Math.round(output * 100)}%.`,
           concept: "fuel" as const,
           kind: "WORLD_EVENT" as const,
           importance: index >= 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
@@ -1772,7 +1772,7 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "A weak rainy season is forecast",
         message:
-          "El Nino is forecast to reduce Zambezi rainfall and reservoir inflow through 2015 and 2016. Nearly all your generation depends on this water.",
+          "El Niño may reduce reservoir inflow in 2015–2016. Nearly all your power depends on this water.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1813,8 +1813,8 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
           ][index],
           message:
             index === 3
-              ? `A better season lifts inflow back to ${Math.round(runoff * 100)}% of normal, and the machines recover to ${Math.round(output * 100)}% as the lake refills.`
-              : `Inflow is ${Math.round(runoff * 100)}% of normal and the falling head limits hydro output to ${Math.round(output * 100)}% of nominal.`,
+              ? `Hydro output recovers to ${Math.round(output * 100)}%; inflow rises to ${Math.round(runoff * 100)}%.`
+              : `Hydro output is down to ${Math.round(output * 100)}%; inflow is at ${Math.round(runoff * 100)}%.`,
           concept: "weather" as const,
           kind: "WORLD_EVENT" as const,
           importance:
@@ -1919,7 +1919,7 @@ const DELHI_SUMMER_ARC: StoryArcDefinitionType = {
             "2023 sets a new peak",
             "The record summer",
           ][index],
-          message: `Demand runs ${Math.round((demand - 1) * 100)}% above normal while heat holds coal and gas output to ${Math.round(thermal * 100)}% of nominal.${index === 3 ? " This is the summer the city sets its all-time peak." : ""}`,
+          message: `Demand is up ${Math.round((demand - 1) * 100)}%; coal and gas output is down to ${Math.round(thermal * 100)}%.`,
           concept: "weather" as const,
           kind: "WORLD_EVENT" as const,
           importance:
