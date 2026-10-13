@@ -106,7 +106,9 @@ for (const theme of ["light", "dark"]) {
       page.getByRole("button", { name: "Events", exact: true }),
     );
     await fast.click();
-    await expect(page.getByText("Through Feb 2025")).toBeVisible({
+    await expect(
+      page.getByText("Through Feb 2025", { exact: true }),
+    ).toBeVisible({
       timeout: 15000,
     });
     await expect(
