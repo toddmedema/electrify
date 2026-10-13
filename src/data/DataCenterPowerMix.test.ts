@@ -1,5 +1,6 @@
 import { LOCATIONS } from "../Constants";
 import { LocationType } from "../Types";
+import snapshot from "./DataCenterPowerCapacity.json";
 import { getDataCenterPowerMix } from "./DataCenterPowerMix";
 
 test("California uses actual state capacity including distributed solar", () => {
@@ -57,6 +58,23 @@ test("possible overlap with Other Renewables never double-counts geothermal", ()
   expect(
     getDataCenterPowerMix(LOCATIONS.SF).reconciledGeothermal,
   ).toBeUndefined();
+});
+
+test.each([
+  ["Papua New Guinea", 51],
+  ["Taiwan", 7],
+])("retains IRENA geothermal capacity for %s", (country, megawatts) => {
+  const mix = getDataCenterPowerMix({ ...LOCATIONS.SF, country }, 2024);
+  const geothermalShare = mix.shares.Geothermal!;
+
+  expect(
+    (snapshot.countries as Record<string, Record<string, number[]>>)[country][
+      "2024"
+    ][8],
+  ).toBe(megawatts);
+  expect(mix.scope).toBe("country");
+  expect(geothermalShare).toBeGreaterThan(0);
+  expect(mix.geothermalSourceUrl).toContain("2025");
 });
 
 test("all bundled countries have nonempty normalized observations with explicit scope", () => {

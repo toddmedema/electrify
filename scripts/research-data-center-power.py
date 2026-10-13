@@ -18,7 +18,7 @@ CACHE.mkdir(exist_ok=True)
 EMBER = "https://files.ember-energy.org/public-downloads/yearly_full_release_long_format.csv"
 EIA = "https://www.eia.gov/electricity/state/xls/SEP%20Tables%20for%20{}.xlsx"
 FUELS = ["Coal", "Natural Gas", "Oil", "Uranium", "Hydro", "Sun", "Wind", "Biomass", "Geothermal", "Unmapped"]
-ALIASES = {"United States": "United States of America", "Ivory Coast": "Cote d'Ivoire", "DR Congo": "Congo (the Democratic Republic of the)", "Bahamas": "Bahamas (the)", "Dominican Republic": "Dominican Republic (the)", "Iran": "Iran (Islamic Republic of)", "Niger": "Niger (the)", "Russia": "Russian Federation (the)", "Sudan": "Sudan (the)", "Syria": "Syrian Arab Republic (the)", "Tanzania": "Tanzania, the United Republic of", "Venezuela": "Venezuela (Bolivarian Republic of)"}
+ALIASES = {"United States": "United States of America", "Ivory Coast": "Cote d'Ivoire", "DR Congo": "Congo (the Democratic Republic of the)", "Bahamas": "Bahamas (the)", "Brunei": "Brunei Darussalam", "Dominican Republic": "Dominican Republic (the)", "Iran": "Iran (Islamic Republic of)", "Laos": "Lao People's Democratic Republic (the)", "Niger": "Niger (the)", "Philippines": "Philippines (the)", "Russia": "Russian Federation (the)", "Sudan": "Sudan (the)", "Syria": "Syrian Arab Republic (the)", "Tanzania": "Tanzania, the United Republic of", "Venezuela": "Venezuela (Bolivarian Republic of)", "Vietnam": "Viet Nam"}
 
 
 def download(url, name):
@@ -48,7 +48,13 @@ IRENA_RELEASES = [
     (2020, 55, "https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2020/Mar/IRENA_RE_Capacity_Statistics_2020.pdf"),
     (2025, 56, "https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2025/Mar/IRENA_DAT_RE_Capacity_Statistics_2025.pdf"),
 ]
-irena_names = {"Russian Fed": "Russia", "Türkiye": "Turkey", "USA": "United States"}
+irena_names = {
+    "Chinese Taipei": "Taiwan",
+    "Papua N Guin": "Papua New Guinea",
+    "Russian Fed": "Russia",
+    "Türkiye": "Turkey",
+    "USA": "United States",
+}
 for release, page_index, url in IRENA_RELEASES:
     with pdfplumber.open(download(url, f"irena{release}.pdf")) as pdf:
         page = pdf.pages[page_index]
