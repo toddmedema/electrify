@@ -135,12 +135,17 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   // The popup sits 16 px above the phone tab bar when that's on screen, else 16 px from the
   // bottom. The tutorial hides the tab bar here, so it must not float above an empty gap.
   const nav = page.locator("#navfooter:visible");
-  const navTop = (await nav.count())
-    ? (await nav.boundingBox())!.y
-    : viewport.height;
-  const gap = navTop - (bounds.y + bounds.height);
-  expect(gap).toBeGreaterThanOrEqual(8);
-  expect(gap).toBeLessThanOrEqual(24);
+  const gap = async () => {
+    const navTop = (await nav.count())
+      ? (await nav.boundingBox())!.y
+      : viewport.height;
+    const popupBounds = (await popup.boundingBox())!;
+    return navTop - (popupBounds.y + popupBounds.height);
+  };
+  // The next mission changes the chrome after the dialog closes. Wait for its measured
+  // clearance and the popup's entrance transition, rather than sampling an intermediate frame.
+  await expect.poll(gap).toBeGreaterThanOrEqual(8);
+  await expect.poll(gap).toBeLessThanOrEqual(24);
   const close = popup.getByRole("button", { name: /Dismiss First Spark/ });
   expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await screenshot(page, info, "popup");
