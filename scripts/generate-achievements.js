@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const catalog = require("../src/desktop/AchievementCatalog.json");
+const catalog = require("../src/achievements/AchievementCatalog.json");
 
 async function generateAchievements(root = path.resolve(__dirname, "..")) {
   const source =
@@ -18,6 +18,53 @@ async function generateAchievements(root = path.resolve(__dirname, "..")) {
       STATS.map(({ name }) => `${name},INT,0,0,1,true,Client`).join("\n") +
       "\n",
   );
+  const list = (entries) =>
+    "[\n" +
+    entries.map((entry) => "            " + JSON.stringify(entry)).join(",\n") +
+    "\n          ]";
+  const tutorialIds = [0, 1, 2, 4, 3, 5, 112];
+  const officialIds = catalog
+    .filter((entry) => entry.scenarioId >= 100)
+    .map((entry) => entry.scenarioId);
+  const wins = officialIds.flatMap((id) =>
+    ["Intern", "Employee", "Manager", "VP", "CEO"].map(
+      (difficulty) => `${id}:${difficulty}`,
+    ),
+  );
+  const block = `// BEGIN GENERATED ACHIEVEMENT RULES
+      // Private, grow-only account history; generated from the shared catalog.
+      match /achievementProgress/{progressId} {
+        function validAchievements(data) {
+          return progressId == 'current'
+            && data.keys().hasAll(['version', 'earned', 'tutorials', 'wins'])
+            && data.keys().hasOnly(['version', 'earned', 'tutorials', 'wins'])
+            && data.version == 1
+            && data.earned is list && data.earned.size() <= ${catalog.length}
+            && data.earned.toSet().size() == data.earned.size()
+            && data.earned.hasOnly(${list(catalog.map(({ id }) => id))})
+            && data.tutorials is list && data.tutorials.size() <= ${tutorialIds.length}
+            && data.tutorials.toSet().size() == data.tutorials.size()
+            && data.tutorials.hasOnly(${JSON.stringify(tutorialIds)})
+            && data.wins is list && data.wins.size() <= ${wins.length}
+            && data.wins.toSet().size() == data.wins.size()
+            && data.wins.hasOnly(${list(wins)});
+        }
+        allow get: if isOwner(uid);
+        allow list, delete: if false;
+        allow create: if isOwner(uid) && validAchievements(request.resource.data);
+        allow update: if isOwner(uid) && validAchievements(request.resource.data)
+          && request.resource.data.earned.hasAll(resource.data.earned)
+          && request.resource.data.tutorials.hasAll(resource.data.tutorials)
+          && request.resource.data.wins.hasAll(resource.data.wins);
+      }
+      // END GENERATED ACHIEVEMENT RULES`;
+  const rulesPath = path.join(root, "firebase/firestore.rules");
+  const rules = fs.readFileSync(rulesPath, "utf8");
+  const region =
+    /\/\/ BEGIN GENERATED ACHIEVEMENT RULES[\s\S]*?\/\/ END GENERATED ACHIEVEMENT RULES/;
+  if (!region.test(rules))
+    throw new Error("Achievement rule markers are missing");
+  fs.writeFileSync(rulesPath, rules.replace(region, block));
 }
 if (require.main === module) void generateAchievements();
 module.exports = { generateAchievements };

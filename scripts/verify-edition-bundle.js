@@ -22,11 +22,14 @@ function verifyEditionBundle(root = "build", edition = "web") {
   const hasElectronChunk = scripts.some((name) =>
     /(?:^|\/)electron\.[^/]+\.chunk\.js$/.test(name),
   );
-  if (edition === "web" && (includesAchievements || hasElectronChunk))
-    throw new Error("Electron achievement code leaked into the web build");
-  if (edition === "desktop" && (!includesAchievements || !hasElectronChunk))
+  const hasSteamBridge = contents.includes("submitAchievements");
+  if (!includesAchievements)
+    throw new Error("The shared achievement catalog is missing");
+  if (edition === "web" && (hasSteamBridge || hasElectronChunk))
+    throw new Error("Electron Steam code leaked into the web build");
+  if (edition === "desktop" && (!hasSteamBridge || !hasElectronChunk))
     throw new Error(
-      "The Electron service chunk or achievement catalog is missing",
+      "The Electron service chunk or Steam achievement bridge is missing",
     );
   console.error(
     `${edition} bundle isolation verified (${scripts.length} scripts).`,

@@ -31,6 +31,7 @@ import {
   UpcomingStoryEventType,
 } from "../views/StoryEventSelectors";
 import { getDesktop, isDesktopApp } from "../../Desktop";
+import { useDesktopState } from "../../DesktopState";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -59,6 +60,7 @@ export interface DispatchProps {
   onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
   onSettings: () => void;
+  onAchievements?: () => void;
   onSavedGames?: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
@@ -131,6 +133,7 @@ export function getGridHealth(
 }
 
 export function GameAppBar(props: Props) {
+  const steamAvailable = useDesktopState()?.steam.available;
   const {
     evidenceRequest,
     facilityDragActive,
@@ -210,6 +213,7 @@ export function GameAppBar(props: Props) {
         <IconButton
           data-settings-trigger
           data-saves-trigger
+          data-achievements-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label={online ? "menu" : "menu, offline"}
@@ -236,6 +240,9 @@ export function GameAppBar(props: Props) {
           )}
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Settings</MenuItem>
+          {!steamAvailable && (
+            <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
+          )}
           <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
@@ -274,6 +281,8 @@ export function GameAppBar(props: Props) {
       onManual,
       onSettings,
       props.onSavedGames,
+      props.onAchievements,
+      steamAvailable,
       onNextTutorial,
       handleQuit,
       nextTutorial,
@@ -447,6 +456,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
+    },
+    onAchievements: () => {
+      dispatch(navigate("ACHIEVEMENTS"));
     },
     onSavedGames: () => {
       dispatch(navigate("SAVED_GAMES"));

@@ -659,17 +659,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
   });
-  if (process.env.REACT_APP_DESKTOP === "true") {
-    if (
-      normalized.desktopAchievements !== undefined &&
-      !require("./desktop/SimulationHooks")
-        .desktopSimulationHooks()
-        ?.validate(normalized.desktopAchievements)
-    )
-      return null;
-  } else {
-    delete normalized.desktopAchievements;
-  }
+  if (
+    normalized.desktopAchievements !== undefined &&
+    !require("./achievements/SimulationHooks")
+      .desktopSimulationHooks()
+      ?.validate(normalized.desktopAchievements)
+  )
+    return null;
   if (
     normalized.runIdentity &&
     (!validRunIdentity(normalized.runIdentity) ||

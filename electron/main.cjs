@@ -295,6 +295,7 @@ handle("desktop:friends", () => {
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
+handle("desktop:readAchievements", () => steam.readAchievements());
 ipcMain.on("desktop:ready-to-quit", (event, success) => {
   if (
     !trustedSender(event, window) ||

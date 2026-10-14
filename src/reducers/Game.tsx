@@ -1,5 +1,5 @@
 import { customEventContext } from "../helpers/CustomScenarioEvents";
-import { desktopSimulationHooks } from "../desktop/SimulationHooks";
+import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
   gasConversionQuote,
   completeGasConversion,
@@ -367,6 +367,7 @@ let speedBeforeCloudSavePrompt: SpeedType | undefined;
 let speedBeforeHidden: SpeedType | undefined;
 const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
+  "ACHIEVEMENTS",
   "SAVED_GAMES",
   "MANUAL",
   "BUILD_GENERATORS",
@@ -1127,8 +1128,7 @@ function completeRetrofits(state: GameType, simulated = false) {
     if (!upgrade || state.date.minute < upgrade.completesMinute) return;
     if (upgrade.upgrade === "combinedCycle") {
       completeGasConversion(facility, state);
-      if (process.env.REACT_APP_DESKTOP === "true" && !simulated)
-        desktopSimulationHooks()?.converted(state, facility.id);
+      if (!simulated) desktopSimulationHooks()?.converted(state, facility.id);
     } else
       facility.resilience = retrofittedResilience(
         facility,
@@ -1609,8 +1609,7 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
-      if (process.env.REACT_APP_DESKTOP === "true")
-        delete state.desktopAchievements;
+      delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
       delete state.tutorialIntertieStress;
       delete state.policies;
@@ -1823,8 +1822,7 @@ export const gameSlice = createSlice({
         ...state.facilities.filter((facility) => !weatherDriven(facility)),
       ];
 
-      if (process.env.REACT_APP_DESKTOP === "true")
-        desktopSimulationHooks()?.initialize(state);
+      desktopSimulationHooks()?.initialize(state);
       // The first blank timeline is created before the authored fleet is resolved. Hydrology is
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.
@@ -2013,8 +2011,7 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(start, (state, action) => {
-      if (process.env.REACT_APP_DESKTOP === "true")
-        delete state.desktopAchievements;
+      delete state.desktopAchievements;
       state.runIdentity = undefined;
       state.challenge = undefined;
       state.scenarioId = action.payload;
@@ -2022,10 +2019,9 @@ export const gameSlice = createSlice({
       // that true by construction rather than by whichever paths happen to lead here
       state.timeline = [];
     });
-    if (process.env.REACT_APP_DESKTOP === "true")
-      builder.addCase("game/completeTutorial", (state) => {
-        desktopSimulationHooks()?.tutorial(state);
-      });
+    builder.addCase("game/completeTutorial", (state) => {
+      desktopSimulationHooks()?.tutorial(state);
+    });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
       // cloneDeep drops the non-enumerable commitment forecast parseSave reattached
@@ -2045,10 +2041,7 @@ export const gameSlice = createSlice({
       restored.inGame = false;
       // Nothing ever autosaves a replay, so anything here came out of a hand-edited save
       restored.replayPlayback = undefined;
-      if (
-        process.env.REACT_APP_DESKTOP === "true" &&
-        !restored.desktopAchievements
-      )
+      if (!restored.desktopAchievements)
         desktopSimulationHooks()?.initialize(restored);
       // tickLoopRunning is deliberately left alone: any loop still alive clears the flag and stops
       // on its next tick, since tick() bails while !inGame or PAUSED
@@ -3326,8 +3319,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
   );
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
-    if (process.env.REACT_APP_DESKTOP === "true")
-      desktopSimulationHooks()?.tick(state, now);
+    desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
 
     const exercise = state.tutorialIntertieStress;
@@ -3486,8 +3478,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
         endTitle?: string,
         endMessage?: string | (() => string),
       ) => {
-        if (process.env.REACT_APP_DESKTOP === "true")
-          desktopSimulationHooks()?.finish(state, outcome);
+        desktopSimulationHooks()?.finish(state, outcome);
         const score: ScoreBreakdownType = computeScoreBreakdown(
           scenario,
           summary,
@@ -3645,11 +3636,10 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
                 } as const)
               : undefined;
 
-      if (process.env.REACT_APP_DESKTOP === "true")
-        desktopSimulationHooks()?.month(
-          state,
-          !failure && state.date.monthsElapsed < termMonths,
-        );
+      desktopSimulationHooks()?.month(
+        state,
+        !failure && state.date.monthsElapsed < termMonths,
+      );
 
       if (failure) {
         const summary = summarizeHistory(history);

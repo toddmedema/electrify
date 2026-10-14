@@ -19,6 +19,7 @@ import {
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "../../Desktop";
+import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
 
 export interface StateProps {
@@ -34,6 +35,7 @@ export interface DispatchProps {
   onContinue: () => void;
   onSavedGames: () => void;
   onSettings: () => void;
+  onAchievements?: () => void;
   onManual: () => void;
   onStart: () => void;
 }
@@ -52,6 +54,7 @@ const DiscordIcon = () => (
 const MainMenu = (props: Props): React.JSX.Element => {
   const menuKeys = useMenuKeys();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
+  const steamAvailable = useDesktopState()?.steam.available;
   // The desktop game bundles no website pages, so those open in the player's browser.
   const sitePage = (path: string) =>
     desktopApp
@@ -199,6 +202,15 @@ const MainMenu = (props: Props): React.JSX.Element => {
           {desktopApp && (
             <Button variant="text" onClick={() => void getDesktop()?.quit()}>
               Quit
+            </Button>
+          )}
+          {!steamAvailable && (
+            <Button
+              data-achievements-trigger
+              variant="text"
+              onClick={props.onAchievements}
+            >
+              Achievements
             </Button>
           )}
         </Stack>

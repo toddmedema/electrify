@@ -121,8 +121,7 @@ export function changeTutorialStep(
   // minutes of watching the sim run
   recordScenarioPlayed(scenarioId);
   const scenario = getScenario(scenarioId);
-  if (process.env.REACT_APP_DESKTOP === "true")
-    dispatch({ type: "game/completeTutorial" });
+  dispatch({ type: "game/completeTutorial" });
   dispatch(
     tutorialCompleteDialog({
       title: scenario?.endTitle || "Tutorial complete!",

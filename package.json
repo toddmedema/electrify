@@ -25,6 +25,7 @@
     "uplot": "^1.6.32"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
     "@playwright/test": "^1.62.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -52,6 +53,7 @@
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\" --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=\"\\.sim\\.test\\.\"",
     "test:sim": "react-scripts test --watchAll=false --testMatch=\"**/src/**/*.sim.test.{ts,tsx}\"",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:rules": "npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-electrify-achievements \"node --test firebase/achievements.test.cjs\"",
     "sim": "node scripts/sim.js",
     "perf:bench": "node scripts/perf/bench.js",
     "perf:bundle": "node scripts/perf/bundle-size.js",

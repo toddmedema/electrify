@@ -195,6 +195,16 @@ class SteamService {
     if (!this.stopped) this.achievements?.add(intent);
   }
 
+  readAchievements() {
+    const data = this.achievements?.data;
+    return {
+      version: 1,
+      earned: [...(data?.earned ?? [])],
+      tutorials: [...(data?.tutorials ?? [])],
+      wins: [...(data?.wins ?? [])],
+    };
+  }
+
   refreshAchievements() {
     if (!this.stopped) this.achievements?.refresh();
   }

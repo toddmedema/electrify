@@ -40,6 +40,17 @@ jobs:
         if: '!cancelled()'
         run: npm run format:check
 
+      - name: Java for the Firestore emulator
+        if: '!cancelled()'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Private achievement security rules
+        if: '!cancelled()'
+        run: npm run test:rules
+
       # Jest's cache holds compiled sources and each file's last duration. Without the durations
       # it schedules the smallest files last, whatever they cost. Caches are scoped to the PR, so a
       # later push or re-run restores the previous run's.
@@ -139,7 +150,7 @@ jobs:
       # phone and desktop without running the entire responsive matrix per PR.
       - name: Browser smoke tests
         if: "!cancelled() && steps.browser.outcome == 'success'"
-        run: npm run test:e2e -- build-options.spec.ts escape-close.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts menu-keyboard.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
+        run: npm run test:e2e -- build-options.spec.ts escape-close.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts menu-keyboard.spec.ts achievements.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
 
       # Text can spill into adjacent columns without making the page horizontally scroll.
       - name: Mobile and desktop text layout

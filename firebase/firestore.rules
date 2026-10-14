@@ -48,6 +48,141 @@ service cloud.firestore {
             || isValidDisplayName(request.resource.data.displayName));
       allow delete: if false;
 
+      // BEGIN GENERATED ACHIEVEMENT RULES
+      // Private, grow-only account history; generated from the shared catalog.
+      match /achievementProgress/{progressId} {
+        function validAchievements(data) {
+          return progressId == 'current'
+            && data.keys().hasAll(['version', 'earned', 'tutorials', 'wins'])
+            && data.keys().hasOnly(['version', 'earned', 'tutorials', 'wins'])
+            && data.version == 1
+            && data.earned is list && data.earned.size() <= 35
+            && data.earned.toSet().size() == data.earned.size()
+            && data.earned.hasOnly([
+            "FIRST_SPARK",
+            "GRID_GRADUATE",
+            "STAYING_POWER",
+            "CHIEF_ELECTRICITY_OFFICER",
+            "LIGHTS_ON",
+            "FOUR_NINES",
+            "BACK_ON_THE_GRID",
+            "CLEAN_FINISH",
+            "HALF_THE_CARBON",
+            "COALS_LAST_SHIFT",
+            "HERE_COMES_THE_SUN",
+            "WINDS_OF_CHANGE",
+            "STRENGTH_IN_DIVERSITY",
+            "NIGHT_SHIFT",
+            "GRID_CONNECTED",
+            "GOOD_NEIGHBOR",
+            "WASTE_NOT",
+            "A_WATT_SAVED",
+            "POWER_TO_THE_PEOPLE",
+            "THE_PRICE_OF_CARBON",
+            "BOOM_AND_BEYOND",
+            "ISLAND_INDEPENDENCE",
+            "A_BRIGHTER_FUTURE",
+            "WEATHER_THE_STORM",
+            "THE_NEXT_ERA",
+            "AHEAD_OF_THE_BOOM",
+            "COLD_COMFORT",
+            "COOL_UNDER_PRESSURE",
+            "BACKUP_PLAN",
+            "FIREBREAK",
+            "THE_END_OF_LOAD_SHEDDING",
+            "BEYOND_THE_RIVER",
+            "BEAT_THE_HEAT",
+            "MASTER_OF_THE_GRID",
+            "OUT_OF_JUICE"
+          ])
+            && data.tutorials is list && data.tutorials.size() <= 7
+            && data.tutorials.toSet().size() == data.tutorials.size()
+            && data.tutorials.hasOnly([0,1,2,4,3,5,112])
+            && data.wins is list && data.wins.size() <= 70
+            && data.wins.toSet().size() == data.wins.size()
+            && data.wins.hasOnly([
+            "100:Intern",
+            "100:Employee",
+            "100:Manager",
+            "100:VP",
+            "100:CEO",
+            "103:Intern",
+            "103:Employee",
+            "103:Manager",
+            "103:VP",
+            "103:CEO",
+            "105:Intern",
+            "105:Employee",
+            "105:Manager",
+            "105:VP",
+            "105:CEO",
+            "101:Intern",
+            "101:Employee",
+            "101:Manager",
+            "101:VP",
+            "101:CEO",
+            "104:Intern",
+            "104:Employee",
+            "104:Manager",
+            "104:VP",
+            "104:CEO",
+            "102:Intern",
+            "102:Employee",
+            "102:Manager",
+            "102:VP",
+            "102:CEO",
+            "106:Intern",
+            "106:Employee",
+            "106:Manager",
+            "106:VP",
+            "106:CEO",
+            "107:Intern",
+            "107:Employee",
+            "107:Manager",
+            "107:VP",
+            "107:CEO",
+            "108:Intern",
+            "108:Employee",
+            "108:Manager",
+            "108:VP",
+            "108:CEO",
+            "110:Intern",
+            "110:Employee",
+            "110:Manager",
+            "110:VP",
+            "110:CEO",
+            "111:Intern",
+            "111:Employee",
+            "111:Manager",
+            "111:VP",
+            "111:CEO",
+            "113:Intern",
+            "113:Employee",
+            "113:Manager",
+            "113:VP",
+            "113:CEO",
+            "114:Intern",
+            "114:Employee",
+            "114:Manager",
+            "114:VP",
+            "114:CEO",
+            "115:Intern",
+            "115:Employee",
+            "115:Manager",
+            "115:VP",
+            "115:CEO"
+          ]);
+        }
+        allow get: if isOwner(uid);
+        allow list, delete: if false;
+        allow create: if isOwner(uid) && validAchievements(request.resource.data);
+        allow update: if isOwner(uid) && validAchievements(request.resource.data)
+          && request.resource.data.earned.hasAll(resource.data.earned)
+          && request.resource.data.tutorials.hasAll(resource.data.tutorials)
+          && request.resource.data.wins.hasAll(resource.data.wins);
+      }
+      // END GENERATED ACHIEVEMENT RULES
+
       // Backups are private, including their names, and deletions persist as tombstones.
       match /cloudSaves/{saveId} {
         allow read: if isOwner(uid);

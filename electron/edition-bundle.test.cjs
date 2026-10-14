@@ -17,15 +17,20 @@ test("edition gate inspects all lazy chunks and requires the Electron service bu
   write();
   fs.writeFileSync(path.join(root, "main.js"), "game");
   fs.writeFileSync(path.join(root, "lazy.js"), "chart");
-  verifyEditionBundle(root, "web");
+  assert.throws(() => verifyEditionBundle(root, "web"), /missing/);
   assert.throws(() => verifyEditionBundle(root, "desktop"), /missing/);
   fs.writeFileSync(path.join(root, "lazy.js"), "GRID_GRADUATE");
+  verifyEditionBundle(root, "web");
+  fs.writeFileSync(
+    path.join(root, "lazy.js"),
+    "GRID_GRADUATE submitAchievements",
+  );
   assert.throws(() => verifyEditionBundle(root, "web"), /leaked/);
   manifest.files.electron = "electron.hash.chunk.js";
   write();
   fs.writeFileSync(
     path.join(root, manifest.files.electron),
-    "NIGHT_SHIFT MASTER_OF_THE_GRID",
+    "NIGHT_SHIFT MASTER_OF_THE_GRID submitAchievements",
   );
   verifyEditionBundle(root, "desktop");
   assert.throws(() => verifyEditionBundle(root, "web"), /leaked/);

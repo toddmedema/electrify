@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld(
     submitScore: (score) => ipcRenderer.invoke("desktop:score", score),
     submitAchievements: (intent) =>
       ipcRenderer.invoke("desktop:achievements", intent),
+    readAchievements: () => ipcRenderer.invoke("desktop:readAchievements"),
     openFriends: () => ipcRenderer.invoke("desktop:friends"),
     setActivity: (activity) => ipcRenderer.invoke("desktop:activity", activity),
     addTimelineEvent: (event) =>

@@ -449,3 +449,13 @@ migration and resets, and the optional Firebase Analytics SDK loads with its fir
 event. Production gzip drops to 882.48 kB initial JS and 1393.04 kB all JS (from 1395.50 kB).
 The bundle ceilings remain unchanged. Tests cover deferred event ordering, connection loss
 during loading, offline initialization, retry after chunk/SDK failures and cross-edition saves.
+
+The follow-up web achievement feature intentionally includes the evaluator, local/account
+journal, transactional Firebase merges, gallery and popup UI in the web edition. Steam services
+continue to live in the Electron-only chunk. Production gzip moves from 882.48 to 896.88 kB for
+initial JS (+14.40 kB, 1.63%) and from 1393.04 to 1424.87 kB across all JS (+31.83 kB, 2.28%).
+The evaluator and UI have named lazy chunks; MUI controls and the Firestore transaction API also
+add shared dependencies. The bundle baseline records this deliberate feature cost, with the
+same 10% tolerance. `perf:rebaseline` reconfirms every scenario's unchanged golden output.
+Tick ratios measure 1.367 and 1.036 and pass the existing 1.632/1.315 ceilings; those ceilings
+are retained because simulation economics and headless instrumentation have not changed.

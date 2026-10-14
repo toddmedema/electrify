@@ -3,13 +3,10 @@ import { getDesktop } from "../Desktop";
 import { initializeDesktopSaves } from "../DesktopSaves";
 import { startDesktopActivity } from "../DesktopActivity";
 import { startDesktopFeedback } from "../audio/DesktopFeedback";
-import { achievementHooks } from "./Achievements";
-import { installSimulationHooks } from "./SimulationHooks";
 import { startAchievements } from "./AchievementObserver";
 
-/** One Electron-only chunk owns native services and simulation instrumentation. */
+/** One Electron-only chunk owns native Steam services and menu feedback. */
 export async function initializeDesktop(): Promise<void> {
-  installSimulationHooks(achievementHooks);
   await initializeDesktopSaves();
 }
 

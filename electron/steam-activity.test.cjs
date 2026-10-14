@@ -10,6 +10,33 @@ const {
   MAX_TIMELINE_EVENTS,
 } = require("./steam-activity.cjs");
 const { SteamService } = require("./steam.cjs");
+
+test("the renderer can read a copy of the current native achievement history without native metadata", () => {
+  const service = new SteamService();
+  assert.deepEqual(service.readAchievements(), {
+    version: 1,
+    earned: [],
+    tutorials: [],
+    wins: [],
+  });
+  service.achievements = {
+    data: {
+      earned: ["FIRST_SPARK"],
+      tutorials: [0],
+      wins: [],
+      confirmed: ["FIRST_SPARK"],
+    },
+  };
+  const record = service.readAchievements();
+  assert.deepEqual(record, {
+    version: 1,
+    earned: ["FIRST_SPARK"],
+    tutorials: [0],
+    wins: [],
+  });
+  record.earned.push("OUT_OF_JUICE");
+  assert.deepEqual(service.achievements.data.earned, ["FIRST_SPARK"]);
+});
 const { validateActivity, validateTimelineEvent } = require("./runtime.cjs");
 const {
   loadTimelineFunctions,
