@@ -42,7 +42,8 @@ test("synced accounts omit the account panel, while sync failures keep retry ava
       <AchievementGallery />
     </Provider>,
   );
-  expect(view.container.querySelector(".achievementAccount")).toBeNull();
+  expect(screen.queryByText(/Synced to your account/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Saved on this device/)).not.toBeInTheDocument();
   act(() => achievementJournal.setSync("failed"));
   expect(screen.getByRole("button", { name: "Retry sync" })).toBeVisible();
   view.unmount();
