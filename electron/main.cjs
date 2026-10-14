@@ -294,6 +294,7 @@ handle("desktop:friends", () => {
 });
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
+handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 ipcMain.on("desktop:ready-to-quit", (event, success) => {
   if (
     !trustedSender(event, window) ||
@@ -339,6 +340,7 @@ async function createWindow() {
   }
   saves = new DesktopSaveStore(app.getPath("userData"), steam);
   steam.configureScoreQueue(saves.directory);
+  steam.configureAchievements(saves.directory, config.appId);
   const player = steam.state().steamId || "offline";
   const isolatedSession = session.fromPartition(`persist:electrify-${player}`);
   isolatedSession.setPermissionRequestHandler(
@@ -514,6 +516,7 @@ async function createWindow() {
   let previousSteamState = JSON.stringify(steam.state());
   const steamTimer = setInterval(() => {
     steam.refreshActivity();
+    steam.refreshAchievements();
     const next = JSON.stringify(steam.state());
     if (next !== previousSteamState) {
       previousSteamState = next;

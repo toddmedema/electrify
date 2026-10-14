@@ -21,6 +21,7 @@ class SteamDispatcher {
     this.pipe = api.pipe();
     if (!this.pipe) throw new Error("Steam callback pipe is unavailable");
     this.pending = new Map();
+    this.listeners = new Map();
     this.requestTimeoutMs = 15000;
   }
 
@@ -35,6 +36,13 @@ class SteamDispatcher {
       }
     }, 1000 / 30);
     this.timer.unref();
+  }
+
+  onCallback(id, listener) {
+    const listeners = this.listeners.get(id) || new Set();
+    this.listeners.set(id, listeners);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   }
 
   callResult(handle, layout) {
@@ -115,6 +123,7 @@ class SteamDispatcher {
         count++
       ) {
         let overlay;
+        let notification;
         try {
           const id = message.readInt32LE(4);
           if (id === OVERLAY_CALLBACK_ID) {
@@ -124,11 +133,21 @@ class SteamDispatcher {
             overlay = payload[0] !== 0;
           } else if (id === CALL_COMPLETED_ID)
             this.complete(this.payload(message));
+          else if (this.listeners.has(id))
+            notification = { id, payload: this.payload(message) };
         } finally {
           // Copy all payloads before freeing the SDK memory, including failure paths.
           this.api.freeCallback(this.pipe);
         }
         if (overlay !== undefined) this.onOverlay(overlay);
+        if (notification)
+          for (const listener of this.listeners.get(notification.id) || []) {
+            try {
+              listener(notification.payload);
+            } catch (error) {
+              this.onError(error);
+            }
+          }
       }
     } finally {
       this.pumping = false;
@@ -145,6 +164,7 @@ class SteamDispatcher {
       pending.reject(error);
     }
     this.pending.clear();
+    this.listeners.clear();
   }
 }
 

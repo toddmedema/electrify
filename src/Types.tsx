@@ -1181,6 +1181,8 @@ export interface PolicyChangeType {
   startHour?: number;
 }
 export interface GameType {
+  /** Optional Electron telemetry, excluded from browser simulation and replay playback. */
+  desktopAchievements?: import("./desktop/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
   policies?: PoliciesType;

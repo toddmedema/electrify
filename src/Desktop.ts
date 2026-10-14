@@ -80,6 +80,10 @@ export interface DesktopBridge {
     challengeId?: string;
   }): Promise<void>;
   openFriends(): Promise<void>;
+  submitAchievements?(intent: {
+    earned: string[];
+    completion?: { scenarioId: number; difficulty: DifficultyType };
+  }): Promise<void>;
   setActivity?(activity: DesktopActivity): Promise<void>;
   addTimelineEvent?(event: DesktopTimelineEvent): Promise<void>;
 }

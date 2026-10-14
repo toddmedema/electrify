@@ -27,6 +27,15 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
+  it("upgrades schema 1 to optional desktop telemetry without inventing historical progress", () => {
+    const raw = { ...clone(legacyFile.save), schemaVersion: 1 };
+    const original = JSON.stringify(raw);
+    const upgraded = parseSave(raw)!;
+    expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(upgraded.game.desktopAchievements).toBeUndefined();
+    expect(upgraded.game.monthlyHistory).toEqual([]);
+    expect(JSON.stringify(raw)).toBe(original);
+  });
   it("upgrades the unversioned fixture and carries its run forward without touching its source", () => {
     const raw = clone(legacyFile);
     const original = JSON.stringify(raw);

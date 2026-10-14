@@ -321,8 +321,7 @@ export default function App() {
     let steamProfileUid: string | undefined;
     let unsubscribeSteam: (() => void) | undefined;
     let unsubscribeDesktopFocus: (() => void) | undefined;
-    let unsubscribePresence: (() => void) | undefined;
-    let stopDesktopFeedback: (() => void) | undefined;
+    let stopDesktopServices: (() => void) | undefined;
     if (process.env.REACT_APP_DESKTOP === "true" && desktop) {
       const updateSteam = (
         state: Awaited<ReturnType<NonNullable<typeof desktop>["getState"]>>,
@@ -373,12 +372,12 @@ export default function App() {
         desktopFocused = focused;
         onVisibilityChange();
       });
-      unsubscribePresence = require("./DesktopActivity").startDesktopActivity(
-        store,
-        desktop,
+      void import(/* webpackChunkName: "electron" */ "./desktop/Runtime").then(
+        ({ startDesktopServices }) => {
+          if (authLive) stopDesktopServices = startDesktopServices(store);
+        },
+        () => undefined,
       );
-      stopDesktopFeedback =
-        require("./audio/DesktopFeedback").startDesktopFeedback(store);
       void desktop
         .getState()
         .then(updateSteam)
@@ -431,8 +430,7 @@ export default function App() {
         authLive = false;
         unsubscribeSteam?.();
         unsubscribeDesktopFocus?.();
-        unsubscribePresence?.();
-        stopDesktopFeedback?.();
+        stopDesktopServices?.();
       }
       unsubscribeAuth?.();
       document.removeEventListener("deviceready", onDeviceReady, false);

@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { verifyBuild } = require("./desktop-verify");
+const { verifyEditionBundle } = require("./verify-edition-bundle");
 
 function desktopBuild() {
   if (Number(process.versions.node.split(".")[0]) !== 24)
@@ -10,6 +11,7 @@ function desktopBuild() {
     "scripts/run-compatibility.js",
     "scripts/generate-icon-manifest.js",
     "scripts/generate-steam-localization.js",
+    "scripts/generate-achievements.js",
     "node_modules/react-scripts/bin/react-scripts.js",
   ]) {
     const arguments_ = script.includes("react-scripts")
@@ -27,6 +29,7 @@ function desktopBuild() {
     if (result.error || result.status !== 0)
       throw result.error || new Error(`Desktop build failed: ${script}`);
   }
+  verifyEditionBundle("build", "desktop");
   const assets = verifyBuild("build", "public");
   fs.writeFileSync(
     path.join("build", "desktop-assets.json"),
