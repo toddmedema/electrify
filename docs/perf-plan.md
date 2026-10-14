@@ -452,8 +452,8 @@ during loading, offline initialization, retry after chunk/SDK failures and cross
 
 The follow-up web achievement feature intentionally includes the evaluator, local/account
 journal, transactional Firebase merges, gallery and popup UI in the web edition. Steam services
-continue to live in the Electron-only chunk. Production gzip moves from 882.48 to 896.88 kB for
-initial JS (+14.40 kB, 1.63%) and from 1393.04 to 1424.87 kB across all JS (+31.83 kB, 2.28%).
+continue to live in the Electron-only chunk. Production gzip moves from 882.48 to 896.90 kB for
+initial JS (+14.42 kB, 1.63%) and from 1393.04 to 1424.97 kB across all JS (+31.93 kB, 2.29%).
 The evaluator and UI have named lazy chunks; MUI controls and the Firestore transaction API also
 add shared dependencies. The bundle baseline records this deliberate feature cost, with the
 same 10% tolerance. `perf:rebaseline` reconfirms every scenario's unchanged golden output.
