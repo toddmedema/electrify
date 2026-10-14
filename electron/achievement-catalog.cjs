@@ -236,4 +236,10 @@ module.exports = [
     description: "Successfully finish all 14 official scenarios on CEO.",
     icon: "logo",
   },
+  {
+    id: "OUT_OF_JUICE",
+    name: "Out of Juice",
+    description: "Go bankrupt in an official scenario on any difficulty.",
+    icon: "logo",
+  },
 ];

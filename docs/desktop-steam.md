@@ -139,10 +139,11 @@ web service worker. Native Steam calls run outside the renderer.
 ### Achievements
 
 The Electron edition implements the 34 achievements specified in
-[issue #532](https://github.com/toddmedema/electrify/issues/532#issuecomment-6160701564).
+[issue #532](https://github.com/toddmedema/electrify/issues/532#issuecomment-6160701564)
+plus Out of Juice for going bankrupt.
 [`src/desktop/AchievementCatalog.json`](../src/desktop/AchievementCatalog.json) is the
 authoritative list of stable API names, English display names, descriptions and existing SVG
-icons. Define all 34 achievements in Steamworks with those exact API names, Client unlocks, and
+icons. Define all 35 achievements in Steamworks with those exact API names, Client unlocks, and
 reviewed unlocked/locked raster versions of the listed artwork; publish the configuration.
 There is no new artwork or browser achievement UI.
 
@@ -160,7 +161,9 @@ an official non-tutorial run. Custom runs, replay playback, forecast calculation
 simulation harnesses are excluded. Scenario achievements require the committed `completed`
 outcome at full duration, including normal objectives. Every difficulty qualifies; a CEO win
 also contributes one distinct scenario to Master of the Grid. A score dialog alone is never
-evidence of a win.
+evidence of a win. Out of Juice requires the committed `bankrupt` outcome on any difficulty;
+it does not record a successful completion or contribute to Master of the Grid. Being fired
+does not qualify.
 
 Reliability requires positive demand and customer energy served/demanded of at least 99.9% in
 each measured month. Four Nines uses lifetime 99.99%. Final-year criteria require 12 completed,
@@ -174,8 +177,8 @@ discharge, imports after commissioning a player-built intertie, exports, modeled
 savings and output after an actual combined-cycle conversion. It uses the simulation's
 representative-day weights and gross-source customer allocation. Evening ticks use the local
 simulation clock from 18:00 up to, but excluding, midnight. Charging, exports, cancelled
-retrofits, inherited storage and new combined
-cycle purchases cannot count toward storage/retrofit achievements. Saves preserve these
+retrofits, inherited storage and new combined-cycle purchases cannot count toward
+storage/retrofit achievements. Saves preserve these
 counters. Older saves receive empty telemetry when resumed: unknown past facility provenance
 and a partially observed month are not reconstructed or awarded. Browser imports discard this
 optional Electron telemetry.

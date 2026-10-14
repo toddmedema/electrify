@@ -67,9 +67,9 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("catalog pins all 34 IDs and the 14 official non-tutorial scenarios", () => {
-  expect(catalog).toHaveLength(34);
-  expect(new Set(catalog.map(({ id }) => id)).size).toBe(34);
+test("catalog pins all 35 IDs and the 14 official non-tutorial scenarios", () => {
+  expect(catalog).toHaveLength(35);
+  expect(new Set(catalog.map(({ id }) => id)).size).toBe(35);
   expect([...OFFICIAL_IDS].sort()).toEqual(
     SCENARIOS.filter((s) => !s.tutorialSteps)
       .map(({ id }) => id)
@@ -95,6 +95,7 @@ test.each(OFFICIAL_IDS)(
       hooks.finish(state, "completed");
       expect(earned(state)).toContain(scenarioAchievement);
       expect(earned(state)).toContain("STAYING_POWER");
+      expect(earned(state)).not.toContain("OUT_OF_JUICE");
       expect(earned(state).includes("CHIEF_ELECTRICITY_OFFICER")).toBe(
         difficulty === "CEO",
       );
@@ -105,12 +106,58 @@ test.each(OFFICIAL_IDS)(
     }
   },
 );
-test("failures, shortened runs, custom runs, simulation harness overrides and replays cannot finish achievements", () => {
-  for (const outcome of ["bankrupt", "fired"]) {
-    const state = finished();
-    hooks.finish(state, outcome);
-    expect(earned(state)).toEqual([]);
+test("bankruptcy unlocks once in every official scenario and difficulty without recording a win", () => {
+  for (const id of OFFICIAL_IDS) {
+    const state = game(id);
+    for (const difficulty of [
+      "Intern",
+      "Employee",
+      "Manager",
+      "VP",
+      "CEO",
+    ] as const) {
+      state.difficulty = difficulty;
+      state.desktopAchievements!.earned = [];
+      hooks.finish(state, "bankrupt");
+      hooks.finish(state, "bankrupt");
+      expect(earned(state)).toEqual(["OUT_OF_JUICE"]);
+      expect(state.desktopAchievements!.completion).toBeUndefined();
+    }
   }
+});
+test("tutorials, custom runs, simulation harness overrides and replays cannot earn bankruptcy", () => {
+  const tutorial = game(0);
+  hooks.finish(tutorial, "bankrupt");
+  expect(earned(tutorial)).toEqual([]);
+  for (const patch of [
+    { customScenario: SCENARIOS[0] },
+    { replayPlayback: {} as GameType["replayPlayback"] },
+    { meaningfulDecisionGateWaived: true },
+    { storyEffectsDisabled: true },
+    { weatherHazardsDisabled: true },
+    { wildfireHazardDisabled: true },
+  ]) {
+    const state = Object.assign(game(), patch);
+    hooks.finish(state, "bankrupt");
+    expect(earned(state)).toEqual([]);
+    expect(state.desktopAchievements!.completion).toBeUndefined();
+  }
+});
+test("a committed bankruptcy earns Out of Juice and preserves it in a save", () => {
+  const state = game();
+  state.timeline[0].cash = -1e12;
+  runMonths(state, 1);
+  expect(state.monthlyHistory[0].cash).toBeLessThan(0);
+  expect(earned(state)).toEqual(["OUT_OF_JUICE"]);
+  expect(state.desktopAchievements!.completion).toBeUndefined();
+  const restored = parseSave(serializeSave(state))!.game;
+  expect(earned(restored)).toEqual(["OUT_OF_JUICE"]);
+  expect(restored.desktopAchievements!.completion).toBeUndefined();
+});
+test("firing, shortened runs, custom runs, simulation harness overrides and replays cannot earn successful finish achievements", () => {
+  const fired = finished();
+  hooks.finish(fired, "fired");
+  expect(earned(fired)).toEqual([]);
   for (const patch of [
     { monthlyHistory: [month()] },
     { customScenario: SCENARIOS[0] },

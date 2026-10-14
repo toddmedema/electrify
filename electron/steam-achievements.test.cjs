@@ -84,9 +84,9 @@ function fixture(
   return { api, calls, filename, listeners, make, received, stored, cache };
 }
 
-test("native catalog matches the renderer's 34 stable IDs and existing artwork", () => {
+test("native catalog matches the renderer's 35 stable IDs and existing artwork", () => {
   assert.deepEqual(catalog, require("../src/desktop/AchievementCatalog.json"));
-  assert.equal(catalog.length, 34);
+  assert.equal(catalog.length, 35);
   assert.equal(OFFICIAL_IDS.length, 14);
   for (const { icon } of catalog)
     assert(fs.existsSync(path.join(__dirname, `../public/images/${icon}.svg`)));
@@ -106,6 +106,28 @@ test("IPC accepts only catalog IDs and official/tutorial completions on known di
   assert.deepEqual(validateIntent({ earned: ["FIRST_SPARK"] }).earned, [
     "FIRST_SPARK",
   ]);
+});
+test("bankruptcy journals offline, survives relaunch and never records a successful completion", (t) => {
+  const f = fixture(t);
+  let service = new SteamAchievements(f.filename);
+  service.add({ earned: ["OUT_OF_JUICE"] });
+  service.add({ earned: ["OUT_OF_JUICE"] });
+  service.dispose();
+  service = f.make();
+  assert.deepEqual(service.data.earned, ["OUT_OF_JUICE"]);
+  assert.deepEqual(service.data.wins, []);
+  assert.deepEqual(service.data.tutorials, []);
+  f.received();
+  assert.deepEqual(
+    f.calls.filter(([kind]) => kind === "award"),
+    [["award", "OUT_OF_JUICE"]],
+  );
+  assert.equal(f.calls.filter(([kind]) => kind === "stat").length, 0);
+  f.stored();
+  service.add({ earned: ["OUT_OF_JUICE"] });
+  assert.equal(service.pending(), false);
+  assert.equal(f.calls.filter(([kind]) => kind === "award").length, 1);
+  service.dispose();
 });
 for (const platform of ["win32", "linux", "darwin"]) {
   test(`${platform} waits for matching stats load and StoreStats receipt, including offline cache`, (t) => {

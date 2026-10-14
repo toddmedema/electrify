@@ -176,7 +176,12 @@ export const achievementHooks: SimulationHooks = {
     progress.month = emptyMonth();
   },
   finish(game, outcome) {
-    if (!eligible(game) || outcome !== "completed") return;
+    if (!eligible(game)) return;
+    if (outcome === "bankrupt") {
+      award(progressFor(game), "OUT_OF_JUICE");
+      return;
+    }
+    if (outcome !== "completed") return;
     const scenario = SCENARIOS.find(({ id }) => id === game.scenarioId)!;
     if (game.monthlyHistory.length < scenario.durationMonths!) return;
     const progress = progressFor(game);
