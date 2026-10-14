@@ -3,6 +3,26 @@ const assert = require("node:assert/strict");
 const koffi = require("koffi");
 const { SteamDispatcher } = require("./steam-dispatch.cjs");
 
+test("stats callbacks use the sole pump and arrive after the SDK payload is freed", () => {
+  const { dispatcher, callbacks, calls } = fixture();
+  let copied;
+  const stop = dispatcher.onCallback(1102, (payload) => {
+    assert.equal(calls.at(-1), "free");
+    copied = payload;
+  });
+  const payload = Buffer.alloc(16);
+  payload.writeBigUInt64LE(123n);
+  callbacks.push({ id: 1102, payload });
+  dispatcher.pump();
+  payload.fill(0);
+  assert.equal(copied.readBigUInt64LE(0), 123n);
+  stop();
+  callbacks.push({ id: 1102, payload: Buffer.alloc(16) });
+  dispatcher.pump();
+  assert.equal(copied.readBigUInt64LE(0), 123n);
+  dispatcher.dispose();
+});
+
 function fixture(platform = "win32") {
   const callbacks = [];
   const events = [];

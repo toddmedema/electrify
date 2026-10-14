@@ -136,6 +136,79 @@ web service worker. Native Steam calls run outside the renderer.
 
 ## Steamworks configuration and acceptance
 
+### Achievements
+
+The Electron edition implements the 34 achievements specified in
+[issue #532](https://github.com/toddmedema/electrify/issues/532#issuecomment-6160701564)
+plus Out of Juice for going bankrupt.
+[`src/desktop/AchievementCatalog.json`](../src/desktop/AchievementCatalog.json) is the
+authoritative list of stable API names, English display names, descriptions and existing SVG
+icons. Define all 35 achievements in Steamworks with those exact API names, Client unlocks, and
+reviewed unlocked/locked raster versions of the listed artwork; publish the configuration.
+There is no new artwork or browser achievement UI.
+
+Configure the 77 INT completion flags listed in
+[`steamworks/achievement-stats.csv`](../steamworks/achievement-stats.csv): seven tutorial
+completions and one flag for every official scenario/difficulty pair. Each defaults to 0, has
+minimum 0 and maximum 1, is increment-only, and is set by Client. This CSV is a configuration
+reference. Independent flags let Steam merge different completions earned offline on different
+computers without overwriting another win. The generated native catalog and CSV are refreshed
+by `node scripts/generate-achievements.js` and `desktop:build`.
+
+First Spark and Grid Graduate use actual walkthrough completion, including the final challenge;
+exiting a tutorial or merely reaching its time limit does not count. Other achievements require
+an official non-tutorial run. Custom runs, replay playback, forecast calculations and modified
+simulation harnesses are excluded. Scenario achievements require the committed `completed`
+outcome at full duration, including normal objectives. Every difficulty qualifies; a CEO win
+also contributes one distinct scenario to Master of the Grid. A score dialog alone is never
+evidence of a win. Out of Juice requires the committed `bankrupt` outcome on any difficulty;
+it does not record a successful completion or contribute to Master of the Grid. Being fired
+does not qualify.
+
+Reliability requires positive demand and customer energy served/demanded of at least 99.9% in
+each measured month. Four Nines uses lifetime 99.99%. Final-year criteria require 12 completed,
+individually reliable months. Emissions intensity includes local, imported and construction
+emissions divided by customer MWh served. Fuel shares use the existing customer-delivered fuel
+history; storage and imports never become local renewable generation. Public utility rates use
+the existing starting-dollar customer-revenue helper, excluding exports and grants.
+
+Electron-only per-run telemetry persists evening customer energy and player-built storage
+discharge, imports after commissioning a player-built intertie, exports, modeled efficiency
+savings and output after an actual combined-cycle conversion. It uses the simulation's
+representative-day weights and gross-source customer allocation. Evening ticks use the local
+simulation clock from 18:00 up to, but excluding, midnight. Charging, exports, cancelled
+retrofits, inherited storage and new combined-cycle purchases cannot count toward
+storage/retrofit achievements. Saves preserve these
+counters. Older saves receive empty telemetry when resumed: unknown past facility provenance
+and a partially observed month are not reconstructed or awarded. Browser imports discard this
+optional Electron telemetry.
+
+The renderer's named `electron` chunk installs simulation hooks before loading saves and owns
+achievement observation, presence and menu feedback. Literal build-time guards omit it and its
+catalog/counters from the browser build. Both build commands inspect every compiled JavaScript
+asset, including lazy chunks, to enforce the edition boundary. The native bridge accepts only
+catalog IDs and bounded official completion records; native pointers and paths stay in main.
+
+Earned intents are atomically journaled in the existing account-specific local save directory
+before touching Steam. The pinned v012 SDK loads stats through RequestCurrentStats and receives
+stats callbacks through the existing sole manual dispatcher. SetAchievement and StoreStats also
+run in Steam Offline Mode, using Steam's offline cache. Pending intents remain on disk until a
+successful, matching UserStatsStored callback acknowledges that submitted batch. Boolean API
+returns, unrelated callbacks, failed writes and later awards cannot acknowledge it. Already
+cached achievements are not set again; retries never reset achievements or completed flags.
+Steam outages leave local play available.
+
+Automated tests cover threshold boundaries, all scenario/difficulty completions, save/resume,
+forecast/replay exclusion, offline earning/reconnect/relaunch, callback packing for all supported
+OSes, overlapping batches and corrupt-journal recovery. Before advertising Steam Achievements,
+test the published configuration on the real App ID/private build: earn a tutorial and scenario
+award, inspect their overlay notifications/icons, earn offline, reconnect, relaunch, check a
+second computer, and verify no duplicate or missing awards. Automated mocks do not establish
+that the partner configuration or Steam overlay works.
+
+References: [Steam Stats and Achievements](https://partner.steamgames.com/doc/features/achievements)
+and [ISteamUserStats](https://partner.steamgames.com/doc/api/ISteamUserStats).
+
 ### Rich Presence and recording highlights
 
 Steam friends see the authored scenario and year progress, with separate menu, loading, pause,

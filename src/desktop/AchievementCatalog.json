@@ -1,0 +1,227 @@
+[
+  {
+    "id": "FIRST_SPARK",
+    "name": "First Spark",
+    "description": "Complete Mission 1: Electricity, including its final challenge.",
+    "icon": "solar",
+    "scenarioId": 0
+  },
+  {
+    "id": "GRID_GRADUATE",
+    "name": "Grid Graduate",
+    "description": "Complete all seven tutorial missions.",
+    "icon": "transmission"
+  },
+  {
+    "id": "STAYING_POWER",
+    "name": "Staying Power",
+    "description": "Successfully finish an official scenario.",
+    "icon": "logo"
+  },
+  {
+    "id": "CHIEF_ELECTRICITY_OFFICER",
+    "name": "Chief Electricity Officer",
+    "description": "Successfully finish an official scenario on CEO.",
+    "icon": "logo"
+  },
+  {
+    "id": "LIGHTS_ON",
+    "name": "Lights On",
+    "description": "Serve at least 99.9% of demand for 12 consecutive completed months.",
+    "icon": "transmission"
+  },
+  {
+    "id": "FOUR_NINES",
+    "name": "Four Nines",
+    "description": "Successfully finish with at least 99.99% of lifetime demand served.",
+    "icon": "nuclear"
+  },
+  {
+    "id": "BACK_ON_THE_GRID",
+    "name": "Back on the Grid",
+    "description": "Recover from a month below 99% reliability with three consecutive months at 99.9%.",
+    "icon": "load shedding"
+  },
+  {
+    "id": "CLEAN_FINISH",
+    "name": "Clean Finish",
+    "description": "Successfully finish with at most 100 kgCO2e/MWh over 12 reliable months.",
+    "icon": "rise of renewables"
+  },
+  {
+    "id": "HALF_THE_CARBON",
+    "name": "Half the Carbon",
+    "description": "Successfully finish with final-year emissions intensity at least 50% below the first year, with reliable service.",
+    "icon": "carbon fee"
+  },
+  {
+    "id": "COALS_LAST_SHIFT",
+    "name": "Coal's Last Shift",
+    "description": "Start with coal and successfully finish with no customer-delivered coal generation in the final reliable year.",
+    "icon": "the end of an era"
+  },
+  {
+    "id": "HERE_COMES_THE_SUN",
+    "name": "Here Comes the Sun",
+    "description": "Successfully finish with solar supplying at least half of customer energy in the final reliable year.",
+    "icon": "solar"
+  },
+  {
+    "id": "WINDS_OF_CHANGE",
+    "name": "Winds of Change",
+    "description": "Successfully finish with wind supplying at least half of customer energy in the final reliable year.",
+    "icon": "wind"
+  },
+  {
+    "id": "STRENGTH_IN_DIVERSITY",
+    "name": "Strength in Diversity",
+    "description": "Successfully finish with four fuels each supplying at least 10% of customer energy in the final reliable year.",
+    "icon": "rise of renewables"
+  },
+  {
+    "id": "NIGHT_SHIFT",
+    "name": "Night Shift",
+    "description": "Player-built storage supplies at least 25% of evening customer energy over a reliable month.",
+    "icon": "battery"
+  },
+  {
+    "id": "GRID_CONNECTED",
+    "name": "Grid Connected",
+    "description": "Commission a player-built intertie and import at least 10% of demand over a reliable month.",
+    "icon": "transmission"
+  },
+  {
+    "id": "GOOD_NEIGHBOR",
+    "name": "Good Neighbor",
+    "description": "Export at least 10% of customer demand over a reliable month.",
+    "icon": "transmission"
+  },
+  {
+    "id": "WASTE_NOT",
+    "name": "Waste Not",
+    "description": "Complete a peaker's combined-cycle retrofit and deliver 1 GWh from that plant afterwards.",
+    "icon": "natural gas cc"
+  },
+  {
+    "id": "A_WATT_SAVED",
+    "name": "A Watt Saved",
+    "description": "Efficiency rebates prevent at least 10% of eligible demand over a reliable month.",
+    "icon": "logo"
+  },
+  {
+    "id": "POWER_TO_THE_PEOPLE",
+    "name": "Power to the People",
+    "description": "Successfully finish a Public utility with lifetime real customer rates no higher than the starting rate and a reliable final year.",
+    "icon": "carbon fee"
+  },
+  {
+    "id": "THE_PRICE_OF_CARBON",
+    "name": "The Price of Carbon",
+    "description": "Successfully finish Carbon Fee on any difficulty.",
+    "icon": "carbon fee",
+    "scenarioId": 100
+  },
+  {
+    "id": "BOOM_AND_BEYOND",
+    "name": "Boom and Beyond",
+    "description": "Successfully finish The Shale Boom on any difficulty.",
+    "icon": "the shale boom",
+    "scenarioId": 103
+  },
+  {
+    "id": "ISLAND_INDEPENDENCE",
+    "name": "Island Independence",
+    "description": "Successfully finish Paradise on any difficulty.",
+    "icon": "paradise",
+    "scenarioId": 105
+  },
+  {
+    "id": "A_BRIGHTER_FUTURE",
+    "name": "A Brighter Future",
+    "description": "Successfully finish Rise of Renewables on any difficulty.",
+    "icon": "rise of renewables",
+    "scenarioId": 101
+  },
+  {
+    "id": "WEATHER_THE_STORM",
+    "name": "Weather the Storm",
+    "description": "Successfully finish Hurricane Season on any difficulty.",
+    "icon": "hurricane season",
+    "scenarioId": 104
+  },
+  {
+    "id": "THE_NEXT_ERA",
+    "name": "The Next Era",
+    "description": "Successfully finish The End of an Era on any difficulty.",
+    "icon": "the end of an era",
+    "scenarioId": 102
+  },
+  {
+    "id": "AHEAD_OF_THE_BOOM",
+    "name": "Ahead of the Boom",
+    "description": "Successfully finish Data Center Boom on any difficulty.",
+    "icon": "ai data center boom",
+    "scenarioId": 106
+  },
+  {
+    "id": "COLD_COMFORT",
+    "name": "Cold Comfort",
+    "description": "Successfully finish Deep Freeze on any difficulty.",
+    "icon": "texas deep freeze",
+    "scenarioId": 107
+  },
+  {
+    "id": "COOL_UNDER_PRESSURE",
+    "name": "Cool Under Pressure",
+    "description": "Successfully finish Heatwave + Drought on any difficulty.",
+    "icon": "heatwave-drought",
+    "scenarioId": 108
+  },
+  {
+    "id": "BACKUP_PLAN",
+    "name": "Backup Plan",
+    "description": "Successfully finish Sudden Nuclear Shutdown on any difficulty.",
+    "icon": "sudden-nuclear-trip",
+    "scenarioId": 110
+  },
+  {
+    "id": "FIREBREAK",
+    "name": "Firebreak",
+    "description": "Successfully finish Wildfire Emergency on any difficulty.",
+    "icon": "wildfire emergency",
+    "scenarioId": 111
+  },
+  {
+    "id": "THE_END_OF_LOAD_SHEDDING",
+    "name": "The End of Load Shedding",
+    "description": "Successfully finish Load Shedding on any difficulty.",
+    "icon": "load shedding",
+    "scenarioId": 113
+  },
+  {
+    "id": "BEYOND_THE_RIVER",
+    "name": "Beyond the River",
+    "description": "Successfully finish The River Runs Dry on any difficulty.",
+    "icon": "river runs dry",
+    "scenarioId": 114
+  },
+  {
+    "id": "BEAT_THE_HEAT",
+    "name": "Beat the Heat",
+    "description": "Successfully finish Delhi Summer on any difficulty.",
+    "icon": "delhi summer",
+    "scenarioId": 115
+  },
+  {
+    "id": "MASTER_OF_THE_GRID",
+    "name": "Master of the Grid",
+    "description": "Successfully finish all 14 official scenarios on CEO.",
+    "icon": "logo"
+  },
+  {
+    "id": "OUT_OF_JUICE",
+    "name": "Out of Juice",
+    "description": "Go bankrupt in an official scenario on any difficulty.",
+    "icon": "logo"
+  }
+]

@@ -7,6 +7,16 @@ const crypto = require("node:crypto");
 // the SDK's documented manual dispatch rather than fabricated steamworks.js methods.
 const DECLARATIONS = {
   stats: "void * SteamAPI_SteamUserStats_v012()",
+  requestStats: "bool SteamAPI_ISteamUserStats_RequestCurrentStats(void *)",
+  getAchievement:
+    "bool SteamAPI_ISteamUserStats_GetAchievement(void *, const char *, void *)",
+  setAchievement:
+    "bool SteamAPI_ISteamUserStats_SetAchievement(void *, const char *)",
+  getStat:
+    "bool SteamAPI_ISteamUserStats_GetStatInt32(void *, const char *, void *)",
+  setStat:
+    "bool SteamAPI_ISteamUserStats_SetStatInt32(void *, const char *, int32_t)",
+  storeStats: "bool SteamAPI_ISteamUserStats_StoreStats(void *)",
   utils: "void * SteamAPI_SteamUtils_v010()",
   friends: "void * SteamAPI_SteamFriends_v017()",
   user: "void * SteamAPI_SteamUser_v023()",

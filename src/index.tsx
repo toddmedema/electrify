@@ -54,8 +54,10 @@ const startDesktop: () => Promise<void> =
           </p>,
         );
         try {
-          const { initializeDesktopSaves } = await import("./DesktopSaves");
-          await initializeDesktopSaves();
+          const { initializeDesktop } = await import(
+            /* webpackChunkName: "electron" */ "./desktop/Runtime"
+          );
+          await initializeDesktop();
           stopBootstrapQuit?.();
           stopBootstrapQuit = undefined;
           renderApp();

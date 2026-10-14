@@ -46,7 +46,7 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/verify-edition-bundle.js web",
     "test": "react-scripts test",
     "test:once": "react-scripts test --watchAll=false",
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\" --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=\"\\.sim\\.test\\.\"",

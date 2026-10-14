@@ -15,6 +15,7 @@ const { SteamActivity } = require("./steam-activity.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { SteamDispatcher } = require("./steam-dispatch.cjs");
+const { SteamAchievements } = require("./steam-achievements.cjs");
 
 const CLOUD_PREFIX = /^electrify\/device-[a-f0-9]{32}\.json$/;
 const MAX_CLOUD_FILE_BYTES = 100 * 1024 * 1024;
@@ -30,6 +31,7 @@ class SteamService {
 
   initialize(app, config, disabled = false) {
     app.on("will-quit", () => {
+      this.achievements?.dispose();
       this.activity?.dispose();
       this.stopped = true;
       this.leaderboards?.dispose();
@@ -176,6 +178,25 @@ class SteamService {
         // A queue is optional; local game saves remain usable when even its backup is invalid.
       }
     }
+  }
+
+  configureAchievements(directory, appId) {
+    this.achievements = new SteamAchievements(
+      path.join(directory, "achievements.json"),
+      this.native,
+      this.dispatcher,
+      appId,
+      this.identity.steamId,
+    );
+    this.achievements.refresh();
+  }
+
+  submitAchievements(intent) {
+    if (!this.stopped) this.achievements?.add(intent);
+  }
+
+  refreshAchievements() {
+    if (!this.stopped) this.achievements?.refresh();
   }
 
   async submitScore(selection) {

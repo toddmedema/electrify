@@ -1,8 +1,4 @@
-import {
-  Analytics,
-  getAnalytics,
-  logEvent as firebaseLogEvent,
-} from "firebase/analytics";
+import type { Analytics } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -85,6 +81,8 @@ const refs = {
   audioContext: null as AudioContext | null,
 };
 
+let analyticsModule: Promise<typeof import("firebase/analytics")> | undefined;
+
 /**
  * Logs a Google Analytics event, initializing analytics on first use once the browser is online.
  *
@@ -100,9 +98,9 @@ const refs = {
  * logEvent already catches its internal rejections. getAnalytics() is the only entry point that
  * does not.
  *
- * The try/catch below covers synchronous throws only -- a rejection from inside the SDK cannot
- * be caught here. A registration that fails while the browser still claims to be online (an ad
- * blocker on the Google endpoints, a captive portal, DNS) rejects that way and is out of reach;
+ * Chunk-load failures and synchronous SDK throws are caught below. A background registration
+ * that fails while the browser still claims to be online (an ad blocker on the Google endpoints,
+ * a captive portal, DNS) rejects that way and is out of reach;
  * outside the dev overlay it is a console line rather than anything the game reacts to.
  */
 export function logEvent(eventName: string, args?: object): void {
@@ -111,17 +109,25 @@ export function logEvent(eventName: string, args?: object): void {
     !firebaseApp
   )
     return;
-  try {
-    if (!refs.analytics) {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        return;
+  if (!refs.analytics && typeof navigator !== "undefined" && !navigator.onLine)
+    return;
+  // Share one SDK load; events queued during it keep their order without delaying gameplay.
+  analyticsModule ??= import(
+    /* webpackChunkName: "analytics" */ "firebase/analytics"
+  );
+  void analyticsModule
+    .then(({ getAnalytics, logEvent: firebaseLogEvent }) => {
+      if (!refs.analytics) {
+        // Connectivity can change while the chunk is loading.
+        if (typeof navigator !== "undefined" && !navigator.onLine) return;
+        refs.analytics = getAnalytics(firebaseApp);
       }
-      refs.analytics = getAnalytics(firebaseApp);
-    }
-    firebaseLogEvent(refs.analytics, eventName, args);
-  } catch {
-    // Analytics is telemetry, not gameplay: a failure here must never break the game.
-  }
+      firebaseLogEvent(refs.analytics, eventName, args);
+    })
+    .catch(() => {
+      // A failed chunk load or SDK initialization remains retryable on the next event.
+      analyticsModule = undefined;
+    });
 }
 
 export function getDb(): Firestore {
