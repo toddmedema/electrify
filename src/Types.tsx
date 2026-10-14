@@ -1281,9 +1281,11 @@ export type ThemeChoiceType = ThemeModeType | "system";
 export interface SettingsType {
   audioEnabled?: boolean;
   // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
-  // switch and remains undefined until the player grants first-run audio permission.
+  // switch; the browser leaves it undefined until the player grants audio permission.
   musicVolume: number;
   soundEffectsVolume: number;
+  controllerVibrationEnabled?: boolean;
+  steamTimelineEnabled?: boolean;
   units: UnitSystemType;
   theme: ThemeChoiceType;
 }

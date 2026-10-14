@@ -1,4 +1,5 @@
 import { prefetchIcons } from "./helpers/OfflineData";
+import { isDesktopApp } from "./Desktop";
 
 /** Long enough for the app shell, current screen and first interaction to take priority. */
 export const BACKGROUND_CACHE_DELAY_MS = 3000;
@@ -8,6 +9,7 @@ export const BACKGROUND_CACHE_DELAY_MS = 3000;
  * icon; installed apps also get every weather location and fresh market data.
  */
 export function registerServiceWorker(win: Window = window): void {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
   const serviceWorker = win.navigator.serviceWorker;
   let registered = false;
   const syncIcons = () => {

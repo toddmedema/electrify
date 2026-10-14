@@ -12,7 +12,7 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
-# Three jobs run side by side, each a few minutes, instead of one job running every check in turn.
+# The main gates and native desktop matrix run side by side.
 # Within a job, each check runs even if an earlier one failed, so one PR run reports every problem
 # rather than only the first. The `check` job at the end is the required status check.
 jobs:
@@ -139,7 +139,7 @@ jobs:
       # phone and desktop without running the entire responsive matrix per PR.
       - name: Browser smoke tests
         if: "!cancelled() && steps.browser.outcome == 'success'"
-        run: npm run test:e2e -- build-options.spec.ts escape-close.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
+        run: npm run test:e2e -- build-options.spec.ts escape-close.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts menu-keyboard.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
 
       # Text can spill into adjacent columns without making the page horizontally scroll.
       - name: Mobile and desktop text layout
@@ -155,11 +155,112 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  desktop:
+    name: Packaged ${{ matrix.label }} desktop
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64
+            runner: windows-latest
+            platform: win32
+            arch: x64
+            directory: win-unpacked
+            executable: win-unpacked/Electrify.exe
+          - label: Linux x64
+            runner: ubuntu-22.04
+            platform: linux
+            arch: x64
+            directory: linux-unpacked
+            executable: linux-unpacked/Electrify
+          - label: macOS Intel
+            runner: macos-15-intel
+            platform: darwin
+            arch: x64
+            directory: mac
+            executable: mac/Electrify.app/Contents/MacOS/Electrify
+          - label: macOS Apple Silicon
+            runner: macos-15
+            platform: darwin
+            arch: arm64
+            directory: mac-arm64
+            executable: mac-arm64/Electrify.app/Contents/MacOS/Electrify
+    steps:
+      - name: Check out repository code and every bundled asset
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - uses: ./.github/actions/install
+
+      - name: Require the native host and installed architecture
+        shell: bash
+        env:
+          EXPECTED_PLATFORM: ${{ matrix.platform }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: node -e 'if (process.platform !== process.env.EXPECTED_PLATFORM || process.arch !== process.env.EXPECTED_ARCH) throw new Error("The desktop build must run on its target platform and architecture")'
+
+      - name: Install Linux graphical test dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          npx playwright install-deps chromium
+          sudo apt-get install --yes xvfb openbox
+
+      - name: Native desktop tests
+        run: npm run test:desktop:native
+
+      # This exercises the full depot without Steam credentials. The shipping Steam command
+      # additionally requires STEAM_APP_ID and writes it into the packaged configuration.
+      - name: Build and verify the offline depot
+        id: package
+        run: npm run desktop:pack:offline -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - name: Fresh-install offline game, display controls and save recovery (Windows and macOS)
+        if: matrix.platform != 'linux'
+        env:
+          ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
+        run: npm run test:desktop
+
+      # A real X server and window manager exercise focus/fullscreen while retaining the
+      # renderer sandbox. Ubuntu 22.04 also gives the native depot a conservative glibc host.
+      - name: Fresh-install offline game, display controls and save recovery (Linux)
+        if: matrix.platform == 'linux'
+        env:
+          ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:desktop'
+
+      # Upload a tar archive rather than loose POSIX files: GitHub artifact extraction otherwise
+      # loses executable permissions. These are QA builds without Steam IDs or release signing.
+      - name: Archive the complete verified QA depot
+        id: archive
+        shell: bash
+        run: tar -czf dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C dist/desktop ${{ matrix.directory }}
+
+      - name: Downloadable offline QA build
+        if: "!cancelled() && steps.archive.outcome == 'success'"
+        uses: actions/upload-artifact@v7
+        with:
+          name: electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Preserve desktop QA diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   # The one required status check on master. It passes only when every job above succeeded, so a
   # failed, cancelled or timed-out job blocks the merge.
   check:
     if: '!cancelled()'
-    needs: [unit, simulation, browser]
+    needs: [unit, simulation, browser, desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -168,8 +269,10 @@ jobs:
           UNIT: ${{ needs.unit.result }}
           SIMULATION: ${{ needs.simulation.result }}
           BROWSER: ${{ needs.browser.result }}
+          DESKTOP: ${{ needs.desktop.result }}
         run: |
           echo "Types, lint and unit tests: $UNIT"
           echo "Simulation and performance: $SIMULATION"
           echo "Build and browser tests:    $BROWSER"
-          [ "$UNIT" = success ] && [ "$SIMULATION" = success ] && [ "$BROWSER" = success ]
+          echo "Packaged desktop matrix:   $DESKTOP"
+          [ "$UNIT" = success ] && [ "$SIMULATION" = success ] && [ "$BROWSER" = success ] && [ "$DESKTOP" = success ]

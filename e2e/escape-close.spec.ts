@@ -185,7 +185,11 @@ test("Escape matches Back for Manual, Settings, and Saved games", async ({
       }
       await expect(page.locator(".cardTransitions")).toHaveAttribute(
         "data-exit-property",
-        "transform",
+        "opacity",
+      );
+      await expect(page.locator(".cardTransitions")).toHaveAttribute(
+        "data-exit-transform",
+        "none",
       );
       await expect(heading).toHaveCount(0);
       await expect(page.locator("main.base_main")).toHaveCount(1);

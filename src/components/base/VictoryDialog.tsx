@@ -21,6 +21,7 @@ import { fetchGlobalRank } from "../../reducers/User";
 import { canShare, shareText } from "../../helpers/Share";
 import { formatScore } from "../../helpers/Format";
 import { ResultScore, resultTitle, RunDebrief } from "./RunResult";
+import { isDesktopApp } from "../../Desktop";
 
 export interface StateProps {
   victory: VictoryType | null;
@@ -58,6 +59,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const scenarioId = victory?.scenarioId;
   const score = victory?.score;
   const ranked = Boolean(victory?.ranked);
+  const difficulty = victory?.difficulty;
 
   React.useEffect(() => {
     if (scenarioId === undefined || score === undefined || !ranked) {
@@ -68,7 +70,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     // Guarded rather than cancelled: an aggregate read that lands after the player has closed the
     // dialog must not set state on an unmounted tree
     let live = true;
-    fetchGlobalRank(scenarioId, score)
+    // The web board ranks by score alone; Steam keeps a board per difficulty.
+    fetchGlobalRank(scenarioId, score, difficulty)
       .then((position) => {
         if (live) {
           setRank(position);
@@ -83,7 +86,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     return () => {
       live = false;
     };
-  }, [scenarioId, score, ranked]);
+  }, [scenarioId, score, ranked, difficulty]);
 
   if (!victory) {
     // Rendered closed rather than not at all, so MUI can animate the dialog out
@@ -190,19 +193,21 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             )}
           </Typography>
         )}
-        {ranked && !loggedIn && (
-          <Typography
-            className="victoryStanding"
-            variant="body2"
-            color="textSecondary"
-            component="div"
-          >
-            <Button color="primary" onClick={onLogin} size="small">
-              Log in
-            </Button>
-            to join the leaderboard
-          </Typography>
-        )}
+        {ranked &&
+          !loggedIn &&
+          !(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) && (
+            <Typography
+              className="victoryStanding"
+              variant="body2"
+              color="textSecondary"
+              component="div"
+            >
+              <Button color="primary" onClick={onLogin} size="small">
+                Log in
+              </Button>
+              to join the leaderboard
+            </Typography>
+          )}
       </DialogContent>
       <DialogActions
         className="victoryDialogActions"

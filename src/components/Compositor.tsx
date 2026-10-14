@@ -643,9 +643,7 @@ export default class Compositor extends React.Component<Props, {}> {
       !isGatedStep(tutorialSteps![tutorialStep - 1])
     );
 
-    // The pane layouts don't slide between their own cards: on desktop nothing about the screen
-    // changes, and on two columns only the second one does -- sliding the pinned fleet off the
-    // side with it would be a lie about what just happened
+    // Keep shared panes mounted when their navigation changes, so the pinned fleet stays visible.
     // A quick retry may start before the previous loading view finishes exiting.
     // A fresh key guarantees the new mission runs its loading lifecycle.
     const transitionKey =
@@ -664,12 +662,16 @@ export default class Compositor extends React.Component<Props, {}> {
     // Chrome the step hides is dropped by app.scss rules on this attribute, so no pane or bar
     // needs to know about tutorials to step aside
     const hiddenUi = currentTutorialStep?.hideUi;
+    const singlePanel =
+      !isNavCard(this.props.card.name) ||
+      !isPaneLayout() ||
+      hiddenUi?.includes("sidePanes");
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
     return (
       <div
-        className="app_container"
+        className={`app_container${singlePanel ? " single-panel" : ""}`}
         data-tutorial-hide={hiddenUi?.length ? hiddenUi.join(" ") : undefined}
       >
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
@@ -687,6 +689,15 @@ export default class Compositor extends React.Component<Props, {}> {
           <CSSTransition
             key={transitionKey}
             nodeRef={transitionNodeRef}
+            onEnter={() => {
+              if (transitionNodeRef.current)
+                transitionNodeRef.current.inert = false;
+            }}
+            onExit={() => {
+              // The outgoing screen stays visible while fading, but can't receive input.
+              if (transitionNodeRef.current)
+                transitionNodeRef.current.inert = true;
+            }}
             onExited={() => {
               if (transitionKey.startsWith("LOADING:")) {
                 this.nodeRefs.delete(transitionKey);
@@ -700,8 +711,8 @@ export default class Compositor extends React.Component<Props, {}> {
           >
             <main
               className={`base_main${
-                // The guide is a separate document, so a slide can't continue from it. The
-                // setup it links to fades in on that first load instead (ts 0 is the startup card)
+                // Fade in the setup linked from the separate guide document on its first load
+                // (ts 0 is the startup card).
                 this.props.card.ts === 0 &&
                 this.props.card.name === "DATA_CENTER_SETUP"
                   ? " pageEnter"

@@ -5,13 +5,32 @@ import { saveRepository } from "./SaveSession";
 import { AUTO_CLOUD_SAVE_MS, CloudSaveSync } from "./CloudSaveSync";
 import { FirebaseSaveTransport } from "./CloudSaveTransport";
 import { subscribeCloudSaveRequests } from "./SaveEffects";
+import { isDesktopApp } from "./Desktop";
 
 let retry = () => {};
 export function retryCloudSync(): void {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    void import("./DesktopSaves").then(({ retryDesktopCloud }) =>
+      retryDesktopCloud(),
+    );
+    return;
+  }
   retry();
 }
 
 export function startCloudSaves(store: AppStore): () => void {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    let live = true;
+    let stop = () => {};
+    void import("./DesktopSaves").then(({ startDesktopSaves }) => {
+      if (live) stop = startDesktopSaves(store);
+    });
+    return () => {
+      live = false;
+      stop();
+    };
+  }
+  if (!firebaseAppAuth) return () => {};
   const sync = new CloudSaveSync(saveRepository, new FirebaseSaveTransport());
   let uid: string | undefined;
   let generation = 0;

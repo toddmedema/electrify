@@ -1,10 +1,16 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameType } from "../../Types";
 import NewGameDetails, { Props } from "./NewGameDetails";
+import { DesktopBridge } from "../../Desktop";
+import { ScoreType } from "../../Types";
 
 const mockGetDocs = jest.fn();
+const mockDesktopScores = jest.fn();
+jest.mock("../../DesktopScores", () => ({
+  desktopScores: (...args: unknown[]) => mockDesktopScores(...args),
+}));
 const mockPrefetchScenarioData = jest.fn();
 const mockWhere = jest.fn((field: string, op: string, value: unknown) => ({
   field,
@@ -51,6 +57,9 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("NewGameDetails leaderboard", () => {
+  afterEach(() => {
+    delete window.electrifyDesktop;
+  });
   beforeEach(() => {
     mockGetDocs.mockResolvedValue({ docs: [] });
     mockPrefetchScenarioData.mockClear();
@@ -172,5 +181,47 @@ describe("NewGameDetails leaderboard", () => {
     expect(
       mockWhere.mock.calls.filter(([field]) => field === "difficulty"),
     ).toHaveLength(1);
+  });
+
+  it("uses Steam friends scores and ignores a stale global response on the expanded board", async () => {
+    window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+    const score = (displayName: string): ScoreType =>
+      ({
+        displayName,
+        score: 500,
+        scenarioId: 100,
+        difficulty: "Employee",
+        uid: "steam:2",
+        scoreBreakdown: {},
+      }) as ScoreType;
+    let resolveGlobal!: (scores: ScoreType[]) => void;
+    const globalRequest = new Promise<ScoreType[]>((resolve) => {
+      resolveGlobal = resolve;
+    });
+    mockDesktopScores.mockImplementation(
+      (_scenarioId: number, difficulty: string | undefined, scope: string) =>
+        scope === "friends"
+          ? Promise.resolve([score("Steam friend")])
+          : difficulty
+            ? Promise.resolve([score("Global player")])
+            : globalRequest,
+    );
+    render(<NewGameDetails {...props()} />);
+    await screen.findByText("Global player");
+    await userEvent.click(
+      screen.getByRole("button", { name: "View all scores" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Friends" }));
+    await screen.findByText("Steam friend");
+    await act(async () => {
+      resolveGlobal([score("Stale global player")]);
+      await globalRequest;
+    });
+    expect(screen.getByText("Steam friend")).toBeInTheDocument();
+    expect(screen.queryByText("Stale global player")).not.toBeInTheDocument();
+    expect(mockGetDocs).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("columnheader", { name: "Replay" }),
+    ).not.toBeInTheDocument();
   });
 });

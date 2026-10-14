@@ -1,0 +1,103 @@
+import type { DifficultyType } from "./Types";
+// Compile-time switch: web production builds set REACT_APP_DESKTOP=false, so webpack drops
+// desktop branches and the chunks they import. Webpack can only evaluate the env var itself,
+// not an imported constant, so call sites test `process.env.REACT_APP_DESKTOP === "true"`
+// inline before calling isDesktopApp().
+export const DESKTOP_BUILD = process.env.REACT_APP_DESKTOP === "true";
+
+export interface DesktopDisplay {
+  fullscreen: boolean;
+  width: number;
+  height: number;
+  resolutions: { width: number; height: number }[];
+}
+export interface DesktopState {
+  display: DesktopDisplay;
+  steam: {
+    available: boolean;
+    online: boolean;
+    steamId?: string;
+    displayName?: string;
+    cloudEnabled: boolean;
+    timelineSupported?: boolean;
+  };
+}
+export interface DesktopScore {
+  steamId: string;
+  displayName: string;
+  score: number;
+  rank: number;
+  scenarioId: number;
+  difficulty: DifficultyType;
+}
+export type DesktopCloudState = "disabled" | "offline" | "ready" | "failed";
+export interface DesktopActivity {
+  phase:
+    "loading" | "menu" | "playing" | "paused" | "replay" | "victory" | "ended";
+  scenarioId?: number;
+  year?: number;
+  totalYears?: number;
+  timelineEnabled: boolean;
+}
+export interface DesktopTimelineEvent {
+  runId: string;
+  eventId: string;
+  kind: "construction" | "blackout" | "recovery" | "victory";
+  scenarioId: number;
+  year: number;
+}
+export interface DesktopBridge {
+  apiVersion: 1;
+  getState(): Promise<DesktopState>;
+  setDisplay(
+    display: Pick<DesktopDisplay, "fullscreen" | "width" | "height">,
+  ): Promise<DesktopDisplay>;
+  onStateChanged(callback: (state: DesktopState) => void): () => void;
+  onGameFocusChanged(callback: (focused: boolean) => void): () => void;
+  quit(): Promise<void>;
+  onBeforeQuit(callback: () => void): () => void;
+  readyToQuit(success?: boolean): void;
+  readSaveLibrary(): Promise<{
+    local: unknown | null;
+    cloud: unknown | null;
+    cloudCopies?: unknown[];
+    cloudState: DesktopCloudState;
+  }>;
+  writeSaveLibrary(
+    library: unknown,
+    syncCloud?: boolean,
+  ): Promise<{ cloudState: DesktopCloudState }>;
+  getLeaderboard(request: {
+    scenarioId: number;
+    difficulty?: DifficultyType;
+    scope: "global" | "friends" | "player";
+    challengeId?: string;
+  }): Promise<DesktopScore[]>;
+  submitScore(score: {
+    scenarioId: number;
+    difficulty: DifficultyType;
+    score: number;
+    challengeId?: string;
+  }): Promise<void>;
+  openFriends(): Promise<void>;
+  setActivity?(activity: DesktopActivity): Promise<void>;
+  addTimelineEvent?(event: DesktopTimelineEvent): Promise<void>;
+}
+
+declare global {
+  interface Window {
+    electrifyDesktop?: DesktopBridge;
+  }
+}
+
+/** The isolated preload is the only native capability available to the renderer. */
+export function getDesktop(): DesktopBridge | undefined {
+  if (!DESKTOP_BUILD) return undefined;
+  return typeof window !== "undefined" &&
+    window.electrifyDesktop?.apiVersion === 1
+    ? window.electrifyDesktop
+    : undefined;
+}
+export const isDesktopApp = DESKTOP_BUILD
+  ? (): boolean => !!getDesktop()
+  : (): boolean => false;

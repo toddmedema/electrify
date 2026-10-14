@@ -19,6 +19,8 @@ import {
   TableHead,
   TableRow,
   Typography,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ScreenHeader from "../base/ScreenHeader";
 import InfoIcon from "@mui/icons-material/Info";
@@ -43,6 +45,7 @@ import {
 } from "../../Types";
 
 import { formatScore } from "../../helpers/Format";
+import { isDesktopApp } from "../../Desktop";
 
 export interface StateProps {
   challenge?: ChallengeInvitation;
@@ -72,6 +75,7 @@ interface State {
   // The replay currently being fetched, so its row can show a spinner instead of the play button
   loadingReplayId?: string;
   leaderboardExpanded?: boolean;
+  steamScope?: "global" | "friends";
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -99,6 +103,7 @@ function BriefingFact(props: {
 export default class NewGameDetails extends React.Component<Props, State> {
   private boardRequestId = 0;
   private myBestRequestId = 0;
+  private allScoresRequestId = 0;
 
   constructor(props: Props) {
     super(props);
@@ -124,6 +129,16 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const difficulty = this.props.game.difficulty;
     this.setState({ scores: undefined, boardFailed: false });
     try {
+      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+        const { desktopScores } = await import("../../DesktopScores");
+        const scores = await desktopScores(
+          scenario.id,
+          difficulty,
+          this.state.steamScope || "global",
+        );
+        if (requestId === this.boardRequestId) this.setState({ scores });
+        return;
+      }
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
@@ -155,8 +170,19 @@ export default class NewGameDetails extends React.Component<Props, State> {
     if (!scenario) {
       return;
     }
+    const requestId = ++this.allScoresRequestId;
     this.setState({ allScores: undefined, allScoresFailed: false });
     try {
+      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+        const { desktopScores } = await import("../../DesktopScores");
+        const allScores = await desktopScores(
+          scenario.id,
+          undefined,
+          this.state.steamScope || "global",
+        );
+        if (requestId === this.allScoresRequestId) this.setState({ allScores });
+        return;
+      }
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
@@ -165,12 +191,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
           limit(50),
         ),
       );
+      if (requestId !== this.allScoresRequestId) return;
       this.setState({
         allScores: querySnapshot.docs.map((doc) => doc.data() as ScoreType),
       });
     } catch (err) {
       console.warn("Couldn't load all high scores: ", err);
-      this.setState({ allScores: [], allScoresFailed: true });
+      if (requestId === this.allScoresRequestId)
+        this.setState({ allScores: [], allScoresFailed: true });
     }
   }
 
@@ -195,6 +223,13 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const difficulty = this.props.game.difficulty;
     this.setState({ myTopScore: undefined });
     try {
+      if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+        const { desktopScores } = await import("../../DesktopScores");
+        const scores = await desktopScores(scenario.id, difficulty, "player");
+        if (requestId === this.myBestRequestId)
+          this.setState({ myTopScore: scores[0] });
+        return;
+      }
       const querySnapshot = await getDocs(
         query(
           collection(getDb(), "scores"),
@@ -281,6 +316,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
   }
 
+  public componentWillUnmount() {
+    ++this.boardRequestId;
+    ++this.myBestRequestId;
+    ++this.allScoresRequestId;
+  }
+
   public componentDidUpdate(prevProps: Props) {
     if (this.props.game.scenarioId !== prevProps.game.scenarioId) {
       const scenario =
@@ -346,7 +387,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
-    const scoreColumnCount = leaderboardExpanded ? 5 : 4;
+    // Steam boards have no replays or Google sign-in.
+    const desktopApp =
+      process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
+    const scoreColumnCount =
+      (leaderboardExpanded ? 5 : 4) - (desktopApp ? 1 : 0);
     const visibleBoardFailed = leaderboardExpanded
       ? allScoresFailed
       : boardFailed;
@@ -450,6 +495,29 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
           {!challenge && (
             <div className="leaderboard">
+              {desktopApp && (
+                <ToggleButtonGroup
+                  exclusive
+                  value={this.state.steamScope || "global"}
+                  aria-label="Steam leaderboard"
+                  size="small"
+                  sx={{ m: 1.5 }}
+                  onChange={(
+                    _event,
+                    steamScope: "global" | "friends" | null,
+                  ) => {
+                    if (!steamScope) return;
+                    this.setState({ steamScope, allScores: undefined }, () => {
+                      void this.loadBoard();
+                      if (this.state.leaderboardExpanded)
+                        void this.loadAllScores();
+                    });
+                  }}
+                >
+                  <ToggleButton value="global">Global</ToggleButton>
+                  <ToggleButton value="friends">Friends</ToggleButton>
+                </ToggleButtonGroup>
+              )}
               <Table id="HighScores">
                 <TableHead>
                   <TableRow>
@@ -466,7 +534,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     <TableCell>Name</TableCell>
                     <TableCell>Score</TableCell>
                     {leaderboardExpanded && <TableCell>Level</TableCell>}
-                    <TableCell className="replay">Replay</TableCell>
+                    {!desktopApp && (
+                      <TableCell className="replay">Replay</TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -482,7 +552,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           {difficultyLabel(myTopScore.difficulty)}
                         </TableCell>
                       )}
-                      {this.renderReplayCell(myTopScore)}
+                      {!desktopApp && this.renderReplayCell(myTopScore)}
                     </TableRow>
                   )}
                   {!visibleScores && (
@@ -499,7 +569,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       <TableCell colSpan={scoreColumnCount}>
                         <Typography variant="body2" color="textSecondary">
                           {visibleBoardFailed
-                            ? "Couldn't load the high scores right now."
+                            ? desktopApp
+                              ? "Steam scores are unavailable. You can still play and save offline."
+                              : "Couldn't load the high scores right now."
                             : "Finish this game to join the leaderboard"}
                         </Typography>
                       </TableCell>
@@ -531,7 +603,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                               {difficultyLabel(score.difficulty)}
                             </TableCell>
                           )}
-                          {this.renderReplayCell(score)}
+                          {!desktopApp && this.renderReplayCell(score)}
                         </TableRow>
                       );
                     })}
@@ -547,7 +619,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </div>
           )}
           {/* Below the board rather than in place of it: the board is the reason to log in */}
-          {!challenge && !uid && (
+          {!challenge && !uid && !desktopApp && (
             <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
               <Button variant="outlined" color="primary" onClick={login}>
                 Sign in with Google

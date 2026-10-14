@@ -168,50 +168,28 @@ $delta_bad: var(--delta-bad);
 // Transitional animation classes
 // ===============================================
 
-.next-enter {
-  transform: translate(100%);
-}
-.next-enter.next-enter-active {
-  transform: translate(0%);
-  transition: transform 300ms ease-in-out;
-}
-.next-exit {
-  position: absolute;
-  transform: translate(0%);
-}
-.next-exit.next-exit-active {
-  transform: translate(-100%);
-  transition: transform 300ms ease-in-out;
-}
-
-.prev-enter {
-  transform: translate(-100%);
-}
-.prev-enter.prev-enter-active {
-  transform: translate(0%);
-  transition: transform 300ms ease-in-out;
-}
-.prev-exit {
-  position: absolute;
-  transform: translate(0%);
-}
-.prev-exit.prev-exit-active {
-  transform: translate(100%);
-  transition: transform 300ms ease-in-out;
-}
-
+.next-enter,
+.prev-enter,
 .nav-enter {
-  opacity: 1;
+  opacity: 0;
 }
+.next-enter.next-enter-active,
+.prev-enter.prev-enter-active,
 .nav-enter.nav-enter-active {
   opacity: 1;
+  transition: opacity 300ms ease-in-out;
 }
+.next-exit,
+.prev-exit,
 .nav-exit {
   opacity: 1;
+  pointer-events: none;
 }
+.next-exit.next-exit-active,
+.prev-exit.prev-exit-active,
 .nav-exit.nav-exit-active {
-  opacity: 0.01;
-  transition: opacity 250ms ease-out;
+  opacity: 0;
+  transition: opacity 300ms ease-in-out;
 }
 
 .fadein-fast {
@@ -360,6 +338,29 @@ button,
   }
 }
 
+.keyboardMenu :focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.keyboardMenu .MuiTouchRipple-ripplePulsate {
+  display: none;
+}
+.keyboardMenu :is(.settingsRow, .settingsKeyboardRow):focus-within {
+  background: var(--bg-raised);
+  box-shadow: inset 3px 0 var(--interactive-blue);
+}
+.menuKeyHint {
+  margin: 8px 0;
+  text-align: center;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption-sm);
+}
+@media (pointer: coarse) {
+  .menuKeyHint {
+    display: none;
+  }
+}
+
 // Anything wider than a phone gets the whole window: the frame's width cap - and the side
 // borders that bounded it - only earned their keep while there was a grey page showing around it
 @media screen and (min-width: $abswidthmax) {
@@ -386,6 +387,11 @@ button,
     min-height: 0;
     width: 100%;
   }
+}
+
+.app_container.single-panel {
+  max-width: 1400px;
+  margin-inline: auto;
 }
 
 #noscript {

@@ -30,6 +30,7 @@ import {
   selectUpcomingStoryEvents,
   UpcomingStoryEventType,
 } from "../views/StoryEventSelectors";
+import { getDesktop, isDesktopApp } from "../../Desktop";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -253,6 +254,16 @@ export function GameAppBar(props: Props) {
                 ? "Main menu"
                 : "Save & Quit"}
           </MenuItem>
+          {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
+            <MenuItem
+              onClick={() => {
+                handleMenuClose();
+                void getDesktop()?.quit();
+              }}
+            >
+              Quit
+            </MenuItem>
+          )}
         </Menu>
       </>
     ),

@@ -18,6 +18,8 @@ import {
   shareText,
 } from "../../helpers/Share";
 import InstallAppButton from "../base/InstallAppButton";
+import { getDesktop, isDesktopApp } from "../../Desktop";
+import { useMenuKeys } from "../base/useMenuKeys";
 
 export interface StateProps {
   audioEnabled?: boolean;
@@ -48,6 +50,17 @@ const DiscordIcon = () => (
 );
 
 const MainMenu = (props: Props): React.JSX.Element => {
+  const menuKeys = useMenuKeys();
+  const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
+  // The desktop game bundles no website pages, so those open in the player's browser.
+  const sitePage = (path: string) =>
+    desktopApp
+      ? {
+          href: `https://electrifygame.com${path}`,
+          target: "_blank",
+          rel: "noopener noreferrer",
+        }
+      : { href: path };
   const startLabel = props.hasSavedGame ? "Start a new game" : "Start playing";
   const [shareStatus, setShareStatus] = React.useState("");
   // An <img> can't read the page's custom properties, so dark swaps in a copy of the logo painted
@@ -100,7 +113,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <Typography component="h1" className="srOnly">
         Electrify
       </Typography>
-      <Box id="centeredMenu" sx={{ px: 3 }}>
+      <Box
+        id="centeredMenu"
+        className="keyboardMenu"
+        {...menuKeys}
+        sx={{ px: 3 }}
+      >
         <Stack
           component="section"
           aria-label="Primary actions"
@@ -178,6 +196,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
+          {desktopApp && (
+            <Button variant="text" onClick={() => void getDesktop()?.quit()}>
+              Quit
+            </Button>
+          )}
         </Stack>
         <Box className="utilityActions">
           <Stack
@@ -192,8 +215,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
               justifyContent: "center",
             }}
           >
-            <InstallAppButton />
-            {props.audioEnabled === undefined && (
+            {!desktopApp && <InstallAppButton />}
+            {props.audioEnabled === undefined && !desktopApp && (
               <Button
                 color="primary"
                 startIcon={<VolumeUpIcon />}
@@ -221,7 +244,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </IconButton>
         <IconButton
           color="primary"
-          href="/about.html#feedback"
+          {...sitePage("/about.html#feedback")}
           aria-label="Send feedback"
           size="large"
         >
@@ -229,7 +252,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         </IconButton>
         <IconButton
           color="primary"
-          href="/about.html"
+          {...sitePage("/about.html")}
           aria-label="About Electrify"
           size="large"
         >

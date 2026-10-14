@@ -12,6 +12,7 @@
     "@mui/material": "^9.3.1",
     "@reduxjs/toolkit": "^2.12.0",
     "firebase": "^12.18.0",
+    "koffi": "3.3.3",
     "lodash.clonedeep": "^4.5.0",
     "numbro": "^2.5.0",
     "react": "^18.3.1",
@@ -19,6 +20,7 @@
     "react-hotkeys": "^2.0.0",
     "react-redux": "^9.3.0",
     "react-transition-group": "^4.4.5",
+    "steamworks.js": "0.4.0",
     "suncalc": "^2.0.1",
     "uplot": "^1.6.32"
   },
@@ -34,6 +36,8 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/react-transition-group": "^4.4.12",
+    "electron": "44.7.1",
+    "electron-builder": "26.15.3",
     "fake-indexeddb": "^6.2.5",
     "prettier": "^3.9.6",
     "react-scripts": "5.0.1",
@@ -56,10 +60,10 @@
     "update-weather": "node scripts/update-weather.js",
     "fetch-watersheds": "node scripts/fetch-watersheds.js",
     "eject": "react-scripts eject",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\"",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" --max-warnings=0",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\" \"scripts/**/*.js\" \"e2e/**/*.ts\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\" --fix",
     "typecheck": "tsc --noEmit && tsc -p e2e",
     "check": "node scripts/check.js",
     "fix": "npm run lint:fix && npm run format",
@@ -74,7 +78,14 @@
     "pretest:sim": "npm run compatibility:generate && npm run icons:generate",
     "pretest:e2e": "npm run compatibility:generate && npm run icons:generate",
     "presim": "npm run compatibility:generate",
-    "pretypecheck": "npm run compatibility:generate"
+    "pretypecheck": "npm run compatibility:generate",
+    "desktop:build": "node scripts/desktop-build.js",
+    "desktop:start": "electron .",
+    "desktop:pack": "node scripts/desktop-package.js --mode steam",
+    "desktop:pack:offline": "node scripts/desktop-package.js --mode offline",
+    "desktop:verify": "node scripts/desktop-verify.js",
+    "test:desktop:native": "node --test electron/*.test.cjs",
+    "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -141,6 +152,15 @@
             }
           ]
         }
+      },
+      {
+        "files": [
+          "electron/**/*.cjs"
+        ],
+        "env": {
+          "node": true,
+          "es2020": true
+        }
       }
     ]
   },
@@ -203,5 +223,6 @@
       "webpack-dev-server": "^5.2.6"
     },
     "uuid": "^11.1.1"
-  }
+  },
+  "main": "electron/main.cjs"
 }

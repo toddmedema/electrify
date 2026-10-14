@@ -24,6 +24,7 @@ import {
   deleteSavedGame,
   exportCurrentSave,
   exportSaveRecovery,
+  exportSavedGame,
   readSavedGame,
   refreshSavedGames,
   resumeSavedGame,
@@ -37,6 +38,7 @@ import { saveTitle } from "../../helpers/SaveDisplay";
 import CloudSaveStatus from "../base/CloudSaveStatus";
 import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
+import { isDesktopApp } from "../../Desktop";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -441,12 +443,19 @@ export default function SavedGames(): React.JSX.Element {
             if (id)
               if (saves.unavailable?.[id])
                 void perform(() => exportSaveRecovery(id));
+              else if (
+                process.env.REACT_APP_DESKTOP === "true" &&
+                isDesktopApp()
+              )
+                void perform(() => exportSavedGame(id));
               else setSharing(id);
           }}
         >
           {menu && saves.unavailable?.[menu.save.id]
             ? "Download recovery data"
-            : "Share"}
+            : process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
+              ? "Export save"
+              : "Share"}
         </MenuItem>
         {menu?.save.status === "completed" &&
           !saves.unavailable?.[menu.save.id] && (

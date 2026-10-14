@@ -30,7 +30,7 @@ export default function ShareSaveDialog({
   const request = useRef(0);
   const input = useRef<HTMLInputElement>(null);
   const create = async (snapshot: SaveFileType, generation: number) => {
-    const uid = firebaseAppAuth.currentUser?.uid;
+    const uid = firebaseAppAuth?.currentUser?.uid;
     if (!uid) return;
     setBusy(true);
     try {
@@ -58,7 +58,7 @@ export default function ShareSaveDialog({
           if (request.current !== generation) return;
           setFile(snapshot);
           setBusy(false);
-          if (firebaseAppAuth.currentUser) void create(snapshot, generation);
+          if (firebaseAppAuth?.currentUser) void create(snapshot, generation);
         })
         .catch(() => {
           if (request.current === generation) {
@@ -76,7 +76,7 @@ export default function ShareSaveDialog({
     const generation = request.current;
     setError("");
     setBusy(true);
-    if (!firebaseAppAuth.currentUser && !(await login())) {
+    if (!firebaseAppAuth?.currentUser && !(await login())) {
       if (generation === request.current) {
         setBusy(false);
         setError("Sign-in didn't finish. Please try again.");
@@ -119,7 +119,7 @@ export default function ShareSaveDialog({
               onFocus={() => input.current?.select()}
             />
           )}
-          {!url && !busy && !firebaseAppAuth.currentUser && (
+          {!url && !busy && !firebaseAppAuth?.currentUser && (
             <Typography variant="body2">
               Sign in with Google to create a share link. No account is needed
               to open it.
@@ -156,7 +156,7 @@ export default function ShareSaveDialog({
             disabled={busy || !file}
             onClick={() => void signInAndShare()}
           >
-            {firebaseAppAuth.currentUser
+            {firebaseAppAuth?.currentUser
               ? "Create share link"
               : "Sign in and share"}
           </Button>

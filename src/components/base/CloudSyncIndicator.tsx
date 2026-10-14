@@ -14,6 +14,7 @@ import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import { useAppSelector } from "../../Store";
 import { retryCloudSync } from "../../CloudSaves";
+import { isDesktopApp } from "../../Desktop";
 
 type IndicatorState = "synced" | "syncing" | "offline" | "failed";
 
@@ -151,7 +152,11 @@ export default function CloudSyncIndicator(): React.JSX.Element | null {
         ? "Compatible cloud backups are up to date. Games load from this device."
         : "Cloud backup up to date. Games load from this device."
       : state === "offline"
-        ? "You're offline. Games save on this device; cloud backup resumes when you reconnect."
+        ? process.env.REACT_APP_DESKTOP === "true" &&
+          isDesktopApp() &&
+          cloudError
+          ? cloudError
+          : "You're offline. Games save on this device; cloud backup resumes when you reconnect."
         : state === "failed"
           ? cloudError || FAILED_FALLBACK
           : "Syncing cloud backup. Games load from this device.";

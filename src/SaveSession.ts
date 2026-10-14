@@ -482,6 +482,23 @@ export async function retryCurrentSave(): Promise<boolean> {
     return false;
   }
 }
+
+/** Electron waits for the actual save commit before allowing a normal window close. */
+export async function checkpointForDesktopExit(): Promise<void> {
+  await transitionTail;
+  const requested = active;
+  if (requested) {
+    requested.capture(getStore().getState().game);
+    await requested.flush();
+  }
+}
+
+/** Call only after Electron's required disk backup succeeds, immediately before close. */
+export async function releaseDesktopSaveWriter(): Promise<void> {
+  // A new Electron window has a new sessionStorage token. Release the durable lease so
+  // an immediate relaunch can resume; failed native writes leave the live writer intact.
+  await active?.release();
+}
 export async function renameSavedGame(id: string, name: string): Promise<void> {
   const current = active?.id === id ? active : undefined;
   if (current) {

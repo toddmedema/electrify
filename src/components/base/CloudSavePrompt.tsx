@@ -11,6 +11,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { cloudSavePromptVisible } from "../../reducers/GameActions";
 import { getLocalStorage, login } from "../../Globals";
 import { setStorageKeyValue } from "../../LocalStorage";
+import { isDesktopApp } from "../../Desktop";
 
 export const CLOUD_PROMPT_KEY = "electrify-cloud-save-prompt-seen";
 export default function CloudSavePrompt(): React.JSX.Element {
@@ -20,7 +21,10 @@ export default function CloudSavePrompt(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const visible = open && saves.cloudState === "signedOut";
+  const visible =
+    !(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) &&
+    open &&
+    saves.cloudState === "signedOut";
   useEffect(() => {
     if (!visible) return;
     dispatch(cloudSavePromptVisible(true));
@@ -30,6 +34,7 @@ export default function CloudSavePrompt(): React.JSX.Element {
   }, [dispatch, visible]);
   useEffect(() => {
     if (
+      (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) ||
       seen.current ||
       saves.cloudState !== "signedOut" ||
       !saves.cloudPromptRequested ||

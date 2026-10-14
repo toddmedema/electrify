@@ -21,7 +21,7 @@ import {
   scenarioFromSearch,
   scenarioListUrl,
 } from "./ScenarioUrl";
-import { startSaveSessions } from "./SaveSession";
+import { saveRepository, startSaveSessions } from "./SaveSession";
 import { startCloudSaves } from "./CloudSaves";
 import { startEventToasts } from "./EventToasts";
 import { NAV_CARDS } from "./Constants";
@@ -37,6 +37,7 @@ import {
 } from "./Theme";
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
+import { getDesktop, isDesktopApp } from "./Desktop";
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -68,6 +69,7 @@ function setupDevice(): () => void {
 }
 
 function setupStorage(document: Document) {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
   // Alert user if cookies disabled
   // Based on https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cookies.js
   try {
@@ -179,8 +181,9 @@ function OfflineNotice(): React.JSX.Element | null {
   );
   return online || onGameScreen ? null : (
     <div className="offlineBanner" role="status">
-      Offline — saves use this device’s browser storage. Online features will
-      reconnect automatically.
+      {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
+        ? "Offline — games save on this device. Steam features reconnect when Steam is online."
+        : "Offline — saves use this device’s browser storage. Online features will reconnect automatically."}
     </div>
   );
 }
@@ -286,8 +289,9 @@ export default function App() {
     };
     window.addEventListener("popstate", onPopState);
 
+    let desktopFocused = true;
     const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
+      if (document.visibilityState === "hidden" || !desktopFocused) {
         store.dispatch(pauseAudio());
         store.dispatch(pageHidden());
       } else if (document.visibilityState === "visible") {
@@ -311,7 +315,76 @@ export default function App() {
     const stopEventToasts = startEventToasts(store);
 
     // Returns its own unsubscribe, which was previously dropped on the floor
-    const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
+    const desktop =
+      process.env.REACT_APP_DESKTOP === "true" ? getDesktop() : undefined;
+    let authLive = true;
+    let steamProfileUid: string | undefined;
+    let unsubscribeSteam: (() => void) | undefined;
+    let unsubscribeDesktopFocus: (() => void) | undefined;
+    let unsubscribePresence: (() => void) | undefined;
+    let stopDesktopFeedback: (() => void) | undefined;
+    if (process.env.REACT_APP_DESKTOP === "true" && desktop) {
+      const updateSteam = (
+        state: Awaited<ReturnType<NonNullable<typeof desktop>["getState"]>>,
+      ) => {
+        if (!authLive) return;
+        if (state.steam.steamId) {
+          const uid = `steam:${state.steam.steamId}`;
+          store.dispatch(
+            delta({
+              uid,
+              displayName: state.steam.displayName || "Steam player",
+            }),
+          );
+          if (steamProfileUid !== uid) {
+            steamProfileUid = uid;
+            void (async () => {
+              const bests: NonNullable<import("./Types").UserType["bests"]> =
+                {};
+              for (const entry of await saveRepository.list()) {
+                try {
+                  const { result } = await saveRepository.read(entry.id);
+                  if (
+                    result &&
+                    result.score >
+                      (bests[String(result.scenarioId)]?.score ?? -Infinity)
+                  ) {
+                    bests[String(result.scenarioId)] = {
+                      score: result.score,
+                      difficulty: result.difficulty,
+                      date: Date.parse(entry.savedAt),
+                    };
+                  }
+                } catch {
+                  /* A damaged historical save cannot prevent playing. */
+                }
+              }
+              if (authLive && store.getState().user.uid === uid)
+                store.dispatch(delta({ bests }));
+            })().catch(() => undefined);
+          }
+        } else {
+          steamProfileUid = undefined;
+          store.dispatch(reset());
+        }
+      };
+      unsubscribeSteam = desktop.onStateChanged(updateSteam);
+      unsubscribeDesktopFocus = desktop.onGameFocusChanged((focused) => {
+        desktopFocused = focused;
+        onVisibilityChange();
+      });
+      unsubscribePresence = require("./DesktopActivity").startDesktopActivity(
+        store,
+        desktop,
+      );
+      stopDesktopFeedback =
+        require("./audio/DesktopFeedback").startDesktopFeedback(store);
+      void desktop
+        .getState()
+        .then(updateSteam)
+        .catch(() => undefined);
+    }
+    const unsubscribeAuth = firebaseAppAuth?.onAuthStateChanged(
       (user: User | null) => {
         if (!user) {
           // Signed out, or never signed in: drop the whole slice rather than only the uid, so one
@@ -354,7 +427,14 @@ export default function App() {
       stopSaveSessions();
       stopCloudSaves();
       stopEventToasts();
-      unsubscribeAuth();
+      if (process.env.REACT_APP_DESKTOP === "true") {
+        authLive = false;
+        unsubscribeSteam?.();
+        unsubscribeDesktopFocus?.();
+        unsubscribePresence?.();
+        stopDesktopFeedback?.();
+      }
+      unsubscribeAuth?.();
       document.removeEventListener("deviceready", onDeviceReady, false);
       teardownDevice?.();
     };

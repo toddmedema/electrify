@@ -27,6 +27,7 @@ import {
   validateDisplayName,
 } from "../helpers/DisplayName";
 import { encodeReplay, MAX_REPLAY_BYTES, replayByteLength } from "../Replay";
+import { isDesktopApp } from "../Desktop";
 
 export const initialUser: UserType = {};
 
@@ -164,7 +165,12 @@ async function backfillScoreNames(uid: string, displayName: string) {
 export async function fetchGlobalRank(
   scenarioId: number,
   score: number,
+  difficulty: DifficultyType = "Employee",
 ): Promise<number> {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    const { desktopGlobalRank } = await import("../DesktopScores");
+    return desktopGlobalRank(scenarioId, difficulty, score);
+  }
   const better = await getCountFromServer(
     query(
       collection(getDb(), "scores"),
@@ -248,7 +254,10 @@ export const submitHighscore = createAsyncThunk<
   if (!uid) {
     return { uid, scenarioId: submission.scenarioId };
   }
-  await submitScore(uid, displayName, submission);
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    const { submitDesktopScore } = await import("../DesktopScores");
+    await submitDesktopScore(submission);
+  } else await submitScore(uid, displayName, submission);
 
   const previous = (bests || {})[String(submission.scenarioId)];
   if (previous && previous.score >= submission.score) {
@@ -259,7 +268,8 @@ export const submitHighscore = createAsyncThunk<
     difficulty: submission.difficulty,
     date: Date.now(),
   };
-  await saveBest(uid, submission.scenarioId, best);
+  if (!(process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()))
+    await saveBest(uid, submission.scenarioId, best);
   return { uid, scenarioId: submission.scenarioId, best };
 });
 

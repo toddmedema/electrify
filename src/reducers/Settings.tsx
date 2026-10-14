@@ -9,6 +9,7 @@ import { SettingsType } from "../Types";
 import { pause, resume } from "../data/Audio";
 import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
+import { isDesktopApp } from "../Desktop";
 
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
@@ -26,6 +27,15 @@ export const initialSettings: SettingsType = {
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
 };
+
+if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+  // Desktop sound needs no first-run permission prompt. A saved mute is still authoritative.
+  initialSettings.audioEnabled ??= true;
+  initialSettings.controllerVibrationEnabled =
+    getStorageBooleanOrUndefined("controllerVibrationEnabled") ?? false;
+  initialSettings.steamTimelineEnabled =
+    getStorageBooleanOrUndefined("steamTimelineEnabled") ?? false;
+}
 
 export const settingsSlice = createSlice({
   name: "settings",
