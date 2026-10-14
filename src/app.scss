@@ -2473,6 +2473,7 @@ $pane_header_height: 48px;
 // One tooltip covering every series at the hovered x, the way the Victory voronoi container's
 // did, positioned by the chart's own cursor handler
 .chartTooltip {
+  box-sizing: border-box;
   position: absolute;
   display: none;
   z-index: 10;
