@@ -122,6 +122,9 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await popup.hover();
   await expect(popup).toContainText("First Spark");
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    popup.getByRole("button", { name: "View achievements", exact: true }),
+  ).toHaveCount(0);
   // Hit testing proves the popup is above the modal backdrop, not merely laid out underneath it.
   await expect
     .poll(() =>
@@ -173,8 +176,9 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "menu", exact: true }),
-  ).toBeFocused();
+    page.getByRole("heading", { name: "Achievements", exact: true }),
+  ).toBeHidden();
+  await expect(page.locator("#appbar:visible")).toBeVisible();
   await page.reload();
   await openGallery(page);
   await expect(

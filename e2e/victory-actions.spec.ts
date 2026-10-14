@@ -153,6 +153,7 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
   await editSavedGame(page, (save) => {
     const offset = 1440 - 15 - save.game.date.minute;
     save.game.date.minute += offset;
+    save.game.lowCashWarningMonth = save.game.date.monthsElapsed;
     for (const tick of save.game.timeline) {
       tick.minute += offset;
       tick.cash = -1000000000;

@@ -343,15 +343,17 @@ export default function AchievementNotifications(): React.JSX.Element {
                 >
                   {entry.description}
                 </Typography>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    achievementJournal.clearNotifications();
-                    dispatch(navigate("ACHIEVEMENTS"));
-                  }}
-                >
-                  View achievements
-                </Button>
+                {container === document.body && (
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      achievementJournal.clearNotifications();
+                      dispatch(navigate("ACHIEVEMENTS"));
+                    }}
+                  >
+                    View achievements
+                  </Button>
+                )}
               </div>
               <IconButton
                 aria-label={`Dismiss ${entry.name} achievement notification`}
