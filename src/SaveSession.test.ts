@@ -10,6 +10,8 @@ import {
   startSaveSessions,
   saveSessionMiddleware,
   snapshotSavedGame,
+  checkpointForDesktopExit,
+  releaseDesktopSaveWriter,
 } from "./SaveSession";
 import { downloadSave } from "./SaveFile";
 import { store } from "./Store";
@@ -422,6 +424,31 @@ async function openActive() {
   expect(await completeSaveLoading(getLoadingGeneration())).toBe(true);
   return repository;
 }
+
+test("desktop shutdown commits progress before releasing its lease for immediate relaunch", async () => {
+  const repository = await openActive();
+  repository.release.mockClear();
+  const commit = deferred<SaveMetadata>();
+  repository.writeSnapshot.mockReturnValueOnce(commit.promise);
+  store.dispatch({ type: "game/delta", payload: { dollarsPerkWh: 0.12 } });
+  const exiting = checkpointForDesktopExit();
+  await eventually(() =>
+    repository.writeSnapshot.mock.results.some(
+      (call: { value: unknown }) => call.value === commit.promise,
+    ),
+  );
+  expect(repository.release).not.toHaveBeenCalled();
+  commit.resolve(metadata(3));
+  await exiting;
+  expect(repository.release).not.toHaveBeenCalled();
+  await releaseDesktopSaveWriter();
+  expect(repository.release).toHaveBeenCalledWith({
+    saveId: "A",
+    writerToken: "handoff-A",
+    revision: 3,
+  });
+  expect(await quitSavedGame()).toBe(true);
+});
 
 test("only a successful Save & Quit requests the invitation and immediate cloud backup", async () => {
   const repository = await openActive();

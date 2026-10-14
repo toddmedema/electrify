@@ -1,4 +1,5 @@
 import { LocationType } from "../Types";
+import { isDesktopApp } from "../Desktop";
 
 /**
  * Asks the active service worker to cache everything needed to start a game at this location.
@@ -8,6 +9,7 @@ import { LocationType } from "../Types";
 export async function prefetchScenarioData(
   location: LocationType,
 ): Promise<void> {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return;
   }
@@ -30,6 +32,7 @@ export async function prefetchScenarioData(
  * just installed apps. The worker skips what it already has, so repeat calls are cheap.
  */
 export async function prefetchIcons(): Promise<void> {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) return;
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return;
   }

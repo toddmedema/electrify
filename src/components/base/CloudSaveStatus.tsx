@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { sessionChanged } from "../../SaveLibrary";
 import { login } from "../../Globals";
 import { refreshToUpdate } from "../../helpers/Cache";
+import { isDesktopApp } from "../../Desktop";
 
 /**
  * Cloud backup messages that need the player: the sign-in invitation and the alerts that ask
@@ -15,6 +16,20 @@ export default function CloudSaveStatus(): React.JSX.Element | null {
     cloudConflicts,
     incompatibleCloudSaves = [],
   } = useAppSelector((state) => state.saves);
+  if (
+    process.env.REACT_APP_DESKTOP === "true" &&
+    isDesktopApp() &&
+    (cloudState === "offline" ||
+      cloudState === "signedOut" ||
+      cloudState === "initializing" ||
+      !cloudState)
+  )
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Games save on this device. Steam Cloud syncs when Steam is online and
+        cloud saves are enabled.
+      </Typography>
+    );
   if (cloudState === "signedOut" || !cloudState)
     return (
       <Stack

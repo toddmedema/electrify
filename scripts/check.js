@@ -10,6 +10,7 @@ const steps = [
   { name: "Types", script: "typecheck" },
   { name: "Lint", script: "lint", fix: "npm run lint:fix" },
   { name: "Formatting", script: "format:check", fix: "npm run format" },
+  { name: "Desktop runtime", script: "test:desktop:native" },
   { name: "Tests", script: "test:ci" },
   { name: "Simulation tests", script: "test:sim" },
   {

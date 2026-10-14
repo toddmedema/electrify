@@ -11,25 +11,33 @@ import {
   signOut,
 } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
+import { isDesktopApp } from "./Desktop";
 
-const firebaseApp = initializeApp({
-  // Set by CI from a repo secret; falls back to the placeholder for local dev
-  // (contact an admin for a key). Firebase web API keys are public by design --
-  // access is controlled by Firestore rules and API key restrictions, not secrecy.
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "CONTACT-ADMIN-TO-GET-KEY",
-  authDomain: "electrify-game.firebaseapp.com",
-  databaseURL: "https://electrify-game.firebaseio.com",
-  projectId: "electrify-game",
-  storageBucket: "electrify-game.appspot.com",
-  messagingSenderId: "882673691459",
-  appId: "1:882673691459:web:b6af63afe7ddf377a31df6",
-  measurementId: "G-M064W1XFDY",
-});
-export const firebaseAppAuth = getAuth(firebaseApp);
+const firebaseApp =
+  process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
+    ? undefined
+    : initializeApp({
+        // Set by CI from a repo secret; falls back to the placeholder for local dev
+        // (contact an admin for a key). Firebase web API keys are public by design --
+        // access is controlled by Firestore rules and API key restrictions, not secrecy.
+        apiKey:
+          process.env.REACT_APP_FIREBASE_API_KEY || "CONTACT-ADMIN-TO-GET-KEY",
+        authDomain: "electrify-game.firebaseapp.com",
+        databaseURL: "https://electrify-game.firebaseio.com",
+        projectId: "electrify-game",
+        storageBucket: "electrify-game.appspot.com",
+        messagingSenderId: "882673691459",
+        appId: "1:882673691459:web:b6af63afe7ddf377a31df6",
+        measurementId: "G-M064W1XFDY",
+      });
+// Desktop accounts come from Steam; even constructing Firebase Auth starts web transport.
+export const firebaseAppAuth = firebaseApp ? getAuth(firebaseApp) : undefined;
 const provider = new GoogleAuthProvider();
 
 export function login(): Promise<boolean> {
-  return signInWithPopup(firebaseAppAuth, provider)
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
+    return Promise.resolve(false);
+  return signInWithPopup(firebaseAppAuth!, provider)
     .then(() => {
       // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
       // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
@@ -48,7 +56,9 @@ export function login(): Promise<boolean> {
  * same way it hears about signing in, so nothing needs to be reset here -- see App.tsx.
  */
 export function logout(): Promise<void> {
-  return signOut(firebaseAppAuth);
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
+    return Promise.resolve();
+  return signOut(firebaseAppAuth!);
 }
 
 // The slice of the History API the game uses. Card navigation pushes a hash entry so the
@@ -96,6 +106,11 @@ const refs = {
  * outside the dev overlay it is a console line rather than anything the game reacts to.
  */
 export function logEvent(eventName: string, args?: object): void {
+  if (
+    (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) ||
+    !firebaseApp
+  )
+    return;
   try {
     if (!refs.analytics) {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -110,6 +125,11 @@ export function logEvent(eventName: string, args?: object): void {
 }
 
 export function getDb(): Firestore {
+  if (
+    !firebaseApp ||
+    (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp())
+  )
+    throw new Error("Web services are unavailable in the desktop game.");
   if (!refs.db) {
     refs.db = getFirestore(firebaseApp);
   }
@@ -216,6 +236,10 @@ export function getAudioContext(): AudioContext | null {
 }
 
 export function openWindow(url: string): void {
+  if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+    window.open(new URL(url, "https://electrifygame.com").href, "_blank");
+    return;
+  }
   window.open(url, "_system");
 }
 
@@ -228,6 +252,10 @@ export function getLocalStorage(): Storage {
   // Alert user if cookies disabled (after error display set up)
   // Based on https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cookies.js
   try {
+    if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
+      refs.localStorage = window.localStorage;
+      return refs.localStorage;
+    }
     document.cookie = "cookietest=1";
     const ret = document.cookie.indexOf("cookietest=") !== -1;
     document.cookie = "cookietest=1; expires=Thu, 01-Jan-1970 00:00:01 GMT";

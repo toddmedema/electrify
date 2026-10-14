@@ -23,6 +23,17 @@ import ScreenHeader from "../base/ScreenHeader";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
+import { getDesktop, isDesktopApp } from "../../Desktop";
+import { useDesktopState } from "../../DesktopState";
+import { useMenuKeys } from "../base/useMenuKeys";
+const DesktopDisplaySettings =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("../base/DesktopDisplaySettings"))
+    : () => null;
+const DesktopFeedbackSettings =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("../base/DesktopFeedbackSettings"))
+    : () => null;
 
 export interface StateProps {
   settings: SettingsType;
@@ -137,6 +148,7 @@ function VolumeSlider(props: {
   const value = Math.round(props.value * 100);
   return (
     <Box
+      className="settingsKeyboardRow"
       sx={{
         display: "grid",
         gridTemplateColumns: {
@@ -174,7 +186,11 @@ function VolumeSlider(props: {
 
 export default function Settings(props: Props): React.JSX.Element {
   const canInstallApp = useCanInstallApp();
+  const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
+  const desktop = useDesktopState();
   const onBack = () => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
     props.onBack();
     // Card transitions replace the button that opened Settings. Once the previous card is back,
     // return keyboard users to its stable replacement instead of leaving focus on <body>.
@@ -182,9 +198,10 @@ export default function Settings(props: Props): React.JSX.Element {
       document.querySelector<HTMLElement>("[data-settings-trigger]")?.focus();
     }, 350);
   };
+  const menuKeys = useMenuKeys(true, onBack);
 
   return (
-    <div className="flexContainer" id="gameCard">
+    <div className="flexContainer keyboardMenu" id="gameCard" {...menuKeys}>
       <ScreenHeader title="Settings" onBack={onBack} />
       <Box
         className="scrollable"
@@ -207,6 +224,9 @@ export default function Settings(props: Props): React.JSX.Element {
             boxSizing: "border-box",
           }}
         >
+          <p className="menuKeyHint">
+            Arrow keys to choose · Enter to select · Esc to go back
+          </p>
           <SettingsGroup id="preferences-settings" title="Preferences">
             <Stack divider={<Divider flexItem />}>
               <SettingRow
@@ -271,6 +291,11 @@ export default function Settings(props: Props): React.JSX.Element {
                   />
                 </Box>
               )}
+              {desktopApp && (
+                <React.Suspense fallback={null}>
+                  <DesktopFeedbackSettings kind="vibration" />
+                </React.Suspense>
+              )}
 
               <SettingRow
                 label="Units"
@@ -309,52 +334,108 @@ export default function Settings(props: Props): React.JSX.Element {
             </Stack>
           </SettingsGroup>
 
-          <SettingsGroup id="leaderboard-settings" title="Leaderboard">
-            <SettingRow
-              label={props.loggedIn ? "Leaderboard name" : "Public profile"}
-              description={
-                props.loggedIn
-                  ? props.displayName
-                    ? props.displayName
-                    : "Choose a public name for your scores."
-                  : "Sign in to post scores under a public name."
-              }
-              stackOnMobile
-            >
-              <Stack
-                direction="row"
-                spacing={1}
-                useFlexGap
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  flexWrap: "wrap",
-                  "& .MuiButton-root": {
-                    flex: { xs: "1 1 140px", sm: "0 0 auto" },
-                  },
-                }}
+          {desktopApp && (
+            <SettingsGroup id="display-settings" title="Display">
+              <React.Suspense
+                fallback={
+                  <Typography sx={{ p: 2 }}>
+                    Loading display settings…
+                  </Typography>
+                }
               >
-                {props.loggedIn ? (
-                  <>
-                    <Button variant="outlined" onClick={props.onChangeName}>
-                      {props.displayName ? "Edit name" : "Choose a name"}
-                    </Button>
-                    <Button variant="text" onClick={props.onLogout}>
-                      Sign out
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outlined" onClick={props.onLogin}>
-                    Sign in with Google
+                <DesktopDisplaySettings />
+              </React.Suspense>
+            </SettingsGroup>
+          )}
+          <SettingsGroup
+            id="leaderboard-settings"
+            title={desktopApp ? "Steam" : "Leaderboard"}
+          >
+            {desktopApp ? (
+              <Stack divider={<Divider flexItem />}>
+                <SettingRow
+                  label={desktop?.steam.displayName || "Steam player"}
+                  description={
+                    desktop?.steam.available
+                      ? desktop.steam.online
+                        ? "Steam is connected. Scores use your Steam profile name."
+                        : "Steam is offline. Play and save on this device."
+                      : "Steam is unavailable. Play and save on this device. Launch through Steam to connect."
+                  }
+                  stackOnMobile
+                >
+                  <Button
+                    variant="outlined"
+                    disabled={!desktop?.steam.online}
+                    onClick={() =>
+                      void getDesktop()
+                        ?.openFriends()
+                        .catch(() => undefined)
+                    }
+                  >
+                    Steam friends
                   </Button>
-                )}
+                </SettingRow>
+                <React.Suspense fallback={null}>
+                  <DesktopFeedbackSettings
+                    kind="timeline"
+                    timelineSupported={desktop?.steam.timelineSupported}
+                  />
+                </React.Suspense>
               </Stack>
-            </SettingRow>
+            ) : (
+              <>
+                <SettingRow
+                  label={props.loggedIn ? "Leaderboard name" : "Public profile"}
+                  description={
+                    props.loggedIn
+                      ? props.displayName
+                        ? props.displayName
+                        : "Choose a public name for your scores."
+                      : "Sign in to post scores under a public name."
+                  }
+                  stackOnMobile
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    useFlexGap
+                    sx={{
+                      width: { xs: "100%", sm: "auto" },
+                      flexWrap: "wrap",
+                      "& .MuiButton-root": {
+                        flex: { xs: "1 1 140px", sm: "0 0 auto" },
+                      },
+                    }}
+                  >
+                    {props.loggedIn ? (
+                      <>
+                        <Button variant="outlined" onClick={props.onChangeName}>
+                          {props.displayName ? "Edit name" : "Choose a name"}
+                        </Button>
+                        <Button variant="text" onClick={props.onLogout}>
+                          Sign out
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="outlined" onClick={props.onLogin}>
+                        Sign in with Google
+                      </Button>
+                    )}
+                  </Stack>
+                </SettingRow>
+              </>
+            )}
           </SettingsGroup>
 
           <SettingsGroup id="saved-game-settings" title="Game data">
             <SettingRow
               label="Saved games"
-              description="Resume, rename, share, or delete saves. Sign in for cloud backup and access on other devices."
+              description={
+                desktopApp
+                  ? "Games save automatically on this device. Steam Cloud backs them up when enabled and online."
+                  : "Resume, rename, share, or delete saves. Sign in for cloud backup and access on other devices."
+              }
               stackOnMobile
             >
               <Stack
@@ -380,7 +461,22 @@ export default function Settings(props: Props): React.JSX.Element {
             </SettingRow>
           </SettingsGroup>
 
-          {canInstallApp && (
+          {desktopApp && (
+            <SettingsGroup id="exit-settings" title="Game">
+              <SettingRow
+                label="Quit game"
+                description="Save your progress and close Electrify."
+              >
+                <Button
+                  variant="outlined"
+                  onClick={() => void getDesktop()?.quit()}
+                >
+                  Quit
+                </Button>
+              </SettingRow>
+            </SettingsGroup>
+          )}
+          {!desktopApp && canInstallApp && (
             <SettingsGroup id="app-settings" title="Install Electrify">
               <SettingRow
                 label="Install app"
@@ -450,14 +546,16 @@ export default function Settings(props: Props): React.JSX.Element {
             >
               GitHub
             </Button>
-            <Button
-              variant="text"
-              size="small"
-              onClick={() => void clearAppCache()}
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
-            >
-              Clear cached data
-            </Button>
+            {!desktopApp && (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => void clearAppCache()}
+                sx={{ color: "text.secondary", fontSize: "0.75rem" }}
+              >
+                Clear cached data
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Box>

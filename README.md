@@ -47,6 +47,14 @@ npm start
 
 This runs the app at [http://localhost:3000](http://localhost:3000).
 
+### Desktop and Steam
+
+`npm run desktop:pack:offline` builds a self-contained Electron package on Windows x64, Linux
+x64, or macOS Intel/Apple Silicon. Native CI publishes downloadable offline QA bundles. Use
+`npm run desktop:pack` with Electrify's `STEAM_APP_ID` to prepare a Steam depot. See
+[desktop build and Steam setup](docs/desktop-steam.md) for fullscreen controls, offline packaging,
+Cloud saves, friends leaderboards, testing and the remaining Steamworks release steps.
+
 ### Run tests
 
 ```sh

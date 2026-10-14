@@ -20,8 +20,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     transition = "instant";
   } else if (state.card.toPrevious) {
     transition = "prev";
-  } else if (state.card.name === "MAIN_MENU") {
-    transition = "instant";
   } else if (isNavCard(state.card.name)) {
     transition = "nav";
   } else if (
@@ -29,7 +27,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
       state.card.name,
     ) !== -1
   ) {
-    // modals that should fade in / out instead of slide
+    // Build screens share the game panes' fade transition.
     transition = "nav";
   }
 

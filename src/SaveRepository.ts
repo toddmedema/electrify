@@ -60,6 +60,13 @@ interface RepositoryOptions {
   leaseMs?: number;
 }
 
+export interface SaveRepositoryBackup {
+  version: 1;
+  saves: SaveMetadata[];
+  payloads: { id: string; save: unknown; result?: unknown }[];
+  sync: unknown[];
+}
+
 /** Random identity is browser bookkeeping, and never participates in seeded game outcomes. */
 export function newSaveId(): string {
   const values = new Uint8Array(16);
@@ -269,6 +276,144 @@ export class SaveRepository {
           done(sortSaves(entries)),
         ),
     );
+  }
+
+  /** One committed image, including deletion queues and damaged data kept for recovery. */
+  backup(): Promise<SaveRepositoryBackup> {
+    if (process.env.REACT_APP_DESKTOP !== "true")
+      return Promise.reject(
+        new SaveRepositoryError(
+          "unavailable",
+          "Desktop backups are unavailable in the browser build.",
+        ),
+      );
+    return this.transaction(
+      ["saves", "payloads", "sync"],
+      "readonly",
+      (tx, done, request) => {
+        request(tx.objectStore("saves").getAll(), (saves: SaveMetadata[]) => {
+          request(
+            tx.objectStore("payloads").getAll(),
+            (payloads: StoredPayload[]) => {
+              request(tx.objectStore("sync").getAll(), (sync: unknown[]) => {
+                done({ version: 1, saves, payloads, sync });
+              });
+            },
+          );
+        });
+      },
+    );
+  }
+
+  /** Restore a lost browser database only; an existing database can contain newer commits. */
+  async restoreBackup(raw: unknown): Promise<void> {
+    if (process.env.REACT_APP_DESKTOP !== "true")
+      throw new SaveRepositoryError(
+        "unavailable",
+        "Desktop backups are unavailable in the browser build.",
+      );
+    if (!raw || typeof raw !== "object")
+      throw new SaveRepositoryError(
+        "invalid",
+        "The desktop save backup is invalid.",
+      );
+    const backup = raw as SaveRepositoryBackup;
+    if (
+      backup.version !== 1 ||
+      !Array.isArray(backup.saves) ||
+      !Array.isArray(backup.payloads) ||
+      !Array.isArray(backup.sync)
+    )
+      throw new SaveRepositoryError(
+        "invalid",
+        "The desktop save backup is invalid.",
+      );
+    const initialized = await this.transaction<boolean>(
+      ["saves", "sync"],
+      "readonly",
+      (tx, done, request) => {
+        request(tx.objectStore("saves").count(), (saves: number) => {
+          request(tx.objectStore("sync").count(), (sync: number) =>
+            done(!!(saves || sync)),
+          );
+        });
+      },
+    );
+    if (initialized) return;
+    const ids = new Set<string>();
+    for (const metadata of backup.saves) {
+      if (
+        !metadata ||
+        typeof metadata.id !== "string" ||
+        !/^[a-f0-9]{32}$/.test(metadata.id) ||
+        ids.has(metadata.id)
+      )
+        throw new SaveRepositoryError(
+          "invalid",
+          "The desktop save backup has invalid identities.",
+        );
+      ids.add(metadata.id);
+      normalizeSaveName(metadata.name);
+      // Payloads are restored as committed, without decoding: the mirror deliberately keeps
+      // damaged or newer-schema saves for recovery, and rejecting one would block startup.
+    }
+    for (const entry of backup.sync) {
+      if (
+        !entry ||
+        typeof entry !== "object" ||
+        !("key" in entry) ||
+        typeof entry.key !== "string"
+      )
+        throw new SaveRepositoryError(
+          "invalid",
+          "The desktop save backup has invalid sync data.",
+        );
+    }
+    await this.transaction<void>(
+      ["saves", "payloads", "sync"],
+      "readwrite",
+      (tx, done, request) => {
+        request(tx.objectStore("saves").count(), (count: number) => {
+          if (count) return done(undefined);
+          backup.saves.forEach((entry) => tx.objectStore("saves").put(entry));
+          backup.payloads
+            .filter((entry) => ids.has(entry?.id))
+            .forEach((entry) => tx.objectStore("payloads").put(entry));
+          backup.sync.forEach((entry) => tx.objectStore("sync").put(entry));
+          done(undefined);
+        });
+      },
+    );
+    this.changed();
+  }
+
+  markDesktopInitialized(): Promise<void> {
+    if (process.env.REACT_APP_DESKTOP !== "true")
+      return Promise.reject(
+        new SaveRepositoryError(
+          "unavailable",
+          "Desktop backups are unavailable in the browser build.",
+        ),
+      );
+    return this.transaction(["sync"], "readwrite", (tx, done) => {
+      tx.objectStore("sync").put({ key: "desktop-initialized", value: true });
+      done(undefined);
+    });
+  }
+
+  /** Native bootstrap only: Electron guarantees one game window and one running instance. */
+  recoverDesktopWriterLeases(): Promise<void> {
+    if (process.env.REACT_APP_DESKTOP !== "true")
+      return Promise.reject(
+        new SaveRepositoryError(
+          "unavailable",
+          "Desktop backups are unavailable in the browser build.",
+        ),
+      );
+    return this.transaction(["sessions"], "readwrite", (tx, done) => {
+      tx.objectStore("sessions").clear();
+      done(undefined);
+    });
   }
 
   private summary(

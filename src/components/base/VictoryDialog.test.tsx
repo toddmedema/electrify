@@ -141,7 +141,7 @@ describe("VictoryDialog", () => {
     mockFetchGlobalRank.mockResolvedValue(4);
     renderDialog();
     expect(await screen.findByText(/#4 globally/)).toBeInTheDocument();
-    expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812);
+    expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812, "CEO");
   });
 
   it("drops the rank line rather than the dialog when the query fails", async () => {

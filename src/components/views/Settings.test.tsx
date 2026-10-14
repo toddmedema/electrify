@@ -1,8 +1,12 @@
 import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 import Settings, { Props } from "./Settings";
 import { clearAppCache } from "../../helpers/Cache";
+import settingsReducer from "../../reducers/Settings";
+import type { DesktopBridge } from "../../Desktop";
 
 jest.mock("../../helpers/Cache", () => ({
   clearAppCache: jest.fn(async () => undefined),
@@ -33,10 +37,86 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onBack: () => undefined,
     ...overrides,
   };
-  return render(<Settings {...props} />);
+  const store = configureStore({
+    reducer: { settings: settingsReducer },
+    preloadedState: { settings: props.settings },
+  });
+  return render(
+    <Provider store={store}>
+      <Settings {...props} />
+    </Provider>,
+  );
 }
 
 describe("Settings", () => {
+  afterEach(() => {
+    delete window.electrifyDesktop;
+    localStorage.removeItem("controllerVibrationEnabled");
+    localStorage.removeItem("steamTimelineEnabled");
+  });
+
+  it("keeps desktop feedback preferences out of the browser edition", () => {
+    renderSettings();
+    expect(
+      screen.queryByRole("switch", { name: "Controller vibration" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("switch", { name: "Recorded highlights" }),
+    ).toBeNull();
+  });
+
+  it("offers independent saved opt-ins while muted and explains unsupported recording", async () => {
+    window.electrifyDesktop = {
+      apiVersion: 1,
+      getState: jest.fn(async () => ({
+        display: {
+          fullscreen: true,
+          width: 1280,
+          height: 720,
+          resolutions: [],
+        },
+        steam: {
+          available: false,
+          online: false,
+          cloudEnabled: false,
+          timelineSupported: false,
+        },
+      })),
+      onStateChanged: jest.fn(() => () => {}),
+    } as unknown as DesktopBridge;
+    renderSettings({
+      settings: {
+        audioEnabled: false,
+        musicVolume: 1,
+        soundEffectsVolume: 0,
+        units: "metric",
+        theme: "system",
+      },
+    });
+    const vibration = await screen.findByRole("switch", {
+      name: "Controller vibration",
+    });
+    const recording = await screen.findByRole("switch", {
+      name: "Recorded highlights",
+    });
+    expect(vibration).not.toBeChecked();
+    expect(recording).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
+    expect(screen.queryByRole("slider", { name: "Effects volume" })).toBeNull();
+    expect(
+      await screen.findByText(/Steam Game Recording is unavailable right now/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not start video recording/),
+    ).toBeInTheDocument();
+    await userEvent.click(vibration);
+    await userEvent.click(recording);
+    expect(vibration).toBeChecked();
+    expect(recording).toBeChecked();
+    expect(localStorage.getItem("controllerVibrationEnabled")).toBe("true");
+    expect(localStorage.getItem("steamTimelineEnabled")).toBe("true");
+    expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
+  });
   it("changes appearance and units with direct choices", async () => {
     const onThemeChange = jest.fn();
     const onUnitsChange = jest.fn();
@@ -163,5 +243,27 @@ describe("Settings", () => {
     expect(trigger).toHaveFocus();
     trigger.remove();
     jest.useRealTimers();
+  });
+
+  it("blurs the exiting input before calling back so rapid arrows cannot change it", () => {
+    const onBack = jest.fn(() => {
+      expect(effects).not.toHaveFocus();
+      expect(document.body).toHaveFocus();
+    });
+    renderSettings({
+      settings: {
+        audioEnabled: true,
+        musicVolume: 1,
+        soundEffectsVolume: 0,
+        units: "metric",
+        theme: "system",
+      },
+      onBack,
+    });
+    const effects = screen.getByRole("slider", { name: "Effects volume" });
+    act(() => effects.focus());
+    expect(effects).toHaveFocus();
+    fireEvent.keyDown(effects, { key: "Escape" });
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

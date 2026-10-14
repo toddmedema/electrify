@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
+import type { DesktopBridge } from "../../Desktop";
 
 function props(overrides: Partial<Props> = {}): Props {
   return {
@@ -18,6 +19,23 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
+  afterEach(() => delete window.electrifyDesktop);
+
+  it("keeps the first-run sound prompt in the browser", () => {
+    render(<MainMenu {...props({ audioEnabled: undefined })} />);
+    expect(screen.getByRole("button", { name: "Turn on sound" })).toBeVisible();
+  });
+
+  it.each([undefined, false, true])(
+    "never offers Turn on sound in Electron when the preference is %s",
+    (audioEnabled) => {
+      window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+      render(<MainMenu {...props({ audioEnabled })} />);
+      expect(
+        screen.queryByRole("button", { name: "Turn on sound" }),
+      ).not.toBeInTheDocument();
+    },
+  );
   it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
     const user = userEvent.setup();
