@@ -10,12 +10,15 @@ const migrations: ((
   (save) => save,
   // 1 -> 2: Electron adds optional per-run achievement telemetry. Existing saves
   // start observing on their next committed tick, without inventing historical counters.
-  (save) => ({
-    ...save,
-    ...(object(save.game) && {
-      game: { ...save.game, desktopAchievements: undefined },
-    }),
-  }),
+  // Web saves use the same schema; parseSave discards imported Electron telemetry.
+  process.env.REACT_APP_DESKTOP === "true"
+    ? (save) => ({
+        ...save,
+        ...(object(save.game) && {
+          game: { ...save.game, desktopAchievements: undefined },
+        }),
+      })
+    : (save) => save,
 ];
 
 /** Save structure evolves independently of simulation rules and app releases. */

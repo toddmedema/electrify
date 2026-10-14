@@ -27,6 +27,30 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
+  it("web imports accept both save schemas and discard Electron telemetry without mutating the source", () => {
+    const desktopEdition = process.env.REACT_APP_DESKTOP;
+    process.env.REACT_APP_DESKTOP = "false";
+    try {
+      for (const schemaVersion of [1, SAVE_SCHEMA_VERSION]) {
+        const raw = {
+          ...clone(legacyFile.save),
+          schemaVersion,
+          game: {
+            ...clone(legacyFile.save.game),
+            desktopAchievements: { invalid: true },
+          },
+        };
+        const original = JSON.stringify(raw);
+        const upgraded = parseSave(raw)!;
+        expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+        expect(upgraded.game).not.toHaveProperty("desktopAchievements");
+        expect(upgraded.game.monthlyHistory).toEqual([]);
+        expect(JSON.stringify(raw)).toBe(original);
+      }
+    } finally {
+      process.env.REACT_APP_DESKTOP = desktopEdition;
+    }
+  });
   it("upgrades schema 1 to optional desktop telemetry without inventing historical progress", () => {
     const raw = { ...clone(legacyFile.save), schemaVersion: 1 };
     const original = JSON.stringify(raw);

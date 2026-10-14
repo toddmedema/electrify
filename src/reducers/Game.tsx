@@ -1609,7 +1609,8 @@ export const gameSlice = createSlice({
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
-      delete state.desktopAchievements;
+      if (process.env.REACT_APP_DESKTOP === "true")
+        delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
       delete state.tutorialIntertieStress;
       delete state.policies;
@@ -2012,7 +2013,8 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(start, (state, action) => {
-      delete state.desktopAchievements;
+      if (process.env.REACT_APP_DESKTOP === "true")
+        delete state.desktopAchievements;
       state.runIdentity = undefined;
       state.challenge = undefined;
       state.scenarioId = action.payload;

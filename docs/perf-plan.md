@@ -442,3 +442,10 @@ for worker publication, build options and tutorial exit. The final code-review a
 three feedback rounds with no remaining actionable findings; its refresh-test proof issue was
 corrected by holding
 the second worker reply until the viewport settles, then requiring publication to change the UI.
+
+The October 14 achievement bundle audit found the initial web JavaScript at 885.68 kB,
+just beyond the existing 10% tolerance. Compile-time guards now omit Electron telemetry
+migration and resets, and the optional Firebase Analytics SDK loads with its first online
+event. Production gzip drops to 882.48 kB initial JS and 1393.04 kB all JS (from 1395.50 kB).
+The bundle ceilings remain unchanged. Tests cover deferred event ordering, connection loss
+during loading, offline initialization, retry after chunk/SDK failures and cross-edition saves.
