@@ -142,9 +142,10 @@ Both editions implement the 34 achievements specified in
 [issue #532](https://github.com/toddmedema/electrify/issues/532#issuecomment-6160701564)
 plus Out of Juice for going bankrupt.
 [`src/achievements/AchievementCatalog.json`](../src/achievements/AchievementCatalog.json) is the
-authoritative list of stable API names, English display names, descriptions and existing SVG
-icons. Define all 35 achievements in Steamworks with those exact API names, Client unlocks, and
-reviewed unlocked/locked raster versions of the listed artwork; publish the configuration.
+authoritative list of stable API names, English display names, descriptions and SVG icons under
+`public/images/`. Define all 35 achievements in Steamworks with those exact API names, Client
+unlocks, and reviewed unlocked/locked raster versions of the listed artwork; publish the
+configuration. Re-upload both rasters whenever a catalog icon changes.
 When Steam is available, its achievement interface and notifications are used. Without Steam,
 the game provides bottom-right unlock notifications and an Achievements page from the main and
 game menus. See [shared achievements](achievements.md) for device storage and Firebase sync.
