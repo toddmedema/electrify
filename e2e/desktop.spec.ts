@@ -842,25 +842,26 @@ test("production projection workers finish offline and native focus pauses and r
 
 test("mocked Steam IPC shows friends scores and the Steam profile without a web account", async ({}, testInfo) => {
   const { app, page } = desktop;
-  const nativeState = await page.evaluate(() =>
-    window.electrifyDesktop!.getState(),
-  );
-  const state: DesktopState = {
-    ...nativeState,
-    steam: {
-      available: true,
-      online: true,
-      cloudEnabled: false,
-      steamId: "76561198000000001",
-      displayName: "QA Player",
-    },
+  const steamState: DesktopState["steam"] = {
+    available: true,
+    online: true,
+    cloudEnabled: false,
+    steamId: "76561198000000001",
+    displayName: "QA Player",
   };
   // Only this case substitutes native API responses. It verifies the complete
   // renderer -> isolated preload -> main IPC -> score table path, and never
   // contacts Steam or implies a successful live Steamworks integration.
-  await app.evaluate(({ ipcMain }, state) => {
-    ipcMain.removeHandler("desktop:state");
-    ipcMain.handle("desktop:state", () => state);
+  await app.evaluate(({ app: nativeApp, ipcMain }, steamState) => {
+    const nativeRequire = process
+      .getBuiltinModule("module")
+      .createRequire(`${nativeApp.getAppPath()}/package.json`);
+    const { SteamService } = nativeRequire(
+      `${nativeApp.getAppPath()}/electron/steam.cjs`,
+    );
+    // Mock the shared source so the real state getter and native display/Steam
+    // broadcasts agree, including delayed startup fullscreen notifications.
+    SteamService.prototype.state = () => steamState;
     ipcMain.removeHandler("desktop:leaderboard");
     const requests: {
       scope: string;
@@ -891,11 +892,26 @@ test("mocked Steam IPC shows friends scores and the Steam profile without a web 
         },
       ];
     });
-  }, state);
+  }, steamState);
   await page.goto("electrify://app/index.html?scenario=101");
   const scores = page.locator("#HighScores");
   await expect(scores).toContainText("QA Global");
   await expect(scores).toContainText("Your best");
+  // A display confirmation also broadcasts Steam state. Keep the identity and
+  // personal score consistent when a native event arrives after initial login.
+  const publishedState = await page.evaluate(async () => {
+    const bridge = window.electrifyDesktop!;
+    const changed = new Promise<DesktopState>((resolve) => {
+      const unsubscribe = bridge.onStateChanged((next) => {
+        unsubscribe();
+        resolve(next);
+      });
+    });
+    await bridge.setDisplay((await bridge.getState()).display);
+    return changed;
+  });
+  await expect(scores).toContainText("Your best");
+  expect(publishedState.steam).toEqual(steamState);
   await page.getByRole("button", { name: "Friends", exact: true }).click();
   await expect(scores).toContainText("QA Friend");
   await expect(scores).not.toContainText("QA Global");

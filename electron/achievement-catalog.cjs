@@ -18,13 +18,13 @@ module.exports = [
     id: "STAYING_POWER",
     name: "Staying Power",
     description: "Successfully finish an official scenario.",
-    icon: "logo",
+    icon: "achievement-staying-power",
   },
   {
     id: "CHIEF_ELECTRICITY_OFFICER",
     name: "Chief Electricity Officer",
     description: "Successfully finish an official scenario on CEO.",
-    icon: "logo",
+    icon: "achievement-chief-electricity-officer",
   },
   {
     id: "LIGHTS_ON",
@@ -122,7 +122,7 @@ module.exports = [
     name: "A Watt Saved",
     description:
       "Efficiency rebates prevent at least 10% of eligible demand over a reliable month.",
-    icon: "logo",
+    icon: "achievement-a-watt-saved",
   },
   {
     id: "POWER_TO_THE_PEOPLE",
@@ -234,12 +234,12 @@ module.exports = [
     id: "MASTER_OF_THE_GRID",
     name: "Master of the Grid",
     description: "Successfully finish all 14 official scenarios on CEO.",
-    icon: "logo",
+    icon: "achievement-master-of-the-grid",
   },
   {
     id: "OUT_OF_JUICE",
     name: "Out of Juice",
     description: "Go bankrupt in an official scenario on any difficulty.",
-    icon: "logo",
+    icon: "achievement-out-of-juice",
   },
 ];

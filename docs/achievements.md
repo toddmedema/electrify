@@ -1,7 +1,8 @@
 # Achievements
 
 The same 35 achievements, including bankruptcy's **Out of Juice**, work on web and Electron.
-`src/achievements/AchievementCatalog.json` supplies stable IDs, requirements and existing artwork.
+`src/achievements/AchievementCatalog.json` supplies stable IDs, requirements and each award's
+`public/images/` icon, which must be a dedicated design that follows the icon rules in `AGENTS.md`.
 The shared evaluator observes committed simulation evidence. Official scenarios qualify on any
 difficulty unless a requirement specifies CEO; tutorials require their final challenge. Custom
 games, replay playback, forecasts and modified simulation harnesses do not earn achievements.

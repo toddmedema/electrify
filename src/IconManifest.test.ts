@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
+import achievements from "./achievements/AchievementCatalog.json";
 import { LOCATIONS } from "./Constants";
 import { GENERATORS, STORAGE } from "./data/Facilities";
 import { SCENARIOS } from "./data/Scenarios";
@@ -96,6 +97,16 @@ describe("public/icons.json", () => {
       "/images/transmission.svg",
     ].map(requestPath);
 
+    expect(manifest).toEqual(expect.arrayContaining(requested));
+  });
+
+  // The gallery and Steam both show this artwork at 40-48 px, where the wordmark is illegible.
+  it("covers a dedicated icon for every achievement", () => {
+    const requested = achievements.map(({ icon }) =>
+      requestPath(`/images/${icon}.svg`),
+    );
+
+    expect(requested).not.toContain("/images/logo.svg");
     expect(manifest).toEqual(expect.arrayContaining(requested));
   });
 
