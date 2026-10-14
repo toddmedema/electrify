@@ -14,8 +14,26 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=101");
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await page
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.locator("#appbar:visible .gameStatusValue.weak"),
+    ).not.toContainText("Jan 2002");
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
     // Move a real save to its final tick to exercise the actual completed-run flow.
     await editSavedGame(page, (save) => {
+      const realMonth = save.game.monthlyHistory[0];
+      expect(realMonth).toBeDefined();
+      save.game.monthlyHistory = Array.from({ length: 143 }, (_, index) => ({
+        ...realMonth,
+        year: save.game.startingYear + Math.floor((142 - index) / 12),
+        month: ((142 - index) % 12) + 1,
+      }));
       const offset = 144 * 1440 - 15 - save.game.date.minute;
       save.game.date.minute += offset;
       save.game.date.monthsElapsed = 143;
@@ -42,6 +60,23 @@ for (const theme of ["light", "dark"]) {
       .click();
     const dialog = page.getByRole("dialog", { name: "Mission complete" });
     await expect(dialog).toBeVisible();
+    const popup = page.locator(".achievementToastPanel");
+    await expect(popup).toBeVisible();
+    await expect(popup).toContainText("Staying Power");
+    await expect
+      .poll(() =>
+        popup.evaluate((el) => {
+          const bounds = el.getBoundingClientRect();
+          return el.contains(
+            document.elementFromPoint(bounds.right - 24, bounds.top + 24),
+          );
+        }),
+      )
+      .toBe(true);
+    // Dismiss queued awards so the remaining result-action checks can use the whole dialog.
+    while (await popup.isVisible()) {
+      await popup.getByRole("button", { name: /^Dismiss/ }).click();
+    }
     await expect(dialog.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(dialog);
     const newGame = dialog.getByRole("button", {

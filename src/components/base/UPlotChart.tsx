@@ -50,8 +50,8 @@ export interface UPlotChartProps<S> {
   structureKey?: string | number;
   /** One tooltip covering every series at the hovered x */
   tooltip?: (idx: number, state: S) => string;
-  /** Tap or use the keyboard to read a point's full breakdown below the plot. */
-  interactiveDetails?: boolean;
+  /** Format a two-column breakdown, also available through the keyboard. */
+  interactiveTooltip?: boolean;
   /**
    * Charts sharing this key share a cursor: hovering one puts a crosshair at the same x on all
    * of them. Only for charts drawn against the same x scale, one above another. Numbers stay
@@ -70,32 +70,11 @@ const TOOLTIP_OFFSET = 8;
 // pointer move; uPlot can resize its existing canvas cheaply in the meantime.
 const RESIZE_SETTLE_MS = 120;
 
-function revealInScrollPane(element: HTMLElement | null) {
-  if (!element) return;
-  for (let pane = element.parentElement; pane; pane = pane.parentElement) {
-    if (
-      !/auto|scroll/.test(getComputedStyle(pane).overflowY) ||
-      pane.scrollHeight <= pane.clientHeight
-    )
-      continue;
-    const bounds = element.getBoundingClientRect();
-    const top = pane.getBoundingClientRect().top + pane.clientTop;
-    const bottom = top + pane.clientHeight;
-    if (bounds.height > pane.clientHeight || bounds.top < top) {
-      pane.scrollTop += bounds.top - top;
-    } else if (bounds.bottom > bottom) {
-      pane.scrollTop += bounds.bottom - bottom;
-    }
-    return;
-  }
-}
-
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
   hoverOnly: boolean,
-  hideTooltip: () => boolean,
-  interactiveDetails: boolean,
+  interactiveTooltip: boolean,
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
   let header: HTMLDivElement;
@@ -110,11 +89,11 @@ function tooltipPlugin<S>(
         el = document.createElement("div");
         el.className = "chartTooltip";
         u.over.appendChild(el);
-        if (interactiveDetails) {
+        if (interactiveTooltip) {
           el.classList.add("chartTooltip-breakdown");
           header = document.createElement("div");
           const values = document.createElement("div");
-          values.className = "chartPointDetailsValues";
+          values.className = "chartTooltipValues";
           columns = [0, 1].map(() => {
             const column = document.createElement("div");
             const total = document.createElement("strong");
@@ -144,14 +123,14 @@ function tooltipPlugin<S>(
       setCursor: (u: uPlot) => {
         const label = getLabel();
         const idx = u.cursor.idx;
-        if (!el || !label || idx == null || !hovering || hideTooltip()) {
+        if (!el || !label || idx == null || !hovering) {
           if (el) {
             el.style.display = "none";
           }
           return;
         }
         const text = label(idx, getState());
-        if (interactiveDetails) {
+        if (interactiveTooltip) {
           const groups = text.split("\n\n");
           const [time, ...supply] = groups[0].split("\n");
           header.textContent = time;
@@ -194,22 +173,7 @@ export default function UPlotChart<S>(
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
   const [selectedPoint, setSelectedPoint] = React.useState<number | null>(null);
-  const selectedPointRef = React.useRef(selectedPoint);
-  selectedPointRef.current = selectedPoint;
-  const detailsId = React.useId();
   const instructionsId = React.useId();
-  const detailsRef = React.useRef<HTMLDivElement>(null);
-  const detailsWereOpen = React.useRef(false);
-  const detailsOpen = selectedPoint !== null;
-  React.useLayoutEffect(() => {
-    if (!props.interactiveDetails) return;
-    if (detailsOpen) {
-      revealInScrollPane(detailsRef.current);
-    } else if (detailsWereOpen.current) {
-      revealInScrollPane(rootRef.current?.parentElement?.parentElement || null);
-    }
-    detailsWereOpen.current = detailsOpen;
-  }, [detailsOpen, props.interactiveDetails]);
   const measuredWidthRef = React.useRef(0);
   const heightRef = React.useRef(height);
   heightRef.current = height;
@@ -402,8 +366,7 @@ export default function UPlotChart<S>(
             getState,
             () => tooltipRef.current,
             !!syncKey,
-            () => selectedPointRef.current !== null,
-            !!props.interactiveDetails,
+            !!props.interactiveTooltip,
           ),
         ],
       },
@@ -636,28 +599,24 @@ export default function UPlotChart<S>(
     const plot = plotRef.current;
     if (!plot || !data[0].length) return;
     const point = Math.max(0, Math.min(data[0].length - 1, index));
-    selectedPointRef.current = point;
     setSelectedPoint(point);
     plot.setCursor({ left: plot.valToPos(data[0][point], "x"), top: 0 });
   };
   const closeDetails = () => {
-    selectedPointRef.current = null;
     setSelectedPoint(null);
     plotRef.current?.setCursor({ left: -10, top: -10 });
-    rootRef.current?.focus({ preventScroll: true });
   };
   const detail =
     selectedPoint === null
       ? undefined
       : props.tooltip?.(Math.min(selectedPoint, data[0].length - 1), state);
-  const [detailTime, ...detailRows] = detail?.split("\n") || [];
 
   return (
     <div className="accessibleChart">
-      {props.interactiveDetails && (
+      {props.interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
-          Tap or press Enter to inspect a time. Use Left and Right arrows, Home
-          and End to read points. Escape closes details.
+          Hover or press Enter to inspect a time. Use Left and Right arrows,
+          Home and End to read points. Escape closes the tooltip.
         </span>
       )}
       <div
@@ -665,10 +624,11 @@ export default function UPlotChart<S>(
         ref={rootRef}
         role="img"
         aria-label={accessibleLabel}
-        tabIndex={props.interactiveDetails ? 0 : undefined}
-        aria-describedby={props.interactiveDetails ? instructionsId : undefined}
+        tabIndex={props.interactiveTooltip ? 0 : undefined}
+        aria-describedby={props.interactiveTooltip ? instructionsId : undefined}
+        onBlur={props.interactiveTooltip ? closeDetails : undefined}
         onKeyDown={
-          props.interactiveDetails
+          props.interactiveTooltip
             ? (event) => {
                 const current =
                   selectedPoint ?? plotRef.current?.cursor.idx ?? 0;
@@ -689,27 +649,6 @@ export default function UPlotChart<S>(
               }
             : undefined
         }
-        onClick={
-          props.interactiveDetails
-            ? (event) => {
-                const plot = plotRef.current;
-                if (!plot) return;
-                const bounds = plot.over.getBoundingClientRect();
-                if (
-                  event.clientX < bounds.left ||
-                  event.clientX > bounds.right ||
-                  event.clientY < bounds.top ||
-                  event.clientY > bounds.bottom
-                )
-                  return;
-                plot.setCursor({
-                  left: event.clientX - bounds.left,
-                  top: event.clientY - bounds.top,
-                });
-                selectPoint(plot.cursor.idx ?? 0);
-              }
-            : undefined
-        }
         data-viewport-min={viewport?.range[0]}
         data-viewport-max={viewport?.range[1]}
         style={{
@@ -719,46 +658,15 @@ export default function UPlotChart<S>(
           overflow: "hidden",
         }}
       />
-      {props.interactiveDetails && detail && (
-        <div className="chartPointDetails" id={detailsId} ref={detailsRef}>
-          <div className="chartPointDetailsHeader">
-            <strong>{detailTime}</strong>
-            <button
-              type="button"
-              aria-label="Close chart details"
-              onClick={closeDetails}
-            >
-              Close
-            </button>
-          </div>
-          <div
-            className="chartPointDetailsValues"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span className="srOnly">{detailTime}</span>
-            {detailRows
-              .join("\n")
-              .split("\n\n")
-              .map((group, i) => (
-                <div key={i}>
-                  {group.split("\n").map((row, j) => (
-                    <div
-                      key={j}
-                      className={
-                        row.startsWith("Total ")
-                          ? "chartPointDetailsTotal"
-                          : undefined
-                      }
-                    >
-                      {row}
-                    </div>
-                  ))}
-                </div>
-              ))}
-          </div>
-        </div>
+      {props.interactiveTooltip && (
+        <span
+          className="srOnly"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {detail}
+        </span>
       )}
     </div>
   );

@@ -124,23 +124,17 @@ describe("MainMenu", () => {
     expect(buttons[2]).toHaveClass("MuiButton-outlined");
   });
 
-  it("identifies Continue's target and keeps the library accessible", async () => {
+  it("keeps the save library accessible beside Continue", async () => {
     const onSavedGames = jest.fn();
     render(
       <MainMenu
         {...props({
           hasSavedGame: true,
           hasSavedGames: true,
-          savedGameName: "Wind experiment",
-          savedGameDescription: "Rise of Renewables · June 2035",
           onSavedGames,
         })}
       />,
     );
-    expect(screen.getByText("Wind experiment")).toBeInTheDocument();
-    expect(
-      screen.getByText("Rise of Renewables · June 2035"),
-    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
     expect(onSavedGames).toHaveBeenCalledTimes(1);
   });

@@ -70,6 +70,9 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   await expect(
     page.getByText("Saved on this device.", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByText(/Earn achievements in official scenarios/),
+  ).toHaveCount(0);
   await expect(page.locator(".achievementToastPanel")).toBeHidden();
   await assertLayout(page);
   await screenshot(page, info, "gallery-light");
@@ -115,14 +118,21 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible({ timeout: 60000 });
   const popup = page.locator(".achievementToastPanel");
-  await expect(popup).toBeHidden();
-  await page
-    .getByRole("button", { name: "Next tutorial", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toBeHidden();
   await expect(popup).toBeVisible();
   await popup.hover();
   await expect(popup).toContainText("First Spark");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  // Hit testing proves the popup is above the modal backdrop, not merely laid out underneath it.
+  await expect
+    .poll(() =>
+      popup.evaluate((el) => {
+        const bounds = el.getBoundingClientRect();
+        return el.contains(
+          document.elementFromPoint(bounds.right - 24, bounds.top + 24),
+        );
+      }),
+    )
+    .toBe(true);
   await expect(
     page
       .getByRole("status")
@@ -151,6 +161,10 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   await screenshot(page, info, "popup");
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await screenshot(page, info, "popup-dark");
+  await page
+    .getByRole("button", { name: "Next tutorial", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeHidden();
   await popup
     .getByRole("button", { name: "View achievements", exact: true })
     .click();

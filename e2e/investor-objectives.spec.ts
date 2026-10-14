@@ -12,7 +12,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=100");
     await page
-      .getByRole("button", { name: "What counts as a win", exact: true })
+      .getByRole("button", { name: "Victory Conditions", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText(

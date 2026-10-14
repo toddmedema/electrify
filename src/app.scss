@@ -474,9 +474,6 @@ button,
     border-radius: var(--radius-sm);
   }
 }
-.achievementScope {
-  margin-top: 12px !important;
-}
 .achievementAccount {
   box-sizing: border-box;
   margin-top: 20px;
@@ -2498,7 +2495,7 @@ $pane_header_height: 48px;
   width: 320px;
   pointer-events: auto;
   overscroll-behavior: contain;
-  .chartPointDetailsValues {
+  .chartTooltipValues {
     gap: 8px;
     line-height: 1.45;
   }
@@ -2510,40 +2507,13 @@ $pane_header_height: 48px;
   width: 100%;
   min-width: 0;
 }
-.chartPointDetails {
-  margin: 0 12px 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--tooltip-border);
-  border-radius: var(--radius-md);
-  background: var(--tooltip-bg);
-  font-size: var(--font-size-caption);
-  font-variant-numeric: tabular-nums;
-}
-.chartPointDetailsHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  button {
-    min-height: 44px;
-    padding: 0 8px;
-    color: var(--interactive-strong);
-    border: 0;
-    background: none;
-    font: inherit;
-    cursor: pointer;
-  }
-}
-.chartPointDetailsValues {
+.chartTooltipValues {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   white-space: pre-wrap;
   line-height: 1.6;
   overflow-wrap: anywhere;
-}
-.chartPointDetailsTotal {
-  font-weight: 600;
 }
 
 .uplot {
