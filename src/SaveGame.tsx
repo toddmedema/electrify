@@ -659,17 +659,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
   });
-  if (process.env.REACT_APP_DESKTOP === "true") {
-    if (
-      normalized.desktopAchievements !== undefined &&
-      !require("./desktop/SimulationHooks")
-        .desktopSimulationHooks()
-        ?.validate(normalized.desktopAchievements)
-    )
-      return null;
-  } else {
+  // Achievement telemetry is optional: a save from a newer catalog (or a tampered one) still
+  // loads, and resume starts observing it afresh rather than trusting the stored counters.
+  if (
+    normalized.desktopAchievements !== undefined &&
+    !require("./achievements/SimulationHooks")
+      .desktopSimulationHooks()
+      ?.validate(normalized.desktopAchievements)
+  )
     delete normalized.desktopAchievements;
-  }
   if (
     normalized.runIdentity &&
     (!validRunIdentity(normalized.runIdentity) ||

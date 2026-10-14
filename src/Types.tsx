@@ -202,6 +202,7 @@ export type CardNameType =
   | "NEW_GAME_DETAILS"
   | "MANUAL"
   | "SETTINGS"
+  | "ACHIEVEMENTS"
   | "SAVED_GAMES"
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
@@ -1181,8 +1182,8 @@ export interface PolicyChangeType {
   startHour?: number;
 }
 export interface GameType {
-  /** Optional Electron telemetry, excluded from browser simulation and replay playback. */
-  desktopAchievements?: import("./desktop/SimulationHooks").AchievementProgress;
+  /** Shared achievement telemetry; retain the legacy save key for compatibility. */
+  desktopAchievements?: import("./achievements/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
   challenge?: ChallengeInvitation;
   policies?: PoliciesType;

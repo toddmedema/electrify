@@ -10,7 +10,8 @@ files are large, so broad rewrites create expensive review diffs.
 - Run `npm run check` before handing work off (about a minute). It runs the same gates as CI:
   types (including `e2e/`), lint, formatting, the covered Jest suite, the long simulation suites
   (`npm run test:sim`, which includes every scenario through the headless simulation), and a
-  short run of the simulation CLI. It reports every failing step at once, prints only
+  short run of the simulation CLI. CI also runs the Firestore rules tests (`npm run test:rules`,
+  which needs Java 21); run them yourself when you change `firebase/firestore.rules`. It reports every failing step at once, prints only
   failing output, and ends with a one-line-per-step summary and fix commands.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.

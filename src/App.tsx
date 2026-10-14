@@ -3,7 +3,14 @@ import { delta as uiDelta } from "./reducers/UI";
 import { logEvent } from "./Globals";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
@@ -38,6 +45,13 @@ import {
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "./Desktop";
+
+const AchievementNotifications = lazy(
+  () =>
+    import(
+      /* webpackChunkName: "achievements-ui" */ "./achievements/Interface"
+    ),
+);
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -313,6 +327,13 @@ export default function App() {
     const stopSaveSessions = startSaveSessions(store);
     const stopCloudSaves = startCloudSaves(store);
     const stopEventToasts = startEventToasts(store);
+    let stopAchievements: (() => void) | undefined;
+    let achievementsLive = true;
+    void import(
+      /* webpackChunkName: "achievements" */ "./achievements/Runtime"
+    ).then(({ startAchievementServices }) => {
+      if (achievementsLive) stopAchievements = startAchievementServices(store);
+    });
 
     // Returns its own unsubscribe, which was previously dropped on the floor
     const desktop =
@@ -426,6 +447,8 @@ export default function App() {
       stopSaveSessions();
       stopCloudSaves();
       stopEventToasts();
+      achievementsLive = false;
+      stopAchievements?.();
       if (process.env.REACT_APP_DESKTOP === "true") {
         authLive = false;
         unsubscribeSteam?.();
@@ -453,6 +476,9 @@ export default function App() {
               <ScenarioChoiceDialog />
               <CloudSavePrompt />
               <SharedGameDialog />
+              <Suspense fallback={null}>
+                <AchievementNotifications />
+              </Suspense>
             </UnitsProvider>
           </div>
         </InstallPromptProvider>

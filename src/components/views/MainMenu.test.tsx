@@ -1,7 +1,33 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
-import type { DesktopBridge } from "../../Desktop";
+import type { DesktopBridge, DesktopState } from "../../Desktop";
+
+function desktopBridge(available = false): DesktopBridge {
+  const state: DesktopState = {
+    display: { fullscreen: false, width: 1280, height: 800, resolutions: [] },
+    steam: { available, online: available, cloudEnabled: false },
+  };
+  return {
+    apiVersion: 1,
+    getState: jest.fn(async () => state),
+    onStateChanged: () => () => {},
+    setDisplay: async () => state.display,
+    onGameFocusChanged: () => () => {},
+    quit: async () => {},
+    onBeforeQuit: () => () => {},
+    readyToQuit: () => {},
+    readSaveLibrary: async () => ({
+      local: null,
+      cloud: null,
+      cloudState: "disabled",
+    }),
+    writeSaveLibrary: async () => ({ cloudState: "disabled" }),
+    getLeaderboard: async () => [],
+    submitScore: async () => {},
+    openFriends: async () => {},
+  };
+}
 
 function props(overrides: Partial<Props> = {}): Props {
   return {
@@ -12,6 +38,7 @@ function props(overrides: Partial<Props> = {}): Props {
     onContinue: jest.fn(),
     onSavedGames: jest.fn(),
     onSettings: jest.fn(),
+    onAchievements: jest.fn(),
     onManual: jest.fn(),
     onStart: jest.fn(),
     ...overrides,
@@ -28,14 +55,33 @@ describe("MainMenu", () => {
 
   it.each([undefined, false, true])(
     "never offers Turn on sound in Electron when the preference is %s",
-    (audioEnabled) => {
-      window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
+    async (audioEnabled) => {
+      window.electrifyDesktop = desktopBridge();
       render(<MainMenu {...props({ audioEnabled })} />);
+      await waitFor(() =>
+        expect(window.electrifyDesktop!.getState).toHaveBeenCalled(),
+      );
       expect(
         screen.queryByRole("button", { name: "Turn on sound" }),
       ).not.toBeInTheDocument();
     },
   );
+  it("offers the gallery without Steam", async () => {
+    window.electrifyDesktop = desktopBridge();
+    const onAchievements = jest.fn();
+    render(<MainMenu {...props({ onAchievements })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Achievements" }));
+    expect(onAchievements).toHaveBeenCalledTimes(1);
+  });
+  it("defers to Steam's achievement interface when available", async () => {
+    window.electrifyDesktop = desktopBridge(true);
+    render(<MainMenu {...props()} />);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Achievements" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
   it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
     const user = userEvent.setup();

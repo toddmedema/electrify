@@ -85,7 +85,10 @@ function fixture(
 }
 
 test("native catalog matches the renderer's 35 stable IDs and existing artwork", () => {
-  assert.deepEqual(catalog, require("../src/desktop/AchievementCatalog.json"));
+  assert.deepEqual(
+    catalog,
+    require("../src/achievements/AchievementCatalog.json"),
+  );
   assert.equal(catalog.length, 35);
   assert.equal(OFFICIAL_IDS.length, 14);
   for (const { icon } of catalog)

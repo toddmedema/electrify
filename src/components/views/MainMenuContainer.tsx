@@ -45,6 +45,9 @@ export const mapDispatchToProps = (
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
     },
+    onAchievements: () => {
+      dispatch(navigate("ACHIEVEMENTS"));
+    },
     onStart: () => {
       // A brand-new player jumps straight into Mission 1.
       const played = getPlayedScenarioIds();

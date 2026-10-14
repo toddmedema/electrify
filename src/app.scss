@@ -447,6 +447,182 @@ button,
   }
 }
 
+.achievementCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.achievementGallery {
+  overflow: auto;
+  width: 100%;
+  min-height: 0;
+  padding: 24px 16px 32px;
+  box-sizing: border-box;
+  > * {
+    max-width: 864px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+.achievementSummary {
+  h2 {
+    margin: 0 0 12px;
+  }
+  .MuiLinearProgress-root {
+    height: 4px;
+    border-radius: var(--radius-sm);
+  }
+}
+.achievementScope {
+  margin-top: 12px !important;
+}
+.achievementAccount {
+  box-sizing: border-box;
+  margin-top: 20px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  .MuiButton-root {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+}
+.achievementFilters {
+  margin-top: 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  .MuiTab-root {
+    min-height: 48px;
+    min-width: 0;
+    padding: 8px 12px;
+  }
+}
+.achievementList {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.achievementRow {
+  padding: 20px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.achievementArt {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  img {
+    width: 40px;
+    height: 40px;
+  }
+}
+.achievementDescription {
+  flex: 1;
+  min-width: 0;
+}
+.achievementRowHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+  h3 {
+    font-weight: 600;
+  }
+}
+.achievementState {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--font-color-faded);
+}
+.isUnlocked .achievementState {
+  color: var(--delta-good);
+}
+// Earned awards keep their colour; the "Locked" label still carries the state in text.
+.isLocked .achievementArt img {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+.achievementEmpty {
+  padding: 32px 16px;
+  text-align: center;
+}
+.achievementToast.MuiSnackbar-root {
+  left: auto;
+  right: max(16px, env(safe-area-inset-right));
+  // The measured tab bar already includes the safe area it pads for.
+  bottom: calc(
+    16px +
+      max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
+  );
+  width: min(384px, calc(100vw - 32px));
+  max-width: none;
+}
+.achievementToastPanel {
+  display: flex;
+  position: relative;
+  gap: 12px;
+  padding: 16px 48px 8px 16px;
+  width: 100%;
+  box-sizing: border-box;
+  .MuiButton-root {
+    min-height: 44px;
+    margin-left: -8px;
+  }
+  .MuiTypography-overline {
+    line-height: 1.5;
+    font-size: 0.75rem;
+  }
+}
+// The page is near-black in dark mode, so the popup steps up a surface instead of a shadow
+[data-theme="dark"] .achievementToastPanel.MuiPaper-root {
+  background-color: var(--bg-raised);
+}
+.achievementToastText {
+  flex: 1;
+  min-width: 0;
+}
+@media screen and (max-width: 359px) {
+  .achievementToastRequirement {
+    display: none;
+  }
+}
+.achievementToastClose.MuiIconButton-root {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 44px;
+  height: 44px;
+}
+@media screen and (max-width: 599px) {
+  .achievementGallery {
+    padding-top: 16px;
+  }
+  .achievementAccount {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .achievementRow {
+    gap: 12px;
+    padding: 16px 0;
+  }
+  .achievementRowHeading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
 .MuiDialogTitle-root {
   padding: 16px;
 }

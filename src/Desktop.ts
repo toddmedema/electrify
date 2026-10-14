@@ -84,6 +84,9 @@ export interface DesktopBridge {
     earned: string[];
     completion?: { scenarioId: number; difficulty: DifficultyType };
   }): Promise<void>;
+  readAchievements?(): Promise<
+    import("./achievements/Progress").AchievementRecord
+  >;
   setActivity?(activity: DesktopActivity): Promise<void>;
   addTimelineEvent?(event: DesktopTimelineEvent): Promise<void>;
 }

@@ -138,14 +138,16 @@ web service worker. Native Steam calls run outside the renderer.
 
 ### Achievements
 
-The Electron edition implements the 34 achievements specified in
+Both editions implement the 34 achievements specified in
 [issue #532](https://github.com/toddmedema/electrify/issues/532#issuecomment-6160701564)
 plus Out of Juice for going bankrupt.
-[`src/desktop/AchievementCatalog.json`](../src/desktop/AchievementCatalog.json) is the
+[`src/achievements/AchievementCatalog.json`](../src/achievements/AchievementCatalog.json) is the
 authoritative list of stable API names, English display names, descriptions and existing SVG
 icons. Define all 35 achievements in Steamworks with those exact API names, Client unlocks, and
 reviewed unlocked/locked raster versions of the listed artwork; publish the configuration.
-There is no new artwork or browser achievement UI.
+When Steam is available, its achievement interface and notifications are used. Without Steam,
+the game provides bottom-right unlock notifications and an Achievements page from the main and
+game menus. See [shared achievements](achievements.md) for device storage and Firebase sync.
 
 Configure the 77 INT completion flags listed in
 [`steamworks/achievement-stats.csv`](../steamworks/achievement-stats.csv): seven tutorial
@@ -172,7 +174,7 @@ emissions divided by customer MWh served. Fuel shares use the existing customer-
 history; storage and imports never become local renewable generation. Public utility rates use
 the existing starting-dollar customer-revenue helper, excluding exports and grants.
 
-Electron-only per-run telemetry persists evening customer energy and player-built storage
+Shared per-run telemetry persists evening customer energy and player-built storage
 discharge, imports after commissioning a player-built intertie, exports, modeled efficiency
 savings and output after an actual combined-cycle conversion. It uses the simulation's
 representative-day weights and gross-source customer allocation. Evening ticks use the local
@@ -180,12 +182,13 @@ simulation clock from 18:00 up to, but excluding, midnight. Charging, exports, c
 retrofits, inherited storage and new combined-cycle purchases cannot count toward
 storage/retrofit achievements. Saves preserve these
 counters. Older saves receive empty telemetry when resumed: unknown past facility provenance
-and a partially observed month are not reconstructed or awarded. Browser imports discard this
-optional Electron telemetry.
+and a partially observed month are not reconstructed or awarded. Browser imports validate and
+retain this optional telemetry, using the original save key for compatibility.
 
-The renderer's named `electron` chunk installs simulation hooks before loading saves and owns
-achievement observation, presence and menu feedback. Literal build-time guards omit it and its
-catalog/counters from the browser build. Both build commands inspect every compiled JavaScript
+The renderer's shared `achievements` chunk installs simulation hooks before loading saves;
+`achievements-ui` holds the non-Steam gallery and notifications. The named `electron` chunk owns
+Steam submission, presence and menu feedback. Literal build-time guards omit the native services
+from the browser build. Both build commands inspect every compiled JavaScript
 asset, including lazy chunks, to enforce the edition boundary. The native bridge accepts only
 catalog IDs and bounded official completion records; native pointers and paths stay in main.
 

@@ -1,6 +1,6 @@
 import type { GameType, TickPresentFutureType } from "../Types";
 
-/** Installed by the Electron entry point before saves or gameplay are loaded. */
+/** Installed by the shared achievement entry point before saves or gameplay are loaded. */
 export interface SimulationHooks {
   initialize(game: GameType): void;
   tick(game: GameType, tick: TickPresentFutureType): void;

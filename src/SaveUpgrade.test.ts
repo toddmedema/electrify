@@ -9,9 +9,12 @@ import { runMonths } from "./testing/SimulationTestHelpers";
 import { projectAuthoredRunReference } from "./helpers/RunIdentity";
 import { challengeComparison } from "./helpers/Challenge";
 import type { GameType, VictoryType } from "./Types";
+import { achievementHooks } from "./achievements/Achievements";
+import { installSimulationHooks } from "./achievements/SimulationHooks";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const OLD_RULES = legacyFile.save.game.runIdentity.compatibilityId;
+beforeAll(() => installSimulationHooks(achievementHooks));
 
 /** A current run with a friend's challenge, saved as if by an earlier deploy. */
 function challengedSave() {
@@ -27,26 +30,23 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
-  it("web imports accept both save schemas and discard Electron telemetry without mutating the source", () => {
+  it("web imports retain valid shared achievement evidence and drop malformed evidence", () => {
     const desktopEdition = process.env.REACT_APP_DESKTOP;
     process.env.REACT_APP_DESKTOP = "false";
     try {
-      for (const schemaVersion of [1, SAVE_SCHEMA_VERSION]) {
-        const raw = {
-          ...clone(legacyFile.save),
-          schemaVersion,
-          game: {
-            ...clone(legacyFile.save.game),
-            desktopAchievements: { invalid: true },
-          },
-        };
-        const original = JSON.stringify(raw);
-        const upgraded = parseSave(raw)!;
-        expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-        expect(upgraded.game).not.toHaveProperty("desktopAchievements");
-        expect(upgraded.game.monthlyHistory).toEqual([]);
-        expect(JSON.stringify(raw)).toBe(original);
-      }
+      const raw = clone(serializeSave(createGame({ scenarioId: 101 })));
+      const original = JSON.stringify(raw);
+      expect(raw.game.desktopAchievements).toBeDefined();
+      expect(parseSave(raw)!.game.desktopAchievements).toEqual(
+        raw.game.desktopAchievements,
+      );
+      expect(JSON.stringify(raw)).toBe(original);
+      const malformed = parseSave({
+        ...raw,
+        game: { ...raw.game, desktopAchievements: { invalid: true } },
+      });
+      expect(malformed).not.toBeNull();
+      expect(malformed!.game.desktopAchievements).toBeUndefined();
     } finally {
       process.env.REACT_APP_DESKTOP = desktopEdition;
     }

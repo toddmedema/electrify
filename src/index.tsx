@@ -41,6 +41,10 @@ function renderApp(): void {
 }
 
 let stopBootstrapQuit: (() => void) | undefined;
+const prepareAchievements = () =>
+  import(/* webpackChunkName: "achievements" */ "./achievements/Runtime").then(
+    ({ initializeAchievements }) => initializeAchievements(),
+  );
 const startDesktop: () => Promise<void> =
   process.env.REACT_APP_DESKTOP === "true"
     ? async () => {
@@ -54,6 +58,7 @@ const startDesktop: () => Promise<void> =
           </p>,
         );
         try {
+          await prepareAchievements();
           const { initializeDesktop } = await import(
             /* webpackChunkName: "electron" */ "./desktop/Runtime"
           );
@@ -68,7 +73,12 @@ const startDesktop: () => Promise<void> =
               <p>
                 Your desktop backup has been kept. Retry before starting a game.
               </p>
-              <button onClick={() => void startDesktop()}>Retry</button>
+              <button
+                style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
+                onClick={() => void startDesktop()}
+              >
+                Retry
+              </button>
               <button onClick={() => void getDesktop()?.quit()}>Quit</button>
             </div>,
           );
@@ -77,7 +87,27 @@ const startDesktop: () => Promise<void> =
     : async () => {};
 const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
 if (desktopApp) void startDesktop();
-else renderApp();
+else {
+  const startWeb = () => {
+    void prepareAchievements()
+      .then(renderApp)
+      .catch(() => {
+        root.render(
+          <div role="alert" style={{ padding: 24 }}>
+            <h1>Electrify couldn't finish loading</h1>
+            <p>Check your connection and try again.</p>
+            <button
+              style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
+              onClick={startWeb}
+            >
+              Retry
+            </button>
+          </div>,
+        );
+      });
+  };
+  startWeb();
+}
 
 if (
   !desktopApp &&

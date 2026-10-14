@@ -61,6 +61,12 @@ import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
 
+const AchievementGallery = React.lazy(() =>
+  import(
+    /* webpackChunkName: "achievements-ui" */ "../achievements/Interface"
+  ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
+);
+
 // The in-game cards share one stable transition key above the desktop breakpoint. Facilities
 // and Insights stay mounted while Events replaces Insights, or joins it on an ultrawide screen.
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
@@ -295,6 +301,15 @@ const shortcutHandlers = {
           ? navigate("FACILITIES")
           : navigateBack(),
       );
+      // Escape may arrive before the gallery's entry focus settles.
+      if (card.name === "ACHIEVEMENTS")
+        window.setTimeout(
+          () =>
+            document
+              .querySelector<HTMLElement>("[data-achievements-trigger]")
+              ?.focus(),
+          350,
+        );
     }
   },
   ...Object.fromEntries(
@@ -580,6 +595,12 @@ export default class Compositor extends React.Component<Props, {}> {
         return <FacilitiesContainer />;
       case "SETTINGS":
         return <SettingsContainer />;
+      case "ACHIEVEMENTS":
+        return (
+          <React.Suspense fallback={<p role="status">Loading achievements…</p>}>
+            <AchievementGallery />
+          </React.Suspense>
+        );
       case "SAVED_GAMES":
         return <SavedGames />;
       case "MAIN_MENU":
