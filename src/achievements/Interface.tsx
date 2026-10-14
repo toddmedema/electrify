@@ -232,7 +232,9 @@ export default function AchievementNotifications(): React.JSX.Element {
   const snackbarOpen = useAppSelector((root) => root.ui.snackbar.open);
   const dialogOpen = useAppSelector((root) => root.ui.dialog.open);
   const [obstructed, setObstructed] = React.useState(true);
-  const [paused, setPaused] = React.useState(false);
+  const [hovered, setHovered] = React.useState(false);
+  const [focused, setFocused] = React.useState(false);
+  const panel = React.useRef<HTMLDivElement>(null);
   const id = state.notifications[0];
   const entry = catalog.find((item) => item.id === id);
   React.useEffect(() => {
@@ -259,13 +261,14 @@ export default function AchievementNotifications(): React.JSX.Element {
     !snackbarOpen &&
     !dialogOpen;
   React.useEffect(() => {
-    setPaused(false);
-  }, [id]);
+    setHovered(!!open && !!panel.current?.matches(":hover"));
+    setFocused(!!open && !!panel.current?.contains(document.activeElement));
+  }, [id, open]);
   React.useEffect(() => {
-    if (!open || paused || !id) return;
+    if (!open || hovered || focused || !id) return;
     const timer = setTimeout(() => achievementJournal.dismiss(id), 8000);
     return () => clearTimeout(timer);
-  }, [open, paused, id]);
+  }, [open, hovered, focused, id]);
   return (
     <>
       <div
@@ -285,14 +288,15 @@ export default function AchievementNotifications(): React.JSX.Element {
           className={`achievementToast ${inGame ? "achievementToastInGame" : ""}`}
         >
           <Paper
+            ref={panel}
             variant="outlined"
             className="achievementToastPanel"
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
-            onFocus={() => setPaused(true)}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            onFocus={() => setFocused(true)}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget))
-                setPaused(false);
+                setFocused(false);
             }}
           >
             <div className="achievementArt">

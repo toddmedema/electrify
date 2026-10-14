@@ -73,7 +73,12 @@ const startDesktop: () => Promise<void> =
               <p>
                 Your desktop backup has been kept. Retry before starting a game.
               </p>
-              <button onClick={() => void startDesktop()}>Retry</button>
+              <button
+                style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
+                onClick={() => void startDesktop()}
+              >
+                Retry
+              </button>
               <button onClick={() => void getDesktop()?.quit()}>Quit</button>
             </div>,
           );
@@ -91,7 +96,12 @@ else {
           <div role="alert" style={{ padding: 24 }}>
             <h1>Electrify couldn't finish loading</h1>
             <p>Check your connection and try again.</p>
-            <button onClick={startWeb}>Retry</button>
+            <button
+              style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
+              onClick={startWeb}
+            >
+              Retry
+            </button>
           </div>,
         );
       });

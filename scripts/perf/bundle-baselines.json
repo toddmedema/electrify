@@ -2,9 +2,9 @@
   "recorded": "2026-10-14",
   "node": "v24.14.0",
   "metrics": {
-    "mainJs": 896877,
+    "mainJs": 896904,
     "mainCss": 23947,
-    "initialJs": 896877,
-    "allJs": 1424869
+    "initialJs": 896904,
+    "allJs": 1424972
   }
 }
