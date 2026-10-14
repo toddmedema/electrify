@@ -228,24 +228,35 @@ export function AchievementGallery(): React.JSX.Element {
 export default function AchievementNotifications(): React.JSX.Element {
   const state = useAchievements();
   const dispatch = useAppDispatch();
-  const inGame = useAppSelector((root) => root.game.inGame);
   const snackbarOpen = useAppSelector((root) => root.ui.snackbar.open);
   const dialogOpen = useAppSelector((root) => root.ui.dialog.open);
   const [obstructed, setObstructed] = React.useState(true);
   const [hovered, setHovered] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
   const panel = React.useRef<HTMLDivElement>(null);
+  // Height of the phone tab bar when one is actually on screen; tutorials and build cards hide it.
+  const [navClearance, setNavClearance] = React.useState(0);
   const id = state.notifications[0];
   const entry = catalog.find((item) => item.id === id);
   React.useEffect(() => {
     if (!id) return;
-    const inspect = () =>
+    const inspect = () => {
       setObstructed(
         document.hidden ||
           !!document.querySelector(
             '[role="dialog"][aria-modal="true"], .MuiModal-root:not(.MuiModal-hidden):not([aria-hidden="true"])',
           ),
       );
+      const nav = document.getElementById("navfooter");
+      setNavClearance(
+        nav?.getClientRects().length
+          ? Math.max(
+              0,
+              Math.round(window.innerHeight - nav.getBoundingClientRect().top),
+            )
+          : 0,
+      );
+    };
     inspect();
     const timer = setInterval(inspect, 250);
     document.addEventListener("visibilitychange", inspect);
@@ -285,7 +296,12 @@ export default function AchievementNotifications(): React.JSX.Element {
         <Snackbar
           open={open}
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          className={`achievementToast ${inGame ? "achievementToastInGame" : ""}`}
+          className="achievementToast"
+          style={
+            {
+              "--achievement-nav-clearance": `${navClearance}px`,
+            } as React.CSSProperties
+          }
         >
           <Paper
             ref={panel}

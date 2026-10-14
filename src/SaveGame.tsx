@@ -659,13 +659,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
     scenarioChoicePause: undefined,
     timeline: game.timeline.map((t) => ({ ...t })),
   });
+  // Achievement telemetry is optional: a save from a newer catalog (or a tampered one) still
+  // loads, and resume starts observing it afresh rather than trusting the stored counters.
   if (
     normalized.desktopAchievements !== undefined &&
     !require("./achievements/SimulationHooks")
       .desktopSimulationHooks()
       ?.validate(normalized.desktopAchievements)
   )
-    return null;
+    delete normalized.desktopAchievements;
   if (
     normalized.runIdentity &&
     (!validRunIdentity(normalized.runIdentity) ||

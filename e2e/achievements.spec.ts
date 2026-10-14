@@ -132,9 +132,15 @@ test("a real mission unlocks First Spark with a usable popup and persists it wit
   const viewport = page.viewportSize()!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(
-    viewport.height - (info.project.use.isMobile ? 56 : 0),
-  );
+  // The popup sits 16 px above the phone tab bar when that's on screen, else 16 px from the
+  // bottom. The tutorial hides the tab bar here, so it must not float above an empty gap.
+  const nav = page.locator("#navfooter:visible");
+  const navTop = (await nav.count())
+    ? (await nav.boundingBox())!.y
+    : viewport.height;
+  const gap = navTop - (bounds.y + bounds.height);
+  expect(gap).toBeGreaterThanOrEqual(8);
+  expect(gap).toBeLessThanOrEqual(24);
   const close = popup.getByRole("button", { name: /Dismiss First Spark/ });
   expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await screenshot(page, info, "popup");

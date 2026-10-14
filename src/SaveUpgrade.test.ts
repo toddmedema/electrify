@@ -30,7 +30,7 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
-  it("web imports retain valid shared achievement evidence and reject malformed evidence", () => {
+  it("web imports retain valid shared achievement evidence and drop malformed evidence", () => {
     const desktopEdition = process.env.REACT_APP_DESKTOP;
     process.env.REACT_APP_DESKTOP = "false";
     try {
@@ -41,12 +41,12 @@ describe("save upgrades", () => {
         raw.game.desktopAchievements,
       );
       expect(JSON.stringify(raw)).toBe(original);
-      expect(
-        parseSave({
-          ...raw,
-          game: { ...raw.game, desktopAchievements: { invalid: true } },
-        }),
-      ).toBeNull();
+      const malformed = parseSave({
+        ...raw,
+        game: { ...raw.game, desktopAchievements: { invalid: true } },
+      });
+      expect(malformed).not.toBeNull();
+      expect(malformed!.game.desktopAchievements).toBeUndefined();
     } finally {
       process.env.REACT_APP_DESKTOP = desktopEdition;
     }

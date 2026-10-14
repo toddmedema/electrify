@@ -51,6 +51,11 @@ export class AchievementJournal {
   private listeners = new Set<() => void>();
   private dirty = false;
   private guestClaimPending = false;
+  /**
+   * Set while the stored journal can't be read, such as one a newer deploy wrote with IDs this
+   * build doesn't know. Writing then would replace every account's history with this tab's.
+   */
+  private unreadable = false;
   private snapshot: AchievementSnapshot = {
     progress: emptyRecord(),
     sync: "local",
@@ -68,6 +73,7 @@ export class AchievementJournal {
         progress: mergeRecords(this.root.guest),
       };
     } catch {
+      this.unreadable = true;
       this.snapshot = { ...this.snapshot, storageAvailable: false };
     }
   }
@@ -85,6 +91,11 @@ export class AchievementJournal {
     this.listeners.forEach((listener) => listener());
   }
   private persist() {
+    if (this.unreadable) {
+      this.dirty = true;
+      this.publish({ storageAvailable: false });
+      return;
+    }
     try {
       this.storage().setItem(
         ACHIEVEMENT_STORAGE_KEY,
@@ -102,6 +113,7 @@ export class AchievementJournal {
   refresh() {
     try {
       const next = readDevice(this.storage());
+      this.unreadable = false;
       if (this.dirty) {
         let accounts = { ...next.accounts };
         for (const [uid, record] of Object.entries(this.root.accounts))
@@ -133,6 +145,7 @@ export class AchievementJournal {
         ),
       });
     } catch {
+      this.unreadable = true;
       this.publish({ storageAvailable: false });
     }
   }

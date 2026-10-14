@@ -80,6 +80,40 @@ test("storage failures retain live awards and can persist them later without dup
   ).toEqual(["FIRST_SPARK"]);
 });
 
+test("a journal this build can't read is never overwritten, and later writes catch up", () => {
+  const storage = memoryStorage();
+  const future = JSON.stringify({
+    version: 1,
+    guest: { version: 1, earned: ["A_FUTURE_AWARD"], tutorials: [], wins: [] },
+    accounts: {
+      alice: { version: 1, earned: ["LIGHTS_ON"], tutorials: [], wins: [] },
+    },
+  });
+  storage.setItem(ACHIEVEMENT_STORAGE_KEY, future);
+  const journal = new AchievementJournal(() => storage);
+  expect(journal.getSnapshot().storageAvailable).toBe(false);
+  journal.merge(recordIntent({ earned: ["OUT_OF_JUICE"] }), true);
+  journal.activate("bob");
+  journal.retryStorage();
+  expect(storage.getItem(ACHIEVEMENT_STORAGE_KEY)).toBe(future);
+  expect(journal.getSnapshot().storageAvailable).toBe(false);
+  // Once the stored journal is readable again (the newer tab reset it, say), the session's
+  // awards merge into it rather than replacing it.
+  storage.setItem(
+    ACHIEVEMENT_STORAGE_KEY,
+    JSON.stringify({
+      version: 1,
+      guest: emptyRecord(),
+      accounts: { alice: recordIntent({ earned: ["LIGHTS_ON"] }) },
+    }),
+  );
+  journal.retryStorage();
+  expect(journal.getSnapshot().storageAvailable).toBe(true);
+  const stored = JSON.parse(storage.getItem(ACHIEVEMENT_STORAGE_KEY)!);
+  expect(stored.accounts.alice.earned).toEqual(["LIGHTS_ON"]);
+  expect(stored.accounts.bob.earned).toEqual(["OUT_OF_JUICE"]);
+});
+
 test("a failed guest claim cannot be claimed again by a later account", () => {
   const storage = memoryStorage();
   const journal = new AchievementJournal(() => storage);

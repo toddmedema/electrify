@@ -37,13 +37,14 @@ function fixture(uid?: string) {
     listeners.forEach((listener) => listener());
   };
   const values = new Map<string, string>();
-  const journal = new AchievementJournal(() => ({
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => {
+  const storage = () => ({
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
       values.set(key, value);
     },
-  }));
-  return { observer, publish, journal, game: () => state.game };
+  });
+  const journal = new AchievementJournal(storage);
+  return { observer, publish, journal, storage, game: () => state.game };
 }
 const flush = async () => {
   for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -61,7 +62,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("live awards toast once while imported, replay and custom evidence stay quiet", () => {
+test("live awards toast once while loaded, replay and custom evidence never count", () => {
   const f = fixture();
   const stop = startAchievementServices(f.observer, f.journal);
   f.publish({ inGame: true });
@@ -75,16 +76,49 @@ test("live awards toast once while imported, replay and custom evidence stay qui
     desktopAchievements: { ...progress, earned: ["LIGHTS_ON"] },
   });
   expect(f.journal.getSnapshot().progress.earned).toEqual(["OUT_OF_JUICE"]);
+  // A resumed save or shared link carries someone's earlier evidence, including a finished run.
   f.publish({
     replayPlayback: undefined,
     inGame: false,
-    desktopAchievements: { ...progress, earned: ["FIRST_SPARK"] },
+    desktopAchievements: {
+      ...progress,
+      earned: ["FIRST_SPARK", "LIGHTS_ON"],
+      completion: { scenarioId: 101, difficulty: "CEO" },
+    },
+  });
+  f.publish({ inGame: true });
+  expect(f.journal.getSnapshot().progress.earned).toEqual(["OUT_OF_JUICE"]);
+  // Play continuing from that save still earns what happens live.
+  f.publish({
+    desktopAchievements: {
+      ...f.game().desktopAchievements!,
+      earned: ["FIRST_SPARK", "LIGHTS_ON", "FOUR_NINES"],
+    },
   });
   expect(f.journal.getSnapshot().progress.earned).toEqual([
-    "FIRST_SPARK",
+    "FOUR_NINES",
     "OUT_OF_JUICE",
   ]);
-  expect(f.journal.getSnapshot().notifications).toEqual([]);
+  expect(f.journal.getSnapshot().notifications).toEqual(["FOUR_NINES"]);
+  stop();
+});
+
+test("a guest award claimed by another tab is not announced or re-offered to the guest", () => {
+  const f = fixture();
+  const stop = startAchievementServices(f.observer, f.journal);
+  f.publish({ inGame: true });
+  const progress = f.game().desktopAchievements!;
+  f.publish({ desktopAchievements: { ...progress, earned: ["LIGHTS_ON"] } });
+  expect(f.journal.getSnapshot().notifications).toEqual(["LIGHTS_ON"]);
+  f.journal.clearNotifications();
+  new AchievementJournal(f.storage).activate("alice");
+  f.journal.refresh();
+  expect(f.journal.getSnapshot().progress.earned).toEqual([]);
+  f.publish({
+    desktopAchievements: { ...progress, earned: ["LIGHTS_ON", "FOUR_NINES"] },
+  });
+  expect(f.journal.getSnapshot().notifications).toEqual(["FOUR_NINES"]);
+  expect(f.journal.getSnapshot().progress.earned).toEqual(["FOUR_NINES"]);
   stop();
 });
 

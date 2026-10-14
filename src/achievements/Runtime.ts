@@ -100,16 +100,14 @@ export function startAchievementServices(
     const progress = game.desktopAchievements;
     const preceding = previous;
     previous = game;
-    if (!progress) {
-      priorAccountAwards.clear();
-      priorAccountCompletion = "";
+    // Evidence only changes during live play. Anything already present outside it came with a
+    // loaded save or shared link, which may be another player's or another account's run.
+    if (!progress || !game.inGame) {
+      priorAccountAwards = new Set(progress?.earned ?? []);
+      priorAccountCompletion = JSON.stringify(progress?.completion);
+      return;
     }
-    if (
-      !progress ||
-      saves.transitioning ||
-      game.replayPlayback ||
-      game.customScenario
-    )
+    if (saves.transitioning || game.replayPlayback || game.customScenario)
       return;
     const intent = {
       earned: progress.earned.filter((id) => !priorAccountAwards.has(id)),
@@ -124,8 +122,13 @@ export function startAchievementServices(
     observed = key;
     journal.merge(
       recordIntent(intent),
-      !!game.inGame && !!preceding.inGame && !!preceding.desktopAchievements,
+      !!preceding.inGame && !!preceding.desktopAchievements,
     );
+    // Credit each piece of run evidence once. Re-sending it would re-announce an award another
+    // tab has since moved into an account, and put it back in the guest record to be claimed again.
+    intent.earned.forEach((id) => priorAccountAwards.add(id));
+    if (intent.completion)
+      priorAccountCompletion = JSON.stringify(intent.completion);
     void sync();
   };
   const desktop =

@@ -528,7 +528,7 @@ test("saved telemetry survives resume, forecasts and frozen optimized live ticks
   runMonths(resumed, 1);
   expect(resumed.desktopAchievements!.lastMinute).toBe(resumed.date.minute);
 });
-test("telemetry validation rejects malformed imported counters and unknown awards", () => {
+test("telemetry validation drops malformed imported counters and unknown awards but keeps the save", () => {
   const state = game();
   for (const patch of [
     { earned: ["UNKNOWN"] },
@@ -539,13 +539,13 @@ test("telemetry validation rejects malformed imported counters and unknown award
   ]) {
     const invalid = { ...state.desktopAchievements!, ...patch };
     expect(validAchievementProgress(invalid)).toBe(false);
-    expect(
-      parseSave(
-        serializeSave({
-          ...state,
-          desktopAchievements: invalid as GameType["desktopAchievements"],
-        }),
-      ),
-    ).toBeNull();
+    const restored = parseSave(
+      serializeSave({
+        ...state,
+        desktopAchievements: invalid as GameType["desktopAchievements"],
+      }),
+    );
+    expect(restored).not.toBeNull();
+    expect(restored!.game.desktopAchievements).toBeUndefined();
   }
 });

@@ -456,6 +456,8 @@ continue to live in the Electron-only chunk. Production gzip moves from 882.48 t
 initial JS (+14.42 kB, 1.63%) and from 1393.04 to 1424.97 kB across all JS (+31.93 kB, 2.29%).
 The evaluator and UI have named lazy chunks; MUI controls and the Firestore transaction API also
 add shared dependencies. The bundle baseline records this deliberate feature cost, with the
-same 10% tolerance. `perf:rebaseline` reconfirms every scenario's unchanged golden output.
+same 10% tolerance. The previous recorded baseline (805.13 kB initial, 1270.27 kB all JS) predated
+later growth, so the effective ceiling moves 11.4% for initial JS (885.64 to 986.59 kB) and
+12.2% for all JS, more than this feature's own cost. `perf:rebaseline` reconfirms every scenario's unchanged golden output.
 Tick ratios measure 1.367 and 1.036 and pass the existing 1.632/1.315 ceilings; those ceilings
 are retained because simulation economics and headless instrumentation have not changed.

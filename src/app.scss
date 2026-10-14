@@ -515,8 +515,6 @@ button,
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
-  border-radius: var(--radius-md);
-  background: #f0f3f5;
   display: grid;
   place-items: center;
   img {
@@ -549,6 +547,11 @@ button,
 .isUnlocked .achievementState {
   color: var(--delta-good);
 }
+// Earned awards keep their colour; the "Locked" label still carries the state in text.
+.isLocked .achievementArt img {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
 .achievementEmpty {
   padding: 32px 16px;
   text-align: center;
@@ -556,7 +559,11 @@ button,
 .achievementToast.MuiSnackbar-root {
   left: auto;
   right: max(16px, env(safe-area-inset-right));
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  // The measured tab bar already includes the safe area it pads for.
+  bottom: calc(
+    16px +
+      max(var(--achievement-nav-clearance, 0px), env(safe-area-inset-bottom))
+  );
   width: min(384px, calc(100vw - 32px));
   max-width: none;
 }
@@ -576,6 +583,10 @@ button,
     font-size: 0.75rem;
   }
 }
+// The page is near-black in dark mode, so the popup steps up a surface instead of a shadow
+[data-theme="dark"] .achievementToastPanel.MuiPaper-root {
+  background-color: var(--bg-raised);
+}
 .achievementToastText {
   flex: 1;
   min-width: 0;
@@ -591,11 +602,6 @@ button,
   top: 4px;
   width: 44px;
   height: 44px;
-}
-@media screen and (max-width: ($desktop_breakpoint - 1px)) {
-  .achievementToastInGame.MuiSnackbar-root {
-    bottom: calc(56px + env(safe-area-inset-bottom) + 16px);
-  }
 }
 @media screen and (max-width: 599px) {
   .achievementGallery {

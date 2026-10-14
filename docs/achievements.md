@@ -9,7 +9,10 @@ games, replay playback, forecasts and modified simulation harnesses do not earn 
 The `achievements` lazy chunk installs the evaluator before game saves are parsed or restored.
 The existing optional `game.desktopAchievements` save key is retained for compatibility; its
 shape and schema have not changed. Older saves begin observing new counters on resume and cannot
-invent missing history. `achievements-ui` contains the gallery and popup components. Steam-only
+invent missing history. A save whose telemetry fails validation (a newer catalog, or a tampered
+file) still loads without it, and resume starts observing afresh. Evidence already in a loaded
+save or shared link is never credited: only awards earned during live play count, so opening a
+friend's finished CEO run, or another account's save, cannot unlock anything. `achievements-ui` contains the gallery and popup components. Steam-only
 submission, presence and SDK code remain behind the Electron build guard and named `electron`
 chunk. Both production builds inspect all compiled JavaScript, including lazy chunks, for this
 boundary.
@@ -32,7 +35,9 @@ merges.
 
 If storage access or a write fails, live achievements remain in memory and the gallery explains
 the session-only state. Sync can still save them to an authenticated account. Writes retry on
-focus, online events and a 30-second interval. Corrupt or oversized local records are rejected.
+focus, online events and a 30-second interval. Corrupt or oversized local records are rejected,
+and a stored journal this build can't read (such as one a newer deploy wrote) is never
+overwritten; once it reads again, the session's awards merge into it.
 
 ## Firebase sync
 
@@ -60,8 +65,8 @@ shows all requirements, earned/locked text and count filters, plus accurate devi
 status and the existing Google sign-in flow. Opening the gallery pauses gameplay like other
 standalone screens. Keyboard entry focuses Back; Escape returns to the opener.
 
-Live local unlocks queue one popup at the bottom right. On phones the popup sits above game
-navigation. It never pauses gameplay or steals focus, waits behind dialogs/menus and ordinary
+Live local unlocks queue one popup 16 px from the bottom right. It rises above the phone tab bar
+only while that bar is on screen; tutorials and build screens hide it. It never pauses gameplay or steals focus, waits behind dialogs/menus and ordinary
 snackbars, pauses its eight-second timer while hovered or focused, and offers View achievements
 and an always-visible 44 px close button. At 320 px the popup omits the visible requirement
 sentence to cover less gameplay; the gallery and polite announcement retain it.
