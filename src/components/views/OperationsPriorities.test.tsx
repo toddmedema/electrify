@@ -172,8 +172,14 @@ test.each(["pointer", "keyboard"])(
         name: "Inspect Solar project and grid output",
       });
     const first = rows()[0];
-    if (interaction === "pointer") await user.hover(first);
-    else await act(async () => first.focus());
+    const expectedFocus =
+      interaction === "keyboard"
+        ? first
+        : screen.getByRole("button", { name: /Keep the utility solvent/ });
+    if (interaction === "pointer") {
+      await act(async () => expectedFocus.focus());
+      await user.hover(first);
+    } else await act(async () => first.focus());
     const expired = produce(game, (draft) => {
       draft.date.minute = 10 + MINUTES_PER_MONTH;
       draft.facilities[0].currentW = 500;
@@ -183,7 +189,7 @@ test.each(["pointer", "keyboard"])(
     expect(rows()[0]).toBe(first);
     expect(first).toHaveTextContent("#3");
     expect(first).toHaveTextContent("500W now");
-    if (interaction === "keyboard") expect(first).toHaveFocus();
+    expect(expectedFocus).toHaveFocus();
     fireEvent.click(first);
     expect(passed.onFacility).toHaveBeenCalledWith(3);
     if (interaction === "pointer") await user.unhover(first);
