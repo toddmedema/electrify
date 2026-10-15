@@ -40,6 +40,8 @@ for (const theme of ["light", "dark"] as const) {
       page.locator(".eventLog"),
       page.getByRole("button", { name: "Events", exact: true }),
     );
+    const history = page.getByRole("button", { name: /^Event history \(/ });
+    if (await history.isVisible()) await history.click();
     await page
       .getByRole("button", { name: "Filter event history, All events" })
       .click();

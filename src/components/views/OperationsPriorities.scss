@@ -1,0 +1,181 @@
+.operationsPriorities {
+  max-width: 480px;
+  margin-inline: auto;
+  padding: 0 12px 12px;
+  color: var(--font-color-primary);
+}
+
+.operationsSection {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+
+  & + & {
+    margin-top: 12px;
+  }
+}
+
+.operationsSectionHeader {
+  min-height: var(--control-size);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  .MuiButton-root {
+    min-height: var(--control-size);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-emphasis);
+  }
+}
+
+.operationsGoals {
+  display: grid;
+  gap: 8px;
+}
+
+.operationsPriorities .operationsGoal,
+.operationsPriorities .operationsRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-height: var(--control-size);
+  padding: 12px;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  color: var(--font-color-primary);
+  text-align: left;
+  line-height: 1.45;
+  font-size: var(--font-size-body2);
+  text-transform: none;
+
+  &:hover {
+    border-color: var(--border-selected);
+    background: var(--bg-selected);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &.selected {
+    background: var(--bg-selected);
+    border-color: var(--interactive-strong);
+  }
+
+  &.warning {
+    border-inline-start: 4px solid var(--warning-icon);
+  }
+
+  &.danger,
+  &.status-failed {
+    border-inline-start: 4px solid var(--blackout-red);
+  }
+}
+
+.operationsPriorities .operationsRow + .operationsRow {
+  margin-top: 8px;
+}
+
+.operationsRowTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+
+  > svg {
+    flex-shrink: 0;
+    color: var(--font-color-faded);
+  }
+
+  strong {
+    font-weight: var(--font-weight-emphasis);
+  }
+}
+
+.operationsDetail,
+.operationsGoalTarget {
+  display: block;
+}
+
+.operationsGoalTarget,
+.operationsEmpty,
+.operationsMeta,
+.operationsAssetId {
+  color: var(--font-color-faded);
+  font-size: var(--font-size-caption);
+}
+
+.operationsMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  > svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.operationsAssetId {
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.operationsDecisionTrail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-caption);
+
+  > svg {
+    width: 14px;
+    height: 14px;
+    color: var(--font-color-faded);
+  }
+}
+
+.operationsPinCheck {
+  width: 28px;
+  display: inline-flex;
+}
+
+.operationsEmpty {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.operationsPriorities .operationsTextAction {
+  min-height: var(--control-size);
+  justify-content: flex-start;
+  text-transform: none;
+  padding-inline: 0;
+}
+
+.operationsHistoryToggle {
+  max-width: 480px;
+  margin-inline: auto;
+  padding: 0 12px 12px;
+
+  > .MuiButton-root {
+    min-height: var(--control-size);
+    width: 100%;
+    text-transform: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .operationsSectionHeader .MuiButton-root,
+  .operationsPriorities .operationsTextAction,
+  .operationsHistoryToggle > .MuiButton-root {
+    min-height: 44px;
+  }
+}

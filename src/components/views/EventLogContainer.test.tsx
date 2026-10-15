@@ -1,8 +1,42 @@
-import { navigationForStoryTarget, selectOngoing } from "./EventLogContainer";
+import {
+  makeMapStateToProps,
+  navigationForStoryTarget,
+  selectOngoing,
+} from "./EventLogContainer";
+import { createNextState as produce } from "@reduxjs/toolkit";
+import { initialUI } from "../../reducers/UI";
+import { TICK_MINUTES } from "../../Constants";
 import { createGame } from "../../testing/Simulator";
 import { AppStateType } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { selectUpcomingStoryEvents } from "./StoryEventSelectors";
+
+test("FAST presents a bounded rail snapshot while evidence and incidents update immediately", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.speed = "FAST";
+  const state = { game, ui: initialUI } as AppStateType;
+  const select = makeMapStateToProps();
+  const first = select(state);
+  const next = produce(state, (draft) => {
+    draft.game.date.minute += TICK_MINUTES;
+  });
+  const held = select(next);
+  expect(held.game).toBe(first.game);
+  expect(held.events).toBe(first.events);
+  const inspect = produce(next, (draft) => {
+    draft.ui.evidenceRequest = { id: 1, runId: 0, target: "finances" };
+  });
+  expect(select(inspect).game).toBe(inspect.game);
+  const incident = produce(inspect, (draft) => {
+    draft.game.eventLog.unshift({
+      id: 400,
+      kind: "BLACKOUT",
+      label: "Now",
+      message: "Supply is short.",
+    });
+  });
+  expect(select(incident).events).toHaveLength(first.events.length + 1);
+});
 
 describe("story action targets", () => {
   it("routes a generator target to the quote screen and preserves its fuel", () => {
