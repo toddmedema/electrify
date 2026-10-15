@@ -18,6 +18,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL,
+    headless: true,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },

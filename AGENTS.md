@@ -30,6 +30,12 @@ files are large, so broad rewrites create expensive review diffs.
 - Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and
   run with `npm run test:e2e -- <spec> --project=desktop-chromium` when the changed path warrants
   them. CI runs `build-options.spec.ts` and `tutorial-exit.spec.ts` on desktop and 390 px phone.
+- Keep local validation windowless: use `npm run check` and headless Chromium through
+  `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
+  leave it to CI unless the user explicitly requests a local native-window test. It requires
+  `npm run test:desktop -- --headed`. Do not add `--headed`, `--debug`, or `--ui`, set `PWDEBUG`,
+  or launch `desktop:start` during routine local validation. `test:desktop:native` is a
+  windowless Node unit suite and remains part of `check`.
 
 ## Run compatibility manifest
 

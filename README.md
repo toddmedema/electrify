@@ -80,7 +80,12 @@ Types, lint, formatting and tests, which is what CI runs on every pull request. 
 | `npm run format:check` | Report unformatted app or script files                    |
 | `npm run test:ci`      | Run Jest once with the same coverage checks used by CI    |
 | `npm run test:sim`     | Run the long simulation suites (`*.sim.test.tsx`)         |
+| `npm run test:e2e`     | Run browser UI tests in headless Chromium                |
 | `npm run sim -- --all` | Run every scenario through the headless invariant checker |
+
+Local checks run without opening application windows. The Electron UI suite requires an
+explicit `npm run test:desktop -- --headed` because it opens native windows and takes keyboard
+focus. CI runs that suite on dedicated runners; see [desktop testing](docs/desktop-steam.md).
 
 `npm run test:ci` reports coverage and skips the `*.sim.test.tsx` suites, which CI runs without
 coverage through `npm run test:sim`. `src/helpers` and `src/reducers` have floors set in

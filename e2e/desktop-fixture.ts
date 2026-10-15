@@ -1,9 +1,10 @@
-import { _electron, ElectronApplication, Page } from "@playwright/test";
+import { _electron, ElectronApplication, Page, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const workspace = path.resolve(__dirname, "..");
 const profileRoot = path.join(workspace, ".tmp", "desktop-qa");
+const requireHeadedDesktop = require("../scripts/desktop-test-setup.js");
 
 export interface DesktopSession {
   app: ElectronApplication;
@@ -26,6 +27,8 @@ export async function removeDesktopProfile(profile: string): Promise<void> {
 }
 
 export async function launchDesktop(profile: string): Promise<DesktopSession> {
+  // Also protect direct Playwright runs that bypass desktop.playwright.config.ts.
+  requireHeadedDesktop({ projects: [test.info().project] });
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
       (entry): entry is [string, string] =>
