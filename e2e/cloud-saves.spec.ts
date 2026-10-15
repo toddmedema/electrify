@@ -54,28 +54,32 @@ async function setSaveLibrary(page: Page, payload: Record<string, unknown>) {
   await page.evaluate((payload) => {
     type FixtureStore = {
       dispatch(action: { type: string; payload: unknown }): void;
+      getState(): unknown;
     };
-    const runtime = window as unknown as {
-      webpackChunkelectrify: {
-        push(
-          chunk: [
-            string[],
-            object,
-            (require: (id: string) => { store: FixtureStore }) => void,
-          ],
-        ): void;
-      };
+    type Fiber = {
+      return: Fiber | null;
+      memoizedProps?: { store?: FixtureStore };
     };
-    runtime.webpackChunkelectrify.push([
-      [`cloud-save-ui-fixture-${Math.random()}`],
-      {},
-      (require) => {
-        require("./src/Store.tsx").store.dispatch({
-          type: "saves/sessionChanged",
-          payload,
-        });
-      },
-    ]);
+    // Read the Redux Provider already mounted by React. Development-only webpack module IDs
+    // disappear in a minified production build; no test hook is added to the shipped app.
+    const element = document.querySelector("#root")?.firstElementChild;
+    if (!element) throw new Error("The app has not mounted");
+    const key = Object.keys(element).find((name) =>
+      name.startsWith("__reactFiber$"),
+    );
+    let fiber = key ? (element as unknown as Record<string, Fiber>)[key] : null;
+    while (fiber) {
+      const store = fiber.memoizedProps?.store;
+      if (
+        typeof store?.dispatch === "function" &&
+        typeof store.getState === "function"
+      ) {
+        store.dispatch({ type: "saves/sessionChanged", payload });
+        return;
+      }
+      fiber = fiber.return;
+    }
+    throw new Error("Could not find the mounted Redux Provider");
   }, payload);
 }
 

@@ -1,0 +1,21 @@
+name: Jest shard cache
+description: Restore transforms and timings independently for each shard; save after the run.
+inputs:
+  group:
+    required: true
+    description: unit or simulation
+  shard:
+    required: true
+    description: Shard index
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v6
+      with:
+        path: .tmp/jest-${{ inputs.group }}
+        key: jest-4-${{ inputs.group }}-${{ inputs.shard }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: |
+          jest-4-${{ inputs.group }}-${{ inputs.shard }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-
+          jest-4-${{ inputs.group }}-1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-
+          jest-4-${{ inputs.group }}-2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-
+          jest-4-${{ inputs.group }}-3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-

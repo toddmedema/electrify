@@ -3,6 +3,9 @@ description: >
   Sets up Node and installs exactly what package-lock.json pins, restoring node_modules from the
   cache when the lockfile and Node version are unchanged.
 inputs:
+  profile:
+    description: full, or desktop for native QA after the renderer is compiled elsewhere
+    default: full
   node-version:
     description: Node version; keep in step with deploy-prod.yml.
     default: 24.14.0
@@ -14,7 +17,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ inputs.node-version }}-${{ hashFiles('package-lock.json') }}
+        key: node-modules-${{ inputs.profile == 'desktop' && format('desktop-{0}-', hashFiles('scripts/ci/desktop-dependencies.js')) || '' }}${{ runner.os }}-${{ runner.arch }}-node${{ inputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
     # npm's download cache only helps when npm ci runs, so skip restoring it on a hit.
     - name: Setup Node.js environment
@@ -26,9 +29,17 @@ runs:
     # ci, not install: installs exactly what package-lock.json pins, so a run can't pass on a
     # dependency tree nobody has locally.
     - name: Install packages
-      if: steps.modules.outputs.cache-hit != 'true'
+      if: steps.modules.outputs.cache-hit != 'true' && inputs.profile != 'desktop'
       shell: bash
       run: npm ci
+
+    - name: Install the exact locked native QA dependency closure
+      if: steps.modules.outputs.cache-hit != 'true' && inputs.profile == 'desktop'
+      shell: bash
+      run: |
+        node scripts/ci/desktop-dependencies.js prepare
+        npm ci --prefix .tmp/desktop-deps
+        node scripts/ci/desktop-dependencies.js adopt
 
     # Saved straight after the install, before any job writes build or lint caches under
     # node_modules/.cache, so every job restores the same pristine tree. Parallel jobs race to

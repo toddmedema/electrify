@@ -2,7 +2,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const builder = require("electron-builder");
 const { desktopBuild } = require("./desktop-build");
-const { verifyPackaged, verifySignedMacPackage } = require("./desktop-verify");
+const {
+  verifyBuild,
+  verifyPackaged,
+  verifySignedMacPackage,
+} = require("./desktop-verify");
+const { verifyEditionBundle } = require("./verify-edition-bundle");
 
 async function signMacAdHoc(options) {
   return require("@electron/osx-sign").signAsync({
@@ -96,6 +101,19 @@ async function desktopPackage() {
   if (!process.argv.includes("--skip-build")) desktopBuild();
   else if (!fs.existsSync("build/desktop-assets.json"))
     throw new Error("Run desktop:build before --skip-build");
+  else {
+    verifyEditionBundle("build", "desktop");
+    const expected = JSON.parse(
+      fs.readFileSync("build/desktop-assets.json", "utf8"),
+    );
+    if (
+      JSON.stringify(verifyBuild("build", "public")) !==
+      JSON.stringify(expected)
+    )
+      throw new Error(
+        "Shared desktop renderer differs from its verified manifest",
+      );
+  }
   fs.writeFileSync(
     "desktop-config.json",
     JSON.stringify(mode === "steam" ? { mode, appId } : { mode }, null, 2) +
@@ -106,7 +124,6 @@ async function desktopPackage() {
     linux: builder.Platform.LINUX,
     darwin: builder.Platform.MAC,
   }[platform];
-  let signedMac = false;
   await withOfflineMacSigning(mode, platform, () =>
     builder.build({
       targets: target.createTarget(
@@ -120,12 +137,6 @@ async function desktopPackage() {
           // Mach-O signatures, including ad-hoc signatures in macOS offline QA builds.
           verifyPackaged(context.appOutDir);
         },
-        afterSign: (context) => {
-          if (platform === "darwin") {
-            verifySignedMacPackage(context.appOutDir);
-            signedMac = true;
-          }
-        },
       },
     }),
   );
@@ -138,9 +149,12 @@ async function desktopPackage() {
           ? "mac-arm64"
           : "mac";
   const directory = path.join("dist", "desktop", output);
-  const count = signedMac
-    ? verifySignedMacPackage(directory)
-    : verifyPackaged(directory);
+  // Check the finished signature once, after all packaging has completed. An afterSign hook
+  // also fires when the pinned builder skips signing, so it cannot establish signature validity.
+  const count =
+    platform === "darwin"
+      ? verifySignedMacPackage(directory)
+      : verifyPackaged(directory);
   console.error(
     `Packaged desktop verified: ${count} assets, native Steam runtime, and offline game.`,
   );

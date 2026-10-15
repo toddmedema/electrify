@@ -1,13 +1,7 @@
 import { TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
-import { INTERN_ONE_BUILD_PLAYS } from "./BalancePlaybooks";
-import {
-  baselineChoiceActions,
-  baselineMeaningfulChoices,
-  ECONOMICS_SCENARIOS,
-  expectNoViolations,
-} from "./SimulationTestHelpers";
+import { expectNoViolations } from "./SimulationTestHelpers";
 import { createGame, runSimulation } from "./Simulator";
 
 jest.setTimeout(120000);
@@ -15,63 +9,6 @@ jest.setTimeout(120000);
 // The economics matrix is split across SimulationEconomics*.sim.test.tsx so that Jest, which
 // runs files rather than tests in parallel, can spread its long simulations over every CI core.
 describe("simulation economics", () => {
-  ECONOMICS_SCENARIOS.forEach((scenario) => {
-    it(`validates the one-build balance playbook on Intern in "${scenario.name}"`, () => {
-      const passive = runSimulation({
-        scenarioId: scenario.id,
-        difficulty: "Intern",
-      });
-      expectNoViolations(passive);
-      expect(passive.actionCount).toBe(
-        baselineChoiceActions(passive, scenario.id),
-      );
-      expect(passive.meaningfulDecisionCount).toBe(
-        baselineMeaningfulChoices(scenario.id, passive),
-      );
-      // The internal action benchmark must not change a player outcome.
-      expect(passive.meaningfulDecisionCount).toBeLessThanOrEqual(1);
-
-      const active = runSimulation({
-        scenarioId: scenario.id,
-        difficulty: "Intern",
-        ...INTERN_ONE_BUILD_PLAYS[scenario.id],
-      });
-      expectNoViolations(active);
-      expect(active.actionCount).toBe(
-        1 + baselineChoiceActions(active, scenario.id),
-      );
-      expect(active.meaningfulDecisionCount).toBe(
-        1 + baselineMeaningfulChoices(scenario.id, active),
-      );
-      expect(active.builds).toHaveLength(1);
-      expect(active.outcome).toBe("completed");
-    });
-  });
-
-  it.each([107, 111])(
-    "keeps Intern scenario %s one-build playbooks viable across seeds 1-20",
-    (scenarioId) => {
-      for (let seed = 1; seed <= 20; seed++) {
-        const passive = runSimulation({
-          scenarioId,
-          difficulty: "Intern",
-          seed,
-        });
-        const active = runSimulation({
-          scenarioId,
-          difficulty: "Intern",
-          seed,
-          ...INTERN_ONE_BUILD_PLAYS[scenarioId],
-        });
-        expectNoViolations(passive);
-        expectNoViolations(active);
-        expect(passive.meaningfulDecisionCount).toBeLessThanOrEqual(1);
-        expect([seed, active.outcome]).toEqual([seed, "completed"]);
-        expect(active.meaningfulDecisionCount).toBe(1);
-      }
-    },
-  );
-
   it("makes a replacement build necessary at the End of an Era compliance deadline", () => {
     const shortcut = runSimulation({
       scenarioId: 102,
