@@ -18,6 +18,7 @@ for (const theme of ["light", "dark"]) {
       theme,
     );
     await page.goto("/");
+    await expect(page.locator("#desktopStartup")).toHaveCount(0);
     const primary = page.getByRole("region", { name: "Primary actions" });
     const resources = page.getByRole("navigation", { name: "Game resources" });
     const discovery = page.locator(".discoveryActions");

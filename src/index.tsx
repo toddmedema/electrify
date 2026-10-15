@@ -6,14 +6,29 @@ import App from "./App";
 import { registerServiceWorker } from "./ServiceWorkerRegistration";
 import "./app.scss";
 import { getDesktop, isDesktopApp } from "./Desktop";
+import {
+  prepareDesktopStartup,
+  failDesktopStartup,
+  finishDesktopStartup,
+} from "./desktop/Startup";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);
+
+function DesktopStartupHandoff(): null {
+  React.useLayoutEffect(() => {
+    finishDesktopStartup();
+  }, []);
+  return null;
+}
 
 const app = (
   <React.StrictMode>
     <Provider store={store}>
       <App />
+      {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
+        <DesktopStartupHandoff />
+      )}
     </Provider>
   </React.StrictMode>
 );
@@ -52,11 +67,7 @@ const startDesktop: () => Promise<void> =
         stopBootstrapQuit = getDesktop()?.onBeforeQuit(() =>
           getDesktop()?.readyToQuit(true),
         );
-        root.render(
-          <p role="status" style={{ padding: 24 }}>
-            Preparing saved games…
-          </p>,
-        );
+        prepareDesktopStartup();
         try {
           await prepareAchievements();
           const { initializeDesktop } = await import(
@@ -67,20 +78,9 @@ const startDesktop: () => Promise<void> =
           stopBootstrapQuit = undefined;
           renderApp();
         } catch {
-          root.render(
-            <div role="alert" style={{ padding: 24 }}>
-              <h1>Saved games couldn't be restored</h1>
-              <p>
-                Your desktop backup has been kept. Retry before starting a game.
-              </p>
-              <button
-                style={{ minHeight: 44, padding: "8px 16px", font: "inherit" }}
-                onClick={() => void startDesktop()}
-              >
-                Retry
-              </button>
-              <button onClick={() => void getDesktop()?.quit()}>Quit</button>
-            </div>,
+          failDesktopStartup(
+            () => void startDesktop(),
+            () => void getDesktop()?.quit(),
           );
         }
       }
