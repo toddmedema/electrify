@@ -653,7 +653,20 @@ export default function UPlotChart<S>(
   const [detailTime, ...detailRows] = detail?.split("\n") || [];
 
   return (
-    <div className="accessibleChart">
+    <div
+      className="accessibleChart"
+      onKeyDown={(event) => {
+        if (
+          props.interactiveDetails &&
+          event.key === "Escape" &&
+          selectedPoint !== null
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeDetails();
+        }
+      }}
+    >
       {props.interactiveDetails && (
         <span id={instructionsId} className="srOnly">
           Tap or press Enter to inspect a time. Use Left and Right arrows, Home
@@ -679,10 +692,7 @@ export default function UPlotChart<S>(
                   End: data[0].length - 1,
                   Enter: current,
                 };
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  closeDetails();
-                } else if (event.key in points) {
+                if (event.key in points) {
                   event.preventDefault();
                   selectPoint(points[event.key]);
                 }

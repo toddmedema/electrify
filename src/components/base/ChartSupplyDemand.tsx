@@ -622,16 +622,18 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         <ChartLegend
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
-            ...sources.map((source) => ({
-              name: source,
-              color: sourcePattern(source)
-                ? chartPalette().powerFlowPattern
-                : sourceColor(source),
-              pattern: sourcePattern(source),
-              fill: sourcePattern(source)
-                ? chartPalette().powerFlowFill
-                : undefined,
-            })),
+            ...(compact
+              ? [{ name: "Supply", color: sourceColor("Dispatchable") }]
+              : sources.map((source) => ({
+                  name: source,
+                  color: sourcePattern(source)
+                    ? chartPalette().powerFlowPattern
+                    : sourceColor(source),
+                  pattern: sourcePattern(source),
+                  fill: sourcePattern(source)
+                    ? chartPalette().powerFlowFill
+                    : undefined,
+                }))),
           ]}
         />
       )}

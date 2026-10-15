@@ -145,7 +145,6 @@
 }
 
 .operatingStageBuild {
-  container-type: inline-size;
   .constructionCash {
     display: none;
   }
@@ -179,24 +178,74 @@
   }
 }
 
-// A short tablet still needs room to choose a project. Keep a compact live plot and readings
-// visible while the catalog scrolls independently underneath them.
-@media (max-height: 760px) {
-  .operatingWorkspace {
-    .operatingStagePlot {
-      height: 128px;
+// Compact against the actual workspace and text size, rather than physical display height.
+// Current supply/demand stay legible; the HUD already carries the duplicated reserve state.
+.operatingWorkspace[data-compact] {
+  .operatingStagePlot {
+    height: 160px;
+  }
+  .operatingStageCaption {
+    display: none;
+  }
+  .operatingStageHeader {
+    padding: 8px 12px 4px;
+    h6 {
+      font-size: var(--font-size-subtitle);
     }
-    .operatingStageCaption {
-      display: none;
-    }
-    .operatingStageHeader {
-      padding-top: 8px;
-    }
-    .operatingStageHint {
-      padding-block: 4px;
-    }
-    .operatingStageSelection {
-      padding-block: 4px;
-    }
+  }
+  .operatingStageReadings > span {
+    flex-direction: row;
+    align-items: baseline;
+  }
+  .operatingStageReadings .operatingStageHealth {
+    display: none;
+  }
+  .operatingStageHint {
+    padding-block: 4px;
+  }
+  .operatingStageSelection {
+    padding-block: 4px;
+  }
+}
+
+.operatingWorkspace[data-compact][data-context="build"],
+.operatingWorkspace[data-tight] {
+  .operatingStageReadings,
+  .operatingStageHint,
+  .operatingStageCommands,
+  .operatingStageSelection > .MuiIconButton-root {
+    display: none;
+  }
+  .operatingStageSelectedReading {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+}
+
+.operatingWorkspace[data-tight] {
+  .operatingStageReadings {
+    display: flex;
+  }
+  .operatingStagePlot {
+    height: 128px;
+  }
+}
+
+// If fixed catalog headers would leave less than a useful decision area, scroll them with
+// the projects. Review can then be fully exposed without shrinking its touch target.
+@container operating-context (max-height: 18rem) {
+  .buildFacilities {
+    display: block;
+    overflow-y: auto;
+  }
+  .buildFacilities .constructionPanel,
+  .buildFacilities .constructionPanel > .screenCatalog {
+    display: block;
+    height: auto;
+  }
+  .buildFacilities .cardList {
+    overflow: visible;
+    flex: none !important;
   }
 }

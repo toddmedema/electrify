@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, IconButton, Typography, useMediaQuery } from "@mui/material";
+import { Button, IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { GameType, isStorage } from "../../Types";
 import { useAppDispatch, useAppSelector } from "../../Store";
@@ -79,17 +79,28 @@ export default function OperatingStage({
   const evidence = useAppSelector((state) => state.ui.evidenceRequest);
   const dragging = useAppSelector((state) => state.ui.facilityDragActive);
   const plot = React.useRef<HTMLDivElement>(null);
+  const workspace = React.useRef<HTMLDivElement>(null);
   const anchor = React.useRef<HTMLElement>(null);
   const [height, setHeight] = React.useState(220);
-  const compact = useMediaQuery("(max-height:760px)");
+  const [compact, setCompact] = React.useState(false);
+  const [tight, setTight] = React.useState(false);
   React.useLayoutEffect(() => {
     const element = plot.current;
     if (!element) return;
     const measure = () => {
+      const available = workspace.current?.clientHeight || 0;
+      const rem =
+        parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      // Budget against the room below the actual HUD and navigation, including larger text.
+      // A short context must remain usable even on a physically tall display at 150% size.
+      if (available > 0) {
+        setCompact(available < 38 * rem);
+        setTight(available < 26 * rem);
+      }
       const legend = element.querySelector(".chartLegend");
       setHeight(
         Math.max(
-          56,
+          1,
           (element.clientHeight - (legend?.clientHeight || 24) - 8) /
             chartScale(element.clientWidth || 350),
         ),
@@ -99,6 +110,7 @@ export default function OperatingStage({
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(element);
+    if (workspace.current) observer.observe(workspace.current);
     const legend = element.querySelector(".chartLegend");
     if (legend) observer.observe(legend);
     return () => observer.disconnect();
@@ -135,7 +147,13 @@ export default function OperatingStage({
   };
 
   return (
-    <div className="operatingWorkspace" data-context={context}>
+    <div
+      className="operatingWorkspace"
+      data-context={context}
+      data-compact={compact || undefined}
+      data-tight={tight || undefined}
+      ref={workspace}
+    >
       <section
         className="operatingStage operatingEvidence"
         aria-label="Live grid"

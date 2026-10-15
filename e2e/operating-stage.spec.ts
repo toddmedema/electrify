@@ -93,6 +93,14 @@ for (const viewport of layouts) {
         path: testInfo.outputPath(`stage-build-${viewport.width}-${theme}.png`),
         animations: "disabled",
       });
+      const image = stage.getByRole("img");
+      await image.focus();
+      await image.press("Home");
+      await expect(stage.locator(".chartPointDetails")).toBeVisible();
+      await stage.getByRole("button", { name: "Close chart details" }).focus();
+      await page.keyboard.press("Escape");
+      await expect(stage.locator(".chartPointDetails")).toHaveCount(0);
+      await expect(catalog).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(catalog).toHaveCount(0);
       await expect(insights).toBeVisible();
