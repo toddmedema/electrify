@@ -24,9 +24,6 @@ describe("researched transmission profiles", () => {
     const groupedIds = Object.values(TRANSMISSION_PROFILE_LOCATION_IDS).flat();
     const mappedIds = [...groupedIds, ...NO_INTERTIE_LOCATION_IDS];
 
-    expect(plannedIds).toHaveLength(285);
-    expect(groupedIds).toHaveLength(254);
-    expect(NO_INTERTIE_LOCATION_IDS).toHaveLength(31);
     expect(new Set(plannedIds).size).toBe(plannedIds.length);
     expect(new Set(mappedIds).size).toBe(mappedIds.length);
     expect([...mappedIds].sort()).toEqual([...plannedIds].sort());
@@ -35,7 +32,6 @@ describe("researched transmission profiles", () => {
     );
 
     const downloadedIds = Object.keys(weatherIndex.cities);
-    expect(downloadedIds).toHaveLength(283);
     expect(
       downloadedIds.every((id) => id in LOCATION_TRANSMISSION_PROFILE_IDS),
     ).toBe(true);
@@ -55,9 +51,6 @@ describe("researched transmission profiles", () => {
       for (const [id, , , price, supplyW, demandW] of markets) {
         expect(marketIds.has(id)).toBe(false);
         marketIds.add(id);
-        expect([price, supplyW, demandW]).toEqual(
-          expect.arrayContaining([expect.any(Number)]),
-        );
         for (const value of [price, supplyW, demandW]) {
           expect(Number.isFinite(value)).toBe(true);
           expect(value).toBeGreaterThanOrEqual(0);

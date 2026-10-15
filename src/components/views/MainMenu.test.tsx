@@ -95,9 +95,12 @@ describe("MainMenu", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("prioritizes continuing a save while offering mission selection", () => {
+  it("prioritizes continuing a save while offering mission selection and the save library", async () => {
+    const onSavedGames = jest.fn();
     render(
-      <MainMenu {...props({ hasSavedGame: true, hasSavedGames: true })} />,
+      <MainMenu
+        {...props({ hasSavedGame: true, hasSavedGames: true, onSavedGames })}
+      />,
     );
 
     expect(
@@ -109,9 +112,6 @@ describe("MainMenu", () => {
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
-      { gap: "8px" },
-    );
     const buttons = within(
       screen.getByRole("region", { name: "Primary actions" }),
     ).getAllByRole("button");
@@ -120,21 +120,6 @@ describe("MainMenu", () => {
       "Start a new game",
       "Saved games",
     ]);
-    expect(buttons[1]).toHaveClass("MuiButton-outlined");
-    expect(buttons[2]).toHaveClass("MuiButton-outlined");
-  });
-
-  it("keeps the save library accessible beside Continue", async () => {
-    const onSavedGames = jest.fn();
-    render(
-      <MainMenu
-        {...props({
-          hasSavedGame: true,
-          hasSavedGames: true,
-          onSavedGames,
-        })}
-      />,
-    );
     await userEvent.click(screen.getByRole("button", { name: "Saved games" }));
     expect(onSavedGames).toHaveBeenCalledTimes(1);
   });

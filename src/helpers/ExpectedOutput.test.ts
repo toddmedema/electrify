@@ -77,32 +77,20 @@ describe("expectedMonthlyOutputShape", () => {
     expect(shape.lowMonth).toBe(11);
   });
 
-  it.each(["Natural Gas", "Coal", "Nuclear"])(
-    "treats %s as available on demand",
-    (name) => {
-      const game = createGame({ scenarioId: 104 });
-      const plant = GENERATORS(game, 500_000_000, [], []).find(
-        (candidate) => candidate.name === name,
-      );
-      if (!plant) {
-        return;
-      }
-      expect(expectedMonthlyOutputShape(plant, [])).toEqual({
+  it("treats dispatchable fuels as available on demand without a weather forecast", () => {
+    for (const fuel of ["Natural Gas", "Coal", "Uranium"] as const) {
+      expect(
+        expectedMonthlyOutputShape(
+          { name: fuel, fuel, peakW: 500_000_000 },
+          [],
+        ),
+      ).toEqual({
         kind: "on-demand",
         monthly: [],
         mean: 1,
         lowMonth: 0,
       });
-    },
-  );
-
-  it("is deterministic for the same seed and location", () => {
-    const game = createGame({ scenarioId: 108 });
-    const timeline = forecast(game);
-    const wind = generator(game, "Wind", timeline);
-    expect(expectedMonthlyOutputShape(wind, timeline)).toEqual(
-      expectedMonthlyOutputShape(wind, forecast(game)),
-    );
+    }
   });
 
   it("follows the hemisphere's seasons for solar", () => {
@@ -143,12 +131,11 @@ describe("expectedMonthlyOutputShape", () => {
     const wind = generator(game, "Wind", timeline);
     const byMonth = monthlyRenewableCapacityFactors(timeline, [wind]);
     const shape = expectedMonthlyOutputShape(wind, timeline);
-    if (byMonth.length !== 12 || !shape) {
-      return;
-    }
+    expect(byMonth).toHaveLength(12);
+    expect(shape).toBeDefined();
     byMonth.forEach((point) => {
       const month = Math.floor(point.minute / MINUTES_PER_MONTH) % 12;
-      expect(shape.monthly[month]).toBeCloseTo(point.factors.Wind);
+      expect(shape!.monthly[month]).toBeCloseTo(point.factors.Wind);
     });
   });
 });

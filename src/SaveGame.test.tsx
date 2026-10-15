@@ -1,4 +1,4 @@
-import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
+import { summarizeTimeline } from "./helpers/DateTime";
 import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
@@ -14,10 +14,6 @@ jest.setTimeout(60000);
 // Rise of Renewables, entirely inside the recorded data so setup stays quick
 const OPTIONS = { scenarioId: 101, seed: 31337 };
 
-function cash(game: GameType): number {
-  return getTimeFromTimeline(game.date.minute, game.timeline)!.cash;
-}
-
 describe("SaveGame", () => {
   let game: GameType;
 
@@ -25,21 +21,11 @@ describe("SaveGame", () => {
     game = createGame(OPTIONS);
   });
 
-  it("round trips a game through the serialized payload boundary", () => {
+  it("round trips a detached game without dropping serialized state", () => {
     const save = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
     expect(save).not.toBeNull();
-    expect(save!.game.seed).toBe(game.seed);
-    expect(save!.game.scenarioId).toBe(game.scenarioId);
-    expect(save!.game.facilities).toEqual(game.facilities);
-    expect(save!.game.monthlyHistory).toEqual(game.monthlyHistory);
-    expect(cash(save!.game)).toBe(cash(game));
-    expect(
-      save!.game.facilities.find((facility) => facility.name === "Oil")
-        ?.variableOperatingCostPerMWh,
-    ).toBe(
-      game.facilities.find((facility) => facility.name === "Oil")
-        ?.variableOperatingCostPerMWh,
-    );
+    expect(save!.game).not.toBe(game);
+    expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
 
   it.each([NaN, Infinity, 0, -1, 9, "2", null])(
@@ -222,6 +208,10 @@ describe("SaveGame", () => {
     expect(restored?.game.monthlyHistory[0].chartAverage).toEqual(
       recorded.monthlyHistory[0].chartAverage,
     );
+    const withoutStoryFacts = JSON.parse(JSON.stringify(raw));
+    delete withoutStoryFacts.game.monthlyHistory[0].deliveredWhByFuel;
+    expect(parseSave(withoutStoryFacts)).toBeNull();
+
     raw.game.monthlyHistory[0].chartAverage.demandByType.Residential = "bad";
     expect(parseSave(raw)).toBeNull();
   });
@@ -377,12 +367,6 @@ describe("SaveGame", () => {
     expect(parseSave(islanded)).toBeNull();
   });
 
-  it("parses a detached snapshot rather than handing back the live object", () => {
-    const save = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
-    expect(save!.game).not.toBe(game);
-    expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
-  });
-
   it("validates the commitment forecast it carries beside the timeline", () => {
     // A month's rollover forecasts afresh, which is what attaches the commitment metadata
     const played = createGame(OPTIONS);
@@ -495,20 +479,6 @@ describe("SaveGame", () => {
       delete incomplete[field];
       expect(parseSave({ ...save, game: incomplete })).toBeNull();
     }
-  });
-
-  it("rejects monthly history without story simulation facts", () => {
-    const save = serializeSave(game);
-    const month = { ...save.game.monthlyHistory[0] } as Partial<
-      GameType["monthlyHistory"][number]
-    >;
-    delete month.deliveredWhByFuel;
-    expect(
-      parseSave({
-        ...save,
-        game: { ...save.game, monthlyHistory: [month] },
-      }),
-    ).toBeNull();
   });
 
   it("rejects a save with incomplete facility totals", () => {

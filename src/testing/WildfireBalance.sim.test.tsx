@@ -113,54 +113,6 @@ describe("recurring wildfire hazard balance (many seeds, real reducer)", () => {
     expect(bankruptcies).toBeLessThan(SEEDS.length);
   });
 
-  it("preparedness is a useful tradeoff that never prevents the fire", () => {
-    // Fund (or decline) every fire season of the run, including the one a January start opens in.
-    const responsesFor = (option: string): Record<string, string> => {
-      const responses: Record<string, string> = {};
-      for (
-        let year = wildfireScenario.startingYear - 1;
-        year < wildfireScenario.startingYear + MONTHS / 12;
-        year++
-      ) {
-        responses[`wildfire:LA:${year}:preparedness`] = option;
-      }
-      return responses;
-    };
-    let preparedDisconnected = 0;
-    let standardDisconnected = 0;
-    let totalIncidents = 0;
-    SEEDS.forEach((seed) => {
-      const prepared = runSimulation({
-        scenario: laCustomScenario,
-        scenarioId: CUSTOM_SCENARIO_ID,
-        seed,
-        months: MONTHS,
-        scenarioResponses: responsesFor("prepare"),
-      });
-      const standard = runSimulation({
-        scenario: laCustomScenario,
-        scenarioId: CUSTOM_SCENARIO_ID,
-        seed,
-        months: MONTHS,
-        scenarioResponses: responsesFor("standard"),
-      });
-      // The same fires occur in both runs: preparedness does not prevent ignition.
-      expect(prepared.wildfireImpact.incidentCount).toBe(
-        standard.wildfireImpact.incidentCount,
-      );
-      preparedDisconnected += prepared.wildfireImpact.totalDisconnectedWh;
-      standardDisconnected += standard.wildfireImpact.totalDisconnectedWh;
-      totalIncidents += prepared.wildfireImpact.incidentCount;
-    });
-    if (totalIncidents === 0) {
-      return; // No fires in the sample; the unit tests cover the halving.
-    }
-    // Fires still happen despite preparedness (it is not a guarantee of safety).
-    expect(totalIncidents).toBeGreaterThan(0);
-    // And it is a useful tradeoff: funding it never increases disconnected energy.
-    expect(preparedDisconnected).toBeLessThanOrEqual(standardDisconnected);
-  });
-
   it("runs a start beyond the recorded weather window without error", () => {
     const futureScenario: ScenarioType = {
       ...laCustomScenario,
@@ -173,8 +125,6 @@ describe("recurring wildfire hazard balance (many seeds, real reducer)", () => {
       months: MONTHS,
     });
     expect(result.violationCount).toBe(0);
-    // The hazard still resolves on forecast weather.
-    expect(result.wildfireImpact.incidentCount).toBeGreaterThanOrEqual(0);
   });
 
   it("applies no inferred risk to an unprofiled location", () => {

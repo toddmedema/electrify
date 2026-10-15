@@ -7,14 +7,19 @@ async function scrollPast(target: Locator, distance: number) {
     let scroller = element.parentElement!;
     while (
       scroller.parentElement &&
-      !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)
+      (!/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) ||
+        scroller.scrollHeight <= scroller.clientHeight + 1)
     ) {
       scroller = scroller.parentElement;
     }
+    const previousScroll = scroller.scrollTop;
     scroller.scrollTop +=
       element.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top +
       above;
+    if (scroller.scrollTop <= previousScroll) {
+      throw new Error("Sticky-header fixture must scroll past its target");
+    }
     return scroller.getBoundingClientRect().top;
   }, distance);
 }
@@ -35,6 +40,11 @@ for (const colorScheme of ["light", "dark"] as const) {
     const header = pane.locator(".insightsStickyHeader");
     const showRate = header.getByRole("button", { name: "Show rate slider" });
     if (await showRate.isVisible()) await showRate.click();
+    // The default charts can fit without scrolling. Exercise real sticky positioning
+    // at every viewport, just as the Events fixture below gives its sections room.
+    await pane.locator(".insightsTracks").evaluate((tracks) => {
+      (tracks as HTMLElement).style.minHeight = "1600px";
+    });
     const top = await scrollPast(header, 250);
     await expect(async () => {
       expect((await header.boundingBox())!.y).toBeCloseTo(top, 0);

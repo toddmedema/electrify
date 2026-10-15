@@ -21,8 +21,6 @@ function setNavigator(overrides: Shareable) {
 
 afterEach(() => setNavigator(original));
 
-describe("buildShareText", () => {});
-
 describe("shareText", () => {
   it("uses the platform share sheet when there is one", async () => {
     const share = jest.fn().mockResolvedValue(undefined);

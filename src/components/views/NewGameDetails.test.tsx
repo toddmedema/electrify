@@ -66,17 +66,12 @@ describe("NewGameDetails leaderboard", () => {
     mockWhere.mockClear();
   });
 
-  it("prefetches the scenario data while the player reads its details", async () => {
-    render(<NewGameDetails {...props()} />);
-
+  it("prefetches scenario data and keeps the leaderboard visible at the selected difficulty", async () => {
+    const { rerender } = render(<NewGameDetails {...props()} />);
     expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
       expect.objectContaining({ id: "SF" }),
     );
     await screen.findByText("Finish this game to join the leaderboard");
-  });
-
-  it("is always visible and follows the selected difficulty", async () => {
-    const { rerender } = render(<NewGameDetails {...props()} />);
 
     expect(
       screen.getByRole("heading", { name: "Leaderboard — Easy" }),

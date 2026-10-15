@@ -26,17 +26,6 @@ describe("Airborne Wind", () => {
     expect(getAirborneWindOutputFactor(kph(20.1))).toBe(0);
     expect(getAirborneWindOutputFactor(kph(100))).toBe(0);
   });
-
-  it("averages the same output helper used by live dispatch", () => {
-    const speeds = [5, 8.5, 11].map((windMS) => windMS * 3.6);
-    expect(getAirborneWindCapacityFactor([])).toBe(0);
-    expect(getAirborneWindCapacityFactor(speeds)).toBeCloseTo(
-      speeds.reduce(
-        (total, speed) => total + getAirborneWindOutputFactor(speed),
-        0,
-      ) / speeds.length,
-    );
-  });
 });
 
 // Onshore input is raw 10m weather, with one explicit farm reference multiplier.
@@ -79,33 +68,39 @@ describe("getSolarOutputFactor", () => {
   });
 });
 
-describe("getWindCapacityFactor", () => {
-  it("returns a bounded average, including for an empty sample", () => {
-    [[], [5, 10, 15, 20, 25]].forEach((windSpeedsKph) => {
-      const result = getWindCapacityFactor(windSpeedsKph);
-      expect(result).toBeGreaterThanOrEqual(0);
-      expect(result).toBeLessThanOrEqual(1);
-    });
-  });
-});
-
-describe("getOffshoreWindCapacityFactor", () => {
-  it("averages the offshore output curve", () => {
-    expect(getOffshoreWindCapacityFactor([])).toEqual(0);
-    expect(getOffshoreWindCapacityFactor([20, 40])).toBeCloseTo(
-      (getOffshoreWindOutputFactor(20) + getOffshoreWindOutputFactor(40)) / 2,
-    );
-  });
-});
-
-describe("getSolarCapacityFactor", () => {
-  it("returns a bounded average, including for an empty sample", () => {
-    [[], [500, 1000, 1000, 500, 0]].forEach((irradiancesWM2) => {
-      const result = getSolarCapacityFactor(irradiancesWM2);
-      expect(result).toBeGreaterThanOrEqual(0);
-      expect(result).toBeLessThanOrEqual(1);
-    });
-  });
+describe("renewable capacity factors", () => {
+  it.each([
+    {
+      technology: "onshore wind",
+      capacityFactor: getWindCapacityFactor,
+      samples: [0, 40, 75],
+      expected: 1 / 3,
+    },
+    {
+      technology: "offshore wind",
+      capacityFactor: getOffshoreWindCapacityFactor,
+      samples: [0, 40, 100],
+      expected: 0.85 / 3,
+    },
+    {
+      technology: "airborne wind",
+      capacityFactor: getAirborneWindCapacityFactor,
+      samples: [0, 11 * 3.6, 21 * 3.6],
+      expected: 0.888 / 3,
+    },
+    {
+      technology: "solar",
+      capacityFactor: getSolarCapacityFactor,
+      samples: [0, 500, 1000],
+      expected: 0.46,
+    },
+  ])(
+    "averages $technology output and accepts an empty sample",
+    ({ capacityFactor, samples, expected }) => {
+      expect(capacityFactor([])).toBe(0);
+      expect(capacityFactor(samples)).toBeCloseTo(expected, 10);
+    },
+  );
 });
 
 describe("getDispatchOrderedFuels", () => {

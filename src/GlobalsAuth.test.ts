@@ -15,9 +15,7 @@ it("logs an authentication failure without exposing credentials", async () => {
   (signInWithPopup as jest.Mock).mockRejectedValue(error);
   const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
   try {
-    login();
-    await Promise.resolve();
-    await Promise.resolve();
+    await expect(login()).resolves.toBe(false);
     expect(log).toHaveBeenCalledWith("Auth error:", error.code);
     expect(JSON.stringify(log.mock.calls)).not.toContain("private-token");
   } finally {

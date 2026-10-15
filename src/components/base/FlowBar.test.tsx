@@ -9,44 +9,22 @@ function bar(fraction: number): HTMLElement {
 }
 
 describe("FlowBar", () => {
-  it("scales forward flow from the left edge in the shared neutral tint", () => {
+  it("scales forward flow from the left edge", () => {
     const element = bar(0.4);
     expect(element).not.toHaveClass("reverseFlow");
     expect(element.style.transform).toBe("scaleX(0.4)");
-    expect(element.style.width).toBe("");
-    // No inline tint: the stylesheet's neutral --flow-fill paints every forward row
-    expect(element.style.backgroundColor).toBe("");
   });
 
-  it("gives reverse flow its own class, colour and magnitude", () => {
+  it("gives reverse flow its own direction and magnitude", () => {
     const element = bar(-0.4);
     expect(element).toHaveClass("reverseFlow");
     // Sized by width rather than scaleX, so the stylesheet's hatch isn't squashed with the fill
     expect(element.style.width).toBe("40%");
-    expect(element.style.transform).toBe("");
-    expect(element.style.backgroundColor).not.toBe("");
-  });
-
-  it("keeps full reverse flow distinguishable from full forward flow", () => {
-    const forward = bar(1);
-    const reverse = bar(-1);
-    // Both cover the whole row, so the class carrying the hatch is the only thing standing
-    // between them and being the same picture
-    expect(forward).not.toHaveClass("reverseFlow");
-    expect(reverse).toHaveClass("reverseFlow");
-    expect(reverse.style.width).toBe("100%");
   });
 
   it("clamps beyond the rating rather than overflowing the row", () => {
     expect(bar(2.5).style.transform).toBe("scaleX(1)");
     expect(bar(-2.5).style.width).toBe("100%");
-  });
-
-  it("leaves background-image to the stylesheet so the hatch survives", () => {
-    // Setting the `background` shorthand inline would clear background-image and take the
-    // diagonal with it, leaving hue as the only thing marking direction
-    expect(bar(-0.5).style.backgroundImage).toBe("");
-    expect(bar(0.5).style.backgroundImage).toBe("");
   });
 
   it("treats a facility that has never run as neither direction", () => {

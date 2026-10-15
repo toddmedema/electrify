@@ -322,6 +322,7 @@ describe("weather resilience details", () => {
   it("reports an active hail outage and when repairs finish", () => {
     const game = carbonFee();
     const solar = withSolar(game);
+    solar.annualOutputDegradation = 0;
     outage(
       game,
       solar,
@@ -334,39 +335,21 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("Hail damage");
     expect(operation).toHaveTextContent("60% available");
     expect(operation).toHaveTextContent("4 days to repair");
+    expect(operation).toHaveTextContent("Current maximum output");
+    expect(operation).toHaveTextContent("Limited to 60% (hail)");
   });
 
   it("reports an extreme-cold outage until month end", () => {
     const game = carbonFee();
     const gas = game.facilities[0];
+    gas.annualOutputDegradation = 0;
     outage(game, gas, false, 0.55);
     showDetails(game, gas);
     const operation = screen.getByRole("region", { name: "Operation" });
     expect(operation).toHaveTextContent("Extreme cold");
     expect(operation).toHaveTextContent("55% available");
     expect(operation).toHaveTextContent("Until month end");
-  });
-
-  it("caps current maximum output by an active hail outage", () => {
-    const game = carbonFee();
-    const solar = withSolar(game);
-    solar.annualOutputDegradation = 0;
-    outage(game, solar, true, 0.6);
-    showDetails(game, solar);
-    const operation = screen.getByRole("region", { name: "Operation" });
-    expect(operation).toHaveTextContent("Current maximum output");
-    expect(operation).toHaveTextContent("Limited to 60% (hail)");
-  });
-
-  it("names cold as the cause of a cold-limited maximum output", () => {
-    const game = carbonFee();
-    const gas = game.facilities[0];
-    gas.annualOutputDegradation = 0;
-    outage(game, gas, false, 0.55);
-    showDetails(game, gas);
-    expect(screen.getByRole("region", { name: "Operation" })).toHaveTextContent(
-      "Limited to 55% (cold)",
-    );
+    expect(operation).toHaveTextContent("Limited to 55% (cold)");
   });
 
   it("combines age wear with hail damage in the maximum output", () => {

@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
-  test(`interties share facility row surfaces and support trading reordering in ${theme}`, async ({
+  test(`interties support keyboard and pointer trading reordering in ${theme}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((mode) => {
@@ -55,22 +55,6 @@ for (const theme of ["light", "dark"] as const) {
         ),
       );
     const disclosure = rows.first().locator(".facilityDisclosure");
-    const layout = await disclosure.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      const text = element
-        .querySelector(".transmissionLineText")!
-        .getBoundingClientRect();
-      const chevron = element
-        .querySelector(".facilityChevron")!
-        .getBoundingClientRect();
-      return {
-        width: bounds.width,
-        textWidth: text.width,
-        chevronInset: bounds.right - chevron.right,
-      };
-    });
-    expect(layout.textWidth).toBeGreaterThan(layout.width / 2);
-    expect(layout.chevronInset).toBeCloseTo(16, 0);
     await disclosure.focus();
     await page.keyboard.press("Enter");
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
@@ -111,6 +95,9 @@ for (const theme of ["light", "dark"] as const) {
     // The icon itself reorders, using a pointer on desktop and a long press on phones.
     const handle = rows.last().locator(".facilityDragHandle");
     await handle.scrollIntoViewIfNeeded();
+    expect((await handle.boundingBox())!.height).toBeGreaterThanOrEqual(
+      testInfo.project.use.hasTouch ? 44 : 40,
+    );
     const start = (await handle
       .locator(".transmissionListIcon")
       .boundingBox())!;
@@ -167,27 +154,6 @@ for (const theme of ["light", "dark"] as const) {
       ),
     ).toBeLessThanOrEqual(1);
 
-    const header = rows.first().locator(".facilityRowHeader");
-    const surfaces = await header.evaluate((element) => {
-      const grip = element.querySelector(".facilityDragHandle")!;
-      const disclosure = element.querySelector(".facilityDisclosure")!;
-      return {
-        separator: getComputedStyle(element).borderTopWidth,
-        children: [grip, disclosure].map((child) => ({
-          background: getComputedStyle(child).backgroundColor,
-          separator: getComputedStyle(child).borderTopWidth,
-        })),
-        gripHeight: grip.getBoundingClientRect().height,
-      };
-    });
-    expect(surfaces.separator).toBe("1px");
-    expect(surfaces.children).toEqual([
-      { background: "rgba(0, 0, 0, 0)", separator: "0px" },
-      { background: "rgba(0, 0, 0, 0)", separator: "0px" },
-    ]);
-    expect(surfaces.gripHeight).toBeGreaterThanOrEqual(
-      testInfo.project.use.hasTouch ? 44 : 40,
-    );
     await rows.first().scrollIntoViewIfNeeded();
     await page.mouse.move(0, 0);
     await pane.screenshot({

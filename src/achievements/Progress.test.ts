@@ -30,7 +30,7 @@ test("different devices combine tutorial and CEO completions into aggregate achi
   expect(combined.earned).toContain("MASTER_OF_THE_GRID");
   expect(combined.earned).toContain("CHIEF_ELECTRICITY_OFFICER");
   expect(combined.earned).toContain("STAYING_POWER");
-  expect(combined.wins).toHaveLength(14);
+  expect(combined.wins).toHaveLength(OFFICIAL_IDS.length);
   expect(mergeRecords(second, first, combined)).toEqual(combined);
 });
 

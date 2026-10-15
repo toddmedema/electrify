@@ -19,11 +19,14 @@ it("preserves every JSON value and the commitment forecast without mutating live
   const save = serializeSave(game);
   const before = JSON.stringify(save);
   const encoded = encodeSave(save);
+  expect(Array.isArray(encoded.game.timeline)).toBe(false);
   expect(decodeSave(JSON.parse(JSON.stringify(encoded)))).toEqual(
     JSON.parse(before),
   );
   const restored = parseSave(JSON.parse(JSON.stringify(encoded)))!;
   expect(restored).not.toBeNull();
+  expect(restored.game.timeline).toEqual(game.timeline);
+  expect(restored.game.monthlyHistory).toEqual(game.monthlyHistory);
   expect(serializeCommitmentMetadata(restored.game.timeline)).toEqual(
     save.commitmentForecast,
   );
@@ -58,14 +61,6 @@ it("distinguishes null, absent fields, empty objects, and nested arrays", () => 
   expect(decodeSave(JSON.parse(JSON.stringify(encodeSave(sample))))).toEqual(
     JSON.parse(JSON.stringify(sample)),
   );
-});
-
-it("encodes compact records and validates an expanded save", () => {
-  const wire = JSON.parse(JSON.stringify(encodeSave(serializeSave(game))));
-  expect(Array.isArray(wire.game.timeline)).toBe(false);
-  const restored = parseSave(wire);
-  expect(restored?.game.timeline).toEqual(game.timeline);
-  expect(restored?.game.monthlyHistory).toEqual(game.monthlyHistory);
 });
 
 it("keeps a twenty-year save below 55% of the unpacked JSON without dropping history", () => {

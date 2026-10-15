@@ -127,18 +127,17 @@ function findSeedIgnitingAfterPreparedness(maxSeeds = 60): number | undefined {
 }
 
 describe("recurring wildfire hazard integration", () => {
-  it("ignites for at least one seed in the first year (test is not vacuous)", () => {
-    expect(
-      runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12),
-    ).toBeDefined();
-  });
-
   it("creates exactly one occurrence at ignition and applies its effects", () => {
     const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
     expect(result).toBeDefined();
     const { state, incident } = result!;
     // Exactly one occurrence exists (not duplicated).
     expect(wildfireOccurrences(state).length).toBe(1);
+    // Connected demand excludes exactly the disconnected share.
+    const disconnected = incident.attributes.disconnectedDemand as number;
+    expect(incident.effects.demandMultiplier).toBeCloseTo(1 - disconnected, 12);
+    expect(disconnected).toBeGreaterThan(0);
+    expect(disconnected).toBeLessThan(1);
     // Effects are present and bounded.
     expect(incident.effects.demandMultiplier).toBeLessThan(1);
     expect(incident.effects.demandMultiplier).toBeGreaterThan(0);
@@ -155,12 +154,12 @@ describe("recurring wildfire hazard integration", () => {
     );
   });
 
-  it("persists the incident across a save/load without rerolling (fixed facility selection)", () => {
+  it("keeps incident attributes when a cloned state continues through rollovers", () => {
     const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
     expect(result).toBeDefined();
     const { state: midEvent, incident } = result!;
 
-    // Simulate a save/load: the persisted state is self-contained.
+    // Continuing a copied state must not redraw already-persisted onset attributes.
     const reloaded = cloneDeep(midEvent);
     // Advance a couple more months; the incident must not be re-drawn or duplicated.
     let after = tickOneMonth(reloaded);
@@ -176,85 +175,58 @@ describe("recurring wildfire hazard integration", () => {
     expect(sameKey[0].attributes.severity).toBe(incident.attributes.severity);
   });
 
-  it("restores: the incident expires from active after its effect window", () => {
+  it("expires an incident and records its occurrence and restoration exactly once", () => {
     const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
     expect(result).toBeDefined();
     const { state: midEvent, incident } = result!;
     const durationMonths = incident.attributes.durationMonths as number;
-    // Tick well past the end of the window.
-    let after = midEvent;
-    for (let i = 0; i < durationMonths + 2; i++) {
-      after = tickOneMonth(after);
-    }
-    expect(after.worldEvents.active.some((e) => e.key === incident.key)).toBe(
-      false,
-    );
-    // The occurrence is retained for the record but expired.
-    expect(
-      after.worldEvents.occurrences.some((e) => e.key === incident.key),
-    ).toBe(true);
-  });
-
-  it("logs a restoration-complete notice exactly once when the incident expires", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { state: midEvent, incident } = result!;
-    const durationMonths = incident.attributes.durationMonths as number;
+    const onset = midEvent.date.monthsElapsed;
     // Tick to just past the end of the window (the month it expires).
     let after = midEvent;
     for (let i = 0; i < durationMonths + 1; i++) {
       after = tickOneMonth(after);
     }
-    const recoveryEvents = after.eventLog.filter(
-      (e) => e.title === "Wildfire restoration complete",
+    expect(after.worldEvents.active.some((e) => e.key === incident.key)).toBe(
+      false,
     );
-    expect(recoveryEvents.length).toBe(1);
-    // Ticking further does not log it again.
-    after = tickOneMonth(after);
-    expect(
-      after.eventLog.filter((e) => e.title === "Wildfire restoration complete")
-        .length,
-    ).toBe(1);
-  });
-
-  it("does not re-create the incident on repeated rollovers (exactly-once)", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { state: midEvent, incident } = result!;
-    // Keep ticking well past the incident; it must never be created a second time.
-    let after = midEvent;
-    for (let i = 0; i < 12; i++) {
+    const recoveryEvents = () =>
+      after.eventLog.filter(
+        (e) =>
+          e.title === "Wildfire restoration complete" &&
+          e.storyPhaseKey === incident.key,
+      );
+    expect(recoveryEvents()).toHaveLength(1);
+    // More rollovers must retain the original occurrence without recreating it or its notice.
+    while (after.date.monthsElapsed < onset + 12) {
       after = tickOneMonth(after);
     }
-    const sameKey = wildfireOccurrences(after).filter(
-      (e) => e.key === incident.key,
-    );
-    expect(sameKey.length).toBe(1);
+    expect(
+      wildfireOccurrences(after).filter((e) => e.key === incident.key),
+    ).toHaveLength(1);
+    expect(recoveryEvents()).toHaveLength(1);
   });
 
   it("applies preparedness when the player funds it before onset", () => {
     const seed = findSeedIgnitingAfterPreparedness();
-    if (seed === undefined) {
-      // No post-preparedness ignition in the sample; the unit tests cover the halving.
-      return;
-    }
+    expect(seed).toBeDefined();
     // A run that funds preparedness (answers "prepare" for the wildfire choice).
     const prepared = runToActiveWildfire(
-      customGameAtLA(seed),
+      customGameAtLA(seed!),
       14,
       (decision) =>
         decision.id.startsWith("wildfire:") ? "prepare" : undefined,
     );
     // A control run that declines it.
     const standard = runToActiveWildfire(
-      customGameAtLA(seed),
+      customGameAtLA(seed!),
       14,
       (decision) =>
         decision.id.startsWith("wildfire:") ? "standard" : undefined,
     );
-    if (!prepared || !standard) {
-      return;
-    }
+    expect(prepared).toBeDefined();
+    expect(standard).toBeDefined();
+    if (!prepared || !standard)
+      throw new Error("Expected both wildfire runs to ignite");
     expect(prepared.incident.attributes.prepared).toBe(true);
     expect(standard.incident.attributes.prepared).toBe(false);
     // Preparedness halves disconnections and output losses.
@@ -294,17 +266,5 @@ describe("recurring wildfire hazard integration", () => {
       state = tickOneMonth(state);
     }
     expect(wildfireOccurrences(state).length).toBe(0);
-  });
-
-  it("keeps the incident's disconnected load out of connected demand (demandMultiplier)", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { incident } = result!;
-    // The effect reduces connected demand by exactly the disconnected share.
-    const disconnected = incident.attributes.disconnectedDemand as number;
-    expect(incident.effects.demandMultiplier).toBeCloseTo(1 - disconnected, 12);
-    // The disconnected share is a readable fraction of customer load.
-    expect(disconnected).toBeGreaterThan(0);
-    expect(disconnected).toBeLessThan(1);
   });
 });

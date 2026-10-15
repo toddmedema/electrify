@@ -69,13 +69,14 @@ describe("logEvent", () => {
     expect(mockFirebaseLogEvent).not.toHaveBeenCalled();
   });
 
-  it("loads analytics on demand and reports the event when the page is online", async () => {
+  it("loads analytics on demand once and preserves pending events in order", async () => {
     setOnline(true);
     const analytics = {};
     mockGetAnalytics.mockReturnValue(analytics);
     const logEvent = loadLogEvent();
-    expect(mockLoadAnalytics).not.toHaveBeenCalled();
 
+    expect(mockLoadAnalytics).not.toHaveBeenCalled();
+    logEvent("scenario_start", {});
     logEvent("card_view", { card: "MANUAL" });
     expect(mockGetAnalytics).not.toHaveBeenCalled();
     await flushAnalytics();
@@ -85,19 +86,6 @@ describe("logEvent", () => {
     expect(mockFirebaseLogEvent).toHaveBeenCalledWith(analytics, "card_view", {
       card: "MANUAL",
     });
-  });
-
-  it("shares one load and initializes once, preserving the order of pending events", async () => {
-    setOnline(true);
-    mockGetAnalytics.mockReturnValue({});
-    const logEvent = loadLogEvent();
-
-    logEvent("scenario_start", {});
-    logEvent("card_view", { card: "MANUAL" });
-    await flushAnalytics();
-
-    expect(mockLoadAnalytics).toHaveBeenCalledTimes(1);
-    expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
     expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(2);
     expect(mockFirebaseLogEvent.mock.calls.map((call) => call[1])).toEqual([
       "scenario_start",

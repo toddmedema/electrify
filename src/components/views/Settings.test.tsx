@@ -129,10 +129,10 @@ describe("Settings", () => {
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
   });
 
-  it("controls music and sound-effects volume independently", () => {
+  it("controls independent volumes while sound is enabled and hides them otherwise", () => {
     const onMusicVolumeChange = jest.fn();
     const onSoundEffectsVolumeChange = jest.fn();
-    renderSettings({
+    const view = renderSettings({
       settings: {
         audioEnabled: true,
         musicVolume: 0.7,
@@ -144,6 +144,10 @@ describe("Settings", () => {
       onSoundEffectsVolumeChange,
     });
 
+    expect(screen.getByRole("slider", { name: /music volume/i })).toBeVisible();
+    expect(
+      screen.getByRole("slider", { name: /effects volume/i }),
+    ).toBeVisible();
     fireEvent.change(screen.getByRole("slider", { name: /music volume/i }), {
       target: { value: 35 },
     });
@@ -152,31 +156,13 @@ describe("Settings", () => {
     });
     expect(onMusicVolumeChange).toHaveBeenCalledWith(0.35);
     expect(onSoundEffectsVolumeChange).toHaveBeenCalledWith(0.8);
-  });
-
-  it("only shows volume controls while audio is enabled", () => {
-    const view = renderSettings();
+    view.unmount();
+    renderSettings();
 
     expect(screen.queryByRole("slider", { name: /music volume/i })).toBeNull();
     expect(
       screen.queryByRole("slider", { name: /effects volume/i }),
     ).toBeNull();
-
-    view.unmount();
-    renderSettings({
-      settings: {
-        audioEnabled: true,
-        musicVolume: 1,
-        soundEffectsVolume: 1,
-        units: "metric",
-        theme: "system",
-      },
-    });
-
-    expect(screen.getByRole("slider", { name: /music volume/i })).toBeVisible();
-    expect(
-      screen.getByRole("slider", { name: /effects volume/i }),
-    ).toBeVisible();
   });
 
   it("opens save management even when no game has been saved yet", async () => {
@@ -187,10 +173,6 @@ describe("Settings", () => {
     expect(
       screen.getByText(/Sign in for cloud backup and access on other devices/),
     ).toBeInTheDocument();
-  });
-
-  it("offers a way in when nobody is logged in", () => {
-    renderSettings();
     expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     expect(screen.queryByText("Log out")).not.toBeInTheDocument();
   });

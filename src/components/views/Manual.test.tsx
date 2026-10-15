@@ -34,7 +34,7 @@ describe("Manual", () => {
 
   // The old filter only looked at children that were plain strings, so any paragraph
   // containing an element (<strong>, a nested list, ...) was invisible to search
-  it("finds representative terms inside mixed markup", async () => {
+  it("finds terms in mixed markup, keywords and hyphenated units", () => {
     renderManual();
     for (const [term, title] of [
       ["merit order", MANUAL_ENTRY.FORECASTS],
@@ -42,16 +42,16 @@ describe("Manual", () => {
       ["peak shortage", MANUAL_ENTRY.FORECASTS],
       ["job security", MANUAL_ENTRY.BLACKOUTS],
       ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+      ["LCOE", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+      ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
+      ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
+      ["scoring", MANUAL_ENTRY.SCORE],
     ]) {
-      await search(term);
-      expect(entryHeader(title)).toBeInTheDocument();
+      search(term);
+      expect(
+        screen.getByRole("button", { name: title, expanded: true }),
+      ).toBeVisible();
     }
-  });
-
-  it("finds terms by keyword as well as by title", async () => {
-    renderManual();
-    await search("LCOE");
-    expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toBeInTheDocument();
   });
 
   it("links weather damage from operating costs and finds it by hazard", () => {
@@ -75,29 +75,11 @@ describe("Manual", () => {
     ).toBeVisible();
   });
 
-  it("names the severe weather symbol in the symbol guide", () => {
-    renderManual(MANUAL_ENTRY.SYMBOLS);
-    expect(
-      within(screen.getByTestId("concept-legend")).getByText("Severe weather"),
-    ).toBeInTheDocument();
-  });
-
-  it.each([
-    ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
-    ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
-    ["scoring", MANUAL_ENTRY.SCORE],
-  ])("finds the right lesson when searching %s", (term, title) => {
-    renderManual();
-    search(term);
-    expect(
-      screen.getByRole("button", { name: title, expanded: true }),
-    ).toBeVisible();
-  });
-
   it("includes every shared game symbol in the symbol guide", async () => {
     renderManual();
     await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
     const legend = screen.getByTestId("concept-legend");
+    expect(within(legend).getByText("Severe weather")).toBeInTheDocument();
     CONCEPT_NAMES.forEach((concept) => {
       expect(
         within(legend).getByLabelText(CONCEPT_LABELS[concept]),
@@ -105,7 +87,7 @@ describe("Manual", () => {
     });
   });
 
-  it("expands matched entries and highlights the match", async () => {
+  it("expands and highlights search matches, then lets the player collapse them", async () => {
     renderManual();
     // Collapsed to start with, so the body isn't in the DOM at all
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
@@ -121,11 +103,6 @@ describe("Manual", () => {
     screen.getAllByText("available supply").forEach((match) => {
       expect(match.tagName).toBe("MARK");
     });
-  });
-
-  it("lets the player collapse an auto-expanded result", async () => {
-    renderManual();
-    await search("available supply");
     await userEvent.click(entryHeader(MANUAL_ENTRY.BLACKOUTS));
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",

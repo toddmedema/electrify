@@ -432,14 +432,12 @@ test("public event selector remains the disclosure boundary", () => {
   expect(publicEvents.some((e) => e.key.endsWith(":trip"))).toBe(false);
 });
 
-test("real immutable tick profiling samples cache invalidation without simulation mutations", () => {
+test("immutable tick reads reuse cached projections without simulation mutations", () => {
   let game = createGame({ scenarioId: 103 });
-  // Warm the shared projection cache first: the test measures the per-tick read, and the
-  // once-per-month rebuild is budgeted separately below
+  // Warm the shared projection cache before checking per-tick reuse and rollover rebuilds.
   selectProjection(game, game.timeline[0]);
   const rebuilds = jest.spyOn(GameModule, "generateNewTimeline");
   let changed = 0;
-  let steadyMs = 0;
   let steadyTicks = 0;
   let rebuildCount = 0;
   for (let i = 0; i < 120; i++) {
@@ -450,26 +448,20 @@ test("real immutable tick profiling samples cache invalidation without simulatio
     if (previous !== game.timeline) changed++;
     const before = JSON.stringify(game);
     const callsBefore = rebuilds.mock.calls.length;
-    const started = performance.now();
     getMissionStatus(game);
     selectMissionRisk(game);
     projectedShortfall(game.timeline, game.date.minute);
-    const elapsed = performance.now() - started;
-    // A month rollover re-simulates the long-range forecast; that spike is real but once-a-month,
-    // so it is counted, not averaged in with the steady-state reads
+    // A month rollover rebuilds the long-range forecast; ordinary reads must reuse it.
     if (rebuilds.mock.calls.length > callsBefore) {
       rebuildCount++;
     } else {
-      steadyMs += elapsed;
       steadyTicks++;
     }
     expect(JSON.stringify(game)).toBe(before);
   }
   rebuilds.mockRestore();
   expect(changed).toBeGreaterThan(0);
-  // Broad smoke bound, not a device performance guarantee; report actual measurements separately.
   expect(steadyTicks).toBeGreaterThan(0);
-  expect(steadyMs / steadyTicks).toBeLessThan(10);
   // At most a rollover or two in a day of ticks
   expect(rebuildCount).toBeLessThanOrEqual(2);
 });

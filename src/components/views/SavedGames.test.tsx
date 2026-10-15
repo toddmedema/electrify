@@ -91,7 +91,7 @@ it("shows game date, difficulty and location above the saved date and time", () 
   );
 });
 
-it.each(["", " (2)", " (10)", " (23)"])(
+it.each(["", " (23)"])(
   "omits the location from legacy generated titles with suffix '%s'",
   (suffix) => {
     renderLibrary({
@@ -115,14 +115,13 @@ it("preserves player-authored titles and completed outcomes", () => {
   expect(screen.getByText("Completed")).toBeInTheDocument();
 });
 
-it.each([0, 1, 2, 3])("hides search for a library with %i saves", (count) => {
-  renderLibrary({
-    entries: Array.from({ length: count }, (_, i) => entry({ id: String(i) })),
-  });
+it("shows an empty library without search", () => {
+  renderLibrary({ entries: [] });
   expect(
     screen.queryByRole("textbox", { name: "Search saves" }),
   ).not.toBeInTheDocument();
-  expect(screen.queryAllByRole("article")).toHaveLength(count);
+  expect(screen.queryAllByRole("article")).toHaveLength(0);
+  expect(screen.getByText("No saved games yet")).toBeVisible();
 });
 
 it("searches names and scenarios without opening a save", async () => {

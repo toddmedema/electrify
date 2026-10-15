@@ -581,7 +581,7 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the market benchmark without repeating the rate unit", () => {
+  it("keeps the market benchmark and compact metrics when the rate slider is collapsed", async () => {
     renderInsights();
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
@@ -604,11 +604,6 @@ describe("Insights layers", () => {
     expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
       /projected customers .* next month/i,
     );
-  });
-
-  it("keeps the compact rate metrics visible when the slider is collapsed", async () => {
-    renderInsights();
-
     const toggle = labelledButton("Hide rate slider");
     const sliderControl = screen.getByTestId("rate-slider-control");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -1166,7 +1161,7 @@ describe("Insights layers", () => {
     ).toHaveTextContent("OverviewEdited");
   });
 
-  it("saves changes back to a default preset and restores them on remount", async () => {
+  it("saves default preset changes across a remount and restores its original layers", async () => {
     const view = renderInsights();
     await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
@@ -1190,17 +1185,6 @@ describe("Insights layers", () => {
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).not.toHaveTextContent("Edited");
-  });
-
-  it("restores a modified default preset to its original layers", async () => {
-    renderInsights();
-    await user.click(labelledButton(/Layers/));
-    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(labelledButton("Preset actions"));
-    await user.click(
-      screen.getByRole("menuitem", { name: "Save preset changes" }),
-    );
-
     await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Reset to default" }),
@@ -1208,10 +1192,10 @@ describe("Insights layers", () => {
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
     expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
-    const library = JSON.parse(
+    const restoredLibrary = JSON.parse(
       localStorage.getItem("insightsPresetLibrary") || "{}",
     );
-    expect(library.defaults.overview).toBeUndefined();
+    expect(restoredLibrary.defaults.overview).toBeUndefined();
   });
 
   it("resets unsaved changes to a standard preset", async () => {
@@ -1261,7 +1245,7 @@ describe("Insights layers", () => {
     });
   });
 
-  it("renames a named preset and restores it across mounts", async () => {
+  it("renames a saved preset across mounts and deletes it", async () => {
     storeCustomPreset("Peak watch");
     const view = renderInsights();
 
@@ -1280,12 +1264,6 @@ describe("Insights layers", () => {
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Morning peak");
-  });
-
-  it("deletes a named preset", async () => {
-    storeCustomPreset("Morning peak");
-    renderInsights();
-
     await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: /Delete custom preset/ }),

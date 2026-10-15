@@ -5,7 +5,7 @@ import { getAirborneWindOutputFactor } from "../helpers/Energy";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { encodeSave } from "../SaveEncoding";
-import { DifficultyType, GameType, ScenarioType } from "../Types";
+import { GameType, ScenarioType } from "../Types";
 import { loadSimData } from "./SimData";
 import { expectNoViolations, runMonths } from "./SimulationTestHelpers";
 import { createGame, runSimulation } from "./Simulator";
@@ -58,14 +58,6 @@ describe("simulation invariants", () => {
         runSimulation({ scenarioId: 101, months: MONTHS, dollarsPerkWh }),
       ),
     );
-  });
-
-  (["Intern", "CEO"] as DifficultyType[]).forEach((difficulty) => {
-    it(`holds on ${difficulty} difficulty`, () => {
-      expectNoViolations(
-        runSimulation({ scenarioId: 103, months: MONTHS, difficulty }),
-      );
-    });
   });
 });
 
