@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 import { isDesktopApp } from "./Desktop";
+import { getInterfaceScale } from "./InterfaceScale";
 
 const firebaseApp =
   process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
@@ -147,24 +148,18 @@ export function getDevicePlatform(): "web" {
 }
 
 /**
- * Reading scrollWidth / offsetWidth forces the browser to flush pending layout, and between the
- * compositor, the game card and the panes the answer is asked for the better part of a dozen
+ * The compositor, game card and panes ask for the width the better part of a dozen
  * times per render -- which at FAST speed is a hundred renders a second, all for a number that
  * only moves when the window does. So it is measured once and kept until a resize says otherwise.
- * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+ * Content overflow must not influence the breakpoint: an outgoing desktop panel can briefly
+ * overflow a smaller viewport during its transition, preventing that layout from ever reflowing.
  */
 let cachedViewportWidth: number | null = null;
 let cachedViewportHeight: number | null = null;
 
 function getViewportWidth(): number {
   if (cachedViewportWidth === null) {
-    cachedViewportWidth = Math.max(
-      document.body.scrollWidth,
-      document.documentElement.scrollWidth,
-      document.body.offsetWidth,
-      document.documentElement.offsetWidth,
-      document.documentElement.clientWidth,
-    );
+    cachedViewportWidth = document.documentElement.clientWidth;
   }
   return cachedViewportWidth;
 }
@@ -195,7 +190,7 @@ export function isBigScreen(): boolean {
  * Keep in sync with $desktop_breakpoint in app.scss.
  */
 export function isDesktopScreen(): boolean {
-  return getViewportWidth() >= 1300;
+  return getViewportWidth() >= 1300 * getInterfaceScale();
 }
 
 /**

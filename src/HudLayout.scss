@@ -1,0 +1,95 @@
+// The frame follows CSS viewport space, never native display resolution. Extra screen width
+// becomes a quiet surround rather than longer fleet rows and a distant incident column.
+.app_container.hud-frame {
+  max-width: calc(2000px * var(--interface-scale, 1));
+  margin-inline: auto;
+  border-inline: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+  background: var(--bg-primary);
+}
+
+body:has(.hud-frame) {
+  background: var(--bg-sunken);
+}
+
+html[data-interface-scale] {
+  --control-size: 2.5rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+}
+@media (pointer: coarse) {
+  html[data-interface-scale] {
+    --control-size: 2.75rem;
+  }
+  html:is([data-interface-scale="1.25"], [data-interface-scale="1.5"]) {
+    .MuiButtonBase-root:not(.MuiSwitch-switchBase) {
+      min-height: var(--control-size) !important;
+      min-width: var(--control-size) !important;
+    }
+  }
+}
+
+// Scale actual layout dimensions: no transformed surfaces or mismatched pointer coordinates.
+html:is([data-interface-scale="1.25"], [data-interface-scale="1.5"]) {
+  .MuiButton-root,
+  .MuiToggleButton-root,
+  .MuiIconButton-root,
+  .MuiInputBase-root {
+    min-height: var(--control-size);
+  }
+  .MuiToggleButton-root,
+  .MuiIconButton-root {
+    min-width: var(--control-size);
+  }
+  .insights {
+    --insights-control-size: var(--control-size);
+  }
+  .facilityRowIcon.MuiListItemAvatar-root {
+    min-width: 3rem;
+  }
+  .facilityRowIcon .MuiAvatar-root {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  .base_main .facilityDragHandle {
+    width: 4.5rem;
+    gap: 0.25rem;
+    padding: 0.75rem 0 0.75rem 0.25rem;
+    > .MuiSvgIcon-root {
+      width: 1rem;
+      height: 1.25rem;
+    }
+  }
+  .base_main .MuiToolbar-root:is(.paneHeader, .insightsHeader) {
+    min-height: calc(var(--control-size) + 0.5rem) !important;
+  }
+}
+
+// Media queries use unscaled CSS viewport width. The compositor uses the chosen size too,
+// so its two-pane variant must retain navigation even on a wide display at 150%.
+.pane-layout #navfooter {
+  display: flex;
+}
+.desktop-layout #navfooter {
+  display: none;
+}
+
+.interfaceSizeSettings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+@media (max-width: 999px) {
+  .interfaceSizeSettings {
+    grid-template-columns: minmax(0, 1fr);
+    .MuiToggleButtonGroup-root {
+      justify-self: start;
+    }
+  }
+}

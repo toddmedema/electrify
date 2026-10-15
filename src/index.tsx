@@ -5,6 +5,7 @@ import { store } from "./Store";
 import App from "./App";
 import { registerServiceWorker } from "./ServiceWorkerRegistration";
 import "./app.scss";
+import "./HudLayout.scss";
 import { getDesktop, isDesktopApp } from "./Desktop";
 
 const container = document.getElementById("root")!;

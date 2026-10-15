@@ -26,6 +26,7 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
+import InterfaceSizeSettings from "../base/InterfaceSizeSettings";
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -265,6 +266,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 </ToggleButtonGroup>
               </SettingRow>
 
+              <InterfaceSizeSettings />
               <SettingRow label="Sound" description="Music and effects">
                 <Switch
                   color="primary"

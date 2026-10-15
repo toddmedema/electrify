@@ -1291,6 +1291,8 @@ export interface SettingsType {
   steamTimelineEnabled?: boolean;
   units: UnitSystemType;
   theme: ThemeChoiceType;
+  /** Tablet/desktop preference; phones retain their standard interface size. */
+  interfaceScale?: 1 | 1.25 | 1.5;
 }
 
 export interface DialogType {
