@@ -103,8 +103,7 @@ function main() {
   const child = spawnSync(
     process.execPath,
     [
-      require.resolve("react-scripts/bin/react-scripts.js", { paths: [ROOT] }),
-      "test",
+      require.resolve("./jest-baseline"),
       "--watchAll=false",
       "--testMatch",
       "**/src/testing/PerfBench.tsx",

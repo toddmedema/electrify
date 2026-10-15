@@ -5,14 +5,19 @@
  * followed by the command that usually fixes it. See AGENTS.md.
  */
 const { spawn } = require("child_process");
+const workers = process.env.ELECTRIFY_CHECK_WORKERS;
+if (workers && !/^[1-9]\d*$/.test(workers))
+  throw new Error("ELECTRIFY_CHECK_WORKERS must be a positive integer");
+const jestArgs = workers ? ["--", `--maxWorkers=${workers}`] : [];
 
 const steps = [
   { name: "Types", script: "typecheck" },
   { name: "Lint", script: "lint", fix: "npm run lint:fix" },
   { name: "Formatting", script: "format:check", fix: "npm run format" },
   { name: "Desktop runtime", script: "test:desktop:native" },
-  { name: "Tests", script: "test:ci" },
-  { name: "Simulation tests", script: "test:sim" },
+  { name: "CI tooling", script: "test:ci-tools" },
+  { name: "Tests", script: "test:ci", args: jestArgs },
+  { name: "Simulation tests", script: "test:sim", args: jestArgs },
   {
     name: "Simulation CLI",
     script: "sim",
@@ -47,8 +52,8 @@ function run(step) {
 }
 
 async function main() {
-  // The static checks take a few seconds each and barely contend with one another; each Jest run
-  // uses every core, so they run alone.
+  // Static checks barely contend. Each Jest run uses every core by default, so it runs alone.
+  // Workstations sharing CPU/memory with other tasks can bound workers through the env above.
   const results = [...(await Promise.all(steps.slice(0, 3).map(run)))];
   for (const step of steps.slice(3)) {
     results.push(await run(step));

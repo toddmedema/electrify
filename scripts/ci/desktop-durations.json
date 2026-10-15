@@ -1,0 +1,20 @@
+{
+  "[electron] › desktop-achievements.spec.ts › a real tutorial completion journals First Spark offline and survives relaunch without duplicates": 38.6,
+  "[electron] › desktop-feedback.spec.ts › a renderer crash during the quit checkpoint restarts with the prior save and can then quit normally": 18.7,
+  "[electron] › desktop-feedback.spec.ts › a renderer crash during the quit warning restarts with the prior save and can then quit normally": 16.2,
+  "[electron] › desktop-feedback.spec.ts › an arrow immediately after leaving Settings cannot change the exiting volume slider": 6.4,
+  "[electron] › desktop-feedback.spec.ts › fresh desktop sound is on, local menu cues require user input, and saved mute remains silent": 9.3,
+  "[electron] › desktop-feedback.spec.ts › mocked controller feedback is optional, bounded, independent of mute, and stops on native blur/disconnect/reduced motion": 10.5,
+  "[electron] › desktop-feedback.spec.ts › offline Recorded highlights preference persists and unsupported native Timeline APIs remain harmless": 8,
+  "[electron] › desktop-feedback.spec.ts › zero Effects volume silences cached menu cues and persists independently of Sound": 11.9,
+  "[electron] › desktop-keyboard.spec.ts › Escape closes the native resolution popup before leaving settings": 4.6,
+  "[electron] › desktop-keyboard.spec.ts › desktop settings keep keyboard selection visible in dark mode": 4.3,
+  "[electron] › desktop-keyboard.spec.ts › packaged fullscreen menus support the same keyboard journey as web": 7.1,
+  "[electron] › desktop.spec.ts › a failed desktop checkpoint keeps the game open and recovers before quitting": 17,
+  "[electron] › desktop.spec.ts › a forced process exit recovers its saved mission immediately on relaunch": 9.9,
+  "[electron] › desktop.spec.ts › a fresh offline install launches fullscreen with every bundled file and a sandboxed renderer": 18.9,
+  "[electron] › desktop.spec.ts › display settings, native shortcuts, and light/dark layouts remain usable at compact resolution": 22.9,
+  "[electron] › desktop.spec.ts › mocked Steam IPC shows friends scores and the Steam profile without a web account": 7.3,
+  "[electron] › desktop.spec.ts › production projection workers finish offline and native focus pauses and resumes play": 23.9,
+  "[electron] › desktop.spec.ts › the first offline walkthrough leads to a mission that saves, resumes after relaunch, and quits from the game": 10.9
+}

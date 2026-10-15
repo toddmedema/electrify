@@ -1,0 +1,24 @@
+name: Production compiler cache
+description: Reuse CRA's input-validated compiler cache separately for web and desktop builds.
+inputs:
+  edition:
+    required: true
+    description: web or desktop; compile-time desktop flags must never share a cache
+runs:
+  using: composite
+  steps:
+    - id: node
+      shell: bash
+      run: echo "version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v6
+      with:
+        path: .tmp/compiler-${{ inputs.edition }}
+        key: build-${{ inputs.edition }}-${{ runner.os }}-node${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
+        restore-keys: |
+          build-${{ inputs.edition }}-${{ runner.os }}-node${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json', 'package.json', 'tsconfig.json') }}-
+    - name: Select this edition's compiler cache
+      shell: bash
+      env:
+        EDITION: ${{ inputs.edition }}
+      run: |
+        node -e 'const fs = require("node:fs"), path = require("node:path"); const root = process.cwd(); const cache = path.resolve(root, "node_modules/.cache"); if (!cache.startsWith(root + path.sep)) throw new Error("Cache outside checkout"); const target = path.resolve(root, ".tmp", "compiler-" + process.env.EDITION); fs.mkdirSync(target, {recursive:true}); fs.rmSync(cache, {recursive:true, force:true}); fs.symlinkSync(target, cache, "dir");'

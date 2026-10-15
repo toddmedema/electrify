@@ -1,289 +1,274 @@
 name: Test Code
 run-name: Running tests on behalf of ${{ github.actor }} 🚀
-# Runs on pull requests only. Tests gate the merge (required status check on
-# master), so re-running them on the post-merge commit would only duplicate a
-# result we already have -- and slow down the prod deploy.
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      qa-artifacts:
+        description: Archive and upload all four verified offline desktop builds
+        type: boolean
+        default: false
 
-# A new push to a PR makes the in-flight run's answer obsolete, so drop it.
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
-# The main gates and native desktop matrix run side by side.
-# Within a job, each check runs even if an earlier one failed, so one PR run reports every problem
-# rather than only the first. The `check` job at the end is the required status check.
+# Hard cap: one build + four native workers + one required coverage gate = six jobs.
+# Every existing test and coverage threshold remains required on every PR.
 jobs:
-  unit:
-    name: Types, lint and unit tests
+  build:
+    name: Shared production builds
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    env:
+      DISABLE_ESLINT_PLUGIN: "true"
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           lfs: true
-
       - uses: ./.github/actions/install
-
-      - name: Types
-        if: '!cancelled()'
-        run: npm run typecheck
-
-      - name: Lint
-        if: '!cancelled()'
-        run: npm run lint
-
-      - name: Formatting
-        if: '!cancelled()'
-        run: npm run format:check
-
-      - name: Java for the Firestore emulator
-        if: '!cancelled()'
-        uses: actions/setup-java@v6
+      - uses: ./.github/actions/build-cache
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Private achievement security rules
-        if: '!cancelled()'
-        run: npm run test:rules
-
-      # Jest's cache holds compiled sources and each file's last duration. Without the durations
-      # it schedules the smallest files last, whatever they cost. Caches are scoped to the PR, so a
-      # later push or re-run restores the previous run's.
-      - name: Restore Jest cache
-        uses: actions/cache/restore@v6
+          edition: desktop
+      - name: Compile and verify the shared desktop renderer
+        run: npm run desktop:build
+      - uses: actions/upload-artifact@v7
         with:
-          path: ${{ runner.temp }}/jest-cache
-          key: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-
-      # Coverage floors apply here. The long simulations live in *.sim.test.tsx and run in the
-      # simulation job instead: instrumenting them makes them about half again as slow, and these
-      # suites meet the floors without them. No --passWithNoTests: if the jest config ever breaks so
-      # that no test matches, that should fail the build rather than report success.
-      - name: Tests
-        if: '!cancelled()'
-        run: npm run test:ci -- --cacheDirectory="$RUNNER_TEMP/jest-cache"
-
-      - name: Save Jest cache
-        if: '!cancelled()'
-        uses: actions/cache/save@v6
+          name: desktop-renderer
+          path: |
+            build/
+            electron/steam-localization.cjs
+            electron/achievement-catalog.cjs
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
+      - uses: ./.github/actions/build-cache
         with:
-          path: ${{ runner.temp }}/jest-cache
-          key: jest-unit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-  simulation:
-    name: Simulation and performance
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - uses: ./.github/actions/install
-
-      - name: Restore Jest cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ runner.temp }}/jest-cache
-          key: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-
-      # Economics, balance and golden-output suites. GoldenOutputs runs every scenario the way
-      # `npm run sim -- --all` does and fails on any invariant violation.
-      - name: Simulation tests
-        if: '!cancelled()'
-        run: npm run test:sim -- --cacheDirectory="$RUNNER_TEMP/jest-cache"
-
-      - name: Save Jest cache
-        if: '!cancelled()'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/jest-cache
-          key: jest-sim-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      # One short run keeps the CLI entry point itself honest; the scenario sweep is covered above.
-      - name: Simulation CLI
-        if: '!cancelled()'
-        run: npm run sim -- --scenario 101 --months 12
-
-      # Same-process ratios (Immer overhead, month rollover vs an ordinary tick) cancel runner
-      # speed, so they can gate; the milliseconds are reported only. See docs/perf-plan.md.
-      # Runs after the tests so nothing else competes for the CPU.
-      - name: Tick performance ratios
-        if: '!cancelled()'
-        run: npm run perf:bench
-
-  browser:
-    name: Build and browser tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - uses: ./.github/actions/install
-
-      - name: Production build
-        id: build
+          edition: web
+      - name: Production web build
         run: npm run build
-
-      # Gzip bytes gate at 10% over the recorded ceilings.
       - name: Bundle size
-        if: "!cancelled() && steps.build.outcome == 'success'"
         run: npm run perf:bundle
-
-      - name: Install browser
-        id: browser
-        if: '!cancelled()'
-        run: npx playwright install --with-deps chromium
-
-      # Cover purchases, themes, keyboard dismissal, tutorial progression and exit behavior on both
-      # phone and desktop without running the entire responsive matrix per PR.
-      - name: Browser smoke tests
-        if: "!cancelled() && steps.browser.outcome == 'success'"
-        run: npm run test:e2e -- build-options.spec.ts escape-close.spec.ts tutorial-exit.spec.ts cloud-saves.spec.ts menu-keyboard.spec.ts achievements.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
-
-      # Text can spill into adjacent columns without making the page horizontally scroll.
-      - name: Mobile and desktop text layout
-        if: "!cancelled() && steps.browser.outcome == 'success'"
-        run: npm run test:e2e -- multiline-text.spec.ts modal-layout.spec.ts --project=desktop-chromium --project=mobile-390px --project=mobile-320px --workers=2 --output=test-results/text-layout
-
-      - name: Preserve browser failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
-          name: browser-smoke-failures
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          name: web-renderer
+          path: build/
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
 
-  desktop:
-    name: Packaged ${{ matrix.label }} desktop
+  platform:
+    name: ${{ matrix.label }} tests
+    needs: build
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 30
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.tmp/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.tmp/electron-builder-cache
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tmp/playwright-browsers
+      E2E_BUILD_DIR: ${{ github.workspace }}/.tmp/web-renderer
+      ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: Windows x64
-            runner: windows-latest
-            platform: win32
-            arch: x64
-            directory: win-unpacked
-            executable: win-unpacked/Electrify.exe
           - label: Linux x64
+            index: 1
             runner: ubuntu-22.04
             platform: linux
             arch: x64
             directory: linux-unpacked
             executable: linux-unpacked/Electrify
-          - label: macOS Intel
-            runner: macos-15-intel
-            platform: darwin
+          - label: Windows x64
+            index: 2
+            runner: windows-latest
+            platform: win32
             arch: x64
-            directory: mac
-            executable: mac/Electrify.app/Contents/MacOS/Electrify
+            directory: win-unpacked
+            executable: win-unpacked/Electrify.exe
           - label: macOS Apple Silicon
+            index: 3
             runner: macos-15
             platform: darwin
             arch: arm64
             directory: mac-arm64
             executable: mac-arm64/Electrify.app/Contents/MacOS/Electrify
+          - label: macOS Intel
+            index: 4
+            runner: macos-15-intel
+            platform: darwin
+            arch: x64
+            directory: mac
+            executable: mac/Electrify.app/Contents/MacOS/Electrify
     steps:
-      - name: Check out repository code and every bundled asset
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           lfs: true
-
       - uses: ./.github/actions/install
-
+        with:
+          profile: ${{ (matrix.index == 2 || matrix.index == 4) && 'desktop' || 'full' }}
+      - uses: ./.github/actions/jest-cache
+        if: matrix.index == 1
+        with:
+          group: unit
+          shard: ${{ matrix.index }}
+      - uses: ./.github/actions/jest-cache
+        if: matrix.index == 1
+        with:
+          group: simulation
+          shard: ${{ matrix.index }}
+      - name: Restore native packaging downloads
+        id: native-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: desktop-tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
       - name: Require the native host and installed architecture
         shell: bash
         env:
           EXPECTED_PLATFORM: ${{ matrix.platform }}
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: node -e 'if (process.platform !== process.env.EXPECTED_PLATFORM || process.arch !== process.env.EXPECTED_ARCH) throw new Error("The desktop build must run on its target platform and architecture")'
-
-      - name: Install Linux graphical test dependencies
+      - name: Cache the locked headless browser
+        if: matrix.index == 2 || matrix.index == 3
+        uses: actions/cache@v6
+        with:
+          path: .tmp/playwright-browsers
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Linux graphical system dependencies
         if: matrix.platform == 'linux'
-        run: |
-          npx playwright install-deps chromium
-          sudo apt-get install --yes xvfb openbox
-
-      - name: Native desktop tests
+        run: npx playwright install-deps chromium
+      - name: Install Windows or Mac headless browser
+        if: matrix.index == 2 || matrix.index == 3
+        run: npx playwright install --only-shell chromium
+      - name: Install Linux native window dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get install --yes xvfb openbox
+      - name: Generate local manifests
+        run: npm run compatibility:generate && npm run icons:generate
+      - name: Java for the Firestore emulator
+        if: matrix.index == 1 && !cancelled()
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Native desktop unit tests
         run: npm run test:desktop:native
-
-      # This exercises the full depot without Steam credentials. The shipping Steam command
-      # additionally requires STEAM_APP_ID and writes it into the packaged configuration.
-      - name: Build and verify the offline depot
-        id: package
-        run: npm run desktop:pack:offline -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
-
-      - name: Fresh-install offline game, display controls and save recovery (Windows and macOS)
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-renderer
+      - uses: actions/download-artifact@v8
+        if: matrix.index == 2 || matrix.index == 3
+        with:
+          name: web-renderer
+          path: .tmp/web-renderer
+      - name: Unit, simulation, browser and full packaged desktop suites
         if: matrix.platform != 'linux'
-        env:
-          ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
-        run: npm run test:desktop -- --headed
-
-      # A real X server and window manager exercise focus/fullscreen while retaining the
-      # renderer sandbox. Ubuntu 22.04 also gives the native depot a conservative glibc host.
-      - name: Fresh-install offline game, display controls and save recovery (Linux)
+        run: npm run test:ci-platform -- ${{ matrix.index }}
+      - name: Unit, simulation, browser and full packaged desktop suites (Linux)
         if: matrix.platform == 'linux'
-        env:
-          ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:desktop -- --headed'
-
-      # Upload a tar archive rather than loose POSIX files: GitHub artifact extraction otherwise
-      # loses executable permissions. These are QA builds without Steam IDs or release signing.
-      - name: Archive the complete verified QA depot
-        id: archive
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:ci-platform -- ${{ matrix.index }}'
+      - name: Save native packaging downloads
+        if: "!cancelled() && steps.native-cache.outputs.cache-hit != 'true'"
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - name: Coverage and suite manifest
+        if: matrix.index == 1 && !cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jest-unit-${{ matrix.index }}
+          path: test-results/jest-unit-${{ matrix.index }}/
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
+      - name: Archive the complete verified QA depot (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.qa-artifacts
         shell: bash
         run: tar -czf dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C dist/desktop ${{ matrix.directory }}
-
-      - name: Downloadable offline QA build
-        if: "!cancelled() && steps.archive.outcome == 'success'"
+      - name: Downloadable offline QA build (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.qa-artifacts
         uses: actions/upload-artifact@v7
         with:
           name: electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}
           path: dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
           retention-days: 14
+          compression-level: 0
           if-no-files-found: error
-
-      - name: Preserve desktop QA diagnostics
+      - name: Preserve diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: desktop-smoke-${{ matrix.platform }}-${{ matrix.arch }}
-          path: test-results/
+          name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            test-results/browser/
+            test-results/desktop/
+            test-results/desktop-results.json
+            test-results/jest-simulation-${{ matrix.index }}/manifest.json
           retention-days: 7
           if-no-files-found: ignore
 
-  # The one required status check on master. It passes only when every job above succeeded, so a
-  # failed, cancelled or timed-out job blocks the merge.
   check:
-    if: '!cancelled()'
-    needs: [unit, simulation, browser, desktop]
+    name: check
+    if: "!cancelled()"
+    needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
     steps:
-      - name: Every job passed
+      - name: Shared builds passed
         env:
-          UNIT: ${{ needs.unit.result }}
-          SIMULATION: ${{ needs.simulation.result }}
-          BROWSER: ${{ needs.browser.result }}
-          DESKTOP: ${{ needs.desktop.result }}
-        run: |
-          echo "Types, lint and unit tests: $UNIT"
-          echo "Simulation and performance: $SIMULATION"
-          echo "Build and browser tests:    $BROWSER"
-          echo "Packaged desktop matrix:   $DESKTOP"
-          [ "$UNIT" = success ] && [ "$SIMULATION" = success ] && [ "$BROWSER" = success ] && [ "$DESKTOP" = success ]
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$BUILD_RESULT" = success
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+      - uses: ./.github/actions/install
+      - uses: ./.github/actions/jest-cache
+        with:
+          group: unit
+          shard: 2
+      - uses: ./.github/actions/jest-cache
+        with:
+          group: simulation
+          shard: 2
+      - name: Generate local manifests
+        run: npm run compatibility:generate && npm run icons:generate
+      - name: Simulation CLI
+        run: npm run sim -- --scenario 101 --months 12
+      - name: Isolated tick performance ratios
+        run: npm run perf:bench
+      - name: Unit and simulation shard 2
+        if: "!cancelled() && needs.build.result == 'success'"
+        run: npm run test:ci-core
+      - name: Coverage and suite manifest
+        if: "!cancelled() && needs.build.result == 'success'"
+        uses: actions/upload-artifact@v7
+        with:
+          name: jest-unit-2
+          path: test-results/jest-unit-2/
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
+      # Execute useful CPU work before the fan-in, avoiding a seventh job.
+      # Use each job's latest result in this run, including unchanged jobs in a partial rerun.
+      - name: Require every native worker for this commit
+        if: "!cancelled() && needs.build.result == 'success'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/wait-native.js
+      - uses: actions/download-artifact@v8
+        if: "!cancelled() && needs.build.result == 'success'"
+        with:
+          name: jest-unit-1
+          path: test-results/jest-unit-1
+      - name: Every suite exactly once, with the unchanged coverage floors
+        if: "!cancelled() && needs.build.result == 'success'"
+        run: node scripts/ci/coverage.js test-results 2
