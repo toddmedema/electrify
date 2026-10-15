@@ -5,6 +5,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: ".",
   testMatch: "desktop*.spec.ts",
+  globalSetup: require.resolve("../scripts/desktop-test-setup.js"),
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

@@ -11,11 +11,23 @@ verification refuses pointer files and missing public assets.
 
 ```sh
 npm ci
-npm run desktop:build
-npm run desktop:start
+npm run check
+npm run test:e2e
 npm run test:desktop:native
-npm run test:desktop
 ```
+
+These checks are windowless. Use headless Chromium for routine local UI validation, including
+shared game UI changes. The Electron UI suite needs real native windows for focus, fullscreen,
+and keyboard coverage, so run it in CI. To deliberately exercise native windows locally:
+
+```sh
+npm run desktop:build
+npm run test:desktop -- --headed
+```
+
+By default, the desktop suite stops before launching Electron and points to the headless
+browser command. The same opt-in is required in CI. For a manual game session, use
+`npm run desktop:start` after building.
 
 For a complete package on the current operating system that can be tested without a Steam
 account or App ID:
@@ -49,7 +61,7 @@ Run the packaged-app tests in PowerShell:
 
 ```powershell
 $env:ELECTRIFY_EXECUTABLE = "$PWD/dist/desktop/win-unpacked/Electrify.exe"
-npm run test:desktop
+npm run test:desktop -- --headed
 Remove-Item Env:ELECTRIFY_EXECUTABLE
 ```
 
@@ -57,7 +69,7 @@ Use the matching path on Linux or macOS:
 
 ```sh
 # Linux; for macOS replace the path with the matching executable from the table.
-ELECTRIFY_EXECUTABLE="$PWD/dist/desktop/linux-unpacked/Electrify" npm run test:desktop
+ELECTRIFY_EXECUTABLE="$PWD/dist/desktop/linux-unpacked/Electrify" npm run test:desktop -- --headed
 ```
 
 The desktop suite launches Electron with a fresh, isolated profile. It exercises the production

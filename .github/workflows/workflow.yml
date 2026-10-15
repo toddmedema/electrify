@@ -232,7 +232,7 @@ jobs:
         if: matrix.platform != 'linux'
         env:
           ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
-        run: npm run test:desktop
+        run: npm run test:desktop -- --headed
 
       # A real X server and window manager exercise focus/fullscreen while retaining the
       # renderer sandbox. Ubuntu 22.04 also gives the native depot a conservative glibc host.
@@ -240,7 +240,7 @@ jobs:
         if: matrix.platform == 'linux'
         env:
           ELECTRIFY_EXECUTABLE: ${{ github.workspace }}/dist/desktop/${{ matrix.executable }}
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:desktop'
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" sh -c 'openbox & npm run test:desktop -- --headed'
 
       # Upload a tar archive rather than loose POSIX files: GitHub artifact extraction otherwise
       # loses executable permissions. These are QA builds without Steam IDs or release signing.
