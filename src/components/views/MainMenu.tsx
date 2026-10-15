@@ -86,6 +86,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
           <img
             src={dark ? "images/logo-home-dark.svg" : "images/logo-home.svg"}
             alt="Electrify"
+            width="300"
+            height="70"
           />
           <svg
             className="homeEnergyTrace"

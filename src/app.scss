@@ -3081,90 +3081,6 @@ $pane_header_height: 48px;
       padding: $space-4 24px 0;
     }
 
-    .homeLogo {
-      position: relative;
-      max-width: 680px;
-      margin: auto;
-    }
-
-    .homeEnergyTrace {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .homeEnergyPulse {
-      fill: none;
-      stroke: var(--tutorial-glint);
-      stroke-width: 1.2;
-      stroke-linecap: round;
-      filter: drop-shadow(0 0 1px var(--tutorial-glow));
-      stroke-dasharray: 16 100;
-      stroke-dashoffset: 16;
-      opacity: 0;
-      animation: homeEnergySweep calc(10s / 1.4) ease-in-out 1.5s infinite;
-    }
-
-    .homeEnergyTrace {
-      overflow: visible;
-    }
-
-    // Stands in for the two smoke circles removed from logo-home.svg. Drift, rise, and growth
-    // each run as one unbroken segment on their own element, so the puff never pauses; their
-    // easings are fitted so the path passes through the original small and then large circle.
-    // The two puffs are half a cycle apart, so one or two are visible at a time.
-    $homeSmokeCycle: 5.6s;
-
-    .homeSmokePuff {
-      // The logo's own blue on each palette, so the puffs match logo-home(-dark).svg
-      fill: var(--interactive-blue);
-      animation:
-        homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3)
-          infinite,
-        homeSmokeFade $homeSmokeCycle linear infinite;
-    }
-
-    .homeSmokeLift {
-      animation: homeSmokeLift $homeSmokeCycle linear infinite;
-    }
-
-    .homeSmokePuff circle {
-      transform-box: fill-box;
-      transform-origin: center;
-      animation: homeSmokeGrow $homeSmokeCycle
-        cubic-bezier(0.15, 0.4, 0.25, 0.35) infinite;
-    }
-
-    .homeSmokePuff:nth-child(2),
-    .homeSmokePuff:nth-child(2) * {
-      animation-delay: $homeSmokeCycle * -0.5;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      // Named as specifically as the circle's growth rule, or that one still wins
-      .homeEnergyPulse,
-      .homeSmokePuff,
-      .homeSmokePuff *,
-      .homeSmokePuff circle {
-        animation: none;
-      }
-
-      // Hold the puffs where the logo's original smoke circles sit.
-      .homeSmokePuff:nth-child(2) {
-        transform: translateX(-4.3px);
-
-        .homeSmokeLift {
-          transform: translateY(3.6px);
-        }
-
-        circle {
-          transform: scale(0.7);
-        }
-      }
-    }
-
     #centeredMenu {
       flex: 1 0 auto;
       display: flex;
@@ -4913,6 +4829,182 @@ $sizemap: (
   // compositor hearing about it
   #navfooter {
     display: none;
+  }
+}
+
+// Shared by the early native entrance and the main menu.
+.homeLogo {
+  position: relative;
+  max-width: 680px;
+  margin: auto;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.homeEnergyTrace {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.homeEnergyPulse {
+  fill: none;
+  stroke: var(--tutorial-glint);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 1px var(--tutorial-glow));
+  stroke-dasharray: 16 100;
+  stroke-dashoffset: 16;
+  opacity: 0;
+  animation: homeEnergySweep calc(10s / 1.4) ease-in-out 1.5s infinite;
+}
+
+.homeEnergyTrace {
+  overflow: visible;
+}
+
+// Stands in for the two smoke circles removed from logo-home.svg. Drift, rise, and growth
+// each run as one unbroken segment on their own element, so the puff never pauses; their
+// easings are fitted so the path passes through the original small and then large circle.
+// The two puffs are half a cycle apart, so one or two are visible at a time.
+$homeSmokeCycle: 5.6s;
+
+.homeSmokePuff {
+  // The logo's own blue on each palette, so the puffs match logo-home(-dark).svg
+  fill: var(--interactive-blue);
+  animation:
+    homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3) infinite,
+    homeSmokeFade $homeSmokeCycle linear infinite;
+}
+
+.homeSmokeLift {
+  animation: homeSmokeLift $homeSmokeCycle linear infinite;
+}
+
+.homeSmokePuff circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: homeSmokeGrow $homeSmokeCycle cubic-bezier(0.15, 0.4, 0.25, 0.35)
+    infinite;
+}
+
+.homeSmokePuff:nth-child(2),
+.homeSmokePuff:nth-child(2) * {
+  animation-delay: $homeSmokeCycle * -0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  // Named as specifically as the circle's growth rule, or that one still wins
+  .homeEnergyPulse,
+  .homeSmokePuff,
+  .homeSmokePuff *,
+  .homeSmokePuff circle {
+    animation: none;
+  }
+
+  // Hold the puffs where the logo's original smoke circles sit.
+  .homeSmokePuff:nth-child(2) {
+    transform: translateX(-4.3px);
+
+    .homeSmokeLift {
+      transform: translateY(3.6px);
+    }
+
+    circle {
+      transform: scale(0.7);
+    }
+  }
+}
+
+#desktopStartup {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  overflow: auto;
+  background: var(--bg-primary);
+  color: var(--font-color-primary);
+  text-align: center;
+  font-family: var(--font-family);
+  line-height: 1.45;
+
+  .desktopStartupLogo {
+    flex: 0 0 auto;
+    padding: 32px 24px 0;
+  }
+
+  // Start the existing sweep immediately; carry its clock to the menu at handoff.
+  .homeEnergyPulse {
+    animation-delay: 0s;
+  }
+
+  [data-startup-status] {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 680px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 24px;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body1);
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--font-color-primary);
+    font-size: var(--font-size-title);
+    font-weight: var(--font-weight-emphasis);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .desktopStartupActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  button {
+    min-height: 44px;
+    padding: 8px 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-raised);
+    color: var(--font-color-primary);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  button:first-child {
+    border-color: var(--interactive-strong);
+    background: var(--interactive-strong);
+    color: var(--interactive-contrast);
+  }
+
+  &.desktopStartupFailed .homeLogo * {
+    animation-play-state: paused;
+  }
+
+  @media (max-height: 450px) {
+    .homeLogo img {
+      max-height: 72px;
+      object-fit: contain;
+    }
   }
 }
 

@@ -135,6 +135,55 @@
   <body unresolved class="fullbleed layout vertical center-justified">
     <div id="root" style="width: 100%; height: 100%"></div>
 
+    <!-- Inert on the web: only the native preload installs this entrance. Keep the logo
+         geometry in step with MainMenu; both use the same homeLogo styles and animation. -->
+    <template id="desktopStartupTemplate">
+      <div id="desktopStartup">
+        <div class="desktopStartupLogo">
+          <div class="homeLogo">
+            <img alt="Electrify" width="300" height="70" />
+            <svg
+              class="homeEnergyTrace"
+              viewBox="0 0 300 70"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                class="homeEnergyPulse"
+                d="M57.7873 5.39465C57.7873 5.39465 85.2179 11.978 107.162 11.978C129.107 11.978 150.32 8.22915 150.32 8.22915"
+                pathLength="100"
+              />
+              <g class="homeSmoke">
+                <g class="homeSmokePuff">
+                  <g class="homeSmokeLift">
+                    <circle cx="222" cy="8.1" r="4.4" />
+                  </g>
+                </g>
+                <g class="homeSmokePuff">
+                  <g class="homeSmokeLift">
+                    <circle cx="222" cy="8.1" r="4.4" />
+                  </g>
+                </g>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div data-startup-status role="status">Starting Electrify…</div>
+      </div>
+    </template>
+    <script>
+      if (window.electrifyDesktop && window.electrifyDesktop.apiVersion === 1) {
+        const template = document.getElementById("desktopStartupTemplate");
+        const entrance = template.content.cloneNode(true);
+        entrance.querySelector("img").src =
+          document.documentElement.dataset.theme === "dark"
+            ? "%PUBLIC_URL%/images/logo-home-dark.svg"
+            : "%PUBLIC_URL%/images/logo-home.svg";
+        document.body.append(entrance);
+      }
+      document.getElementById("desktopStartupTemplate").remove();
+    </script>
+
     <noscript id="noscript">
       <p>
         <b
