@@ -17,10 +17,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     audioEnabled: state.settings.audioEnabled,
     hasSavedGame: !!saved,
     hasSavedGames: !!state.saves?.entries.length,
-    savedGameName: saved?.name,
-    savedGameDescription: saved
-      ? `${saved.scenarioName} · ${saved.date.month} ${saved.date.year}`
-      : undefined,
   };
 };
 

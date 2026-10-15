@@ -80,11 +80,6 @@ test("a saved game remains separated from the logo and footer on short screens",
   ).toBeVisible();
   await expectGap(
     primary.getByRole("button", { name: "Continue", exact: true }),
-    primary.locator("[data-continue-context]"),
-    8,
-  );
-  await expectGap(
-    primary.locator("[data-continue-context]"),
     primary.getByRole("button", { name: "Start a new game", exact: true }),
     8,
   );

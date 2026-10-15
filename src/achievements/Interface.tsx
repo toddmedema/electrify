@@ -1,5 +1,12 @@
 import * as React from "react";
-import { Button, IconButton, Paper, Snackbar, Typography } from "@mui/material";
+import {
+  Button,
+  IconButton,
+  Paper,
+  Portal,
+  Snackbar,
+  Typography,
+} from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
@@ -60,7 +67,7 @@ export function AchievementGallery(): React.JSX.Element {
   const account = !!state.uid && !!firebaseAppAuth;
   const status =
     !state.storageAvailable && account && state.sync === "synced"
-      ? "Synced to your account. Device storage is unavailable."
+      ? "Device storage is unavailable."
       : !state.storageAvailable && account && state.sync === "syncing"
         ? "Device storage is unavailable. Syncing to your account…"
         : !state.storageAvailable
@@ -68,7 +75,7 @@ export function AchievementGallery(): React.JSX.Element {
           : !account
             ? "Saved on this device."
             : state.sync === "synced"
-              ? "Synced to your account."
+              ? null
               : !online || state.sync === "offline"
                 ? "Saved on this device. We'll sync when you're online."
                 : state.sync === "failed"
@@ -99,42 +106,40 @@ export function AchievementGallery(): React.JSX.Element {
             value={(count / catalog.length) * 100}
             aria-label="Achievement progress"
           />
-          <Typography className="achievementScope" color="text.secondary">
-            Earn achievements in official scenarios on any difficulty. Tutorials
-            have their own achievements; custom games and replays don't count.
-          </Typography>
         </div>
-        <Paper variant="outlined" className="achievementAccount">
-          <div>
-            <Typography>{status}</Typography>
-            {!account && firebaseAppAuth && (
-              <Typography color="text.secondary">
-                {online
-                  ? "Sign in to keep achievements across devices."
-                  : "Sign in when you're online to keep achievements across devices."}
-              </Typography>
+        {status && (
+          <Paper variant="outlined" className="achievementAccount">
+            <div>
+              <Typography>{status}</Typography>
+              {!account && firebaseAppAuth && (
+                <Typography color="text.secondary">
+                  {online
+                    ? "Sign in to keep achievements across devices."
+                    : "Sign in when you're online to keep achievements across devices."}
+                </Typography>
+              )}
+              {signInError && (
+                <Typography color="error" role="alert">
+                  Sign-in couldn't finish. Please try again.
+                </Typography>
+              )}
+            </div>
+            {!state.uid && firebaseAppAuth && (
+              <Button
+                variant="outlined"
+                disabled={signingIn || !online}
+                onClick={() => void signIn()}
+              >
+                {signingIn ? "Signing in…" : "Sign in with Google"}
+              </Button>
             )}
-            {signInError && (
-              <Typography color="error" role="alert">
-                Sign-in couldn't finish. Please try again.
-              </Typography>
+            {account && state.sync === "failed" && online && (
+              <Button variant="outlined" onClick={retryAchievementSync}>
+                Retry sync
+              </Button>
             )}
-          </div>
-          {!state.uid && firebaseAppAuth && (
-            <Button
-              variant="outlined"
-              disabled={signingIn || !online}
-              onClick={() => void signIn()}
-            >
-              {signingIn ? "Signing in…" : "Sign in with Google"}
-            </Button>
-          )}
-          {account && state.sync === "failed" && online && (
-            <Button variant="outlined" onClick={retryAchievementSync}>
-              Retry sync
-            </Button>
-          )}
-        </Paper>
+          </Paper>
+        )}
         <Tabs
           value={filter}
           onChange={(_event, value: Filter) => setFilter(value)}
@@ -224,13 +229,13 @@ export function AchievementGallery(): React.JSX.Element {
   );
 }
 
-/** One announcement at a time; never steal focus, cover a modal, or pause a run. */
+/** Announce awards over the game and its result dialogs without stealing focus. */
 export default function AchievementNotifications(): React.JSX.Element {
   const state = useAchievements();
   const dispatch = useAppDispatch();
   const snackbarOpen = useAppSelector((root) => root.ui.snackbar.open);
-  const dialogOpen = useAppSelector((root) => root.ui.dialog.open);
-  const [obstructed, setObstructed] = React.useState(true);
+  const [pageHidden, setPageHidden] = React.useState(() => document.hidden);
+  const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const [hovered, setHovered] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
   const panel = React.useRef<HTMLDivElement>(null);
@@ -238,14 +243,21 @@ export default function AchievementNotifications(): React.JSX.Element {
   const [navClearance, setNavClearance] = React.useState(0);
   const id = state.notifications[0];
   const entry = catalog.find((item) => item.id === id);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!id) return;
     const inspect = () => {
-      setObstructed(
-        document.hidden ||
-          !!document.querySelector(
-            '[role="dialog"][aria-modal="true"], .MuiModal-root:not(.MuiModal-hidden):not([aria-hidden="true"])',
-          ),
+      setPageHidden(document.hidden);
+      // Stay inside the active modal's accessibility and focus boundary, above its backdrop.
+      // Portaling only to body would leave the announcement aria-hidden when a dialog opens.
+      const modal = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.MuiModal-root:not(.MuiModal-hidden):not([aria-hidden="true"])',
+        ),
+      ).at(-1);
+      setContainer(
+        modal?.querySelector<HTMLElement>(".MuiDialog-container") ||
+          modal ||
+          document.body,
       );
       const nav = document.getElementById("navfooter");
       setNavClearance(
@@ -258,100 +270,102 @@ export default function AchievementNotifications(): React.JSX.Element {
       );
     };
     inspect();
+    const observer = new MutationObserver(inspect);
+    observer.observe(document.body, { childList: true });
     const timer = setInterval(inspect, 250);
     document.addEventListener("visibilitychange", inspect);
     return () => {
       clearInterval(timer);
+      observer.disconnect();
       document.removeEventListener("visibilitychange", inspect);
     };
   }, [id]);
-  const open =
-    !!entry &&
-    !state.steamAvailable &&
-    !obstructed &&
-    !snackbarOpen &&
-    !dialogOpen;
+  const open = !!entry && !state.steamAvailable && !pageHidden && !snackbarOpen;
   React.useEffect(() => {
     setHovered(!!open && !!panel.current?.matches(":hover"));
     setFocused(!!open && !!panel.current?.contains(document.activeElement));
-  }, [id, open]);
+  }, [id, open, container]);
   React.useEffect(() => {
     if (!open || hovered || focused || !id) return;
     const timer = setTimeout(() => achievementJournal.dismiss(id), 8000);
     return () => clearTimeout(timer);
   }, [open, hovered, focused, id]);
   return (
-    <>
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="srOnly"
-      >
-        {open && entry
-          ? `Achievement unlocked: ${entry.name}. ${entry.description}`
-          : ""}
-      </div>
-      {entry && (
-        <Snackbar
-          open={open}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          className="achievementToast"
-          style={
-            {
-              "--achievement-nav-clearance": `${navClearance}px`,
-            } as React.CSSProperties
-          }
+    <Portal container={container}>
+      <>
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="srOnly"
         >
-          <Paper
-            ref={panel}
-            variant="outlined"
-            className="achievementToastPanel"
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            onFocus={() => setFocused(true)}
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget))
-                setFocused(false);
-            }}
+          {open && entry
+            ? `Achievement unlocked: ${entry.name}. ${entry.description}`
+            : ""}
+        </div>
+        {entry && (
+          <Snackbar
+            open={open}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            className="achievementToast"
+            style={
+              {
+                "--achievement-nav-clearance": `${navClearance}px`,
+              } as React.CSSProperties
+            }
           >
-            <div className="achievementArt">
-              <img src={`images/${entry.icon}.svg`} alt="" />
-            </div>
-            <div className="achievementToastText">
-              <Typography variant="overline" component="p">
-                Achievement unlocked
-              </Typography>
-              <Typography variant="subtitle1" component="p">
-                {entry.name}
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                className="achievementToastRequirement"
-              >
-                {entry.description}
-              </Typography>
-              <Button
-                size="small"
-                onClick={() => {
-                  achievementJournal.clearNotifications();
-                  dispatch(navigate("ACHIEVEMENTS"));
-                }}
-              >
-                View achievements
-              </Button>
-            </div>
-            <IconButton
-              aria-label={`Dismiss ${entry.name} achievement notification`}
-              onClick={() => achievementJournal.dismiss(id)}
-              className="achievementToastClose"
+            <Paper
+              ref={panel}
+              variant="outlined"
+              className="achievementToastPanel"
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              onFocus={() => setFocused(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setFocused(false);
+              }}
             >
-              <CloseIcon />
-            </IconButton>
-          </Paper>
-        </Snackbar>
-      )}
-    </>
+              <div className="achievementArt">
+                <img src={`images/${entry.icon}.svg`} alt="" />
+              </div>
+              <div className="achievementToastText">
+                <Typography variant="overline" component="p">
+                  Achievement unlocked
+                </Typography>
+                <Typography variant="subtitle1" component="p">
+                  {entry.name}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  className="achievementToastRequirement"
+                >
+                  {entry.description}
+                </Typography>
+                {container === document.body && (
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      achievementJournal.clearNotifications();
+                      dispatch(navigate("ACHIEVEMENTS"));
+                    }}
+                  >
+                    View achievements
+                  </Button>
+                )}
+              </div>
+              <IconButton
+                aria-label={`Dismiss ${entry.name} achievement notification`}
+                onClick={() => achievementJournal.dismiss(id)}
+                className="achievementToastClose"
+              >
+                <CloseIcon />
+              </IconButton>
+            </Paper>
+          </Snackbar>
+        )}
+      </>
+    </Portal>
   );
 }
