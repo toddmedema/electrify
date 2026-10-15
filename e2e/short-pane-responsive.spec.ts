@@ -87,7 +87,9 @@ for (const theme of ["light", "dark"] as const) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
-      const chart = facilities.locator(".facilitySupplyChart");
+      const chart = page.locator(
+        ".operatingStagePlot:visible, .facilities:visible .facilitySupplyChart",
+      );
       await chart.scrollIntoViewIfNeeded();
       await expect(chart).toBeInViewport();
       await expect(

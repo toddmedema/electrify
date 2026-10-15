@@ -75,7 +75,7 @@ for (const theme of ["light", "dark"]) {
     expect(charging).toBeGreaterThanOrEqual(0);
     expect(discharging).toBeGreaterThanOrEqual(0);
     expect(exporting).toBeGreaterThanOrEqual(0);
-    const chart = pane.locator("#chartSupplyDemand");
+    const chart = page.locator("#chartSupplyDemand");
     const image = chart.getByRole("img");
     await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
     await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
@@ -223,7 +223,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    const chart = pane.locator("#chartSupplyDemand");
+    const chart = page.locator("#chartSupplyDemand");
     await expect(chart.locator("canvas")).toBeVisible();
     await expect(
       chart.getByText("Production by fuel", { exact: true }),
@@ -351,7 +351,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
       .getByRole("button", { name: `Inspect ${name}`, exact: true })
       .click();
   }
-  const chart = pane.locator("#chartSupplyDemand");
+  const chart = page.locator("#chartSupplyDemand");
   await expect(chart.locator("canvas")).toBeVisible();
   await expect(
     chart.getByText("Supply to customers", { exact: true }),
@@ -438,7 +438,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
     pane,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  const chart = pane.locator("#chartSupplyDemand");
+  const chart = page.locator("#chartSupplyDemand");
   await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
   const legendBounds = (await chart.locator(".chartLegend").boundingBox())!;
   for (const item of await chart.locator(".chartLegendItem").all()) {

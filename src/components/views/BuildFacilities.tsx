@@ -24,7 +24,11 @@ const categories = [
   ["BUILD_INTERTIES", "Interties", "Intertie"],
 ] as const;
 
-export default function BuildFacilities(): React.JSX.Element {
+export default function BuildFacilities({
+  contextual = false,
+}: {
+  contextual?: boolean;
+}): React.JSX.Element {
   const dispatch = useAppDispatch();
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
@@ -42,17 +46,32 @@ export default function BuildFacilities(): React.JSX.Element {
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const close = () => dispatch(navigate("FACILITIES"));
 
+  React.useEffect(() => {
+    if (!contextual) return;
+    const trigger = document.activeElement;
+    document.getElementById("close-button")?.focus();
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus();
+    };
+  }, [contextual]);
+
   return (
-    <div id="topbar" className="flexContainer screenCatalog buildFacilities">
+    <div
+      id={contextual ? undefined : "topbar"}
+      className="flexContainer screenCatalog buildFacilities"
+    >
       <header className="constructionHeader">
         <CatalogTitleBar
           icon={<ConceptIcon concept="build" fontSize="small" />}
           title="Build"
           cash={cash}
           onClose={close}
+          closeLabel={contextual ? "Close build" : undefined}
+          showSpeedControls={!contextual}
           closeButtonId="close-button"
           // The build screen stands in for the game bar, so tutorials find its speeds here
-          speedControlId="speedChangeButtons"
+          speedControlId={contextual ? undefined : "speedChangeButtons"}
         />
         {!introductoryChoices && (
           <Tabs

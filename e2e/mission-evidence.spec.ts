@@ -1,7 +1,7 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "./fixtures";
-import { openPane } from "./layout";
+import { isPaneLayout, openPane } from "./layout";
 
 const reviewProjects = new Set([
   "desktop-chromium",
@@ -238,7 +238,7 @@ test("Insights keeps its date range while the build screen is open", async ({
   await page.getByRole("button", { name: "Pan later", exact: true }).click();
   const origin = await range(page);
   await openBuildGenerators(page);
-  await page.getByRole("button", { name: "close", exact: true }).click();
+  await page.locator("#close-button").click();
   await openInsights(page);
   expect(await range(page)).toEqual(origin);
 });
@@ -327,7 +327,7 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(page.locator(".buildOption").first()).toBeVisible();
-    await page.getByRole("button", { name: "close", exact: true }).click();
+    await page.locator("#close-button").click();
     await settle(page);
     expect(
       await page.evaluate(
@@ -376,7 +376,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
   await expect(page.locator(".operatingEvidence")).toHaveAccessibleName(
-    "Supply and demand",
+    isPaneLayout(page) ? "Live grid" : "Supply and demand",
   );
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
