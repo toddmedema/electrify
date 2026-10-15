@@ -49,14 +49,10 @@ describe("PurchaseReviewDialog", () => {
     expect(button("Take loan")).toBeDisabled();
   });
 
-  it("offers only the loan when the full price is out of reach", () => {
-    const { button } = renderDialog();
+  it("offers an affordable loan and submits it once however quickly it is clicked", () => {
+    const { button, onPurchase } = renderDialog();
     expect(button("Pay cash")).toBeDisabled();
     expect(button("Take loan")).toBeEnabled();
-  });
-
-  it("submits once however quickly the loan is clicked", () => {
-    const { button, onPurchase } = renderDialog();
     fireEvent.click(button("Take loan"));
     fireEvent.click(button("Take loan"));
     expect(onPurchase).toHaveBeenCalledTimes(1);

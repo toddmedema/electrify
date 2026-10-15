@@ -33,17 +33,10 @@ describe("DifficultyPicker", () => {
     expect(
       screen.getByText(DIFFICULTIES.Manager.description),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByText(DIFFICULTY_LABELS.CEO));
-    expect(onChange).toHaveBeenCalledWith("CEO");
-  });
-
-  it("ignores deselecting the current toggle", () => {
-    const onChange = jest.fn();
-    render(
-      <DifficultyPicker variant="toggle" value="Manager" onChange={onChange} />,
-    );
     fireEvent.click(screen.getByText(DIFFICULTY_LABELS.Manager));
     expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText(DIFFICULTY_LABELS.CEO));
+    expect(onChange).toHaveBeenCalledWith("CEO");
   });
 
   it("shows the player-facing label in the select", () => {

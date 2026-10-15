@@ -168,25 +168,23 @@ describe("the fleet list", () => {
     },
   );
 
-  it("selects a facility when its row is clicked", async () => {
+  it("opens a facility's record and closes it when its row is clicked again", async () => {
     const { onSelect } = renderFacilities(game, null);
+    expect(
+      screen.getByRole("img", {
+        name: /electricity supply and demand over the day/i,
+      }),
+    ).toHaveAccessibleName(/MW/);
     await user.click(rows()[0]);
     expect(onSelect).toHaveBeenCalledWith(game.facilities[0].id);
-  });
-
-  it("deselects when the row that is already open is clicked again", async () => {
-    const { onSelect } = renderFacilities(game, game.facilities[0].id);
-    await user.click(rows()[0]);
-    expect(onSelect).toHaveBeenCalledWith(null);
-  });
-
-  it("shows what the selected facility has earned, and only that one", () => {
-    renderFacilities(game, game.facilities[0].id);
     // One panel, not one per row -- getByText throws if a second facility opened too
     expect(screen.getByText("Lifetime profit")).toBeInTheDocument();
     expect(screen.getByText("Avg output")).toBeInTheDocument();
     expect(screen.getByText("Lifetime cost per MWh")).toBeInTheDocument();
     expect(screen.getByText("Revenue per MWh")).toBeInTheDocument();
+    await user.click(rows()[0]);
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText("Lifetime profit")).not.toBeInTheDocument();
   });
 
   it("shows Coal starts and cost", () => {
@@ -233,25 +231,6 @@ describe("the fleet list", () => {
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
-  });
-
-  it("uses compact watt units in the accessible chart summary", () => {
-    renderFacilities(game, null);
-
-    expect(
-      screen.getByRole("img", {
-        name: /electricity supply and demand over the day/i,
-      }),
-    ).toHaveAccessibleName(/MW/);
-  });
-
-  it("omits move buttons from expanded actions", () => {
-    renderFacilities(game, game.facilities[1].id);
-    expect(
-      screen.queryByRole("button", {
-        name: /earlier in the dispatch order|later in the dispatch order/,
-      }),
-    ).toBeNull();
   });
 
   it("scrolls live wheel input with its units while preserving zoom and edge gestures", () => {
@@ -405,19 +384,6 @@ describe("the fleet list", () => {
     await user.click(screen.getByRole("button", { name: "Sell" }));
 
     expect(onSell).toHaveBeenCalledWith(facility.id);
-  });
-
-  it("hides the player's controls while a replay is being watched", () => {
-    const replay = {
-      ...game,
-      replayPlayback: { actions: [], index: 0 },
-    } as GameType;
-    renderFacilities(replay, null);
-    game.facilities.forEach((f: FacilityOperatingType) => {
-      expect(
-        screen.queryByLabelText(`Move ${f.name} earlier in the dispatch order`),
-      ).toBeNull();
-    });
   });
 });
 

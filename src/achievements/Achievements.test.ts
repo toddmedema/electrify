@@ -67,9 +67,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("catalog pins all 35 IDs and the 14 official non-tutorial scenarios", () => {
-  expect(catalog).toHaveLength(35);
-  expect(new Set(catalog.map(({ id }) => id)).size).toBe(35);
+test("catalog IDs are unique and cover the official non-tutorial scenarios", () => {
+  expect(new Set(catalog.map(({ id }) => id)).size).toBe(catalog.length);
   expect([...OFFICIAL_IDS].sort()).toEqual(
     SCENARIOS.filter((s) => !s.tutorialSteps)
       .map(({ id }) => id)

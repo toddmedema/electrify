@@ -80,14 +80,10 @@ describe("useAfterPaintValue", () => {
     return { compute, onRender, shown, rerender, view };
   }
 
-  it("computes synchronously on mount, so there is no empty frame", () => {
-    const { compute, shown } = setup("a");
-    expect(shown()).toBe("value for a");
-    expect(compute).toHaveBeenCalledTimes(1);
-  });
-
   it("keeps the previous value on screen until the new key's value lands after paint", () => {
     const { compute, shown, rerender } = setup("a");
+    expect(shown()).toBe("value for a");
+    expect(compute).toHaveBeenCalledTimes(1);
     rerender("b");
     expect(shown()).toBe("value for a");
     expect(compute).toHaveBeenCalledTimes(1);

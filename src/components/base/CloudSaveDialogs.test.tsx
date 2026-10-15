@@ -315,49 +315,54 @@ it("offers a one-click update for a game shared from a newer version", async () 
   expect(mockImport).not.toHaveBeenCalled();
 });
 
-it.each([
-  [
-    "synced",
-    "Cloud backup up to date",
-    "Cloud backup up to date. Games load from this device.",
-  ],
-  [
-    "offline",
-    "Cloud backup offline",
-    "You're offline. Games save on this device; cloud backup resumes when you reconnect.",
-  ],
-  [
-    "syncing",
-    "Syncing cloud backup",
-    "Syncing cloud backup. Games load from this device.",
-  ],
-] as const)(
-  "condenses %s cloud status into one header icon that explains itself",
-  async (cloudState, label, message) => {
-    renderWithSaves(<CloudSyncIndicator />, { cloudState });
+it("explains routine cloud state changes and supports hover, touch and Escape", async () => {
+  const states = [
+    [
+      "synced",
+      "Cloud backup up to date",
+      "Cloud backup up to date. Games load from this device.",
+    ],
+    [
+      "offline",
+      "Cloud backup offline",
+      "You're offline. Games save on this device; cloud backup resumes when you reconnect.",
+    ],
+    [
+      "syncing",
+      "Syncing cloud backup",
+      "Syncing cloud backup. Games load from this device.",
+    ],
+  ] as const;
+  const { store } = renderWithSaves(<CloudSyncIndicator />, {
+    cloudState: "synced",
+  });
+  for (const [cloudState, label, message] of states) {
+    act(() => store.dispatch(sessionChanged({ cloudState })));
     const icon = screen.getByLabelText(label);
     // Assistive tech hears the whole explanation without opening anything
     expect(icon).toHaveAccessibleDescription(message);
     expect(icon).toHaveAttribute("aria-expanded", "false");
     // Routine state stays silent
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    await userEvent.hover(icon);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent(message);
-    // Touch has no hover, so a tap pins the same explanation open
-    await userEvent.click(icon);
-    expect(icon).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("dialog")).toHaveTextContent(message);
-    expect(screen.queryByText("Retry now")).not.toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    expect(icon).toHaveFocus();
-    // Focus coming back after Escape doesn't bring the explanation straight back up
-    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  },
-);
+  }
+  const [, label, message] = states[states.length - 1];
+  const icon = screen.getByLabelText(label);
+  await userEvent.hover(icon);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(message);
+  // Touch has no hover, so a tap pins the same explanation open
+  await userEvent.click(icon);
+  expect(icon).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("dialog")).toHaveTextContent(message);
+  expect(screen.queryByText("Retry now")).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(icon).toHaveFocus();
+  // Focus coming back after Escape doesn't bring the explanation straight back up
+  await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
 
 it.each([
   ["signedOut", 1],

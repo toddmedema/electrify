@@ -80,14 +80,17 @@ test("settings controls are flush with each row's right edge", async ({
   }
 });
 
-test("settings remain direct and overflow-free on a common phone", async ({
+test("settings controls and sound remain usable on phones", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-390px");
+  test.skip(!testInfo.project.name.startsWith("mobile-"));
   await openSettings(page);
 
   await expect(page.getByRole("group", { name: "Appearance" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Units" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Keyboard shortcuts" }),
+  ).toBeHidden();
   await page.getByRole("switch", { name: "Sound" }).click();
   await expect(
     page.getByRole("slider", { name: "Music volume" }),

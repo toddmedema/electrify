@@ -8,7 +8,7 @@ for (const theme of ["light", "dark"] as const) {
     { id: 110, name: "Sudden Nuclear Shutdown", window: "Jul 2026–Dec 2027" },
     { id: 100, name: "Carbon Fee" },
   ]) {
-    test(`${scenario.name} victory rules use two lines in ${theme} mode`, async ({
+    test(`${scenario.name} victory requirements stay readable in ${theme} mode`, async ({
       page,
     }, testInfo) => {
       await page.addInitScript((mode) => {
@@ -17,6 +17,20 @@ for (const theme of ["light", "dark"] as const) {
         localStorage.setItem("audioEnabled", "false");
       }, theme);
       await page.goto(`/?scenario=${scenario.id}`);
+      if (scenario.id === 100) {
+        await page
+          .getByRole("button", { name: "Victory Conditions", exact: true })
+          .click();
+        const briefing = page.getByRole("dialog");
+        await expect(briefing).toContainText(
+          "retain at least 80% of starting customers",
+        );
+        await expect(briefing).not.toContainText("build or upgrade the grid");
+        await expectDialogToFit(briefing);
+        await briefing
+          .getByRole("button", { name: "Close", exact: true })
+          .click();
+      }
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
@@ -30,6 +44,12 @@ for (const theme of ["light", "dark"] as const) {
       const rules = dialog.locator(".missionRequirements dt");
       const progress = dialog.locator(".missionRequirements dd");
       await expect(progress).toHaveCount(await rules.count());
+      if (scenario.id === 100) {
+        await expect(dialog).toContainText(
+          "Retain ≥800,000 customers at term end",
+        );
+        await expect(dialog).not.toContainText("Invest in the grid");
+      }
       if (scenario.window) {
         await expect(rules.first()).toHaveText(
           `≥99.5% of demand monthly · ${scenario.window}`,

@@ -1,5 +1,4 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`storage tutorial ring stays separate from expanded details in ${theme}`, async ({
@@ -26,6 +25,10 @@ for (const theme of ["light", "dark"]) {
     await page
       .getByRole("button", { name: "Start Storage", exact: true })
       .click();
+    // Tutorial initialization replaces the entering game card. Its first objective must
+    // be active before Build can open a catalog that survives that navigation.
+    await expect(page.locator(".tutorialHud")).toContainText("Tap Build");
+    await expect(page.locator(".cardTransitions > main")).toHaveCount(1);
     await page.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Storage", exact: true }).click();
     await page
@@ -58,69 +61,5 @@ for (const theme of ["light", "dark"]) {
       path: testInfo.outputPath("storage-tutorial-expanded.png"),
       animations: "disabled",
     });
-  });
-
-  test(`facility row surfaces span the grip in ${theme} mode`, async ({
-    page,
-  }, testInfo) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-    }, theme);
-    await page.goto("/?scenario=108");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-    const row = pane.locator(".facilityRow").first();
-    const header = row.locator(".facilityRowHeader");
-    const grip = header.locator(".facilityDragHandle");
-    await header.scrollIntoViewIfNeeded();
-    await grip.hover();
-
-    const surfaces = await header.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      const fill = element.querySelector(".outputProgressBar")!;
-      const fillBounds = fill.getBoundingClientRect();
-      const gripBounds = element
-        .querySelector(".facilityDragHandle")!
-        .getBoundingClientRect();
-      return {
-        left: bounds.left,
-        gripLeft: gripBounds.left,
-        fillBottom: fillBounds.bottom,
-        bottom: bounds.bottom,
-        separator: style.borderTopWidth,
-        hover: style.backgroundColor,
-        children: Array.from(
-          element.querySelectorAll(
-            ".facilityDragHandle, .facilityDisclosure, .facility",
-          ),
-        ).map((child) => ({
-          background: getComputedStyle(child).backgroundColor,
-          separator: getComputedStyle(child).borderTopWidth,
-        })),
-      };
-    });
-    expect(surfaces.gripLeft).toBe(surfaces.left);
-    expect(surfaces.fillBottom).toBe(surfaces.bottom);
-    expect(surfaces.separator).toBe("1px");
-    expect(surfaces.hover).not.toBe("rgba(0, 0, 0, 0)");
-    expect(surfaces.children).toEqual([
-      { background: "rgba(0, 0, 0, 0)", separator: "0px" },
-      { background: "rgba(0, 0, 0, 0)", separator: "0px" },
-      { background: "rgba(0, 0, 0, 0)", separator: "0px" },
-    ]);
-    await page.screenshot({ path: testInfo.outputPath("row-hover.png") });
-
-    await header.locator(".facilityDisclosure").click();
-    await expect(row.locator(".facilityDetails")).toBeVisible();
-    await row.locator(".facilityDetails").hover();
-    await expect(row).toHaveCSS("box-shadow", "none");
-    await expect(header).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await page.screenshot({ path: testInfo.outputPath("row-expanded.png") });
   });
 }

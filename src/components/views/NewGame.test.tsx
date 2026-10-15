@@ -51,6 +51,12 @@ describe("NewGame", () => {
       expect.stringContaining("Data Center Boom"),
       expect.stringContaining("Carbon Fee"),
     ]);
+    expect(screen.getByTestId("mission-row-107")).toHaveTextContent(
+      "Austin, TX · 2017–2023",
+    );
+    expect(screen.getByTestId("mission-row-106")).toHaveTextContent(
+      "Manassas, VA · 2020–2035",
+    );
     expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -213,17 +219,6 @@ describe("NewGame", () => {
       expect.stringContaining("Deep Freeze"),
       expect.stringContaining("Carbon Fee"),
     ]);
-  });
-
-  it("shows the inclusive final calendar year for recommendations", () => {
-    render(<NewGame {...props()} />);
-
-    expect(screen.getByTestId("mission-row-107")).toHaveTextContent(
-      "Austin, TX · 2017–2023",
-    );
-    expect(screen.getByTestId("mission-row-106")).toHaveTextContent(
-      "Manassas, VA · 2020–2035",
-    );
   });
 
   it("turns the first incomplete tutorial into an explicit continuation", () => {

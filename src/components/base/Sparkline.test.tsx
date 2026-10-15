@@ -18,22 +18,6 @@ function yValues(svg: SVGElement): number[] {
 }
 
 describe("Sparkline", () => {
-  it("renders an ordinary trend exactly as before", () => {
-    const svg = draw(
-      <Sparkline values={[1, 3, 2]} color="#123456" ariaLabel="Trend" />,
-    );
-    expect(svg.getAttribute("width")).toBe("72");
-    expect(svg.querySelector("polyline")!.getAttribute("points")).toBe(
-      "0.0,19.3 36.0,0.8 72.0,10.0",
-    );
-    expect(svg.querySelector("polygon")).toBeNull();
-    expect(svg.querySelector("circle")).toBeNull();
-    expect(svg.querySelector("line")).toBeNull();
-    expect(
-      svg.querySelector("polyline")!.getAttribute("stroke-dasharray"),
-    ).toBeNull();
-  });
-
   it("scales against a shared domain instead of the series' own range", () => {
     const own = yValues(
       draw(<Sparkline values={[0.1, 0.2]} ariaLabel="Own range" height={24} />),

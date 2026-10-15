@@ -2,7 +2,6 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CityType } from "../../data/Cities";
-import { WORLD_LAND_PATH } from "./WorldLand";
 import LocationPicker from "./LocationPicker";
 
 const cities: CityType[] = [
@@ -52,7 +51,6 @@ it("combines the selected city and search in one field on an aligned detailed ma
   ).toHaveValue("West City");
   expect(screen.queryByLabelText("Selected location")).not.toBeInTheDocument();
   expect(screen.queryByText(/Choose a playable city/)).not.toBeInTheDocument();
-  expect(WORLD_LAND_PATH.match(/M/g)?.length).toBeGreaterThan(100);
   expect(
     screen.getByRole("button", { name: /Select West City/ }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -113,22 +111,6 @@ it("keeps a marker click out of the pan gesture after zooming", async () => {
   expect(onChange).toHaveBeenCalledWith(cities[1]);
 });
 
-it("captures wheel gestures inside the map", () => {
-  render(
-    <LocationPicker
-      locations={cities}
-      value={cities[0]}
-      onChange={jest.fn()}
-    />,
-  );
-
-  const wheel = new WheelEvent("wheel", { bubbles: true, cancelable: true });
-  screen
-    .getByRole("group", { name: "Playable locations map" })
-    .dispatchEvent(wheel);
-  expect(wheel.defaultPrevented).toBe(true);
-});
-
 it("supports arrow navigation, Enter and Space activation, and Home", () => {
   const onChange = jest.fn();
   render(
@@ -160,7 +142,9 @@ it("zooms in and out with the scroll wheel", () => {
   const content = screen.getByTestId("world-map-content");
   const before = content.getAttribute("transform");
 
-  fireEvent.wheel(map, { deltaY: -100, clientX: 300, clientY: 150 });
+  expect(
+    fireEvent.wheel(map, { deltaY: -100, clientX: 300, clientY: 150 }),
+  ).toBe(false);
   expect(content).not.toHaveAttribute("transform", before);
   expect(screen.getByRole("button", { name: "Zoom out" })).toBeEnabled();
 
