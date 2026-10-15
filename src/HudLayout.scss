@@ -67,6 +67,40 @@ html:is([data-interface-scale="1.25"], [data-interface-scale="1.5"]) {
   .base_main .MuiToolbar-root:is(.paneHeader, .insightsHeader) {
     min-height: calc(var(--control-size) + 0.5rem) !important;
   }
+  .insightsViewportToolbar {
+    height: auto;
+    min-height: calc(var(--control-size) + 0.5rem);
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 1rem;
+  }
+  .insightsViewportButtons {
+    flex: 0 0 auto;
+    min-height: var(--control-size);
+    gap: 0.125rem;
+
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: var(--control-size);
+      height: var(--control-size);
+      flex: 0 0 var(--control-size);
+    }
+    .insightsViewportButton {
+      display: flex;
+    }
+  }
+  .pane-layout #navfooter {
+    height: 3.5rem;
+    min-height: 3.5rem;
+    flex: 0 0 3.5rem;
+
+    .MuiBottomNavigationAction-root {
+      height: 100%;
+      max-width: 10.5rem;
+      gap: 0.125rem;
+      padding-inline: 0.75rem;
+    }
+  }
 }
 
 // Media queries use unscaled CSS viewport width. The compositor uses the chosen size too,
