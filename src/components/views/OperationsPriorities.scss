@@ -161,21 +161,32 @@
 }
 
 .operationsHistoryToggle {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
   max-width: 480px;
   margin-inline: auto;
-  padding: 0 12px 12px;
+  margin-bottom: 8px;
+  padding: 4px 12px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
 
   > .MuiButton-root {
     min-height: var(--control-size);
-    width: 100%;
     text-transform: none;
   }
+}
+
+#operationsHistory {
+  scroll-margin-block-start: calc(var(--control-size) + 16px);
 }
 
 @media (pointer: coarse) {
   .operationsSectionHeader .MuiButton-root,
   .operationsPriorities .operationsTextAction,
   .operationsHistoryToggle > .MuiButton-root {
-    min-height: 44px;
+    min-height: max(44px, var(--control-size));
   }
 }

@@ -36,6 +36,24 @@ for (const layout of [
       await goals.focus();
       await page.keyboard.press("Enter");
       await expect(page.getByRole("menuitemcheckbox").first()).toBeVisible();
+      const minimum = await page.evaluate(() =>
+        Math.max(
+          matchMedia("(pointer: coarse)").matches ? 44 : 40,
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              "--control-size",
+            ),
+          ) || 40,
+        ),
+      );
+      for (const item of await page
+        .getByRole("menu", { name: "Pinned goals" })
+        .locator(".MuiMenuItem-root")
+        .all()) {
+        expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(
+          minimum,
+        );
+      }
       await page.keyboard.press("Escape");
       await expect(goals).toBeFocused();
       for (const row of await page

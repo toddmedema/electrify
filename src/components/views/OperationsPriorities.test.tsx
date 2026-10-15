@@ -6,6 +6,7 @@ import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
 import OperationsPriorities from "./OperationsPriorities";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 
 function fixture(change?: (game: GameType) => void) {
   return produce(createGame({ scenarioId: 111 }), (draft) => {
@@ -138,3 +139,61 @@ test("a project's commitment stays linked to the same asset as it starts produci
   expect(button).toHaveTextContent("500W now");
   expect(button).toHaveClass("selected");
 });
+
+test.each(["pointer", "keyboard"])(
+  "project expiry holds the %s target while live output keeps updating",
+  async (interaction) => {
+    const user = userEvent.setup();
+    const game = fixture((draft) => {
+      draft.date.minute = 20;
+      draft.facilities = [
+        {
+          ...draft.facilities[0],
+          id: 3,
+          name: "Solar",
+          yearsToBuildLeft: 0,
+          minuteOperational: 10,
+          currentW: 100,
+        },
+        {
+          ...draft.facilities[0],
+          id: 4,
+          name: "Solar",
+          yearsToBuildLeft: 0.5,
+          minuteOperational: undefined,
+          currentW: 0,
+        },
+      ];
+    });
+    const passed = props(game);
+    const view = render(<OperationsPriorities {...passed} />);
+    const rows = () =>
+      screen.getAllByRole("button", {
+        name: "Inspect Solar project and grid output",
+      });
+    const first = rows()[0];
+    if (interaction === "pointer") await user.hover(first);
+    else await act(async () => first.focus());
+    const expired = produce(game, (draft) => {
+      draft.date.minute = 10 + MINUTES_PER_MONTH;
+      draft.facilities[0].currentW = 500;
+    });
+    view.rerender(<OperationsPriorities {...passed} game={expired} />);
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0]).toBe(first);
+    expect(first).toHaveTextContent("#3");
+    expect(first).toHaveTextContent("500W now");
+    if (interaction === "keyboard") expect(first).toHaveFocus();
+    fireEvent.click(first);
+    expect(passed.onFacility).toHaveBeenCalledWith(3);
+    if (interaction === "pointer") await user.unhover(first);
+    else
+      await act(async () =>
+        screen
+          .getByRole("button", { name: /Keep the utility solvent/ })
+          .focus(),
+      );
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toHaveTextContent("#4");
+  },
+);

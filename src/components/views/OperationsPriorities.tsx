@@ -99,7 +99,13 @@ export default function OperationsPriorities({
   }, [preferenceKey, pinned]);
   const [goalAnchor, setGoalAnchor] = React.useState<HTMLElement | null>(null);
   const [heldNext, setHeldNext] = React.useState<UpcomingStoryEventType>();
-  const projects = operationsProjects(game);
+  const [heldProjects, setHeldProjects] =
+    React.useState<FacilityOperatingType[]>();
+  const pointerInProjects = React.useRef(false);
+  const currentProjects = operationsProjects(game);
+  // Hold identities during an interaction, while reading each asset's newest operating state.
+  // An expired outcome cannot slide the next asset under a stationary pointer or keyboard focus.
+  const projects = heldProjects || currentProjects;
   // These slots are deliberately separate: a new incident cannot replace a pinned goal.
   const health = now ? getGridHealth(game, now) : undefined;
   const shortfall = projectedShortfall(game.timeline, game.date.minute);
@@ -127,10 +133,23 @@ export default function OperationsPriorities({
           </Button>
         </header>
         <Menu
+          transitionDuration={0}
           anchorEl={goalAnchor}
           open={!!goalAnchor}
           onClose={() => setGoalAnchor(null)}
-          slotProps={{ list: { "aria-label": "Pinned goals" } }}
+          slotProps={{
+            list: {
+              "aria-label": "Pinned goals",
+              sx: {
+                "& .MuiMenuItem-root": {
+                  minHeight: "var(--control-size, 40px)",
+                  "@media (pointer: coarse)": {
+                    minHeight: "max(44px, var(--control-size, 44px))",
+                  },
+                },
+              },
+            },
+          }}
         >
           {mission.requirements.map((goal) => (
             <MenuItem
@@ -299,16 +318,40 @@ export default function OperationsPriorities({
       <section
         aria-labelledby="operationsProjectsTitle"
         className="operationsSection"
+        onPointerEnter={() => {
+          pointerInProjects.current = true;
+          setHeldProjects((held) => held || currentProjects);
+        }}
+        onPointerLeave={(event) => {
+          pointerInProjects.current = false;
+          if (!event.currentTarget.contains(document.activeElement))
+            setHeldProjects(undefined);
+        }}
+        onFocusCapture={() =>
+          setHeldProjects((held) => held || currentProjects)
+        }
+        onBlurCapture={(event) => {
+          if (
+            !pointerInProjects.current &&
+            !event.currentTarget.contains(event.relatedTarget)
+          )
+            setHeldProjects(undefined);
+        }}
       >
         <header className="operationsSectionHeader">
           <h3 id="operationsProjectsTitle">Projects & outcomes</h3>
         </header>
-        {projects.map((facility) => {
+        {projects.map((project) => {
+          const live = game.facilities.find(
+            (facility) => facility.id === project.id,
+          );
+          const facility = live || project;
           const building = facility.yearsToBuildLeft > 0;
           return (
             <Button
               color="inherit"
               key={facility.id}
+              disabled={!live}
               className={`operationsRow operationsProject${selectedFacilityId === facility.id ? " selected" : ""}`}
               aria-pressed={selectedFacilityId === facility.id}
               onClick={() => onFacility(facility.id)}
@@ -330,15 +373,19 @@ export default function OperationsPriorities({
                 <span>Committed</span>
                 <ArrowForwardIcon />
                 <span>
-                  {building
-                    ? `${Math.ceil(facility.yearsToBuildLeft * 12)} mo to online`
-                    : "Online"}
+                  {!live
+                    ? "Removed from fleet"
+                    : building
+                      ? `${Math.ceil(facility.yearsToBuildLeft * 12)} mo to online`
+                      : "Online"}
                 </span>
                 <ArrowForwardIcon />
                 <span>
-                  {building
-                    ? "No output yet"
-                    : `${formatWatts(facility.currentW)} now`}
+                  {!live
+                    ? "Output unavailable"
+                    : building
+                      ? "No output yet"
+                      : `${formatWatts(facility.currentW)} now`}
                 </span>
               </span>
               <span className="operationsMeta">

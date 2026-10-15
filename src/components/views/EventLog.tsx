@@ -113,6 +113,14 @@ export default function EventLog(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  const historyAnchor = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (operations && historyOpen) {
+      historyAnchor.current?.scrollIntoView?.({ block: "start" });
+      if (!historyOpenedForEvidence.current)
+        historyAnchor.current?.focus({ preventScroll: true });
+    }
+  }, [operations, historyOpen]);
   React.useEffect(() => {
     const request = evidenceRequest;
     if (
@@ -126,7 +134,10 @@ export default function EventLog(props: Props): React.JSX.Element {
         setHistoryOpen(true);
         return;
       }
-      onEvidenceReady?.(request, evidenceAnchor.current);
+      onEvidenceReady?.(
+        request,
+        operations ? historyAnchor.current : evidenceAnchor.current,
+      );
     }
   }, [
     evidenceRequest,
@@ -195,6 +206,25 @@ export default function EventLog(props: Props): React.JSX.Element {
         tabIndex={-1}
         aria-label="Announced events and event history evidence"
       >
+        {operations && (
+          <div className="operationsHistoryToggle">
+            <Button
+              onClick={() => {
+                historyOpenedForEvidence.current = false;
+                if (historyOpen && evidenceAnchor.current)
+                  evidenceAnchor.current.scrollTop = 0;
+                setHistoryOpen((open) => !open);
+              }}
+              aria-expanded={historyOpen}
+              aria-controls="operationsHistory"
+              size="small"
+            >
+              {historyOpen
+                ? "Close history"
+                : `Event history (${events.length})`}
+            </Button>
+          </div>
+        )}
         {operations && props.game && props.onEvidence && props.onFacility && (
           <OperationsPriorities
             key={`${props.game.scenarioId}:${props.game.seed}:${props.game.startingYear}`}
@@ -207,26 +237,12 @@ export default function EventLog(props: Props): React.JSX.Element {
             onFacility={props.onFacility}
           />
         )}
-        {operations && (
-          <div className="operationsHistoryToggle">
-            <Button
-              onClick={() => {
-                historyOpenedForEvidence.current = false;
-                setHistoryOpen((open) => !open);
-              }}
-              aria-expanded={historyOpen}
-              aria-controls="operationsHistory"
-              variant="outlined"
-              size="small"
-            >
-              {historyOpen
-                ? "Close history"
-                : `Event history (${events.length})`}
-            </Button>
-          </div>
-        )}
         {(!operations || historyOpen) && (
-          <div id={operations ? "operationsHistory" : undefined}>
+          <div
+            id={operations ? "operationsHistory" : undefined}
+            ref={historyAnchor}
+            tabIndex={operations ? -1 : undefined}
+          >
             {riskNotice && (
               <section
                 className="eventLogSection wildfireRiskNotice"
