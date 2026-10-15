@@ -2435,7 +2435,6 @@ export default class Insights extends React.Component<Props, State> {
             </Toolbar>
             {this.renderLevers(now)}
           </div>
-          {/* The preset and layer controls sit directly above the charts they choose */}
           <Toolbar className="insightsHeader">
             <div className="insightsHeaderControls">
               <div

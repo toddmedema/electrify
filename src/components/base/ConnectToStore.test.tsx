@@ -1,7 +1,7 @@
 import * as React from "react";
 import { act, render, screen } from "@testing-library/react";
 import { configureStore, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { connect, Provider } from "react-redux";
+import { Provider } from "react-redux";
 import { AppStateType } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
 
@@ -55,12 +55,16 @@ function Pane({
   );
 }
 
-function renderTree(
-  wrap: typeof connectToStore,
-  store = testStore(),
-): { store: ReturnType<typeof testStore>; commits: () => number } {
-  const ConnectedLeaf = wrap((state) => ({ tick: tickOf(state) }))(Leaf);
-  const ConnectedPane = wrap((state) => ({ tick: tickOf(state) }))(Pane);
+function renderTree(store = testStore()): {
+  store: ReturnType<typeof testStore>;
+  commits: () => number;
+} {
+  const ConnectedLeaf = connectToStore((state) => ({ tick: tickOf(state) }))(
+    Leaf,
+  );
+  const ConnectedPane = connectToStore((state) => ({ tick: tickOf(state) }))(
+    Pane,
+  );
   let commits = 0;
   render(
     <Provider store={store}>
@@ -78,7 +82,7 @@ function renderTree(
 
 describe("connectToStore", () => {
   test("updates nested store readers in one commit per dispatch", () => {
-    const { store, commits } = renderTree(connectToStore);
+    const { store, commits } = renderTree();
 
     act(() => {
       store.dispatch(slice.actions.tick());
@@ -89,21 +93,8 @@ describe("connectToStore", () => {
     expect(commits()).toBe(1);
   });
 
-  test("connect commits once more per nested level, which it replaces", () => {
-    const { store, commits } = renderTree(
-      connect as unknown as typeof connectToStore,
-    );
-
-    act(() => {
-      store.dispatch(slice.actions.tick());
-    });
-
-    expect(screen.getByTestId("leaf")).toHaveTextContent("1");
-    expect(commits()).toBe(2);
-  });
-
   test("skips renders when no mapped field changed", () => {
-    const { store, commits } = renderTree(connectToStore);
+    const { store, commits } = renderTree();
 
     act(() => {
       store.dispatch(slice.actions.label("b"));
