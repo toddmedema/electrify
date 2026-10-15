@@ -335,7 +335,6 @@ export default function App() {
       if (achievementsLive) stopAchievements = startAchievementServices(store);
     });
 
-    // Returns its own unsubscribe, which was previously dropped on the floor
     const desktop =
       process.env.REACT_APP_DESKTOP === "true" ? getDesktop() : undefined;
     let authLive = true;

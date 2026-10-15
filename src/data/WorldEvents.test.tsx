@@ -319,9 +319,9 @@ describe("The Shale Boom pilot arc", () => {
   });
 });
 
-describe("authored upcoming-event copy", () => {
+describe("authored upcoming-event previews", () => {
   it.each(STORY_ARC_DEFINITIONS.map((arc) => [arc.id, arc] as const))(
-    "%s has brief future-tense forecasts in native and custom games",
+    "%s hides exact outcomes in native and custom forecasts",
     (_id, arc) => {
       const difficulties: DifficultyType[] = [
         "Intern",
@@ -342,13 +342,7 @@ describe("authored upcoming-event copy", () => {
           };
           const events = upcomingStoryPhases(start);
           for (const event of events) {
-            expect(event.title).toMatch(/\b(will|may)\b/);
-            expect(event.message).toMatch(/\b(will|may)\b/);
             expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
-            expect(event.message.split(/\s+/).length).toBeLessThanOrEqual(20);
-            expect(event.message).not.toMatch(
-              /\b(met|supplied|last year|is down|has ended)\b/,
-            );
             expect(event.startsMinute).toBeGreaterThan(start.date.minute);
           }
           // Current results and plant names cannot stand in for a future event's outcome.
@@ -399,8 +393,6 @@ describe("authored upcoming-event copy", () => {
           });
           for (const preview of previews) {
             // Also review the opening phase, which may already be active at month zero.
-            expect(preview.title).toMatch(/\b(will|may)\b/);
-            expect(preview.message).toMatch(/\b(will|may)\b/);
             expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
           }
         }

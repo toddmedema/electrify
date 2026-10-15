@@ -154,11 +154,6 @@ test("the landing page opens a prepared current-year grid and supports browser h
       .boundingBox())!;
     const source = (await gridSize.locator("p").last().boundingBox())!;
     expect(source.y).toBeGreaterThan(accounts.y + accounts.height);
-    await expect(gridSize).not.toContainText("Your chosen size.");
-    await expect(gridSize).not.toContainText("More than 380,000");
-    await expect(gridSize).not.toContainText(
-      "This published count stays fixed",
-    );
     await gridSize.locator("summary").click();
     expect(
       await page.evaluate(

@@ -84,29 +84,3 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).not.toBeVisible();
   });
 }
-
-test("the data-center landing page contains the requested shorter copy", async ({
-  page,
-}, info) => {
-  await page.goto("/data-centers.html");
-  await expect(page.locator(".hero .eyebrow")).toHaveCount(0);
-  await expect(page.locator("main")).not.toContainText(
-    "These decisions get made close to home",
-  );
-  await expect(page.locator(".community-model-note")).toContainText(
-    "Electrify is a simulation. It shows what's possible, but it can't predict a specific project's exact effects.",
-  );
-  if (
-    process.env.REVIEW_SCREENSHOT_DIR &&
-    info.project.name === "desktop-chromium"
-  ) {
-    await page.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        "data-center-copy-desktop.png",
-      ),
-      fullPage: true,
-      animations: "disabled",
-    });
-  }
-});

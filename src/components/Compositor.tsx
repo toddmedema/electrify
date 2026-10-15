@@ -625,12 +625,10 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public shouldComponentUpdate(nextProps: Props) {
-    // Update if changing tutorial step
     if (this.props.tutorialStep !== nextProps.tutorialStep) {
       return true;
     }
 
-    // Update if dialog / snackbar changes
     if (
       this.props.ui.dialog !== nextProps.ui.dialog ||
       this.props.ui.snackbar !== nextProps.ui.snackbar ||

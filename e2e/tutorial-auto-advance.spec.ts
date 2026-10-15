@@ -49,6 +49,7 @@ for (const mission of [
       .getByRole("button", { name: `Start ${mission}`, exact: true })
       .click();
     const hud = page.locator(".tutorialHud");
+    await expect(hud).toBeVisible();
     if (mission === "Generators" || mission === "Storage") {
       await page.locator(".button-buildFacility").click();
       if (mission === "Storage") {

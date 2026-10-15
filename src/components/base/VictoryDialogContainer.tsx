@@ -37,8 +37,6 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       login();
     },
     onShared: (victory: VictoryType, method: string) => {
-      // The share button is the lever this whole feature is pulling, so measure whether anyone
-      // actually pulls it
       logEvent("score_share", {
         scenarioId: victory.scenarioId,
         difficulty: victory.difficulty,

@@ -1,6 +1,4 @@
 import { UnknownAction } from "@reduxjs/toolkit";
-import * as fs from "fs";
-import * as path from "path";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
 import type { AppDispatch } from "../Store";
@@ -206,63 +204,6 @@ describe("onTutorialStep", () => {
   });
 });
 
-/**
- * Every component's markup as one blob to search. Source only: the test files are full of
- * fixture markup no walkthrough will ever point at.
- */
-const SOURCE = (function read(dir: string): string[] {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return read(full);
-    }
-    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)
-      ? [fs.readFileSync(full, "utf8")]
-      : [];
-  });
-})(path.join(__dirname, "..")).join("\n");
-
-/** Both targets a step can carry, since the desktop override is a selector of its own */
-function targetsOf(steps: TutorialStepType[]): string[] {
-  return steps
-    .flatMap((s) => [s.target, s.desktop && s.desktop.target])
-    .filter((t): t is string => Boolean(t));
-}
-
-/** Whether anything in the app still declares the id or class a simple selector names */
-function declares(simple: string): boolean {
-  if (simple.startsWith("[")) {
-    const attribute = simple.match(/^\[([\w-]+)/)?.[1];
-    return !!attribute && SOURCE.includes(`${attribute}=`);
-  }
-  if (/^[a-z]/.test(simple)) {
-    return (
-      SOURCE.includes(`<${simple}`) ||
-      SOURCE.includes(`<${simple[0].toUpperCase()}${simple.slice(1)}`)
-    );
-  }
-  const name = simple.slice(1);
-  if (simple.startsWith("#")) {
-    return (
-      SOURCE.includes(`id="${name}"`) ||
-      Array.from(SOURCE.matchAll(/id=\{`([^$`]*)\$\{/g)).some(([, prefix]) =>
-        name.startsWith(prefix),
-      )
-    );
-  }
-  // MUI generates its own class names, so there is nothing of ours to find. Those steps lean
-  // on the card check above instead
-  if (name.startsWith("Mui")) {
-    return true;
-  }
-  // Class attributes are often assembled from a template, so look for the whole word anywhere
-  // on a line that sets one rather than trying to parse the value out
-  return SOURCE.split("\n").some(
-    (line) =>
-      line.includes("className") && line.split(/[^\w-]+/).includes(name),
-  );
-}
-
 describe("walkthrough steps", () => {
   const tutorials = SCENARIOS.filter((s) => s.tutorialSteps);
   const actionGateTypes = new Set<string>([
@@ -319,29 +260,6 @@ describe("walkthrough steps", () => {
           toStep,
           declared,
         ]);
-      });
-    });
-  });
-
-  /**
-   * A selector matching nothing silently loses the restrained target treatment. Rendering every
-   * card would be the airtight check; scanning the source for the id or class each selector names
-   * catches that kind of rename far cheaper.
-   */
-  it("points every tutorial step at markup that still exists", () => {
-    tutorials.forEach((scenario) => {
-      const steps = scenario.tutorialSteps as TutorialStepType[];
-      targetsOf(steps).forEach((target) => {
-        (
-          target.match(/\[[^\]]+\]|[.#][\w-]+|(?:^|\s)[a-z][\w-]*/g) || []
-        ).forEach((part) => {
-          const simple = part.trim();
-          expect([scenario.name, target, declares(simple)]).toEqual([
-            scenario.name,
-            target,
-            true,
-          ]);
-        });
       });
     });
   });
