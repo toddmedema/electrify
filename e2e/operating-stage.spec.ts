@@ -141,3 +141,49 @@ test("phone keeps its full-screen catalog", async ({ page }, testInfo) => {
     animations: "disabled",
   });
 });
+
+test("large text reserves a useful primary context on a short tablet", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("audioEnabled", "false");
+  });
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const stage = page.getByRole("region", { name: "Live grid", exact: true });
+  await expect(stage).toBeVisible();
+  // Exercise the shared text/control contract without depending on another feature's settings.
+  await page.addStyleTag({
+    content: `html {font-size:24px;--control-size:66px}
+    .MuiButton-root,.MuiIconButton-root,.MuiInputBase-root {min-height:66px!important}
+    #topbar .MuiToolbar-root {min-height:66px!important} .gameStatusBar {min-height:68px}
+    .pane-layout #navfooter {height:84px;min-height:84px;flex:0 0 84px}`,
+  });
+  await page.locator(".facilityDisclosure").first().click();
+  await page.locator(".button-buildFacility").click();
+  await expect(page.locator(".operatingWorkspace")).toHaveAttribute(
+    "data-mini",
+    "true",
+  );
+  await expect(stage.locator(".operatingStageInlineSelection")).toBeVisible();
+  const catalog = page.locator(".operatingStageBuild");
+  const review = catalog
+    .getByRole("button", { name: /Review purchase of/ })
+    .first();
+  await review.scrollIntoViewIfNeeded();
+  await expect(review).toBeInViewport({ ratio: 0.99 });
+  await review.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "close", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(catalog).toHaveCount(0);
+  expect(
+    (await page.locator(".operatingStageContext:not([hidden])").boundingBox())!
+      .height,
+  ).toBeGreaterThanOrEqual(240);
+});

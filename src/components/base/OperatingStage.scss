@@ -223,6 +223,37 @@
   }
 }
 
+// At the smallest effective height, give the primary context room for its own heading and
+// a complete scaled action. Selection moves into the header and exact chart values remain
+// available through point inspection; fleet controls still operate the selected plant.
+.operatingWorkspace[data-mini] {
+  .operatingStageHeader .operatingStageReadings,
+  .operatingStageSelection,
+  .operatingStageHint {
+    display: none;
+  }
+  .operatingStagePlot {
+    height: max(80px, 4rem);
+  }
+  .operatingStageHeader {
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+}
+
+.operatingStageInlineSelection {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: var(--font-size-caption-sm);
+  span {
+    color: var(--font-color-faded);
+  }
+}
+
 .operatingWorkspace[data-tight] {
   .operatingStageReadings {
     display: flex;

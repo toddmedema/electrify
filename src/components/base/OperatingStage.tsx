@@ -24,15 +24,22 @@ class LiveSupplyDemand extends React.Component<{
   game: GameType;
   height: number;
   compact: boolean;
+  mini: boolean;
 }> {
   private throttle = new TickThrottle();
 
   shouldComponentUpdate(
-    next: Readonly<{ game: GameType; height: number; compact: boolean }>,
+    next: Readonly<{
+      game: GameType;
+      height: number;
+      compact: boolean;
+      mini: boolean;
+    }>,
   ) {
     if (
       next.height !== this.props.height ||
       next.compact !== this.props.compact ||
+      next.mini !== this.props.mini ||
       next.game.speed !== this.props.game.speed ||
       (next.game.speed !== "FAST" && next.game.speed !== "ULTRA") ||
       next.game.facilities.map((facility) => facility.id).join("|") !==
@@ -47,11 +54,12 @@ class LiveSupplyDemand extends React.Component<{
   }
 
   render() {
-    const { game, height, compact } = this.props;
+    const { game, height, compact, mini } = this.props;
     return (
       <ChartSupplyDemand
         height={height}
         compact={compact}
+        mini={mini}
         timeline={game.timeline}
         fuelOrder={getDispatchOrderedFuels(game.facilities)}
         currentMinute={game.date.minute}
@@ -84,6 +92,7 @@ export default function OperatingStage({
   const [height, setHeight] = React.useState(220);
   const [compact, setCompact] = React.useState(false);
   const [tight, setTight] = React.useState(false);
+  const [mini, setMini] = React.useState(false);
   React.useLayoutEffect(() => {
     const element = plot.current;
     if (!element) return;
@@ -96,6 +105,7 @@ export default function OperatingStage({
       if (available > 0) {
         setCompact(available < 38 * rem);
         setTight(available < 26 * rem);
+        setMini(available < 20 * rem);
       }
       const legend = element.querySelector(".chartLegend");
       setHeight(
@@ -131,6 +141,21 @@ export default function OperatingStage({
     isUpgradingAt(selected, game.date.minute);
   const readOnly = !!game.replayPlayback;
   const health = now && getGridHealth(game, now);
+  const selectedReading = !selected
+    ? ""
+    : selected.yearsToBuildLeft > 0
+      ? "Under construction"
+      : upgrading
+        ? "Upgrading"
+        : selected.paused
+          ? "Paused"
+          : selected.currentW === 0
+            ? "Idle"
+            : `${formatWatts(Math.abs(selected.currentW))} ${isStorage(selected) ? (selected.currentW < 0 ? "charging" : "discharging") : "now"}`;
+  const storedReading =
+    selected && isStorage(selected)
+      ? ` · ${formatWattHours(selected.currentWh)} stored`
+      : "";
 
   const toggle = () => {
     if (!selected) return;
@@ -152,6 +177,7 @@ export default function OperatingStage({
       data-context={context}
       data-compact={compact || undefined}
       data-tight={tight || undefined}
+      data-mini={mini || undefined}
       ref={workspace}
     >
       <section
@@ -167,6 +193,15 @@ export default function OperatingStage({
               Supply and demand over the day
             </span>
           </div>
+          {mini && selected && (
+            <div className="operatingStageInlineSelection">
+              <strong>{selected.name}</strong>
+              <span>
+                {selectedReading}
+                {storedReading}
+              </span>
+            </div>
+          )}
           {now && health && (
             <div className="operatingStageReadings">
               <span>
@@ -186,7 +221,12 @@ export default function OperatingStage({
         </header>
         <div className="operatingStagePlot" ref={plot}>
           {!!game.timeline.length && (
-            <LiveSupplyDemand game={game} height={height} compact={compact} />
+            <LiveSupplyDemand
+              game={game}
+              height={height}
+              compact={compact}
+              mini={mini}
+            />
           )}
         </div>
         {selected ? (
@@ -198,17 +238,8 @@ export default function OperatingStage({
             <div className="operatingStageSelectedReading">
               <strong>{selected.name}</strong>
               <span>
-                {selected.yearsToBuildLeft > 0
-                  ? "Under construction"
-                  : upgrading
-                    ? "Upgrading"
-                    : selected.paused
-                      ? "Paused"
-                      : selected.currentW === 0
-                        ? "Idle"
-                        : `${formatWatts(Math.abs(selected.currentW))} ${isStorage(selected) ? (selected.currentW < 0 ? "charging" : "discharging") : "now"}`}
-                {isStorage(selected) &&
-                  ` · ${formatWattHours(selected.currentWh)} stored`}
+                {selectedReading}
+                {storedReading}
               </span>
             </div>
             {!readOnly && (
