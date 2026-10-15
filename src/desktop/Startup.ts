@@ -5,7 +5,7 @@ export function prepareDesktopStartup(): void {
   entrance.classList.remove("desktopStartupFailed");
   const status = entrance.querySelector("[data-startup-status]");
   status?.setAttribute("role", "status");
-  status?.replaceChildren("Preparing saved games…");
+  status?.replaceChildren("Reticulating splines...");
 }
 
 export function failDesktopStartup(retry: () => void, quit: () => void): void {

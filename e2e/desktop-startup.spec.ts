@@ -45,7 +45,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
       await page.reload();
       const entrance = page.locator("#desktopStartup");
       await expect(entrance.getByRole("status")).toHaveText(
-        "Preparing saved games…",
+        "Reticulating splines...",
       );
       await expect(entrance.getByAltText("Electrify")).toBeVisible();
       await expect(page.locator("#menuCard")).toHaveCount(0);
