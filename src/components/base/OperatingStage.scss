@@ -65,16 +65,6 @@
     width: 100%;
     max-width: none;
   }
-  // A deliberate sample inspection opens over its plot, so it cannot push the contextual
-  // catalog off a short display. The live readings and close control remain visible.
-  .chartPointDetails {
-    position: absolute;
-    z-index: 5;
-    inset: 8px 12px auto;
-    margin: 0;
-    max-height: min(360px, calc(100vh - 220px));
-    overflow-y: auto;
-  }
 }
 
 .operatingStageHint {
@@ -226,7 +216,7 @@
 // At the smallest effective height, give the primary context room for its own heading and
 // a complete scaled action. Selection moves into the header and exact chart values remain
 // available through point inspection; fleet controls still operate the selected plant.
-.operatingWorkspace[data-mini] {
+.operatingWorkspace[data-mini][data-tight] {
   .operatingStageHeader .operatingStageReadings,
   .operatingStageSelection,
   .operatingStageHint {
