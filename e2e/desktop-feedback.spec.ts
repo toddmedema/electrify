@@ -303,8 +303,17 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
     const before = await readSavedGame(page);
     const originalId = (await readSaveRecords(page))[0].metadata.id;
     expect(before).toBeDefined();
-    // Keep the real validated IPC handler/storage instance. Inject one failure only
-    // after the native quit broadcast, avoiding a background backup race.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          async () =>
+            !!(await window.electrifyDesktop!.readSaveLibrary()).local,
+        ),
+      )
+      .toBe(true);
+    // Keep the real validated IPC handler/storage instance. Fail quit-phase writes
+    // until the crash: an already-pending backup must not consume a one-shot fault
+    // and leave the actual quit checkpoint free to succeed.
     await app.evaluate(({ app, BrowserWindow, dialog }, mode) => {
       const nativeRequire = process
         .getBuiltinModule("module")
@@ -317,14 +326,20 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
         windowId: game.id,
         quit: false,
         injected: false,
+        backgroundPending: false,
+        failedWrites: 0,
         crashes: 0,
         loads: 0,
         warnings: [] as Array<{ title: string; buttons: string[] }>,
       };
       Object.assign(globalThis, { feedbackQuitAudit: audit });
+      let resumeBackground: (() => void) | undefined;
       const send = game.webContents.send;
       game.webContents.send = function (channel, ...arguments_) {
-        if (channel === "desktop:before-quit") audit.quit = true;
+        if (channel === "desktop:before-quit") {
+          audit.quit = true;
+          resumeBackground?.();
+        }
         return Reflect.apply(send, this, [channel, ...arguments_]);
       };
       game.webContents.on("did-finish-load", () => {
@@ -345,9 +360,17 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
         this: unknown,
         ...arguments_: unknown[]
       ) {
-        if (audit.quit && !audit.injected) {
+        if (mode === "warning" && !audit.quit && !audit.backgroundPending) {
+          audit.backgroundPending = true;
+          await new Promise<void>((resolve) => {
+            resumeBackground = resolve;
+          });
+        }
+        if (audit.quit && audit.crashes === 0) {
+          const firstFailure = !audit.injected;
           audit.injected = true;
-          if (mode === "checkpoint") await crash();
+          audit.failedWrites++;
+          if (mode === "checkpoint" && firstFailure) await crash();
           throw new Error("QA injected quit checkpoint failure");
         }
         return Reflect.apply(write, this, arguments_);
@@ -364,6 +387,27 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
         return { response: 0, checkboxChecked: false };
       }) as typeof dialog.showMessageBox;
     }, crashAt);
+    if (crashAt === "warning") {
+      // Force the CI race: a valid background backup reaches native storage before
+      // Quit, but its write resumes only after the native quit broadcast.
+      await page.evaluate(async () => {
+        const desktop = window.electrifyDesktop!;
+        const { local } = await desktop.readSaveLibrary();
+        void desktop.writeSaveLibrary(local, false).catch(() => undefined);
+      });
+      await expect
+        .poll(() =>
+          app.evaluate(
+            () =>
+              (
+                globalThis as unknown as {
+                  feedbackQuitAudit: { backgroundPending: boolean };
+                }
+              ).feedbackQuitAudit.backgroundPending,
+          ),
+        )
+        .toBe(true);
+    }
     // Native close enters the same save handshake as Quit. Keep renderer-bound
     // Playwright operations out of the deliberately crashed execution context.
     await app.evaluate(({ BrowserWindow }) => {
@@ -433,6 +477,8 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
           globalThis as unknown as {
             feedbackQuitAudit: {
               windowId: number;
+              backgroundPending: boolean;
+              failedWrites: number;
               crashes: number;
               loads: number;
               warnings: Array<{ title: string; buttons: string[] }>;
@@ -442,6 +488,10 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
     );
     expect(audit.crashes).toBe(1);
     expect(audit.loads).toBe(1);
+    expect(audit.failedWrites).toBeGreaterThanOrEqual(
+      crashAt === "warning" ? 2 : 1,
+    );
+    expect(audit.backgroundPending).toBe(crashAt === "warning");
     expect(audit.warnings).toEqual([
       crashAt === "checkpoint"
         ? {
@@ -488,6 +538,8 @@ for (const crashAt of ["checkpoint", "warning"] as const) {
         injected: crashAt,
         nativeWindowId: audit.windowId,
         crashes: audit.crashes,
+        failedWrites: audit.failedWrites,
+        backgroundPending: audit.backgroundPending,
         reloads: audit.loads,
         warnings: audit.warnings,
         originalSaveId: originalId,
