@@ -92,7 +92,7 @@ for (const theme of ["light", "dark"]) {
     }) => {
       await page.goto("/?scenario=111");
       await page
-        .getByRole("button", { name: "What counts as a win", exact: true })
+        .getByRole("button", { name: "Victory Conditions", exact: true })
         .click();
       const dialog = page.getByRole("dialog");
       await expectDialogToFit(dialog);

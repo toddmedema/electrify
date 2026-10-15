@@ -47,7 +47,7 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
           {(reliabilityObjective.durationMonths || 1) > 1
             ? " in every event month"
             : ""}
-          . A month below target ends the run.
+          .
         </p>
       )}
       {minimumCustomerRetention !== undefined && (

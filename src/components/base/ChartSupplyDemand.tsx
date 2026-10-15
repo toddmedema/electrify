@@ -649,7 +649,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       )}
       <UPlotChart<State>
         ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
-        interactiveDetails
+        interactiveTooltip
         formatSummaryValue={formatWatts}
         height={height}
         state={state}

@@ -100,19 +100,20 @@ for (const theme of ["light", "dark"]) {
       for (let i = 0; i < index; i++) await image.press("ArrowRight");
     };
     await selectPoint(charging);
-    const details = chart.locator(".chartPointDetails");
+    const details = chart.locator(".chartTooltip");
     await expect(details).toContainText("Storage charging:");
     await expect(details).toContainText("Demand:");
-    const firstTime = await details.locator("strong").textContent();
+    const time = details.locator(":scope > div").first();
+    const firstTime = await time.textContent();
     await image.press("ArrowRight");
-    await expect(details.locator("strong")).not.toHaveText(firstTime!);
+    await expect(time).not.toHaveText(firstTime!);
     await selectPoint(exporting);
     await expect(details).toContainText("Interties exporting:");
     await selectPoint(discharging);
     await expect(details).toContainText("Storage discharging:");
     await image.press("End");
     await image.press("Escape");
-    await expect(details).toHaveCount(0);
+    await expect(details).toBeHidden();
     const plot = chart.locator(".u-over");
     const bounds = (await plot.boundingBox())!;
     if (info.project.use.hasTouch) {
@@ -120,26 +121,23 @@ for (const theme of ["light", "dark"]) {
     } else {
       await plot.click({ position: { x: bounds.width * 0.8, y: 8 } });
     }
+    await expect(chart.locator(".chartPointDetails")).toHaveCount(0);
+    await image.focus();
+    await image.press("Home");
     await expect(details).toBeVisible();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await expect(details).toContainText("Total supply:");
     await expect(details).toContainText("Total load:");
-    const totals = details.locator(".chartPointDetailsTotal");
+    const totals = details.locator("strong");
     await expect(totals).toHaveCount(2);
-    for (const total of await totals.all()) {
-      const totalBounds = (await total.boundingBox())!;
-      expect(totalBounds.y + totalBounds.height).toBeLessThanOrEqual(
-        page.viewportSize()!.height - 44,
-      );
-    }
     expect(
       await details.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     await details.screenshot({
       path: info.outputPath(`storage-details-${theme}.png`),
     });
-    await chart.getByRole("button", { name: "Close chart details" }).click();
-    await expect(details).toHaveCount(0);
+    await image.press("Escape");
+    await expect(details).toBeHidden();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     // Hover details stay within the plot, including at opposite corners on narrow screens.
     await chart.scrollIntoViewIfNeeded();
@@ -165,6 +163,19 @@ for (const theme of ["light", "dark"]) {
       expect(tip.y + tip.height).toBeLessThanOrEqual(
         hoverBounds.y + hoverBounds.height + 1,
       );
+    }
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      theme === "light" &&
+      info.project.name === "desktop-chromium"
+    ) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "chart-hover-desktop.png",
+        ),
+        animations: "disabled",
+      });
     }
     await page.mouse.move(0, 0);
     await page.evaluate(() => document.fonts.ready);
@@ -408,6 +419,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   });
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => !!(await readSavedGame(page))).toBe(true);
   await editSavedGame(page, (save) => {
     save.game.timeline.forEach((tick) => {
       tick.supplyByFuel = {
@@ -450,7 +462,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   }
   await chart.getByRole("img").focus();
   await chart.getByRole("img").press("Home");
-  const details = chart.locator(".chartPointDetails");
+  const details = chart.locator(".chartTooltip");
   for (const direction of [
     "Storage discharging:",
     "Storage charging:",

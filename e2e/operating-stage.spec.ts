@@ -96,10 +96,9 @@ for (const viewport of layouts) {
       const image = stage.getByRole("img");
       await image.focus();
       await image.press("Home");
-      await expect(stage.locator(".chartPointDetails")).toBeVisible();
-      await stage.getByRole("button", { name: "Close chart details" }).focus();
-      await page.keyboard.press("Escape");
-      await expect(stage.locator(".chartPointDetails")).toHaveCount(0);
+      await expect(stage.locator(".chartTooltip")).toBeVisible();
+      await image.press("Escape");
+      await expect(stage.locator(".chartTooltip")).toBeHidden();
       await expect(catalog).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(catalog).toHaveCount(0);
