@@ -136,3 +136,66 @@ test("a committed project links its actual asset to grid evidence", async ({
     path: testInfo.outputPath("operations-project-dark.png"),
   });
 });
+
+test("history opens at its filter in a short pane with many upcoming events", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
+      }),
+    );
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .click();
+  await page.getByRole("button", { name: "View Custom Game details" }).click();
+  await page
+    .getByRole("combobox", { name: "Scenario events", exact: true })
+    .click();
+  for (const name of [
+    "Data Center Boom",
+    "Heatwave + Drought",
+    "Wildfire Emergency",
+  ]) {
+    await page.getByRole("option", { name, exact: true }).click();
+  }
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  const scroller = page.locator(".operationsPane > .scrollable");
+  await expect(scroller).toBeVisible();
+  await scroller.evaluate((element) => {
+    Object.assign((element as HTMLElement).style, {
+      height: "210px",
+      maxHeight: "210px",
+      flex: "0 0 210px",
+    });
+  });
+  await page.getByRole("button", { name: /^Event history \(/ }).click();
+  expect(
+    await page.locator(".upcomingEvents .eventLogItem").count(),
+  ).toBeGreaterThanOrEqual(4);
+  await expect(
+    page.getByRole("region", { name: "Event history" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Filter event history, All events" }),
+  ).toBeInViewport({ ratio: 1 });
+  await expect(
+    page.getByRole("button", { name: "Close history", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page
+    .getByRole("button", { name: "Close history", exact: true })
+    .click({ trial: true });
+  await page.screenshot({
+    path: testInfo.outputPath("history-short-pane.png"),
+  });
+});

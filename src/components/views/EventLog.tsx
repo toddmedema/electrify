@@ -114,11 +114,12 @@ export default function EventLog(props: Props): React.JSX.Element {
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
   const historyAnchor = React.useRef<HTMLDivElement>(null);
+  // Explicit history navigation skips announcements; semantic EVENTS requests still include them.
+  const historySectionAnchor = React.useRef<HTMLElement>(null);
   React.useEffect(() => {
-    if (operations && historyOpen) {
-      historyAnchor.current?.scrollIntoView?.({ block: "start" });
-      if (!historyOpenedForEvidence.current)
-        historyAnchor.current?.focus({ preventScroll: true });
+    if (operations && historyOpen && !historyOpenedForEvidence.current) {
+      historySectionAnchor.current?.scrollIntoView?.({ block: "start" });
+      historySectionAnchor.current?.focus({ preventScroll: true });
     }
   }, [operations, historyOpen]);
   React.useEffect(() => {
@@ -379,6 +380,8 @@ export default function EventLog(props: Props): React.JSX.Element {
             <section
               className="eventLogSection eventHistory"
               aria-labelledby="eventHistoryTitle"
+              ref={operations ? historySectionAnchor : undefined}
+              tabIndex={operations ? -1 : undefined}
             >
               <header className="eventLogSectionHeader">
                 <Typography id="eventHistoryTitle" variant="subtitle2">

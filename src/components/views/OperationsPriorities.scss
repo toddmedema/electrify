@@ -163,7 +163,7 @@
 .operationsHistoryToggle {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 4;
   display: flex;
   justify-content: flex-end;
   max-width: 480px;
@@ -179,7 +179,8 @@
   }
 }
 
-#operationsHistory {
+#operationsHistory,
+.operationsPane .eventHistory {
   scroll-margin-block-start: calc(var(--control-size) + 16px);
 }
 
