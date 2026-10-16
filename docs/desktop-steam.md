@@ -308,13 +308,11 @@ and [Electron signing and notarization](https://www.electronjs.org/docs/latest/t
 
 ## Store and library artwork
 
-The [Steam artwork package](../steamworks/artwork/README.md) contains the store and library
-capsules, text-free hero, transparent logo, client icons (including macOS ICNS), optional page
-and event artwork, and six real 1920 × 1080 gameplay screenshots. Its upload map lists the
-Steamworks slot for every file. The coordinated set uses the selected
-Connected landscape illustration, with editable SVG layouts, generation provenance,
-a local review gallery, technical validation and independent review notes.
+The [Steam artwork package](../steamworks/artwork/README.md) contains the required store and
+library artwork, client icons (including macOS ICNS) and six real 1920 × 1080 gameplay
+screenshots. Its upload map identifies every slot; the store and library headers share one
+image. Five illustration masters, the wordmark and one export script support future updates.
 
-Use these marketing exports directly in Steamworks; they are kept outside `public/` so the game
-does not cache or package them as runtime assets. Check the separate library logo's position in
-Steamworks' preview, then submit the store page through the normal Valve review process.
+Use the marketing exports directly in Steamworks. They stay outside `public/` and the desktop
+depot. Position the separate library logo in Steamworks' preview, then submit the store page
+through Valve's normal review process.
