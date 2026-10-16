@@ -5,8 +5,8 @@
     "height": 430,
     "slot": "Store / Header Capsule",
     "required": true,
-    "bytes": 289165,
-    "sha256": "752087284d29db084a5984e529989e10523522fa1eef0b5c06da42a7e42b6881"
+    "bytes": 332777,
+    "sha256": "70435a3b2124269125b0f351a4770a34bf8bc3390543e073426cf0ac9cfe93fe"
   },
   {
     "file": "store-small.png",
@@ -14,8 +14,8 @@
     "height": 174,
     "slot": "Store / Small Capsule",
     "required": true,
-    "bytes": 45690,
-    "sha256": "be8da544be2c4179ca284ad349c3b01d382786aa821ea7ef512c95e6b79206e8"
+    "bytes": 52284,
+    "sha256": "96206b1ff16215075326b1f4427a5d6b6b62452891444596b92ac1917bfa57db"
   },
   {
     "file": "store-main.png",
@@ -23,8 +23,8 @@
     "height": 706,
     "slot": "Store / Main Capsule",
     "required": true,
-    "bytes": 535101,
-    "sha256": "25d45caf36254405bdc32f18aed5c9f53f76f8a67d17c7479af1b9fac8445cbd"
+    "bytes": 607178,
+    "sha256": "41e1c518a4ac3a46146c5a9058082f0fbd8db5ca696cf1ab4e0240e8ded11154"
   },
   {
     "file": "store-vertical.png",
@@ -32,8 +32,8 @@
     "height": 896,
     "slot": "Store / Vertical Capsule",
     "required": true,
-    "bytes": 457006,
-    "sha256": "299c07e07dad2e726aa1d520f33817d202fcf5f534bf2f6df54807ce1eafe8a9"
+    "bytes": 495898,
+    "sha256": "09aa03619cb68bb2070d6e33ab6ed7c4dead45fea35629d9d911599112b601c8"
   },
   {
     "file": "library-capsule.png",
@@ -41,8 +41,8 @@
     "height": 900,
     "slot": "Library / Capsule",
     "required": true,
-    "bytes": 387144,
-    "sha256": "b897e62bcb8210c1d75a12935f7b68aba08ea1f6c1b9f4f75d16424b5ecaa295"
+    "bytes": 407066,
+    "sha256": "21d0a18a7e2f45861f678a734fefb63a64d9ef2d57d1cc042beb3f321bc6e044"
   },
   {
     "file": "library-header.png",
@@ -50,8 +50,8 @@
     "height": 430,
     "slot": "Library / Header",
     "required": true,
-    "bytes": 289165,
-    "sha256": "752087284d29db084a5984e529989e10523522fa1eef0b5c06da42a7e42b6881"
+    "bytes": 332777,
+    "sha256": "70435a3b2124269125b0f351a4770a34bf8bc3390543e073426cf0ac9cfe93fe"
   },
   {
     "file": "library-hero.png",
@@ -59,8 +59,8 @@
     "height": 1240,
     "slot": "Library / Hero",
     "required": true,
-    "bytes": 1498205,
-    "sha256": "9fb69296513c98ceb60fdf23192539221e01fe5a826ff75a489208b9793129f5"
+    "bytes": 1524520,
+    "sha256": "7e2e61b3418c8ebbfc1ef61a0cf0b4e527768f34a859766818b0597e7a82ce46"
   },
   {
     "file": "library-logo.png",
@@ -78,8 +78,8 @@
     "height": 810,
     "slot": "Store / Page Background",
     "required": false,
-    "bytes": 271309,
-    "sha256": "2d219d4b6f3eb5b2843bfe1579935fe1ce549c28862a8d56477d9ede528808f3"
+    "bytes": 447686,
+    "sha256": "6ce08dd4952e0371e0999e316dc9724218ad4f09b64ff915c8b28fed9434f020"
   },
   {
     "file": "event-cover.png",
@@ -87,8 +87,8 @@
     "height": 450,
     "slot": "Events / Cover (when posting an event)",
     "required": false,
-    "bytes": 279131,
-    "sha256": "5cb6e91a663b6a18e168dce14a03b0a2972903db75167680f8b46f6a460c26ab"
+    "bytes": 312898,
+    "sha256": "0b9ec6aee9af404b0941ff10d77fa2ade92a418ff44cf5eefb1f25a0ce8719ba"
   },
   {
     "file": "event-header.png",
@@ -96,8 +96,8 @@
     "height": 622,
     "slot": "Events / Header",
     "required": false,
-    "bytes": 675406,
-    "sha256": "539c44459ab13281efeaef8b35485ebb128fb494cc0550c4e796e6fabd5b958f"
+    "bytes": 684165,
+    "sha256": "0aad337683681724fe3c0ccbe1da0433a24ebf6c65fcf2edb2adfab867951057"
   },
   {
     "file": "shortcut-icon.png",
@@ -111,7 +111,14 @@
   },
   {
     "file": "shortcut-icon.ico",
-    "sizes": [16, 32, 48, 64, 128, 256],
+    "sizes": [
+      16,
+      32,
+      48,
+      64,
+      128,
+      256
+    ],
     "slot": "Community / Shortcut Icon (ICO alternative)",
     "required": false,
     "bytes": 14154,
@@ -119,7 +126,15 @@
   },
   {
     "file": "mac-icon.icns",
-    "sizes": [16, 32, 64, 128, 256, 512, 1024],
+    "sizes": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
     "slot": "Community / Mac Icon",
     "required": "macOS shortcuts",
     "bytes": 47297,

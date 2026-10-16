@@ -24,7 +24,7 @@ const layouts = [
     height: 430,
     slot: "Store / Header Capsule",
     required: true,
-    art: "dispatch-landscape.png",
+    art: "connected-wide.png",
     title: [45, 48, 510],
   },
   {
@@ -33,16 +33,17 @@ const layouts = [
     height: 174,
     slot: "Store / Small Capsule",
     required: true,
-    art: "dispatch-small.png",
+    art: "connected-small.png",
     title: [18, 44, 326],
   },
   {
     file: "store-main.png",
+    align: "xMaxYMid",
     width: 1232,
     height: 706,
     slot: "Store / Main Capsule",
     required: true,
-    art: "dispatch-landscape.png",
+    art: "connected-wide.png",
     title: [72, 100, 680],
   },
   {
@@ -51,7 +52,7 @@ const layouts = [
     height: 896,
     slot: "Store / Vertical Capsule",
     required: true,
-    art: "dispatch-store-portrait.png",
+    art: "connected-store-portrait.png",
     title: [48, 42, 652],
   },
   {
@@ -60,7 +61,7 @@ const layouts = [
     height: 900,
     slot: "Library / Capsule",
     required: true,
-    art: "dispatch-portrait.png",
+    art: "connected-portrait.png",
     title: [40, 66, 520],
   },
   {
@@ -69,7 +70,7 @@ const layouts = [
     height: 430,
     slot: "Library / Header",
     required: true,
-    art: "dispatch-landscape.png",
+    art: "connected-wide.png",
     title: [45, 48, 510],
   },
   {
@@ -78,7 +79,7 @@ const layouts = [
     height: 1240,
     slot: "Library / Hero",
     required: true,
-    art: "dispatch-hero.png",
+    art: "connected-hero.png",
   },
   {
     file: "library-logo.png",
@@ -91,20 +92,22 @@ const layouts = [
   },
   {
     file: "page-background.png",
+    align: "xMaxYMid",
     width: 1438,
     height: 810,
     slot: "Store / Page Background",
     required: false,
-    art: "dispatch-landscape.png",
+    art: "connected-wide.png",
     dim: true,
   },
   {
     file: "event-cover.png",
+    align: "xMaxYMid",
     width: 800,
     height: 450,
     slot: "Events / Cover (when posting an event)",
     required: false,
-    art: "dispatch-landscape.png",
+    art: "connected-wide.png",
     title: [44, 52, 442],
   },
   {
@@ -113,7 +116,7 @@ const layouts = [
     height: 622,
     slot: "Events / Header",
     required: false,
-    art: "dispatch-hero.png",
+    art: "connected-hero.png",
     title: [86, 100, 740],
   },
 ];
@@ -184,6 +187,9 @@ function icns(images) {
 
 async function main() {
   fs.mkdirSync(uploads, { recursive: true });
+  fs.mkdirSync(path.join(root, "../../.tmp/steam-artwork"), {
+    recursive: true,
+  });
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ deviceScaleFactor: 1 });
   const manifest = [];
@@ -197,10 +203,19 @@ async function main() {
   };
   try {
     for (const layout of layouts) {
-      const { file, width, height, art, title, dim, transparent, ...rest } =
-        layout;
+      const {
+        file,
+        width,
+        height,
+        art,
+        title,
+        dim,
+        transparent,
+        align,
+        ...rest
+      } = layout;
       const body =
-        (art ? scene(art, width, height) : "") +
+        (art ? scene(art, width, height, align) : "") +
         (dim
           ? `<rect width="100%" height="100%" fill="#07121d" opacity=".65"/>`
           : "") +
@@ -310,26 +325,27 @@ async function main() {
       path.join(root, "manifest.json"),
       `${JSON.stringify(manifest, null, 2)}\n`,
     );
-    const review = `<html lang="en"><meta charset="utf-8"><title>Electrify Steam artwork review</title><style>body{margin:32px;background:#e8edf3;color:#142337;font:15px system-ui}h1{font-size:26px}main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}figure{margin:0}img{display:block;width:100%;height:210px;object-fit:contain;background:#102133}figcaption{padding:8px 0}small{display:block}section{margin:28px 0}.tiny{width:auto;height:auto}.hero{position:relative}.hero img{height:auto}.hero .logo{position:absolute;left:5%;bottom:18%;width:27%;height:auto;background:none}.logo-light{background:#edf2f7}</style><h1>Electrify · Dispatch desk</h1><p><a href="hybrids/review.html">Compare the three new A × C hybrid concepts</a></p><p>Exact upload files; labels and simulated logo placement below are review aids only.</p><section><strong>Three artwork directions</strong><main><figure><img src="options/a-grid-atlas.png" alt="A Grid atlas"><figcaption>A · Grid atlas</figcaption></figure><figure><img src="options/b-power-portfolio.png" alt="B Power portfolio"><figcaption>B · Power portfolio</figcaption></figure><figure><img src="uploads/store-main.png" alt="C Dispatch desk"><figcaption>C · Dispatch desk — selected</figcaption></figure></main></section><section><strong>Actual small-capsule sizes</strong><p><img class="tiny" src="uploads/store-small.png" width="120" style="width:120px" alt="120 by 45 small capsule"></p><p><img class="tiny" src="uploads/store-small.png" width="184" style="width:184px" alt="184 by 69 small capsule"></p></section><main>${manifest
-      .filter((item) => item.file.endsWith(".png"))
+    const review = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Electrify · Connected landscape</title><style>*{box-sizing:border-box}body{margin:0;padding:32px;background:#e8edf3;color:#142337;font:15px system-ui;line-height:1.5}h1{font-size:28px;margin:0 0 8px}h2{font-size:21px}main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}figure{margin:0}img{display:block;width:100%;height:230px;object-fit:contain;background:#102031}figcaption{padding:8px 0}small{display:block}section{margin:32px 0}a{color:#075ab4}.lead{display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start}.lead img{height:auto}.tiny{width:auto;height:auto}.hero{position:relative}.hero img{height:auto}.hero .logo{position:absolute;left:5%;bottom:18%;width:27%;height:auto;background:none}.logo-light{background:#edf2f7}.download{display:flex;flex-wrap:wrap;gap:16px}@media(max-width:800px){body{padding:16px}main,.lead{grid-template-columns:1fr}}</style><h1>Electrify · Connected landscape</h1><p>The selected artwork, adapted for every Steam format. Preview labels and simulated logo placement are review aids only.</p><section class="lead"><figure><a href="uploads/store-main.png"><img src="uploads/store-main.png" alt="Electrify main capsule with the blue pylon and connected electricity landscape"></a><figcaption>Main store capsule · 1232 × 706</figcaption></figure><div><h2>Production artwork</h2><p>One connected community, powered by hydro, wind, solar and a compact power station. Bold electric blue, ivory and navy keep the electricity theme clear.</p><p><a href="README.md">Upload map and instructions</a><br><a href="sources/connected-landscape.png">Preserved approved master</a><br><a href="review-notes.md">Independent review notes</a></p><strong>Actual small-capsule sizes</strong><p><img class="tiny" src="uploads/store-small.png" style="width:120px" alt="Small capsule at 120 by 45 pixels"></p><p><img class="tiny" src="uploads/store-small.png" style="width:184px" alt="Small capsule at 184 by 69 pixels"></p></div></section><h2>Steam upload files</h2><main>${manifest
+      .filter((item) => /\.(png|jpg)$/.test(item.file))
       .map(
         (item) =>
-          `<figure><img src="uploads/${item.file}" alt="${item.slot}"><figcaption>${item.file}<small>${item.width} × ${item.height}</small></figcaption></figure>`,
+          `<figure><a href="uploads/${item.file}"><img src="uploads/${item.file}" alt="${item.slot}"></a><figcaption>${item.file}<small>${item.width} × ${item.height} · ${item.slot}</small></figcaption></figure>`,
       )
       .join(
         "",
-      )}</main><section><strong>Library hero with separate logo (simulated placement)</strong><div class="hero"><img src="uploads/library-hero.png" alt="Text-free library hero"><img class="logo" src="uploads/library-logo.png" alt="Separate logo"></div></section><section><strong>Transparent logo on a light surface</strong><img class="logo-light" src="uploads/library-logo.png" style="width:640px;height:auto" alt="White logo transparency check; intended for dark hero"></section><h2>Gameplay screenshots</h2><main>${
+      )}</main><p class="download"><a href="uploads/shortcut-icon.ico">Windows ICO · 16–256 px</a><a href="uploads/mac-icon.icns">macOS ICNS · 16–1024 px</a></p><section><h2>Library hero with separate logo</h2><div class="hero"><img src="uploads/library-hero.png" alt="Text-free library hero"><img class="logo" src="uploads/library-logo.png" alt="Separate white Electrify logo, simulated Steam placement"></div><p>The full central pylon, town and generation group remains inside the centered 860 × 380 safe crop. Position the separate logo in Steamworks’ preview.</p></section><section><h2>Transparent logo on a light surface</h2><img class="logo-light" src="uploads/library-logo.png" style="max-width:640px;height:auto" alt="White logo transparency check; intended for the dark hero"></section><h2>Authentic gameplay screenshots</h2><main>${
       fs.existsSync(path.join(root, "screenshots"))
         ? fs
             .readdirSync(path.join(root, "screenshots"))
             .filter((f) => f.endsWith(".png"))
             .map(
               (file) =>
-                `<figure><img src="screenshots/${file}" alt="${file}"><figcaption>${file}</figcaption></figure>`,
+                `<figure><a href="screenshots/${file}"><img src="screenshots/${file}" alt="${file}"></a><figcaption>${file}</figcaption></figure>`,
             )
             .join("")
         : ""
     }</main></html>`;
+
     fs.writeFileSync(path.join(root, "review.html"), review);
     await page.setViewportSize({ width: 1480, height: 1000 });
     await page.goto(pathToFileURL(path.join(root, "review.html")).href);

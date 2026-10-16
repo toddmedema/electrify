@@ -1,31 +1,17 @@
 # Steam artwork
 
-The original coordinated set uses **C — Dispatch desk**: the original Electrify wordmark,
-three recognizable power sources, and crossing supply/demand curves. The complete
-set was approved by two independent visual reviewers and one Steam genre reviewer
-after three feedback rounds. See [review notes](review-notes.md).
-
-## A × C hybrid follow-up
-
-The latest concepts combine A's connected town and power sources with C's simpler,
-bolder shapes. Compare [Connected landscape, Powering the town, and Grid in silhouette](hybrids/README.md)
-in the [new gallery](hybrids/review.html).
-
-## Original three directions
-
-| Option                | Main capsule                             | Direction                                                        |
-| --------------------- | ---------------------------------------- | ---------------------------------------------------------------- |
-| A — Grid atlas        | [Preview](options/a-grid-atlas.png)      | An illustrated grid, facilities, and a town.                     |
-| B — Power portfolio   | [Preview](options/b-power-portfolio.png) | Large generation silhouettes and a dam.                          |
-| **C — Dispatch desk** | [Preview](uploads/store-main.png)        | Selected; emphasizes electricity economics and facility choices. |
-
-A and B are alternative concepts. The coordinated upload set below uses C.
+The production artwork uses **Connected landscape**, the user-selected illustration:
+blue transmission pylon, connected town, hydro, wind, solar and power station in a
+bold navy, electric-blue and ivory composition. Each Steam format has a matching
+layout with the original Electrify wordmark. See the [gallery](review.html) and
+[review notes](review-notes.md). The approved native master is preserved unchanged
+in [sources/connected-landscape.png](sources/connected-landscape.png).
 
 ## Upload map
 
 Sizes were checked against Valve's documentation on October 15, 2026. Use the files
 in `uploads/` for artwork and `screenshots/` for gameplay images. The gallery,
-source SVGs, concept options, and review crops are not Steam upload slots.
+source SVGs and review crops are not Steam upload slots.
 
 | Steamworks slot           | File                                      | Pixels                  | Requirement                          |
 | ------------------------- | ----------------------------------------- | ----------------------- | ------------------------------------ |
@@ -67,7 +53,7 @@ References: [store artwork and screenshots](https://partner.steamgames.com/doc/s
 `sources/` contains text-free raster illustrations and editable SVG compositions
 with relative image references. The original logo geometry and app icon come from
 `public/images/`; the logo's tagline is excluded. [generation.json](generation.json)
-records every illustration prompt and the built-in ImageGen provenance.
+records the selected master's checksum, format-adaptation prompts and built-in ImageGen provenance.
 
 The raster masters retain the tool's native resolution. Exact-size uploads are
 rendered from the SVG layouts using Chromium; the 3840 px hero is resampled from

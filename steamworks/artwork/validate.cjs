@@ -18,6 +18,62 @@ async function main() {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, "manifest.json"), "utf8"),
   );
+  const generation = JSON.parse(
+    fs.readFileSync(path.join(root, "generation.json"), "utf8"),
+  );
+  const master = fs.readFileSync(
+    path.join(root, generation.selectedMaster.file),
+  );
+  assert.equal(
+    crypto.createHash("sha256").update(master).digest("hex"),
+    generation.selectedMaster.sha256,
+    "Approved master changed",
+  );
+  const expectedMasters = [
+    generation.selectedMaster.file,
+    ...generation.prompts.map((entry) => entry.file),
+  ]
+    .map((file) => path.basename(file))
+    .sort();
+  assert.deepEqual(
+    fs
+      .readdirSync(path.join(root, "sources"))
+      .filter((file) => file.endsWith(".png"))
+      .sort(),
+    expectedMasters,
+    "Unlisted or missing illustration sources",
+  );
+  assert.deepEqual(
+    fs.readdirSync(path.join(root, "uploads")).sort(),
+    manifest.map((entry) => entry.file).sort(),
+    "Unlisted or missing upload files",
+  );
+  const documents = [
+    "review.html",
+    ...fs
+      .readdirSync(path.join(root, "sources"))
+      .filter((file) => file.endsWith(".svg"))
+      .map((file) => "sources/" + file),
+  ];
+  for (const file of documents) {
+    const contents = fs.readFileSync(path.join(root, file), "utf8");
+    for (const [, reference] of contents.matchAll(/(?:href|src)="([^"]+)"/g)) {
+      if (/^(?:[a-z]+:|#)/i.test(reference)) continue;
+      const target = path.resolve(
+        root,
+        path.dirname(file),
+        reference.split("#")[0],
+      );
+      assert.ok(
+        target.startsWith(path.resolve(root) + path.sep),
+        file + ": reference outside artwork package",
+      );
+      assert.ok(
+        fs.existsSync(target),
+        file + ": missing reference " + reference,
+      );
+    }
+  }
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   try {
@@ -113,7 +169,7 @@ async function main() {
       );
     }
     console.log(
-      `Verified ${manifest.length} Steam upload files and ${screenshots.length} gameplay screenshots: dimensions, formats, hashes, transparency and icon containers.`,
+      `Verified ${manifest.length} Steam upload files and ${screenshots.length} gameplay screenshots: dimensions, formats, hashes, transparency, icon containers and local references.`,
     );
   } finally {
     await browser.close();

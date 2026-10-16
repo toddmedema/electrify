@@ -311,8 +311,9 @@ and [Electron signing and notarization](https://www.electronjs.org/docs/latest/t
 The [Steam artwork package](../steamworks/artwork/README.md) contains the store and library
 capsules, text-free hero, transparent logo, client icons (including macOS ICNS), optional page
 and event artwork, and six real 1920 × 1080 gameplay screenshots. Its upload map lists the
-Steamworks slot for every file. It also includes three concept options, editable SVG layouts,
-generation prompts, a local review gallery, validation, and the three-round design review.
+Steamworks slot for every file. The coordinated set uses the selected
+Connected landscape illustration, with editable SVG layouts, generation provenance,
+a local review gallery, technical validation and independent review notes.
 
 Use these marketing exports directly in Steamworks; they are kept outside `public/` so the game
 does not cache or package them as runtime assets. Check the separate library logo's position in
