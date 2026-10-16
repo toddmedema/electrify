@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       qa-artifacts:
-        description: Archive and upload all four verified offline desktop builds
+        description: Archive and upload all three verified offline desktop builds
         type: boolean
         default: false
 
@@ -13,7 +13,7 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
-# Hard cap: one build + four native workers + one required coverage gate = six jobs.
+# Hard cap: one build + three native workers + one required coverage gate = five jobs.
 # Every existing test and coverage threshold remains required on every PR.
 jobs:
   build:
@@ -77,6 +77,7 @@ jobs:
             runner: ubuntu-22.04
             platform: linux
             arch: x64
+            depot: linux-x64
             directory: linux-unpacked
             executable: linux-unpacked/Electrify
           - label: Windows x64
@@ -84,29 +85,26 @@ jobs:
             runner: windows-latest
             platform: win32
             arch: x64
+            depot: win32-x64
             directory: win-unpacked
             executable: win-unpacked/Electrify.exe
-          - label: macOS Apple Silicon
+          # One universal app serves Intel and Apple Silicon Macs. This Apple Silicon host
+          # packages both slices and tests the arm64 one.
+          - label: macOS universal
             index: 3
             runner: macos-15
             platform: darwin
             arch: arm64
-            directory: mac-arm64
-            executable: mac-arm64/Electrify.app/Contents/MacOS/Electrify
-          - label: macOS Intel
-            index: 4
-            runner: macos-15-intel
-            platform: darwin
-            arch: x64
-            directory: mac
-            executable: mac/Electrify.app/Contents/MacOS/Electrify
+            depot: darwin-universal
+            directory: mac-universal
+            executable: mac-universal/Electrify.app/Contents/MacOS/Electrify
     steps:
       - uses: actions/checkout@v7
         with:
           lfs: true
       - uses: ./.github/actions/install
         with:
-          profile: ${{ (matrix.index == 2 || matrix.index == 4) && 'desktop' || 'full' }}
+          profile: ${{ matrix.index == 2 && 'desktop' || 'full' }}
       - uses: ./.github/actions/jest-cache
         if: matrix.index == 1
         with:
@@ -190,13 +188,13 @@ jobs:
       - name: Archive the complete verified QA depot (manual runs only)
         if: github.event_name == 'workflow_dispatch' && inputs.qa-artifacts
         shell: bash
-        run: tar -czf dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C dist/desktop ${{ matrix.directory }}
+        run: tar -czf dist/desktop/electrify-offline-qa-${{ matrix.depot }}.tar.gz -C dist/desktop ${{ matrix.directory }}
       - name: Downloadable offline QA build (manual runs only)
         if: github.event_name == 'workflow_dispatch' && inputs.qa-artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}
-          path: dist/desktop/electrify-offline-qa-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          name: electrify-offline-qa-${{ matrix.depot }}
+          path: dist/desktop/electrify-offline-qa-${{ matrix.depot }}.tar.gz
           retention-days: 14
           compression-level: 0
           if-no-files-found: error
@@ -204,7 +202,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}
+          name: diagnostics-${{ matrix.depot }}
           path: |
             test-results/browser/
             test-results/desktop/

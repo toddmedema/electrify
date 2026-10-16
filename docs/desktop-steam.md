@@ -36,16 +36,18 @@ account or App ID:
 npm run desktop:pack:offline
 ```
 
-Build on the target OS and architecture using its native Node 24 installation and `npm ci`.
-The packaging command rejects cross-host or cross-architecture builds: Koffi installs a native
-package for the host, and each depot must contain the correct Steam SDK and Electron binaries.
+Build on the target OS using its native Node 24 installation and `npm ci`. Windows and Linux
+packaging rejects cross-host or cross-architecture builds: Koffi installs a native package for
+the host, and each depot must contain the correct Steam SDK and Electron binaries. On macOS,
+either an Apple Silicon or an Intel Mac builds one universal app containing both architectures.
+Packaging installs the other architecture's locked Koffi package before it merges the two
+builds, and checks that the signed executable contains both `arm64` and `x86_64` slices.
 
 | Target | Depot under `dist/desktop/` | Executable inside the depot | CI runner |
 | --- | --- | --- | --- |
 | Windows x64 | `win-unpacked/` | `Electrify.exe` | `windows-latest` |
 | Linux x64 | `linux-unpacked/` | `Electrify` | `ubuntu-22.04` |
-| macOS Intel | `mac/` | `Electrify.app/Contents/MacOS/Electrify` | `macos-15-intel` |
-| macOS Apple Silicon | `mac-arm64/` | `Electrify.app/Contents/MacOS/Electrify` | `macos-15` |
+| macOS (universal) | `mac-universal/` | `Electrify.app/Contents/MacOS/Electrify` | `macos-15` |
 
 On macOS, open `Electrify.app`; on Linux, run `./Electrify` from the depot. Ship the **entire
 directory or app bundle**, including native libraries and Chromium resources. Copying only the
@@ -53,7 +55,7 @@ executable does not produce a working game. Steam installs the unpacked depot; p
 run npm, download dependencies, or install Electron themselves. Linux ARM and Windows ARM are
 not supported by the pinned Steam binding.
 
-Both Mac builds require macOS 13 Ventura or later, matching the
+The Mac app requires macOS 13 Ventura or later, matching the
 [Electron 44 minimum](https://www.electronjs.org/blog/electron-44-0). The package's
 `LSMinimumSystemVersion` is set to `13.0`; Steam store requirements must use that same minimum.
 
@@ -75,15 +77,15 @@ ELECTRIFY_EXECUTABLE="$PWD/dist/desktop/linux-unpacked/Electrify" npm run test:d
 The desktop suite launches Electron with a fresh, isolated profile. It exercises the production
 renderer through the local protocol rather than a development server. The regular `npm run
 check` also runs native desktop unit tests. The CI matrix builds and launches the complete
-packaged executable on all four native targets, verifies every asset hash, resolves the actual
+packaged executable on all three native targets, verifies every asset hash, resolves the actual
 Steam SDK exports, and exercises offline gameplay, display changes, save recovery and keyboard
 controls. Linux tests run under Xvfb and Openbox with the Electron renderer sandbox enabled.
 Existing web browser and simulation gates remain required.
 
-Successful jobs upload `electrify-offline-qa-<platform>-<arch>` artifacts for 14 days. Each contains
+Successful jobs upload `electrify-offline-qa-<target>` artifacts for 14 days. Each contains
 a `.tar.gz` of the entire depot, preserving executable permissions and macOS bundle structure.
 Download it from the workflow's Artifacts list, extract the artifact ZIP, then extract the tar
-archive with `tar -xzf electrify-offline-qa-<platform>-<arch>.tar.gz`. These are QA builds without
+archive with `tar -xzf electrify-offline-qa-<target>.tar.gz`. These are QA builds without
 a Steam App ID, Developer ID signing or notarization; they do not enable Steam services and are
 not release depots. Mac QA bundles use local ad hoc signatures for valid native code on Apple
 Silicon; these are not a trusted Developer ID signature. Windows QA executables are unsigned.
@@ -106,11 +108,11 @@ Remove-Item Env:STEAM_APP_ID
 
 The same command works on each native host; in POSIX shells use
 `STEAM_APP_ID=YOUR_ELECTRIFY_APP_ID npm run desktop:pack`. It refuses a missing App ID. Create
-separate Windows, Linux and macOS depots, with distinct Intel and Apple Silicon Mac builds and
-matching launch settings. Set Windows to `Electrify.exe`, Linux to `Electrify`, and macOS to
-`Electrify.app`. Test how Steam selects the two Mac architecture depots on both kinds of Mac
-before release. Publish the Steamworks changes and assign the build to a private testing branch.
-This repository does not publish a Steam depot or configure your partner account.
+separate Windows, Linux and macOS depots with matching launch settings. Steam has one macOS
+platform and does not choose depots by CPU architecture, so the single universal app serves
+both Intel and Apple Silicon Macs. Set Windows to `Electrify.exe`, Linux to `Electrify`, and
+macOS to `Electrify.app`. Publish the Steamworks changes and assign the build to a private
+testing branch. This repository does not publish a Steam depot or configure your partner account.
 
 macOS Steam releases require Developer ID signing and Apple notarization. Supply your signing
 certificate through electron-builder's `CSC_LINK` and `CSC_KEY_PASSWORD` configuration (or an
@@ -121,8 +123,8 @@ SDK/overlay injection required by Valve, and omit Apple's app-sandbox entitlemen
 renderer sandbox remains enabled. Packaging checks native bytes before signing, then verifies
 the signed app with `codesign --verify --deep --strict` and checks every game asset again. Before
 uploading, confirm notarization and its offline ticket with `xcrun stapler validate Electrify.app`,
-and test a fresh Steam install on each architecture. Windows signing uses the configured release
-certificate or signing provider; offline CI does not sign the executable.
+and test a fresh Steam install on both an Apple Silicon and an Intel Mac. Windows signing uses
+the configured release certificate or signing provider; offline CI does not sign the executable.
 
 Steam has to be installed and logged in at least once to establish a player's ownership and
 offline account. The game itself has all of its content available on the first launch without
