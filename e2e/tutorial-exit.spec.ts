@@ -38,6 +38,15 @@ test("closing a walkthrough offers a working way to the missions", async ({
     .getByRole("button", { name: "Exit" })
     .click();
 
+  await expect(page.locator(".tutorialHud")).toBeHidden();
+  for (const action of ["Build", "Programs", "Insights", "Events"]) {
+    await expect(
+      page
+        .locator("#navfooter")
+        .getByRole("button", { name: action, exact: true }),
+    ).toBeVisible();
+  }
+
   const snackbar = page.locator(".snackbarContent");
   await expect(snackbar).toContainText("Walkthrough closed");
   const missions = snackbar.getByRole("button", { name: "Missions" });

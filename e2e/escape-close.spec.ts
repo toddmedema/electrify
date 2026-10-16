@@ -28,10 +28,7 @@ async function observeExit(screen: Locator): Promise<void> {
   });
 }
 
-async function expectFade(page: Page): Promise<void> {
-  const group = page.locator(".cardTransitions");
-  await expect(group).toHaveAttribute("data-exit-property", "opacity");
-  await expect(group).toHaveAttribute("data-exit-transform", "none");
+async function expectBuildClosed(page: Page): Promise<void> {
   await expect(page.locator(".buildFacilities")).toHaveCount(0);
   await expect(page.locator(".facilities")).toBeVisible();
   await expect(page.locator("main.base_main")).toHaveCount(1);
@@ -91,23 +88,27 @@ for (const theme of ["light", "dark"] as const) {
           });
         }
 
-        await observeExit(catalog);
         if (close === "button") {
-          await catalog
-            .getByRole("button", { name: "close", exact: true })
+          await page
+            .getByRole("button", { name: "Close Build", exact: true })
             .click();
         } else {
           // Escape also works when a capacity slider has retained keyboard focus.
-          await catalog.getByRole("slider").first().focus();
+          const slider = catalog.getByRole("slider").first();
+          if (await slider.count()) await slider.focus();
+          else
+            await catalog
+              .getByRole("tab", { name: category, exact: true })
+              .focus();
           await page.keyboard.press("Escape");
         }
-        await expectFade(page);
+        await expectBuildClosed(page);
       }
     }
   });
 }
 
-test("Escape dismisses nested build dialogs before fading the catalog", async ({
+test("Escape dismisses nested build dialogs before closing the sheet", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -146,9 +147,8 @@ test("Escape dismisses nested build dialogs before fading the catalog", async ({
   await expect(page.locator('[data-manual-help="true"]')).toHaveCount(0);
   await expect(catalog).toBeVisible();
 
-  await observeExit(catalog);
   await page.keyboard.press("Escape");
-  await expectFade(page);
+  await expectBuildClosed(page);
 });
 
 test("Escape matches Back for Manual, Settings, and Saved games", async ({

@@ -43,9 +43,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
     },
-    onGeneratorBuild: () => {
-      dispatch(navigate({ name: "BUILD_GENERATORS", dontRemember: true }));
-    },
+
     onSell: (id) => {
       // Ids are handed out monotonically, so a stale selection can't come back to life on a
       // later facility - but a pane still shouldn't go on reporting one that isn't there

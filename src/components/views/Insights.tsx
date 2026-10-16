@@ -1,10 +1,5 @@
-import {
-  activeScenario,
-  activeScenarioOrDefault,
-  currentTick,
-} from "../../helpers/GameSelectors";
+import { activeScenario, currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import CustomerPrograms from "./CustomerPrograms";
 import {
   Button,
   Checkbox,
@@ -20,7 +15,6 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
-  Slider,
   Table,
   TableBody,
   TableCell,
@@ -41,11 +35,10 @@ import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
-import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { PRICED_FUELS, TICK_MINUTES } from "../../Constants";
+import { PRICED_FUELS } from "../../Constants";
 import {
   DerivedHistoryKeysType,
   GameType,
@@ -59,15 +52,7 @@ import {
   getDateFromMinute,
   MINUTES_PER_MONTH,
   reduceHistories,
-  summarizeHistory,
 } from "../../helpers/DateTime";
-import {
-  customerMarketSizeAt,
-  getMarketRate,
-  projectCustomerChange,
-  publicRateCap,
-} from "../../helpers/Customers";
-import { getRateInflationIndex } from "../../data/Economy";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { facilityLifetime } from "../../helpers/Financials";
 import {
@@ -117,16 +102,11 @@ import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
 import {
-  formatCustomerChange,
   HISTORY_METRIC_KEYS,
   HistoryMetricKeyType,
   historyMetrics,
 } from "../../helpers/HistoryMetrics";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
-import {
-  PUBLIC_RATE_POINTS_PER_CENT,
-  publicRateYearContribution,
-} from "../../helpers/Scoring";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -288,27 +268,6 @@ const SYNC_KEY = "insights";
 const GROUPS: LayerGroup[] = ["Grid", "Customers", "Economics", "Environment"];
 const ALL_LAYER_IDS = new Set(INSIGHT_LAYERS.map((layer) => layer.id));
 
-function formatRateCompact(rate: number): string {
-  return `${Number((rate * 100).toFixed(1))}¢`;
-}
-
-function rateMarkLabel(
-  rate: number,
-  desktopLabel = formatMoneyConcise(rate),
-  mobileLabel = "",
-) {
-  return (
-    <>
-      <span className="insightsRateMarkDesktop">{desktopLabel}</span>
-      <span className="insightsRateMarkMobile">{mobileLabel}</span>
-    </>
-  );
-}
-
-function formatRateScore(points: number): string {
-  return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${Math.abs(points).toLocaleString("en-US")} pts`;
-}
-
 export interface StateProps {
   savedViewport?: SavedViewport;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
@@ -329,7 +288,6 @@ export interface DispatchProps {
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
   ) => void;
-  onDelta: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -348,8 +306,6 @@ interface State {
   presetName: string;
   presetNameError: string;
   layersOpen: boolean;
-  leversOpen: boolean;
-  shortRateOpen: boolean;
   activeEventKey?: string;
   viewport: ChartViewportRange;
   // The game month the viewport was last advanced to
@@ -722,8 +678,6 @@ export default class Insights extends React.Component<Props, State> {
       presetName: "",
       presetNameError: "",
       layersOpen: false,
-      leversOpen: true,
-      shortRateOpen: false,
       activeEventKey: undefined,
       viewport: props.savedViewport
         ? this.restoredViewport(props.savedViewport)
@@ -1263,277 +1217,6 @@ export default class Insights extends React.Component<Props, State> {
         !!this.props.game.transmission?.lines.some(
           ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
         ))
-    );
-  }
-
-  private renderLevers(now: TickPresentFutureType) {
-    const { game, onDelta } = this.props;
-    const scenario = activeScenarioOrDefault(game);
-    const marketRate = getMarketRate(
-      scenario.dollarsPerkWh,
-      game.date,
-      game.startingYear,
-      game.seed,
-    );
-    const customerChange = projectCustomerChange({
-      customers: now.customers,
-      customerRate: now.customerRate || game.customerRate || game.dollarsPerkWh,
-      currentRate: game.dollarsPerkWh,
-      marketRateAt: (tick) =>
-        getMarketRate(
-          scenario.dollarsPerkWh,
-          getDateFromMinute(
-            game.date.minute + tick * TICK_MINUTES,
-            game.startingYear,
-          ),
-          game.startingYear,
-          game.seed,
-        ),
-      marketSizeAt: (tick) =>
-        customerMarketSizeAt(
-          game.customerMarketSize || now.customers * 2,
-          game.date.minute + tick * TICK_MINUTES,
-        ),
-      ownership: scenario.ownership,
-    });
-    const investor = scenario.ownership === "Investor";
-    // A public utility's customers never switch and its growth is fixed, so the market rate
-    // changes nothing it can act on. What the rate does move is the score, against the
-    // scenario's own target. That target is authored in starting-year dollars and scored against
-    // deflated revenue, so the slider shows it in today's dollars, beside the rate being set.
-    const inflationIndex = getRateInflationIndex(
-      game.date,
-      game.startingYear,
-      game.seed,
-    );
-    const targetRate = scenario.dollarsPerkWh * inflationIndex;
-    const max = publicRateCap(
-      scenario.dollarsPerkWh,
-      game.date,
-      game.startingYear,
-      game.seed,
-    );
-    // The final score decomposes exactly into a supply-weighted sum over the years played, so
-    // what a rate is worth is the coming year's own term of that sum: the distance from the
-    // target, times how much of the lifetime energy the coming year makes up. Always a full
-    // year, even near the end of a run, so the figure means the same thing every time. The
-    // sign is the sign of target minus rate: a rate above target reads as a loss every year it
-    // is in force, no matter what the lifetime average did last period.
-    const projection = investor ? undefined : this.getProjection(now);
-    const upcoming = projection?.financeProjected.slice(0, 12) || [];
-    const pastTotals = summarizeHistory(game.monthlyHistory);
-    const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
-    const rateScore = (rate: number) =>
-      publicRateYearContribution(
-        scenario.dollarsPerkWh,
-        pastTotals,
-        { supplyWh: nextSupplyWh },
-        rate,
-        inflationIndex,
-      );
-    const formattedRateScore = projection
-      ? formatRateScore(rateScore(game.dollarsPerkWh))
-      : "Calculating…";
-    const marks = investor
-      ? [
-          { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
-          {
-            value: marketRate,
-            label: rateMarkLabel(
-              marketRate,
-              `${formatMoneyConcise(marketRate)} market`,
-              `market ${formatRateCompact(marketRate)}`,
-            ),
-          },
-          {
-            value: max,
-            label: rateMarkLabel(
-              max,
-              formatMoneyConcise(max),
-              formatRateCompact(max),
-            ),
-          },
-        ]
-      : [
-          { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
-          {
-            value: targetRate,
-            label: rateMarkLabel(
-              targetRate,
-              `${formatMoneyConcise(targetRate)} target`,
-              `target ${formatRateCompact(targetRate)}`,
-            ),
-          },
-          {
-            value: max,
-            label: rateMarkLabel(
-              max,
-              `${formatMoneyConcise(max)} board cap`,
-              `cap ${formatRateCompact(max)}`,
-            ),
-          },
-        ];
-    const formattedCustomerChange = formatCustomerChange(
-      customerChange,
-      now.customers,
-    );
-    const rateSummary = investor
-      ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${projection ? `rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
-    const rateScoreClass = `insightsRateScore ${
-      rateScore(game.dollarsPerkWh) > 0
-        ? "good"
-        : rateScore(game.dollarsPerkWh) < 0
-          ? "bad"
-          : ""
-    }`;
-    const rateMetrics = (
-      <>
-        <span className="insightsRateMetric">
-          <span className="insightsRateMetricLabel">Your rate</span>
-          <strong className="insightsRateMetricValue">
-            {formatRateCompact(game.dollarsPerkWh)}/kWh
-          </strong>
-        </span>
-        <span className="insightsRateMetric">
-          <span className="insightsRateMetricLabel">
-            {investor ? "Market" : "Target"}
-          </span>
-          <span className="insightsRateMetricValue">
-            {formatRateCompact(investor ? marketRate : targetRate)}
-          </span>
-        </span>
-        {investor ? (
-          <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Customers / mo</span>
-            <strong className="insightsRateMetricValue">
-              {formattedCustomerChange}
-            </strong>
-          </span>
-        ) : (
-          <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Points / yr</span>
-            <strong className={`insightsRateMetricValue ${rateScoreClass}`}>
-              {formattedRateScore}
-            </strong>
-          </span>
-        )}
-      </>
-    );
-    return (
-      <section
-        className={`insightsLevers ${!scenario.tutorialSteps ? "insightsShortRateDisclosure" : ""} ${this.state.shortRateOpen ? "insightsShortRateOpen" : ""}`}
-        aria-label="Planning controls"
-      >
-        <Button
-          className="insightsRateToggle"
-          startIcon={<TuneIcon />}
-          onClick={() => this.setState({ leversOpen: !this.state.leversOpen })}
-          aria-expanded={this.state.leversOpen}
-          aria-controls="rateSliderControl"
-          aria-label={`${this.state.leversOpen ? "Hide" : "Show"} rate slider`}
-          aria-describedby="insightsRateSummary"
-        >
-          <span className="insightsRateToggleLabel">Rate controls</span>
-        </Button>
-        <Typography
-          className="insightsRateSummaryDesktop"
-          variant="body2"
-          color="textSecondary"
-          aria-hidden="true"
-        >
-          Your rate{" "}
-          <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
-          {investor ? (
-            <>
-              {" "}
-              · market {formatMoneyConcise(marketRate)} · projected customers{" "}
-              <strong>{formattedCustomerChange}</strong> next month
-            </>
-          ) : (
-            <>
-              {" "}
-              · target {formatMoneyConcise(targetRate)} · rate score{" "}
-              <strong className={rateScoreClass}>
-                {formattedRateScore}/yr
-              </strong>
-            </>
-          )}
-        </Typography>
-        <div className="insightsRateMetrics" aria-hidden="true">
-          {rateMetrics}
-        </div>
-        {!scenario.tutorialSteps && (
-          <button
-            type="button"
-            className="insightsShortRateToggle"
-            aria-label={`${this.state.shortRateOpen ? "Hide" : "Show"} rate slider`}
-            aria-expanded={this.state.shortRateOpen}
-            aria-controls="rateSliderControl"
-            aria-describedby="insightsRateSummary"
-            onClick={() =>
-              this.setState({ shortRateOpen: !this.state.shortRateOpen })
-            }
-          >
-            <span className="insightsRateMetrics" aria-hidden="true">
-              {rateMetrics}
-            </span>
-            <ChevronRightIcon
-              className={this.state.shortRateOpen ? "expanded" : ""}
-            />
-          </button>
-        )}
-        <CustomerPrograms game={game} />
-        <span id="insightsRateSummary" className="srOnly">
-          {rateSummary}
-        </span>
-        {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
-          game.policies?.programs.curtailment?.tier !== "Off") &&
-          game.policies && (
-            <Typography variant="caption">
-              Active programs adjust this rate.
-            </Typography>
-          )}
-        <div
-          className={`budgetSlider flex-newline ${
-            this.state.leversOpen ? "" : "insightsRateSliderCollapsed"
-          }`}
-          id="rateSliderControl"
-          data-testid="rate-slider-control"
-        >
-          <Slider
-            // Keep the thumb local while it is moving. Dispatching every pointer step makes
-            // the entire workbench reconcile and regenerate its long-range projection before
-            // the browser can paint the next thumb position. The committed rate remounts this
-            // uncontrolled slider through its key, so external changes still stay in sync.
-            key={game.dollarsPerkWh}
-            id="rateSlider"
-            disabled={!!game.replayPlayback}
-            defaultValue={game.dollarsPerkWh}
-            aria-label="The rate you charge for electricity generation"
-            valueLabelDisplay="auto"
-            valueLabelFormat={(rate) =>
-              investor
-                ? `${formatMoneyConcise(rate)}/kWh`
-                : `${formatMoneyConcise(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
-            }
-            getAriaValueText={(rate) =>
-              investor
-                ? `${formatMoneyConcise(rate)} per kilowatt hour`
-                : `${formatMoneyConcise(rate)} per kilowatt hour, rate score ${formatRateScore(rateScore(rate))} over the next year`
-            }
-            marks={marks}
-            min={0}
-            step={investor ? 0.001 : 0.01}
-            max={max}
-            onChangeCommitted={(_event, value) =>
-              onDelta({
-                dollarsPerkWh: Array.isArray(value) ? value[0] : value,
-              })
-            }
-          />
-        </div>
-      </section>
     );
   }
 
@@ -2295,9 +1978,7 @@ export default class Insights extends React.Component<Props, State> {
             <div className="insightsStickyHeader">
               <Toolbar className="paneHeader insightsTitle">
                 <Typography variant="h6">Insights</Typography>
-                <CustomerPrograms game={game} />
               </Toolbar>
-              {this.renderLevers(now)}
             </div>
             <Typography role="status" sx={{ padding: 2 }}>
               Calculating forecast…
@@ -2431,9 +2112,7 @@ export default class Insights extends React.Component<Props, State> {
           <div className="insightsStickyHeader">
             <Toolbar className="paneHeader insightsTitle">
               <Typography variant="h6">Insights</Typography>
-              <CustomerPrograms game={game} />
             </Toolbar>
-            {this.renderLevers(now)}
           </div>
           <Toolbar className="insightsHeader">
             <div className="insightsHeaderControls">

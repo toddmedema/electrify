@@ -1,0 +1,240 @@
+// The fleet is the stage; tools rise above it without changing its layout or scroll position.
+.gameWorkspace {
+  --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
+  --game-dock-clearance: calc(80px + var(--game-dock-bottom));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.gameStage {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+
+  > .facilities {
+    height: 100%;
+    padding-bottom: var(--game-dock-clearance);
+    box-sizing: border-box;
+  }
+}
+
+.gameWorkspace #navfooter.gameActionDock {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  bottom: var(--game-dock-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 20px var(--shadow-ring);
+}
+
+.gameActionDock .gameDockAction.MuiButton-root {
+  min-width: 72px;
+  min-height: 56px;
+  padding: 4px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--font-color-faded);
+  font-size: 12px;
+  line-height: 16px;
+
+  > .MuiBadge-root > svg {
+    font-size: 24px;
+  }
+  &:hover {
+    background: var(--bg-selected);
+    color: var(--font-color-primary);
+  }
+  &.gameDockActionOpen {
+    color: var(--interactive-strong);
+    border-color: var(--border-selected);
+    background: var(--bg-selected);
+  }
+  &.gameDockBuild {
+    color: var(--interactive-contrast);
+    background: var(--interactive-strong);
+    &:hover {
+      background: var(--interactive-blue);
+    }
+  }
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.gameToolTray {
+  position: absolute;
+  z-index: 5;
+  bottom: var(--game-dock-clearance);
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 12px;
+  height: min(72dvh, calc(100% - var(--game-dock-clearance) - 8px));
+  max-width: 1120px;
+  margin-inline: auto;
+  pointer-events: none;
+
+  &[data-panel-count="0"] {
+    display: none;
+  }
+  &[data-panel-count="2"],
+  &[data-panel-count="3"] {
+    max-width: none;
+  }
+}
+
+.gameToolPanel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg-primary);
+  box-shadow: 0 4px 24px var(--shadow-ring);
+  animation: gameToolRise 200ms ease-out;
+}
+
+.gameToolHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 48px;
+  padding: 4px 8px 4px 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+
+  > svg {
+    color: var(--font-color-faded);
+    font-size: 20px;
+  }
+  h2 {
+    flex: 1;
+    margin: 0;
+    min-width: 0;
+    font-size: 16px;
+    line-height: 24px;
+  }
+  h2:focus {
+    outline: none;
+  }
+  .MuiIconButton-root {
+    width: var(--control-size);
+    height: var(--control-size);
+    color: var(--font-color-primary);
+  }
+  .gameToolPin {
+    min-height: var(--control-size);
+  }
+}
+
+.gameToolBody {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+
+  > * {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+  > .pane > .paneHeader {
+    display: none;
+  }
+  .insightsTitle.MuiToolbar-root {
+    display: none !important;
+  }
+  .buildFacilities {
+    max-width: none;
+    margin: 0;
+  }
+  .insights {
+    container-type: inline-size;
+  }
+}
+
+.gameWorkspace .gameStatusBar .gridHealth {
+  flex: 0 1 auto;
+}
+.app_container:has(.gameWorkspace) .snackbar-above-nav {
+  bottom: 96px !important;
+}
+[data-tutorial-hide~="nav"] .gameWorkspace #navfooter {
+  display: flex !important;
+  visibility: visible;
+  pointer-events: auto;
+}
+[data-tutorial-hide~="nav"] .gameDockAction:not(.gameDockBuild),
+[data-tutorial-hide~="build"] .gameDockBuild {
+  display: none !important;
+}
+[data-tutorial-hide~="nav"][data-tutorial-hide~="build"]
+  .gameWorkspace
+  #navfooter {
+  display: none !important;
+}
+
+@keyframes gameToolRise {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 599px) {
+  .gameWorkspace {
+    --game-dock-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .gameWorkspace #navfooter.gameActionDock {
+    padding: 4px;
+    border-radius: 16px;
+  }
+  .gameActionDock .gameDockAction.MuiButton-root {
+    min-width: 64px;
+    padding: 4px 8px;
+  }
+  .gameToolTray {
+    left: max(4px, env(safe-area-inset-left));
+    right: max(4px, env(safe-area-inset-right));
+    height: calc(100% - var(--game-dock-clearance) - 8px);
+  }
+  .gameToolPanel {
+    border-radius: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gameToolPanel {
+    animation: none;
+  }
+}

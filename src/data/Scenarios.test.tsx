@@ -16,17 +16,6 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
-import { isPaneLayout } from "../Globals";
-
-// Registered above the imports by babel's jest.mock hoisting, so the step predicates (which
-// call isPaneLayout) see the mock. Kept after the imports for import/first.
-jest.mock("../Globals", () => ({
-  ...jest.requireActual("../Globals"),
-  isPaneLayout: jest.fn(),
-}));
-const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
-  typeof isPaneLayout
->;
 
 describe("getScenario", () => {
   it("returns the custom scenario for the custom id", () => {
@@ -82,13 +71,7 @@ describe("getNextTutorial", () => {
 });
 
 describe("tutorial mission metadata", () => {
-  afterEach(() => {
-    mockIsPaneLayout.mockReset();
-  });
-
-  it("advances the finances tutorial when the mobile Insights tab opens", () => {
-    // A phone: the switch itself is the deed, and the pane escape hatch does not apply
-    mockIsPaneLayout.mockReturnValue(false);
+  it("advances the finances tutorial when Insights opens from the dock", () => {
     const finances = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 4: Finances",
     )!;
@@ -104,8 +87,7 @@ describe("tutorial mission metadata", () => {
     ).toBe(false);
   });
 
-  it("advances the mission 5 opening the same way, keeping its rate escape hatch", () => {
-    mockIsPaneLayout.mockReturnValue(false);
+  it("opens Programs for pricing, keeping its rate escape hatch", () => {
     const pricing = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 5: Pricing",
     )!;
@@ -113,7 +95,7 @@ describe("tutorial mission metadata", () => {
 
     expect(isGatedStep(firstStep)).toBe(true);
     expect(
-      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+      firstStep.advanceOn?.({ card: { name: "PROGRAMS" } } as AppStateType),
     ).toBe(true);
     // Already did the next step's deed, so no tap is owed
     expect(

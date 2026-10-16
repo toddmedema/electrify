@@ -16,7 +16,6 @@ import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
-import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
@@ -59,7 +58,6 @@ it("keeps first worker startup and long worker recovery out of the Insights rend
     game,
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
   };
   const insights = new Insights(props);
   const internals = insights as unknown as {
@@ -98,7 +96,6 @@ it("keeps a connected live exchange's tick updates out of forecast-chart renders
     live: true,
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
   };
   const insights = new Insights(props);
   const next = {
@@ -115,7 +112,6 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
   const game = createGame({ scenarioId: 106, seed: 4 });
   const props = {
     game,
-    onDelta: jest.fn(),
     selectedFacilityId: null,
     facilityDragActive: false,
   };
@@ -307,7 +303,6 @@ it("reframes the same event after its selected chip leaves the viewport", () => 
     game: createGame({ scenarioId: 101 }),
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
     onEvidenceReady: jest.fn(),
     upcomingEvents: [
       {
@@ -350,7 +345,6 @@ it("reveals finance evidence temporarily and lets explicit selection own saved l
     game: createGame({ scenarioId: 101 }),
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
     onEvidenceReady: jest.fn(),
   };
   const request = { id: 1, runId: 0, target: "finances" as const };
@@ -403,7 +397,6 @@ it("reorders configured charts while ending temporary reveal without saving it",
     game: createGame({ scenarioId: 101 }),
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
     onEvidenceReady: jest.fn(),
   };
   const { rerender } = render(
@@ -447,7 +440,6 @@ function renderInsights(
       selectedFacilityId={null}
       facilityDragActive={false}
       upcomingEvents={upcomingEvents}
-      onDelta={() => undefined}
     />,
   );
 }
@@ -581,75 +573,6 @@ describe("Insights layers", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the market benchmark and compact metrics when the rate slider is collapsed", async () => {
-    renderInsights();
-
-    const levers = screen.getByRole("region", { name: "Planning controls" });
-    expect(levers).toHaveTextContent(/Rate .*\/kWh/);
-    expect(
-      within(levers).getByText(/market \$/, {
-        selector: ".insightsRateSummaryDesktop",
-      }).textContent,
-    ).not.toMatch(/market [^·]*\/kWh/);
-    expect(
-      within(levers).getByText("Market", {
-        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(levers).getByText("Customers / mo", {
-        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
-      }),
-    ).toBeInTheDocument();
-    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
-      /projected customers .* next month/i,
-    );
-    const toggle = labelledButton("Hide rate slider");
-    const sliderControl = screen.getByTestId("rate-slider-control");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(sliderControl).not.toHaveClass("insightsRateSliderCollapsed");
-    expect(screen.getByRole("slider")).toBeVisible();
-
-    await user.click(toggle);
-
-    expect(labelledButton("Show rate slider")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(sliderControl).toHaveClass("insightsRateSliderCollapsed");
-    expect(screen.getByRole("slider")).toBeInTheDocument();
-    expect(
-      within(
-        screen.getByRole("region", { name: "Planning controls" }),
-      ).getByText("Customers / mo", {
-        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it.each(["Investor", "Public"] as const)(
-    "caps the %s slider at exactly twice the target, even with a higher saved rate",
-    (ownership) => {
-      const game = createGame({ scenarioId: 100 });
-      const target = 0.1234;
-      renderInsights(100, {
-        ...game,
-        scenarioId: CUSTOM_SCENARIO_ID,
-        customScenario: {
-          ...getScenario(100)!,
-          id: CUSTOM_SCENARIO_ID,
-          ownership,
-          dollarsPerkWh: target,
-        },
-        dollarsPerkWh: target * 3,
-      });
-      expect(screen.getByRole("slider")).toHaveAttribute(
-        "aria-valuemax",
-        String(target * 2),
-      );
-    },
-  );
-
   // Regression test. Construction progress was part of the projection's cache key, so every
   // tick of a build re-simulated the long-range forecast from a start that had moved on by one
   // tick, and its hourly samples (wind most visibly) jittered from frame to frame
@@ -663,7 +586,6 @@ describe("Insights layers", () => {
     const props = {
       selectedFacilityId: null,
       facilityDragActive: false,
-      onDelta: () => undefined,
     };
     const { rerender } = render(<Insights game={game} {...props} />);
     const calls = generate.mock.calls.length;
@@ -679,117 +601,6 @@ describe("Insights layers", () => {
 
     expect(generate.mock.calls.length).toBe(calls);
     generate.mockRestore();
-  });
-
-  it("shows a public utility the points its rate earns over the next year", () => {
-    const game = createGame({ scenarioId: 107 });
-    const target = game.dollarsPerkWh;
-    renderInsights(107, { ...game, dollarsPerkWh: target - 0.02 });
-
-    const levers = screen.getByRole("region", { name: "Planning controls" });
-    // Customers never switch and growth is fixed, so neither is worth the space
-    expect(levers).not.toHaveTextContent(/market/i);
-    expect(levers).not.toHaveTextContent(/growth/i);
-    expect(
-      within(levers).getByText("Target", {
-        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(levers).getByText("Points / yr", {
-        selector: "div.insightsRateMetrics .insightsRateMetricLabel",
-      }),
-    ).toBeInTheDocument();
-    const points = within(levers).getByText(/pts$/, {
-      selector:
-        "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
-    });
-    expect(points.textContent).toMatch(/^\+\d+ pts$/);
-    expect(points).toHaveClass("good");
-    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
-      /rate score \+\d+ pts over the next year/i,
-    );
-  });
-
-  it("marks a public utility rate above its target as losing points", () => {
-    const game = createGame({ scenarioId: 107 });
-    renderInsights(107, { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 });
-
-    const points = within(
-      screen.getByRole("region", { name: "Planning controls" }),
-    ).getByText(/pts$/, {
-      selector:
-        "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
-    });
-    expect(points.textContent).toMatch(/^−\d+ pts$/);
-    expect(points).toHaveClass("bad");
-  });
-
-  it("shows a year's rate moving a long record's score less", () => {
-    const points = (game: GameType) => {
-      const { unmount } = renderInsights(107, game);
-      const value = Number(
-        within(screen.getByRole("region", { name: "Planning controls" }))
-          .getByText(/pts$/, {
-            selector:
-              "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
-          })
-          .textContent!.replace(/[^\d]/g, ""),
-      );
-      unmount();
-      return value;
-    };
-    const game = createGame({ scenarioId: 107 });
-    const cheaper = { ...game, dollarsPerkWh: game.dollarsPerkWh - 0.02 };
-    // Years of sales at the target already on the record dilute the coming year
-    const established = {
-      ...cheaper,
-      monthlyHistory: [
-        {
-          ...EMPTY_HISTORY,
-          supplyWh: 1e15,
-          revenue: (1e15 / 1000) * game.dollarsPerkWh,
-        },
-      ],
-    };
-
-    expect(points(established)).toBeLessThan(points(cheaper));
-  });
-
-  it("always counts a public rate's points over a full year, even as the run ends", () => {
-    const points = (game: GameType) => {
-      const { unmount } = renderInsights(107, game);
-      const value = within(
-        screen.getByRole("region", { name: "Planning controls" }),
-      ).getByText(/pts$/, {
-        selector:
-          "div.insightsRateMetrics .insightsRateMetricValue.insightsRateScore",
-      }).textContent;
-      unmount();
-      return value;
-    };
-    const game = createGame({ scenarioId: 107 });
-    const established = {
-      ...game,
-      dollarsPerkWh: game.dollarsPerkWh - 0.02,
-      monthlyHistory: [
-        {
-          ...EMPTY_HISTORY,
-          supplyWh: 1e15,
-          revenue: (1e15 / 1000) * game.dollarsPerkWh,
-        },
-      ],
-    };
-    // One month left; the projection is the same one, so only the window could differ
-    const ending = {
-      ...established,
-      date: {
-        ...established.date,
-        monthsElapsed: getScenario(107)!.durationMonths - 1,
-      },
-    };
-
-    expect(points(ending)).toBe(points(established));
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {
@@ -916,7 +727,6 @@ describe("Insights layers", () => {
         game={nextGame}
         selectedFacilityId={null}
         facilityDragActive={false}
-        onDelta={() => undefined}
       />,
     );
 
@@ -954,7 +764,6 @@ describe("Insights layers", () => {
         game={game}
         selectedFacilityId={null}
         facilityDragActive={false}
-        onDelta={() => undefined}
         onViewportChange={onViewportChange}
       />,
     );
@@ -971,7 +780,6 @@ describe("Insights layers", () => {
         game={game}
         selectedFacilityId={null}
         facilityDragActive={false}
-        onDelta={() => undefined}
         savedViewport={saved}
       />,
     );
@@ -1008,7 +816,6 @@ describe("Insights layers", () => {
           savedViewport={saved}
           selectedFacilityId={null}
           facilityDragActive={false}
-          onDelta={() => undefined}
           onViewportChange={(next) => {
             saves.push(next);
             setSaved(next);
@@ -1043,7 +850,6 @@ describe("Insights layers", () => {
         savedViewport={zoomed}
         selectedFacilityId={null}
         facilityDragActive={false}
-        onDelta={() => undefined}
         onViewportChange={onViewportChange}
       />,
     );
@@ -1080,7 +886,6 @@ describe("Insights layers", () => {
         game={nextGame}
         selectedFacilityId={null}
         facilityDragActive={false}
-        onDelta={() => undefined}
       />,
     );
     const after = JSON.parse(supply.getAttribute("data-domain") || "[]");
@@ -1312,8 +1117,8 @@ describe("Insights layers", () => {
     await user.click(labelledButton("Fit full timeline"));
 
     expect(
-      screen.getByRole("region", { name: "Planning controls" }),
-    ).toBeVisible();
+      screen.queryByRole("region", { name: "Electricity pricing" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("Supply & Demand", { selector: "h6" }),
     ).toBeVisible();
@@ -1343,7 +1148,6 @@ describe("Insights layers", () => {
       game,
       selectedFacilityId: null,
       facilityDragActive: false,
-      onDelta: () => undefined,
     };
     mockSupplyDemandPaints = 0;
     const view = render(<Insights {...props} />);
@@ -1380,7 +1184,6 @@ describe("Insights layers", () => {
       game,
       selectedFacilityId: null,
       facilityDragActive: false,
-      onDelta: () => undefined,
     };
     const ref = React.createRef<Insights>();
     render(<Insights {...props} ref={ref} />);
@@ -1451,7 +1254,6 @@ it("does not relabel cached simulated samples as recorded history as time advanc
     game,
     selectedFacilityId: null,
     facilityDragActive: false,
-    onDelta: jest.fn(),
   };
   const { rerender } = render(<Insights {...props} />);
   expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(

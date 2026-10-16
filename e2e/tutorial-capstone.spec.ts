@@ -47,12 +47,10 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expectObjectiveDocked();
 
   if (testInfo.project.name === "desktop-1440px") {
-    await expect(page.locator(".desktop-layout")).toHaveCount(1);
-    await expect(page.locator(".pane-layout")).toHaveCount(0);
-    // Mission 1 keeps Insights and Events for later: the fleet has the screen to itself, with
-    // no empty column or splitter left where they would be
+    await expect(page.locator(".gameWorkspace")).toHaveCount(1);
+    // Mission 1 keeps the action dock for later: the fleet has the screen to itself.
     await expect(page.locator("#facilitiesPane")).toBeVisible();
-    await expect(page.locator(".desktop-pane")).toHaveCount(1);
+    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
     await expect(page.locator(".pane-splitter")).toHaveCount(0);
     await expect(page.locator("#insightsPane")).toHaveCount(0);
     await expect(page.locator("#eventsPane")).toHaveCount(0);
@@ -60,7 +58,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await expect(
-    page.getByText(/Supply must stay at or above demand/i),
+    page.locator(".tutorialHud").getByText("Find the supply and demand lines"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();

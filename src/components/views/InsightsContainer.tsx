@@ -1,8 +1,7 @@
 import { delta as uiDelta } from "../../reducers/UI";
 import { connectToStore } from "../base/ConnectToStore";
 import type { AppDispatch } from "../../Store";
-import { delta } from "../../reducers/Game";
-import { AppStateType, GameType } from "../../Types";
+import { AppStateType } from "../../Types";
 import Insights, {
   DispatchProps,
   InsightLayerId,
@@ -38,7 +37,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
   onEvidenceReady: (request, element) => {
     dispatch(focusEvidence(request, element));
   },
-  onDelta: (change: Partial<GameType>) => dispatch(delta(change)),
 });
 
 export default connectToStore(mapStateToProps, mapDispatchToProps)(Insights);

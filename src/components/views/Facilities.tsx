@@ -747,7 +747,6 @@ export interface DispatchProps {
     request: EvidenceRequestType,
     element: HTMLElement | null,
   ) => void;
-  onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
@@ -920,7 +919,6 @@ export default class Facilities extends React.Component<Props> {
   public render() {
     const {
       game,
-      onGeneratorBuild,
       onSell,
       onTogglePause,
       onPause,
@@ -952,17 +950,6 @@ export default class Facilities extends React.Component<Props> {
             other panes' headers and the build buttons stay put as the fleet scrolls */}
           <Toolbar className="paneHeader">
             <Typography variant="h6">Facilities</Typography>
-            {!readOnly && (
-              <Button
-                variant="contained"
-                color="primary"
-                className="button-buildFacility"
-                startIcon={<ConceptIcon concept="build" fontSize="small" />}
-                onClick={onGeneratorBuild}
-              >
-                Build
-              </Button>
-            )}
           </Toolbar>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />

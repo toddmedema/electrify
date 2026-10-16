@@ -75,39 +75,29 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   page,
 }) => {
   await startLesson(page, "Pricing");
-  await openPane(page.locator(".insights"), page.locator("#insightsNav"));
-  // openPane's tap is exactly what the navigation step waits for in single-pane mode, and in
-  // the pane layout the step advanced on its own - either way the player is on the next step
+  await page.locator("#programsNav").click();
   const rate = page.locator("#rateSlider input");
   await rate.focus();
   await rate.press("ArrowLeft");
   await expectTargetVisible(page, "#chartInsightsCustomers");
   const originalViewport = page.viewportSize()!;
-  const selectedRate = await rate.inputValue();
   for (const width of [390, 768, 884, 1280]) {
     await page.setViewportSize({ width, height: 1024 });
     await expectTargetVisible(page, "#chartInsightsCustomers");
-    // The layout switch transitions its outgoing card out; let it settle before asserting
-    // on the one rate slider the player can be looking at
-    await waitForSettled(page, "#rateSlider input");
-    await expect(page.locator("#rateSlider input")).toHaveValue(selectedRate);
     await expect(page.locator(".tutorialHud")).toContainText(
       "Find customer growth",
     );
   }
   await page.setViewportSize(originalViewport);
   await expectTargetVisible(page, "#chartInsightsCustomers");
-  // A resize re-reveals the target once, 450ms after it settles. Let that land first.
-  await page.waitForTimeout(600);
-  // Revealing a target must not continuously pull the player away from other information.
-  await page.locator("#rateSlider").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(600);
-  await expect(page.locator("#rateSlider")).toBeInViewport();
+  await page.locator("#programsNav").click();
+  await expect(rate).toHaveValue("0.069");
+  await page.locator("#insightsNav").click();
   await next(page);
-  const chosenRate = await rate.inputValue();
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toContainText("Grow customers 5%");
-  await expect(rate).toHaveValue(chosenRate);
+  await page.locator("#programsNav").click();
+  await expect(rate).toHaveValue("0.069");
   await expect(
     page.getByRole("button", { name: "slow speed", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -224,13 +214,16 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   await expect(pause).toHaveAttribute("aria-pressed", "true");
 });
 
-test("a paused navigation gate advances when resizing into the pane layout", async ({
+test("resizing keeps the navigation lesson waiting for its dock action", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await startLesson(page, "Pricing");
-  await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
+  await expect(page.locator(".tutorialHud")).toContainText("Tap Programs");
   await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator(".tutorialHud")).toContainText("Tap Programs");
+  await expect(page.locator("#rateSlider")).toHaveCount(0);
+  await page.locator("#programsNav").click();
   await expect(page.locator(".tutorialHud")).toContainText(
     "Drag the rate slider",
   );
