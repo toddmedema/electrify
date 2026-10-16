@@ -21,6 +21,9 @@ import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
+import { isPaneLayout } from "../../Globals";
+import { EvidenceTargetType, GameType } from "../../Types";
+import OperationsPriorities from "./OperationsPriorities";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -80,6 +83,8 @@ const EVENT_HISTORY_FILTERS: {
 ];
 
 export interface StateProps {
+  game?: GameType;
+  selectedFacilityId?: number | null;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   facilityDragActive?: boolean;
   events: GameEventType[];
@@ -89,6 +94,8 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onEvidence?: (target: EvidenceTargetType) => void;
+  onFacility?: (id: number) => void;
   onEvidenceReady?: (
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
@@ -100,9 +107,21 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
+  const operations = isPaneLayout() && !!props.game;
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const historyOpenedForEvidence = React.useRef(false);
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  const historyAnchor = React.useRef<HTMLDivElement>(null);
+  // Explicit history navigation skips announcements; semantic EVENTS requests still include them.
+  const historySectionAnchor = React.useRef<HTMLElement>(null);
+  React.useEffect(() => {
+    if (operations && historyOpen && !historyOpenedForEvidence.current) {
+      historySectionAnchor.current?.scrollIntoView?.({ block: "start" });
+      historySectionAnchor.current?.focus({ preventScroll: true });
+    }
+  }, [operations, historyOpen]);
   React.useEffect(() => {
     const request = evidenceRequest;
     if (
@@ -111,9 +130,23 @@ export default function EventLog(props: Props): React.JSX.Element {
       request.target.card === "EVENTS" &&
       !facilityDragActive
     ) {
-      onEvidenceReady?.(request, evidenceAnchor.current);
+      if (operations && !historyOpen) {
+        historyOpenedForEvidence.current = true;
+        setHistoryOpen(true);
+        return;
+      }
+      onEvidenceReady?.(
+        request,
+        operations ? historyAnchor.current : evidenceAnchor.current,
+      );
     }
-  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
+  }, [
+    evidenceRequest,
+    facilityDragActive,
+    onEvidenceReady,
+    operations,
+    historyOpen,
+  ]);
   const {
     events,
     onOpen,
@@ -155,304 +188,358 @@ export default function EventLog(props: Props): React.JSX.Element {
   React.useEffect(() => {
     // A semantic evidence request changes presentation only. Ordinary visits retain the
     // existing mark-read action; resolving or acknowledging a request must not dispatch it.
-    if (!openedForEvidence.current) onOpen();
-  }, [onOpen]);
+    if (
+      !openedForEvidence.current &&
+      !historyOpenedForEvidence.current &&
+      (!operations || historyOpen)
+    )
+      onOpen();
+  }, [onOpen, operations, historyOpen]);
   return (
-    <GameCard className="eventLog" title="Events" id="eventsPane">
+    <GameCard
+      className={`eventLog${operations ? " operationsPane" : ""}`}
+      title={operations ? "Operations" : "Events"}
+      id="eventsPane"
+    >
       <div
         className="scrollable"
         ref={evidenceAnchor}
         tabIndex={-1}
         aria-label="Announced events and event history evidence"
       >
-        {riskNotice && (
-          <section
-            className="eventLogSection wildfireRiskNotice"
-            aria-labelledby="wildfireRiskNoticeTitle"
-          >
-            <header className="eventLogSectionHeader">
-              <Typography id="wildfireRiskNoticeTitle" variant="subtitle2">
-                {riskNotice.title}
-              </Typography>
-            </header>
-            <Typography variant="body2" color="textSecondary">
-              {riskNotice.message}
-            </Typography>
-          </section>
-        )}
-        {ongoing.length > 0 && (
-          <section
-            className="eventLogSection ongoingEvents"
-            aria-labelledby="ongoingEventsTitle"
-          >
-            <header className="eventLogSectionHeader">
-              <Typography id="ongoingEventsTitle" variant="subtitle2">
-                Ongoing events
-              </Typography>
-            </header>
-            <ul className="eventLogList">
-              {ongoing.map((event) => (
-                <li
-                  className={`eventLogItem ongoing importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
-                  key={event.key}
-                  onClick={() => onSelect(event.actionTarget)}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                    if (
-                      event.actionTarget &&
-                      (e.key === "Enter" || e.key === " ")
-                    ) {
-                      e.preventDefault();
-                      onSelect(event.actionTarget);
-                    }
-                  }}
-                  role={event.actionTarget ? "button" : undefined}
-                  tabIndex={event.actionTarget ? 0 : undefined}
-                >
-                  <span className="eventLogIcon">
-                    <ConceptIcon
-                      concept={event.concept || "forecast"}
-                      fontSize="small"
-                    />
-                  </span>
-                  <span>
-                    {event.title && <strong>{event.title}</strong>}
-                    <span className="eventLogCopy">
-                      <Typography
-                        variant="body2"
-                        component="span"
-                        sx={{ display: "block" }}
-                      >
-                        {event.message}
-                      </Typography>
-                    </span>
-                  </span>
-                  <Typography
-                    className="eventLogWhen"
-                    variant="body2"
-                    color="textSecondary"
-                    component="span"
-                  >
-                    {event.label}
-                  </Typography>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {upcoming.length > 0 && (
-          <section
-            className="eventLogSection upcomingEvents"
-            aria-labelledby="upcomingEventsTitle"
-          >
-            <header className="eventLogSectionHeader">
-              <Typography id="upcomingEventsTitle" variant="subtitle2">
-                Upcoming events
-              </Typography>
-            </header>
-            <ul className="eventLogList">
-              {upcoming.map((event) => (
-                <li
-                  className={`eventLogItem upcoming importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
-                  key={event.key}
-                  onClick={() => onSelect(event.actionTarget)}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                    if (
-                      event.actionTarget &&
-                      (e.key === "Enter" || e.key === " ")
-                    ) {
-                      e.preventDefault();
-                      onSelect(event.actionTarget);
-                    }
-                  }}
-                  role={event.actionTarget ? "button" : undefined}
-                  tabIndex={event.actionTarget ? 0 : undefined}
-                >
-                  <span className="eventLogIcon">
-                    <ConceptIcon
-                      concept={event.concept || "forecast"}
-                      fontSize="small"
-                    />
-                  </span>
-                  <span>
-                    {event.title && <strong>{event.title}</strong>}
-                    <span className="eventLogCopy">
-                      <Typography
-                        variant="body2"
-                        component="span"
-                        sx={{ display: "block" }}
-                      >
-                        {event.message}
-                      </Typography>
-                    </span>
-                  </span>
-                  <Typography
-                    className="eventLogWhen"
-                    variant="body2"
-                    color="textSecondary"
-                    component="span"
-                  >
-                    {event.label}
-                  </Typography>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <section
-          className="eventLogSection eventHistory"
-          aria-labelledby="eventHistoryTitle"
-        >
-          <header className="eventLogSectionHeader">
-            <Typography id="eventHistoryTitle" variant="subtitle2">
-              Event history
-            </Typography>
-            <Tooltip
-              title={
-                allSelected ? "Filter event history" : `Filter: ${filterLabel}`
-              }
-            >
-              <Button
-                id="eventHistoryFilterButton"
-                className={`eventHistoryFilterButton${allSelected ? "" : " active"}`}
-                size="small"
-                onClick={(event) => setFilterAnchor(event.currentTarget)}
-                aria-label={`Filter event history, ${filterLabel}`}
-                startIcon={<FilterListIcon fontSize="small" />}
-                aria-controls={
-                  filterAnchor ? "eventHistoryFilterMenu" : undefined
-                }
-                aria-expanded={filterAnchor ? true : undefined}
-                aria-haspopup="menu"
-              >
-                {allSelected
-                  ? "Filter"
-                  : `Types ${activeFilters.length}/${EVENT_HISTORY_FILTERS.length}`}
-              </Button>
-            </Tooltip>
-            <Menu
-              id="eventHistoryFilterMenu"
-              anchorEl={filterAnchor}
-              open={Boolean(filterAnchor)}
-              onClose={() => setFilterAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
-              slotProps={{
-                list: {
-                  "aria-labelledby": "eventHistoryFilterButton",
-                  sx: {
-                    "& .MuiMenuItem-root": {
-                      minHeight: 40,
-                      "@media (pointer: coarse)": { minHeight: 44 },
-                    },
-                  },
-                },
+        {operations && (
+          <div className="operationsHistoryToggle">
+            <Button
+              onClick={() => {
+                historyOpenedForEvidence.current = false;
+                if (historyOpen && evidenceAnchor.current)
+                  evidenceAnchor.current.scrollTop = 0;
+                setHistoryOpen((open) => !open);
               }}
+              aria-expanded={historyOpen}
+              aria-controls="operationsHistory"
+              size="small"
             >
-              <MenuItem
-                onClick={() =>
-                  setHistoryFilters(
-                    EVENT_HISTORY_FILTERS.map((filter) => filter.value),
-                  )
-                }
+              {historyOpen
+                ? "Close history"
+                : `Event history (${events.length})`}
+            </Button>
+          </div>
+        )}
+        {operations && props.game && props.onEvidence && props.onFacility && (
+          <OperationsPriorities
+            key={`${props.game.scenarioId}:${props.game.seed}:${props.game.startingYear}`}
+            game={props.game}
+            selectedFacilityId={props.selectedFacilityId}
+            ongoing={ongoing}
+            upcoming={upcoming}
+            riskNotice={riskNotice}
+            onEvidence={props.onEvidence}
+            onFacility={props.onFacility}
+          />
+        )}
+        {(!operations || historyOpen) && (
+          <div
+            id={operations ? "operationsHistory" : undefined}
+            ref={historyAnchor}
+            tabIndex={operations ? -1 : undefined}
+          >
+            {riskNotice && (
+              <section
+                className="eventLogSection wildfireRiskNotice"
+                aria-labelledby="wildfireRiskNoticeTitle"
               >
-                Show all events
-              </MenuItem>
-              {EVENT_HISTORY_FILTERS.map((filter) => (
-                <MenuItem
-                  key={filter.value}
-                  role="menuitemcheckbox"
-                  aria-checked={historyFilters.includes(filter.value)}
-                  selected={historyFilters.includes(filter.value)}
-                  onClick={() => {
-                    setHistoryFilters((selected) =>
-                      selected.includes(filter.value)
-                        ? selected.filter((value) => value !== filter.value)
-                        : [...selected, filter.value],
-                    );
+                <header className="eventLogSectionHeader">
+                  <Typography id="wildfireRiskNoticeTitle" variant="subtitle2">
+                    {riskNotice.title}
+                  </Typography>
+                </header>
+                <Typography variant="body2" color="textSecondary">
+                  {riskNotice.message}
+                </Typography>
+              </section>
+            )}
+            {ongoing.length > 0 && (
+              <section
+                className="eventLogSection ongoingEvents"
+                aria-labelledby="ongoingEventsTitle"
+              >
+                <header className="eventLogSectionHeader">
+                  <Typography id="ongoingEventsTitle" variant="subtitle2">
+                    Ongoing events
+                  </Typography>
+                </header>
+                <ul className="eventLogList">
+                  {ongoing.map((event) => (
+                    <li
+                      className={`eventLogItem ongoing importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                      key={event.key}
+                      onClick={() => onSelect(event.actionTarget)}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                        if (
+                          event.actionTarget &&
+                          (e.key === "Enter" || e.key === " ")
+                        ) {
+                          e.preventDefault();
+                          onSelect(event.actionTarget);
+                        }
+                      }}
+                      role={event.actionTarget ? "button" : undefined}
+                      tabIndex={event.actionTarget ? 0 : undefined}
+                    >
+                      <span className="eventLogIcon">
+                        <ConceptIcon
+                          concept={event.concept || "forecast"}
+                          fontSize="small"
+                        />
+                      </span>
+                      <span>
+                        {event.title && <strong>{event.title}</strong>}
+                        <span className="eventLogCopy">
+                          <Typography
+                            variant="body2"
+                            component="span"
+                            sx={{ display: "block" }}
+                          >
+                            {event.message}
+                          </Typography>
+                        </span>
+                      </span>
+                      <Typography
+                        className="eventLogWhen"
+                        variant="body2"
+                        color="textSecondary"
+                        component="span"
+                      >
+                        {event.label}
+                      </Typography>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {upcoming.length > 0 && (
+              <section
+                className="eventLogSection upcomingEvents"
+                aria-labelledby="upcomingEventsTitle"
+              >
+                <header className="eventLogSectionHeader">
+                  <Typography id="upcomingEventsTitle" variant="subtitle2">
+                    Upcoming events
+                  </Typography>
+                </header>
+                <ul className="eventLogList">
+                  {upcoming.map((event) => (
+                    <li
+                      className={`eventLogItem upcoming importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                      key={event.key}
+                      onClick={() => onSelect(event.actionTarget)}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                        if (
+                          event.actionTarget &&
+                          (e.key === "Enter" || e.key === " ")
+                        ) {
+                          e.preventDefault();
+                          onSelect(event.actionTarget);
+                        }
+                      }}
+                      role={event.actionTarget ? "button" : undefined}
+                      tabIndex={event.actionTarget ? 0 : undefined}
+                    >
+                      <span className="eventLogIcon">
+                        <ConceptIcon
+                          concept={event.concept || "forecast"}
+                          fontSize="small"
+                        />
+                      </span>
+                      <span>
+                        {event.title && <strong>{event.title}</strong>}
+                        <span className="eventLogCopy">
+                          <Typography
+                            variant="body2"
+                            component="span"
+                            sx={{ display: "block" }}
+                          >
+                            {event.message}
+                          </Typography>
+                        </span>
+                      </span>
+                      <Typography
+                        className="eventLogWhen"
+                        variant="body2"
+                        color="textSecondary"
+                        component="span"
+                      >
+                        {event.label}
+                      </Typography>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            <section
+              className="eventLogSection eventHistory"
+              aria-labelledby="eventHistoryTitle"
+              ref={operations ? historySectionAnchor : undefined}
+              tabIndex={operations ? -1 : undefined}
+            >
+              <header className="eventLogSectionHeader">
+                <Typography id="eventHistoryTitle" variant="subtitle2">
+                  Event history
+                </Typography>
+                <Tooltip
+                  title={
+                    allSelected
+                      ? "Filter event history"
+                      : `Filter: ${filterLabel}`
+                  }
+                >
+                  <Button
+                    id="eventHistoryFilterButton"
+                    className={`eventHistoryFilterButton${allSelected ? "" : " active"}`}
+                    size="small"
+                    onClick={(event) => setFilterAnchor(event.currentTarget)}
+                    aria-label={`Filter event history, ${filterLabel}`}
+                    startIcon={<FilterListIcon fontSize="small" />}
+                    aria-controls={
+                      filterAnchor ? "eventHistoryFilterMenu" : undefined
+                    }
+                    aria-expanded={filterAnchor ? true : undefined}
+                    aria-haspopup="menu"
+                  >
+                    {allSelected
+                      ? "Filter"
+                      : `Types ${activeFilters.length}/${EVENT_HISTORY_FILTERS.length}`}
+                  </Button>
+                </Tooltip>
+                <Menu
+                  id="eventHistoryFilterMenu"
+                  anchorEl={filterAnchor}
+                  open={Boolean(filterAnchor)}
+                  onClose={() => setFilterAnchor(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  transformOrigin={{ vertical: "top", horizontal: "right" }}
+                  slotProps={{
+                    list: {
+                      "aria-labelledby": "eventHistoryFilterButton",
+                      sx: {
+                        "& .MuiMenuItem-root": {
+                          minHeight: 40,
+                          "@media (pointer: coarse)": { minHeight: 44 },
+                        },
+                      },
+                    },
                   }}
                 >
-                  <ListItemIcon className="eventHistoryFilterCheck">
-                    {historyFilters.includes(filter.value) && (
-                      <CheckIcon fontSize="small" />
-                    )}
-                  </ListItemIcon>
-                  <ListItemText>{filter.label}</ListItemText>
-                </MenuItem>
-              ))}
-              <MenuItem onClick={() => setFilterAnchor(null)}>Done</MenuItem>
-            </Menu>
-          </header>
-          {events.length === 0 && (
-            <Typography
-              className="eventLogEmpty"
-              variant="body2"
-              color="textSecondary"
-            >
-              Blackouts, completed builds, loans, and fuel-price changes appear
-              here.
-            </Typography>
-          )}
-          {events.length > 0 && visibleEvents.length === 0 && (
-            <Typography
-              className="eventLogEmpty"
-              variant="body2"
-              color="textSecondary"
-            >
-              {activeFilters.length === 0
-                ? "Select an event type to show its history."
-                : activeFilters.length === 1
-                  ? activeFilters[0].emptyMessage
-                  : "No events match the selected types yet."}
-            </Typography>
-          )}
-          <ul className="eventLogList">
-            {visibleEvents.map((event: GameEventType) => (
-              <li
-                className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
-                key={event.id}
-                onClick={() => onSelect(event.actionTarget)}
-                onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                  if (
-                    event.actionTarget &&
-                    (e.key === "Enter" || e.key === " ")
-                  ) {
-                    e.preventDefault();
-                    onSelect(event.actionTarget);
-                  }
-                }}
-                role={event.actionTarget ? "button" : undefined}
-                tabIndex={event.actionTarget ? 0 : undefined}
-              >
-                <span className="eventLogIcon">
-                  <ConceptIcon
-                    concept={event.concept || KIND_CONCEPTS[event.kind]}
-                    fontSize="small"
-                  />
-                </span>
-                <span>
-                  {event.title && <strong>{event.title}</strong>}
-                  <span className="eventLogCopy">
-                    <Typography
-                      variant="body2"
-                      component="span"
-                      sx={{ display: "block" }}
+                  <MenuItem
+                    onClick={() =>
+                      setHistoryFilters(
+                        EVENT_HISTORY_FILTERS.map((filter) => filter.value),
+                      )
+                    }
+                  >
+                    Show all events
+                  </MenuItem>
+                  {EVENT_HISTORY_FILTERS.map((filter) => (
+                    <MenuItem
+                      key={filter.value}
+                      role="menuitemcheckbox"
+                      aria-checked={historyFilters.includes(filter.value)}
+                      selected={historyFilters.includes(filter.value)}
+                      onClick={() => {
+                        setHistoryFilters((selected) =>
+                          selected.includes(filter.value)
+                            ? selected.filter((value) => value !== filter.value)
+                            : [...selected, filter.value],
+                        );
+                      }}
                     >
-                      {event.message}
-                    </Typography>
-                  </span>
-                </span>
+                      <ListItemIcon className="eventHistoryFilterCheck">
+                        {historyFilters.includes(filter.value) && (
+                          <CheckIcon fontSize="small" />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText>{filter.label}</ListItemText>
+                    </MenuItem>
+                  ))}
+                  <MenuItem onClick={() => setFilterAnchor(null)}>
+                    Done
+                  </MenuItem>
+                </Menu>
+              </header>
+              {events.length === 0 && (
                 <Typography
-                  className="eventLogWhen"
+                  className="eventLogEmpty"
                   variant="body2"
                   color="textSecondary"
-                  component="span"
                 >
-                  {event.label}
+                  Blackouts, completed builds, loans, and fuel-price changes
+                  appear here.
                 </Typography>
-              </li>
-            ))}
-          </ul>
-        </section>
+              )}
+              {events.length > 0 && visibleEvents.length === 0 && (
+                <Typography
+                  className="eventLogEmpty"
+                  variant="body2"
+                  color="textSecondary"
+                >
+                  {activeFilters.length === 0
+                    ? "Select an event type to show its history."
+                    : activeFilters.length === 1
+                      ? activeFilters[0].emptyMessage
+                      : "No events match the selected types yet."}
+                </Typography>
+              )}
+              <ul className="eventLogList">
+                {visibleEvents.map((event: GameEventType) => (
+                  <li
+                    className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                    key={event.id}
+                    onClick={() => onSelect(event.actionTarget)}
+                    onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                      if (
+                        event.actionTarget &&
+                        (e.key === "Enter" || e.key === " ")
+                      ) {
+                        e.preventDefault();
+                        onSelect(event.actionTarget);
+                      }
+                    }}
+                    role={event.actionTarget ? "button" : undefined}
+                    tabIndex={event.actionTarget ? 0 : undefined}
+                  >
+                    <span className="eventLogIcon">
+                      <ConceptIcon
+                        concept={event.concept || KIND_CONCEPTS[event.kind]}
+                        fontSize="small"
+                      />
+                    </span>
+                    <span>
+                      {event.title && <strong>{event.title}</strong>}
+                      <span className="eventLogCopy">
+                        <Typography
+                          variant="body2"
+                          component="span"
+                          sx={{ display: "block" }}
+                        >
+                          {event.message}
+                        </Typography>
+                      </span>
+                    </span>
+                    <Typography
+                      className="eventLogWhen"
+                      variant="body2"
+                      color="textSecondary"
+                      component="span"
+                    >
+                      {event.label}
+                    </Typography>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        )}
       </div>
     </GameCard>
   );

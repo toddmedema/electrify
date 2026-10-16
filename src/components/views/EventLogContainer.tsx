@@ -8,6 +8,8 @@ import EventLog, { DispatchProps, StateProps } from "./EventLog";
 import type { AppDispatch } from "../../Store";
 import { markEventsRead } from "../../reducers/Game";
 import { focusEvidence, openEvidence } from "../../helpers/Evidence";
+import { selectFacility } from "../../reducers/UI";
+import { TickThrottle } from "../../helpers/RenderThrottle";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
   selectUpcomingStoryEvents,
@@ -56,24 +58,60 @@ export function selectOngoing(state: AppStateType): UpcomingStoryEventType[] {
   return ongoing.length > 0 ? ongoing : NO_ONGOING;
 }
 
-const mapStateToProps = (state: AppStateType): StateProps => {
-  const ongoing = selectOngoing(state);
-  const ongoingKeys = new Set(ongoing.map((event) => event.key));
-  return {
-    evidenceRequest: state.ui.evidenceRequest,
-    facilityDragActive: state.ui.facilityDragActive,
-    // An active story belongs in the status section; its original log row returns to history as
-    // soon as the effect expires.
-    events: state.game.eventLog.filter(
-      (event) => !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
-    ),
-    ongoing,
-    upcoming: selectUpcomingStoryEvents(state),
-    riskNotice: selectWildfireRiskNotice(state),
+export const makeMapStateToProps = () => {
+  const throttle = new TickThrottle();
+  let previous: AppStateType | undefined;
+  let presented: StateProps | undefined;
+  return (state: AppStateType): StateProps => {
+    const game = state.game;
+    // The rail is an overview, not a tick display. Keep direct interactions, incidents and
+    // month boundaries immediate; FAST/ULTRA can share one presentation every ten ticks.
+    if (
+      !previous ||
+      !presented ||
+      (game.speed !== "FAST" && game.speed !== "ULTRA") ||
+      game.speed !== previous.game.speed ||
+      game.date.monthsElapsed !== previous.game.date.monthsElapsed ||
+      game.eventLog !== previous.game.eventLog ||
+      game.scenarioId !== previous.game.scenarioId ||
+      game.seed !== previous.game.seed ||
+      game.inGame !== previous.game.inGame ||
+      state.ui.evidenceRequest !== previous.ui.evidenceRequest ||
+      state.ui.selectedFacilityId !== previous.ui.selectedFacilityId ||
+      throttle.due(game.date.minute, 10)
+    ) {
+      const ongoing = selectOngoing(state);
+      const ongoingKeys = new Set(ongoing.map((event) => event.key));
+      presented = {
+        game,
+        events: game.eventLog.filter(
+          (event) =>
+            !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
+        ),
+        ongoing,
+        upcoming: selectUpcomingStoryEvents(state),
+        riskNotice: selectWildfireRiskNotice(state),
+      };
+      throttle.rendered(game.date.minute);
+      previous = state;
+    }
+    return {
+      ...presented,
+      selectedFacilityId: state.ui.selectedFacilityId,
+      evidenceRequest: state.ui.evidenceRequest,
+      facilityDragActive: state.ui.facilityDragActive,
+    };
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
+  onEvidence: (target) => {
+    dispatch(openEvidence(target));
+  },
+  onFacility: (id) => {
+    dispatch(selectFacility(id));
+    dispatch(openEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }));
+  },
   onEvidenceReady: (request, element) => {
     dispatch(focusEvidence(request, element));
   },
@@ -86,7 +124,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
 });
 
 const EventLogContainer = connect(
-  mapStateToProps,
+  makeMapStateToProps,
   mapDispatchToProps,
 )(EventLog);
 

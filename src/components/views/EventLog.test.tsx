@@ -2,6 +2,8 @@ import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EventLog from "./EventLog";
+import * as Globals from "../../Globals";
+import { createGame } from "../../testing/Simulator";
 
 jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
   <div>{props.children}</div>
@@ -9,6 +11,52 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 
 describe("EventLog", () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => jest.restoreAllMocks());
+  it("keeps the pane's full history available on demand and opens it for evidence", async () => {
+    jest.spyOn(Globals, "isPaneLayout").mockReturnValue(true);
+    const user = userEvent.setup();
+    const onEvidenceReady = jest.fn();
+    const passed = {
+      game: createGame({ scenarioId: 111 }),
+      upcoming: Array.from({ length: 4 }, (_, index) => ({
+        key: `future:${index}`,
+        label: "Expected next year",
+        title: `Future announcement ${index + 1}`,
+        message: "A scheduled change will affect operations.",
+      })),
+      events: [
+        {
+          id: 1,
+          kind: "BUILD" as const,
+          label: "Jan 2024",
+          message: "A recorded build.",
+        },
+      ],
+      onOpen: jest.fn(),
+      onSelect: jest.fn(),
+      onEvidence: jest.fn(),
+      onFacility: jest.fn(),
+      onEvidenceReady,
+    };
+    const view = render(<EventLog {...passed} />);
+    expect(screen.queryByText("A recorded build.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Event history (1)" }));
+    expect(screen.getByText("A recorded build.")).toBeVisible();
+    // History has its own destination even when many future announcements precede it.
+    expect(screen.getByRole("region", { name: "Event history" })).toHaveFocus();
+    expect(
+      screen.getAllByText(/Future announcement/).length,
+    ).toBeGreaterThanOrEqual(4);
+    await user.click(screen.getByRole("button", { name: "Close history" }));
+    const request = { id: 1, runId: 0, target: { card: "EVENTS" as const } };
+    view.rerender(<EventLog {...passed} evidenceRequest={request} />);
+    expect(screen.getByText("A recorded build.")).toBeVisible();
+    expect(onEvidenceReady).toHaveBeenCalledWith(
+      request,
+      expect.any(HTMLElement),
+    );
+    expect(passed.onOpen).toHaveBeenCalledTimes(1);
+  });
   it("retains an empty selection across remounts and restores all on request", async () => {
     const user = userEvent.setup();
     const props = {
