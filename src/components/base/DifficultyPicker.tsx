@@ -95,8 +95,21 @@ export default function DifficultyPicker({
           className="difficultyDescription"
           variant="body2"
           color="textSecondary"
+          sx={{ display: "grid" }}
         >
-          {DIFFICULTIES[value].description}
+          {/* Share one grid cell so changing the copy never changes the control's height. */}
+          {DIFFICULTY_IDS.map((difficulty) => (
+            <span
+              key={difficulty}
+              aria-hidden={difficulty !== value}
+              style={{
+                gridArea: "1 / 1",
+                visibility: difficulty === value ? "visible" : "hidden",
+              }}
+            >
+              {DIFFICULTIES[difficulty].description}
+            </span>
+          ))}
         </Typography>
       )}
     </>

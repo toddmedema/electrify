@@ -54,18 +54,34 @@ export class AudioNode {
     this.source = source;
     source.buffer = this.buffer;
     source.loop = loop;
-    source.connect(this.gain);
+    const gain = this.gain;
+    source.connect(gain);
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+    };
     source.start(when, offset);
   }
 
   public fadeIn(peak?: number, seconds?: number) {
+    this.fadeTo(peak ?? 1, seconds ?? MUSIC_FADE_SECONDS);
+  }
+
+  /** Retarget an in-flight fade from its audible level rather than queueing competing ramps. */
+  public fadeTo(volume: number, seconds: number) {
     if (!this.gain) {
       return;
     }
-    this.gain.gain.linearRampToValueAtTime(
-      peak || 1.0,
-      this.context.currentTime + (seconds || MUSIC_FADE_SECONDS),
-    );
+    const param = this.gain.gain;
+    const now = this.context.currentTime;
+    if (typeof param.cancelAndHoldAtTime === "function") {
+      param.cancelAndHoldAtTime(now);
+    } else {
+      const current = param.value;
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(current, now);
+    }
+    param.linearRampToValueAtTime(volume, now + seconds);
   }
 
   public fadeOut(seconds?: number, stop?: boolean) {
@@ -76,7 +92,7 @@ export class AudioNode {
     if (!gain) {
       return;
     }
-    gain.gain.linearRampToValueAtTime(0, this.context.currentTime + seconds);
+    this.fadeTo(0, seconds);
     if (stop && this.source) {
       const source = this.source;
       try {

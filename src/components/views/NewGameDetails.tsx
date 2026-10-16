@@ -79,6 +79,7 @@ interface State {
   // The replay currently being fetched, so its row can show a spinner instead of the play button
   loadingReplayId?: string;
   leaderboardExpanded?: boolean;
+  leaderboardMinHeight?: number;
   steamScope?: "global" | "friends";
 }
 
@@ -108,6 +109,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   private boardRequestId = 0;
   private myBestRequestId = 0;
   private allScoresRequestId = 0;
+  private leaderboardRef = React.createRef<HTMLDivElement>();
 
   constructor(props: Props) {
     super(props);
@@ -131,7 +133,19 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
     const requestId = ++this.boardRequestId;
     const difficulty = this.props.game.difficulty;
-    this.setState({ scores: undefined, boardFailed: false });
+    // Keep the compact board's space while another difficulty loads or has fewer scores.
+    // Collapsing it briefly clamps the scroller and moves the difficulty buttons above it.
+    const leaderboardMinHeight = this.state.leaderboardExpanded
+      ? this.state.leaderboardMinHeight
+      : Math.max(
+          this.state.leaderboardMinHeight || 0,
+          this.leaderboardRef.current?.getBoundingClientRect().height || 0,
+        );
+    this.setState({
+      scores: undefined,
+      boardFailed: false,
+      leaderboardMinHeight,
+    });
     try {
       if (process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()) {
         const { desktopScores } = await import("../../DesktopScores");
@@ -334,7 +348,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
           this.props.game.customScenario,
         ) || null;
       this.setState(
-        { scenario, location: getScenarioLocation(scenario) || null },
+        {
+          scenario,
+          location: getScenarioLocation(scenario) || null,
+          leaderboardMinHeight: undefined,
+        },
         () => this.loadBoard(),
       );
       return;
@@ -368,6 +386,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       allScores,
       allScoresFailed,
       leaderboardExpanded,
+      leaderboardMinHeight,
     } = this.state;
 
     const toggleVictoryDialog = (e: React.SyntheticEvent) => {
@@ -506,7 +525,17 @@ export default class NewGameDetails extends React.Component<Props, State> {
           />
 
           {!challenge && !coop && (
-            <div className="leaderboard">
+            <div
+              className="leaderboard"
+              role="region"
+              aria-labelledby="leaderboard-title"
+              ref={this.leaderboardRef}
+              style={{
+                minHeight: leaderboardExpanded
+                  ? undefined
+                  : leaderboardMinHeight,
+              }}
+            >
               {desktopApp && (
                 <ToggleButtonGroup
                   exclusive
@@ -534,7 +563,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 <TableHead>
                   <TableRow>
                     <TableCell colSpan={scoreColumnCount}>
-                      <Typography variant="h6">
+                      <Typography id="leaderboard-title" variant="h6">
                         {leaderboardExpanded
                           ? "Leaderboard — All levels"
                           : `Leaderboard — ${DIFFICULTY_LABELS[game.difficulty]}`}

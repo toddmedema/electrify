@@ -38,15 +38,35 @@
       html[data-theme="dark"] {
         background: var(--bg-primary, #0b1016);
       }
+      .app-loading {
+        max-width: 36rem;
+        margin: 0 auto;
+        padding: 48px 24px;
+        color: #17212b;
+        font-family: Inter, sans-serif;
+        line-height: 1.6;
+      }
+      html[data-theme="dark"] .app-loading {
+        color: #f2f6f9;
+      }
+      .app-loading a {
+        display: inline-block;
+        min-height: 44px;
+        margin-right: 16px;
+        color: #0967b8;
+      }
+      html[data-theme="dark"] .app-loading a {
+        color: #8bc8f8;
+      }
     </style>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Electrify</title>
+    <title>Electrify — Take charge of the power markets</title>
     <meta
       name="description"
-      content="Build power plants, keep the lights on, and make your grid cleaner in a learn-as-you-play strategy game."
+      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
     />
     <link rel="canonical" href="https://electrifygame.com/" />
 
@@ -65,24 +85,30 @@
     <meta name="twitter:site" content="@toddmedema" />
     <meta
       name="twitter:title"
-      content="Electrify: Take Charge of the Power Market"
+      content="Electrify — Take charge of the power markets"
     />
     <meta
       name="twitter:description"
-      content="Build power plants, keep supply equal to demand, manage costs, and reduce grid emissions in a learn-as-you-play strategy game."
+      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
     />
     <meta name="twitter:creator" content="@ToddMedema" />
     <meta
       name="twitter:image"
       content="https://electrifygame.com/images/gameplay-preview.png"
     />
+    <meta
+      name="twitter:image:alt"
+      content="Electrify gameplay showing power plants, electricity supply and demand, and grid finances"
+    />
 
     <!-- Open Graph data -->
     <meta
       property="og:title"
-      content="Electrify: Take Charge of the Power Market"
+      content="Electrify — Take charge of the power markets"
     />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Electrify" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:url" content="https://electrifygame.com/" />
     <meta
       property="og:image"
@@ -96,8 +122,34 @@
     />
     <meta
       property="og:description"
-      content="Build power plants, keep the lights on, and make your grid cleaner."
+      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://electrifygame.com/#website",
+            "url": "https://electrifygame.com/",
+            "name": "Electrify"
+          },
+          {
+            "@type": "VideoGame",
+            "@id": "https://electrifygame.com/#game",
+            "url": "https://electrifygame.com/",
+            "name": "Electrify",
+            "description": "A free, research-backed strategy game about running an electric utility. Build power plants, balance supply and demand, manage costs, and reduce grid emissions.",
+            "image": "https://electrifygame.com/images/gameplay-preview.png",
+            "inLanguage": "en",
+            "genre": ["Strategy", "Simulation", "Educational"],
+            "gamePlatform": "Web browser",
+            "isAccessibleForFree": true,
+            "license": "https://github.com/toddmedema/electrify/blob/master/LICENSE.md"
+          }
+        ]
+      }
+    </script>
 
     <!-- The installed Android shell can retain the manifest theme_color independently of
          this page's meta tag. Keep its base colors dark too: color_scheme_dark alone
@@ -120,10 +172,7 @@
     <!-- Add to homescreen for Safari on iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta
-      name="apple-mobile-web-app-title"
-      content="Electrify: Take Charge of the Power Market"
-    />
+    <meta name="apple-mobile-web-app-title" content="Electrify" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/images/icon/152x152.png" />
 
     <!-- Tile icon for Win8 (144x144) -->
@@ -133,7 +182,27 @@
     />
   </head>
   <body unresolved class="fullbleed layout vertical center-justified">
-    <div id="root" style="width: 100%; height: 100%"></div>
+    <div id="root" style="width: 100%; height: 100%">
+      <main class="app-loading">
+        <h1>Electrify</h1>
+        <p><strong>Take charge of the power markets.</strong></p>
+        <p>
+          Build power plants, balance supply and demand, manage costs, and make
+          your grid cleaner in a free, research-backed strategy game.
+        </p>
+        <p role="status" hidden>Loading Electrify…</p>
+        <noscript>
+          <p><strong>Enable JavaScript to load and play Electrify.</strong></p>
+        </noscript>
+        <nav aria-label="About Electrify">
+          <a href="%PUBLIC_URL%/about.html">About the game</a>
+          <a href="%PUBLIC_URL%/data-centers.html"
+            >Data centers and your grid</a
+          >
+          <a href="%PUBLIC_URL%/privacy.html">Privacy</a>
+        </nav>
+      </main>
+    </div>
 
     <!-- Inert on the web: only the native preload installs this entrance. Keep the logo
          geometry in step with MainMenu; both use the same homeLogo styles and animation. -->
@@ -172,6 +241,7 @@
       </div>
     </template>
     <script>
+      document.querySelector(".app-loading [role='status']").hidden = false;
       if (window.electrifyDesktop && window.electrifyDesktop.apiVersion === 1) {
         const template = document.getElementById("desktopStartupTemplate");
         const entrance = template.content.cloneNode(true);
@@ -183,18 +253,6 @@
       }
       document.getElementById("desktopStartupTemplate").remove();
     </script>
-
-    <noscript id="noscript">
-      <p>
-        <b
-          >JavaScript is currently disabled. You must enable JavaScript to use
-          the app and play Electrify.</b
-        >
-      </p>
-      <p>
-        <a href="%PUBLIC_URL%/about.html">Learn more about Electrify here</a>
-      </p>
-    </noscript>
 
     <!-- Prefetch low priority assets -->
     <link rel="prefetch" href="%PUBLIC_URL%/data/FuelPricesRaw.csv" />

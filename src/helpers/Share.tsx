@@ -65,7 +65,7 @@ export function buildGameShareContent(): ShareContentType {
       ? "https://electrifygame.com"
       : window.location.origin;
   return {
-    title: "Electrify — keep the lights on",
+    title: "Electrify — take charge of the power markets",
     text: "Build power plants, keep the lights on, and make the grid cleaner. No energy experience needed.",
     url: `${base}/?utm_source=share`,
   };

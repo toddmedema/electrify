@@ -19,6 +19,7 @@ export interface StateProps extends SoundEventSnapshot {
   enabled?: boolean;
   musicVolume: number;
   soundEffectsVolume: number;
+  musicIntensity: number;
 }
 
 export interface DispatchProps {
@@ -31,7 +32,7 @@ export default class Audio extends React.Component<Props, {}> {
   private loadTimer: ReturnType<typeof setTimeout> | undefined;
 
   componentDidMount() {
-    setMusicInGame(this.props.inGame);
+    setMusicInGame(this.props.inGame, this.props.musicIntensity);
     // Load after a timeout so as not to overload the device.
     this.loadTimer = setTimeout(() => {
       if (!this.props.enabled) {
@@ -64,8 +65,11 @@ export default class Audio extends React.Component<Props, {}> {
   }
 
   componentDidUpdate(prevProps: StateProps) {
-    if (this.props.inGame !== prevProps.inGame) {
-      setMusicInGame(this.props.inGame);
+    if (
+      this.props.inGame !== prevProps.inGame ||
+      this.props.musicIntensity !== prevProps.musicIntensity
+    ) {
+      setMusicInGame(this.props.inGame, this.props.musicIntensity);
     }
     if (this.props.enabled !== prevProps.enabled) {
       this.handleEnableState(this.props.enabled);

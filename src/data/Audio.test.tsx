@@ -24,6 +24,7 @@ beforeEach(() => {
     musicOutput: null,
     paused: false,
     inGame: false,
+    musicIntensity: 0,
   });
 });
 
@@ -65,7 +66,7 @@ it.each([false, true])(
       "audio/basic/medium.mp3",
       "audio/basic/high.mp3",
     ]);
-    setMusicInGame(!initialInGame);
+    setMusicInGame(!initialInGame, 0.5);
     for (const request of requests) request.onload?.();
     await waitFor(() => expect(state.loaded).toBe("LOADED"));
     const constructor = ThemeManager as jest.MockedClass<typeof ThemeManager>;
@@ -77,7 +78,7 @@ it.each([false, true])(
       }),
     );
     expect(manager.setIntensity).toHaveBeenLastCalledWith(
-      initialInGame ? 1 : 2,
+      initialInGame ? 1 : 6,
     );
 
     setMusicInGame(initialInGame);
