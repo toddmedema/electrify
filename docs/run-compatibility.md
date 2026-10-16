@@ -33,6 +33,12 @@ challenges. No historical simulation runtime is provided. Saved games, including
 challenged runs in progress, carry forward silently, as described in
 [save upgrades](save-upgrades.md).
 
+Steam leaderboard names derive from `compatibilityId`, so code that only co-op runs stays
+out of it. The manifest's separate `multiplayerCompatibilityId` hashes `compatibilityId`
+together with `src/multiplayer`, the co-op worker and the native Steam transport. Co-op
+lobbies and shared saves require it to match, so peers reject incompatible message formats
+and simulation builds before joining, without moving single-player leaderboards.
+
 When changing simulation behavior outside these directories, add the source to
 the generator's inputs, or bump `rulesRevision` in the generator.
 Changes to the digest algorithm or input-selection policy also require a rules

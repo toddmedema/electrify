@@ -194,6 +194,8 @@ export const INTERTIE_CONSTRUCTION_KGCO2E_PER_W = 0.08;
 // $560k per MW, which is the Desert connection, the reference this scale is anchored on.
 export const INTERTIE_CONSTRUCTION_REFERENCE_COST_PER_W = 0.56;
 export const INTERTIE_CONSTRUCTION_COST_EXPONENT = 0.7;
+// Heat and sun derate a line's dynamic rating, but never below this share of its nameplate.
+export const MIN_TRANSMISSION_RATING_FRACTION = 0.6;
 // Reinforcing a standing corridor reuses its towers, foundations and cleared route, which are
 // over half of a new line's embodied emissions. Deliberately mild, because the authored costs
 // already price existing routes about a third below new ones; the full structural discount

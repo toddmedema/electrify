@@ -10,7 +10,8 @@ export interface NavigableCardRowProps {
   ariaLabel: string;
   // Points assistive technology at an element in `description` that explains the row
   ariaDescribedBy?: string;
-  onOpen: () => void;
+  // Omitted for a row someone else opens, such as a co-op host's choice a guest only reads
+  onOpen?: () => void;
   // The trailing chevron that says the row opens a screen of its own
   showChevron?: boolean;
   // Styling hooks for a row that's finished or currently in effect
@@ -37,6 +38,17 @@ export default function NavigableCardRow({
   className,
   testId,
 }: NavigableCardRowProps): React.JSX.Element {
+  const header = (
+    <CardHeader
+      avatar={avatar}
+      title={title}
+      subheader={description}
+      action={
+        showChevron &&
+        onOpen && <ChevronRightGlyph className="rowChevron" aria-hidden />
+      }
+    />
+  );
   return (
     <Card
       data-testid={testId}
@@ -46,22 +58,17 @@ export default function NavigableCardRow({
       data-completed={done || undefined}
       data-active={active || undefined}
     >
-      <CardActionArea
-        onClick={onOpen}
-        aria-label={ariaLabel}
-        aria-describedby={ariaDescribedBy}
-      >
-        <CardHeader
-          avatar={avatar}
-          title={title}
-          subheader={description}
-          action={
-            showChevron && (
-              <ChevronRightGlyph className="rowChevron" aria-hidden />
-            )
-          }
-        />
-      </CardActionArea>
+      {onOpen ? (
+        <CardActionArea
+          onClick={onOpen}
+          aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+        >
+          {header}
+        </CardActionArea>
+      ) : (
+        header
+      )}
     </Card>
   );
 }

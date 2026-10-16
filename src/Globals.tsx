@@ -10,7 +10,8 @@ import { Firestore, getFirestore } from "firebase/firestore";
 import { isDesktopApp } from "./Desktop";
 
 const firebaseApp =
-  process.env.REACT_APP_DESKTOP === "true" && isDesktopApp()
+  process.env.REACT_APP_DESKTOP === "true" &&
+  (isDesktopApp() || typeof window === "undefined")
     ? undefined
     : initializeApp({
         // Set by CI from a repo secret; falls back to the placeholder for local dev
@@ -251,6 +252,16 @@ export function openWindow(url: string): void {
 
 // Can't set it by default, since some browsers on high privacy throw an error when accessing window.localStorage
 export function getLocalStorage(): Storage {
+  if (typeof window === "undefined") {
+    return {
+      length: 0,
+      clear: () => {},
+      getItem: () => null,
+      key: () => null,
+      removeItem: () => {},
+      setItem: () => {},
+    };
+  }
   if (refs.localStorage) {
     return refs.localStorage;
   }

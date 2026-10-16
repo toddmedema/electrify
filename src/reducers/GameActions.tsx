@@ -32,6 +32,10 @@ export const launchRun = createAction<{
 }>("game/launchRun");
 export const start = createAction<number>("game/start");
 export const loaded = createAction("game/loaded");
+/** An authoritative co-op snapshot; the renderer never advances this grid's clock. */
+export const multiplayerSnapshot = createAction<GameType>(
+  "game/multiplayerSnapshot",
+);
 /**
  * Ends the scenario. Pass { toScenarioList: true } to land on the scenario list rather than the
  * title screen - what you want after finishing (or failing) a scenario, since the next thing a

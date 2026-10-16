@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { setSpeed } from "../../reducers/Game";
 import { formatMoneyStable } from "../../helpers/Format";
 import { isDesktopScreen } from "../../Globals";
-import { buildSpeedOptions } from "./SpeedControls";
+import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 
 export interface CatalogTitleBarProps {
   /** Sits before the title */
@@ -38,6 +38,8 @@ export default function CatalogTitleBar(
   const dispatch = useAppDispatch();
   const inGame = useAppSelector((state) => state.game.inGame);
   const speed = useAppSelector((state) => state.game.speed);
+  const multiplayer = useAppSelector((state) => state.game.multiplayer);
+  const clock = multiplayer?.clock;
   const cash = formatMoneyStable(props.cash);
   return (
     <Toolbar
@@ -75,9 +77,10 @@ export default function CatalogTitleBar(
       {inGame && (
         <div className="constructionSpeed" id={props.speedControlId}>
           {buildSpeedOptions({
-            speed,
+            speed: clock?.selectedSpeed ?? speed,
             onSpeedChange: (next) => dispatch(setSpeed(next)),
             desktop: isDesktopScreen(),
+            multiplayer: sharedClockSpeedProps(multiplayer),
           })}
         </div>
       )}

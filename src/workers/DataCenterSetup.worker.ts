@@ -1,6 +1,7 @@
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
+import { waitForLoad } from "../helpers/WaitForLoad";
 import {
   DataCenterSetupRequest,
   DataCenterSetupResponse,
@@ -10,20 +11,6 @@ import { calibrateDataCenterScenario } from "../helpers/DataCenterCalibration";
 const worker = globalThis as unknown as Worker;
 let pending: DataCenterSetupRequest | undefined;
 let running = false;
-
-function waitForLoad(
-  initialize: (done: (failure?: string) => void) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    initialize((failure?: string) => {
-      if (failure) {
-        reject(new Error(failure));
-      } else {
-        resolve();
-      }
-    });
-  });
-}
 
 async function calculate(request: DataCenterSetupRequest): Promise<void> {
   const { requestId, location } = request;

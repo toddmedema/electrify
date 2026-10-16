@@ -47,6 +47,11 @@ interface WeatherSeriesType {
 
 const weatherSeries = new Map<string, WeatherSeriesType>();
 let loadedLocation: string | undefined;
+/** The authoritative co-op worker keeps several recorded locations loaded at once. */
+export function selectWeatherLocation(id: string): void {
+  if (!weatherSeries.has(id)) throw new Error(`Weather not loaded for ${id}`);
+  loadedLocation = id;
+}
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,

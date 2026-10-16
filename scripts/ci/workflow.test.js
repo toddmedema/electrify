@@ -97,6 +97,11 @@ test("platform plans retain all CPU shards, browser shards and full native suite
       assert(browser.args.includes(`--shard=${index - 1}/2`));
       assert(browser.args.includes("--workers=2"));
     }
+    assert.equal(
+      plan.ui.some(({ script }) => script === "test:multiplayer"),
+      index === 3,
+      "Headless multiplayer renderer tests run once on the full-dependency Mac browser worker",
+    );
   }
   assert.deepEqual(
     cpuSuites(2, 4).map(({ script }) => script),

@@ -933,7 +933,8 @@ export default class Facilities extends React.Component<Props> {
     const facilitiesCount = game.facilities.length;
     const readOnly = !!game.replayPlayback;
     const intertiesAvailable = !!(
-      game.transmission && corridorsForLocation(game.location).length
+      game.transmission &&
+      (game.multiplayer || corridorsForLocation(game.location).length)
     );
     const storyEffects = combineStoryEffects(
       game.worldEvents.active.filter(

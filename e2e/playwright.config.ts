@@ -9,7 +9,7 @@ const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: ".",
-  testIgnore: "desktop*.spec.ts",
+  testIgnore: ["desktop*.spec.ts", "multiplayer.spec.ts"],
   timeout: 45000,
   expect: { timeout: 12000 },
   fullyParallel: true,

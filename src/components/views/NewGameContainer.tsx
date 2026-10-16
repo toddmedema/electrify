@@ -7,22 +7,31 @@ import { navigate } from "../../reducers/Card";
 import { scenarioDetailsUrl } from "../../ScenarioUrl";
 import { AppStateType, GameType } from "../../Types";
 import NewGame, { DispatchProps, StateProps } from "./NewGame";
+import { coopControls } from "../../multiplayer/Registry";
+import { store } from "../../Store";
+
+// A co-op guest follows the host's screens, so its own clicks don't navigate.
+const guest = () => store.getState().ui.coop?.role === "guest";
+const coop = () => !!store.getState().ui.coop;
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     game: state.game,
+    coop: state.ui.coop,
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
-      void quitSavedGame();
+      if (coop()) coopControls()?.back();
+      else void quitSavedGame();
     },
     onCustomGame: () => {
-      dispatch(navigate("CUSTOM_GAME"));
+      if (!guest()) dispatch(navigate("CUSTOM_GAME"));
     },
     onDetails: (d: Partial<GameType>) => {
+      if (guest()) return;
       dispatch(uiDelta({ scenarioPreview: d.scenarioId }));
       if (d.scenarioId !== undefined) {
         dispatch(
@@ -37,6 +46,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("MANUAL"));
     },
     onTutorial: (scenarioId: number) => {
+      if (coop()) return;
       void runSaveTransition(() => startTutorial(dispatch, scenarioId));
     },
   };

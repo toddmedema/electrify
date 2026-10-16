@@ -41,6 +41,9 @@ import {
   withRunSaveEffects,
 } from "./SaveEffects";
 import { sessionChanged } from "./SaveLibrary";
+import { delta } from "./reducers/Game";
+import { registerMultiplayerRuntime } from "./multiplayer/Registry";
+import type { MouseEvent } from "react";
 
 jest.mock("./SaveFile", () => ({ downloadSave: jest.fn() }));
 jest.mock("./SaveRepository", () => {
@@ -628,5 +631,49 @@ test("teardown releases token locks even when IndexedDB release fails, allowing 
       configurable: true,
       value: originalLocks,
     });
+  }
+});
+
+test("a co-op player whose host cannot save can still leave the match", async () => {
+  await quitSavedGame();
+  store.dispatch(dialogClose());
+  store.dispatch(delta({ multiplayer: { seat: "guest" } }));
+  const leave = jest.fn(async (options?: { skipSave?: boolean }) => {
+    if (!options?.skipSave)
+      throw new Error("The host could not finish the save");
+    // The real session clears its view, which unregisters the runtime.
+    registerMultiplayerRuntime(undefined);
+  });
+  registerMultiplayerRuntime({
+    command: jest.fn(),
+    submit: jest.fn(),
+    activity: jest.fn(),
+    leave,
+  });
+  const click = {} as MouseEvent<HTMLElement>;
+  const proceed = jest.fn(() => {
+    store.dispatch(quit());
+  });
+  try {
+    expect(await runSaveTransition(proceed)).toBe(false);
+    expect(proceed).not.toHaveBeenCalled();
+    const failure = store.getState().ui.dialog;
+    expect(failure).toMatchObject({
+      title: "Your game could not be saved",
+      message: "The host could not finish the save",
+      focusCancel: true,
+      actionLabel: "Retry",
+      tertiaryLabel: "Leave without saving",
+    });
+    expect(failure.secondaryLabel).toBeUndefined();
+    failure.tertiaryAction!(click);
+    const confirm = store.getState().ui.dialog;
+    expect(confirm.title).toBe("Leave without saving?");
+    confirm.action!(click);
+    await eventually(() => proceed.mock.calls.length === 1);
+    expect(leave).toHaveBeenLastCalledWith({ skipSave: true });
+    expect(store.getState().game.multiplayer).toBeUndefined();
+  } finally {
+    registerMultiplayerRuntime(undefined);
   }
 });

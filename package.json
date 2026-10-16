@@ -92,7 +92,8 @@
     "desktop:pack:offline": "node scripts/desktop-package.js --mode offline",
     "desktop:verify": "node scripts/desktop-verify.js",
     "test:desktop:native": "node --test electron/*.test.cjs",
-    "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts"
+    "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts",
+    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -204,6 +205,7 @@
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
+      "!src/multiplayer/WorkerClient.ts",
       "!src/workers/**/*.ts",
       "!src/testing/SimCli.tsx"
     ],

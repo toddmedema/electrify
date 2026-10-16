@@ -22,12 +22,7 @@ import {
   generatorsAboveDemandFloor,
   mothballAdvice,
 } from "../helpers/Mothball";
-import {
-  decidedObjectiveFailure,
-  hasChronicBlackouts,
-  retentionBaseline,
-  scenarioObjectiveFailure,
-} from "../helpers/ObjectiveRules";
+import { runFailure } from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
 import {
   validBuildFacility,
@@ -266,7 +261,14 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
-import { start, loaded, quit, resume, startReplay } from "./GameActions";
+import {
+  start,
+  loaded,
+  quit,
+  resume,
+  startReplay,
+  multiplayerSnapshot,
+} from "./GameActions";
 import { currentRunSaveEffects, RunSaveEffects } from "../SaveEffects";
 import {
   recordReplayAction,
@@ -289,6 +291,8 @@ import {
   GameType,
   GeneratorOperatingType,
   MonthlyHistoryType,
+  PeerPlan,
+  PeerSettlement,
   ScenarioFacilityType,
   ScenarioType,
   ScoreBreakdownType,
@@ -305,6 +309,12 @@ import {
   isStorage,
 } from "../Types";
 import { pow } from "../helpers/Pow";
+import {
+  PEER_TRADE_BASE_PRICE_PER_MWH,
+  PEER_TRADE_GAS_HEAT_RATE,
+  PEER_TRADE_MIN_PRICE_PER_MWH,
+  PEER_TRADE_RESERVE_FRACTION,
+} from "../data/Multiplayer";
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -1141,9 +1151,10 @@ function completeRetrofits(state: GameType, simulated = false) {
     logGameEvent(state, "CONSTRUCTION", message, {
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     });
-    setTimeout(() => {
-      getStore().dispatch(snackbarOpen(message));
-    }, 0);
+    if (!state.multiplayer)
+      setTimeout(() => {
+        getStore().dispatch(snackbarOpen(message));
+      }, 0);
   });
 }
 
@@ -1442,6 +1453,7 @@ const initialGame: GameType = {
 // Using a "is it running" flag rather than comparing against a remembered previous speed means
 // this works no matter how state.speed changed (setSpeed, dialogClose, or a future caller).
 function ensureTicking(state: GameType) {
+  if (state.multiplayer) return;
   if (state.speed !== "PAUSED" && !tickLoopRunning) {
     tickLoopRunning = true;
     previousTickMs = performance.now();
@@ -1520,7 +1532,7 @@ export const gameSlice = createSlice({
   initialState: initialGame,
   reducers: {
     tick: (state) => {
-      if (!state.inGame || state.speed === "PAUSED") {
+      if (!state.inGame || state.speed === "PAUSED" || state.multiplayer) {
         tickLoopRunning = false;
         return;
       }
@@ -1973,6 +1985,34 @@ export const gameSlice = createSlice({
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
   // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(multiplayerSnapshot, (state, action) => {
+      const incoming = action.payload;
+      const sameGrid =
+        !!state.multiplayer &&
+        state.multiplayer.seat === incoming.multiplayer?.seat &&
+        state.seed === incoming.seed &&
+        state.location.id === incoming.location.id &&
+        state.scenarioId === incoming.scenarioId &&
+        state.startingYear === incoming.startingYear;
+      return {
+        ...incoming,
+        // Completed months and the authored location are immutable. Keeping their identity lets
+        // normal forecasts finish while authoritative tick snapshots continue to arrive.
+        location: sameGrid ? state.location : incoming.location,
+        monthlyHistory:
+          sameGrid &&
+          state.date.monthsElapsed === incoming.date.monthsElapsed &&
+          state.monthlyHistory.length === incoming.monthlyHistory.length
+            ? state.monthlyHistory
+            : incoming.monthlyHistory,
+        // Reading state belongs to this renderer and survives network updates.
+        eventLogReadThroughId: sameGrid ? state.eventLogReadThroughId : 0,
+        lowCashWarningMonth: sameGrid ? state.lowCashWarningMonth : undefined,
+        speed: action.payload.multiplayer?.clock?.activeSpeed ?? "PAUSED",
+        policyPause: sameGrid ? state.policyPause : undefined,
+        inGame: true,
+      };
+    });
     builder.addCase(beginIntertieStress, (state) => {
       if (
         state.scenarioId !== 112 ||
@@ -3284,6 +3324,17 @@ function adoptTickWorkingState(
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
 export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
+  const phases = tickStatePhases(state, saveEffects);
+  while (!phases.next().done) {
+    /* Single-player has no peer settlement. */
+  }
+}
+
+/** Plan every grid before resuming any grid's settlement. */
+export function* tickStatePhases(
+  state: GameType,
+  saveEffects?: RunSaveEffects,
+): Generator<PeerPlan, void, PeerSettlement | undefined> {
   if (isDraft(state) && !state.replayPlayback) {
     const snapshot = current(state);
     const working = tickWorkingState(snapshot);
@@ -3318,7 +3369,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
     state.timeline,
   );
   if (now && prev) {
-    updateSupplyFacilitiesFinances(state, prev, now);
+    yield* supplyFacilitiesFinancesPhases(state, prev, now);
     desktopSimulationHooks()?.tick(state, now);
     logHailRepairsCompleted(state);
 
@@ -3358,7 +3409,7 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
       );
       delete state.blackout;
     }
-    if (inBlackout !== wasInBlackout) {
+    if (!state.multiplayer && inBlackout !== wasInBlackout) {
       const message = inBlackout
         ? "Blackout! Demand is outrunning your supply."
         : "Blackout over - supply is meeting demand again.";
@@ -3445,6 +3496,24 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
           true,
           true,
         );
+      }
+
+      if (state.multiplayer) {
+        // The host judges each company by the single-player rules, then leaves every effect
+        // (score, dialogs, analytics, saves) to the shared match.
+        const scenario = getScenario(state.scenarioId, state.customScenario);
+        if (scenario && !state.multiplayer.ending) {
+          const failure = runFailure(state, scenario, history, now, false);
+          const month = state.date.monthsElapsed;
+          if (failure) state.multiplayer.ending = { ...failure, month };
+          else if (month >= (scenario.durationMonths || 12 * 20))
+            state.multiplayer.ending = {
+              outcome: "completed",
+              title: scenario.endTitle || "Mission complete!",
+              month,
+            };
+        }
+        return;
       }
 
       // ===== TRIGGERS ======
@@ -3594,47 +3663,8 @@ export function tickState(state: GameType, saveEffects?: RunSaveEffects) {
         }, 1);
       };
 
-      const chronicBlackouts = hasChronicBlackouts(history, state.difficulty);
       const termMonths = scenario.durationMonths || 12 * 20;
-      const retentionStart = retentionBaseline(
-        scenario,
-        state.customerMarketSize,
-      );
-      // Objectives are judged in full at term end; before that, only once already decided
-      const objectiveFailure =
-        state.date.monthsElapsed === termMonths
-          ? scenarioObjectiveFailure(scenario, history, retentionStart)
-          : state.date.monthsElapsed < termMonths && !isTutorial
-            ? decidedObjectiveFailure(scenario, history, {
-                startingCustomers: retentionStart,
-                monthsRemaining: termMonths - state.date.monthsElapsed,
-                marketSize: customerMarketSizeAt(
-                  state.customerMarketSize,
-                  now.minute,
-                ),
-              })
-            : undefined;
-      const failure =
-        now.cash < 0
-          ? ({
-              outcome: "bankrupt",
-              title: "Bankrupt!",
-              reason: undefined,
-            } as const)
-          : chronicBlackouts
-            ? ({
-                outcome: "fired",
-                title: "Fired!",
-                reason:
-                  "Blackouts continued for 3 months, so the utility board ended your term.",
-              } as const)
-            : objectiveFailure
-              ? ({
-                  outcome: "fired",
-                  title: "Mission objective missed",
-                  reason: objectiveFailure,
-                } as const)
-              : undefined;
+      const failure = runFailure(state, scenario, history, now, isTutorial);
 
       desktopSimulationHooks()?.month(
         state,
@@ -4028,6 +4058,32 @@ function forecastIndexAt(state: GameType, minute: number): number {
 
 // Updates game state and now in place
 function updateSupplyFacilitiesFinances(
+  ...args: Parameters<typeof supplyFacilitiesFinancesPhases>
+) {
+  const phases = supplyFacilitiesFinancesPhases(...args);
+  let result = phases.next();
+  while (!result.done) result = phases.next();
+  return result.value;
+}
+
+/** The gas-indexed co-op trade price for one grid's tick. */
+export function basePeerTradePrice(tick: TickPresentFutureType): number {
+  return Math.max(
+    PEER_TRADE_MIN_PRICE_PER_MWH,
+    PEER_TRADE_BASE_PRICE_PER_MWH +
+      (tick["Natural Gas"] || 0) * PEER_TRADE_GAS_HEAT_RATE,
+  );
+}
+
+/** The host sets one shared price per tick; a grid outside a match uses its own index. */
+export function peerTradePrice(
+  state: GameType,
+  tick: TickPresentFutureType,
+): number {
+  return state.multiplayer?.pricePerMWh ?? basePeerTradePrice(tick);
+}
+
+function* supplyFacilitiesFinancesPhases(
   state: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
@@ -4036,7 +4092,7 @@ function updateSupplyFacilitiesFinances(
   optimizeCommitment = true,
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
-) {
+): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
   const { facilities, date } = state;
   const tickScale = stepMinutes / TICK_MINUTES;
   const ticksPerHour = 60 / stepMinutes;
@@ -4044,6 +4100,9 @@ function updateSupplyFacilitiesFinances(
   const ticksPerYear = TICKS_PER_YEAR / tickScale;
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
   const difficulty = DIFFICULTIES[state.difficulty];
+  // Only a live co-op tick settles with peers. Forecasts and pre-rolls estimate peer supply as
+  // zero, so they charge storage and value spare output like a single-player grid.
+  const peerSettlement = !!state.multiplayer && !simulated;
 
   // Everything being built right now emits while it is being built, spread evenly across each
   // project's schedule. Derived from how far each clock actually moved rather than from elapsed
@@ -4092,7 +4151,7 @@ function updateSupplyFacilitiesFinances(
           !state.commissionedHydroSiteIds.includes(f.hydroSiteId)
         )
           state.commissionedHydroSiteIds.push(f.hydroSiteId);
-        if (!simulated) {
+        if (!simulated && !state.multiplayer) {
           const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
           logGameEvent(state, "CONSTRUCTION", message);
           setTimeout(() => {
@@ -4174,6 +4233,7 @@ function updateSupplyFacilitiesFinances(
   const chargeRequests = new Map<number, number>();
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (
+      !peerSettlement &&
       g.peakWh &&
       g.currentWh < g.peakWh &&
       g.yearsToBuildLeft === 0 &&
@@ -4202,9 +4262,19 @@ function updateSupplyFacilitiesFinances(
   let hydroReservoirCapacityWh = 0;
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
+  const peerHeadroom: { generator: GeneratorOperatingType; watts: number }[] =
+    [];
   const startedFacilityIds = new Set<number>();
   const tickStoryEffects = storyEffectsAt(tickDate, state);
   const carbonFee = tickStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e;
+  // Read once per tick, and only when a live co-op grid prices its spare output.
+  let peerTickFuelPrices: FuelPricesType | undefined;
+  const peerFuelPrices = () =>
+    (peerTickFuelPrices ??= getEffectiveFuelPrices(
+      tickDate,
+      state,
+      tickStoryEffects,
+    ));
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
     // Commitment is only read or written behind hasMinimumStableOutput, which storage never has
@@ -4399,6 +4469,32 @@ function updateSupplyFacilitiesFinances(
             }
             break;
         }
+        if (
+          peerSettlement &&
+          !hydro &&
+          !WEATHER_DEPENDENT_FUELS.includes(g.fuel) &&
+          g.currentW > 0 &&
+          (hasMinimumStableOutput ? generator?.committed : true)
+        ) {
+          const cost =
+            (g.variableOperatingCostPerMWh || 0) *
+              operatingCostEscalation(state, g, tickDate) *
+              (tickStoryEffects.operatingCostMultipliersByFuel?.[g.fuel] || 1) +
+            (g.btuPerWh || 0) *
+              ((peerFuelPrices()[g.fuel] || 0) +
+                feeableKgCO2ePerBtu(g.fuel) * carbonFee * 1e6);
+          if (cost <= peerTradePrice(state, now))
+            peerHeadroom.push({
+              generator: g,
+              watts: Math.max(
+                0,
+                Math.min(
+                  dispatchPeakW,
+                  previousW + (g.peakW * stepMinutes) / g.spinMinutes,
+                ) - g.currentW,
+              ),
+            });
+        }
         supply += g.currentW;
         supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
         if (hydro) {
@@ -4429,7 +4525,11 @@ function updateSupplyFacilitiesFinances(
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
           dischargedW += g.currentW;
-        } else if (g.currentWh < g.peakWh && supply - charge > now.demandW) {
+        } else if (
+          !peerSettlement &&
+          g.currentWh < g.peakWh &&
+          supply - charge > now.demandW
+        ) {
           // The grid draw is capped before conversion losses. All round-trip losses are
           // applied on charging, so discharge can use the stored energy directly.
           const gridChargeW = Math.min(
@@ -4486,8 +4586,82 @@ function updateSupplyFacilitiesFinances(
       }
     }
   });
+  let peer: PeerSettlement | undefined;
+  if (peerSettlement) {
+    const reserveW = now.demandW * PEER_TRADE_RESERVE_FRACTION;
+    peer = yield {
+      offerW:
+        Math.max(0, supply - now.demandW - reserveW) +
+        Math.max(
+          0,
+          peerHeadroom.reduce((sum, item) => sum + item.watts, 0) -
+            Math.max(0, now.demandW + reserveW - supply),
+        ),
+      shortageW: Math.max(0, now.demandW - supply),
+      pricePerMWh: peerTradePrice(state, now),
+      temperatureC: now.temperatureC,
+      solarIrradianceWM2: now.solarIrradianceWM2,
+      emissionsAt: (exportedW) => {
+        const intensity = (g: GeneratorOperatingType) =>
+          (g.btuPerWh || 0) * (FUELS[g.fuel]?.kgCO2ePerBtu || 0) * 1e6;
+        let watts = 0,
+          weighted = 0;
+        for (const g of facilities) {
+          if (isStorage(g) || g.paused) continue;
+          watts += g.currentW;
+          weighted += g.currentW * intensity(g);
+        }
+        let extra = Math.max(0, exportedW - Math.max(0, supply - now.demandW));
+        for (const item of peerHeadroom) {
+          const delivered = Math.min(item.watts, extra);
+          watts += delivered;
+          weighted += delivered * intensity(item.generator);
+          extra -= delivered;
+        }
+        return watts > 0 ? weighted / watts : 0;
+      },
+    };
+    let extra = Math.max(
+      0,
+      (peer?.exportedW || 0) - Math.max(0, supply - now.demandW),
+    );
+    for (const { generator, watts } of peerHeadroom) {
+      const delivered = Math.min(watts, extra);
+      generator.currentW += delivered;
+      supply += delivered;
+      supplyByFuel[generator.fuel] =
+        (supplyByFuel[generator.fuel] || 0) + delivered;
+      spareGenerationW -= delivered;
+      reachableHeadroomW = Math.max(0, reachableHeadroomW - delivered);
+      extra -= delivered;
+    }
+    supply += (peer?.importedW || 0) - (peer?.exportedW || 0);
+    let leftovers = Math.max(0, supply - now.demandW - (peer?.importedW || 0));
+    for (const battery of facilities) {
+      if (
+        !isStorage(battery) ||
+        battery.paused ||
+        battery.yearsToBuildLeft > 0 ||
+        battery.currentW > 0
+      )
+        continue;
+      const draw = Math.min(
+        leftovers,
+        battery.peakW,
+        ((battery.peakWh - battery.currentWh) * ticksPerHour) /
+          battery.roundTripEfficiency,
+      );
+      battery.currentW = -draw * battery.roundTripEfficiency;
+      battery.currentWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
+      storedWh += (draw * battery.roundTripEfficiency) / ticksPerHour;
+      charge += draw;
+      storageLossWh +=
+        (draw * (1 - battery.roundTripEfficiency)) / ticksPerHour;
+      leftovers -= draw;
+    }
+  }
   const operatingLines = transmission.lines.filter(
-    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0 && !state.multiplayer,
   );
   const intertieContext = intertieContextForGame(state);
   const tradingYear = intertieYear(now.minute, state.startingYear);
@@ -4525,7 +4699,8 @@ function updateSupplyFacilitiesFinances(
   ).exportedW.reduce((sum, w) => sum + w, 0);
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
-  const grossLocalSupplyW = supply;
+  const grossLocalSupplyW =
+    supply - (peer?.importedW || 0) + (peer?.exportedW || 0);
   const clearing = clearTransmissionMarket({
     localSupplyW: supply - charge,
     demandW: now.demandW,
@@ -4534,9 +4709,14 @@ function updateSupplyFacilitiesFinances(
     exportLimitW: marketExportLimitW,
     policy: transmission.tradingPolicy,
   });
-  const { importedW, exportedW } = clearing;
+  const importedW = clearing.importedW + (peer?.importedW || 0);
+  const exportedW = clearing.exportedW + (peer?.exportedW || 0);
   // The player gives earlier interties the first chance to import or export.
-  const flows = allocateIntertieFlows(offers, importedW, exportedW);
+  const flows = allocateIntertieFlows(
+    offers,
+    clearing.importedW,
+    clearing.exportedW,
+  );
   // Keep the row readings aligned with the aggregate flow written to this tick, including
   // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
   // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
@@ -4555,6 +4735,11 @@ function updateSupplyFacilitiesFinances(
     importEmissionsWeight += basisW * offer.emissionsKgco2ePerMWh;
     importEmissionsBasisW += basisW;
   });
+  importCostPerHour += (peer?.importedW || 0) * peerTradePrice(state, now);
+  exportRevenuePerHour += (peer?.exportedW || 0) * peerTradePrice(state, now);
+  importEmissionsWeight +=
+    (peer?.importedW || 0) * (peer?.importEmissionsKgPerMWh || 0);
+  importEmissionsBasisW += peer?.importedW || 0;
   const flowW = importedW + exportedW;
   const marketPricePerMWh =
     flowW > 0

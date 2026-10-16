@@ -43,11 +43,11 @@ either an Apple Silicon or an Intel Mac builds one universal app containing both
 Packaging installs the other architecture's locked Koffi package before it merges the two
 builds, and checks that the signed executable contains both `arm64` and `x86_64` slices.
 
-| Target | Depot under `dist/desktop/` | Executable inside the depot | CI runner |
-| --- | --- | --- | --- |
-| Windows x64 | `win-unpacked/` | `Electrify.exe` | `windows-latest` |
-| Linux x64 | `linux-unpacked/` | `Electrify` | `ubuntu-22.04` |
-| macOS (universal) | `mac-universal/` | `Electrify.app/Contents/MacOS/Electrify` | `macos-15` |
+| Target            | Depot under `dist/desktop/` | Executable inside the depot              | CI runner        |
+| ----------------- | --------------------------- | ---------------------------------------- | ---------------- |
+| Windows x64       | `win-unpacked/`             | `Electrify.exe`                          | `windows-latest` |
+| Linux x64         | `linux-unpacked/`           | `Electrify`                              | `ubuntu-22.04`   |
+| macOS (universal) | `mac-universal/`            | `Electrify.app/Contents/MacOS/Electrify` | `macos-15`       |
 
 On macOS, open `Electrify.app`; on Linux, run `./Electrify` from the depot. Ship the **entire
 directory or app bundle**, including native libraries and Chromium resources. Copying only the
@@ -318,3 +318,100 @@ image. Five illustration masters, the wordmark and one export script support fut
 Use the marketing exports directly in Steamworks. They stay outside `public/` and the desktop
 depot. Position the separate library logo in Steamworks' preview, then submit the store page
 through Valve's normal review process.
+
+## Realtime Steam co-op
+
+**Play with friends** on the desktop title screen opens a friends-only Steam lobby. Host a room,
+then invite friends through Steam or share its full numeric lobby code. Once two to four players
+are connected, the host presses **Choose a game together** and picks any authored scenario or a
+custom game in the normal selection screens. Guests follow the host's screen, scenario,
+difficulty and custom settings read-only, and mark **Ready** for exactly what is shown; any change
+by the host clears it. **Start for everyone** launches that scenario for the lobby. Everyone
+selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
+single-player only. See [co-op scenario selection](multiplayer-scenario-selection.md).
+
+Every company plays the scenario as authored: its location, opening fleet, cash, customers,
+difficulty, seed, story events and term are identical, so trade comes from different decisions.
+The only change is the intertie setup below. Each company answers its own scenario choices, and
+the shared clock waits until everyone has. Co-op is unranked. A company that goes bankrupt, is
+fired or misses its objective retires: its grid freezes, its links stop, and it no longer holds
+the shared clock, while the others play on. The match ends at the scenario's term or once every
+company has retired, with a results table and **Back to lobby** for the host.
+
+The host's worker runs every grid on one clock. Multiplayer uses the normal game view, including
+the full build catalog, storage, policies, forecasts, rate controls and facility management.
+Each player selects their own speed; the shared clock runs at the slowest selection. Your own
+selection is the filled segment, and the game's active speed carries a slowly pulsing ring.
+Other players' person markers sit along the bottom of the speed they chose, filling each button
+from the left. Names, selections and pause reasons remain in accessible descriptions and hover
+text.
+Opening the build screen, reading a notification, opening settings, or putting the game
+in the background pauses everyone without changing anyone's selection. Closing the interruption
+restores the slowest remaining speed. Manual pause stays selected until that player changes it.
+Starting, reconnecting, and restoring a save require everyone to select a running speed. Construction
+controls keep working while paused. Save & Quit uses the normal top-left menu; guests request
+a fresh whole-match checkpoint from the host before leaving.
+
+Every company starts with an operating tier 1 intertie to every other player, including islands.
+The normal intertie list and upgrade dialogs show these players. NPC market connections and
+NPC fallback supply are removed for the match. Four companies have three human connections
+each and six shared physical edges overall.
+Starting connection budgets are 25% of opening peak demand, divided across the fixed roster.
+Upgrades use the normal tier progression and construction accounting, require both owners'
+approval, and charge each owner their half using cash or financing. Initial connections are
+free and their combined annual O&M is $0.005 per installed watt. These starting multiplayer
+calibrations need human balance testing.
+
+The common market serves customers first, protects a 2% reserve, then helps neighbors before
+optional storage charging. Running thermal plants can increase output within their original
+tick's ramp limit when the posted fuel-indexed price covers incremental running costs. Plants
+do not start solely to export. One global allocation maximizes served shortage, then shares it
+by shortage coverage; both ends use one weather-adjusted line rating. Fuel, emissions and cash
+settle through the existing simulation once. Paused purchases preserve the last shared tick's
+recorded trade rather than overwriting it with a forecast of unknown future human supply.
+
+Steam NetworkingSockets provides authenticated connections and reliable bounded messages through
+the existing single callback dispatcher. Changed, complete revision-tagged views are coalesced
+before cloning and sent at up to five times per second. Commands and their receipts use a separate
+100 ms publication bound; unchanged paused views are suppressed. A small authenticated host
+keepalive arrives once per second without replacing game state or acknowledging commands.
+Commands have a match, epoch and monotonically increasing player sequence; retries retain the same
+identity and last receipt. Reconnects receive a complete baseline immediately. A disconnect pauses every grid and
+prevents resume until everyone reconnects. Lobby ownership transfer does not migrate the host. Client and host-controller heartbeats expire
+after five seconds; an unresponsive player pauses the group. Desktop background timer throttling
+is disabled only while a lobby is active.
+
+See [network measurements](multiplayer-network.md) for reproducible payload sizes, scheduler-specific
+traffic estimates and remaining opportunities. Complete ten-second checkpoints retain their existing
+durability and retry behavior.
+
+The host writes an atomic complete checkpoint about every ten seconds, then sends a chunked,
+compressed, checksummed copy to each connected guest. A shared-save confirmation requires another
+computer's persisted acknowledgement. The bundle includes all grids, canonical edges, dispatch
+commitment metadata and command receipts. Normal host exit joins the existing desktop quit save
+handshake. Local persistence does not wait for an absent player's acknowledgement. Manual resume
+uses one complete bundle, the original roster and a fresh epoch; pending old commands are dropped.
+The first co-op save schema requires the same rules/build. Unsupported bundles remain on disk;
+whole-match version migrations are required before promising cross-update campaign support.
+
+Run `npm run test:multiplayer` for windowless two- and four-player browser sessions with the real
+worker and an in-memory Steam bridge. CI serves the verified production desktop renderer. To
+exercise that path locally, run `npm run desktop:build`, then set `MULTIPLAYER_BUILD_DIR=build`
+when running the multiplayer tests. The default local path uses the development server.
+Native unit tests resolve the actual SDK exports and cover
+framing, membership checks and invite IDs. `src/multiplayer/World.sim.test.ts` runs four grids for
+five years, checking trade conservation and checkpoint size. A local uninstrumented run measured
+0.8 ms mean world-step time and a 249 KB maximum compressed checkpoint; month rollovers reached
+67 ms and slow the shared clock instead of skipping economic ticks. These are development-machine
+measurements, not a Steam Deck or network acceptance result.
+
+Before release, use the real App ID on a private Steam branch with separate accounts: test two,
+three and four players; relay-only connectivity; running-game and launch-time invites; Windows,
+Linux and macOS peers; disconnect/reconnect; a sleeping host; clean host exit; and resume from a
+guest's saved copy in a new lobby. No live Steam account acceptance is claimed by the mocked
+headless tests. No Firebase relay or developer-operated game server is required for this mode.
+
+Design background: [V2 proposal](multiplayer-realtime-proposal.md). Native API references:
+[NetworkingSockets](https://partner.steamgames.com/doc/api/ISteamNetworkingSockets),
+[lobbies](https://partner.steamgames.com/doc/features/multiplayer/matchmaking), and
+[lobby join requests](https://partner.steamgames.com/doc/api/ISteamFriends#GameLobbyJoinRequested_t).

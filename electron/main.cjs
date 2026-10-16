@@ -23,6 +23,7 @@ const {
 } = require("./runtime.cjs");
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { SteamService } = require("./steam.cjs");
+const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
 const { applyConfirmedDisplay, createDisplayQueue } = require("./display.cjs");
 
 protocol.registerSchemesAsPrivileged([
@@ -296,6 +297,35 @@ handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
+function multiplayerRequest(input) {
+  if (!steam.multiplayer && (!steam.state().online || !steam.dispatcher)) {
+    if (input?.kind === "state")
+      return {
+        available: false,
+        members: [],
+        connected: [],
+        error: "Connect to Steam to play with friends",
+      };
+    throw new Error("Connect to Steam to play with friends");
+  }
+  steam.multiplayer ??= new SteamMultiplayer(
+    steam,
+    steam.dispatcher,
+    saves.directory,
+    (event) => {
+      if (window && !window.isDestroyed()) {
+        if (event.kind === "state") {
+          const throttle = !event.state.lobbyId;
+          if (window.webContents.getBackgroundThrottling() !== throttle)
+            window.webContents.setBackgroundThrottling(throttle);
+        }
+        window.webContents.send("desktop:multiplayer-event", event);
+      }
+    },
+  );
+  return steam.multiplayer.request(input);
+}
+handle("desktop:multiplayer", multiplayerRequest);
 ipcMain.on("desktop:ready-to-quit", (event, success) => {
   if (
     !trustedSender(event, window) ||
@@ -342,6 +372,13 @@ async function createWindow() {
   saves = new DesktopSaveStore(app.getPath("userData"), steam);
   steam.configureScoreQueue(saves.directory);
   steam.configureAchievements(saves.directory, config.appId);
+  if (steam.state().online) {
+    try {
+      multiplayerRequest({ kind: "state" });
+    } catch (error) {
+      console.warn(`Steam multiplayer unavailable: ${error.message}`);
+    }
+  }
   const player = steam.state().steamId || "offline";
   const isolatedSession = session.fromPartition(`persist:electrify-${player}`);
   isolatedSession.setPermissionRequestHandler(
@@ -534,7 +571,16 @@ async function createWindow() {
 
 if (!primaryInstance) app.quit();
 else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, args) => {
+    const lobbyId = lobbyFromArgs(args);
+    if (lobbyId && steam.multiplayer) {
+      steam.multiplayer.pendingInvite = lobbyId;
+      if (window && !window.isDestroyed())
+        window.webContents.send("desktop:multiplayer-event", {
+          kind: "invite",
+          lobbyId,
+        });
+    }
     if (window) {
       if (window.isMinimized()) window.restore();
       window.focus();

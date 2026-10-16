@@ -205,6 +205,7 @@ jobs:
           name: diagnostics-${{ matrix.depot }}
           path: |
             test-results/browser/
+            test-results/multiplayer/
             test-results/desktop/
             test-results/desktop-results.json
             test-results/jest-simulation-${{ matrix.index }}/manifest.json

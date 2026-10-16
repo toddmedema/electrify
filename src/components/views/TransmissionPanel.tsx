@@ -601,7 +601,7 @@ export default function TransmissionPanel({
   const intertieContext = intertieContextForGame(game);
   const forecast = useIntertieForecast(
     game,
-    projectsOnly || selectedLine !== null,
+    !game.multiplayer && (projectsOnly || selectedLine !== null),
   );
   const contextKey = JSON.stringify(intertieContext);
   const cutoff = forecast ? forecastCutoffIndex(forecast, game.date.minute) : 0;
@@ -684,7 +684,9 @@ export default function TransmissionPanel({
   };
 
   // Paths whose real counterpart had not been built yet in this year, soonest first.
-  const upcomingCorridors = corridorsForLocation(game.location)
+  const upcomingCorridors = (
+    game.multiplayer ? [] : corridorsForLocation(game.location)
+  )
     .filter(
       ({ id }) =>
         !corridorOpenInYear(id, game.date.year) &&
@@ -737,15 +739,18 @@ export default function TransmissionPanel({
               {(droppable) => (
                 <div ref={droppable.innerRef} {...droppable.droppableProps}>
                   {state.lines.map((line, index) => {
+                    const peer = game.multiplayer?.peers?.find(
+                      (p) => p.corridor.id === line.corridorId,
+                    );
                     const market = adjacentMarketForCorridor(line.corridorId);
                     const capacities = intertieDirectionalCapacities(
                       line.corridorId,
                       intertieContext,
                       line.capacityW,
                     );
-                    const rating = now
-                      ? transmissionRatingW(line, now)
-                      : line.capacityW;
+                    const rating =
+                      peer?.ratingW ??
+                      (now ? transmissionRatingW(line, now) : line.capacityW);
                     const building = line.yearsToBuildLeft > 0;
                     // Remaining time plus elapsed simulation time preserves the original build duration.
                     const elapsedYears =
@@ -768,14 +773,16 @@ export default function TransmissionPanel({
                         alt=""
                       />
                     );
-                    const importableW = now
-                      ? intertieImportLimitW(
-                          line,
-                          intertieContext,
-                          now.minute,
-                          now,
-                        )
-                      : rating;
+                    const importableW = peer
+                      ? Math.min(rating, peer.availableSupplyW ?? 0)
+                      : now
+                        ? intertieImportLimitW(
+                            line,
+                            intertieContext,
+                            now.minute,
+                            now,
+                          )
+                        : rating;
                     const outlook =
                       selectedLine === line.id
                         ? outlookFor(line.corridorId, line.capacityW)
@@ -992,12 +999,15 @@ export default function TransmissionPanel({
                                         <dt>Price now</dt>
                                         <dd className="facilityStatValue">
                                           {formatMoneyConcise(
-                                            adjacentMarketPricePerMWh(
-                                              line.corridorId,
-                                              intertieContext,
-                                              now.minute,
-                                              now,
-                                            ),
+                                            game.multiplayer
+                                              ? (game.multiplayer.pricePerMWh ??
+                                                  0)
+                                              : adjacentMarketPricePerMWh(
+                                                  line.corridorId,
+                                                  intertieContext,
+                                                  now.minute,
+                                                  now,
+                                                ),
                                           )}
                                           /MWh
                                         </dd>
@@ -1043,54 +1053,68 @@ export default function TransmissionPanel({
                                     color="textSecondary"
                                   >
                                     Flow limited by:{" "}
-                                    {line.paused
-                                      ? "Paused"
-                                      : state.tradingPolicy === "CLOSED" ||
-                                          (state.tradingPolicy ===
-                                            "SURPLUS_ONLY" &&
-                                            flowW >= 0)
-                                        ? "Trading rule"
-                                        : flowW < 0
-                                          ? Math.abs(flowW) >=
-                                            capacities.exportCapacityW - 1
-                                            ? "Export capacity"
-                                            : Math.abs(flowW) >= rating - 1
-                                              ? "Weather"
-                                              : "Local surplus"
-                                          : Math.abs(flowW) < importableW - 1
-                                            ? "Local demand or trading rule"
-                                            : neighborImportSupplyW(
-                                                  line.corridorId,
-                                                  intertieContext,
-                                                  now.minute,
-                                                  now,
-                                                  line.capacityW,
-                                                ) < rating
-                                              ? "Neighbor supply"
-                                              : rating <
-                                                  capacities.importCapacityW
+                                    {game.multiplayer
+                                      ? "Player generation, demand, and shared line capacity"
+                                      : line.paused
+                                        ? "Paused"
+                                        : state.tradingPolicy === "CLOSED" ||
+                                            (state.tradingPolicy ===
+                                              "SURPLUS_ONLY" &&
+                                              flowW >= 0)
+                                          ? "Trading rule"
+                                          : flowW < 0
+                                            ? Math.abs(flowW) >=
+                                              capacities.exportCapacityW - 1
+                                              ? "Export capacity"
+                                              : Math.abs(flowW) >= rating - 1
                                                 ? "Weather"
-                                                : "Import capacity"}
+                                                : "Local surplus"
+                                            : Math.abs(flowW) < importableW - 1
+                                              ? "Local demand or trading rule"
+                                              : neighborImportSupplyW(
+                                                    line.corridorId,
+                                                    intertieContext,
+                                                    now.minute,
+                                                    now,
+                                                    line.capacityW,
+                                                  ) < rating
+                                                ? "Neighbor supply"
+                                                : rating <
+                                                    capacities.importCapacityW
+                                                  ? "Weather"
+                                                  : "Import capacity"}
                                     .
                                   </Typography>
                                 )}
                                 {outlook && <IntertieYear outlook={outlook} />}
                                 {!building && (
-                                  <IntertieUpgradeControl
-                                    costIndex={getCostTableIndex(
-                                      game.date,
-                                      game.startingYear,
-                                      game.seed,
+                                  <>
+                                    {peer?.upgradeRequestedBy && (
+                                      <Typography
+                                        variant="body2"
+                                        color="textSecondary"
+                                      >
+                                        {peer.upgradeRequestedBySelf
+                                          ? `You requested this upgrade. Waiting for ${peer.name} to approve their half.`
+                                          : `${peer.upgradeRequestedBy} requested this upgrade. Review the upgrade to approve and fund your half.`}
+                                      </Typography>
                                     )}
-                                    line={line}
-                                    context={accessContextForGame(game)}
-                                    cash={now?.cash}
-                                    year={game.date.year}
-                                    interestRate={game.interestRate}
-                                    units={units}
-                                    readOnly={readOnly}
-                                    onUpgrade={onUpgrade}
-                                  />
+                                    <IntertieUpgradeControl
+                                      costIndex={getCostTableIndex(
+                                        game.date,
+                                        game.startingYear,
+                                        game.seed,
+                                      )}
+                                      line={line}
+                                      context={accessContextForGame(game)}
+                                      cash={now?.cash}
+                                      year={game.date.year}
+                                      interestRate={game.interestRate}
+                                      units={units}
+                                      readOnly={readOnly}
+                                      onUpgrade={onUpgrade}
+                                    />
+                                  </>
                                 )}
                               </div>
                             )}
