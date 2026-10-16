@@ -74,7 +74,10 @@ test("settings controls are flush with each row's right edge", async ({
 
   // Five rows (Appearance, Sound, Units, Leaderboard, Saved game) plus two volume sliders; an empty
   // result would otherwise pass without checking anything
-  expect(offsets).toHaveLength(7);
+  const interfaceSizeRows = await page
+    .getByRole("group", { name: "Interface size" })
+    .count();
+  expect(offsets).toHaveLength(7 + interfaceSizeRows);
   for (const { control, offset } of offsets) {
     expect(Math.abs(offset), control).toBeLessThanOrEqual(2);
   }

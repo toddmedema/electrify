@@ -690,7 +690,7 @@ export default class Compositor extends React.Component<Props, {}> {
     // for more details on use of childFactory in TransitionGroup
     return (
       <div
-        className={`app_container${singlePanel ? " single-panel" : ""}`}
+        className={`app_container${singlePanel ? " single-panel" : ""}${isNavCard(this.props.card.name) && isPaneLayout() ? " hud-frame" : ""}`}
         data-tutorial-hide={hiddenUi?.length ? hiddenUi.join(" ") : undefined}
       >
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />

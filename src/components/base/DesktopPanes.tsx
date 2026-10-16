@@ -1,5 +1,9 @@
 import * as React from "react";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 
 /**
  * The desktop column layout: the panes side by side, with a splitter the player can drag
@@ -64,34 +68,37 @@ function toWeights(widths: number[]): number[] {
   return widths.map((w) => (w / total) * widths.length);
 }
 
-// Freeze undersized tracks at their minimum, then redistribute the remaining space.
+// Allocate by weight between readable minima and role-specific side-panel limits.
 export function constrainedPaneWidths(
   weights: number[],
   total: number,
+  scale = 1,
 ): number[] {
-  const minimum = Math.min(MIN_PANE_PX, total / weights.length);
-  const result = new Array(weights.length).fill(0);
-  let remaining = weights.map((_, index) => index);
-  let available = total;
-  while (remaining.length) {
-    const space = available;
-    const sum = remaining.reduce((value, index) => value + weights[index], 0);
-    const small = remaining.filter(
-      (index) => (space * weights[index]) / sum < minimum,
+  const minimum = Math.min(MIN_PANE_PX * scale, total / weights.length);
+  const maximum = weights.map((_, index) =>
+    weights.length === 1
+      ? Infinity
+      : index === 0
+        ? Math.max(minimum, 480 * scale)
+        : weights.length === 3 && index === 2
+          ? Math.max(minimum, 360 * scale)
+          : Infinity,
+  );
+  // A shared multiplier preserves the requested ratios wherever no limit intervenes.
+  // Solve the monotone sum rather than freezing small tracks prematurely: a capped fleet
+  // can release space that an initially tiny Insights track then needs to absorb.
+  const at = (multiplier: number) =>
+    weights.map((weight, index) =>
+      Math.max(minimum, Math.min(maximum[index], weight * multiplier)),
     );
-    if (!small.length) {
-      remaining.forEach((index) => {
-        result[index] = (space * weights[index]) / sum;
-      });
-      break;
-    }
-    for (const index of small) {
-      result[index] = minimum;
-      available -= minimum;
-    }
-    remaining = remaining.filter((index) => !small.includes(index));
+  let low = 0;
+  let high = total / Math.min(...weights);
+  for (let iteration = 0; iteration < 64; iteration++) {
+    const middle = (low + high) / 2;
+    if (at(middle).reduce((sum, width) => sum + width, 0) < total) low = middle;
+    else high = middle;
   }
-  return result;
+  return at((low + high) / 2);
 }
 
 export interface Props {
@@ -99,6 +106,11 @@ export interface Props {
 }
 
 export default function DesktopPanes(props: Props): React.JSX.Element {
+  const scale = React.useSyncExternalStore(
+    subscribeInterfaceScale,
+    getInterfaceScale,
+    getInterfaceScale,
+  );
   const panes = React.Children.toArray(props.children);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = React.useState(0);
@@ -149,7 +161,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
     ).reduce((sum, el) => sum + el.getBoundingClientRect().width, 0);
     const current = weightsRef.current;
     const weighted = current.reduce((sum, w) => sum + w, 0);
-    return weighted > 0 ? constrainedPaneWidths(current, total) : [];
+    return weighted > 0 ? constrainedPaneWidths(current, total, scale) : [];
   };
 
   /**
@@ -166,7 +178,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
       return undefined;
     }
     const pair = widths[index] + widths[index + 1];
-    const minimum = Math.min(MIN_PANE_PX, pair / 2);
+    const minimum = Math.min(MIN_PANE_PX * scale, pair / 2);
     const first = Math.max(
       minimum,
       Math.min(pair - minimum, widths[index] + delta),
@@ -174,7 +186,13 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
     const next = [...widths];
     next[index] = first;
     next[index + 1] = pair - first;
-    const resized = toWeights(next);
+    const resized = toWeights(
+      constrainedPaneWidths(
+        next,
+        next.reduce((sum, width) => sum + width, 0),
+        scale,
+      ),
+    );
     weightsRef.current = resized;
     setWeights(resized);
     return resized;
@@ -240,6 +258,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
       ? constrainedPaneWidths(
           requested,
           Math.max(0, containerWidth - SPLITTER_PX * (panes.length - 1)),
+          scale,
         )
       : requested;
   const totalWeight = sized.reduce((sum, weight) => sum + weight, 0);

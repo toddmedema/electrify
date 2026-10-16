@@ -45,6 +45,8 @@ import {
 import { ThemeChoiceType } from "./Types";
 import { InstallPromptProvider } from "./components/base/InstallAppButton";
 import { getDesktop, isDesktopApp } from "./Desktop";
+import { isPaneLayout } from "./Globals";
+import { normalizeInterfaceScale } from "./InterfaceScale";
 
 const AchievementNotifications = lazy(
   () =>
@@ -114,6 +116,30 @@ function setupStorage(document: Document) {
  * because a palette change has to reach the whole tree.
  */
 function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+  const preferredScale = useAppSelector(
+    (state) => state.settings.interfaceScale ?? 1,
+  );
+  const [paneEligible, setPaneEligible] = useState(isPaneLayout);
+  useEffect(() => {
+    const update = () => setPaneEligible(isPaneLayout());
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
+  const interfaceScale = paneEligible
+    ? normalizeInterfaceScale(preferredScale)
+    : 1;
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.interfaceScale = String(interfaceScale);
+    root.style.fontSize = `${interfaceScale * 100}%`;
+    root.style.setProperty("--interface-scale", String(interfaceScale));
+    window.dispatchEvent(new Event("electrify-interface-scale"));
+    store.dispatch(layoutChanged());
+  }, [interfaceScale]);
   const choice: ThemeChoiceType = useAppSelector(
     (state) => state.settings.theme,
   );
@@ -176,7 +202,9 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   }, [mode]);
 
   return (
-    <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+    <ThemeProvider theme={createAppTheme(mode, interfaceScale)}>
+      {props.children}
+    </ThemeProvider>
   );
 }
 

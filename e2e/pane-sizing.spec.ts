@@ -44,7 +44,13 @@ for (const theme of ["light", "dark"]) {
         )
         .toBe(true);
       const insights = page.locator(".insights:visible").last();
-      await expect(insights).toHaveClass(/insightsCompact/);
+      // Bounded fleet widths release room to Insights on larger screens. Compactness
+      // must follow the panel's actual width, including a player's saved splitter ratios.
+      if ((await insights.boundingBox())!.width <= 700) {
+        await expect(insights).toHaveClass(/insightsCompact/);
+      } else {
+        await expect(insights).not.toHaveClass(/insightsCompact/);
+      }
       const programs = insights.getByRole("button", {
         name: "Customer programs",
       });

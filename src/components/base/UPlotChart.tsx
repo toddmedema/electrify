@@ -3,6 +3,10 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 import {
   ChartViewportContext,
@@ -250,6 +254,11 @@ export default function UPlotChart<S>(
     getThemeVersion,
     getThemeVersion,
   );
+  const interfaceScale = React.useSyncExternalStore(
+    subscribeInterfaceScale,
+    getInterfaceScale,
+    getInterfaceScale,
+  );
   const [fontReady, setFontReady] = React.useState(
     () => !document.fonts || document.fonts.check("14px Inter"),
   );
@@ -382,7 +391,7 @@ export default function UPlotChart<S>(
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion, fontReady]);
+  }, [width, height, structureKey, themeVersion, fontReady, interfaceScale]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -398,7 +407,15 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion, fontReady]);
+  }, [
+    viewport,
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    fontReady,
+    interfaceScale,
+  ]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -589,7 +606,15 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, height, structureKey, themeVersion, viewportEnabled, fontReady]);
+  }, [
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    viewportEnabled,
+    fontReady,
+    interfaceScale,
+  ]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();

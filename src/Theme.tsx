@@ -309,15 +309,17 @@ export function subscribeThemeMode(onChange: () => void): () => void {
  * The MUI theme for a palette. Cached per mode: MUI rebuilds every component's styles whenever
  * it is handed a theme object it hasn't seen, which is not something a re-render should cost.
  */
-const muiThemes: { [mode in ThemeModeType]?: Theme } = {};
+const muiThemes: Record<string, Theme> = {};
 
-export function createAppTheme(mode: ThemeModeType): Theme {
-  const cached = muiThemes[mode];
+export function createAppTheme(mode: ThemeModeType, interfaceScale = 1): Theme {
+  const key = `${mode}:${interfaceScale}`;
+  const cached = muiThemes[key];
   if (cached) {
     return cached;
   }
   const palette = CHART_PALETTES[mode];
   const built = createTheme({
+    spacing: 8 * interfaceScale,
     palette: {
       mode,
       primary: {
@@ -509,7 +511,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       },
     },
   });
-  muiThemes[mode] = built;
+  muiThemes[key] = built;
   return built;
 }
 

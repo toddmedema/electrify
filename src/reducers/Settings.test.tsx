@@ -28,6 +28,18 @@ it("preserves the browser's first-run sound permission and omits desktop default
   expect(initialSettings.steamTimelineEnabled).toBeUndefined();
 });
 
+it("validates and persists the interface size independently of display resolution", () => {
+  localStorage.setItem("interfaceScale", "1.5");
+  const { initialSettings, default: reducer, change } = settings();
+  expect(initialSettings.interfaceScale).toBe(1.5);
+  expect(
+    reducer(initialSettings, change({ interfaceScale: 1.25 })).interfaceScale,
+  ).toBe(1.25);
+  expect(localStorage.getItem("interfaceScale")).toBe("1.25");
+  localStorage.setItem("interfaceScale", "999");
+  expect(settings().initialSettings.interfaceScale).toBe(1);
+});
+
 it("defaults Electron sound on and independent vibration/highlights off", () => {
   window.electrifyDesktop = { apiVersion: 1 } as DesktopBridge;
   const { initialSettings } = settings();
