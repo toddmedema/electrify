@@ -59,7 +59,7 @@ test("players can choose concurrent goals and their choices survive remount", as
       name: /January and February.*wildfire emergency/,
     }),
   );
-  await user.click(screen.getByRole("menuitem", { name: "Done" }));
+  await user.keyboard("{Escape}");
   view.unmount();
   render(<OperationsPriorities {...passed} />);
   expect(

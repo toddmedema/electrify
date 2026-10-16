@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Menu, MenuItem } from "@mui/material";
+import { Button, IconButton, Menu, MenuItem } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -121,16 +121,15 @@ export default function OperationsPriorities({
       >
         <header className="operationsSectionHeader">
           <h3 id="operationsGoalsTitle">Pinned goals</h3>
-          <Button
+          <IconButton
             size="small"
             onClick={(event) => setGoalAnchor(event.currentTarget)}
             aria-label="Choose pinned goals"
             aria-haspopup="menu"
             aria-expanded={!!goalAnchor}
-            startIcon={<PushPinOutlinedIcon fontSize="small" />}
           >
-            Pin
-          </Button>
+            <PushPinOutlinedIcon fontSize="small" />
+          </IconButton>
         </header>
         <Menu
           transitionDuration={0}
@@ -170,7 +169,6 @@ export default function OperationsPriorities({
               {goal.label}
             </MenuItem>
           ))}
-          <MenuItem onClick={() => setGoalAnchor(null)}>Done</MenuItem>
         </Menu>
         <div className="operationsGoals">
           {pinned.map((id) => {
@@ -200,13 +198,6 @@ export default function OperationsPriorities({
             <p className="operationsEmpty">Pin a goal to keep it in view.</p>
           )}
         </div>
-        <Button
-          className="operationsTextAction"
-          size="small"
-          onClick={() => onEvidence("mission-details")}
-        >
-          All requirements · {mission.monthsRemaining} months left
-        </Button>
       </section>
 
       <section

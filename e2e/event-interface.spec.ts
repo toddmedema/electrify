@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
+import path from "path";
 
 for (const theme of ["light", "dark"] as const) {
   test(`event selection and history filters in ${theme}`, async ({
@@ -40,8 +41,27 @@ for (const theme of ["light", "dark"] as const) {
       page.locator(".eventLog"),
       page.getByRole("button", { name: "Events", exact: true }),
     );
-    const history = page.getByRole("button", { name: /^Event history \(/ });
-    if (await history.isVisible()) await history.click();
+    if (testInfo.project.name === "desktop-chromium") {
+      await expect(
+        page.locator("#operationsHistory .upcomingEvents"),
+      ).toHaveCount(0);
+      const pin = page.getByRole("button", { name: "Choose pinned goals" });
+      await expect(pin).toHaveText("");
+      await pin.click();
+      await expect(page.getByRole("menuitem", { name: "Done" })).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".operationsPriorities")).not.toContainText(
+        "All requirements",
+      );
+      const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+      if (reviewDir && theme === "dark") {
+        await page.locator(".operationsPriorities").scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: path.join(reviewDir, "operations-desktop.png"),
+          animations: "disabled",
+        });
+      }
+    }
     await page
       .getByRole("button", { name: "Filter event history, All events" })
       .click();

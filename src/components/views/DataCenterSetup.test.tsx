@@ -142,9 +142,6 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   expect(request.startingYear).toBe(new Date().getFullYear());
   const growth = preparedScenario();
   reply(growth);
-  expect(
-    screen.getByText(/Uses local weather and a regional power mix\./),
-  ).toBeInTheDocument();
   expect(startButton()).toBeEnabled();
   expect(
     screen.getByRole("heading", { name: "How much extra power?" }),
@@ -256,14 +253,20 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
     target: { value: "19" },
   });
   fireEvent.click(screen.getByText(/^Grid size: /));
-  const accounts = screen.getByRole("spinbutton", {
+  const accounts = screen.getByRole("textbox", {
     name: "Homes and businesses served",
   });
+  fireEvent.change(accounts, { target: { value: "" } });
+  expect(accounts).toHaveValue("");
+  expectStartHidden();
   fireEvent.change(accounts, { target: { value: "0" } });
+  expectStartHidden();
+  fireEvent.change(accounts, { target: { value: "100,000,001" } });
+  expect(accounts).toHaveAttribute("aria-invalid", "true");
   expectStartHidden();
   fireEvent.change(accounts, { target: { value: "123456" } });
   expectStartHidden();
-  expect(accounts).toHaveValue(123456);
+  expect(accounts).toHaveValue("123,456");
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   expect(request.startingCustomers).toBe(123456);
   reply(preparedScenario());
@@ -282,8 +285,8 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
   );
   reply(preparedScenario());
   expect(
-    screen.getByRole("spinbutton", { name: "Homes and businesses served" }),
-  ).toHaveValue(request.startingCustomers!);
+    screen.getByRole("textbox", { name: "Homes and businesses served" }),
+  ).toHaveValue(request.startingCustomers!.toLocaleString("en-US"));
 });
 
 it("blocks starting and offers retry after a worker error", async () => {

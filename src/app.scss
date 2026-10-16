@@ -7161,10 +7161,6 @@ $programs_column: 800px;
     gap: var(--space-3);
   }
 
-  .dataCenterSetupComparison {
-    margin-bottom: var(--space-4);
-  }
-
   .dataCenterSetupContent {
     width: min(100%, var(--data-center-setup-width));
     box-sizing: border-box;
@@ -7264,10 +7260,6 @@ $programs_column: 800px;
         gap: var(--space-1);
       }
     }
-  }
-
-  .dataCenterSetupFactsYears {
-    font-variant-numeric: tabular-nums;
   }
 
   .dataCenterSetupNote {
