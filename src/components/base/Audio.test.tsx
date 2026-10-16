@@ -1,7 +1,15 @@
 import * as React from "react";
 import { act, render } from "@testing-library/react";
 import Audio, { StateProps } from "./Audio";
-import { loadAudioFiles, pause, setMusicInGame, state } from "../../data/Audio";
+import {
+  loadAudioFiles,
+  pause,
+  resume,
+  setMusicInGame,
+  setMusicVolume,
+  setSoundEffectsVolume,
+  state,
+} from "../../data/Audio";
 import { INIT_DELAY } from "../../Constants";
 
 jest.mock("../../data/Audio", () => ({
@@ -81,3 +89,33 @@ it("changes music on entering and leaving a game, including while muted", () => 
   rerender(<Audio {...props} enabled={false} />);
   expect(setMusicInGame).toHaveBeenLastCalledWith(false);
 });
+
+it.each([false, true])(
+  "leaves playback alone during unrelated card/UI and volume updates (inGame=%s)",
+  (inGame) => {
+    state.loaded = "LOADED";
+    const initial = { ...props, inGame };
+    const { rerender } = render(<Audio {...initial} />);
+    act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+    jest.clearAllMocks();
+
+    rerender(
+      <Audio {...initial} events={[]} dialogOpen dialogTitle="Settings" />,
+    );
+    rerender(<Audio {...initial} events={[]} />);
+    rerender(
+      <Audio
+        {...initial}
+        events={[]}
+        musicVolume={0.4}
+        soundEffectsVolume={0.3}
+      />,
+    );
+    expect(setMusicVolume).toHaveBeenCalledWith(0.4);
+    expect(setSoundEffectsVolume).toHaveBeenCalledWith(0.3);
+    expect(setMusicInGame).not.toHaveBeenCalled();
+    expect(loadAudioFiles).not.toHaveBeenCalled();
+    expect(pause).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+  },
+);

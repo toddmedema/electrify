@@ -110,6 +110,35 @@ describe("menu and gameplay music", () => {
     expect(sources[0].stop).not.toHaveBeenCalled();
   });
 
+  it.each([1, 2])(
+    "keeps existing sources and their position when the active theme is selected again (%s)",
+    (intensity) => {
+      const { themeManager, context, sources } = musicHarness();
+      themeManager.setIntensity(intensity);
+      const original = sources.slice();
+      context.currentTime = 7;
+      themeManager.setIntensity(intensity);
+      context.currentTime = 18.5;
+      themeManager.setIntensity(intensity);
+      expect(sources).toEqual(original);
+      for (const source of original) {
+        expect(source.start).toHaveBeenCalledTimes(1);
+        expect(source.stop).not.toHaveBeenCalled();
+      }
+
+      themeManager.pause();
+      context.currentTime = 60;
+      themeManager.resume();
+      for (const source of sources.slice(original.length)) {
+        expect(source.start).toHaveBeenCalledWith(60, 18.5);
+      }
+      const resumed = sources.length;
+      context.currentTime = 65;
+      themeManager.resume();
+      expect(sources).toHaveLength(resumed);
+    },
+  );
+
   it("crossfades into the existing aligned gameplay tracks when a game starts", () => {
     const { themeManager, context, sources } = musicHarness();
     themeManager.setIntensity(1);

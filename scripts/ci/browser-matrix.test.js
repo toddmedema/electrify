@@ -31,7 +31,7 @@ function list(arguments_) {
   return cases;
 }
 
-test("production browser shards preserve the complete pre-sharding PR matrix exactly once", () => {
+test("production browser shards run the complete PR matrix exactly once", () => {
   const projects = ["--project=desktop-chromium", "--project=mobile-390px"];
   const original = [
     ...list([
@@ -41,6 +41,7 @@ test("production browser shards preserve the complete pre-sharding PR matrix exa
       "tutorial-exit.spec.ts",
       "cloud-saves.spec.ts",
       "menu-keyboard.spec.ts",
+      "music.spec.ts",
       "achievements.spec.ts",
       ...projects,
     ]),

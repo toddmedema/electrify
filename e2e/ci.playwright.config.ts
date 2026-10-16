@@ -8,12 +8,13 @@ const smoke = [
   "tutorial-exit.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
+  "music.spec.ts",
   "achievements.spec.ts",
 ];
 const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
 const port = process.env.E2E_PORT || "3100";
 
-// Preserve the exact old PR matrix: smoke at 1280/390 px, layout at 1280/390/320 px.
+// Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/320 px.
 // One invocation lets Playwright shard all cases together without starting a dev compiler.
 export default defineConfig({
   ...base,
