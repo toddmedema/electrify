@@ -5,8 +5,8 @@
     "height": 430,
     "slot": "Store / Header Capsule",
     "required": true,
-    "bytes": 332777,
-    "sha256": "70435a3b2124269125b0f351a4770a34bf8bc3390543e073426cf0ac9cfe93fe"
+    "bytes": 348285,
+    "sha256": "47cecf7e8ad092e4ab4db60bdd5058666a611d3f143ae56a319b6bac844c1ca5"
   },
   {
     "file": "store-small.png",
@@ -23,8 +23,8 @@
     "height": 706,
     "slot": "Store / Main Capsule",
     "required": true,
-    "bytes": 607178,
-    "sha256": "41e1c518a4ac3a46146c5a9058082f0fbd8db5ca696cf1ab4e0240e8ded11154"
+    "bytes": 653375,
+    "sha256": "db1860e48a3623f690e7f24065c9736c0fa15d6aacb4ffa4e75694c7f2c0e341"
   },
   {
     "file": "store-vertical.png",
@@ -32,8 +32,8 @@
     "height": 896,
     "slot": "Store / Vertical Capsule",
     "required": true,
-    "bytes": 495898,
-    "sha256": "09aa03619cb68bb2070d6e33ab6ed7c4dead45fea35629d9d911599112b601c8"
+    "bytes": 506774,
+    "sha256": "d4e5fb14307490f2347566b07911d613d41ec91fc938d5559e05826e17c0cde5"
   },
   {
     "file": "library-capsule.png",
@@ -41,8 +41,8 @@
     "height": 900,
     "slot": "Library / Capsule",
     "required": true,
-    "bytes": 407066,
-    "sha256": "21d0a18a7e2f45861f678a734fefb63a64d9ef2d57d1cc042beb3f321bc6e044"
+    "bytes": 414461,
+    "sha256": "440e27d03276ae00740fc424cf42b32b76b780606943ef93d5ab8ba73c66dc39"
   },
   {
     "file": "library-header.png",
@@ -50,8 +50,8 @@
     "height": 430,
     "slot": "Library / Header",
     "required": true,
-    "bytes": 332777,
-    "sha256": "70435a3b2124269125b0f351a4770a34bf8bc3390543e073426cf0ac9cfe93fe"
+    "bytes": 348285,
+    "sha256": "47cecf7e8ad092e4ab4db60bdd5058666a611d3f143ae56a319b6bac844c1ca5"
   },
   {
     "file": "library-hero.png",
@@ -59,8 +59,8 @@
     "height": 1240,
     "slot": "Library / Hero",
     "required": true,
-    "bytes": 1524520,
-    "sha256": "7e2e61b3418c8ebbfc1ef61a0cf0b4e527768f34a859766818b0597e7a82ce46"
+    "bytes": 2842588,
+    "sha256": "cf5b6463bba22dfa8061bfa55882208e09a11858a3a9387f94869289906a4905"
   },
   {
     "file": "library-logo.png",
@@ -78,8 +78,8 @@
     "height": 810,
     "slot": "Store / Page Background",
     "required": false,
-    "bytes": 447686,
-    "sha256": "6ce08dd4952e0371e0999e316dc9724218ad4f09b64ff915c8b28fed9434f020"
+    "bytes": 450510,
+    "sha256": "5b6fb492fc89d29d345c999e63bd8a246da466aaa8bd271e84f6c20e58ec6cfb"
   },
   {
     "file": "event-cover.png",
@@ -87,8 +87,8 @@
     "height": 450,
     "slot": "Events / Cover (when posting an event)",
     "required": false,
-    "bytes": 312898,
-    "sha256": "0b9ec6aee9af404b0941ff10d77fa2ade92a418ff44cf5eefb1f25a0ce8719ba"
+    "bytes": 326224,
+    "sha256": "c5f4dbd52bca7fe3e53f40f92057e33ee51f0ac087474fb776b844bd9be36d87"
   },
   {
     "file": "event-header.png",
@@ -96,8 +96,8 @@
     "height": 622,
     "slot": "Events / Header",
     "required": false,
-    "bytes": 684165,
-    "sha256": "0aad337683681724fe3c0ccbe1da0433a24ebf6c65fcf2edb2adfab867951057"
+    "bytes": 1089673,
+    "sha256": "6212a6c1d5f5428e8e9f5d497766d92ccd3b3ca26944d391a4141b1b3c17633d"
   },
   {
     "file": "shortcut-icon.png",

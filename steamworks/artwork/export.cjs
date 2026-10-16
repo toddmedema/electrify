@@ -15,8 +15,12 @@ const logo = fs
   .replace(/<\/svg>\s*$/, "");
 const mark = (x, y, w) =>
   `<svg x="${x}" y="${y}" width="${w}" height="${(w * 70) / 300}" viewBox="0 0 300 70" fill="none">${logo}</svg>`;
-const scene = (file, w, h, align = "xMidYMid") =>
-  `<image href="${file}" width="${w}" height="${h}" preserveAspectRatio="${align} slice"/>`;
+const scene = (file, w, h, align = "xMidYMid", frame) => {
+  if (!frame)
+    return `<image href="${file}" width="${w}" height="${h}" preserveAspectRatio="${align} slice"/>`;
+  const data = fs.readFileSync(path.join(sources, file));
+  return `<svg width="${w}" height="${h}" viewBox="${frame.join(" ")}" preserveAspectRatio="${align} slice"><image href="${file}" width="${data.readUInt32BE(16)}" height="${data.readUInt32BE(20)}"/></svg>`;
+};
 const layouts = [
   {
     file: "store-header.png",
@@ -80,6 +84,7 @@ const layouts = [
     slot: "Library / Hero",
     required: true,
     art: "connected-hero.png",
+    frame: [0, 12, 2171, 700],
   },
   {
     file: "library-logo.png",
@@ -117,7 +122,8 @@ const layouts = [
     slot: "Events / Header",
     required: false,
     art: "connected-hero.png",
-    title: [86, 100, 740],
+    frame: [0, 12, 2171, 700],
+    title: [72, 456, 600],
   },
 ];
 
@@ -212,10 +218,11 @@ async function main() {
         dim,
         transparent,
         align,
+        frame,
         ...rest
       } = layout;
       const body =
-        (art ? scene(art, width, height, align) : "") +
+        (art ? scene(art, width, height, align, frame) : "") +
         (dim
           ? `<rect width="100%" height="100%" fill="#07121d" opacity=".65"/>`
           : "") +
@@ -325,7 +332,7 @@ async function main() {
       path.join(root, "manifest.json"),
       `${JSON.stringify(manifest, null, 2)}\n`,
     );
-    const review = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Electrify · Connected landscape</title><style>*{box-sizing:border-box}body{margin:0;padding:32px;background:#e8edf3;color:#142337;font:15px system-ui;line-height:1.5}h1{font-size:28px;margin:0 0 8px}h2{font-size:21px}main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}figure{margin:0}img{display:block;width:100%;height:230px;object-fit:contain;background:#102031}figcaption{padding:8px 0}small{display:block}section{margin:32px 0}a{color:#075ab4}.lead{display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start}.lead img{height:auto}.tiny{width:auto;height:auto}.hero{position:relative}.hero img{height:auto}.hero .logo{position:absolute;left:5%;bottom:18%;width:27%;height:auto;background:none}.logo-light{background:#edf2f7}.download{display:flex;flex-wrap:wrap;gap:16px}@media(max-width:800px){body{padding:16px}main,.lead{grid-template-columns:1fr}}</style><h1>Electrify · Connected landscape</h1><p>The selected artwork, adapted for every Steam format. Preview labels and simulated logo placement are review aids only.</p><section class="lead"><figure><a href="uploads/store-main.png"><img src="uploads/store-main.png" alt="Electrify main capsule with the blue pylon and connected electricity landscape"></a><figcaption>Main store capsule · 1232 × 706</figcaption></figure><div><h2>Production artwork</h2><p>One connected community, powered by hydro, wind, solar and a compact power station. Bold electric blue, ivory and navy keep the electricity theme clear.</p><p><a href="README.md">Upload map and instructions</a><br><a href="sources/connected-landscape.png">Preserved approved master</a><br><a href="review-notes.md">Independent review notes</a></p><strong>Actual small-capsule sizes</strong><p><img class="tiny" src="uploads/store-small.png" style="width:120px" alt="Small capsule at 120 by 45 pixels"></p><p><img class="tiny" src="uploads/store-small.png" style="width:184px" alt="Small capsule at 184 by 69 pixels"></p></div></section><h2>Steam upload files</h2><main>${manifest
+    const review = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Electrify · Connected landscape</title><style>*{box-sizing:border-box}body{margin:0;padding:32px;background:#e8edf3;color:#142337;font:15px system-ui;line-height:1.5}h1{font-size:28px;margin:0 0 8px}h2{font-size:21px}main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}figure{margin:0}img{display:block;width:100%;height:230px;object-fit:contain;background:#102031}figcaption{padding:8px 0}small{display:block}section{margin:32px 0}a{color:#075ab4}.lead{display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start}.lead img{height:auto}.tiny{width:auto;height:auto}.hero{position:relative}.hero img{height:auto}.hero .logo{position:absolute;left:4%;bottom:8%;width:23%;height:auto;background:none}.logo-light{background:#edf2f7}.download{display:flex;flex-wrap:wrap;gap:16px}@media(max-width:800px){body{padding:16px}main,.lead{grid-template-columns:1fr}}</style><h1>Electrify · Connected landscape</h1><p>The selected artwork, adapted for every Steam format. Preview labels and simulated logo placement are review aids only.</p><section class="lead"><figure><a href="uploads/store-main.png"><img src="uploads/store-main.png" alt="Electrify main capsule with the blue pylon and connected electricity landscape"></a><figcaption>Main store capsule · 1232 × 706</figcaption></figure><div><h2>Production artwork</h2><p>A community powered by hydro, wind, solar and a compact power station. Bold electric blue, ivory and navy keep the electricity theme clear.</p><p><a href="README.md">Upload map and instructions</a><br><a href="sources/connected-landscape.png">Selected master without the diagram overlay</a><br><a href="review-notes.md">Independent review notes</a></p><strong>Actual small-capsule sizes</strong><p><img class="tiny" src="uploads/store-small.png" style="width:120px" alt="Small capsule at 120 by 45 pixels"></p><p><img class="tiny" src="uploads/store-small.png" style="width:184px" alt="Small capsule at 184 by 69 pixels"></p></div></section><h2>Steam upload files</h2><main>${manifest
       .filter((item) => /\.(png|jpg)$/.test(item.file))
       .map(
         (item) =>
@@ -333,7 +340,7 @@ async function main() {
       )
       .join(
         "",
-      )}</main><p class="download"><a href="uploads/shortcut-icon.ico">Windows ICO · 16–256 px</a><a href="uploads/mac-icon.icns">macOS ICNS · 16–1024 px</a></p><section><h2>Library hero with separate logo</h2><div class="hero"><img src="uploads/library-hero.png" alt="Text-free library hero"><img class="logo" src="uploads/library-logo.png" alt="Separate white Electrify logo, simulated Steam placement"></div><p>The full central pylon, town and generation group remains inside the centered 860 × 380 safe crop. Position the separate logo in Steamworks’ preview.</p></section><section><h2>Transparent logo on a light surface</h2><img class="logo-light" src="uploads/library-logo.png" style="max-width:640px;height:auto" alt="White logo transparency check; intended for the dark hero"></section><h2>Authentic gameplay screenshots</h2><main>${
+      )}</main><p class="download"><a href="uploads/shortcut-icon.ico">Windows ICO · 16–256 px</a><a href="uploads/mac-icon.icns">macOS ICNS · 16–1024 px</a></p><section><h2>Library hero with separate logo</h2><div class="hero"><img src="uploads/library-hero.png" alt="Text-free library hero"><img class="logo" src="uploads/library-logo.png" alt="Separate white Electrify logo, simulated Steam placement"></div><p>The center crop retains the town and electricity infrastructure; the full panorama extends through the dam, wind farm, solar field and foreground pylon. Position the separate logo in Steamworks’ preview.</p></section><section><h2>Transparent logo on a light surface</h2><img class="logo-light" src="uploads/library-logo.png" style="max-width:640px;height:auto" alt="White logo transparency check; intended for the dark hero"></section><h2>Authentic gameplay screenshots</h2><main>${
       fs.existsSync(path.join(root, "screenshots"))
         ? fs
             .readdirSync(path.join(root, "screenshots"))

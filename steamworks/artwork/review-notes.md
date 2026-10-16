@@ -1,4 +1,4 @@
-# Steam artwork review — October 15, 2026
+# Steam artwork review — October 16, 2026
 
 **Connected landscape** is the user-selected production direction. Two independent
 visual reviewers and the Steam genre reviewer inspected the matching final exports
@@ -6,16 +6,24 @@ and approved them without material visual blockers.
 
 ## Final production verification
 
-| Reviewer             | Result                                                                                                          |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Visual reviewer A    | Approved main, small and portrait capsules, title separation, consistent landscape and complete hero safe crop. |
-| Visual reviewer B    | Approved coherent branding, hierarchy, contrast, readable thumbnails and portrait compositions.                 |
-| Steam genre reviewer | Approved immediate electricity-management recognition and consistency with authentic gameplay screenshots.      |
+| Reviewer             | Result                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Visual reviewer A    | Approved main, small and portrait capsules, title separation, consistent landscape and recognizable central hero crop. |
+| Visual reviewer B    | Approved coherent branding, hierarchy, contrast, readable thumbnails and portrait compositions.                        |
+| Steam genre reviewer | Approved immediate electricity-management recognition and consistency with authentic gameplay screenshots.             |
+
+The user selected the richer low-angle panorama, with a large foreground pylon,
+for the text-free hero and requested removal of its four white-centered node
+markers. The thick blue zigzag and its three nodes were removed from the existing
+capsule compositions. Both visual reviewers confirmed that the facilities,
+terrain, composition and title spacing remain intact, and the genre reviewer
+approved the revised presentation.
 
 The dedicated small capsule was inspected at **120 × 45** and **184 × 69**. The
-literal centered **860 × 380** hero crop retains the pylon, town, hydro, wind, power
-station and solar array. Every applicable art slot follows the same connected
-landscape identity. The original vector wordmark and established app/shortcut icon
+literal centered **860 × 380** hero crop retains recognizable town and electricity
+infrastructure. Larger facilities extend across the panorama; the foreground
+pylon is intentionally cropped at the right edge. Every applicable art slot
+follows the same Connected landscape identity. The original vector wordmark and established app/shortcut icon
 provide consistent branding.
 
 The six gameplay screenshots retain the previously verified real game interface,
@@ -24,7 +32,7 @@ forecast. They contain no generated gameplay or marketing overlays. Keep screens
 01 first. Position the separate library logo in Steamworks' preview when uploading.
 
 Technical validation decodes all upload images, checks dimensions, alpha, hashes
-and icon containers, verifies the approved master's checksum and resolves gallery
+and icon containers, verifies the current selected master's checksum and resolves gallery
 and SVG references. It rejects unlisted illustration masters or upload files.
 
 ## Current Steam comparison

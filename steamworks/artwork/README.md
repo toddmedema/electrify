@@ -4,8 +4,10 @@ The production artwork uses **Connected landscape**, the user-selected illustrat
 blue transmission pylon, connected town, hydro, wind, solar and power station in a
 bold navy, electric-blue and ivory composition. Each Steam format has a matching
 layout with the original Electrify wordmark. See the [gallery](review.html) and
-[review notes](review-notes.md). The approved native master is preserved unchanged
-in [sources/connected-landscape.png](sources/connected-landscape.png).
+[review notes](review-notes.md). The selected composition, with its diagram overlay
+removed, is retained in [sources/connected-landscape.png](sources/connected-landscape.png). The text-free
+hero uses the selected low-angle panorama with a large foreground pylon; its
+white-centered blue node markers are removed.
 
 ## Upload map
 
@@ -33,8 +35,10 @@ source SVGs and review crops are not Steam upload slots.
 | Gameplay screenshots      | `screenshots/01-*.png` through `06-*.png` | 1920 × 1080 each        | Six provided; Steam requires five    |
 
 The white library logo is intended for the dark library hero. Upload it separately
-and use Steamworks' preview to position it in the lower left. The essential hero
-motif fits the centered **860 × 380** safe area. The small capsule has a dedicated
+and use Steamworks' preview to position it in the lower left. The hero extends
+across the full canvas; its centered **860 × 380** crop retains
+recognizable town and electricity infrastructure. The large foreground pylon is
+intentionally cropped at the outer edge. The small capsule has a dedicated
 layout checked at **120 × 45** and **184 × 69**; it is not a miniature main capsule.
 
 Upload screenshot 01 first. The remaining images show generator comparisons,
