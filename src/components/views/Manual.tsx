@@ -324,7 +324,6 @@ export default function Manual(props: Props): React.JSX.Element {
 
   return (
     <ScreenPage
-      className="screenManual"
       id="gameCard"
       title="Manual"
       onBack={onBack}

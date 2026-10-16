@@ -6,7 +6,7 @@ async function openSettings(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 }
 
-test("settings use a centered readable measure on desktop", async ({
+test("settings fill the shared menu container on desktop", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-1440px");
@@ -23,7 +23,9 @@ test("settings use a centered readable measure on desktop", async ({
 
   const bounds = await preferences.boundingBox();
   expect(bounds).not.toBeNull();
-  expect(bounds!.width).toBeLessThanOrEqual(760);
+  const frame = (await page.locator(".screenPage").boundingBox())!;
+  expect(bounds!.x).toBeCloseTo(frame.x + 16, 0);
+  expect(bounds!.width).toBeCloseTo(frame.width - 32, 0);
 });
 
 // Every control sits at the row's right edge: labels anchor left, controls anchor right. The row's

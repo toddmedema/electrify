@@ -304,7 +304,6 @@ export default function NewGame(props: Props): React.JSX.Element {
   return (
     <ScreenPage
       id="listCard"
-      className="screenCatalog"
       title="Choose a game"
       onBack={props.onBack}
       trailing={

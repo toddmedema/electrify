@@ -158,9 +158,7 @@ export default function SavedGames(): React.JSX.Element {
           className="savedGames"
           sx={{
             width: "100%",
-            maxWidth: 760,
-            mx: "auto",
-            p: { xs: 2, sm: 3 },
+            pt: { xs: 2, sm: 3 },
             boxSizing: "border-box",
             pb: "max(24px, env(safe-area-inset-bottom))",
           }}

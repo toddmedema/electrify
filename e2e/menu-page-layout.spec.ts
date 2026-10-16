@@ -8,12 +8,48 @@ async function expectPageLayout(page: Page, title: string) {
   const toolbar = header.locator(".screenHeaderBar");
   const bounds = (await frame.boundingBox())!;
   const viewport = page.viewportSize()!;
-  expect(bounds.width).toBeCloseTo(Math.min(viewport.width, 1400), 0);
+  const container = (await page
+    .locator(".app_container.menu-layout")
+    .boundingBox())!;
+  expect(bounds.width).toBeCloseTo(Math.min(viewport.width, 1040), 0);
+  expect(bounds.width).toBeCloseTo(container.width, 0);
+  expect(bounds.x).toBeCloseTo(container.x, 0);
   expect(bounds.x).toBeCloseTo((viewport.width - bounds.width) / 2, 0);
-  for (const element of [header, toolbar]) {
+  const body = frame.locator(":scope > .scrollable");
+  for (const element of [header, toolbar, body]) {
     const box = (await element.boundingBox())!;
     expect(box.x).toBeCloseTo(bounds.x, 0);
     expect(box.width).toBeCloseTo(bounds.width, 0);
+  }
+  const inset = await body.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const left = parseFloat(style.paddingLeft);
+    const right = parseFloat(style.paddingRight);
+    return {
+      x: element.getBoundingClientRect().x + left,
+      width: element.clientWidth - left - right,
+    };
+  });
+  const contentSelectors: Record<string, string[]> = {
+    "Choose a game": [
+      ".groupedList",
+      ".tutorialSpotlight",
+      ".challengeFilters",
+    ],
+    "Custom setup": [".locationPicker", ".customSetupColumns"],
+    "Game details": [".scenarioDossier", ".leaderboard"],
+    "Challenge unavailable": [],
+    Settings: [".settingsGroup"],
+    Manual: [".manual-entry"],
+    "Saved games": [".savedGames"],
+    "Explore data center growth": [".dataCenterSetupContent"],
+  };
+  for (const selector of contentSelectors[title]) {
+    const element = body.locator(selector).first();
+    await expect(element).toBeAttached();
+    const box = (await element.boundingBox())!;
+    expect(box.x, title + " " + selector).toBeCloseTo(inset.x, 0);
+    expect(box.width, title + " " + selector).toBeCloseTo(inset.width, 0);
   }
   const surfaces = await frame.evaluate((element) => {
     const background = (node: Element): string => {
@@ -75,6 +111,12 @@ for (const theme of ["light", "dark"] as const) {
         await page.getByRole("button", { name: "Back", exact: true }).click();
       };
       await page.goto("/");
+      await expect(page.locator(".app_container.menu-layout")).toBeVisible();
+      const home = (await page.locator(".app_container").boundingBox())!;
+      expect(home.width).toBeCloseTo(
+        Math.min(page.viewportSize()!.width, 1040),
+        0,
+      );
       await page
         .getByRole("button", { name: "Start playing", exact: true })
         .click();
@@ -97,8 +139,8 @@ for (const theme of ["light", "dark"] as const) {
       ).not.toBeDisabled();
       if (
         screenshots &&
-        ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
-          (theme === "dark" && testInfo.project.name === "mobile-390px"))
+        theme === "light" &&
+        testInfo.project.name === "desktop-chromium"
       ) {
         await expect(page.locator(".customSetupOutlook-ready")).toBeVisible({
           timeout: 60000,
@@ -114,6 +156,12 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "View Deep Freeze details" })
         .click();
       await expectPageLayout(page, "Game details");
+      if (
+        screenshots &&
+        theme === "dark" &&
+        testInfo.project.name === "mobile-390px"
+      )
+        await captureReview(page, "pr-details-dark-mobile-390px.png");
       await back();
       await back();
       for (const title of ["Settings", "Manual"]) {
@@ -126,6 +174,9 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       await expect(page.locator("#appbar:visible")).toBeVisible();
+      await expect(page.locator(".app_container")).not.toHaveClass(
+        /menu-layout/,
+      );
       await page.getByRole("button", { name: "menu", exact: true }).click();
       await page
         .getByRole("menuitem", { name: "Saved games", exact: true })
@@ -133,6 +184,8 @@ for (const theme of ["light", "dark"] as const) {
       await expectPageLayout(page, "Saved games");
       await page.goto("/?dataCenters=1");
       await expectPageLayout(page, "Explore data center growth");
+      await page.goto("/?challenge=invalid");
+      await expectPageLayout(page, "Challenge unavailable");
     },
   );
 }

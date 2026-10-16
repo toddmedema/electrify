@@ -4,7 +4,7 @@ import ScreenHeader from "./ScreenHeader";
 type Props = React.ComponentProps<typeof ScreenHeader> &
   Omit<React.HTMLAttributes<HTMLDivElement>, "title">;
 
-/** Shared standalone page: full-width navigation and one surface around the scrollable body. */
+/** Shared header and body insets within the compositor's single menu width container. */
 export default React.forwardRef<HTMLDivElement, Props>(function ScreenPage(
   {
     title,

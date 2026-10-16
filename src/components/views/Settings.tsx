@@ -220,9 +220,6 @@ export default function Settings(props: Props): React.JSX.Element {
           spacing={2.5}
           sx={{
             width: "100%",
-            maxWidth: 760,
-            mx: "auto",
-            px: { xs: 2, sm: 3 },
             pt: { xs: 2, sm: 3 },
             pb: "max(24px, env(safe-area-inset-bottom))",
             boxSizing: "border-box",

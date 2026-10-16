@@ -471,12 +471,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   return (
-    <ScreenPage
-      id="listCard"
-      className="screenCustom"
-      title="Custom setup"
-      onBack={onBack}
-    >
+    <ScreenPage id="listCard" title="Custom setup" onBack={onBack}>
       <div className="scrollable">
         <LocationPicker
           locations={selectableLocations}

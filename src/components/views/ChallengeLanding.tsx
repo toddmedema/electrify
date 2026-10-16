@@ -1,4 +1,5 @@
-import { Button, Typography } from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
+import ScreenPage from "../base/ScreenPage";
 import { store, useAppSelector } from "../../Store";
 import { parseChallengeUrl } from "../../helpers/Challenge";
 import { expandAuthoredRunReference } from "../../helpers/RunIdentity";
@@ -31,44 +32,47 @@ export default function ChallengeLanding() {
   };
   if (!invitation)
     return (
-      <div className="flexContainer" style={{ padding: 16 }}>
-        <Typography variant="h5" component="h1">
-          Challenge unavailable
-        </Typography>
-        <Typography role="status" sx={{ my: 2 }}>
-          {route?.error || "This challenge could not be opened."}
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => {
-            if (route?.scenarioId !== undefined) {
-              getHistoryApi().replaceState(
-                null,
-                "",
-                scenarioDetailsUrl(route.scenarioId),
-              );
-              store.dispatch(uiDelta({ scenarioPreview: route.scenarioId }));
-              store.dispatch(
-                navigate({
-                  name: "NEW_GAME_DETAILS",
-                  skipBrowserHistory: true,
-                }),
-              );
-            } else leave();
-          }}
+      <ScreenPage title="Challenge unavailable" onBack={leave}>
+        <Stack
+          className="scrollable"
+          spacing={2}
+          sx={{ py: 2, alignItems: "flex-start" }}
         >
-          {" "}
-          {route?.scenarioId !== undefined
-            ? "Open current mission"
-            : "Choose a mission"}
-        </Button>
-        {(saved || game.inGame) && (
-          <Button onClick={continueGame}>Continue saved game</Button>
-        )}
-        {route?.scenarioId !== undefined && (
-          <Button onClick={leave}>Back to missions</Button>
-        )}
-      </div>
+          <Typography role="status">
+            {route?.error || "This challenge could not be opened."}
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (route?.scenarioId !== undefined) {
+                getHistoryApi().replaceState(
+                  null,
+                  "",
+                  scenarioDetailsUrl(route.scenarioId),
+                );
+                store.dispatch(uiDelta({ scenarioPreview: route.scenarioId }));
+                store.dispatch(
+                  navigate({
+                    name: "NEW_GAME_DETAILS",
+                    skipBrowserHistory: true,
+                  }),
+                );
+              } else leave();
+            }}
+          >
+            {" "}
+            {route?.scenarioId !== undefined
+              ? "Open current mission"
+              : "Choose a mission"}
+          </Button>
+          {(saved || game.inGame) && (
+            <Button onClick={continueGame}>Continue saved game</Button>
+          )}
+          {route?.scenarioId !== undefined && (
+            <Button onClick={leave}>Back to missions</Button>
+          )}
+        </Stack>
+      </ScreenPage>
     );
   return (
     <NewGameDetails
