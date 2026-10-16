@@ -21,8 +21,12 @@
   justify-content: space-between;
   gap: 8px;
 
-  .MuiButton-root {
+  .MuiButtonBase-root {
     min-height: var(--control-size);
+  }
+
+  .MuiIconButton-root {
+    min-width: var(--control-size);
   }
 
   h3 {
@@ -153,41 +157,14 @@
   line-height: 1.5;
 }
 
-.operationsPriorities .operationsTextAction {
-  min-height: var(--control-size);
-  justify-content: flex-start;
-  text-transform: none;
-  padding-inline: 0;
-}
-
-.operationsHistoryToggle {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  display: flex;
-  justify-content: flex-end;
-  max-width: 480px;
-  margin-inline: auto;
-  margin-bottom: 8px;
-  padding: 4px 12px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-subtle);
-
-  > .MuiButton-root {
-    min-height: var(--control-size);
-    text-transform: none;
-  }
-}
-
 #operationsHistory,
 .operationsPane .eventHistory {
-  scroll-margin-block-start: calc(var(--control-size) + 16px);
+  scroll-margin-block-start: 12px;
 }
 
 @media (pointer: coarse) {
-  .operationsSectionHeader .MuiButton-root,
-  .operationsPriorities .operationsTextAction,
-  .operationsHistoryToggle > .MuiButton-root {
+  .operationsSectionHeader .MuiIconButton-root {
+    min-width: max(44px, var(--control-size));
     min-height: max(44px, var(--control-size));
   }
 }

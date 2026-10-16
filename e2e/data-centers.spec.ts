@@ -149,13 +149,48 @@ test("the landing page opens a prepared current-year grid and supports browser h
       Math.abs(start.x + start.width - (content.x + content.width)),
     ).toBeLessThan(2);
     const gridSize = page.locator(".dataCenterSetupGridSize");
+    const power = (await page
+      .getByRole("slider", { name: "Power needed" })
+      .boundingBox())!;
+    const gridSummary = (await gridSize.locator("summary").boundingBox())!;
+    const assumptions = page
+      .locator(".dataCenterSetupAssumptions")
+      .filter({ has: page.locator("summary", { hasText: "Assumptions" }) });
+    expect(gridSummary.y).toBeGreaterThan(power.y + power.height);
+    expect((await assumptions.boundingBox())!.y).toBeGreaterThan(gridSummary.y);
     await gridSize.locator("summary").click();
+    const accountInput = page.getByRole("textbox", {
+      name: "Homes and businesses served",
+    });
+    await accountInput.fill("");
+    await accountInput.pressSequentially("1234567");
+    await expect(accountInput).toHaveValue("1,234,567");
+    await expect(startButton(page)).toBeEnabled({ timeout: 60000 });
     const accounts = (await page
-      .getByRole("spinbutton", { name: "Homes and businesses served" })
+      .getByRole("textbox", { name: "Homes and businesses served" })
       .boundingBox())!;
     const source = (await gridSize.locator("p").last().boundingBox())!;
     expect(source.y).toBeGreaterThan(accounts.y + accounts.height);
+    const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+    if (
+      reviewDir &&
+      ((theme === "light" && testInfo.project.name === "desktop-chromium") ||
+        (theme === "dark" && testInfo.project.name === "mobile-390px"))
+    ) {
+      await gridSize.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(reviewDir, `setup-${testInfo.project.name}.png`),
+        animations: "disabled",
+      });
+    }
     await gridSize.locator("summary").click();
+    await assumptions.locator("summary").click();
+    await expect(assumptions.locator("dt")).toHaveText([
+      "Demand",
+      "Power mix",
+      "Starting plants",
+    ]);
+    await assumptions.locator("summary").click();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
@@ -533,8 +568,8 @@ for (const [city, accounts, energy, territory] of [
     const grid = page.locator(".dataCenterSetupGridSize");
     await grid.locator("summary").click();
     await expect(
-      page.getByRole("spinbutton", { name: "Homes and businesses served" }),
-    ).toHaveValue(String(accounts));
+      page.getByRole("textbox", { name: "Homes and businesses served" }),
+    ).toHaveValue(accounts.toLocaleString("en-US"));
     await expect(grid).toContainText(territory);
     const assumptions = page.locator(".dataCenterSetupAssumptions").filter({
       has: page.locator("summary", {

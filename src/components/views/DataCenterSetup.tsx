@@ -301,51 +301,6 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
               aria-live="polite"
             >
               <div className="dataCenterSetupControls">
-                {customerProfile && (
-                  <details className="dataCenterSetupAssumptions dataCenterSetupGridSize">
-                    <summary>
-                      {accountsInput !== undefined
-                        ? "Your grid size"
-                        : "Grid size"}
-                      {validAccounts &&
-                        `: ${formatCount(startingCustomers!)} accounts`}
-                    </summary>
-                    <TextField
-                      label="Homes and businesses served"
-                      type="number"
-                      value={accountsInput ?? startingCustomers ?? ""}
-                      slotProps={{
-                        htmlInput: { min: 1, max: 100000000, step: 1 },
-                      }}
-                      error={!validAccounts}
-                      helperText={
-                        validAccounts
-                          ? "Customer accounts, not population. Adjust to match the area you want to explore."
-                          : "Enter a whole number from 1 to 100,000,000."
-                      }
-                      onChange={(event) => setAccountsInput(event.target.value)}
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      {accountsInput !== undefined
-                        ? `Published reference: ${formatCount(customerProfile.customers)} accounts from `
-                        : customerProfile.basis === "reference-utility"
-                          ? "Example size based on "
-                          : "Based on "}
-                      <a
-                        href={customerProfile.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {customerProfile.serviceArea}
-                      </a>
-                      {customerProfile.sourceYear
-                        ? ` (${customerProfile.sourceYear})`
-                        : ""}
-                      .
-                    </Typography>
-                  </details>
-                )}
-
                 <Typography
                   component="h2"
                   variant="h6"
@@ -390,19 +345,55 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                     />
                   </div>
                 )}
+                {customerProfile && (
+                  <details className="dataCenterSetupAssumptions dataCenterSetupGridSize">
+                    <summary>
+                      {accountsInput !== undefined
+                        ? "Your grid size"
+                        : "Grid size"}
+                      {validAccounts &&
+                        `: ${formatCount(startingCustomers!)} accounts`}
+                    </summary>
+                    <TextField
+                      label="Homes and businesses served"
+                      value={(
+                        accountsInput ?? String(startingCustomers ?? "")
+                      ).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                      slotProps={{ htmlInput: { inputMode: "numeric" } }}
+                      error={!validAccounts}
+                      helperText={
+                        validAccounts
+                          ? "Customer accounts, not population. Adjust to match the area you want to explore."
+                          : "Enter a whole number from 1 to 100,000,000."
+                      }
+                      onChange={(event) => {
+                        const digits = event.target.value.replace(/,/g, "");
+                        if (/^\d*$/.test(digits)) setAccountsInput(digits);
+                      }}
+                    />
+                    <Typography variant="body2" color="textSecondary">
+                      {accountsInput !== undefined
+                        ? `Published reference: ${formatCount(customerProfile.customers)} accounts from `
+                        : customerProfile.basis === "reference-utility"
+                          ? "Example size based on "
+                          : "Based on "}
+                      <a
+                        href={customerProfile.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {customerProfile.serviceArea}
+                      </a>
+                      {customerProfile.sourceYear
+                        ? ` (${customerProfile.sourceYear})`
+                        : ""}
+                      .
+                    </Typography>
+                  </details>
+                )}
               </div>
               {growthScenario && (
                 <>
-                  <Typography
-                    variant="body2"
-                    color="textSecondary"
-                    className="dataCenterSetupComparison"
-                  >
-                    Uses local weather and a regional power mix. This is an
-                    example grid, not a forecast of your utility’s plans. Your
-                    selected power is a steady total load added to existing
-                    demand and its growth.
-                  </Typography>
                   {growthScenario.facilities.some(
                     (facility) =>
                       facility.label === "Modeled balancing reserve",
@@ -415,14 +406,6 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                   <details className="dataCenterSetupAssumptions">
                     <summary>Assumptions</summary>
                     <dl className="dataCenterSetupFacts">
-                      <div>
-                        <dt>Period</dt>
-                        <dd className="dataCenterSetupFactsYears">
-                          {growthScenario.startingYear}–
-                          {growthScenario.startingYear +
-                            (scenario || growthScenario).durationMonths / 12}
-                        </dd>
-                      </div>
                       <div>
                         <dt>Demand</dt>
                         <dd>
@@ -545,24 +528,6 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
                           <p className="dataCenterSetupNote">
                             This is an opening-year allowance; growing
                             background demand can require more infrastructure.
-                          </p>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Limits</dt>
-                        <dd>
-                          <p>
-                            Hydro is limited to known sites, and geothermal to
-                            suitable locations; those limits can change the
-                            regional mix.
-                          </p>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Costs</dt>
-                        <dd>
-                          <p>
-                            Uses the model’s full costs and construction times.
                           </p>
                         </dd>
                       </div>

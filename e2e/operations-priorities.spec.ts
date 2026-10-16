@@ -25,13 +25,10 @@ for (const layout of [
         page.getByRole("heading", { name: "Pinned goals" }),
       ).toBeVisible();
       await expect(page.locator(".operationsGoal")).toHaveCount(2);
-      const history = page.getByRole("button", { name: /^Event history \(/ });
-      await expect(history).toHaveAttribute("aria-expanded", "false");
-      await history.click();
+      await page.locator(".eventHistory").scrollIntoViewIfNeeded();
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Close history" }).click();
       const goals = page.getByRole("button", { name: "Choose pinned goals" });
       await goals.focus();
       await page.keyboard.press("Enter");
@@ -137,7 +134,7 @@ test("a committed project links its actual asset to grid evidence", async ({
   });
 });
 
-test("history opens at its filter in a short pane with many upcoming events", async ({
+test("history stays below priorities in a short pane without duplicate upcoming events", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120000);
@@ -179,22 +176,13 @@ test("history opens at its filter in a short pane with many upcoming events", as
       flex: "0 0 210px",
     });
   });
-  await page.getByRole("button", { name: /^Event history \(/ }).click();
-  expect(
-    await page.locator(".upcomingEvents .eventLogItem").count(),
-  ).toBeGreaterThanOrEqual(4);
-  await expect(
-    page.getByRole("region", { name: "Event history" }),
-  ).toBeFocused();
+  await expect(page.locator("#operationsHistory .upcomingEvents")).toHaveCount(
+    0,
+  );
+  await page.locator(".eventHistory").scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("button", { name: "Filter event history, All events" }),
   ).toBeInViewport({ ratio: 1 });
-  await expect(
-    page.getByRole("button", { name: "Close history", exact: true }),
-  ).toBeInViewport({ ratio: 1 });
-  await page
-    .getByRole("button", { name: "Close history", exact: true })
-    .click({ trial: true });
   await page.screenshot({
     path: testInfo.outputPath("history-short-pane.png"),
   });

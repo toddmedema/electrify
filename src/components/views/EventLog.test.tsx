@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EventLog from "./EventLog";
 import * as Globals from "../../Globals";
@@ -12,9 +12,8 @@ jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
 describe("EventLog", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => jest.restoreAllMocks());
-  it("keeps the pane's full history available on demand and opens it for evidence", async () => {
+  it("keeps history below priorities without duplicate announcements and targets it for evidence", () => {
     jest.spyOn(Globals, "isPaneLayout").mockReturnValue(true);
-    const user = userEvent.setup();
     const onEvidenceReady = jest.fn();
     const passed = {
       game: createGame({ scenarioId: 111 }),
@@ -39,21 +38,20 @@ describe("EventLog", () => {
       onEvidenceReady,
     };
     const view = render(<EventLog {...passed} />);
-    expect(screen.queryByText("A recorded build.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Event history (1)" }));
     expect(screen.getByText("A recorded build.")).toBeVisible();
-    // History has its own destination even when many future announcements precede it.
-    expect(screen.getByRole("region", { name: "Event history" })).toHaveFocus();
-    expect(
-      screen.getAllByText(/Future announcement/).length,
-    ).toBeGreaterThanOrEqual(4);
-    await user.click(screen.getByRole("button", { name: "Close history" }));
+    const history = screen.getByRole("region", { name: "Event history" });
+    expect(within(history).queryByText(/Future announcement/)).toBeNull();
+    expect(screen.getAllByText(/Future announcement/)).toHaveLength(1);
     const request = { id: 1, runId: 0, target: { card: "EVENTS" as const } };
     view.rerender(<EventLog {...passed} evidenceRequest={request} />);
     expect(screen.getByText("A recorded build.")).toBeVisible();
     expect(onEvidenceReady).toHaveBeenCalledWith(
       request,
       expect.any(HTMLElement),
+    );
+    expect(onEvidenceReady.mock.calls[0][1]).toHaveAttribute(
+      "id",
+      "operationsHistory",
     );
     expect(passed.onOpen).toHaveBeenCalledTimes(1);
   });
