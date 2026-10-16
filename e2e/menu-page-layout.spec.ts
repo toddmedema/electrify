@@ -75,7 +75,19 @@ async function expectPageLayout(page: Page, title: string) {
 async function captureReview(page: Page, filename: string) {
   await page.evaluate(() => document.fonts.ready);
   await page.mouse.move(0, 0);
+  const leaderboard = filename.startsWith("pr-details")
+    ? await page.locator(".leaderboard").boundingBox()
+    : null;
+  const viewport = page.viewportSize()!;
   await page.screenshot({
+    clip: leaderboard
+      ? {
+          x: 0,
+          y: 0,
+          width: viewport.width,
+          height: Math.min(viewport.height, leaderboard.y - 8),
+        }
+      : undefined,
     path: path.join(process.env.REVIEW_SCREENSHOT_DIR!, filename),
     animations: "disabled",
   });

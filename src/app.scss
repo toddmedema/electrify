@@ -7385,6 +7385,7 @@ $programs_column: 800px;
 }
 
 .worldMap {
+  box-sizing: border-box;
   position: relative;
   grid-area: map;
   width: 100%;
