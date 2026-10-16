@@ -35,8 +35,10 @@ import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
+import CoopBrowseBar, { CoopStartButton } from "../base/CoopBrowseBar";
 import {
   ChallengeInvitation,
+  CoopSelectionType,
   GameType,
   LocationType,
   ReplayType,
@@ -52,6 +54,8 @@ export interface StateProps {
   onContinue?: () => void;
   game: GameType;
   uid?: string;
+  /** Choosing with a co-op lobby: the host starts for everyone; guests mark Ready. */
+  coop?: CoopSelectionType;
 }
 
 export interface DispatchProps {
@@ -352,7 +356,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   public render() {
-    const { onBack, onDelta, onStart, game, uid, challenge, onContinue } =
+    const { onBack, onDelta, onStart, game, uid, challenge, onContinue, coop } =
       this.props;
     const {
       scenario,
@@ -401,6 +405,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         titleComponent="div"
         onBack={onBack}
       >
+        <CoopBrowseBar coop={coop} />
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
             <img
@@ -463,21 +468,30 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       showDescription
                       value={game.difficulty}
                       onChange={(difficulty) => onDelta({ difficulty })}
+                      readOnly={coop?.role === "guest"}
                     />
                   </div>
                 )}
-                <Button
-                  className="scenarioStartButton"
-                  size="large"
-                  variant="contained"
-                  color="primary"
-                  onClick={() => onStart(scenario.id)}
-                  startIcon={<PlayCircleIcon />}
-                >
-                  {challenge ? "Start challenge" : "Start game"}
-                </Button>
+                {coop ? (
+                  <CoopStartButton
+                    className="scenarioStartButton"
+                    coop={coop}
+                    onStart={() => onStart(scenario.id)}
+                  />
+                ) : (
+                  <Button
+                    className="scenarioStartButton"
+                    size="large"
+                    variant="contained"
+                    color="primary"
+                    onClick={() => onStart(scenario.id)}
+                    startIcon={<PlayCircleIcon />}
+                  >
+                    {challenge ? "Start challenge" : "Start game"}
+                  </Button>
+                )}
               </div>
-              {onContinue && (
+              {onContinue && !coop && (
                 <Button onClick={onContinue}>Continue saved game</Button>
               )}
             </div>
@@ -491,7 +505,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             difficulty={game.difficulty}
           />
 
-          {!challenge && (
+          {!challenge && !coop && (
             <div className="leaderboard">
               {desktopApp && (
                 <ToggleButtonGroup

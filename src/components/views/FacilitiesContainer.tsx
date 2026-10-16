@@ -25,6 +25,7 @@ import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import { focusEvidence } from "../../helpers/Evidence";
+import { multiplayerRuntime } from "../../multiplayer/Registry";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -77,7 +78,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onFacilityDragStart: (speed) => {
       dispatch(setFacilityDragActive(true));
-      if (speed !== "PAUSED") {
+      if (speed !== "PAUSED" && !multiplayerRuntime()) {
         dispatch(setSpeed("PAUSED"));
       }
     },
@@ -96,7 +97,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           }),
         );
       }
-      if (resumeSpeed !== "PAUSED") {
+      if (resumeSpeed !== "PAUSED" && !multiplayerRuntime()) {
         dispatch(setSpeed(resumeSpeed));
       }
     },

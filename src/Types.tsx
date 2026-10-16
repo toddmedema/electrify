@@ -1181,7 +1181,78 @@ export interface PolicyChangeType {
   month: number;
   startHour?: number;
 }
+/** One co-op grid's tick offer or need, planned before any grid settles the shared tick. */
+export interface PeerPlan {
+  offerW: number;
+  shortageW: number;
+  pricePerMWh: number;
+  temperatureC: number;
+  solarIrradianceWM2: number;
+  /**
+   * Average emissions of exporting this many watts. Host-only planning closure; never persisted
+   * or replicated.
+   */
+  emissionsAt: (exportedW: number) => number;
+}
+/** How one company's co-op run ended: it failed and retired, or reached the scenario's term. */
+export interface CompanyOutcomeType {
+  outcome: "bankrupt" | "fired" | "completed";
+  title: string;
+  reason?: string;
+  /** Months elapsed when the run ended. */
+  month: number;
+}
+/** One row of the co-op result table. */
+export interface CompanyResultType extends CompanyOutcomeType {
+  id: string;
+  name: string;
+  cash: number;
+  kgco2e: number;
+  /** Share of demand served over the whole run. */
+  reliability: number;
+}
+/** What the shared market delivered to one grid this tick. */
+export interface PeerSettlement {
+  importedW: number;
+  exportedW: number;
+  importEmissionsKgPerMWh: number;
+}
 export interface GameType {
+  /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
+  multiplayer?: {
+    seat: string;
+    pricePerMWh?: number;
+    /** Set by the host at the rollover where this company's run ends. */
+    ending?: CompanyOutcomeType;
+    /** Every company whose run has ended, including this one; published by the host. */
+    results?: CompanyResultType[];
+    peers?: {
+      id: string;
+      name: string;
+      locationId: string;
+      corridor: TransmissionCorridorDefinitionType;
+      availableSupplyW?: number;
+      ratingW?: number;
+      upgradeRequestedBy?: string;
+      /** This player asked for the pending upgrade and waits on the other owner. */
+      upgradeRequestedBySelf?: boolean;
+      /** This neighbor's run ended, so its link no longer carries power. */
+      retired?: boolean;
+    }[];
+    clock?: {
+      activeSpeed: SpeedType;
+      selectedSpeed: SpeedType;
+      reason: string;
+      readyRequired: boolean;
+      ready: boolean;
+      players: {
+        id: string;
+        name: string;
+        selectedSpeed: SpeedType;
+        pauseReason?: string;
+      }[];
+    };
+  };
   /** Shared achievement telemetry; retain the legacy save key for compatibility. */
   desktopAchievements?: import("./achievements/SimulationHooks").AchievementProgress;
   runIdentity?: RunIdentity;
@@ -1450,7 +1521,30 @@ export interface VictoryDebriefType {
   >;
 }
 
+/** Choosing a co-op game together: who drives the selection screens, and who is Ready. */
+export interface CoopSelectionType {
+  role: "host" | "guest";
+  hostName: string;
+  /** Everyone in the lobby, with Ready meaning ready for the selection on screen now. */
+  players: {
+    id: string;
+    name: string;
+    host: boolean;
+    connected: boolean;
+    ready: boolean;
+  }[];
+  /** This guest marked Ready for the selection on screen now. */
+  ready: boolean;
+  /** The host has started the match and everyone is loading into it. */
+  starting: boolean;
+  /** The custom game the host is setting up, mirrored to guests. */
+  custom?: ScenarioType;
+  /** What the host has open, in words, such as "Deep Freeze on Easy". */
+  viewing?: string;
+}
 export interface UIType {
+  /** Set while this player chooses a co-op game together with their lobby. */
+  coop?: CoopSelectionType;
   // A one-time guide requested by the data center launch; never part of a save or scenario.
   dataCenterGuideRequested?: boolean;
   challengeHref?: string;

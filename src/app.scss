@@ -903,10 +903,29 @@ $topbar_height: 56px;
     flex: 0 0 auto;
   }
 
+  // A shared game exposes the fifth speed so every player's preference remains visible.
+  // Stack the existing readouts before giving the unchanged speed buttons another row.
+  #topbar:has(.multiplayerSpeedToggles) .gameStatus {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    font-size: var(--font-size-subtitle);
+    line-height: 1.2;
+  }
+
   #topbar .gameStatus .weak {
     font-size: var(--font-size-body2);
   }
   @media screen and (max-width: 359px) {
+    #topbar:has(.multiplayerSpeedToggles)
+      .constructionTitleBar.MuiToolbar-root {
+      flex-wrap: wrap !important;
+    }
+
+    #topbar:has(.multiplayerSpeedToggles) .constructionSpeed {
+      margin-left: auto;
+    }
+
     #topbar .gameStatus {
       flex-direction: column;
       align-items: flex-start;
@@ -3837,6 +3856,81 @@ $pane_header_height: 48px;
     }
   }
 
+  // Co-op splits the single-player selection in two. Your own request is an interaction, so it
+  // takes the blue fill. The speed the shared clock actually runs at is status: like the
+  // single-player selected segment it is neutral text, circled by a neutral ring that pulses
+  // with the tutorial's slow rhythm. A blue pulsing ring would read as a tutorial target.
+  .multiplayerSpeedToggles .MuiToggleButton-root {
+    // The label and ring sit a little high, clearing the marker row on the bottom edge: the
+    // ring spans 2-32 px of a 40 px button and 4-34 px of a 44 px one, and only a middle
+    // marker (heads from 29 or 33 px) meets it, breaking it cleanly with its knockout.
+    --clock-lift: 3px;
+    --clock-ring: var(--font-color-primary);
+    // What a marker's knockout outline matches, so the ring breaks cleanly behind a marker
+    --clock-segment: var(--bg-primary);
+
+    .multiplayerSpeedLabel {
+      transform: translateY(calc(-1 * var(--clock-lift)));
+    }
+
+    .multiplayerSpeedPeers svg {
+      color: $font_color_faded;
+
+      path {
+        stroke: var(--clock-segment);
+        stroke-width: 4px; // 1 px outside the 12 px glyph
+        stroke-linejoin: round;
+        paint-order: stroke;
+      }
+    }
+
+    &[data-active-speed="true"] {
+      color: $font_color_primary;
+    }
+
+    &.Mui-selected,
+    &.Mui-selected:hover {
+      --clock-ring: var(--interactive-contrast);
+      --clock-segment: var(--interactive-blue);
+      background: var(--interactive-blue);
+      color: var(--interactive-contrast);
+
+      .multiplayerSpeedPeers svg {
+        color: var(--interactive-contrast);
+      }
+    }
+
+    // One size wherever it moves, wide enough that 24× clears the stroke
+    &[data-active-speed="true"]::before {
+      --tutorial-glow: color-mix(in srgb, var(--clock-ring) 40%, transparent);
+      // Half the tutorial's reach keeps the glow inside the segment
+      --tutorial-pulse-spread: 4px;
+      content: "";
+      position: absolute;
+      top: calc(50% - var(--clock-lift));
+      left: 50%;
+      width: 30px;
+      height: 30px;
+      box-sizing: border-box;
+      transform: translate(-50%, -50%);
+      border: 2px solid var(--clock-ring);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: tutorialTargetPulse 10s ease-in-out infinite;
+    }
+
+    // The next segment paints over an outset focus ring unless the focused one is raised
+    &:focus-visible {
+      z-index: 2;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      &[data-active-speed="true"]::before {
+        animation: none;
+      }
+    }
+  }
+
   // The run's own record of itself. A list rather than a table: the lines are one clause each,
   // and the only column they share is when they happened
   .eventLogList {
@@ -4612,7 +4706,7 @@ $pane_header_height: 48px;
     box-shadow: 0 0 0 0 var(--tutorial-glow);
   }
   8% {
-    box-shadow: 0 0 0 8.4px transparent;
+    box-shadow: 0 0 0 var(--tutorial-pulse-spread, 8.4px) transparent;
   }
 }
 
@@ -7560,5 +7654,102 @@ $programs_column: 800px;
 
   .savedGames .MuiIconButton-root {
     min-width: 44px;
+  }
+}
+
+// Choosing a co-op game together. A quiet neutral bar above the scenario screens names who is
+// choosing and who is ready, always in words; the screen's own action stays the dominant one.
+.coopBrowseBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-2 $space-3;
+  padding: $space-2 $space-4;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
+
+  .coopBrowseStatus {
+    flex: 1 1 220px;
+    min-width: 0;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .coopBrowseRoster {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1 $space-2;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: inline-flex;
+      gap: $space-1;
+      padding: $space-1 $space-2;
+      border: 1px solid var(--border-tile);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-caption);
+    }
+  }
+
+  .coopBrowseState {
+    color: var(--font-color-faded);
+  }
+
+  .MuiButton-root {
+    min-height: 40px;
+  }
+}
+
+// A guest's copy of the host's custom setup: readable, but only the host changes it.
+.coopFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  // The map, slider and menus are MUI widgets a disabled fieldset doesn't reach; the page
+  // underneath still scrolls.
+  &:disabled {
+    pointer-events: none;
+
+    // Guests read the host's values; keep them at body contrast rather than greyed out.
+    .MuiSelect-select.Mui-disabled,
+    .MuiInputBase-input.Mui-disabled {
+      color: var(--font-color-faded);
+      -webkit-text-fill-color: var(--font-color-faded);
+    }
+  }
+}
+
+// Every company's result; a phone scrolls the table instead of clipping its last columns.
+.coopResultTable {
+  overflow-x: auto;
+
+  .MuiTableCell-root {
+    white-space: nowrap;
+  }
+}
+
+.coopLobbyRoster {
+  display: grid;
+  gap: $space-1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: $space-2;
+  }
+}
+
+@media (pointer: coarse) {
+  .coopBrowseBar .MuiButton-root {
+    min-height: 44px;
   }
 }

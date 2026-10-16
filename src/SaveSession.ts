@@ -1,4 +1,5 @@
 import type { Middleware } from "@reduxjs/toolkit";
+import { multiplayerRuntime } from "./multiplayer/Registry";
 import type { AppStore } from "./Store";
 import type {
   DialogType,
@@ -552,19 +553,27 @@ async function abandonActive(): Promise<void> {
   }
 }
 
-function saveFailureDialog(
-  proceed: () => void,
-  retry = () => {
-    void runSaveTransition(proceed);
-  },
-): void {
+/** Retry, or confirm and leave without saving; Cancel stays in the game and has focus. */
+function showSaveFailureDialog({
+  message,
+  retry,
+  exportGame,
+  lossMessage,
+  leaveWithoutSaving,
+}: {
+  message: string;
+  retry: () => void;
+  exportGame?: () => void;
+  lossMessage: string;
+  leaveWithoutSaving: () => void;
+}): void {
   const dispatch = getStore().dispatch;
   replacing = true;
   try {
     dispatch(
       dialogOpen({
         title: "Your game could not be saved",
-        message: getSaveErrorMessage(active?.failure),
+        message,
         open: true,
         closeText: "Cancel",
         focusCancel: true,
@@ -573,25 +582,23 @@ function saveFailureDialog(
           dispatch(dialogClose());
           retry();
         },
-        secondaryLabel: "Export current game",
-        secondaryAction: () => {
-          void exportCurrentSave();
-        },
+        ...(exportGame && {
+          secondaryLabel: "Export current game",
+          secondaryAction: exportGame,
+        }),
         tertiaryLabel: "Leave without saving",
         tertiaryAction: () => {
           dispatch(
             dialogOpen({
               title: "Leave without saving?",
-              message: active?.created
-                ? "Changes since the last successful save will be lost. Your existing save will remain."
-                : "This game has never been saved. The entire current run will be lost unless you exported it.",
+              message: lossMessage,
               open: true,
               closeText: "Cancel",
               destructive: true,
               actionLabel: "Leave without saving",
               action: () => {
                 dispatch(dialogClose());
-                void abandonActive().then(retry);
+                leaveWithoutSaving();
               },
             }),
           );
@@ -601,6 +608,27 @@ function saveFailureDialog(
   } finally {
     replacing = false;
   }
+}
+
+function saveFailureDialog(
+  proceed: () => void,
+  retry = () => {
+    void runSaveTransition(proceed);
+  },
+): void {
+  showSaveFailureDialog({
+    message: getSaveErrorMessage(active?.failure),
+    retry,
+    exportGame: () => {
+      void exportCurrentSave();
+    },
+    lossMessage: active?.created
+      ? "Changes since the last successful save will be lost. Your existing save will remain."
+      : "This game has never been saved. The entire current run will be lost unless you exported it.",
+    leaveWithoutSaving: () => {
+      void abandonActive().then(retry);
+    },
+  });
 }
 
 /** Await the final source snapshot before any bundle replaces the live Redux game. */
@@ -622,6 +650,33 @@ export async function runSaveTransition(
     // supersede this one, but cannot replace Redux while its writer is settling.
     await previous;
     if (request !== transitionRequest) return false;
+    const multiplayer = multiplayerRuntime();
+    if (multiplayer && getStore().getState().game.multiplayer) {
+      try {
+        await multiplayer.leave();
+      } catch (error) {
+        const again =
+          retry ??
+          (() => {
+            void runSaveTransition(proceed);
+          });
+        showSaveFailureDialog({
+          message: getSaveErrorMessage(error),
+          retry: again,
+          lossMessage:
+            "Progress since the last shared save will be lost. The shared save will remain.",
+          // A host that has gone cannot save. Leaving the match ends it locally even if Steam
+          // could not leave the lobby cleanly, so the transition can always continue.
+          leaveWithoutSaving: () => {
+            void multiplayer
+              .leave({ skipSave: true })
+              .catch(() => undefined)
+              .then(again);
+          },
+        });
+        return false;
+      }
+    }
     const outgoing = active;
     if (outgoing) {
       replacing = true;
@@ -889,7 +944,13 @@ function snapshotChanged(): void {
 function afterLoaded(): void {
   const game = getStore().getState().game;
   const scenario = getScenario(game.scenarioId, game.customScenario);
-  if (game.replayPlayback || !scenario || scenario.tutorialSteps) return;
+  if (
+    game.multiplayer ||
+    game.replayPlayback ||
+    !scenario ||
+    scenario.tutorialSteps
+  )
+    return;
   if (!active) {
     const name = suggestedSaveName(
       scenario.name,

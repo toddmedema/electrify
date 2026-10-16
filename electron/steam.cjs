@@ -31,6 +31,7 @@ class SteamService {
 
   initialize(app, config, disabled = false) {
     app.on("will-quit", () => {
+      this.multiplayer?.dispose();
       this.achievements?.dispose();
       this.activity?.dispose();
       this.stopped = true;

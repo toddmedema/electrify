@@ -12,6 +12,7 @@ import {
   INTERTIE_UPGRADE_STEP,
   INTERTIE_UPGRADE_TIME_SHARE,
   MAX_INTERTIE_UPGRADES,
+  MIN_TRANSMISSION_RATING_FRACTION,
   TICK_MINUTES,
 } from "../Constants";
 import {
@@ -29,6 +30,7 @@ import {
   IntertieAccessContext,
 } from "../data/IntertieAccess";
 import { intertiePriceIndex } from "../data/IntertieTrends";
+import { isPeerCorridorId, PEER_CORRIDOR_DERATE } from "../data/Multiplayer";
 import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
 import {
   AdjacentMarketDefinitionType,
@@ -50,6 +52,8 @@ export function intertieDirectionalCapacities(
   context: IntertieAccessContext,
   capacityW: number,
 ): { importCapacityW: number; exportCapacityW: number } {
+  if (context.peers?.some((p) => p.corridor.id === corridorId))
+    return { importCapacityW: capacityW, exportCapacityW: capacityW };
   const access = effectiveMarket(corridorId, context, capacityW);
   return {
     importCapacityW: Math.min(capacityW, access?.availableSupplyW || 0),
@@ -61,6 +65,22 @@ export function intertieDirectionalCapacities(
  * A compact dynamic line rating: hot conductors shed less heat, while direct sun adds heat.
  * It is intentionally bounded so weather changes capacity without making a built line vanish.
  */
+export function transmissionRatingFactor(
+  corridor: Pick<
+    TransmissionCorridorDefinitionType,
+    "heatDerateStartsC" | "heatDeratePerC" | "solarDerateFraction"
+  >,
+  conditions: TransmissionConditions,
+): number {
+  const heatDerate =
+    Math.max(0, conditions.temperatureC - corridor.heatDerateStartsC) *
+    corridor.heatDeratePerC;
+  const sunDerate =
+    Math.min(1, Math.max(0, conditions.solarIrradianceWM2) / 1000) *
+    corridor.solarDerateFraction;
+  return Math.max(MIN_TRANSMISSION_RATING_FRACTION, 1 - heatDerate - sunDerate);
+}
+
 export function transmissionRatingW(
   line: Pick<
     TransmissionLineOperatingType,
@@ -69,17 +89,13 @@ export function transmissionRatingW(
   conditions: TransmissionConditions,
 ): number {
   if (line.paused) return 0;
-  const corridor = TRANSMISSION_CORRIDORS.find(
-    ({ id }) => id === line.corridorId,
-  );
+  const corridor =
+    TRANSMISSION_CORRIDORS.find(({ id }) => id === line.corridorId) ??
+    (isPeerCorridorId(line.corridorId) ? PEER_CORRIDOR_DERATE : undefined);
   if (!corridor) return 0;
-  const heatDerate =
-    Math.max(0, conditions.temperatureC - corridor.heatDerateStartsC) *
-    corridor.heatDeratePerC;
-  const sunDerate =
-    Math.min(1, Math.max(0, conditions.solarIrradianceWM2) / 1000) *
-    corridor.solarDerateFraction;
-  return Math.round(line.capacityW * Math.max(0.6, 1 - heatDerate - sunDerate));
+  return Math.round(
+    line.capacityW * transmissionRatingFactor(corridor, conditions),
+  );
 }
 
 export function transmissionCapacityW(
@@ -120,6 +136,7 @@ export function intertieContextForGame(
         | "customScenario"
         | "tutorialIntertieStress"
         | "startingYear"
+        | "multiplayer"
       >
     >,
 ): IntertieContext {

@@ -9,6 +9,7 @@ import settingsReducer from "./reducers/Settings";
 import { tutorialGateMiddleware } from "./reducers/Tutorial";
 import uiReducer from "./reducers/UI";
 import userReducer from "./reducers/User";
+import { multiplayerMiddleware } from "./multiplayer/Registry";
 
 export const store = configureStore({
   reducer: {
@@ -32,7 +33,13 @@ export const store = configureStore({
       // Toolkit otherwise reports them on every simulation tick, burying actionable warnings
       // under hundreds of identical messages. Keep serializability checks everywhere else.
       serializableCheck: {
-        ignoredActions: ["ui/dialogOpen", "ui/snackbarOpen"],
+        // Snapshots carry the same authoritative timeline excluded from state below. Walking
+        // its action payload on every network update can starve renderer heartbeats in dev.
+        ignoredActions: [
+          "ui/dialogOpen",
+          "ui/snackbarOpen",
+          "game/multiplayerSnapshot",
+        ],
         ignoredPaths: [
           "ui.dialog.message",
           "ui.dialog.action",
@@ -45,6 +52,7 @@ export const store = configureStore({
         ],
       },
     }).concat(
+      multiplayerMiddleware,
       tutorialGateMiddleware,
       navigationDestinationMiddleware,
       saveSessionMiddleware,

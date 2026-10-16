@@ -35,10 +35,18 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "../../data/Scenarios";
-import { GameType, ScenarioThemeType, ScenarioType } from "../../Types";
+import {
+  CoopSelectionType,
+  GameType,
+  ScenarioThemeType,
+  ScenarioType,
+} from "../../Types";
+import CoopBrowseBar from "../base/CoopBrowseBar";
 
 export interface StateProps {
   game: GameType;
+  /** Choosing a game with a co-op lobby: no lessons, and guests only follow. */
+  coop?: CoopSelectionType;
 }
 
 export interface DispatchProps {
@@ -81,6 +89,8 @@ interface MissionListItemProps {
   completed: boolean;
   onSelect: () => void;
   showThemes?: boolean;
+  /** A co-op guest sees the host's list but cannot open a game themselves. */
+  readOnly?: boolean;
 }
 
 function displayName(s: ScenarioType): string {
@@ -108,7 +118,7 @@ function MissionSectionHeader(
 // One row for everything: tutorial missions, scenarios, and the custom game all share the
 // list now - the only differences are the action control and what the subheader shows
 function MissionListItem(props: MissionListItemProps): React.JSX.Element {
-  const { s, completed, onSelect, showThemes = false } = props;
+  const { s, completed, onSelect, showThemes = false, readOnly } = props;
   const isTutorial = !!s.tutorialSteps;
   const name = displayName(s);
   const location = getScenarioLocation(s) || { name: "UNKNOWN" };
@@ -141,7 +151,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   return (
     <NavigableCardRow
       testId={`mission-row-${s.id}`}
-      onOpen={onSelect}
+      onOpen={readOnly ? undefined : onSelect}
       ariaLabel={
         isTutorial
           ? `${completed ? "Review" : "Start"} ${name}`
@@ -219,8 +229,12 @@ function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
 
 export default function NewGame(props: Props): React.JSX.Element {
   const [showAllTutorials, setShowAllTutorials] = React.useState(false);
+  // "For you" ranks by this player's own history, which a co-op lobby doesn't share.
   const [challengeFilter, setChallengeFilter] =
-    React.useState<ChallengeFilterType>("For you");
+    React.useState<ChallengeFilterType>(
+      props.coop ? "All challenges" : "For you",
+    );
+  const guest = props.coop?.role === "guest";
   const [challengeSort, setChallengeSort] =
     React.useState<ChallengeSortType | null>(null);
   const [challengeSortAnchor, setChallengeSortAnchor] =
@@ -304,7 +318,7 @@ export default function NewGame(props: Props): React.JSX.Element {
   return (
     <ScreenPage
       id="listCard"
-      title="Choose a game"
+      title={props.coop ? "Choose a game together" : "Choose a game"}
       onBack={props.onBack}
       trailing={
         // Otherwise the Manual is only reachable from the title screen and the in-game
@@ -322,67 +336,72 @@ export default function NewGame(props: Props): React.JSX.Element {
         </IconButton>
       }
     >
+      <CoopBrowseBar coop={props.coop} />
       <List
         dense
         className="scrollable cardList missionList"
         aria-label="Available games"
       >
-        <MissionSectionHeader
-          action={
-            <Button
-              size="small"
-              onClick={() => setShowAllTutorials(!showAllTutorials)}
-              aria-expanded={showAllTutorials}
-              aria-controls="tutorial-catalog"
-              endIcon={
-                showAllTutorials ? <ChevronUpGlyph /> : <ChevronDownGlyph />
+        {!props.coop && (
+          <>
+            <MissionSectionHeader
+              action={
+                <Button
+                  size="small"
+                  onClick={() => setShowAllTutorials(!showAllTutorials)}
+                  aria-expanded={showAllTutorials}
+                  aria-controls="tutorial-catalog"
+                  endIcon={
+                    showAllTutorials ? <ChevronUpGlyph /> : <ChevronDownGlyph />
+                  }
+                >
+                  {showAllTutorials
+                    ? "Hide lessons"
+                    : `View all ${TUTORIALS.length}`}
+                </Button>
               }
             >
-              {showAllTutorials
-                ? "Hide lessons"
-                : `View all ${TUTORIALS.length}`}
-            </Button>
-          }
-        >
-          Learn the basics
-        </MissionSectionHeader>
-        {nextTutorial ? (
-          <TutorialSpotlight
-            tutorial={nextTutorial}
-            completedTutorials={completedTutorials}
-            onSelect={() => props.onTutorial(nextTutorial.id)}
-          />
-        ) : (
-          <div className="tutorialCompleteSummary">
-            <CheckCircleIcon color="primary" />
-            <span>
-              <strong>Tutorials complete</strong>
-              <Typography
-                component="span"
-                variant="body2"
-                color="textSecondary"
-              >
-                You can replay any lesson whenever you want.
-              </Typography>
-            </span>
-          </div>
-        )}
-        {showAllTutorials && (
-          <div
-            id="tutorial-catalog"
-            className="tutorialCatalog groupedList"
-            role="group"
-            aria-label="All tutorials"
-          >
-            {TUTORIALS.map((s) => (
-              <MissionListItem
-                key={s.id}
-                s={s}
-                completed={ids.indexOf(s.id) !== -1}
-                onSelect={() => props.onTutorial(s.id)}
+              Learn the basics
+            </MissionSectionHeader>
+            {nextTutorial ? (
+              <TutorialSpotlight
+                tutorial={nextTutorial}
+                completedTutorials={completedTutorials}
+                onSelect={() => props.onTutorial(nextTutorial.id)}
               />
-            ))}
-          </div>
+            ) : (
+              <div className="tutorialCompleteSummary">
+                <CheckCircleIcon color="primary" />
+                <span>
+                  <strong>Tutorials complete</strong>
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    color="textSecondary"
+                  >
+                    You can replay any lesson whenever you want.
+                  </Typography>
+                </span>
+              </div>
+            )}
+            {showAllTutorials && (
+              <div
+                id="tutorial-catalog"
+                className="tutorialCatalog groupedList"
+                role="group"
+                aria-label="All tutorials"
+              >
+                {TUTORIALS.map((s) => (
+                  <MissionListItem
+                    key={s.id}
+                    s={s}
+                    completed={ids.indexOf(s.id) !== -1}
+                    onSelect={() => props.onTutorial(s.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
         <MissionSectionHeader
           action={
@@ -436,7 +455,7 @@ export default function NewGame(props: Props): React.JSX.Element {
         >
           {(
             [
-              "For you",
+              ...(props.coop ? [] : ["For you"]),
               ...CHALLENGE_THEMES,
               "All challenges",
             ] as ChallengeFilterType[]
@@ -458,6 +477,7 @@ export default function NewGame(props: Props): React.JSX.Element {
               completed={ids.indexOf(s.id) !== -1}
               onSelect={() => props.onDetails({ scenarioId: s.id })}
               showThemes={challengeFilter === "All challenges"}
+              readOnly={guest}
             />
           ))}
         </div>
@@ -468,6 +488,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             s={DEFAULT_CUSTOM_SCENARIO}
             completed={false}
             onSelect={props.onCustomGame}
+            readOnly={guest}
           />
         </div>
       </List>

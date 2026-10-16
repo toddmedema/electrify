@@ -47,6 +47,12 @@ export interface DesktopTimelineEvent {
   year: number;
 }
 export interface DesktopBridge {
+  multiplayerRequest?(
+    input: import("./multiplayer/Native").NativeRequest,
+  ): Promise<unknown>;
+  onMultiplayerEvent?(
+    callback: (event: import("./multiplayer/Native").NativeEvent) => void,
+  ): () => void;
   apiVersion: 1;
   getState(): Promise<DesktopState>;
   setDisplay(

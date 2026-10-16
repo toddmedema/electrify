@@ -222,7 +222,7 @@ test("fresh desktop sound is on, local menu cues require user input, and saved m
   await captureMenu();
   await page.keyboard.press("ArrowDown");
   await expect(
-    page.getByRole("button", { name: "Manual", exact: true }),
+    page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeFocused();
   await expect
     .poll(async () => (await menuSources()).length)

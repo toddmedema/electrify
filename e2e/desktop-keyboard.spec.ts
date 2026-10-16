@@ -7,7 +7,7 @@ import {
   launchDesktop,
   removeDesktopProfile,
 } from "./desktop-fixture";
-import { verifyMenuKeyboard } from "./menu-keyboard";
+import { openSettingsWithKeyboard, verifyMenuKeyboard } from "./menu-keyboard";
 
 let profile: string;
 let desktop: DesktopSession;
@@ -53,9 +53,7 @@ test("packaged fullscreen menus support the same keyboard journey as web", async
 
 test("desktop settings keep keyboard selection visible in dark mode", async () => {
   const { page } = desktop;
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
+  await openSettingsWithKeyboard(page);
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   const dark = page

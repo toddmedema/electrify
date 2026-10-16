@@ -199,7 +199,7 @@ function validLineInvestment(
   );
 }
 
-function validTransmissionLine(
+export function validTransmissionLine(
   raw: unknown,
   year: number,
   context?: IntertieAccessContext,
@@ -307,6 +307,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (typeof game !== "object" || game === null) {
     return null;
   }
+  // Shared grids are restored only as a validated whole world, never as a solo import.
+  if (game.multiplayer) return null;
   if (
     !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||

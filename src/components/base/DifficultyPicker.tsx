@@ -23,6 +23,8 @@ export interface DifficultyPickerProps {
   // Toggle only: the chosen difficulty's description beneath the buttons
   showDescription?: boolean;
   id?: string;
+  /** Shows the choice someone else is making, such as a co-op host's difficulty. */
+  readOnly?: boolean;
 }
 
 function isDifficulty(value: unknown): value is DifficultyType {
@@ -36,11 +38,13 @@ export default function DifficultyPicker({
   variant,
   showDescription,
   id,
+  readOnly,
 }: DifficultyPickerProps): React.JSX.Element {
   if (variant === "select") {
     return (
       <Select
         id={id}
+        disabled={readOnly}
         inputProps={{ "aria-label": "Difficulty" }}
         value={value}
         onChange={(e: SelectChangeEvent<DifficultyType>) => {
@@ -78,6 +82,7 @@ export default function DifficultyPicker({
           <ToggleButton
             value={d}
             key={d}
+            disabled={readOnly}
             title={DIFFICULTIES[d].description}
             aria-label={DIFFICULTY_LABELS[d]}
           >

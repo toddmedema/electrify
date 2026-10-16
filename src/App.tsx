@@ -52,6 +52,10 @@ const AchievementNotifications = lazy(
       /* webpackChunkName: "achievements-ui" */ "./achievements/Interface"
     ),
 );
+const MultiplayerRoot =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? lazy(() => import("./multiplayer/Root"))
+    : undefined;
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -475,6 +479,11 @@ export default function App() {
               <ScenarioChoiceDialog />
               <CloudSavePrompt />
               <SharedGameDialog />
+              {MultiplayerRoot && isDesktopApp() && (
+                <Suspense fallback={null}>
+                  <MultiplayerRoot />
+                </Suspense>
+              )}
               <Suspense fallback={null}>
                 <AchievementNotifications />
               </Suspense>

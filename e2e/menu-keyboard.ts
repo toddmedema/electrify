@@ -1,13 +1,20 @@
 import { expect, Page } from "@playwright/test";
 
-/** The same keyboard-only journey runs in Chromium and the packaged game. */
-export async function verifyMenuKeyboard(page: Page): Promise<void> {
+export async function openSettingsWithKeyboard(page: Page): Promise<void> {
   const start = page.getByRole("button", {
     name: "Start playing",
     exact: true,
   });
   await expect(start).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  if (await friends.isVisible()) {
+    await expect(friends).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
@@ -18,7 +25,11 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
+}
 
+/** The same keyboard-only journey runs in Chromium and the packaged game. */
+export async function verifyMenuKeyboard(page: Page): Promise<void> {
+  await openSettingsWithKeyboard(page);
   const appearance = page.getByRole("group", {
     name: "Appearance",
     exact: true,
@@ -55,6 +66,11 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     page.getByRole("slider", { name: "Effects volume", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
+  const start = page.getByRole("button", {
+    name: "Start playing",
+    exact: true,
+  });
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
   await expect(start).toBeVisible();
   await expect(settings).toBeFocused();
 
@@ -63,6 +79,14 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowUp");
+  const friends = page.getByRole("button", {
+    name: "Play with friends",
+    exact: true,
+  });
+  if (await friends.isVisible()) {
+    await expect(friends).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+  }
   await expect(start).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".facilities:visible")).toBeVisible();

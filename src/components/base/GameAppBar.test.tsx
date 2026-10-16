@@ -104,6 +104,46 @@ describe("GameAppBar", () => {
     expect(onSpeedChange).not.toHaveBeenCalled();
   });
 
+  it("keeps a multiplayer player's ULTRA selection on phones while the shared clock is paused", () => {
+    const game = createGame({ scenarioId: 101 });
+    const onSpeedChange = jest.fn();
+    renderAppBar({
+      onSpeedChange,
+      game: {
+        ...game,
+        inGame: true,
+        speed: "PAUSED",
+        multiplayer: {
+          seat: "1",
+          clock: {
+            activeSpeed: "PAUSED",
+            selectedSpeed: "ULTRA",
+            reason: "Waiting for players",
+            readyRequired: true,
+            ready: false,
+            players: [
+              { id: "1", name: "Player 1", selectedSpeed: "ULTRA" },
+              { id: "2", name: "Player 2", selectedSpeed: "SLOW" },
+            ],
+          },
+        },
+      },
+    });
+    expect(screen.getByRole("button", { name: "ultra speed" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.getByRole("group", { name: "your game speed" }),
+    ).toHaveAccessibleDescription(/Game speed: Paused/);
+    expect(onSpeedChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("group", { name: "your game speed" }),
+    ).toHaveAccessibleDescription(/Player 2 selected 1×/);
+    fireEvent.click(screen.getByRole("button", { name: "ultra speed" }));
+    expect(onSpeedChange).toHaveBeenCalledWith("ULTRA");
+  });
+
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;

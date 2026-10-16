@@ -30,7 +30,8 @@ export default function BuildFacilities(): React.JSX.Element {
   const card = useAppSelector((state) => state.card.name);
   const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
   const intertiesAvailable =
-    !!game.transmission && corridorsForLocation(game.location).length > 0;
+    !!game.transmission &&
+    (!!game.multiplayer || corridorsForLocation(game.location).length > 0);
   // Isolated grids have nothing to connect to, so the tab would only ever be empty.
   const visibleCategories = categories.filter(
     ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",

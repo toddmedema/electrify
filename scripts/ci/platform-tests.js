@@ -74,6 +74,15 @@ function commands(index, cores = os.availableParallelism()) {
             },
           ]
         : []),
+      ...(index === 3
+        ? [
+            {
+              name: "Shared-clock Steam renderer",
+              script: "test:multiplayer",
+              args: [],
+            },
+          ]
+        : []),
       {
         name: "Full packaged desktop",
         script: "test:desktop",

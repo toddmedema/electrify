@@ -8,6 +8,7 @@ import {
 import { corridorOpenInYear } from "./IntertieTrends";
 
 export interface IntertieAccessContext {
+  peers?: NonNullable<GameType["multiplayer"]>["peers"];
   scenarioId?: number;
   locationId?: string;
 }
@@ -259,9 +260,11 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
   },
 ];
 export function accessContextForGame(
-  game: Pick<GameType, "scenarioId" | "location" | "customScenario">,
+  game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
+    Partial<Pick<GameType, "multiplayer">>,
 ): IntertieAccessContext {
   return {
+    peers: game.multiplayer?.peers,
     scenarioId: game.customScenario ? undefined : game.scenarioId,
     locationId: game.location.id,
   };
@@ -278,7 +281,9 @@ export function effectiveCorridor(
   corridorId: string,
   context?: IntertieAccessContext,
 ) {
-  const corridor = corridorById(corridorId);
+  const corridor =
+    context?.peers?.find((p) => p.corridor.id === corridorId)?.corridor ??
+    corridorById(corridorId);
   const access = allocation(corridorId, context);
   return corridor && access
     ? {
@@ -322,10 +327,13 @@ export function effectiveMarket(
 }
 /** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
-  game: Pick<GameType, "scenarioId" | "location" | "customScenario"> & {
-    date: Pick<GameType["date"], "year">;
-  },
+  game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
+    Partial<Pick<GameType, "multiplayer">> & {
+      date: Pick<GameType["date"], "year">;
+    },
 ) {
+  if (game.multiplayer)
+    return game.multiplayer.peers?.map((p) => p.corridor) ?? [];
   return corridorsForLocation(game.location)
     .filter(({ id }) => corridorOpenInYear(id, game.date.year))
     .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!);

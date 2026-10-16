@@ -65,9 +65,27 @@ for (const file of inputs) {
       `sha256-${Buffer.from(inputDigest, "hex").toString("base64")}`;
   }
 }
+const compatibilityId = `rules-${rulesRevision}-${digest.digest("hex")}`;
+// Steam leaderboards are named after compatibilityId, so co-op transport and interface edits must
+// not move it. Co-op lobbies and shared saves also require the same co-op code on every peer.
+const multiplayerDigest = crypto.createHash("sha256");
+multiplayerDigest.update(`${compatibilityId}\n`);
+for (const file of [
+  ...filesUnder("src/multiplayer").filter(
+    (file) => /\.(tsx?|json)$/.test(file) && !/\.(test|spec)\./.test(file),
+  ),
+  "src/workers/Multiplayer.worker.ts",
+  "electron/steam-multiplayer.cjs",
+].sort()) {
+  const raw = fs.readFileSync(path.join(root, file));
+  const content = Buffer.from(raw.toString("utf8").replace(/\r\n/g, "\n"));
+  const inputDigest = crypto.createHash("sha256").update(content).digest("hex");
+  multiplayerDigest.update(`${file}\0${inputDigest}\n`);
+}
 const manifest = {
   rulesRevision,
-  compatibilityId: `rules-${rulesRevision}-${digest.digest("hex")}`,
+  compatibilityId,
+  multiplayerCompatibilityId: `coop-${rulesRevision}-${multiplayerDigest.digest("hex")}`,
   dataIntegrity,
 };
 const serialized = `${JSON.stringify(manifest, null, 2)}\n`;

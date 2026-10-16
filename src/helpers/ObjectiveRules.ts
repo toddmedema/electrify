@@ -1,7 +1,14 @@
-import { DifficultyType, MonthlyHistoryType, ScenarioType } from "../Types";
+import {
+  DifficultyType,
+  GameType,
+  MonthlyHistoryType,
+  ScenarioType,
+  TickPresentFutureType,
+} from "../Types";
 import {
   bestReachableCustomers,
   CUSTOMER_MARKET_MULTIPLIER,
+  customerMarketSizeAt,
 } from "./Customers";
 
 export const absoluteMonth = (year: number, month: number): number =>
@@ -158,5 +165,54 @@ export function scenarioObjectiveFailure(
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the customers you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
     }
   }
+  return undefined;
+}
+
+export interface RunFailureType {
+  outcome: "bankrupt" | "fired";
+  title: string;
+  reason?: string;
+}
+/**
+ * Whether a company's run ends at this month rollover: out of cash, three months of chronic
+ * blackouts, or a missed objective (judged in full at term end, before that only once already
+ * decided). Pure, so the co-op host can judge every company without the single-player effects.
+ */
+export function runFailure(
+  game: Pick<GameType, "difficulty" | "customerMarketSize" | "date">,
+  scenario: ScenarioType,
+  history: MonthlyHistoryType[],
+  now: Pick<TickPresentFutureType, "cash" | "minute">,
+  isTutorial: boolean,
+): RunFailureType | undefined {
+  const termMonths = scenario.durationMonths || 12 * 20;
+  const retentionStart = retentionBaseline(scenario, game.customerMarketSize);
+  const objectiveFailure =
+    game.date.monthsElapsed === termMonths
+      ? scenarioObjectiveFailure(scenario, history, retentionStart)
+      : game.date.monthsElapsed < termMonths && !isTutorial
+        ? decidedObjectiveFailure(scenario, history, {
+            startingCustomers: retentionStart,
+            monthsRemaining: termMonths - game.date.monthsElapsed,
+            marketSize: customerMarketSizeAt(
+              game.customerMarketSize,
+              now.minute,
+            ),
+          })
+        : undefined;
+  if (now.cash < 0) return { outcome: "bankrupt", title: "Bankrupt!" };
+  if (hasChronicBlackouts(history, game.difficulty))
+    return {
+      outcome: "fired",
+      title: "Fired!",
+      reason:
+        "Blackouts continued for 3 months, so the utility board ended your term.",
+    };
+  if (objectiveFailure)
+    return {
+      outcome: "fired",
+      title: "Mission objective missed",
+      reason: objectiveFailure,
+    };
   return undefined;
 }

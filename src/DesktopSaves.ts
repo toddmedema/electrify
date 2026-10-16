@@ -1,4 +1,5 @@
 import type { AppStore } from "./Store";
+import { flushShutdownCheckpoints } from "./desktop/Shutdown";
 import { getDesktop } from "./Desktop";
 import {
   DesktopSaveTransport,
@@ -179,6 +180,12 @@ export function startDesktopSaves(store: AppStore): () => void {
   const beforeQuit = desktop.onBeforeQuit(() => {
     store.dispatch(pageHidden());
     void (async () => {
+      // A failed co-op save must still report failure, but it must not skip this game's own
+      // exit save, so both run and the co-op result is checked before quitting.
+      const sharedCheckpoints = flushShutdownCheckpoints().then(
+        () => undefined,
+        (error: unknown) => error ?? new Error("Co-op save failed"),
+      );
       try {
         await checkpointForDesktopExit();
         cancelBackup();
@@ -195,6 +202,8 @@ export function startDesktopSaves(store: AppStore): () => void {
           await desktop.writeSaveLibrary(library, false);
           await desktop.writeSaveLibrary(library, true).catch(() => undefined);
         }
+        const sharedFailure = await sharedCheckpoints;
+        if (sharedFailure) throw sharedFailure;
         await releaseDesktopSaveWriter();
         desktop.readyToQuit(true);
       } catch {

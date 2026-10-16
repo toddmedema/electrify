@@ -19,7 +19,7 @@ import { connectToStore } from "./ConnectToStore";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import { useOnline } from "./OnlineStatus";
-import { buildSpeedOptions } from "./SpeedControls";
+import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
 import { acknowledgeEvidence } from "../../reducers/UI";
@@ -157,7 +157,9 @@ export function GameAppBar(props: Props) {
   }, [evidenceRequest, facilityDragActive, onEvidenceAcknowledged]);
 
   const bigScreen = isBigScreen();
-  const speed = game.speed;
+  const multiplayer = game.multiplayer;
+  const clock = multiplayer?.clock;
+  const speed = clock?.selectedSpeed ?? game.speed;
   // Watching somebody else's run rather than playing your own. The speed controls stay live --
   // being able to pause and fast forward is most of the point of a replay
   const isReplay = !!game.replayPlayback;
@@ -194,18 +196,19 @@ export function GameAppBar(props: Props) {
         speed,
         onSpeedChange,
         desktop,
+        multiplayer: sharedClockSpeedProps(multiplayer),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [speed, onSpeedChange, desktop],
+    [speed, onSpeedChange, desktop, clock, multiplayer?.seat],
   );
   // A window narrowed below desktop width loses the ULTRA button, so it can't stay the selected
   // speed. Re-checked whenever the speed changes too: a card that paused the clock can restore
   // ULTRA after the window has already shrunk.
   React.useEffect(() => {
-    if (speed === "ULTRA" && !desktop) {
+    if (!multiplayer && speed === "ULTRA" && !desktop) {
       onSpeedChange("FAST");
     }
-  }, [speed, desktop, onSpeedChange]);
+  }, [speed, desktop, onSpeedChange, multiplayer]);
 
   const menu = React.useMemo(
     () => (

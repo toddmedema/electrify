@@ -12,6 +12,7 @@ import {
   quit,
   resume,
   startReplay,
+  multiplayerSnapshot,
 } from "./GameActions";
 import type { RootState } from "../Store";
 
@@ -101,6 +102,22 @@ export const cardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(multiplayerSnapshot, (state) => {
+      // A co-op match starts from the lobby or the screens its players chose it on together.
+      if (
+        [
+          "MAIN_MENU",
+          "LOADING",
+          "NEW_GAME",
+          "NEW_GAME_DETAILS",
+          "CUSTOM_GAME",
+        ].includes(state.name)
+      ) {
+        state.name = "FACILITIES";
+        state.history = ["FACILITIES", "MAIN_MENU"];
+        state.ts = Date.now();
+      }
+    });
     builder.addCase(launchRun, (state) => {
       state.history = [];
       state.name = "LOADING";

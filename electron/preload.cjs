@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.invoke("desktop:achievements", intent),
     readAchievements: () => ipcRenderer.invoke("desktop:readAchievements"),
     openFriends: () => ipcRenderer.invoke("desktop:friends"),
+    multiplayerRequest: (input) =>
+      ipcRenderer.invoke("desktop:multiplayer", input),
+    onMultiplayerEvent: (callback) =>
+      subscribe("desktop:multiplayer-event", callback),
     setActivity: (activity) => ipcRenderer.invoke("desktop:activity", activity),
     addTimelineEvent: (event) =>
       ipcRenderer.invoke("desktop:timeline-event", event),
