@@ -307,7 +307,7 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
   const audio = await page.evaluate(async () => {
     const context = new AudioContext();
     try {
-      const response = await fetch("audio/intro/intro.mp3");
+      const response = await fetch("audio/menu/quiet-current.wav");
       const decoded = await context.decodeAudioData(
         await response.arrayBuffer(),
       );

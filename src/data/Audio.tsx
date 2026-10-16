@@ -11,7 +11,13 @@ export const state = {
   soundEffects: null as SoundEffects | null,
   musicOutput: null as GainNode | null,
   paused: false,
+  inGame: false,
 };
+
+export function setMusicInGame(inGame: boolean) {
+  state.inGame = inGame;
+  state.themeManager?.setIntensity(inGame ? 2 : 1);
+}
 
 export function pause() {
   state.paused = true;
@@ -53,7 +59,7 @@ export function getAllMusicFiles(): string[] {
     (acc: string[], themeName: string) => {
       const theme = MUSIC_DEFINITIONS[themeName];
       for (const track of theme.tracks) {
-        acc.push(`${themeName}/${track}`);
+        acc.push(`${theme.directory}${track}`);
       }
       return acc;
     },
@@ -125,7 +131,7 @@ export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
   const audioNodes: { [key: string]: AudioNode } = {};
   eachWithLimit(musicFiles, 4, async (file) => {
     try {
-      const buffer = await loadAudioLocalFile(ac, "audio/" + file + ".mp3");
+      const buffer = await loadAudioLocalFile(ac, "audio/" + file);
       // Every track routes through one gain node, so changing music volume does not disturb
       // ThemeManager's per-track fades or restart the six-minute loop.
       buffer.setOutput(musicOutput);
@@ -141,7 +147,7 @@ export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
       if (state.paused) {
         state.themeManager.pause();
       }
-      state.themeManager.setIntensity(1);
+      state.themeManager.setIntensity(state.inGame ? 2 : 1);
     })
     .catch(() => {
       state.loaded = "ERROR";

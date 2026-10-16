@@ -7,14 +7,12 @@ import {
 import { AudioNode } from "./AudioNode";
 
 /* Notes on audio implementation:
-- intensity (0-MUSIC_INTENSITY_MAX) used as baseline for combat situation, and changes slowly (mostly on loop reset).
-  User hears as different tracks on the four baseline instruments (drums, low strings, low brass, high strings)
-- peak intensity (0-1) used for quick changes, such as the timer.
-  User hears as the matching high brass track.
+- intensity 0 stops music, 1 selects the menu loop, and 2+ selects the existing gameplay mix.
+  The current game state selects the theme; waiting in a menu never advances to gameplay music.
 - some people say that exponentialRampToValueAtTime sounds better than linear ramping;
   after several experiments, I've decided it actually sounds worse for our use case.
-- music files are purposefully longer than their listed durationMs, so that they have time
-  to wrap up their echoes / reverbs
+- gameplay files are purposefully longer than their listed durationMs for their reverb tails.
+  The menu WAV has an exact loop boundary and repeats natively on the audio clock.
 - audio.enabled only changes from detecting incompatibility, or user changing the setting
   and so behaves like an all-stop since it's unlikely to be turned back on that session
   - for example, if this is initialized with audio disabled, it does not load audio files -
@@ -26,7 +24,7 @@ import { AudioNode } from "./AudioNode";
   level rather than per node, since the stems have to stay aligned with each other.
 */
 
-const MUSIC_FADE_LONG_SECONDS = 3.5; // for fade outs, such as the end of combat
+const MUSIC_FADE_LONG_SECONDS = 3.5;
 
 export class ThemeManager {
   private context: AudioContext;
@@ -58,7 +56,7 @@ export class ThemeManager {
         this.active.push(k);
       }
     }
-    this.theme = MUSIC_DEFINITIONS.intro;
+    this.theme = MUSIC_DEFINITIONS.menu;
     this.paused = false;
     this.intensity = intensity;
   }
@@ -84,6 +82,9 @@ export class ThemeManager {
       return 0;
     }
     const elapsed = this.context.currentTime - this.themeStartedAt;
+    if (this.theme.loop && elapsed > 0) {
+      return elapsed % (this.theme.durationMs / 1000);
+    }
     if (elapsed <= 0 || elapsed >= this.theme.durationMs / 1000) {
       return 0;
     }
@@ -130,6 +131,7 @@ export class ThemeManager {
   ) {
     this.fadeOut();
     this.theme = theme;
+    this.resumeOffsetSeconds = offsetSeconds;
     this.loopTheme(true, offsetSeconds);
   }
 
@@ -148,25 +150,23 @@ export class ThemeManager {
     this.intensity = newIntensity;
     if (newIntensity === 0) {
       // Stopping music
-      this.active = [];
       this.fadeOut();
-    } else if (old === 0) {
-      // Starting from silence
-      if (newIntensity === 1) {
-        this.startTheme(MUSIC_DEFINITIONS.intro);
-      } else {
-        this.startTheme(MUSIC_DEFINITIONS.basic);
-      }
+      this.active = [];
     } else {
-      // Shift in existing music
-      this.updateTheme(newIntensity - old);
+      const theme =
+        newIntensity === 1 ? MUSIC_DEFINITIONS.menu : MUSIC_DEFINITIONS.basic;
+      if (old === 0 || theme !== this.theme) {
+        this.startTheme(theme);
+      } else {
+        this.updateTheme(newIntensity - old);
+      }
     }
   }
 
   private generateTracks(): string[] {
     const theme = this.theme;
     return theme.tracks.map((i: string) => {
-      return `${theme.directory}${i}`; // e.g. combat/light/HighBrass4
+      return `${theme.directory}${i}`;
     });
   }
 
@@ -215,20 +215,27 @@ export class ThemeManager {
       // Determine initial & target volume
       const initialVolume = newTheme || !active ? 0 : 1;
       const targetVolume = active ? 1 : 0;
-      node.playOnce(initialVolume, targetVolume, offsetSeconds, startAt);
+      node.playOnce(
+        initialVolume,
+        targetVolume,
+        offsetSeconds,
+        startAt,
+        theme.loop,
+      );
     });
+
+    // The menu WAV is an exact loop, with no encoder padding or reverb tail to overlap.
+    // Web Audio repeats it on its own sample clock, including in throttled background tabs.
+    if (theme.loop) {
+      return;
+    }
 
     // Wrap the theme when it actually ends. A theme resumed part-way through has that much less
     // left to play, so arming this with the full duration would push the loop boundary later on
     // every pause / resume.
     this.timeout = setTimeout(
       () => {
-        if (this.intensity === 1) {
-          this.intensity = 2;
-          this.startTheme(MUSIC_DEFINITIONS.basic);
-        } else {
-          this.loopTheme();
-        }
+        this.loopTheme();
       },
       theme.durationMs - offsetSeconds * 1000,
     );

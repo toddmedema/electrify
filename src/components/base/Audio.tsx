@@ -3,6 +3,7 @@ import {
   pause,
   playSoundEffect,
   resume,
+  setMusicInGame,
   setMusicVolume,
   setSoundEffectsVolume,
   state as audioState,
@@ -30,6 +31,7 @@ export default class Audio extends React.Component<Props, {}> {
   private loadTimer: ReturnType<typeof setTimeout> | undefined;
 
   componentDidMount() {
+    setMusicInGame(this.props.inGame);
     // Load after a timeout so as not to overload the device.
     this.loadTimer = setTimeout(() => {
       if (!this.props.enabled) {
@@ -62,6 +64,9 @@ export default class Audio extends React.Component<Props, {}> {
   }
 
   componentDidUpdate(prevProps: StateProps) {
+    if (this.props.inGame !== prevProps.inGame) {
+      setMusicInGame(this.props.inGame);
+    }
     if (this.props.enabled !== prevProps.enabled) {
       this.handleEnableState(this.props.enabled);
     } else {

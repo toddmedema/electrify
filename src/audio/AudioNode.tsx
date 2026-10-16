@@ -35,6 +35,7 @@ export class AudioNode {
     fadeInVolume: number = 0,
     offsetSeconds: number = 0,
     startAt?: number,
+    loop: boolean = false,
   ) {
     const when = startAt === undefined ? this.context.currentTime : startAt;
     // Starting past the end of a buffer plays nothing at all, so treat an out-of-range seek as
@@ -52,6 +53,7 @@ export class AudioNode {
     const source = this.context.createBufferSource();
     this.source = source;
     source.buffer = this.buffer;
+    source.loop = loop;
     source.connect(this.gain);
     source.start(when, offset);
   }
