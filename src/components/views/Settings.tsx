@@ -19,7 +19,7 @@ import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
@@ -201,24 +201,25 @@ export default function Settings(props: Props): React.JSX.Element {
   const menuKeys = useMenuKeys(true, onBack);
 
   return (
-    <div className="flexContainer keyboardMenu" id="gameCard" {...menuKeys}>
-      <ScreenHeader title="Settings" onBack={onBack} />
+    <ScreenPage
+      className="keyboardMenu"
+      id="gameCard"
+      {...menuKeys}
+      title="Settings"
+      onBack={onBack}
+    >
       <Box
         className="scrollable"
         sx={{
           width: "100%",
           boxSizing: "border-box",
           overflowY: "auto",
-          backgroundColor: "var(--bg-sunken)",
         }}
       >
         <Stack
           spacing={2.5}
           sx={{
             width: "100%",
-            maxWidth: 760,
-            mx: "auto",
-            px: { xs: 2, sm: 3 },
             pt: { xs: 2, sm: 3 },
             pb: "max(24px, env(safe-area-inset-bottom))",
             boxSizing: "border-box",
@@ -559,6 +560,6 @@ export default function Settings(props: Props): React.JSX.Element {
           </Stack>
         </Stack>
       </Box>
-    </div>
+    </ScreenPage>
   );
 }

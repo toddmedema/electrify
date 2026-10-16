@@ -135,17 +135,18 @@ test("the landing page opens a prepared current-year grid and supports browser h
       .locator(".dataCenterSetupContent")
       .boundingBox())!;
     const header = (await page.locator(".screenHeaderBar").boundingBox())!;
-    expect(header.x).toBeCloseTo(content.x, 0);
-    expect(header.width).toBeCloseTo(content.width, 0);
-    if (page.viewportSize()!.width >= 816)
-      expect(content.width).toBeCloseTo(816, 0);
+    const frame = (await page.locator(".screenPage").boundingBox())!;
+    expect(header.x).toBeCloseTo(frame.x, 0);
+    expect(header.width).toBeCloseTo(frame.width, 0);
+    expect(content.x).toBeCloseTo(frame.x + 16, 0);
+    expect(content.width).toBeCloseTo(frame.width - 32, 0);
     const summary = (await page
       .locator(".dataCenterSetupSummary")
       .boundingBox())!;
     if (page.viewportSize()!.width >= 700)
       expect(start.y).toBeGreaterThanOrEqual(summary.y + summary.height);
     expect(
-      Math.abs(start.x + start.width - (content.x + content.width - 16)),
+      Math.abs(start.x + start.width - (content.x + content.width)),
     ).toBeLessThan(2);
     const gridSize = page.locator(".dataCenterSetupGridSize");
     await gridSize.locator("summary").click();

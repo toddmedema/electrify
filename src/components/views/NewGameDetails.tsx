@@ -22,7 +22,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -373,9 +373,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
     if (!scenario || !location) {
       return (
-        <div>
-          <ScreenHeader title="Unknown scenario or location" onBack={onBack} />
-        </div>
+        <ScreenPage title="Unknown scenario or location" onBack={onBack} />
       );
     }
 
@@ -397,12 +395,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
       : boardFailed;
 
     return (
-      <div id="listCard" className="flexContainer">
-        <ScreenHeader
-          title={challenge ? "Friend challenge" : "Game details"}
-          titleComponent="div"
-          onBack={onBack}
-        />
+      <ScreenPage
+        id="listCard"
+        title={challenge ? "Friend challenge" : "Game details"}
+        titleComponent="div"
+        onBack={onBack}
+      >
         <div className="scrollable">
           <section className="scenarioDossier" aria-labelledby="scenario-title">
             <img
@@ -630,7 +628,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </div>
           )}
         </div>
-      </div>
+      </ScreenPage>
     );
   }
 }

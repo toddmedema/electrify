@@ -394,6 +394,11 @@ button,
   margin-inline: auto;
 }
 
+// Every menu screen, including Home and Game details, shares this one width container.
+.app_container.menu-layout {
+  max-width: 1040px;
+}
+
 #noscript {
   position: absolute;
   top: 0;
@@ -2604,9 +2609,7 @@ $pane_header_height: 48px;
 .scenarioDossier {
   display: flex;
   flex-direction: column;
-  max-width: 900px;
-  margin: 16px auto 12px;
-  padding: 0 20px;
+  margin: 16px 0 12px;
 }
 
 .scenarioDossierIcon {
@@ -2690,8 +2693,7 @@ $pane_header_height: 48px;
 }
 
 .leaderboard {
-  margin: 20px auto;
-  max-width: 760px;
+  margin: 20px 0;
 }
 
 .leaderboardToggle {
@@ -2700,10 +2702,6 @@ $pane_header_height: 48px;
 }
 
 @media (max-width: 760px) {
-  .scenarioDossier {
-    padding: 0 12px;
-  }
-
   .scenarioDossierIcon {
     width: 88px;
     margin-bottom: 8px;
@@ -3059,7 +3057,6 @@ $pane_header_height: 48px;
       justify-content: center;
       box-sizing: border-box;
       width: 100%;
-      max-width: 680px;
       margin: 0 auto;
       padding-top: 24px;
       padding-bottom: 24px;
@@ -3183,6 +3180,7 @@ $pane_header_height: 48px;
     // line-height is the header's full height (MUI adds no vertical padding) and sets where
     // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx
     .manual-group {
+      padding-inline: 0;
       background: var(--bg-sunken);
       line-height: 32px;
       font-weight: 600;
@@ -3293,8 +3291,7 @@ $pane_header_height: 48px;
 
   .customSetupColumns {
     width: 100%;
-    max-width: 960px;
-    margin: 8px auto 0;
+    margin: 8px 0 0;
 
     > section {
       min-width: 0;
@@ -3381,7 +3378,6 @@ $pane_header_height: 48px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       align-items: start;
       gap: 24px;
-      width: calc(100% - 32px);
     }
 
     .customSetupSettings #gameSetupTable {
@@ -3432,18 +3428,17 @@ $pane_header_height: 48px;
   }
 
   .cardList {
-    background: var(--bg-sunken);
+    background: inherit;
     padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 
   .missionList {
-    background: $bg_primary;
     padding-top: 0 !important;
 
     .MuiListSubheader-root {
-      padding: 16px 16px 8px;
+      padding: 16px 0 8px;
       line-height: 1.35;
 
       &:first-child {
@@ -5902,21 +5897,6 @@ $homeSmokeCycle: 5.6s;
   margin-right: auto;
   box-sizing: border-box;
 }
-.screenManual > .cardList,
-.screenManual > .MuiToolbar-root {
-  width: 100%;
-  max-width: 880px;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
-}
-.screenCustom > .MuiToolbar-root {
-  width: 100%;
-  max-width: 992px;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
-}
 .base_main .manual-entry,
 .base_main .buildOption {
   box-shadow: none;
@@ -5930,7 +5910,6 @@ $homeSmokeCycle: 5.6s;
 }
 .base_main .customSetupColumns {
   box-sizing: border-box;
-  padding: 0 16px;
   gap: 16px;
 }
 .base_main .customSetupSectionHeading {
@@ -6263,24 +6242,6 @@ $programs_column: 800px;
   }
 }
 
-// Final alignment corrections: target the standalone screens' nested header toolbars.
-.screenCatalog > #topbar > .MuiToolbar-root,
-.screenManual > #topbar > .MuiToolbar-root,
-.screenCustom > #topbar > .MuiToolbar-root {
-  box-sizing: border-box;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-}
-.screenCatalog > #topbar > .MuiToolbar-root {
-  max-width: 1040px;
-}
-.screenManual > #topbar > .MuiToolbar-root {
-  max-width: 880px;
-}
-.screenCustom > #topbar > .MuiToolbar-root {
-  max-width: 992px;
-}
 .base_main #manual .manual-group {
   text-transform: none;
   letter-spacing: 0;
@@ -6673,12 +6634,32 @@ $programs_column: 800px;
 // they settle the older per-screen rules above them.
 // ===============================================
 
-// <ScreenHeader>: an opaque bar on the page surface with a hairline under it. The toolbar keeps
-// the #topbar insets; the title is left-aligned at every width.
+// ScreenPage fills the shared menu width container. The header and scrollable body use
+// identical horizontal insets; content must not introduce another page width cap.
+.screenPage {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-primary);
+
+  > .scrollable {
+    box-sizing: border-box;
+    width: 100%;
+    padding-left: max($space-4, env(safe-area-inset-left));
+    padding-right: max($space-4, env(safe-area-inset-right));
+  }
+}
+
+// The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
 .screenHeader {
   flex: 0 0 auto;
-  background: var(--bg-primary);
+  background: inherit;
   border-bottom: 1px solid var(--border-subtle);
+
+  .screenHeaderBar {
+    box-sizing: border-box;
+    width: 100%;
+  }
 
   .screenHeaderTitle {
     min-width: 0;
@@ -6722,11 +6703,8 @@ $programs_column: 800px;
   }
 }
 
-// List pages sit on the sunken surface so their grouped lists read as raised sections
-.screenCatalog,
-.screenManual,
-.screenCustom,
-#gameCard:has(> .screenHeader) {
+// Construction catalogs keep their in-game surface; standalone pages use ScreenPage.
+.screenCatalog {
   background: var(--bg-sunken);
 }
 
@@ -6783,10 +6761,8 @@ $programs_column: 800px;
 }
 
 .missionList {
-  background: var(--bg-sunken);
-
   .groupedList {
-    margin: 0 $space-4 $space-2;
+    margin: 0 0 $space-2;
   }
 
   .missionSectionHeader {
@@ -6795,17 +6771,17 @@ $programs_column: 800px;
 
   .tutorialSpotlight,
   .tutorialCompleteSummary {
-    margin: 0 $space-4 $space-2;
+    margin: 0 0 $space-2;
   }
 
   .challengeFilters {
-    width: calc(100% - #{2 * $space-4});
-    margin: 0 $space-4 $space-3;
+    width: 100%;
+    margin: 0 0 $space-3;
   }
 
   .MuiListSubheader-root {
-    padding-left: $space-4 + $space-1;
-    padding-right: $space-4;
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 
@@ -6818,8 +6794,8 @@ $programs_column: 800px;
 // The Manual: entries within a group join into one grouped section rather than floating cards
 .base_main #manual {
   .manual-entry {
-    margin-left: $space-4;
-    margin-right: $space-4;
+    margin-left: 0;
+    margin-right: 0;
     margin-bottom: 0;
     border: 1px solid var(--border-subtle);
     border-radius: 0;
@@ -7001,14 +6977,6 @@ $programs_column: 800px;
   }
 }
 
-// Settings' header shares its body's 760px column, as the catalog and Manual headers do
-#gameCard:has(.settingsGroup) > .screenHeader > .MuiToolbar-root {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 760px;
-  margin-inline: auto;
-}
-
 // The collapsed summary paints its own opaque background (it pins while scrolling), so the
 // group's bottom corners have to be rounded on it too, not only on the entry's border
 .base_main #manual {
@@ -7110,14 +7078,6 @@ $programs_column: 800px;
 }
 
 .screenDataCenterSetup {
-  --data-center-setup-width: 816px;
-
-  .screenHeaderBar {
-    width: min(100%, var(--data-center-setup-width));
-    box-sizing: border-box;
-    margin: 0 auto;
-  }
-
   @media (min-width: 700px) {
     .locationPicker {
       grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
@@ -7166,10 +7126,9 @@ $programs_column: 800px;
   }
 
   .dataCenterSetupContent {
-    width: min(100%, var(--data-center-setup-width));
+    width: 100%;
     box-sizing: border-box;
-    margin: 0 auto;
-    padding: var(--space-6) var(--space-4);
+    padding-block: var(--space-6);
     display: grid;
     gap: var(--space-5);
   }
@@ -7382,9 +7341,8 @@ $programs_column: 800px;
     "heading heading"
     "map details";
   gap: 12px 16px;
-  width: calc(100% - 32px);
-  max-width: 960px;
-  margin: 16px auto 8px;
+  width: 100%;
+  margin: 16px 0 8px;
 
   &.locationPickerWithoutHeading {
     grid-template-areas: "map details";
@@ -7427,6 +7385,7 @@ $programs_column: 800px;
 }
 
 .worldMap {
+  box-sizing: border-box;
   position: relative;
   grid-area: map;
   width: 100%;
@@ -7557,7 +7516,6 @@ $programs_column: 800px;
       "heading"
       "details"
       "map";
-    width: calc(100% - 24px);
     margin-top: 12px;
     &.locationPickerWithoutHeading {
       grid-template-areas:

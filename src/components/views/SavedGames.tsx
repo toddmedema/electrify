@@ -31,7 +31,7 @@ import {
   retryCurrentSave,
 } from "../../SaveSession";
 import { SaveMetadata, SavedRunResult, SaveStatus } from "../../Types";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
 import { saveTitle } from "../../helpers/SaveDisplay";
@@ -146,24 +146,19 @@ export default function SavedGames(): React.JSX.Element {
     `${entry.name} ${entry.scenarioName}`.toLocaleLowerCase().includes(query),
   );
   return (
-    <div className="flexContainer" id="gameCard">
-      <ScreenHeader
-        title="Saved games"
-        onBack={onBack}
-        trailing={<CloudSyncIndicator />}
-      />
-      <Box
-        className="scrollable"
-        sx={{ width: "100%", overflowY: "auto", bgcolor: "var(--bg-sunken)" }}
-      >
+    <ScreenPage
+      id="gameCard"
+      title="Saved games"
+      onBack={onBack}
+      trailing={<CloudSyncIndicator />}
+    >
+      <Box className="scrollable" sx={{ width: "100%", overflowY: "auto" }}>
         <Stack
           spacing={2}
           className="savedGames"
           sx={{
             width: "100%",
-            maxWidth: 760,
-            mx: "auto",
-            p: { xs: 2, sm: 3 },
+            pt: { xs: 2, sm: 3 },
             boxSizing: "border-box",
             pb: "max(24px, env(safe-area-inset-bottom))",
           }}
@@ -546,6 +541,6 @@ export default function SavedGames(): React.JSX.Element {
         name={historical?.name}
         onClose={() => setHistorical(undefined)}
       />
-    </div>
+    </ScreenPage>
   );
 }

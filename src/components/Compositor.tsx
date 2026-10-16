@@ -681,6 +681,9 @@ export default class Compositor extends React.Component<Props, {}> {
     // Chrome the step hides is dropped by app.scss rules on this attribute, so no pane or bar
     // needs to know about tutorials to step aside
     const hiddenUi = currentTutorialStep?.hideUi;
+    const menuLayout =
+      !isNavCard(this.props.card.name) &&
+      !this.props.card.name.startsWith("BUILD_");
     const singlePanel =
       !isNavCard(this.props.card.name) ||
       !isPaneLayout() ||
@@ -690,7 +693,7 @@ export default class Compositor extends React.Component<Props, {}> {
     // for more details on use of childFactory in TransitionGroup
     return (
       <div
-        className={`app_container${singlePanel ? " single-panel" : ""}`}
+        className={`app_container${singlePanel ? " single-panel" : ""}${menuLayout ? " menu-layout" : ""}`}
         data-tutorial-hide={hiddenUi?.length ? hiddenUi.join(" ") : undefined}
       >
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
