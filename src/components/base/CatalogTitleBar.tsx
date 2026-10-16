@@ -25,6 +25,8 @@ export interface CatalogTitleBarProps {
   /** The game bar's id, for the one catalog that stands in for it (tutorials target it) */
   speedControlId?: string;
   disableGutters?: boolean;
+  /** Pane catalogs share the operating workspace's clock controls. */
+  showSpeedControls?: boolean;
 }
 
 /**
@@ -72,7 +74,7 @@ export default function CatalogTitleBar(
           {props.compactCash ? "" : " cash"}
         </span>
       </Typography>
-      {inGame && (
+      {inGame && props.showSpeedControls !== false && (
         <div className="constructionSpeed" id={props.speedControlId}>
           {buildSpeedOptions({
             speed,

@@ -612,7 +612,20 @@ export default function UPlotChart<S>(
       : props.tooltip?.(Math.min(selectedPoint, data[0].length - 1), state);
 
   return (
-    <div className="accessibleChart">
+    <div
+      className="accessibleChart"
+      onKeyDown={(event) => {
+        if (
+          props.interactiveTooltip &&
+          event.key === "Escape" &&
+          selectedPoint !== null
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeDetails();
+        }
+      }}
+    >
       {props.interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
           Hover or press Enter to inspect a time. Use Left and Right arrows,
@@ -639,10 +652,7 @@ export default function UPlotChart<S>(
                   End: data[0].length - 1,
                   Enter: current,
                 };
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  closeDetails();
-                } else if (event.key in points) {
+                if (event.key in points) {
                   event.preventDefault();
                   selectPoint(points[event.key]);
                 }

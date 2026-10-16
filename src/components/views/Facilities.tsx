@@ -736,8 +736,8 @@ export interface StateProps {
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
   game: GameType;
-  // The row the player has open, from the UI slice rather than this component's own state:
-  // Insights reads it too, and building a facility unmounts this pane
+  // Selection is shared with Insights and the operating stage; the phone catalog may still
+  // unmount the fleet while a facility is being built.
   selectedFacilityId: number | null;
 }
 
@@ -770,7 +770,10 @@ export interface DispatchProps {
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  /** The shared operating stage owns the live chart on pane layouts. */
+  operatingStage?: boolean;
+}
 
 export default class Facilities extends React.Component<Props> {
   constructor(props: Props) {
@@ -853,6 +856,7 @@ export default class Facilities extends React.Component<Props> {
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
+      nextProps.operatingStage !== this.props.operatingStage ||
       nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
@@ -881,6 +885,7 @@ export default class Facilities extends React.Component<Props> {
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
     if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (this.props.operatingStage && request.target === "supply-demand") return;
     if (
       request.target !== "supply-demand" &&
       !(
@@ -964,7 +969,9 @@ export default class Facilities extends React.Component<Props> {
             )}
           </Toolbar>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
-            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+            {!this.props.operatingStage && (
+              <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+            )}
             <List dense className="scrollable unifiedFacilitiesList">
               {intertiesAvailable && !!game.transmission?.lines.length && (
                 <Typography

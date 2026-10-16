@@ -48,6 +48,10 @@ export interface Props {
   currentMinute: number;
   location: LocationType;
   height?: number;
+  /** The short operating stage keeps hour ticks and direct readings, without crowded axes. */
+  compact?: boolean;
+  /** Preserve the live shape and exact point inspection when only a small overview fits. */
+  mini?: boolean;
   legend?: boolean;
   timeline: ChartData[];
   startingYear: number;
@@ -73,6 +77,8 @@ interface State {
   fuels: FuelNameType[];
   byFuel: number[][];
   startingYear: number;
+  compact: boolean;
+  mini: boolean;
 }
 
 // Words rather than emoji: platform emoji are full-colour art that clash with the flat icon
@@ -228,7 +234,7 @@ function sourceFill(
 }
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
-  const { sources } = getState();
+  const { sources, compact, mini } = getState();
   const loadBaseStart = sources.length + 1;
   const fuelLineStart = loadBaseStart + 3;
   const chargingLineStart = fuelLineStart + sources.length * 2;
@@ -253,7 +259,11 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [18 * scale, 5 * scale, 0, 0],
+    padding: mini
+      ? [4 * scale, 16 * scale, 4 * scale, 16 * scale]
+      : compact
+        ? [8 * scale, 16 * scale, 0, 16 * scale]
+        : [18 * scale, 5 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -266,14 +276,18 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       y: { range: () => getState().domain },
     },
     axes: [
-      xAxis(scale, {
-        size: 27,
-        splits: () => getState().hourTicks,
-        values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
-      }),
+      {
+        ...xAxis(scale, {
+          size: compact ? 22 : 27,
+          splits: () => getState().hourTicks,
+          values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
+        }),
+        show: !mini,
+      },
       {
         // Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable
         scale: "x",
+        show: !compact,
         side: 2,
         stroke: tickLabelFill(),
         font: chartFont(),
@@ -285,9 +299,12 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         splits: () => getState().sunTicks,
         values: () => SUN_LABELS,
       },
-      yAxis(scale, {
-        values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
-      }),
+      {
+        ...yAxis(scale, {
+          values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
+        }),
+        show: !compact,
+      },
     ],
     series: [
       {},
@@ -443,6 +460,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     timeline,
     location,
     fuelOrder = [],
+    compact = false,
+    mini = false,
   } = props;
   const {
     sources,
@@ -585,6 +604,8 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   });
 
   const state: State = {
+    compact,
+    mini,
     timeline,
     domain: [0, padRange(0, domainMax)[1]],
     range: [rangeMin, rangeMax],
@@ -611,16 +632,18 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         <ChartLegend
           items={[
             { name: "Demand", color: chartPalette().demand, dash: "8,4" },
-            ...sources.map((source) => ({
-              name: source,
-              color: sourcePattern(source)
-                ? chartPalette().powerFlowPattern
-                : sourceColor(source),
-              pattern: sourcePattern(source),
-              fill: sourcePattern(source)
-                ? chartPalette().powerFlowFill
-                : undefined,
-            })),
+            ...(compact
+              ? [{ name: "Supply", color: sourceColor("Dispatchable") }]
+              : sources.map((source) => ({
+                  name: source,
+                  color: sourcePattern(source)
+                    ? chartPalette().powerFlowPattern
+                    : sourceColor(source),
+                  pattern: sourcePattern(source),
+                  fill: sourcePattern(source)
+                    ? chartPalette().powerFlowFill
+                    : undefined,
+                }))),
           ]}
         />
       )}
@@ -668,7 +691,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
           "Total load",
         ]}
         buildOptions={buildOptions}
-        structureKey={sources.join(",")}
+        structureKey={`${sources.join(",")}:${compact}:${mini}`}
         tooltip={formatProductionTooltip}
       />
     </div>

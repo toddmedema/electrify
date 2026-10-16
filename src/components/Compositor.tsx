@@ -27,6 +27,7 @@ import {
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
+import OperatingStage from "./base/OperatingStage";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
@@ -529,13 +530,16 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
-    const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
+    const building = this.props.card.name.startsWith("BUILD_");
+    const isPanes =
+      (isNavCard(this.props.card.name) || building) && isPaneLayout();
     const { tutorialStep, tutorialSteps } = this.props;
     // A step that keeps the side panes back gets the fleet on its own. Dropped here rather than
     // hidden in CSS: the grid's tracks come from the pane count, so a hidden pane would leave an
     // empty column and a splitter to nowhere
     if (
       isPanes &&
+      !building &&
       tutorialSteps?.[tutorialStep]?.hideUi?.includes("sidePanes")
     ) {
       return (
@@ -549,33 +553,39 @@ export default class Compositor extends React.Component<Props, {}> {
         </div>
       );
     }
-    // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
-    // instead of splitting the width between separate Finance and Forecast chart columns.
-    if (isPanes && isDesktopScreen()) {
+    // Build shares the same mounted workspace as operations. Tutorials that deliberately hide
+    // the side panes keep their existing focused catalog until the operating stage is introduced.
+    const showStage =
+      isPanes && !tutorialSteps?.[tutorialStep]?.hideUi?.includes("sidePanes");
+    if (showStage && isDesktopScreen()) {
       return (
         <div className="desktop-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
-            <FacilitiesContainer />
-            <InsightsContainer />
+            <FacilitiesContainer operatingStage />
+            <OperatingStage context={building ? "build" : "insights"} />
             <EventLogContainer />
           </DesktopPanes>
         </div>
       );
     }
     // Laptops and landscape tablets keep the fleet pinned beside Insights or Events.
-    if (isPanes) {
+    if (showStage) {
       return (
         <div className="pane-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
-            <FacilitiesContainer />
+            <FacilitiesContainer operatingStage />
             <div className="secondary-pane">
-              {this.props.card.name === "EVENTS" ? (
-                <EventLogContainer />
-              ) : (
-                <InsightsContainer />
-              )}
+              <OperatingStage
+                context={
+                  building
+                    ? "build"
+                    : this.props.card.name === "EVENTS"
+                      ? "events"
+                      : "insights"
+                }
+              />
               <NavigationContainer />
             </div>
           </DesktopPanes>
@@ -665,24 +675,33 @@ export default class Compositor extends React.Component<Props, {}> {
     // Keep shared panes mounted when their navigation changes, so the pinned fleet stays visible.
     // A quick retry may start before the previous loading view finishes exiting.
     // A fresh key guarantees the new mission runs its loading lifecycle.
+    const operatingLayout =
+      (isNavCard(this.props.card.name) ||
+        this.props.card.name.startsWith("BUILD_")) &&
+      isPaneLayout() &&
+      !currentTutorialStep?.hideUi?.includes("sidePanes");
     const transitionKey =
       this.props.card.name === "LOADING"
         ? `LOADING:${this.props.card.ts}`
-        : this.props.card.name.startsWith("BUILD_")
-          ? "BUILD_FACILITIES"
-          : !isNavCard(this.props.card.name)
-            ? this.props.card.name
-            : isDesktopScreen()
-              ? DESKTOP_PANES_KEY
-              : isPaneLayout()
-                ? TABLET_PANES_KEY
-                : this.props.card.name;
+        : operatingLayout
+          ? isDesktopScreen()
+            ? DESKTOP_PANES_KEY
+            : TABLET_PANES_KEY
+          : this.props.card.name.startsWith("BUILD_")
+            ? "BUILD_FACILITIES"
+            : !isNavCard(this.props.card.name)
+              ? this.props.card.name
+              : isDesktopScreen()
+                ? DESKTOP_PANES_KEY
+                : isPaneLayout()
+                  ? TABLET_PANES_KEY
+                  : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
     // Chrome the step hides is dropped by app.scss rules on this attribute, so no pane or bar
     // needs to know about tutorials to step aside
     const hiddenUi = currentTutorialStep?.hideUi;
     const singlePanel =
-      !isNavCard(this.props.card.name) ||
+      (!isNavCard(this.props.card.name) && !operatingLayout) ||
       !isPaneLayout() ||
       hiddenUi?.includes("sidePanes");
 

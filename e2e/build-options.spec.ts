@@ -210,7 +210,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "close" })
         .click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
-      await page.getByRole("button", { name: "close", exact: true }).click();
+      await page.locator("#close-button").click();
       await expect(cards).toHaveCount(0);
     }
   });
