@@ -748,7 +748,7 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <Snackbar
-          className={`snackbar ${isNavCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
+          className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
