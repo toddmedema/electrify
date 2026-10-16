@@ -1,11 +1,17 @@
 # Steam artwork
 
-The selected direction is **C — Dispatch desk**: the original Electrify wordmark,
+The original coordinated set uses **C — Dispatch desk**: the original Electrify wordmark,
 three recognizable power sources, and crossing supply/demand curves. The complete
 set was approved by two independent visual reviewers and one Steam genre reviewer
 after three feedback rounds. See [review notes](review-notes.md).
 
-## Three directions
+## A × C hybrid follow-up
+
+The latest concepts combine A's connected town and power sources with C's simpler,
+bolder shapes. Compare [Connected landscape, Powering the town, and Grid in silhouette](hybrids/README.md)
+in the [new gallery](hybrids/review.html).
+
+## Original three directions
 
 | Option                | Main capsule                             | Direction                                                        |
 | --------------------- | ---------------------------------------- | ---------------------------------------------------------------- |

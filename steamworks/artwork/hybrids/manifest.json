@@ -1,0 +1,29 @@
+[
+  {
+    "id": "01-connected-landscape",
+    "title": "1 · Connected landscape",
+    "description": "A prominent blue pylon, bold grid connections, and a compact landscape of power sources.",
+    "file": "01-connected-landscape.png",
+    "width": 1536,
+    "height": 1024,
+    "sha256": "1631670f0cb14311f4c642e5fb395d301e4c10ed8079503115b291f495078123"
+  },
+  {
+    "id": "02-powering-the-town",
+    "title": "2 · Powering the town",
+    "description": "The community is the focal point, with smaller infrastructure and broad ivory land shapes.",
+    "file": "02-powering-the-town.png",
+    "width": 1536,
+    "height": 1024,
+    "sha256": "5f273fef6dac7711967701f5dad21c070eccf592d6c0b2590d0638cb80d278b5"
+  },
+  {
+    "id": "03-grid-in-silhouette",
+    "title": "3 · Grid in silhouette",
+    "description": "The strongest match to C: dark silhouettes, a broad ivory ribbon, and the simplest geometry.",
+    "file": "03-grid-in-silhouette.png",
+    "width": 1536,
+    "height": 1024,
+    "sha256": "5457eab979fc8d84959d5a346fbdefa39c14b3f6233b6023201c2aaee4819c0e"
+  }
+]
