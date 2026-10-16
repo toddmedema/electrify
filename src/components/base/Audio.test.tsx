@@ -1,13 +1,14 @@
 import * as React from "react";
 import { act, render } from "@testing-library/react";
 import Audio, { StateProps } from "./Audio";
-import { loadAudioFiles, pause, state } from "../../data/Audio";
+import { loadAudioFiles, pause, setMusicInGame, state } from "../../data/Audio";
 import { INIT_DELAY } from "../../Constants";
 
 jest.mock("../../data/Audio", () => ({
   loadAudioFiles: jest.fn(),
   pause: jest.fn(),
   resume: jest.fn(),
+  setMusicInGame: jest.fn(),
   setMusicVolume: jest.fn(),
   setSoundEffectsVolume: jest.fn(),
   playSoundEffect: jest.fn(),
@@ -59,4 +60,24 @@ it("does not download audio when disabled before the delay", () => {
   expect(pause).toHaveBeenCalled();
   rerender(<Audio {...props} />);
   expect(loadAudioFiles).toHaveBeenCalledTimes(1);
+});
+
+it("selects gameplay before delayed audio loading when mounted inside a game", () => {
+  render(<Audio {...props} inGame />);
+  expect(setMusicInGame).toHaveBeenCalledWith(true);
+  expect(loadAudioFiles).not.toHaveBeenCalled();
+  act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
+  expect(loadAudioFiles).toHaveBeenCalledTimes(1);
+});
+
+it("changes music on entering and leaving a game, including while muted", () => {
+  const { rerender } = render(<Audio {...props} />);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(false);
+  rerender(<Audio {...props} inGame />);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(true);
+  const changes = (setMusicInGame as jest.Mock).mock.calls.length;
+  rerender(<Audio {...props} inGame musicVolume={0.4} />);
+  expect(setMusicInGame).toHaveBeenCalledTimes(changes);
+  rerender(<Audio {...props} enabled={false} />);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(false);
 });

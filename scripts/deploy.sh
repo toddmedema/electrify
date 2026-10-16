@@ -91,8 +91,8 @@ prod() {
   assertNoLfsPointers
   # Deploy web app to prod with 1 day cache for most files, 6 month cache for art assets
   export AWS_DEFAULT_REGION='us-east-2'
-  aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --exclude '*.webp' --cache-control 'public, max-age=86400'
-  aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control 'public, max-age=15552000'
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.wav' --exclude '*.jpg' --exclude '*.png' --exclude '*.webp' --cache-control 'public, max-age=86400'
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.wav' --include '*.jpg' --include '*.png' --cache-control 'public, max-age=15552000'
   # Set WebP's type explicitly: older mimetypes tables used by the aws cli don't know it.
   aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.webp' --content-type image/webp --cache-control 'public, max-age=15552000'
 

@@ -10,6 +10,7 @@ interface FakeSource {
   stop: jest.Mock;
   connect: jest.Mock;
   buffer: AudioBuffer | null;
+  loop: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ function fakeContext(tickPerSource: number = 0) {
         stop: jest.fn(),
         connect: jest.fn(),
         buffer: null,
+        loop: false,
       };
       sources.push(source);
       context.currentTime += tickPerSource;
@@ -69,6 +71,104 @@ function playingBasicTheme(tickPerSource: number = 0) {
   themeManager.setIntensity(2); // starts the basic theme from silence
   return { themeManager, context, sources };
 }
+
+function musicHarness() {
+  const { context, sources } = fakeContext();
+  const nodes: { [key: string]: AudioNode } = {};
+  for (const theme of Object.values(MUSIC_DEFINITIONS)) {
+    const buffer = {
+      duration: theme.durationMs / 1000 + (theme.loop ? 0 : 10),
+    } as AudioBuffer;
+    for (const track of theme.tracks) {
+      nodes[`${theme.directory}${track}`] = new AudioNode(
+        context as unknown as AudioContext,
+        buffer,
+      );
+    }
+  }
+  return {
+    themeManager: new ThemeManager(context as unknown as AudioContext, nodes),
+    context,
+    sources,
+  };
+}
+
+describe("menu and gameplay music", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("loops the menu on the audio clock without escalating into gameplay", () => {
+    const { themeManager, sources } = musicHarness();
+    themeManager.setIntensity(1);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].loop).toBe(true);
+    expect(sources[0].buffer?.duration).toBe(
+      MUSIC_DEFINITIONS.menu.durationMs / 1000,
+    );
+    jest.advanceTimersByTime(BASIC.durationMs * 2);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].stop).not.toHaveBeenCalled();
+  });
+
+  it("crossfades into the existing aligned gameplay tracks when a game starts", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(1);
+    context.currentTime = 7;
+    themeManager.setIntensity(2);
+    expect(sources[0].stop).toHaveBeenCalledWith(8.5);
+    const gameplay = sources.slice(1);
+    expect(gameplay).toHaveLength(BASIC.tracks.length);
+    for (const source of gameplay) {
+      expect(source.loop).toBe(false);
+      expect(source.buffer?.duration).toBe(BASIC_DURATION_SECONDS + 10);
+      expect(source.start).toHaveBeenCalledWith(7, 0);
+    }
+  });
+
+  it("returns to the menu on quit and cancels the pending gameplay loop", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(2);
+    context.currentTime = 15;
+    themeManager.setIntensity(1);
+    for (const source of sources.slice(0, BASIC.tracks.length)) {
+      expect(source.stop).toHaveBeenCalledWith(16.5);
+    }
+    expect(sources[BASIC.tracks.length].loop).toBe(true);
+    jest.advanceTimersByTime(BASIC.durationMs * 2);
+    expect(sources).toHaveLength(BASIC.tracks.length + 1);
+  });
+
+  it("resumes the menu at its position after several native loops", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(1);
+    context.currentTime = (MUSIC_DEFINITIONS.menu.durationMs / 1000) * 3 + 12;
+    themeManager.pause();
+    context.currentTime += 50;
+    themeManager.resume();
+    expect(sources[1].loop).toBe(true);
+    expect(sources[1].start.mock.calls[0][1]).toBeCloseTo(12);
+  });
+
+  it("does not carry the old song's seek position across a muted scene change", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(2);
+    context.currentTime = 60;
+    themeManager.pause();
+    themeManager.setIntensity(1);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    context.currentTime = 90;
+    themeManager.resume();
+    expect(sources[BASIC.tracks.length].start).toHaveBeenCalledWith(90, 0);
+    expect(sources[BASIC.tracks.length].loop).toBe(true);
+  });
+
+  it("stops the current looping source when music is stopped", () => {
+    const { themeManager, sources } = musicHarness();
+    themeManager.setIntensity(1);
+    themeManager.setIntensity(0);
+    expect(sources[0].stop).toHaveBeenCalled();
+  });
+});
 
 describe("ThemeManager pause / resume", () => {
   beforeEach(() => {
