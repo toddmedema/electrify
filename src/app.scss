@@ -3432,14 +3432,13 @@ $pane_header_height: 48px;
   }
 
   .cardList {
-    background: var(--bg-sunken);
+    background: inherit;
     padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 
   .missionList {
-    background: $bg_primary;
     padding-top: 0 !important;
 
     .MuiListSubheader-root {
@@ -5902,17 +5901,9 @@ $homeSmokeCycle: 5.6s;
   margin-right: auto;
   box-sizing: border-box;
 }
-.screenManual > .cardList,
-.screenManual > .MuiToolbar-root {
+.screenManual > .cardList {
   width: 100%;
   max-width: 880px;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
-}
-.screenCustom > .MuiToolbar-root {
-  width: 100%;
-  max-width: 992px;
   margin-left: auto;
   margin-right: auto;
   box-sizing: border-box;
@@ -6263,24 +6254,6 @@ $programs_column: 800px;
   }
 }
 
-// Final alignment corrections: target the standalone screens' nested header toolbars.
-.screenCatalog > #topbar > .MuiToolbar-root,
-.screenManual > #topbar > .MuiToolbar-root,
-.screenCustom > #topbar > .MuiToolbar-root {
-  box-sizing: border-box;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-}
-.screenCatalog > #topbar > .MuiToolbar-root {
-  max-width: 1040px;
-}
-.screenManual > #topbar > .MuiToolbar-root {
-  max-width: 880px;
-}
-.screenCustom > #topbar > .MuiToolbar-root {
-  max-width: 992px;
-}
 .base_main #manual .manual-group {
   text-transform: none;
   letter-spacing: 0;
@@ -6673,12 +6646,25 @@ $programs_column: 800px;
 // they settle the older per-screen rules above them.
 // ===============================================
 
-// <ScreenHeader>: an opaque bar on the page surface with a hairline under it. The toolbar keeps
-// the #topbar insets; the title is left-aligned at every width.
+// ScreenPage follows Game details: one page surface and full-width navigation, independent
+// of the readable measures used by the content inside it.
+.screenPage {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-primary);
+}
+
+// The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
 .screenHeader {
   flex: 0 0 auto;
-  background: var(--bg-primary);
+  background: inherit;
   border-bottom: 1px solid var(--border-subtle);
+
+  .screenHeaderBar {
+    box-sizing: border-box;
+    width: 100%;
+  }
 
   .screenHeaderTitle {
     min-width: 0;
@@ -6722,11 +6708,8 @@ $programs_column: 800px;
   }
 }
 
-// List pages sit on the sunken surface so their grouped lists read as raised sections
-.screenCatalog,
-.screenManual,
-.screenCustom,
-#gameCard:has(> .screenHeader) {
+// Construction catalogs keep their in-game surface; standalone pages use ScreenPage.
+.screenCatalog:not(.screenPage) {
   background: var(--bg-sunken);
 }
 
@@ -6783,8 +6766,6 @@ $programs_column: 800px;
 }
 
 .missionList {
-  background: var(--bg-sunken);
-
   .groupedList {
     margin: 0 $space-4 $space-2;
   }
@@ -7001,14 +6982,6 @@ $programs_column: 800px;
   }
 }
 
-// Settings' header shares its body's 760px column, as the catalog and Manual headers do
-#gameCard:has(.settingsGroup) > .screenHeader > .MuiToolbar-root {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 760px;
-  margin-inline: auto;
-}
-
 // The collapsed summary paints its own opaque background (it pins while scrolling), so the
 // group's bottom corners have to be rounded on it too, not only on the entry's border
 .base_main #manual {
@@ -7111,12 +7084,6 @@ $programs_column: 800px;
 
 .screenDataCenterSetup {
   --data-center-setup-width: 816px;
-
-  .screenHeaderBar {
-    width: min(100%, var(--data-center-setup-width));
-    box-sizing: border-box;
-    margin: 0 auto;
-  }
 
   @media (min-width: 700px) {
     .locationPicker {

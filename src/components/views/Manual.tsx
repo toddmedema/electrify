@@ -14,7 +14,7 @@ import {
 import ClearIcon from "@mui/icons-material/Clear";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import SearchIcon from "@mui/icons-material/Search";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import {
   MANUAL_ENTRIES,
   MANUAL_GROUPS,
@@ -323,41 +323,42 @@ export default function Manual(props: Props): React.JSX.Element {
   const pinned = matches.filter((entry: ManualEntryType) => entry.pinned);
 
   return (
-    <div className="flexContainer screenManual" id="gameCard">
-      <ScreenHeader
-        title="Manual"
-        onBack={onBack}
-        trailing={
-          <InputBase
-            className="manual-search"
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              setSearchTerm(event.target.value)
-            }
-            inputProps={{ "aria-label": "Search the manual" }}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchIcon color="primary" fontSize="small" />
+    <ScreenPage
+      className="screenManual"
+      id="gameCard"
+      title="Manual"
+      onBack={onBack}
+      trailing={
+        <InputBase
+          className="manual-search"
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setSearchTerm(event.target.value)
+          }
+          inputProps={{ "aria-label": "Search the manual" }}
+          startAdornment={
+            <InputAdornment position="start">
+              <SearchIcon color="primary" fontSize="small" />
+            </InputAdornment>
+          }
+          endAdornment={
+            searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => setSearchTerm("")}
+                  aria-label="clear search"
+                  color="primary"
+                  size="small"
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
               </InputAdornment>
-            }
-            endAdornment={
-              searchTerm ? (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setSearchTerm("")}
-                    aria-label="clear search"
-                    color="primary"
-                    size="small"
-                  >
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ) : null
-            }
-          />
-        }
-      />
+            ) : null
+          }
+        />
+      }
+    >
       <List
         dense
         component="div"
@@ -398,6 +399,6 @@ export default function Manual(props: Props): React.JSX.Element {
           );
         })}
       </List>
-    </div>
+    </ScreenPage>
   );
 }

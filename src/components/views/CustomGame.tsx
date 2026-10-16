@@ -23,7 +23,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -471,9 +471,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   return (
-    <div id="listCard" className="flexContainer screenCustom">
-      <ScreenHeader title="Custom setup" onBack={onBack} />
-
+    <ScreenPage
+      id="listCard"
+      className="screenCustom"
+      title="Custom setup"
+      onBack={onBack}
+    >
       <div className="scrollable">
         <LocationPicker
           locations={selectableLocations}
@@ -993,6 +996,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
         them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
         common unit for comparing different greenhouse gases.
       </InfoDialog>
-    </div>
+    </ScreenPage>
   );
 }

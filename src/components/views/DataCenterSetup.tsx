@@ -29,7 +29,7 @@ import { createDataCenterSetupWorker } from "../../helpers/DataCenterSetupClient
 import { formatCount, formatWatts } from "../../helpers/Format";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { ScenarioType } from "../../Types";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import LocationPicker from "../base/LocationPicker";
 import {
   useWorkerRequest,
@@ -176,8 +176,12 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
   );
 
   return (
-    <div id="listCard" className="flexContainer screenDataCenterSetup">
-      <ScreenHeader title="Explore data center growth" onBack={onBack} />
+    <ScreenPage
+      id="listCard"
+      className="screenDataCenterSetup"
+      title="Explore data center growth"
+      onBack={onBack}
+    >
       <div className="scrollable">
         <div className="dataCenterSetupContent">
           {onResume && (
@@ -587,6 +591,6 @@ export default function DataCenterSetup({ onBack, onStart, onResume }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </ScreenPage>
   );
 }

@@ -26,7 +26,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import SortIcon from "@mui/icons-material/Sort";
 import NavigableCardRow from "../base/NavigableCardRow";
-import ScreenHeader from "../base/ScreenHeader";
+import ScreenPage from "../base/ScreenPage";
 import { getScenarioPlayCounts } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -302,26 +302,27 @@ export default function NewGame(props: Props): React.JSX.Element {
   )!.label;
 
   return (
-    <div id="listCard" className="flexContainer screenCatalog">
-      <ScreenHeader
-        title="Choose a game"
-        onBack={props.onBack}
-        trailing={
-          // Otherwise the Manual is only reachable from the title screen and the in-game
-          // overflow menu, so players who stop partway through never find out it exists.
-          // Auto margin rather than absolute positioning, so it can't sit on top of the
-          // title on narrow screens
-          <IconButton
-            sx={{ marginLeft: "auto" }}
-            onClick={props.onManual}
-            aria-label="How to play"
-            color="primary"
-            size="large"
-          >
-            <HelpOutlineIcon />
-          </IconButton>
-        }
-      />
+    <ScreenPage
+      id="listCard"
+      className="screenCatalog"
+      title="Choose a game"
+      onBack={props.onBack}
+      trailing={
+        // Otherwise the Manual is only reachable from the title screen and the in-game
+        // overflow menu, so players who stop partway through never find out it exists.
+        // Auto margin rather than absolute positioning, so it can't sit on top of the
+        // title on narrow screens
+        <IconButton
+          sx={{ marginLeft: "auto" }}
+          onClick={props.onManual}
+          aria-label="How to play"
+          color="primary"
+          size="large"
+        >
+          <HelpOutlineIcon />
+        </IconButton>
+      }
+    >
       <List
         dense
         className="scrollable cardList missionList"
@@ -471,6 +472,6 @@ export default function NewGame(props: Props): React.JSX.Element {
           />
         </div>
       </List>
-    </div>
+    </ScreenPage>
   );
 }
