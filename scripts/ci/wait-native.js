@@ -1,11 +1,6 @@
 const { execFileSync } = require("node:child_process");
 
-const names = [
-  "Linux x64 tests",
-  "Windows x64 tests",
-  "macOS Apple Silicon tests",
-  "macOS Intel tests",
-];
+const names = ["Linux x64 tests", "Windows x64 tests", "macOS universal tests"];
 
 function route(env) {
   if (
@@ -68,13 +63,13 @@ async function waitForNativeJobs(
     }
     if (complete(jobs)) {
       console.error(
-        "All four native workers passed in this run's latest job attempts.",
+        "All three native workers passed in this run's latest job attempts.",
       );
       return;
     }
     await sleep(interval);
   }
-  throw new Error("Timed out waiting for all four native workers");
+  throw new Error("Timed out waiting for all three native workers");
 }
 
 if (require.main === module) {

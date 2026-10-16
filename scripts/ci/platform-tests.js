@@ -34,8 +34,8 @@ function cpuSuites(index, cores = os.availableParallelism()) {
 }
 
 function commands(index, cores = os.availableParallelism()) {
-  if (!Number.isInteger(index) || index < 1 || index > 4)
-    throw new Error("Expected a native platform index from 1 to 4");
+  if (!Number.isInteger(index) || index < 1 || index > 3)
+    throw new Error("Expected a native platform index from 1 to 3");
   return {
     cpu: [
       ...(index === 1
@@ -62,7 +62,7 @@ function commands(index, cores = os.availableParallelism()) {
           "--platform",
           process.platform,
           "--arch",
-          process.arch,
+          process.platform === "darwin" ? "universal" : process.arch,
         ],
       },
       ...([2, 3].includes(index)

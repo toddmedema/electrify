@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { finished } = require("node:stream/promises");
 const {
+  installMacNativeSlices,
   packageConfiguration,
   withOfflineMacSigning,
   signMacAdHoc,
@@ -29,6 +30,81 @@ test("packaging refuses Git LFS pointer text and empty assets", () => {
   assert.throws(
     () => assertAsset(Buffer.alloc(0), "data/weather/region.bin"),
     /Empty/,
+  );
+});
+
+test("universal Mac packaging installs the missing Koffi slice exactly as locked", (t) => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const root = fs.mkdtempSync(path.join(temporaryRoot, "slices-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const entry = (arch) => ({
+    version: "3.3.3",
+    resolved: `https://registry.npmjs.org/@koromix/koffi-darwin-${arch}/-/koffi-darwin-${arch}-3.3.3.tgz`,
+    integrity: `sha512-${arch}`,
+    cpu: [arch],
+    optional: true,
+    os: ["darwin"],
+  });
+  fs.writeFileSync(
+    path.join(root, "package-lock.json"),
+    JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        "node_modules/@koromix/koffi-darwin-arm64": entry("arm64"),
+        "node_modules/@koromix/koffi-darwin-x64": entry("x64"),
+      },
+    }),
+  );
+  const writePackage = (directory, version) => {
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(
+      path.join(directory, "package.json"),
+      JSON.stringify({ version }),
+    );
+    fs.writeFileSync(path.join(directory, "koffi.node"), "native");
+  };
+  // npm ci on an Apple Silicon host installed only the arm64 slice.
+  writePackage(
+    path.join(root, "node_modules", "@koromix", "koffi-darwin-arm64"),
+    "3.3.3",
+  );
+  const calls = [];
+  const fakeNpm = (args) => {
+    calls.push(args);
+    const prefix = args[args.indexOf("--prefix") + 1];
+    const lock = JSON.parse(
+      fs.readFileSync(path.join(prefix, "package-lock.json"), "utf8"),
+    );
+    assert.deepEqual(
+      lock.packages["node_modules/@koromix/koffi-darwin-x64"],
+      entry("x64"),
+    );
+    writePackage(
+      path.join(prefix, "node_modules", "@koromix", "koffi-darwin-x64"),
+      "3.3.3",
+    );
+  };
+  installMacNativeSlices(root, fakeNpm);
+  assert.equal(calls.length, 1);
+  assert(calls[0].includes("--os=darwin") && calls[0].includes("--cpu=x64"));
+  assert.equal(
+    fs.readFileSync(
+      path.join(root, "node_modules/@koromix/koffi-darwin-x64/koffi.node"),
+      "utf8",
+    ),
+    "native",
+  );
+  installMacNativeSlices(root, fakeNpm);
+  assert.equal(calls.length, 1, "Installed slices are not fetched again");
+
+  // npm skips a platform mismatch silently, so an empty result must fail.
+  fs.rmSync(path.join(root, "node_modules/@koromix/koffi-darwin-x64"), {
+    recursive: true,
+  });
+  assert.throws(
+    () => installMacNativeSlices(root, () => {}),
+    /did not install the locked @koromix\/koffi-darwin-x64/,
   );
 });
 

@@ -7,19 +7,25 @@ const { commands, cpuSuites, execute } = require("./platform-tests");
 const { names } = require("./wait-native");
 const { partition } = require("./jest-filter");
 
-test("PR CI has exactly six jobs including all native targets and the required coverage gate", () => {
+test("PR CI has exactly five jobs including all native targets and the required coverage gate", () => {
   const { jobs } = parse(
     fs.readFileSync(".github/workflows/workflow.yml", "utf8"),
   );
   assert.deepEqual(Object.keys(jobs).sort(), ["build", "check", "platform"]);
   assert.deepEqual(Object.keys(jobs.platform.strategy.matrix), ["include"]);
   const workers = jobs.platform.strategy.matrix.include;
-  assert.equal(workers.length + 2, 6);
-  assert.deepEqual(
-    workers.map(({ platform, arch }) => `${platform}-${arch}`).sort(),
-    ["darwin-arm64", "darwin-x64", "linux-x64", "win32-x64"],
+  assert.equal(workers.length + 2, 5);
+  assert.deepEqual(workers.map(({ depot }) => depot).sort(), [
+    "darwin-universal",
+    "linux-x64",
+    "win32-x64",
+  ]);
+  // The universal Mac app is packaged on Apple Silicon, so its host guard expects arm64.
+  assert.equal(
+    workers.find(({ platform }) => platform === "darwin").arch,
+    "arm64",
   );
-  assert.deepEqual(workers.map(({ index }) => index).sort(), [1, 2, 3, 4]);
+  assert.deepEqual(workers.map(({ index }) => index).sort(), [1, 2, 3]);
   assert.deepEqual(jobs.check.needs, ["build"]);
   assert.deepEqual(
     workers.map(({ label }) => `${label} tests`).sort(),
@@ -60,7 +66,7 @@ test("PR CI has exactly six jobs including all native targets and the required c
 });
 
 test("platform plans retain all CPU shards, browser shards and full native suites", () => {
-  for (let index = 1; index <= 4; index++) {
+  for (let index = 1; index <= 3; index++) {
     const plan = commands(index, 4);
     assert.deepEqual(
       plan.cpu.filter(({ group }) => group).map(({ script }) => script),

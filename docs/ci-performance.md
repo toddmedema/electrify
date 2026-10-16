@@ -1,11 +1,11 @@
 # PR testing performance
 
-CI has a hard cap of **six jobs per PR**, including the required `check`. A regression test
-expands the platform matrix and enforces this limit. Every existing unit test, long simulation,
+CI has a hard cap of **six jobs per PR** and currently runs five, including the required
+`check`. A regression test expands the platform matrix and enforces this limit. Every existing unit test, long simulation,
 seed, browser viewport, native target, coverage threshold, security rule and performance gate
 remains required on every PR.
 
-## Six-job layout
+## Five-job layout
 
 1. **Shared production builds** compiles/verifies the desktop renderer/catalogs and web build
    once each on Linux, checks bundle size, and uploads the artifacts. Separate input-validated
@@ -14,16 +14,16 @@ remains required on every PR.
 2. **Linux x64** runs unit/simulation shard 1, its complete native/packaged desktop suites,
    Firestore rules and CI tooling regression tests.
 3. **Windows x64** runs production browser shard 1 and its complete native/packaged suites.
-4. **macOS Apple Silicon** runs browser shard 2, its complete native/packaged suites, types,
-   strict lint and formatting.
-5. **macOS Intel** runs its complete native/packaged suites without extra shard jobs.
-6. **check** runs unit/simulation shard 2 on another Linux runner, plus the CLI and isolated
-   tick-ratio benchmark. It then requires all four native workers' latest results in this run
+4. **macOS universal** packages one app containing both Intel and Apple Silicon slices on an
+   Apple Silicon runner, then runs browser shard 2, the complete native/packaged suites against
+   the arm64 slice, types, strict lint and formatting. CI does not launch the Intel slice.
+5. **check** runs unit/simulation shard 2 on another Linux runner, plus the CLI and isolated
+   tick-ratio benchmark. It then requires all three native workers' latest results in this run
    to pass, merges raw coverage and enforces the unchanged `package.json` floors.
 
-The required gate does useful CPU work before waiting for native results, avoiding a seventh
+The required gate does useful CPU work before waiting for native results, avoiding another
 job. Its read-only GitHub API query is pinned to the current run/commit and excludes itself. It
-requires all four named native jobs, and fails on missing, failed, skipped, cancelled or timed-out
+requires all three named native jobs, and fails on missing, failed, skipped, cancelled or timed-out
 workers. A partial rerun can reuse unchanged successes from this run, while a newer pending or
 failed job always supersedes its earlier success. Regression tests cover these conditions.
 
@@ -34,8 +34,8 @@ then the full Electron suite. Every native target keeps one UI worker, preservin
 browser, desktop and coverage output directories prevent Playwright cleanup from erasing a
 concurrent report. The combined native-window harness refuses to run locally.
 
-Linux workers and the static-check worker restore the full locked toolchain. Windows and Intel
-use a lean native dependency closure preserving original locked runtime/tool records and native
+Linux workers and the static-check worker restore the full locked toolchain. Windows uses a
+lean native dependency closure preserving original locked runtime/tool records and native
 platform entries. Every target verifies shared renderer assets against its local checkout,
 packages/signs natively, verifies native binaries and finished signatures, and exercises every
 desktop case. Native CI keeps DOM/network traces, sources and failure screenshots without a
@@ -69,9 +69,9 @@ so its existing draft/plain ratio ceilings still compare the same execution envi
 
 ## Downloadable QA builds
 
-Run **Test Code** manually with **Archive and upload all four verified offline desktop builds**
+Run **Test Code** manually with **Archive and upload all three verified offline desktop builds**
 enabled, or `gh workflow run workflow.yml --ref <branch> -f qa-artifacts=true`. This uses the same
-six jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
+five jobs and full tests. PRs retain diagnostics but omit downloadable archives. Tar preserves
 executable permissions; compressed archives upload without another compression pass.
 
 ## Timing

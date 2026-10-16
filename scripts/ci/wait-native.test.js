@@ -10,7 +10,7 @@ const passed = () =>
     conclusion: "success",
   }));
 
-test("fan-in waits for all four native workers and ignores its own running check", () => {
+test("fan-in waits for all three native workers and ignores its own running check", () => {
   assert(complete([...passed(), { name: "check", status: "in_progress" }]));
   assert.equal(complete(passed().slice(1)), false);
   assert.equal(

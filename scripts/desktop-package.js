@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const builder = require("electron-builder");
 const { desktopBuild } = require("./desktop-build");
 const {
@@ -8,6 +9,84 @@ const {
   verifySignedMacPackage,
 } = require("./desktop-verify");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
+
+const MAC_ARCHITECTURES = ["arm64", "x64"];
+
+function runNpm(args) {
+  const [command, prefix] = process.env.npm_execpath
+    ? [process.execPath, [process.env.npm_execpath]]
+    : ["npm", []];
+  const result = spawnSync(command, [...prefix, ...args], { stdio: "inherit" });
+  if (result.error || result.status !== 0)
+    throw result.error || new Error(`npm ${args.join(" ")} failed`);
+}
+
+function installedVersion(directory) {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(directory, "package.json"), "utf8"),
+    ).version;
+  } catch {
+    return undefined;
+  }
+}
+
+/** npm ci installs only the host's Koffi slice; the universal Mac app needs both. */
+function installMacNativeSlices(root = process.cwd(), run = runNpm) {
+  const lock = JSON.parse(
+    fs.readFileSync(path.join(root, "package-lock.json"), "utf8"),
+  );
+  for (const arch of MAC_ARCHITECTURES) {
+    const name = `@koromix/koffi-darwin-${arch}`;
+    const key = `node_modules/${name}`;
+    const entry = lock.packages[key];
+    if (!entry) throw new Error(`package-lock.json does not pin ${name}`);
+    const target = path.join(root, key);
+    if (installedVersion(target) === entry.version) continue;
+    const directory = path.join(root, ".tmp", `koffi-darwin-${arch}`);
+    fs.rmSync(directory, { recursive: true, force: true });
+    fs.mkdirSync(directory, { recursive: true });
+    const manifest = {
+      name: `electrify-koffi-darwin-${arch}`,
+      private: true,
+      optionalDependencies: { [name]: entry.version },
+    };
+    fs.writeFileSync(
+      path.join(directory, "package.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+    // Reuse the locked resolution and integrity verbatim; nothing is re-resolved.
+    fs.writeFileSync(
+      path.join(directory, "package-lock.json"),
+      JSON.stringify(
+        {
+          name: manifest.name,
+          lockfileVersion: 3,
+          requires: true,
+          packages: { "": manifest, [key]: entry },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    // npm honours --os/--cpu only for optional dependencies, and skips a mismatch silently.
+    run([
+      "ci",
+      "--prefix",
+      directory,
+      "--os=darwin",
+      `--cpu=${arch}`,
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+    ]);
+    const installed = path.join(directory, key);
+    if (installedVersion(installed) !== entry.version)
+      throw new Error(`npm did not install the locked ${name}`);
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.cpSync(installed, target, { recursive: true });
+  }
+}
 
 async function signMacAdHoc(options) {
   return require("@electron/osx-sign").signAsync({
@@ -85,19 +164,26 @@ async function desktopPackage() {
       "Set STEAM_APP_ID to Electrify's actual Steamworks App ID before making a Steam depot build. Use desktop:pack:offline for QA without Steam credentials.",
     );
   const platform = value("--platform", process.platform);
-  const architecture = value("--arch", process.arch);
+  const mac = platform === "darwin";
+  const architecture = value("--arch", mac ? "universal" : process.arch);
   if (
-    !["win32:x64", "linux:x64", "darwin:x64", "darwin:arm64"].includes(
+    !["win32:x64", "linux:x64", "darwin:universal"].includes(
       `${platform}:${architecture}`,
     )
   )
     throw new Error(
-      "Steamworks supports Windows/Linux x64 and macOS x64/arm64 builds",
+      "Steamworks builds are Windows x64, Linux x64 and one universal macOS app",
     );
-  if (platform !== process.platform || architecture !== process.arch)
+  if (
+    platform !== process.platform ||
+    (mac
+      ? !MAC_ARCHITECTURES.includes(process.arch)
+      : architecture !== process.arch)
+  )
     throw new Error(
-      "Build on the target platform and architecture with Node 24 and npm ci, so the matching native Steam bridge is installed and verified.",
+      "Build on the target platform (and architecture, for Windows or Linux) with Node 24 and npm ci, so the matching native Steam bridge is installed and verified.",
     );
+  if (mac) installMacNativeSlices();
   if (!process.argv.includes("--skip-build")) desktopBuild();
   else if (!fs.existsSync("build/desktop-assets.json"))
     throw new Error("Run desktop:build before --skip-build");
@@ -128,7 +214,7 @@ async function desktopPackage() {
     builder.build({
       targets: target.createTarget(
         ["dir"],
-        architecture === "arm64" ? builder.Arch.arm64 : builder.Arch.x64,
+        mac ? builder.Arch.universal : builder.Arch.x64,
       ),
       config: {
         ...packageConfiguration(mode),
@@ -145,9 +231,7 @@ async function desktopPackage() {
       ? "win-unpacked"
       : platform === "linux"
         ? "linux-unpacked"
-        : architecture === "arm64"
-          ? "mac-arm64"
-          : "mac";
+        : "mac-universal";
   const directory = path.join("dist", "desktop", output);
   // Check the finished signature once, after all packaging has completed. An afterSign hook
   // also fires when the pinned builder skips signing, so it cannot establish signature validity.
@@ -166,6 +250,7 @@ if (require.main === module)
   });
 
 module.exports = {
+  installMacNativeSlices,
   packageConfiguration,
   desktopPackage,
   withOfflineMacSigning,

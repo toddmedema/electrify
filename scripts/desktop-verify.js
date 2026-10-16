@@ -113,7 +113,8 @@ function verifyPackaged(directory) {
           ]
         : [
             "steamworks.js/dist/osx/libsteam_api.dylib",
-            `steamworks.js/dist/osx/steamworksjs.darwin-${process.arch}.node`,
+            "steamworks.js/dist/osx/steamworksjs.darwin-arm64.node",
+            "steamworks.js/dist/osx/steamworksjs.darwin-x64.node",
           ];
   for (const name of native) {
     const unpacked = path.join(
@@ -130,28 +131,32 @@ function verifyPackaged(directory) {
     )
       throw new Error(`Packaged native runtime mismatch: ${name}`);
   }
-  const koffiRoot = path.join(
-    "@koromix",
-    `koffi-${process.platform}-${process.arch}`,
-  );
-  const koffiFiles = files(
-    path.join(resources, "app.asar.unpacked", "node_modules", koffiRoot),
-  );
-  if (!koffiFiles.some((name) => name.endsWith(".node")))
-    throw new Error("The packaged native Steam bridge is missing");
-  for (const name of koffiFiles) {
-    const source = fs.readFileSync(path.join("node_modules", koffiRoot, name));
-    const packed = fs.readFileSync(
-      path.join(
-        resources,
-        "app.asar.unpacked",
-        "node_modules",
-        koffiRoot,
-        name,
-      ),
+  // The universal Mac app carries both Koffi slices; Koffi loads the one matching the CPU.
+  const koffiArchitectures =
+    platform === "darwin" ? ["arm64", "x64"] : [process.arch];
+  for (const arch of koffiArchitectures) {
+    const koffiRoot = path.join("@koromix", `koffi-${platform}-${arch}`);
+    const koffiFiles = files(
+      path.join(resources, "app.asar.unpacked", "node_modules", koffiRoot),
     );
-    if (digest(source) !== digest(packed))
-      throw new Error(`Packaged native Steam bridge mismatch: ${name}`);
+    if (!koffiFiles.some((name) => name.endsWith(".node")))
+      throw new Error(`The packaged native Steam bridge is missing: ${arch}`);
+    for (const name of koffiFiles) {
+      const source = fs.readFileSync(
+        path.join("node_modules", koffiRoot, name),
+      );
+      const packed = fs.readFileSync(
+        path.join(
+          resources,
+          "app.asar.unpacked",
+          "node_modules",
+          koffiRoot,
+          name,
+        ),
+      );
+      if (digest(source) !== digest(packed))
+        throw new Error(`Packaged native Steam bridge mismatch: ${name}`);
+    }
   }
   return count;
 }
@@ -170,6 +175,18 @@ function verifySignedMacPackage(directory) {
     throw (
       result.error ||
       new Error(`The signed macOS app failed verification: ${result.stderr}`)
+    );
+  const lipo = spawnSync(
+    "/usr/bin/lipo",
+    ["-archs", path.join(application, "Contents", "MacOS", "Electrify")],
+    { encoding: "utf8" },
+  );
+  if (lipo.error || lipo.status !== 0)
+    throw lipo.error || new Error(lipo.stderr);
+  const slices = lipo.stdout.trim().split(/\s+/);
+  if (!["arm64", "x86_64"].every((arch) => slices.includes(arch)))
+    throw new Error(
+      `The macOS app is not universal: ${lipo.stdout.trim() || "no slices"}`,
     );
   return verifyArchiveAssets(
     path.join(application, "Contents", "Resources", "app.asar"),
