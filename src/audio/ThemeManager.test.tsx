@@ -1,6 +1,15 @@
-import { MUSIC_DEFINITIONS } from "../Constants";
+import {
+  MUSIC_DEFINITIONS,
+  MUSIC_FADE_SECONDS,
+  MUSIC_GAME_VOLUME,
+} from "../Constants";
 import { AudioNode } from "./AudioNode";
-import { ThemeManager } from "./ThemeManager";
+import {
+  MUSIC_PRESSURE_HOLD_MS,
+  MUSIC_PRESSURE_ATTACK_SECONDS,
+  MUSIC_PRESSURE_RELEASE_SECONDS,
+  ThemeManager,
+} from "./ThemeManager";
 
 const BASIC = MUSIC_DEFINITIONS.basic;
 const BASIC_DURATION_SECONDS = BASIC.durationMs / 1000;
@@ -21,18 +30,27 @@ interface FakeSource {
  */
 function fakeContext(tickPerSource: number = 0) {
   const sources: FakeSource[] = [];
+  const gains: Array<{
+    value: number;
+    setValueAtTime: jest.Mock;
+    cancelAndHoldAtTime: jest.Mock;
+    linearRampToValueAtTime: jest.Mock;
+  }> = [];
   const context = {
     currentTime: 0,
     destination: {},
     createGain: () => {
+      const gain = {
+        value: 1,
+        setValueAtTime: jest.fn(),
+        cancelAndHoldAtTime: jest.fn(),
+        linearRampToValueAtTime: jest.fn(),
+      };
+      gains.push(gain);
       return {
         connect: jest.fn(),
         disconnect: jest.fn(),
-        gain: {
-          value: 1,
-          setValueAtTime: jest.fn(),
-          linearRampToValueAtTime: jest.fn(),
-        },
+        gain,
       };
     },
     createBufferSource: () => {
@@ -48,7 +66,7 @@ function fakeContext(tickPerSource: number = 0) {
       return source;
     },
   };
-  return { context, sources };
+  return { context, sources, gains };
 }
 
 // A manager already playing the basic theme, which is the long one (6+ minutes) where restarting
@@ -73,7 +91,7 @@ function playingBasicTheme(tickPerSource: number = 0) {
 }
 
 function musicHarness() {
-  const { context, sources } = fakeContext();
+  const { context, sources, gains } = fakeContext();
   const nodes: { [key: string]: AudioNode } = {};
   for (const theme of Object.values(MUSIC_DEFINITIONS)) {
     const buffer = {
@@ -90,6 +108,7 @@ function musicHarness() {
     themeManager: new ThemeManager(context as unknown as AudioContext, nodes),
     context,
     sources,
+    gains,
   };
 }
 
@@ -144,7 +163,7 @@ describe("menu and gameplay music", () => {
     themeManager.setIntensity(1);
     context.currentTime = 7;
     themeManager.setIntensity(2);
-    expect(sources[0].stop).toHaveBeenCalledWith(8.5);
+    expect(sources[0].stop).toHaveBeenCalledWith(7 + MUSIC_FADE_SECONDS);
     const gameplay = sources.slice(1);
     expect(gameplay).toHaveLength(BASIC.tracks.length);
     for (const source of gameplay) {
@@ -160,7 +179,7 @@ describe("menu and gameplay music", () => {
     context.currentTime = 15;
     themeManager.setIntensity(1);
     for (const source of sources.slice(0, BASIC.tracks.length)) {
-      expect(source.stop).toHaveBeenCalledWith(16.5);
+      expect(source.stop).toHaveBeenCalledWith(15 + MUSIC_FADE_SECONDS);
     }
     expect(sources[BASIC.tracks.length].loop).toBe(true);
     jest.advanceTimersByTime(BASIC.durationMs * 2);
@@ -196,6 +215,163 @@ describe("menu and gameplay music", () => {
     themeManager.setIntensity(1);
     themeManager.setIntensity(0);
     expect(sources[0].stop).toHaveBeenCalled();
+  });
+
+  it("starts every game at zero with a fresh full loop timer", () => {
+    const { themeManager, context, sources } = musicHarness();
+    themeManager.setIntensity(2);
+    jest.advanceTimersByTime(60000);
+    context.currentTime = 60;
+    themeManager.setIntensity(1);
+    jest.advanceTimersByTime(20000);
+    context.currentTime = 80;
+    themeManager.setIntensity(2);
+    const restarted = sources.slice(-BASIC.tracks.length);
+    for (const source of restarted) {
+      expect(source.start).toHaveBeenCalledWith(80, 0);
+    }
+    const beforeWrap = sources.length;
+    jest.advanceTimersByTime(BASIC.durationMs - 1);
+    expect(sources).toHaveLength(beforeWrap);
+    jest.advanceTimersByTime(1);
+    expect(sources).toHaveLength(beforeWrap + BASIC.tracks.length);
+  });
+});
+
+describe("dynamic gameplay music", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it("fades the full stable mix to 85% over five seconds, leaving menu gain unchanged", () => {
+    const { themeManager, context, gains } = musicHarness();
+    themeManager.setIntensity(1);
+    expect(gains[0].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
+    context.currentTime = 20;
+    themeManager.setIntensity(2);
+    for (const gain of gains.slice(1)) {
+      expect(gain.setValueAtTime).toHaveBeenCalledWith(0, 20);
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+        MUSIC_GAME_VOLUME,
+        25,
+      );
+    }
+  });
+
+  it("raises urgent layers smoothly without restarting sources or their playheads", () => {
+    const { themeManager, context, gains, sources } = musicHarness();
+    themeManager.setIntensity(2);
+    context.currentTime = 20;
+    themeManager.setIntensity(6);
+    const targets = gains.map(
+      (gain) => gain.linearRampToValueAtTime.mock.calls.slice(-1)[0][0],
+    );
+    expect(targets[0]).toBeGreaterThan(MUSIC_GAME_VOLUME);
+    expect(targets[1]).toBeGreaterThan(targets[0]);
+    expect(targets[2]).toBeGreaterThan(targets[1]);
+    expect(targets[2]).toBeLessThan(1);
+    for (const gain of gains) {
+      expect(gain.cancelAndHoldAtTime).toHaveBeenLastCalledWith(20);
+      expect(gain.linearRampToValueAtTime.mock.calls.slice(-1)[0][1]).toBe(
+        20 + MUSIC_PRESSURE_ATTACK_SECONDS,
+      );
+    }
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    for (const source of sources) {
+      expect(source.start).toHaveBeenCalledTimes(1);
+      expect(source.stop).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps the full scene fade when pressure changes immediately after entry", () => {
+    const { themeManager, context, gains } = musicHarness();
+    themeManager.setIntensity(2);
+    context.currentTime = 1;
+    themeManager.setIntensity(10);
+    for (const gain of gains) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
+    }
+  });
+
+  it("caps severe blackouts at the old volume ceiling and delays a slow recovery", () => {
+    const { themeManager, context, gains } = musicHarness();
+    themeManager.setIntensity(2);
+    context.currentTime = 20;
+    themeManager.setIntensity(10);
+    for (const gain of gains) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 23);
+    }
+    themeManager.setIntensity(2);
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS - 1);
+    for (const gain of gains) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenCalledTimes(2);
+    }
+    context.currentTime = 28;
+    jest.advanceTimersByTime(1);
+    for (const gain of gains) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+        MUSIC_GAME_VOLUME,
+        28 + MUSIC_PRESSURE_RELEASE_SECONDS,
+      );
+    }
+  });
+
+  it("uses the latest grid state after the hold and cancels recovery on renewed pressure", () => {
+    const { themeManager, context, gains } = musicHarness();
+    themeManager.setIntensity(10);
+    themeManager.setIntensity(2);
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS / 2);
+    themeManager.setIntensity(6);
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS / 2);
+    expect(gains[1].linearRampToValueAtTime).toHaveBeenLastCalledWith(
+      0.925,
+      MUSIC_PRESSURE_RELEASE_SECONDS,
+    );
+    context.currentTime = 20;
+    themeManager.setIntensity(2);
+    themeManager.setIntensity(10);
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS);
+    for (const gain of gains) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+        1,
+        20 + MUSIC_PRESSURE_ATTACK_SECONDS,
+      );
+    }
+  });
+
+  it("clears pending recovery on quit and keeps the menu at its authored level", () => {
+    const { themeManager, gains } = musicHarness();
+    themeManager.setIntensity(10);
+    themeManager.setIntensity(2);
+    themeManager.setIntensity(1);
+    const ramps = gains.map(
+      (gain) => gain.linearRampToValueAtTime.mock.calls.length,
+    );
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS * 2);
+    expect(
+      gains.map((gain) => gain.linearRampToValueAtTime.mock.calls.length),
+    ).toEqual(ramps);
+    expect(gains[3].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 5);
+  });
+
+  it("updates intensity while paused and resumes the same position at the latest mix", () => {
+    const { themeManager, context, gains, sources } = musicHarness();
+    themeManager.setIntensity(10);
+    context.currentTime = 40;
+    themeManager.pause();
+    themeManager.setIntensity(2);
+    jest.advanceTimersByTime(MUSIC_PRESSURE_HOLD_MS);
+    expect(sources).toHaveLength(BASIC.tracks.length);
+    context.currentTime = 90;
+    themeManager.resume();
+    for (const source of sources.slice(BASIC.tracks.length)) {
+      expect(source.start).toHaveBeenCalledWith(90, 40);
+    }
+    for (const gain of gains.slice(BASIC.tracks.length)) {
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+        MUSIC_GAME_VOLUME,
+        95,
+      );
+    }
   });
 });
 

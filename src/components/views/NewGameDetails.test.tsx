@@ -107,6 +107,40 @@ describe("NewGameDetails leaderboard", () => {
     expect(onDelta).toHaveBeenCalledWith({ difficulty: "CEO" });
   });
 
+  it("keeps the board's space while a new difficulty loads and returns fewer scores", async () => {
+    mockGetDocs.mockResolvedValueOnce({
+      docs: Array.from({ length: 3 }, (_, index) => ({
+        data: () => ({
+          displayName: `Player ${index + 1}`,
+          score: 500 - index,
+        }),
+      })),
+    });
+    const { rerender } = render(<NewGameDetails {...props()} />);
+    await screen.findByText("Player 3");
+    const board = screen.getByRole("region", { name: "Leaderboard — Easy" });
+    jest
+      .spyOn(board, "getBoundingClientRect")
+      .mockReturnValue({ height: 360 } as DOMRect);
+    let finish!: (value: { docs: [] }) => void;
+    mockGetDocs.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+
+    rerender(<NewGameDetails {...props({ game: game("CEO") })} />);
+    await screen.findByText("Loading...");
+    expect(board).toHaveStyle({ minHeight: "360px" });
+    expect(screen.queryByText("Player 3")).not.toBeInTheDocument();
+
+    await act(async () => {
+      finish({ docs: [] });
+    });
+    await screen.findByText("Finish this game to join the leaderboard");
+    expect(board).toHaveStyle({ minHeight: "360px" });
+  });
+
   it("puts the player's best score in the score column", async () => {
     mockGetDocs.mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({
       docs: [{ data: () => ({ score: 432, uid: "player" }) }],

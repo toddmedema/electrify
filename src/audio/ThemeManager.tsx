@@ -1,13 +1,14 @@
 import {
   MUSIC_DEFINITIONS,
   MUSIC_FADE_SECONDS,
+  MUSIC_GAME_VOLUME,
   MUSIC_INTENSITY_MAX,
   MusicDefinition,
 } from "../Constants";
 import { AudioNode } from "./AudioNode";
 
 /* Notes on audio implementation:
-- intensity 0 stops music, 1 selects the menu loop, and 2+ selects the existing gameplay mix.
+- intensity 0 stops music, 1 selects the menu loop, and 2-10 adds pressure to the gameplay mix.
   The current game state selects the theme; waiting in a menu never advances to gameplay music.
 - some people say that exponentialRampToValueAtTime sounds better than linear ramping;
   after several experiments, I've decided it actually sounds worse for our use case.
@@ -24,7 +25,9 @@ import { AudioNode } from "./AudioNode";
   level rather than per node, since the stems have to stay aligned with each other.
 */
 
-const MUSIC_FADE_LONG_SECONDS = 3.5;
+export const MUSIC_PRESSURE_HOLD_MS = 8000;
+export const MUSIC_PRESSURE_ATTACK_SECONDS = 3;
+export const MUSIC_PRESSURE_RELEASE_SECONDS = 10;
 
 export class ThemeManager {
   private context: AudioContext;
@@ -37,6 +40,9 @@ export class ThemeManager {
   private paused: boolean;
   private theme: MusicDefinition;
   private timeout: ReturnType<typeof setTimeout> | null = null;
+  private recoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+  private mixedPressure = 0;
+  private transitionEndsAt = 0;
   // Context time at which the current theme would have started playing from its first sample, or
   // null when nothing is playing. Backdated when a theme starts part-way through, so that the
   // elapsed position is always currentTime - themeStartedAt.
@@ -68,9 +74,10 @@ export class ThemeManager {
     this.paused = true;
     // Stamp our place in the theme before fadeOut() tears the sources down. Taken at the moment
     // pause is requested, so the fade-out tail -- which keeps sounding for up to
-    // MUSIC_FADE_LONG_SECONDS after this -- gets replayed under the fade-in on the way back.
-    // That rewind is a couple of seconds at most and sits under a fade, so it reads as natural.
+    // MUSIC_FADE_SECONDS after this -- gets replayed under the fade-in on the way back.
+    // Replaying that brief tail under a fade reads as natural.
     this.resumeOffsetSeconds = this.elapsedInTheme();
+    this.clearRecovery();
     this.fadeOut();
   }
 
@@ -101,10 +108,7 @@ export class ThemeManager {
     this.themeStartedAt = null;
     for (const i of this.active) {
       if (this.nodes[i] && this.nodes[i].isPlaying()) {
-        this.nodes[i].fadeOut(
-          this.intensity > 0 ? MUSIC_FADE_SECONDS : MUSIC_FADE_LONG_SECONDS,
-          true,
-        );
+        this.nodes[i].fadeOut(MUSIC_FADE_SECONDS, true);
       }
     }
   }
@@ -114,9 +118,9 @@ export class ThemeManager {
   }
 
   public setIntensity(intensity: number) {
-    intensity = Math.round(
-      Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity)),
-    );
+    intensity = Number.isFinite(intensity)
+      ? Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity))
+      : 0;
     if (intensity !== this.intensity) {
       this.playAtIntensity(intensity);
     }
@@ -132,6 +136,7 @@ export class ThemeManager {
     this.fadeOut();
     this.theme = theme;
     this.resumeOffsetSeconds = offsetSeconds;
+    this.transitionEndsAt = this.context.currentTime + MUSIC_FADE_SECONDS;
     this.loopTheme(true, offsetSeconds);
   }
 
@@ -140,8 +145,12 @@ export class ThemeManager {
       return;
     }
     this.paused = false;
+    if (this.intensity === 0) {
+      return;
+    }
     const offsetSeconds = this.resumeOffsetSeconds;
     this.resumeOffsetSeconds = 0;
+    this.mixedPressure = this.pressure();
     this.startTheme(this.theme, offsetSeconds);
   }
 
@@ -150,15 +159,18 @@ export class ThemeManager {
     this.intensity = newIntensity;
     if (newIntensity === 0) {
       // Stopping music
+      this.clearRecovery();
       this.fadeOut();
       this.active = [];
     } else {
       const theme =
         newIntensity === 1 ? MUSIC_DEFINITIONS.menu : MUSIC_DEFINITIONS.basic;
       if (old === 0 || theme !== this.theme) {
+        this.clearRecovery();
+        this.mixedPressure = this.pressure();
         this.startTheme(theme);
-      } else {
-        this.updateTheme(newIntensity - old);
+      } else if (!this.paused) {
+        this.updateTheme();
       }
     }
   }
@@ -213,8 +225,8 @@ export class ThemeManager {
       }
 
       // Determine initial & target volume
-      const initialVolume = newTheme || !active ? 0 : 1;
-      const targetVolume = active ? 1 : 0;
+      const targetVolume = active ? this.trackVolume(track) : 0;
+      const initialVolume = newTheme || !active ? 0 : targetVolume;
       node.playOnce(
         initialVolume,
         targetVolume,
@@ -241,32 +253,62 @@ export class ThemeManager {
     );
   }
 
-  // Fade in / out tracks on the current theme for a smoother + more immediate change in intensity
-  private updateTheme(delta: number) {
-    const theme = this.theme;
+  private pressure(): number {
+    return Math.max(0, (this.intensity - 2) / (MUSIC_INTENSITY_MAX - 2));
+  }
 
-    if (delta > 0) {
-      // Fade in one inaudible (but active) baseline track randomly
-      // (don't touch peak instrument, don't duplicate instruments)
-      for (const inst of theme.tracks) {
-        const activeinst = this.getActiveInstrument(inst) || "";
-        const a = this.nodes[activeinst];
-        if (a && a.isPlaying() && (a.getVolume() || 0) < 1.0) {
-          a.fadeIn();
-          break;
-        }
+  private trackVolume(track: string): number {
+    if (this.theme === MUSIC_DEFINITIONS.menu) {
+      return 1;
+    }
+    // Keep every authored layer at 85% when stable. Lift the urgent high layer first, then the
+    // medium and low layers, reaching the original ceiling together in a severe blackout.
+    const pressure = this.mixedPressure;
+    const lift = track.startsWith("high")
+      ? Math.sqrt(pressure)
+      : track.startsWith("low")
+        ? pressure * pressure
+        : pressure;
+    return MUSIC_GAME_VOLUME + (1 - MUSIC_GAME_VOLUME) * lift;
+  }
+
+  private clearRecovery() {
+    if (this.recoveryTimeout !== null) {
+      clearTimeout(this.recoveryTimeout);
+      this.recoveryTimeout = null;
+    }
+  }
+
+  private updateMix(seconds: number) {
+    // Grid changes during the scene fade must not shorten the five-second arrival.
+    const duration = Math.max(
+      seconds,
+      this.transitionEndsAt - this.context.currentTime,
+    );
+    this.theme.tracks.forEach((track) => {
+      this.nodes[`${this.theme.directory}${track}`]?.fadeTo(
+        this.trackVolume(track),
+        duration,
+      );
+    });
+  }
+
+  private updateTheme() {
+    const pressure = this.pressure();
+    if (pressure >= this.mixedPressure) {
+      this.clearRecovery();
+      if (pressure > this.mixedPressure) {
+        this.mixedPressure = pressure;
+        this.updateMix(MUSIC_PRESSURE_ATTACK_SECONDS);
       }
-    } else if (delta < 0 && this.active.length > 1) {
-      // Fade out one random audible baseline track randomly
-      // (don't touch the peak instrument, don't go below 1 active instrument)
-      for (const inst of [...theme.tracks].reverse()) {
-        const activeinst = this.getActiveInstrument(inst) || "";
-        const a = this.nodes[activeinst];
-        if (a && a.isPlaying() && (a.getVolume() || 0) > 0.9) {
-          a.fadeOut();
-          break;
-        }
-      }
+    } else if (this.recoveryTimeout === null) {
+      // Hold through brief recoveries so fast simulation ticks cannot make the mix flutter.
+      // Read the latest pressure after the hold rather than replaying a stale grid state.
+      this.recoveryTimeout = setTimeout(() => {
+        this.recoveryTimeout = null;
+        this.mixedPressure = this.pressure();
+        this.updateMix(MUSIC_PRESSURE_RELEASE_SECONDS);
+      }, MUSIC_PRESSURE_HOLD_MS);
     }
   }
 }

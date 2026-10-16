@@ -1,7 +1,7 @@
 import { AudioNode } from "../audio/AudioNode";
 import { ThemeManager } from "../audio/ThemeManager";
 import { SoundEffects, SoundEffectType } from "../audio/SoundEffects";
-import { MUSIC_DEFINITIONS } from "../Constants";
+import { MUSIC_DEFINITIONS, MUSIC_INTENSITY_MAX } from "../Constants";
 import { getAudioContext } from "../Globals";
 import { AudioLoadingType } from "../Types";
 
@@ -12,11 +12,22 @@ export const state = {
   musicOutput: null as GainNode | null,
   paused: false,
   inGame: false,
+  musicIntensity: 0,
 };
 
-export function setMusicInGame(inGame: boolean) {
+/** Remember the latest grid state while files load or audio is disabled. */
+export function setMusicInGame(inGame: boolean, musicIntensity: number = 0) {
   state.inGame = inGame;
-  state.themeManager?.setIntensity(inGame ? 2 : 1);
+  state.musicIntensity = musicIntensity;
+  state.themeManager?.setIntensity(playbackIntensity());
+}
+
+function playbackIntensity(): number {
+  return state.inGame
+    ? 2 +
+        Math.min(1, Math.max(0, state.musicIntensity)) *
+          (MUSIC_INTENSITY_MAX - 2)
+    : 1;
 }
 
 export function pause() {
@@ -147,7 +158,7 @@ export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
       if (state.paused) {
         state.themeManager.pause();
       }
-      state.themeManager.setIntensity(state.inGame ? 2 : 1);
+      state.themeManager.setIntensity(playbackIntensity());
     })
     .catch(() => {
       state.loaded = "ERROR";

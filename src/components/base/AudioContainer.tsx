@@ -4,6 +4,7 @@ import { change as changeSettings } from "../../reducers/Settings";
 import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Audio, { DispatchProps, StateProps } from "./Audio";
+import { musicIntensityForGame } from "../../audio/MusicIntensity";
 
 const NO_EVENTS: NonNullable<AppStateType["game"]["eventLog"]> = [];
 
@@ -12,6 +13,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     enabled: state.settings.audioEnabled,
     musicVolume: state.settings.musicVolume,
     soundEffectsVolume: state.settings.soundEffectsVolume,
+    musicIntensity: musicIntensityForGame(state.game),
     inGame: state.game.inGame,
     events: state.game.eventLog || NO_EVENTS,
     victoryOpen: Boolean(state.ui.victory),

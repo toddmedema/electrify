@@ -27,6 +27,7 @@ const props: StateProps & { disableAudio: () => void } = {
   enabled: true,
   musicVolume: 1,
   soundEffectsVolume: 1,
+  musicIntensity: 0,
   inGame: false,
   events: [],
   victoryOpen: false,
@@ -72,7 +73,7 @@ it("does not download audio when disabled before the delay", () => {
 
 it("selects gameplay before delayed audio loading when mounted inside a game", () => {
   render(<Audio {...props} inGame />);
-  expect(setMusicInGame).toHaveBeenCalledWith(true);
+  expect(setMusicInGame).toHaveBeenCalledWith(true, 0);
   expect(loadAudioFiles).not.toHaveBeenCalled();
   act(() => jest.advanceTimersByTime(INIT_DELAY.LOAD_AUDIO_MILLIS));
   expect(loadAudioFiles).toHaveBeenCalledTimes(1);
@@ -80,14 +81,14 @@ it("selects gameplay before delayed audio loading when mounted inside a game", (
 
 it("changes music on entering and leaving a game, including while muted", () => {
   const { rerender } = render(<Audio {...props} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(false);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(false, 0);
   rerender(<Audio {...props} inGame />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(true);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0);
   const changes = (setMusicInGame as jest.Mock).mock.calls.length;
   rerender(<Audio {...props} inGame musicVolume={0.4} />);
   expect(setMusicInGame).toHaveBeenCalledTimes(changes);
   rerender(<Audio {...props} enabled={false} />);
-  expect(setMusicInGame).toHaveBeenLastCalledWith(false);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(false, 0);
 });
 
 it.each([false, true])(
@@ -119,3 +120,11 @@ it.each([false, true])(
     expect(resume).not.toHaveBeenCalled();
   },
 );
+
+it("keeps live music pressure current while audio is loading or disabled", () => {
+  const { rerender } = render(<Audio {...props} inGame musicIntensity={0.3} />);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0.3);
+  rerender(<Audio {...props} inGame musicIntensity={0.9} enabled={false} />);
+  expect(setMusicInGame).toHaveBeenLastCalledWith(true, 0.9);
+  expect(loadAudioFiles).not.toHaveBeenCalled();
+});

@@ -364,4 +364,5 @@ export const MUSIC_DEFINITIONS: { [key: string]: MusicDefinition } = {
   },
 };
 
-export const MUSIC_FADE_SECONDS = 1.5;
+export const MUSIC_FADE_SECONDS = 5;
+export const MUSIC_GAME_VOLUME = 0.85;
