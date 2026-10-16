@@ -1,0 +1,137 @@
+[
+  {
+    "file": "store-header.png",
+    "width": 920,
+    "height": 430,
+    "slot": "Store / Header Capsule",
+    "required": true,
+    "bytes": 289165,
+    "sha256": "752087284d29db084a5984e529989e10523522fa1eef0b5c06da42a7e42b6881"
+  },
+  {
+    "file": "store-small.png",
+    "width": 462,
+    "height": 174,
+    "slot": "Store / Small Capsule",
+    "required": true,
+    "bytes": 45690,
+    "sha256": "be8da544be2c4179ca284ad349c3b01d382786aa821ea7ef512c95e6b79206e8"
+  },
+  {
+    "file": "store-main.png",
+    "width": 1232,
+    "height": 706,
+    "slot": "Store / Main Capsule",
+    "required": true,
+    "bytes": 535101,
+    "sha256": "25d45caf36254405bdc32f18aed5c9f53f76f8a67d17c7479af1b9fac8445cbd"
+  },
+  {
+    "file": "store-vertical.png",
+    "width": 748,
+    "height": 896,
+    "slot": "Store / Vertical Capsule",
+    "required": true,
+    "bytes": 457006,
+    "sha256": "299c07e07dad2e726aa1d520f33817d202fcf5f534bf2f6df54807ce1eafe8a9"
+  },
+  {
+    "file": "library-capsule.png",
+    "width": 600,
+    "height": 900,
+    "slot": "Library / Capsule",
+    "required": true,
+    "bytes": 387144,
+    "sha256": "b897e62bcb8210c1d75a12935f7b68aba08ea1f6c1b9f4f75d16424b5ecaa295"
+  },
+  {
+    "file": "library-header.png",
+    "width": 920,
+    "height": 430,
+    "slot": "Library / Header",
+    "required": true,
+    "bytes": 289165,
+    "sha256": "752087284d29db084a5984e529989e10523522fa1eef0b5c06da42a7e42b6881"
+  },
+  {
+    "file": "library-hero.png",
+    "width": 3840,
+    "height": 1240,
+    "slot": "Library / Hero",
+    "required": true,
+    "bytes": 1498205,
+    "sha256": "9fb69296513c98ceb60fdf23192539221e01fe5a826ff75a489208b9793129f5"
+  },
+  {
+    "file": "library-logo.png",
+    "width": 1280,
+    "height": 299,
+    "slot": "Library / Logo",
+    "required": true,
+    "transparent": true,
+    "bytes": 28919,
+    "sha256": "221090a8094d2a24345908e8b6c440c65267dbf9e36a56bef009ed61eba3208e"
+  },
+  {
+    "file": "page-background.png",
+    "width": 1438,
+    "height": 810,
+    "slot": "Store / Page Background",
+    "required": false,
+    "bytes": 271309,
+    "sha256": "2d219d4b6f3eb5b2843bfe1579935fe1ce549c28862a8d56477d9ede528808f3"
+  },
+  {
+    "file": "event-cover.png",
+    "width": 800,
+    "height": 450,
+    "slot": "Events / Cover (when posting an event)",
+    "required": false,
+    "bytes": 279131,
+    "sha256": "5cb6e91a663b6a18e168dce14a03b0a2972903db75167680f8b46f6a460c26ab"
+  },
+  {
+    "file": "event-header.png",
+    "width": 1920,
+    "height": 622,
+    "slot": "Events / Header",
+    "required": false,
+    "bytes": 675406,
+    "sha256": "539c44459ab13281efeaef8b35485ebb128fb494cc0550c4e796e6fabd5b958f"
+  },
+  {
+    "file": "shortcut-icon.png",
+    "width": 512,
+    "height": 512,
+    "slot": "Community / Shortcut Icon",
+    "required": true,
+    "transparent": true,
+    "bytes": 12490,
+    "sha256": "b0a03e36999b39c9a63c0c2deb4a81a1c913cb3009a9feab8e2e1a50c1ab862f"
+  },
+  {
+    "file": "shortcut-icon.ico",
+    "sizes": [16, 32, 48, 64, 128, 256],
+    "slot": "Community / Shortcut Icon (ICO alternative)",
+    "required": false,
+    "bytes": 14154,
+    "sha256": "f7b4d25723a910cfca847a354b298462ba9c28c65007a7776a909bb94c699000"
+  },
+  {
+    "file": "mac-icon.icns",
+    "sizes": [16, 32, 64, 128, 256, 512, 1024],
+    "slot": "Community / Mac Icon",
+    "required": "macOS shortcuts",
+    "bytes": 47297,
+    "sha256": "b98d13c754612403362fcaebda43c9765586f4208e93101caacec5a9376d966e"
+  },
+  {
+    "file": "app-icon.jpg",
+    "width": 184,
+    "height": 184,
+    "slot": "Community / App Icon",
+    "required": true,
+    "bytes": 7253,
+    "sha256": "b970265480cc5284ac92f42d6e1d38da2ee3276a5a962864c0fdc0af8ee6a2a4"
+  }
+]

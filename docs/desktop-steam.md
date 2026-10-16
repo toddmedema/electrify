@@ -305,3 +305,15 @@ Primary references: [Steam Cloud](https://partner.steamgames.com/doc/features/cl
 [Electron headless testing](https://www.electronjs.org/docs/latest/tutorial/testing-on-headless-ci),
 [Steam platform release requirements](https://partner.steamgames.com/doc/store/application/platforms),
 and [Electron signing and notarization](https://www.electronjs.org/docs/latest/tutorial/code-signing).
+
+## Store and library artwork
+
+The [Steam artwork package](../steamworks/artwork/README.md) contains the store and library
+capsules, text-free hero, transparent logo, client icons (including macOS ICNS), optional page
+and event artwork, and six real 1920 × 1080 gameplay screenshots. Its upload map lists the
+Steamworks slot for every file. It also includes three concept options, editable SVG layouts,
+generation prompts, a local review gallery, validation, and the three-round design review.
+
+Use these marketing exports directly in Steamworks; they are kept outside `public/` so the game
+does not cache or package them as runtime assets. Check the separate library logo's position in
+Steamworks' preview, then submit the store page through the normal Valve review process.
