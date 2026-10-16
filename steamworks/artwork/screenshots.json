@@ -4,18 +4,30 @@
     "scenario": 108,
     "theme": "dark",
     "action": "overview",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
-    "gameStatus": "$226M Feb 2023, 5 AM 1× 3× 12× Stable 109MW reserve Demand served ≥ 99.5% (pending) 47 months left Grid stable."
+    "gameStatus": "$230M Feb 2023, 8 AM 1× 3× 12× Stable 78MW reserve Upcoming: Heat will build 47 months left Announced event: Heat will build Grid stable."
   },
   {
     "file": "02-generator-comparison-light.png",
     "scenario": 101,
     "theme": "light",
     "action": "generators",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
     "gameStatus": "$241M Feb 2002, 7 AM 1× 3× 12× Stable 110MW reserve Upcoming: Solar and wind costs will fall 143 months left Announced event: Solar and wind costs will fall Grid stable."
   },
@@ -24,8 +36,14 @@
     "scenario": 106,
     "theme": "dark",
     "action": "storage",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
     "gameStatus": "$28.0M Feb 2020, 4 AM 1× 3× 12× Stable 85MW reserve Upcoming: Data Centers will connect 191 months left Announced event: Data Centers will connect Grid stable."
   },
@@ -34,8 +52,14 @@
     "scenario": 106,
     "theme": "light",
     "action": "programs",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
     "gameStatus": "$28.5M Feb 2020, 8 AM 1× 3× 12× Stable 79MW reserve Upcoming: Data Centers will connect 191 months left Announced event: Data Centers will connect Grid stable."
   },
@@ -44,8 +68,14 @@
     "scenario": 101,
     "theme": "dark",
     "action": "interties",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
     "gameStatus": "$240M Feb 2002, 5 AM 1× 3× 12× Stable 110MW reserve Upcoming: Solar and wind costs will fall 143 months left Announced event: Solar and wind costs will fall Grid stable."
   },
@@ -54,8 +84,14 @@
     "scenario": 108,
     "theme": "light",
     "action": "forecast",
-    "size": [1920, 1080],
-    "viewport": [1280, 720],
+    "size": [
+      1920,
+      1080
+    ],
+    "viewport": [
+      1280,
+      720
+    ],
     "deviceScaleFactor": 1.5,
     "gameStatus": "$232M Feb 2023, 9 AM 1× 3× 12× Stable 73MW reserve Upcoming: Heat will build 47 months left Announced event: Heat will build Grid stable."
   }

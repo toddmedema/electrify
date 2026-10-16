@@ -91,6 +91,13 @@ async function capture() {
         page.locator(".gameStatusValue.weak:visible").first(),
       ).not.toContainText("Jan", { timeout: 30000 });
       await page.getByRole("button", { name: "pause", exact: true }).click();
+      await expect(
+        page.locator('.insights:visible .accessibleChart [role="img"]').first(),
+      ).toBeVisible({ timeout: 60000 });
+      await expect(page.locator(".insightsLevers:visible")).not.toContainText(
+        "Calculating",
+        { timeout: 60000 },
+      );
       const status = await page.locator("#appbar:visible").innerText();
       if (["generators", "storage", "interties"].includes(shot.action)) {
         await page.locator(".button-buildFacility").click();
