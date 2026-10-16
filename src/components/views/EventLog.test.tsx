@@ -47,7 +47,11 @@ describe("EventLog", () => {
     expect(screen.getByText("A recorded build.")).toBeVisible();
     expect(onEvidenceReady).toHaveBeenCalledWith(
       request,
-      history.parentElement,
+      expect.any(HTMLElement),
+    );
+    expect(onEvidenceReady.mock.calls[0][1]).toHaveAttribute(
+      "id",
+      "operationsHistory",
     );
     expect(passed.onOpen).toHaveBeenCalledTimes(1);
   });
