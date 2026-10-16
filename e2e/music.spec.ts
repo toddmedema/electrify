@@ -1,8 +1,16 @@
 import { expect, Page, test } from "./fixtures";
+import { writeFile } from "node:fs/promises";
 
 declare global {
   interface Window {
     electrifyMusicDocument: string;
+    electrifyMusicDecodes: {
+      bytes: number;
+      sampleRate: number;
+      state: "decoding" | "decoded" | "error";
+      elapsedMs?: number;
+      error?: string;
+    }[];
     electrifyMusicStarts: { duration: number; loop: boolean; offset: number }[];
     electrifyMusicPlayback: {
       source: AudioBufferSourceNode;
@@ -19,6 +27,9 @@ declare global {
 test.use({
   launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
 });
+// Startup decodes three six-minute stems before the menu source can start.
+// Leave room for that setup on CI without relaxing any navigation assertion.
+test.setTimeout(90000);
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -31,8 +42,35 @@ test.beforeEach(async ({ page }) => {
       }),
     );
     window.electrifyMusicDocument = crypto.randomUUID();
+    window.electrifyMusicDecodes = [];
     window.electrifyMusicStarts = [];
     window.electrifyMusicPlayback = [];
+    const decode = AudioContext.prototype.decodeAudioData;
+    AudioContext.prototype.decodeAudioData = function (
+      this: AudioContext,
+      ...args: Parameters<AudioContext["decodeAudioData"]>
+    ) {
+      const entry: Window["electrifyMusicDecodes"][number] = {
+        bytes: args[0].byteLength,
+        sampleRate: this.sampleRate,
+        state: "decoding",
+      };
+      window.electrifyMusicDecodes.push(entry);
+      const startedAt = performance.now();
+      const pending = decode.apply(this, args);
+      void pending.then(
+        () => {
+          entry.state = "decoded";
+          entry.elapsedMs = performance.now() - startedAt;
+        },
+        (error: unknown) => {
+          entry.state = "error";
+          entry.elapsedMs = performance.now() - startedAt;
+          entry.error = String(error);
+        },
+      );
+      return pending;
+    };
     const start = AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start = function (
       this: AudioBufferSourceNode,
@@ -73,6 +111,23 @@ test.beforeEach(async ({ page }) => {
       if (playback) playback.stopped = true;
       stop.apply(this, args);
     };
+  });
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (page.isClosed()) return;
+  const startupPath = testInfo.outputPath("music-startup.json");
+  await writeFile(
+    startupPath,
+    JSON.stringify(
+      await page.evaluate(() => window.electrifyMusicDecodes),
+      null,
+      2,
+    ),
+  );
+  await testInfo.attach("music-startup", {
+    path: startupPath,
+    contentType: "application/json",
   });
 });
 
@@ -120,6 +175,19 @@ async function expectContinuousMusic(
 }
 
 async function expectMenuMusic(page: Page) {
+  // Fetching is quick on localhost, but decoding the full soundtrack can exceed
+  // the normal UI timeout on macOS runners. Wait for real decoder completion;
+  // retain the pending/error details in failures instead of guessing from starts.
+  await expect
+    .poll(() => page.evaluate(() => window.electrifyMusicDecodes), {
+      message: "All soundtrack files finish decoding before playback checks",
+      timeout: 60000,
+    })
+    .toEqual(
+      Array.from({ length: 4 }, () =>
+        expect.objectContaining({ state: "decoded" }),
+      ),
+    );
   await expect
     .poll(() => page.evaluate(() => window.electrifyMusicStarts))
     .toHaveLength(1);
