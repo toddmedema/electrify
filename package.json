@@ -144,7 +144,8 @@
           "src/workers/**"
         ],
         "excludedFiles": [
-          "*.test.*"
+          "*.test.*",
+          "*.spec.*"
         ],
         "rules": {
           "no-restricted-properties": [
@@ -158,13 +159,33 @@
               "object": "Math",
               "property": "random",
               "message": "Use addressed draws from helpers/Math with the stored seed. Ambient randomness breaks saves and replays."
+            },
+            {
+              "object": "globalThis",
+              "property": "Math",
+              "message": "Use Math directly so the deterministic-math restrictions apply to its methods."
+            },
+            {
+              "object": "window",
+              "property": "Math",
+              "message": "Use Math directly so the deterministic-math restrictions apply to its methods."
+            },
+            {
+              "object": "self",
+              "property": "Math",
+              "message": "Use Math directly so the deterministic-math restrictions apply to its methods."
+            },
+            {
+              "object": "global",
+              "property": "Math",
+              "message": "Use Math directly so the deterministic-math restrictions apply to its methods."
             }
           ],
           "no-restricted-syntax": [
             "error",
             {
-              "selector": "BinaryExpression[operator='**'][right.type!='Literal']:not([right.type='UnaryExpression'][right.operator=/^[+-]$/][right.argument.type='Literal']), AssignmentExpression[operator='**=']",
-              "message": "** with a computed exponent calls the platform's C pow. Use pow from helpers/Pow so simulations replay identically everywhere."
+              "selector": "BinaryExpression[operator='**']:not([right.type='Literal'][right.value=2]):not([left.type='Literal'][left.value=2][right.type='Literal'][right.raw=/^[0-9_]+$/]):not([left.type='Literal'][left.value=2][right.type='UnaryExpression'][right.operator=/^[+-]$/][right.argument.type='Literal'][right.argument.raw=/^[0-9_]+$/]), AssignmentExpression[operator='**=']",
+              "message": "Only squares and literal integer powers of two may use **. Use pow from helpers/Pow for other exponents so simulations replay identically everywhere."
             }
           ]
         }
