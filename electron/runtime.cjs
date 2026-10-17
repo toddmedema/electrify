@@ -127,7 +127,17 @@ function validateScore(input) {
     input.score > 2147483647
   )
     throw new Error("Score is outside the Steam integer range");
-  return { ...board, score: Math.round(input.score) };
+  if (
+    input.appVersion !== undefined &&
+    (typeof input.appVersion !== "string" ||
+      !/^[a-zA-Z0-9.-]{1,64}$/.test(input.appVersion))
+  )
+    throw new Error("Invalid score app version");
+  return {
+    ...board,
+    score: Math.round(input.score),
+    ...(input.appVersion ? { appVersion: input.appVersion } : {}),
+  };
 }
 
 function activityObject(input, keys) {

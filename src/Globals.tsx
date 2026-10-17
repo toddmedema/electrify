@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 import { isDesktopApp } from "./Desktop";
+import { APP_VERSION } from "./AppVersion";
 
 const firebaseApp =
   process.env.REACT_APP_DESKTOP === "true" &&
@@ -123,7 +124,10 @@ export function logEvent(eventName: string, args?: object): void {
         if (typeof navigator !== "undefined" && !navigator.onLine) return;
         refs.analytics = getAnalytics(firebaseApp);
       }
-      firebaseLogEvent(refs.analytics, eventName, args);
+      firebaseLogEvent(refs.analytics, eventName, {
+        ...args,
+        app_version: APP_VERSION,
+      });
     })
     .catch(() => {
       // A failed chunk load or SDK initialization remains retryable on the next event.

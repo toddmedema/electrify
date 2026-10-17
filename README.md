@@ -200,6 +200,14 @@ To preview a change first, run `npm run deploy beta` and check that:
 
 - basic functionality works (app loads, game starts, music plays)
 
+Web and desktop builds append their build-start time to the package version, for example
+`v1.1.0-21sept26-1705`. The timestamp uses fixed PST (UTC−8, including summer), a two-digit
+day/year, and 24-hour time. Settings and the deployed `/package.json` report the same version.
+Game analytics events include it as `app_version`; new scores, personal bests, replays, and saves
+use `appVersion`. Steam scores store the ASCII version in zero-padded int32 score-detail slots.
+Existing records keep their original metadata, and development/test runs use the source package
+version. Build timestamps do not change the simulation compatibility hash.
+
 ### Troubleshooting
 
 The app supports the [Redux DevTools browser

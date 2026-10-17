@@ -28,6 +28,7 @@ import {
 } from "../helpers/DisplayName";
 import { encodeReplay, MAX_REPLAY_BYTES, replayByteLength } from "../Replay";
 import { isDesktopApp } from "../Desktop";
+import { APP_VERSION } from "../AppVersion";
 
 export const initialUser: UserType = {};
 
@@ -95,6 +96,7 @@ async function submitScore(
     ? await uploadReplay(uid, submission.replay)
     : undefined;
   const scoreSubmission: ScoreType = {
+    appVersion: APP_VERSION,
     score: submission.score,
     scoreBreakdown: submission.scoreBreakdown, // For analytics purposes only
     scenarioId: submission.scenarioId,
@@ -264,6 +266,7 @@ export const submitHighscore = createAsyncThunk<
     return { uid, scenarioId: submission.scenarioId };
   }
   const best: BestScoreType = {
+    appVersion: APP_VERSION,
     score: submission.score,
     difficulty: submission.difficulty,
     date: Date.now(),

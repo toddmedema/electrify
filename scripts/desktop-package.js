@@ -127,10 +127,14 @@ async function withOfflineMacSigning(
   }
 }
 
-function packageConfiguration(mode) {
+function packageConfiguration(
+  mode,
+  version = require("../package.json").version,
+) {
   const buildConfig = require("../electron-builder.config.cjs");
   return {
     ...buildConfig,
+    extraMetadata: { ...buildConfig.extraMetadata, version },
     win: {
       ...buildConfig.win,
       // Steam releases embed the game's icon/version and use configured release signing.
@@ -217,7 +221,10 @@ async function desktopPackage() {
         mac ? builder.Arch.universal : builder.Arch.x64,
       ),
       config: {
-        ...packageConfiguration(mode),
+        ...packageConfiguration(
+          mode,
+          JSON.parse(fs.readFileSync("build/package.json", "utf8")).version,
+        ),
         afterPack: (context) => {
           // Check every asset and exact native SDK/FFI byte before a signer can update
           // Mach-O signatures, including ad-hoc signatures in macOS offline QA builds.

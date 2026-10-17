@@ -16,6 +16,19 @@ const {
   digest,
 } = require("../scripts/desktop-verify.js");
 
+test("packaged app metadata uses the renderer artifact's build version", () => {
+  const version = "1.1.0-21sept26-1705";
+  for (const mode of ["steam", "offline"]) {
+    const config = packageConfiguration(mode, version);
+    assert.equal(config.extraMetadata.version, version);
+    assert.equal(config.extraMetadata.main, "electron/main.cjs");
+  }
+  assert.equal(
+    require("../electron-builder.config.cjs").extraMetadata.version,
+    undefined,
+  );
+});
+
 test("packaging refuses Git LFS pointer text and empty assets", () => {
   assert.throws(
     () =>

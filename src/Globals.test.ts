@@ -1,3 +1,5 @@
+jest.mock("./AppVersion", () => ({ APP_VERSION: "1.1.0-21sept26-1705" }));
+
 // setupTests stubs firebase/analytics so no real transport runs under jsdom; this suite replaces
 // the stub with spies so it can assert whether initialization is attempted. jest.mock's factory
 // is hoisted above every declaration in the file, so the spies it closes over have to be named
@@ -85,6 +87,7 @@ describe("logEvent", () => {
     expect(mockGetAnalytics).toHaveBeenCalledTimes(1);
     expect(mockFirebaseLogEvent).toHaveBeenCalledWith(analytics, "card_view", {
       card: "MANUAL",
+      app_version: "1.1.0-21sept26-1705",
     });
     expect(mockFirebaseLogEvent).toHaveBeenCalledTimes(2);
     expect(mockFirebaseLogEvent.mock.calls.map((call) => call[1])).toEqual([

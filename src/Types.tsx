@@ -288,6 +288,7 @@ export type ScoreCategoryType =
 export type ScoreBreakdownType = Partial<Record<ScoreCategoryType, number>>;
 
 export interface ScoreType {
+  appVersion?: string; // Build that submitted the score; absent on older records.
   scenarioId: number;
   score: number;
   scoreBreakdown: ScoreBreakdownType;
@@ -1576,6 +1577,7 @@ export interface UIType {
 // A player's best run on one scenario, mirrored from users/{uid}.bests so that the victory dialog
 // can compare against it without a read
 export interface BestScoreType {
+  appVersion?: string;
   score: number;
   difficulty: string;
   // Epoch ms rather than a Timestamp: this one is read back into a plain Redux slice
