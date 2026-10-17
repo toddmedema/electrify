@@ -91,10 +91,11 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     // Wait for a real completed month, then stop the clock before inspecting its score.
-    // The status bar's event chip names the emergency too; wait on the ongoing event card.
+    // The status bar's event chip names the emergency too. Scope to the Events pane,
+    // which shows the current event in Operations on desktop and Ongoing events on phones.
     await expect(
       page
-        .locator(".ongoingEvents")
+        .locator(".eventLog")
         .getByText("Wildfire emergency", { exact: true })
         .first(),
     ).toBeAttached({ timeout: 25000 });
@@ -104,6 +105,9 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     await details.click();
+    await expect(
+      dialog.getByText(/Score appears after your first month/),
+    ).not.toBeAttached();
     await expect(dialog.getByText(/points per/).first()).toBeAttached();
     const content = dialog.locator(".MuiDialogContent-root");
     expect(

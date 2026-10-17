@@ -10,6 +10,29 @@ import {
   getSolarCapacityFactor,
   getWindCapacityFactor,
 } from "./Energy";
+import { pow } from "./Pow";
+
+it("preserves exact wind output at and around every curve boundary", () => {
+  const offshoreHeight = pow(150 / 10, 0.11);
+  const speeds = [
+    0,
+    ...[3, 14, 25].flatMap((speed) =>
+      [-1e-10, 0, 1e-10].map(
+        (offset) => ((speed + offset) * 3.6) / offshoreHeight,
+      ),
+    ),
+    ...Array.from({ length: 201 }, (_, i) => i / 2),
+  ];
+  speeds.forEach((speed) => {
+    const turbineWind = (speed / 3.6) * pow(150 / 10, 0.11);
+    const expected =
+      (turbineWind < 3 || turbineWind > 25
+        ? 0
+        : Math.max(0, Math.min(1, (turbineWind - 3) / 11))) * 0.85;
+    expect(getOffshoreWindOutputFactor(speed)).toBe(expected);
+    expect(getAirborneWindReferenceKph(speed)).toBe(speed * pow(100 / 10, 0.2));
+  });
+});
 
 describe("Airborne Wind", () => {
   it("derives the 100m reference speed directly from raw 10m wind", () => {

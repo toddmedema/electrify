@@ -29,10 +29,13 @@ export function getWindOutputFactor(wind10mKph: number) {
 const OFFSHORE_SHEAR_EXPONENT = 0.11;
 const OFFSHORE_HUB_M = 150;
 const OFFSHORE_ARRAY_LOSSES = 0.85;
+const OFFSHORE_HEIGHT_MULTIPLIER = pow(
+  OFFSHORE_HUB_M / 10,
+  OFFSHORE_SHEAR_EXPONENT,
+);
 
 export function getOffshoreWindOutputFactor(windKph: number) {
-  const turbineWindMS =
-    (windKph / KPH_PER_MS) * pow(OFFSHORE_HUB_M / 10, OFFSHORE_SHEAR_EXPONENT);
+  const turbineWindMS = (windKph / KPH_PER_MS) * OFFSHORE_HEIGHT_MULTIPLIER;
   return powerCurve(turbineWindMS) * OFFSHORE_ARRAY_LOSSES;
 }
 
@@ -50,11 +53,13 @@ const AIRBORNE_CUT_OUT_MS = 20;
 // single pumping-cycle/availability factor calibrates it to the project's 3,500 full-load-hour
 // target (39.95%, rounded to 40%) without flattening every location to the same capacity factor.
 const AIRBORNE_SYSTEM_AVAILABILITY = 0.888;
+const AIRBORNE_HEIGHT_MULTIPLIER = pow(
+  AIRBORNE_REFERENCE_HEIGHT_M / 10,
+  AIRBORNE_SHEAR_EXPONENT,
+);
 
 export function getAirborneWindReferenceKph(wind10mKph: number): number {
-  return (
-    wind10mKph * pow(AIRBORNE_REFERENCE_HEIGHT_M / 10, AIRBORNE_SHEAR_EXPONENT)
-  );
+  return wind10mKph * AIRBORNE_HEIGHT_MULTIPLIER;
 }
 
 export function getAirborneWindOutputFactor(wind100mKph: number): number {

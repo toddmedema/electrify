@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { GameType, ScoreCategoryType } from "../../Types";
+import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
 import { DIFFICULTY_LABELS } from "../../Constants";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -56,11 +56,51 @@ function statusLabel(requirement: MissionRequirement): string {
 /** An in-game reminder of the mission and its score through completed months. */
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
-  const units = useUnits();
   const scenario = activeScenario(game);
   if (!scenario) {
     return <Dialog open={false} />;
   }
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-labelledby="scenario-details-title"
+      fullWidth
+      maxWidth="md"
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: 840,
+            backgroundImage: "none",
+            "@media (max-width: 599px)": {
+              m: 0,
+              width: "100%",
+              maxWidth: "100%",
+              height: "100dvh",
+              maxHeight: "100dvh",
+              borderRadius: 0,
+            },
+          },
+        },
+      }}
+    >
+      <ScenarioDetailsContent
+        game={game}
+        scenario={scenario}
+        onClose={onClose}
+      />
+    </Dialog>
+  );
+}
+
+// Dialog mounts this work only while visible, including its exit transition. Keeping the
+// calculations inside the child avoids scanning the run's history on every closed-dialog tick.
+function ScenarioDetailsContent({
+  game,
+  scenario,
+  onClose,
+}: Omit<Props, "open"> & { scenario: ScenarioType }): React.JSX.Element {
+  const units = useUnits();
   const location = getScenarioLocation(scenario);
   const mission = getMissionStatus(game);
   const history = game.monthlyHistory;
@@ -91,29 +131,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   ];
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      aria-labelledby="scenario-details-title"
-      fullWidth
-      maxWidth="md"
-      slotProps={{
-        paper: {
-          sx: {
-            maxWidth: 840,
-            backgroundImage: "none",
-            "@media (max-width: 599px)": {
-              m: 0,
-              width: "100%",
-              maxWidth: "100%",
-              height: "100dvh",
-              maxHeight: "100dvh",
-              borderRadius: 0,
-            },
-          },
-        },
-      }}
-    >
+    <>
       <Box
         sx={{
           display: "flex",
@@ -353,6 +371,6 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
           Back to game
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
 }
