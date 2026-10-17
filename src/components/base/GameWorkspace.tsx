@@ -6,6 +6,7 @@ import { GameToolMemoryContext } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { CardNameType } from "../../Types";
+import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
   GAME_TOOLS,
@@ -30,7 +31,7 @@ const sideFor = (tool: GameTool): ToolSide =>
     : "intelligence";
 
 /** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
-export const SIDE_LAYOUT_MIN_WIDTH = 1200;
+export { SIDE_LAYOUT_MIN_WIDTH };
 /** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
 export const MIN_FLEET_WIDTH = 430;
 const MIN_TOOL_WIDTH = 400;

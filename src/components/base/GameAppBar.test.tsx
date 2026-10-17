@@ -147,6 +147,48 @@ describe("GameAppBar", () => {
     expect(onSpeedChange).toHaveBeenCalledWith("ULTRA");
   });
 
+  it("folds the status row into the top bar, between the date and the speeds, on wide windows", () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({
+        ...matchMedia(query),
+        matches: query.includes("min-width:1200px"),
+      }) as MediaQueryList;
+    try {
+      const { container } = renderAppBar();
+      const appbar = container.querySelector("#appbar")!;
+      const toolbar = appbar.querySelector("#topbar .MuiToolbar-root")!;
+      expect(appbar).toHaveClass("appbarSingleRow");
+      expect(
+        Array.from(toolbar.children, (child) => child.className),
+      ).toEqual([
+        expect.stringContaining("gameMenuButton"),
+        expect.stringContaining("gameStatus"),
+        "gameStatusBar",
+        "",
+      ]);
+      expect(toolbar.lastElementChild).toHaveAttribute(
+        "id",
+        "speedChangeButtons",
+      );
+      expect(appbar.querySelectorAll(".gameStatusBar")).toHaveLength(1);
+      // The months label keeps its full text for assistive tech and copy, only its tail can hide.
+      expect(appbar.querySelector(".missionSummaryMonths")).toHaveTextContent(
+        /^\d+ months left$/,
+      );
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
+  it("keeps the status in its own row below the top bar on narrower windows", () => {
+    const { container } = renderAppBar();
+    const appbar = container.querySelector("#appbar")!;
+    expect(appbar).not.toHaveClass("appbarSingleRow");
+    expect(appbar.querySelector("#topbar .gameStatusBar")).toBeNull();
+    expect(appbar.querySelector(":scope > .gameStatusBar")).not.toBeNull();
+  });
+
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;

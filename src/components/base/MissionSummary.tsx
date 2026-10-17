@@ -189,9 +189,19 @@ export default function MissionSummary({
           )}
           {/* Leads with the goal or its risk, so a warning icon lines up with the grid readout's. */}
           <span className="missionSummaryMonths">
-            {mission.monthsRemaining === 0
-              ? "Term complete"
-              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+            {/* A crowded single-row bar hides the tail to read "144 mo left"; the full text
+                stays in the DOM, so it reads the same everywhere else. */}
+            {mission.monthsRemaining === 0 ? (
+              "Term complete"
+            ) : (
+              <>
+                {mission.monthsRemaining} mo
+                <span className="missionSummaryMonthsTail">
+                  {mission.monthsRemaining === 1 ? "nth" : "nths"}
+                </span>{" "}
+                left
+              </>
+            )}
           </span>
         </div>
         <Tooltip title="All requirements">
