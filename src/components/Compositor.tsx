@@ -52,6 +52,13 @@ import {
 } from "../reducers/Game";
 import { selectTutorialHiddenUi } from "../reducers/Tutorial";
 import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
+import {
+  flingSwipe,
+  followSwipe,
+  resetSwipe,
+  shouldDismissSwipe,
+  SWIPE_DISMISS_EXIT_MS,
+} from "./base/SwipeDismiss";
 import { isDesktopScreen } from "../Globals";
 import { store } from "../Store";
 
@@ -340,31 +347,6 @@ export function isGameCard(name: CardNameType) {
   return isNavCard(name) || name.startsWith("BUILD_");
 }
 
-const SNACKBAR_SWIPE_DISTANCE = 56;
-const SNACKBAR_SWIPE_EXIT_MS = 180;
-
-/** A toast follows the dominant axis of a drag: sideways either way, or down only. */
-export function snackbarSwipeOffset(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-): { axis: "x" | "y"; distance: number } {
-  const x = end.x - start.x;
-  const y = Math.max(0, end.y - start.y);
-  return Math.abs(x) > y
-    ? { axis: "x", distance: x }
-    : { axis: "y", distance: y };
-}
-
-export function shouldDismissSnackbarSwipe(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-): boolean {
-  return (
-    Math.abs(end.x - start.x) >= SNACKBAR_SWIPE_DISTANCE ||
-    end.y - start.y >= SNACKBAR_SWIPE_DISTANCE
-  );
-}
-
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
@@ -444,12 +426,7 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private resetSnackbarDrag = () => {
     this.snackbarDrag = undefined;
-    const content = this.snackbarContentRef.current;
-    if (content) {
-      content.style.transition = "";
-      content.style.transform = "";
-      content.style.opacity = "";
-    }
+    resetSwipe(this.snackbarContentRef.current);
   };
 
   private snackbarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -476,18 +453,10 @@ export default class Compositor extends React.Component<Props, {}> {
     if (!start || start.pointerId !== event.pointerId) {
       return;
     }
-    const { axis, distance } = snackbarSwipeOffset(start, {
+    followSwipe(event.currentTarget, start, {
       x: event.clientX,
       y: event.clientY,
     });
-    const style = event.currentTarget.style;
-    // Follow the finger directly; the release animates the snap back or the fly-out
-    style.transition = "none";
-    style.transform =
-      axis === "x" ? `translateX(${distance}px)` : `translateY(${distance}px)`;
-    style.opacity = String(
-      1 - Math.min(0.6, Math.abs(distance) / (SNACKBAR_SWIPE_DISTANCE * 4)),
-    );
   };
 
   private snackbarPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -498,24 +467,15 @@ export default class Compositor extends React.Component<Props, {}> {
       start &&
       content &&
       start.pointerId === event.pointerId &&
-      shouldDismissSnackbarSwipe(start, end)
+      shouldDismissSwipe(start, end)
     ) {
       this.snackbarDrag = undefined;
-      // Carry on in the swipe's direction and fade, then close. The toast's own exit
-      // transition (a shrink toward its anchor) only starts once it is already invisible,
-      // so the player sees one continuous slide rather than a slide that turns into a shrink
-      const { axis, distance } = snackbarSwipeOffset(start, end);
-      const exit =
-        axis === "x"
-          ? `translateX(${Math.sign(distance) * window.innerWidth}px)`
-          : `translateY(${content.offsetHeight + 96}px)`;
-      content.style.transition = `transform ${SNACKBAR_SWIPE_EXIT_MS}ms ease-out, opacity ${SNACKBAR_SWIPE_EXIT_MS}ms ease-out`;
-      content.style.transform = exit;
-      content.style.opacity = "0";
+      // Fly out first, then close
+      flingSwipe(content, start, end);
       this.snackbarDismissTimeout = setTimeout(() => {
         this.snackbarDismissTimeout = undefined;
         this.props.closeSnackbar();
-      }, SNACKBAR_SWIPE_EXIT_MS);
+      }, SWIPE_DISMISS_EXIT_MS);
       return;
     }
     this.resetSnackbarDrag();

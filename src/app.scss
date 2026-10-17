@@ -572,6 +572,9 @@ button,
 .achievementToastPanel {
   display: flex;
   position: relative;
+  // Swipe it away like a toast; the release animates the snap back
+  touch-action: none;
+  transition: transform 120ms ease-out;
   gap: 12px;
   padding: 16px 48px 8px 16px;
   width: 100%;
@@ -7050,6 +7053,59 @@ $programs_column: 800px;
   .gameStatusBar .gridHealth.hasActiveEvents + .missionSummary {
     padding-left: max(16px, env(safe-area-inset-left));
     border-top: 1px solid var(--border-subtle);
+  }
+
+  // A stable grid shrinks to a checked bolt so the mission gets the rest of the row. The
+  // button is the full 44px row height; its icon keeps the readout's 16px leading inset.
+  .gameStatusBar .gridHealth.gridHealth-compact {
+    flex: 0 0 auto;
+    padding-left: max(4px, calc(env(safe-area-inset-left) - 12px));
+    padding-right: 0;
+  }
+
+  // Beside the checked bolt even a mission with a named risk has the room it needs.
+  .gameStatusBar .gridHealth-compact + .missionSummary,
+  .gameStatusBar .gridHealth-compact + .missionSummary:has(.missionRiskButton) {
+    flex: 1 1 0;
+    padding-left: $space-1;
+    border-top: 0;
+  }
+}
+
+.gridHealthStableButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: $font_color_primary;
+  cursor: pointer;
+  outline-offset: -2px !important;
+}
+
+.gridHealthStableIcon {
+  position: relative;
+  display: flex;
+  line-height: 0;
+
+  .gridHealthStableBolt {
+    font-size: 22px;
+  }
+
+  // A ring in the row's own surface colour cuts the check out of the bolt behind it.
+  .gridHealthStableCheck {
+    position: absolute;
+    right: -5px;
+    bottom: -3px;
+    font-size: 14px;
+    border-radius: 50%;
+    background: var(--bg-raised);
+    box-shadow: 0 0 0 1.5px var(--bg-raised);
+    color: var(--delta-good);
   }
 }
 

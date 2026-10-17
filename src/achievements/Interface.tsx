@@ -23,6 +23,10 @@ import { useAchievements } from "./useAchievements";
 import { retryAchievementSync } from "./Runtime";
 import { useOnline } from "../components/base/OnlineStatus";
 import { useMenuKeys } from "../components/base/useMenuKeys";
+import { useSwipeToDismiss } from "../components/base/SwipeDismiss";
+
+/** Long enough to read the name and requirement; hover or focus holds it on screen. */
+export const ACHIEVEMENT_TOAST_MS = 10_000;
 
 type Filter = "all" | "unlocked" | "locked";
 export function AchievementGallery(): React.JSX.Element {
@@ -238,10 +242,13 @@ export default function AchievementNotifications(): React.JSX.Element {
   const [container, setContainer] = React.useState<HTMLElement | null>(null);
   const [hovered, setHovered] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
+  const id = state.notifications[0];
   const panel = React.useRef<HTMLDivElement>(null);
+  const swipe = useSwipeToDismiss(panel, () => {
+    if (id) achievementJournal.dismiss(id);
+  });
   // Height of the phone tab bar when one is actually on screen; tutorials and build cards hide it.
   const [navClearance, setNavClearance] = React.useState(0);
-  const id = state.notifications[0];
   const entry = catalog.find((item) => item.id === id);
   React.useLayoutEffect(() => {
     if (!id) return;
@@ -281,13 +288,19 @@ export default function AchievementNotifications(): React.JSX.Element {
     };
   }, [id]);
   const open = !!entry && !state.steamAvailable && !pageHidden && !snackbarOpen;
+  // The next award reuses this panel; it must not arrive mid-fling or still faded out.
+  const { reset } = swipe;
+  React.useLayoutEffect(() => reset(), [id, reset]);
   React.useEffect(() => {
     setHovered(!!open && !!panel.current?.matches(":hover"));
     setFocused(!!open && !!panel.current?.contains(document.activeElement));
   }, [id, open, container]);
   React.useEffect(() => {
     if (!open || hovered || focused || !id) return;
-    const timer = setTimeout(() => achievementJournal.dismiss(id), 8000);
+    const timer = setTimeout(
+      () => achievementJournal.dismiss(id),
+      ACHIEVEMENT_TOAST_MS,
+    );
     return () => clearTimeout(timer);
   }, [open, hovered, focused, id]);
   return (
@@ -318,6 +331,7 @@ export default function AchievementNotifications(): React.JSX.Element {
               ref={panel}
               variant="outlined"
               className="achievementToastPanel"
+              {...swipe.handlers}
               onMouseEnter={() => setHovered(true)}
               onMouseLeave={() => setHovered(false)}
               onFocus={() => setFocused(true)}

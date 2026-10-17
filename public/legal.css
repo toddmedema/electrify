@@ -391,6 +391,30 @@ a:hover {
   font-size: 0.8rem;
 }
 
+.panel--credits {
+  grid-column: 1 / -1;
+}
+
+.credits-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 1.25rem 0 0;
+}
+
+.credits-list dt {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.credits-list dd {
+  margin: 0.25rem 0 0;
+  font-size: 1.125rem;
+}
+
 .panel--contact {
   grid-column: 1 / -1;
   display: grid;

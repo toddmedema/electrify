@@ -121,6 +121,52 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(page.locator("#buildNav")).toHaveCSS("color", closedColor);
 });
 
+test("Insights and Events reopen at the scroll position the player left", async ({
+  page,
+}) => {
+  // Short enough that both panes overflow on every project; a phone's Events sheet holds
+  // only the upcoming card and an empty history at the start of a run.
+  await page.setViewportSize({
+    width: page.viewportSize()!.width,
+    height: 480,
+  });
+  await startGame(page, "light");
+  for (const [nav, pane] of [
+    ["#insightsNav", "#insightsPane"],
+    ["#eventsNav", "#eventsPane"],
+  ] as const) {
+    await page.locator(nav).click();
+    const scroller = page.locator(`${pane} .scrollable`).first();
+    // Insights renders a placeholder until its forecast arrives.
+    await expect
+      .poll(() =>
+        scroller.evaluate(
+          (element) => element.scrollHeight - element.clientHeight,
+        ),
+      )
+      .toBeGreaterThanOrEqual(32);
+    const left = await scroller.evaluate((element) => {
+      element.scrollTop = Math.min(
+        120,
+        element.scrollHeight - element.clientHeight,
+      );
+      return element.scrollTop;
+    });
+    expect(left).toBeGreaterThanOrEqual(32);
+    // Let the scroll event land before the pane unmounts.
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+    );
+    await page.locator(nav).click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+    await page.locator(nav).click();
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBe(left);
+    await page.locator(nav).click();
+  }
+});
+
 async function expectFloatingDock(page: Page) {
   const [stage, facilities, dock] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
@@ -274,13 +320,30 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   await startGame(page, "light");
   const dock = page.locator("#navfooter");
   const status = page.locator(".gridHealth");
-  await expect(status.locator(".gridHealthMetric")).toHaveText(
-    /^Stable, \d.* [kMGT]?W$/,
-  );
-  await expect(status.locator(".gridHealthMetric")).toHaveCSS(
-    "text-align",
-    "left",
-  );
+  if (page.viewportSize()!.width < 700) {
+    // Phones shrink a stable grid to a checked bolt; the readout is a tap away.
+    const summary =
+      /^Stable, \d.* [kMGT]?W demand met with \d.* [kMGT]?W reserve$/;
+    const bolt = status.getByRole("button", {
+      name: /^Current grid status: Stable, /,
+    });
+    await expect(bolt).toHaveCSS("height", "44px");
+    await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
+    await bolt.tap();
+    await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
+    await page
+      .locator(".gameStage .facilities")
+      .tap({ position: { x: 8, y: 8 } });
+    await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
+  } else {
+    await expect(status.locator(".gridHealthMetric")).toHaveText(
+      /^Stable, \d.* [kMGT]?W$/,
+    );
+    await expect(status.locator(".gridHealthMetric")).toHaveCSS(
+      "text-align",
+      "left",
+    );
+  }
   await expect(status).toHaveCSS("border-right-width", "0px");
 
   if (!testInfo.project.use.hasTouch) {

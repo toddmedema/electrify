@@ -1,11 +1,26 @@
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
-import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
+import {
+  ClickAwayListener,
+  IconButton,
+  Menu,
+  MenuItem,
+  Toolbar,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import FlashOnIcon from "@mui/icons-material/FlashOn";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import { isBigScreen, isDesktopScreen, openWindow } from "../../Globals";
+import {
+  isBigScreen,
+  isDesktopScreen,
+  isPaneLayout,
+  openWindow,
+} from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { setSpeed, startTutorial } from "../../reducers/Game";
 import { quitSavedGame, runSaveTransition } from "../../SaveSession";
@@ -130,6 +145,85 @@ export function getGridHealth(
     metric: `${formatWatts(reserveW)} reserve`,
     announcement: "Grid stable.",
   };
+}
+
+/** "72MW" -> "72 MW", the spacing the status row reads with. */
+function spacedWatts(watts: number): string {
+  return formatWatts(watts).replace(/([kMGT]?W)$/, " $1");
+}
+
+/** The full stable readout, which phones keep behind the icon's tooltip. */
+export function stableGridSummary(
+  game: GameType,
+  now: TickPresentFutureType,
+): string {
+  return `Stable, ${spacedWatts(now.demandW)} demand met with ${spacedWatts(
+    Math.max(0, reserveCapacityW(game, now)),
+  )} reserve`;
+}
+
+const STABLE_TOOLTIP_MS = 2500;
+
+/**
+ * A stable grid on a phone: a checked bolt whose tooltip carries the full readout. Hover and
+ * keyboard focus open it as usual; a tap opens it too, until a tap elsewhere or a few seconds.
+ * Unmounted whenever the grid leaves the stable state, so it never reopens on its own.
+ */
+function CompactStableStatus({ summary }: { summary: string }) {
+  const [open, setOpen] = React.useState(false);
+  // A tap pins the tooltip: the browser follows a touch with a synthetic mouseleave, which
+  // would otherwise close it the moment the finger lifts.
+  const [pinned, setPinned] = React.useState(0);
+  React.useEffect(() => {
+    if (!pinned) return;
+    const timer = setTimeout(() => {
+      setPinned(0);
+      setOpen(false);
+    }, STABLE_TOOLTIP_MS);
+    return () => clearTimeout(timer);
+  }, [pinned]);
+  return (
+    <div className="gridHealth gridHealth-stable gridHealth-compact">
+      <ClickAwayListener
+        onClickAway={() => {
+          setPinned(0);
+          setOpen(false);
+        }}
+      >
+        <Tooltip
+          title={summary}
+          open={open}
+          onOpen={() => setOpen(true)}
+          onClose={() => {
+            if (!pinned) setOpen(false);
+          }}
+          disableTouchListener
+          arrow
+          // Keep it off the screen edge rather than flush against it.
+          slotProps={{
+            popper: {
+              modifiers: [{ name: "preventOverflow", options: { padding: 8 } }],
+            },
+          }}
+        >
+          <button
+            type="button"
+            className="gridHealthStableButton"
+            aria-label={`Current grid status: ${summary}`}
+            onClick={() => {
+              setOpen(true);
+              setPinned((count) => count + 1);
+            }}
+          >
+            <span className="gridHealthStableIcon" aria-hidden="true">
+              <FlashOnIcon className="gridHealthStableBolt" />
+              <CheckCircleIcon className="gridHealthStableCheck" />
+            </span>
+          </button>
+        </Tooltip>
+      </ClickAwayListener>
+    </div>
+  );
 }
 
 export function GameAppBar(props: Props) {
@@ -311,6 +405,10 @@ export function GameAppBar(props: Props) {
   // Tutorials have no mission row, so the readout would be too short to hold a full-size control;
   // their HUD tells the story instead.
   const activeEvents = (!isTutorial && props.activeEvents) || NO_ACTIVE_EVENTS;
+  // Phones keep a stable grid to a checked bolt, handing the row's width to the mission; the
+  // full readout is one tap (or hover) away. Any other state keeps its words on screen.
+  const compactStable = gridHealth.state === "stable" && !isPaneLayout();
+  const stableSummary = stableGridSummary(game, now);
 
   return (
     <div id="appbar">
@@ -354,34 +452,35 @@ export function GameAppBar(props: Props) {
         />
       )}
       <div className="gameStatusBar">
-        <div
-          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
-          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
-        >
-          <div className="gridHealthSummary">
-            <span className="statusIcon" aria-hidden="true">
-              <ConceptIcon
-                concept={
-                  inBlackout
-                    ? "blackout"
-                    : gridHealth.state === "stable"
-                      ? "supply"
-                      : "danger"
-                }
-                fontSize="small"
-              />
-            </span>
-            <strong className="gridHealthMetric">
-              {gridHealth.label},{" "}
-              {gridHealth.state === "stable"
-                ? formatWatts(reserveCapacityW(game, now)).replace(
-                    /([kMGT]?W)$/,
-                    " $1",
-                  )
-                : gridHealth.metric}
-            </strong>
+        {compactStable ? (
+          <CompactStableStatus summary={stableSummary} />
+        ) : (
+          <div
+            className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
+            aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
+          >
+            <div className="gridHealthSummary">
+              <span className="statusIcon" aria-hidden="true">
+                <ConceptIcon
+                  concept={
+                    inBlackout
+                      ? "blackout"
+                      : gridHealth.state === "stable"
+                        ? "supply"
+                        : "danger"
+                  }
+                  fontSize="small"
+                />
+              </span>
+              <strong className="gridHealthMetric">
+                {gridHealth.label},{" "}
+                {gridHealth.state === "stable"
+                  ? spacedWatts(reserveCapacityW(game, now))
+                  : gridHealth.metric}
+              </strong>
+            </div>
           </div>
-        </div>
+        )}
         {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
         {!isTutorial && (
           <MissionSummary
