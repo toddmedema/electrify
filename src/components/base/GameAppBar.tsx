@@ -8,6 +8,7 @@ import {
   Toolbar,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
@@ -25,6 +26,7 @@ import {
   isDesktopScreen,
   isPaneLayout,
   openWindow,
+  SIDE_LAYOUT_MEDIA,
 } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { setSpeed, startTutorial } from "../../reducers/Game";
@@ -61,6 +63,11 @@ import { useDesktopState } from "../../DesktopState";
  * it was reported from the top-left corner of column one. None of it belongs to a single pane,
  * so it spans the app instead -- one bar above the panes on desktop, and the card's own header
  * on a phone, where there is only ever one pane anyway.
+ *
+ * Narrower windows stack it in two rows: cash, date and speed above, then the grid readout and
+ * the mission. Once the workspace has room for side columns those rows fold into one bar, in the
+ * order a player checks them: cash and date, the grid, the mission (the only part that gives up
+ * width), then the speed controls pinned right where they always are.
  */
 
 export interface StateProps {
@@ -91,6 +98,8 @@ export interface Props extends StateProps, DispatchProps {}
 
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
+/** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
+const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionDetailsButton"];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -272,6 +281,28 @@ export function GameAppBar(props: Props) {
   }, [evidenceRequest, facilityDragActive, onEvidenceAcknowledged]);
 
   const bigScreen = isBigScreen();
+  // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
+  const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  // Crossing the breakpoint moves the status row to another parent, which remounts its
+  // controls; a player tabbed onto one keeps their place rather than dropping to the page.
+  const layoutSeen = React.useRef(singleRow);
+  const refocus = React.useRef<string>();
+  if (layoutSeen.current !== singleRow) {
+    layoutSeen.current = singleRow;
+    const focused = document.activeElement;
+    refocus.current = RESTORABLE_STATUS_FOCUS.find((selector) =>
+      focused?.matches(`#appbar ${selector}`),
+    );
+  }
+  React.useLayoutEffect(() => {
+    const selector = refocus.current;
+    refocus.current = undefined;
+    if (selector) {
+      document
+        .querySelector<HTMLElement>(`#appbar ${selector}`)
+        ?.focus({ preventScroll: true });
+    }
+  }, [singleRow]);
   const multiplayer = game.multiplayer;
   const clock = multiplayer?.clock;
   const speed = clock?.selectedSpeed ?? game.speed;
@@ -431,8 +462,54 @@ export function GameAppBar(props: Props) {
   const compactStable = gridHealth.state === "stable" && !isPaneLayout();
   const stableSummary = stableGridSummary(game, now);
 
+  const statusRow = (
+    <div className="gameStatusBar">
+      {compactStable ? (
+        <CompactStableStatus summary={stableSummary} />
+      ) : (
+        <div
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
+          role="group"
+          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
+        >
+          <div className="gridHealthSummary">
+            <span className="statusIcon" aria-hidden="true">
+              <ConceptIcon
+                concept={
+                  inBlackout
+                    ? "blackout"
+                    : gridHealth.state === "stable"
+                      ? "supply"
+                      : "danger"
+                }
+                fontSize="small"
+              />
+            </span>
+            <strong className="gridHealthMetric">
+              {gridHealth.label},{" "}
+              {gridHealth.state === "stable"
+                ? spacedWatts(reserveCapacityW(game, now))
+                : gridHealth.metric}
+            </strong>
+          </div>
+        </div>
+      )}
+      {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
+      {!isTutorial && (
+        <MissionSummary
+          game={game}
+          upcoming={props.upcomingEvents}
+          activeEvents={activeEvents}
+          onActiveEvents={openEvents}
+          onEvidence={props.onEvidence}
+          onDetails={() => setScenarioDetailsOpen(true)}
+        />
+      )}
+    </div>
+  );
+
   return (
-    <div id="appbar">
+    <div id="appbar" className={singleRow ? "appbarSingleRow" : undefined}>
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
@@ -441,11 +518,17 @@ export function GameAppBar(props: Props) {
               {formatMoneyStable(now.cash)}
             </span>
             <span className="weak gameStatusValue">
-              {date.month} {date.year}
-              {bigScreen ? `, ${formatHour(date)}` : ""}
+              {/* One inline run, so the flex gap doesn't open before the comma. */}
+              <span>
+                {date.month} {date.year}
+                {bigScreen && (
+                  <span className="gameStatusHour">, {formatHour(date)}</span>
+                )}
+              </span>
             </span>
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
+          {singleRow && statusRow}
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
@@ -472,48 +555,7 @@ export function GameAppBar(props: Props) {
           data-active-save-id={props.activeSave?.id}
         />
       )}
-      <div className="gameStatusBar">
-        {compactStable ? (
-          <CompactStableStatus summary={stableSummary} />
-        ) : (
-          <div
-            className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
-            aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
-          >
-            <div className="gridHealthSummary">
-              <span className="statusIcon" aria-hidden="true">
-                <ConceptIcon
-                  concept={
-                    inBlackout
-                      ? "blackout"
-                      : gridHealth.state === "stable"
-                        ? "supply"
-                        : "danger"
-                  }
-                  fontSize="small"
-                />
-              </span>
-              <strong className="gridHealthMetric">
-                {gridHealth.label},{" "}
-                {gridHealth.state === "stable"
-                  ? spacedWatts(reserveCapacityW(game, now))
-                  : gridHealth.metric}
-              </strong>
-            </div>
-          </div>
-        )}
-        {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
-        {!isTutorial && (
-          <MissionSummary
-            game={game}
-            upcoming={props.upcomingEvents}
-            activeEvents={activeEvents}
-            onActiveEvents={openEvents}
-            onEvidence={props.onEvidence}
-            onDetails={() => setScenarioDetailsOpen(true)}
-          />
-        )}
-      </div>
+      {!singleRow && statusRow}
       {game.challenge && (
         <Typography
           variant="caption"
