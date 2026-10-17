@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Badge, Button } from "@mui/material";
+import { Badge, Button, Tooltip } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -7,6 +7,7 @@ import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import ConceptIcon from "./ConceptIcon";
+import useDockLabels from "./useDockLabels";
 
 export interface StateProps {
   card: CardType;
@@ -65,43 +66,61 @@ export default function Navigation({
       (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
   );
   const opened = openTools ?? [gameToolForCard(cardName)];
+  const { labelId, buttonLabels, dockLabels } = useDockLabels();
   return (
-    <nav id="navfooter" className="gameActionDock" aria-label="Game actions">
+    <nav
+      id="navfooter"
+      className="gameActionDock"
+      aria-label="Game actions"
+      {...dockLabels}
+    >
       {GAME_TOOLS.filter(
         (tool) => !readOnly || tool.id !== "BUILD_GENERATORS",
       ).map((tool) => {
         const open = opened.includes(tool.id);
         return (
-          <Button
+          <Tooltip
             key={tool.id}
-            id={tool.triggerId}
-            className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
-            aria-expanded={open}
-            aria-label={tool.label}
-            aria-describedby={
-              tool.id === "EVENTS" && unreadEvents ? "eventsUnread" : undefined
-            }
-            aria-controls={open ? `tool-${tool.id}` : undefined}
-            onClick={() =>
-              onToggle
-                ? onToggle(tool.id)
-                : dispatch(navigate(open ? "FACILITIES" : tool.id))
-            }
+            title={tool.label}
+            placement="top"
+            open={labelId === tool.triggerId}
+            disableHoverListener
+            disableFocusListener
+            disableTouchListener
+            disableInteractive
           >
-            <Badge
-              color="primary"
-              variant="dot"
-              invisible={tool.id !== "EVENTS" || !unreadEvents}
+            <Button
+              id={tool.triggerId}
+              {...buttonLabels}
+              className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
+              aria-expanded={open}
+              aria-label={tool.label}
+              aria-describedby={
+                tool.id === "EVENTS" && unreadEvents
+                  ? "eventsUnread"
+                  : undefined
+              }
+              aria-controls={open ? `tool-${tool.id}` : undefined}
+              onClick={() =>
+                onToggle
+                  ? onToggle(tool.id)
+                  : dispatch(navigate(open ? "FACILITIES" : tool.id))
+              }
             >
-              {tool.icon}
-            </Badge>
-            <span>{tool.label}</span>
-            {tool.id === "EVENTS" && unreadEvents && (
-              <span className="srOnly" id="eventsUnread">
-                Unread events
-              </span>
-            )}
-          </Button>
+              <Badge
+                color="primary"
+                variant="dot"
+                invisible={tool.id !== "EVENTS" || !unreadEvents}
+              >
+                {tool.icon}
+              </Badge>
+              {tool.id === "EVENTS" && unreadEvents && (
+                <span className="srOnly" id="eventsUnread">
+                  Unread events
+                </span>
+              )}
+            </Button>
+          </Tooltip>
         );
       })}
     </nav>

@@ -8,7 +8,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -946,11 +945,6 @@ export default class Facilities extends React.Component<Props> {
     return (
       <GameCard className="facilities" id="facilitiesPane">
         <>
-          {/* The pane's own header rather than a row inside the list, so it lines up with the
-            other panes' headers and the build buttons stay put as the fleet scrolls */}
-          <Toolbar className="paneHeader">
-            <Typography variant="h6">Facilities</Typography>
-          </Toolbar>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             <List dense className="scrollable unifiedFacilitiesList">

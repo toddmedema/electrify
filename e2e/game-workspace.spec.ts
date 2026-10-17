@@ -12,6 +12,10 @@ async function startGame(page: Page, theme: "light" | "dark") {
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
   await page.keyboard.press("0");
+  await expect(page.locator(".facilities > .paneHeader")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Facilities", exact: true }),
+  ).toHaveCount(0);
 }
 
 async function settleSheets(page: Page) {
@@ -72,6 +76,7 @@ for (const theme of ["light", "dark"] as const) {
     for (const label of ["Build", "Programs", "Insights", "Events"]) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
+      await expect(action).not.toContainText(label);
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
@@ -168,6 +173,108 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeLessThanOrEqual(1);
   });
 }
+
+test("icon labels support hover, keyboard focus, and touch hold-and-slide without opening tools", async ({
+  page,
+}, testInfo) => {
+  await startGame(page, "light");
+  const dock = page.locator("#navfooter");
+  const status = page.locator(".gridHealth");
+  await expect(status.locator(".gridHealthMetric")).toHaveText(
+    /^Stable, \d.* [kMGT]?W$/,
+  );
+  await expect(status.locator(".gridHealthMetric")).toHaveCSS(
+    "text-align",
+    "left",
+  );
+  await expect(status).toHaveCSS("border-right-width", "0px");
+
+  if (!testInfo.project.use.hasTouch) {
+    await page.locator("#buildNav").hover();
+    await expect(
+      page.getByRole("tooltip", { name: "Build", exact: true }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.locator("#programsNav").focus();
+    await expect(
+      page.getByRole("tooltip", { name: "Programs", exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+    return;
+  }
+
+  const session = await page.context().newCDPSession(page);
+  const dockBox = (await dock.boundingBox())!;
+  const y = dockBox.y + dockBox.height / 2;
+  // Start on the bar's padding, then move across every icon while holding the same finger.
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: dockBox.x + 2, y }],
+  });
+  await page.waitForTimeout(600);
+  for (const [id, label] of [
+    ["buildNav", "Build"],
+    ["programsNav", "Programs"],
+    ["insightsNav", "Insights"],
+    ["eventsNav", "Events"],
+  ]) {
+    const box = (await page.locator(`#${id}`).boundingBox())!;
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: box.x + box.width / 2, y }],
+    });
+    await expect(
+      page.getByRole("tooltip", { name: label, exact: true }),
+    ).toBeVisible();
+    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-touch-labels.png"),
+    animations: "disabled",
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  // Starting on an icon also works when native capture transfers from the button to the bar.
+  const programs = (await page.locator("#programsNav").boundingBox())!;
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: programs.x + programs.width / 2, y }],
+  });
+  await expect(
+    page.getByRole("tooltip", { name: "Programs", exact: true }),
+  ).toBeVisible();
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: dockBox.x - 20, y }],
+  });
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  const events = (await page.locator("#eventsNav").boundingBox())!;
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: events.x + events.width / 2, y }],
+  });
+  await expect(
+    page.getByRole("tooltip", { name: "Events", exact: true }),
+  ).toBeVisible();
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchCancel",
+    touchPoints: [],
+  });
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(page.locator(".gameToolPanel")).toHaveCount(0);
+  const build = (await page.locator("#buildNav").boundingBox())!;
+  await page.touchscreen.tap(build.x + build.width / 2, y);
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toBeVisible();
+  await session.detach();
+});
 
 test("Programs owns pricing and Build keeps purchase dialogs above its sheet", async ({
   page,

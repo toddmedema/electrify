@@ -1,7 +1,7 @@
 // The fleet fills the stage. Desktop tools occupy their own tracks; compact tools rise above it.
 .gameWorkspace {
   --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
-  --game-dock-clearance: calc(80px + var(--game-dock-bottom));
+  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
   --game-tool-width: clamp(400px, 28vw, 480px);
   position: relative;
   display: flex;
@@ -58,15 +58,17 @@
   border-radius: 20px;
   background: var(--bg-raised);
   box-shadow: 0 4px 20px var(--shadow-ring);
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .gameActionDock .gameDockAction.MuiButton-root {
-  min-width: 72px;
-  min-height: 56px;
-  padding: 4px 12px;
+  min-width: 48px;
+  width: 48px;
+  min-height: 48px;
+  padding: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--font-color-faded);
@@ -315,10 +317,6 @@
   .gameWorkspace #navfooter.gameActionDock {
     padding: 4px;
     border-radius: 16px;
-  }
-  .gameActionDock .gameDockAction.MuiButton-root {
-    min-width: 64px;
-    padding: 4px 8px;
   }
   .gameToolTray {
     left: max(4px, env(safe-area-inset-left));
