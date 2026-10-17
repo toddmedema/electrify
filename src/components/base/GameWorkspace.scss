@@ -71,7 +71,7 @@
   display: flex;
   border: 1px solid transparent;
   border-radius: 12px;
-  color: var(--font-color-faded);
+  color: var(--interactive-strong);
   font-size: 12px;
   line-height: 16px;
 
@@ -80,7 +80,7 @@
   }
   &:hover {
     background: var(--bg-sunken);
-    color: var(--font-color-primary);
+    color: var(--interactive-strong);
   }
   &.gameDockActionOpen {
     color: var(--interactive-strong);
@@ -167,7 +167,7 @@
   .MuiIconButton-root {
     width: var(--control-size);
     height: var(--control-size);
-    color: var(--font-color-primary);
+    color: var(--interactive-strong);
   }
 }
 

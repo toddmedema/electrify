@@ -371,7 +371,7 @@ export default function NewGame(props: Props): React.JSX.Element {
               />
             ) : (
               <div className="tutorialCompleteSummary">
-                <CheckCircleIcon color="primary" />
+                <CheckCircleIcon color="action" />
                 <span>
                   <strong>Tutorials complete</strong>
                   <Typography

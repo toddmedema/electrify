@@ -406,8 +406,12 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         },
       },
       MuiToggleButton: {
+        defaultProps: { color: "primary" },
         styleOverrides: {
           root: {
+            "&:not(.Mui-disabled)": {
+              color: mode === "light" ? primaryDarkColor : palette.interactive,
+            },
             textTransform: "none",
             fontWeight: 600,
             minHeight: 40,
@@ -417,6 +421,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         },
       },
       MuiIconButton: {
+        defaultProps: { color: "primary" },
         styleOverrides: {
           root: {
             minWidth: 40,
@@ -430,6 +435,28 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         styleOverrides: {
           select: { paddingTop: 8, paddingBottom: 8 },
           standard: { paddingLeft: 8 },
+          icon: {
+            "&:not(.Mui-disabled)": {
+              color: mode === "light" ? primaryDarkColor : palette.interactive,
+            },
+          },
+        },
+      },
+      MuiMenuItem: {
+        styleOverrides: {
+          root: {
+            "&:not(.Mui-disabled)": {
+              color: mode === "light" ? primaryDarkColor : palette.interactive,
+            },
+          },
+        },
+      },
+      MuiAccordionSummary: {
+        styleOverrides: {
+          expandIconWrapper: {
+            color: mode === "light" ? primaryDarkColor : palette.interactive,
+            ".Mui-disabled &": { color: "var(--font-color-faded)" },
+          },
         },
       },
       MuiInputBase: {
@@ -437,6 +464,48 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           root: {
             minHeight: 40,
             "@media (pointer: coarse)": { minHeight: 44 },
+          },
+        },
+      },
+      MuiCheckbox: {
+        styleOverrides: {
+          root: {
+            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+          },
+        },
+      },
+      MuiRadio: {
+        styleOverrides: {
+          root: {
+            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+          },
+        },
+      },
+      MuiSwitch: {
+        styleOverrides: {
+          switchBase: {
+            "&:not(.Mui-disabled)": { color: "var(--interactive-strong)" },
+          },
+        },
+      },
+      MuiLinearProgress: {
+        styleOverrides: {
+          root: {
+            "&.MuiLinearProgress-colorPrimary": {
+              backgroundColor: "var(--border-subtle)",
+              "& .MuiLinearProgress-bar": {
+                backgroundColor: "var(--font-color-faded)",
+              },
+            },
+          },
+        },
+      },
+      MuiCircularProgress: {
+        styleOverrides: {
+          root: {
+            "&.MuiCircularProgress-colorPrimary": {
+              color: "var(--font-color-faded)",
+            },
           },
         },
       },
@@ -504,7 +573,14 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       },
       MuiTab: {
         styleOverrides: {
-          root: { textTransform: "none", fontWeight: 600 },
+          root: {
+            textTransform: "none",
+            fontWeight: 600,
+            "&:not(.Mui-disabled)": {
+              color: mode === "light" ? primaryDarkColor : palette.interactive,
+              opacity: 1,
+            },
+          },
         },
       },
     },

@@ -57,9 +57,7 @@ export default function ConstructionBuildHeader(
           variant="body2"
         >
           <span className="weak">{props.capacityLabel || "Capacity"}</span>
-          <Typography color="primary" component="strong">
-            {props.capacity}
-          </Typography>
+          <Typography component="strong">{props.capacity}</Typography>
         </Typography>
         <Slider
           className="constructionCapacitySlider"
@@ -117,7 +115,7 @@ export default function ConstructionBuildHeader(
                   {props.sort === value ? (
                     <strong>{label}</strong>
                   ) : (
-                    <span className="weak">{label}</span>
+                    <span>{label}</span>
                   )}
                 </MenuItem>
               ))}

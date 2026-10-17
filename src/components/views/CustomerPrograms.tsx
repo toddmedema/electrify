@@ -4,6 +4,7 @@ import {
   currentTick,
 } from "../../helpers/GameSelectors";
 import * as React from "react";
+import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
   Alert,
   Avatar,
@@ -825,20 +826,31 @@ export function ProgramsScreen({
   onClose,
   embedded = false,
   pricing,
+  onBackChange,
 }: {
   onClose: () => void;
   embedded?: boolean;
   pricing?: React.ReactNode;
+  onBackChange?: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
 }) {
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
   const activeCard = useAppSelector((s) => s.card?.name);
   const token = React.useId();
-  const [selected, setSelected] = React.useState<Selection>();
-  const [tier, setTier] = React.useState<PolicyTier>("Off");
-  const [startHour, setStartHour] = React.useState(17);
-  const bodyRef = React.useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useToolState<Selection | undefined>(
+    "programs.selection",
+    undefined,
+  );
+  const [tier, setTier] = useToolState<PolicyTier>("programs.tier", "Off");
+  const [startHour, setStartHour] = useToolState("programs.startHour", 17);
+  const bodyRef = useToolScroll<HTMLDivElement>(
+    `programs.scroll.${selected ?? "list"}`,
+  );
+  React.useEffect(() => {
+    onBackChange?.(() => (selected ? () => setSelected(undefined) : undefined));
+    return () => onBackChange?.(undefined);
+  }, [onBackChange, selected, setSelected]);
   const screenRef = React.useRef<HTMLDivElement>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const lastSelection = React.useRef<Selection>();
@@ -846,7 +858,7 @@ export function ProgramsScreen({
     if (!embedded) return;
     if (selected) {
       lastSelection.current = selected;
-      headingRef.current?.focus();
+      headingRef.current?.focus({ preventScroll: true });
     } else if (lastSelection.current) {
       const name =
         lastSelection.current === "wildfire"
@@ -858,9 +870,9 @@ export function ProgramsScreen({
         .find((button) =>
           button.getAttribute("aria-label")?.startsWith(`${name} ·`),
         )
-        ?.focus();
+        ?.focus({ preventScroll: true });
     }
-  }, [embedded, selected]);
+  }, [bodyRef, embedded, selected]);
   React.useEffect(() => {
     if (embedded && !selected) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -883,7 +895,7 @@ export function ProgramsScreen({
     };
     document.addEventListener("keydown", closeOnEscape, true);
     return () => document.removeEventListener("keydown", closeOnEscape, true);
-  }, [onClose, manualOpen, embedded, selected, activeCard]);
+  }, [onClose, manualOpen, embedded, selected, activeCard, setSelected]);
   // A docked overview may stay open while playing. Freeze time only while reviewing an
   // individual decision; the standalone screen retains its existing pause behavior.
   const reviewingDecision = !embedded || !!selected;

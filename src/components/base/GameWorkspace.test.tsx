@@ -196,10 +196,10 @@ it("reveals a remembered compact tool instead of toggling an unseen rail closed"
   expect(screen.queryByRole("region", { name: "Programs" })).toBeNull();
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
-  expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Programs" })).toBeNull();
   expect(action("Insights")).toHaveFocus();
   resize(2240);
-  expect(screen.getAllByRole("region")).toHaveLength(1);
+  expect(screen.queryAllByRole("region")).toHaveLength(0);
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
 });
 
@@ -231,12 +231,14 @@ it("retains Build tab focus and restores its category after closing another tool
   expect(store.getState().card.name).toBe("BUILD_STORAGE");
   await user.click(action("Insights"));
   await user.click(screen.getByRole("button", { name: "Close Insights" }));
+  expect(store.getState().card.name).toBe("FACILITIES");
+  expect(action("Insights")).toHaveFocus();
+  await user.click(action("Build"));
   expect(store.getState().card.name).toBe("BUILD_STORAGE");
   expect(screen.getByRole("tab", { name: "Storage" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  expect(action("Insights")).toHaveFocus();
 });
 
 it("finishes a purchase without closing the opposite desktop rail", async () => {

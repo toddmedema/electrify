@@ -338,7 +338,7 @@ export default function Manual(props: Props): React.JSX.Element {
           inputProps={{ "aria-label": "Search the manual" }}
           startAdornment={
             <InputAdornment position="start">
-              <SearchIcon color="primary" fontSize="small" />
+              <SearchIcon color="action" fontSize="small" />
             </InputAdornment>
           }
           endAdornment={

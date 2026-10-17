@@ -726,7 +726,7 @@ export default class Compositor extends React.Component<Props, {}> {
               </Button>
             )}
             {ui.dialog.tertiaryAction && (
-              <Button color="inherit" onClick={ui.dialog.tertiaryAction}>
+              <Button color="primary" onClick={ui.dialog.tertiaryAction}>
                 {ui.dialog.tertiaryLabel}
               </Button>
             )}

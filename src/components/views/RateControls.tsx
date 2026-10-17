@@ -226,11 +226,11 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
 
   return (
     <section
-      className="programsPricing"
+      className="programsPricing customerProgramSection"
       aria-label="Electricity pricing"
       aria-describedby="programsRateSummary"
     >
-      <Typography component="h2" variant="h6">
+      <Typography component="h3" variant="subtitle2">
         Electricity pricing
       </Typography>
       <div className="insightsRateMetrics" aria-hidden="true">
