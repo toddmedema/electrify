@@ -23,6 +23,14 @@ describe("EventLog", () => {
         title: `Future announcement ${index + 1}`,
         message: "A scheduled change will affect operations.",
       })),
+      ongoing: [
+        {
+          key: "story:111:california-wildfire-2025:firestorm",
+          label: "Through Feb 2025",
+          title: "Wildfire emergency",
+          message: "Safety shutoffs remain active.",
+        },
+      ],
       events: [
         {
           id: 1,
@@ -34,7 +42,6 @@ describe("EventLog", () => {
       onOpen: jest.fn(),
       onSelect: jest.fn(),
       onEvidence: jest.fn(),
-      onFacility: jest.fn(),
       onEvidenceReady,
     };
     const view = render(<EventLog {...passed} />);
@@ -42,6 +49,10 @@ describe("EventLog", () => {
     const history = screen.getByRole("region", { name: "Event history" });
     expect(within(history).queryByText(/Future announcement/)).toBeNull();
     expect(screen.getAllByText(/Future announcement/)).toHaveLength(1);
+    // The top bar owns the live grid state; the rail keeps only what it adds.
+    expect(screen.queryByRole("heading", { name: "Right now" })).toBeNull();
+    expect(screen.queryByText(/Projects & outcomes/)).toBeNull();
+    expect(screen.getAllByText("Wildfire emergency")).toHaveLength(1);
     const request = { id: 1, runId: 0, target: { card: "EVENTS" as const } };
     view.rerender(<EventLog {...passed} evidenceRequest={request} />);
     expect(screen.getByText("A recorded build.")).toBeVisible();

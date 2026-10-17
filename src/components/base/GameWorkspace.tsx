@@ -23,23 +23,48 @@ import {
 } from "./GameWorkspaceContext";
 import "./GameWorkspace.scss";
 
-type ToolGroup = "decision" | "intelligence";
-type ToolSelections = Partial<Record<ToolGroup, GameTool>>;
-const TOOL_GROUPS: { id: ToolGroup }[] = [
-  { id: "decision" },
-  { id: "intelligence" },
-];
-const groupFor = (tool: GameTool): ToolGroup =>
+type ToolSide = "decision" | "intelligence";
+const sideFor = (tool: GameTool): ToolSide =>
   tool === "BUILD_GENERATORS" || tool === "PROGRAMS"
     ? "decision"
     : "intelligence";
 
-/** Side columns protect fleet space; compact screens use one sheet over the stage. */
+/** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
+export const SIDE_LAYOUT_MIN_WIDTH = 1200;
+/** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
+export const MIN_FLEET_WIDTH = 430;
+const MIN_TOOL_WIDTH = 400;
+const MAX_TOOL_WIDTH = 480;
+
+/** Matches --game-tool-width: clamp(400px, 28vw, 480px). */
+export function toolWidth(width: number) {
+  return Math.min(MAX_TOOL_WIDTH, Math.max(MIN_TOOL_WIDTH, width * 0.28));
+}
+
+/** How many tools fit beside the fleet at this window width, keeping it at phone width or more. */
+export function maxOpenTools(width: number) {
+  if (width < SIDE_LAYOUT_MIN_WIDTH) return 1;
+  return Math.max(
+    1,
+    Math.min(
+      GAME_TOOLS.length,
+      Math.floor((width - MIN_FLEET_WIDTH) / toolWidth(width)),
+    ),
+  );
+}
+
+/**
+ * Side columns protect fleet space; compact screens use one sheet over the stage. Wide screens
+ * keep several tools open at once, as many as fit beside a phone-width fleet. Decision tools sit
+ * left of the fleet and intelligence tools right of it, each in action bar order, so opening
+ * another never moves the ones already open.
+ */
 export default function GameWorkspace() {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
-  const [remembered, setRemembered] = React.useState<ToolSelections>({});
+  // Open tools, least recently opened first. The newest ones win when they don't all fit.
+  const [remembered, setRemembered] = React.useState<GameTool[]>([]);
   const [width, setWidth] = React.useState(window.innerWidth);
   const [buildCategory, setBuildCategory] =
     React.useState<CardNameType>("BUILD_GENERATORS");
@@ -47,25 +72,32 @@ export default function GameWorkspace() {
   const memory = React.useRef(new Map<string, unknown>());
   const [programBack, setProgramBack] = React.useState<() => void>();
   const retainFocus = React.useRef(false);
-  const layout = width >= 1800 ? "dual" : width >= 1200 ? "side" : "sheet";
+  const layout = width >= SIDE_LAYOUT_MIN_WIDTH ? "side" : "sheet";
+  const capacity = maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
-  const selections: ToolSelections = active
-    ? { ...remembered, [groupFor(active)]: active }
-    : {};
-  const visibleGroups = TOOL_GROUPS.filter(
-    (group) =>
-      selections[group.id] &&
-      (layout === "dual" || group.id === (active && groupFor(active))),
+  const tools: GameTool[] = active
+    ? [...remembered.filter((tool) => tool !== active), active]
+    : [];
+  const visible = tools.slice(-capacity);
+  const ordered = GAME_TOOLS.map((tool) => tool.id).filter((id) =>
+    tools.includes(id),
   );
-  const visible = visibleGroups.map((group) => selections[group.id]!);
+  const shownOnSide = (side: ToolSide) =>
+    ordered.filter((tool) => visible.includes(tool) && sideFor(tool) === side);
+  const left = shownOnSide("decision");
+  const right = shownOnSide("intelligence");
   React.useEffect(() => {
     const resize = () => {
-      // Keep the rail the player is working in when two columns collapse to one.
+      // Keep the rail the player is working in when columns collapse.
       const focused =
         document.activeElement?.closest<HTMLElement>("[data-game-tool]");
       const tool = focused?.dataset.gameTool as GameTool | undefined;
-      if (window.innerWidth < 1800 && tool && tool !== active) {
+      if (
+        tool &&
+        tool !== active &&
+        !tools.slice(-maxOpenTools(window.innerWidth)).includes(tool)
+      ) {
         retainFocus.current = true;
         dispatch(navigate(tool === "BUILD_GENERATORS" ? buildCategory : tool));
       }
@@ -73,7 +105,7 @@ export default function GameWorkspace() {
     };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [active, buildCategory, dispatch]);
+  });
   React.useLayoutEffect(() => {
     // Keep focus in the active tool when the layout changes, without stealing it
     // from a retained pricing slider or chart.
@@ -84,8 +116,11 @@ export default function GameWorkspace() {
   React.useEffect(() => {
     if (card.startsWith("BUILD_")) setBuildCategory(card);
     if (active)
-      setRemembered((current) => ({ ...current, [groupFor(active)]: active }));
-    else setRemembered({});
+      setRemembered((current) => [
+        ...current.filter((tool) => tool !== active),
+        active,
+      ]);
+    else setRemembered([]);
   }, [card, active]);
   React.useEffect(() => {
     if (retainFocus.current) retainFocus.current = false;
@@ -96,13 +131,12 @@ export default function GameWorkspace() {
   const destination = (tool: GameTool) =>
     tool === "BUILD_GENERATORS" ? buildCategory : tool;
   const close = (tool: GameTool) => {
-    const group = groupFor(tool);
-    const remaining = { ...selections };
-    delete remaining[group];
+    // Only what is on screen stays open; a tool that didn't fit is not revealed by closing another.
+    const remaining = visible.filter((item) => item !== tool);
     setRemembered(remaining);
-    if (active && groupFor(active) === group) {
+    if (active === tool) {
       retainFocus.current = true;
-      const next = visible.find((item) => groupFor(item) !== group);
+      const next = remaining[remaining.length - 1];
       dispatch(navigate(next ? destination(next) : "FACILITIES"));
     }
     document
@@ -140,39 +174,66 @@ export default function GameWorkspace() {
   return (
     <GameToolMemoryContext.Provider value={memory.current}>
       <GameWorkspaceContext.Provider value={true}>
-        <div className="gameWorkspace">
+        <div
+          className="gameWorkspace"
+          style={
+            layout === "side"
+              ? ({
+                  // The action dock floats over the fleet, not over the tools beside it.
+                  "--game-fleet-left": `${left.length * toolWidth(width)}px`,
+                  "--game-fleet-right": `${right.length * toolWidth(width)}px`,
+                } as React.CSSProperties)
+              : undefined
+          }
+        >
           <GameAppBar />
           <div
             className="gameStage"
             data-layout={layout}
             data-panel-count={visible.length}
-            data-decision-open={
-              visibleGroups.some((group) => group.id === "decision") ||
-              undefined
-            }
-            data-intelligence-open={
-              visibleGroups.some((group) => group.id === "intelligence") ||
-              undefined
+            style={
+              layout === "side" && visible.length
+                ? {
+                    gridTemplateColumns: [
+                      ...left.map(() => "var(--game-tool-width)"),
+                      `minmax(${MIN_FLEET_WIDTH}px, 1fr)`,
+                      ...right.map(() => "var(--game-tool-width)"),
+                    ].join(" "),
+                  }
+                : undefined
             }
           >
-            <div className="gameFleet">
+            <div
+              className="gameFleet"
+              style={
+                layout === "side" ? { gridColumn: left.length + 1 } : undefined
+              }
+            >
               <Facilities />
             </div>
             <div className="gameToolTray">
-              {TOOL_GROUPS.map((group) => {
-                const tool = selections[group.id];
-                if (!tool) return null;
+              {ordered.map((tool) => {
                 const config = GAME_TOOLS.find((item) => item.id === tool)!;
-                const shown = visibleGroups.includes(group);
+                const shown = visible.includes(tool);
+                const side = sideFor(tool);
+                const column =
+                  side === "decision"
+                    ? left.indexOf(tool) + 1
+                    : left.length + 2 + right.indexOf(tool);
                 return (
                   <section
-                    key={group.id}
+                    key={tool}
                     id={`tool-${tool}`}
                     className="gameToolPanel"
                     aria-label={config.label}
                     data-game-tool={tool}
-                    data-tool-group={group.id}
+                    data-tool-side={side}
                     hidden={!shown}
+                    style={
+                      layout === "side" && shown
+                        ? { gridColumn: column }
+                        : undefined
+                    }
                   >
                     <header className="gameToolHeader">
                       {tool === "PROGRAMS" && programBack && (

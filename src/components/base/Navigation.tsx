@@ -8,6 +8,7 @@ import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
+import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 
 export interface StateProps {
   card: CardType;
@@ -66,7 +67,7 @@ export default function Navigation({
       (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
   );
   const opened = openTools ?? [gameToolForCard(cardName)];
-  const { labelId, buttonLabels, dockLabels } = useDockLabels();
+  const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
   return (
     <nav
       id="navfooter"
@@ -81,7 +82,11 @@ export default function Navigation({
         return (
           <Tooltip
             key={tool.id}
-            title={tool.label}
+            title={
+              fromTouch
+                ? tool.label
+                : `${tool.label} (${TOOL_SHORTCUTS[tool.id]})`
+            }
             placement="top"
             open={labelId === tool.triggerId}
             disableHoverListener
@@ -95,6 +100,7 @@ export default function Navigation({
               className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
               aria-expanded={open}
               aria-label={tool.label}
+              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id]}
               aria-describedby={
                 tool.id === "EVENTS" && unreadEvents
                   ? "eventsUnread"

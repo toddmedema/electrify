@@ -85,7 +85,6 @@ const EVENT_HISTORY_FILTERS: {
 
 export interface StateProps {
   game?: GameType;
-  selectedFacilityId?: number | null;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   facilityDragActive?: boolean;
   events: GameEventType[];
@@ -96,7 +95,6 @@ export interface StateProps {
 
 export interface DispatchProps {
   onEvidence?: (target: EvidenceTargetType) => void;
-  onFacility?: (id: number) => void;
   onEvidenceReady?: (
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
@@ -182,16 +180,12 @@ export default function EventLog(props: Props): React.JSX.Element {
         tabIndex={-1}
         aria-label="Announced events and event history evidence"
       >
-        {operations && props.game && props.onEvidence && props.onFacility && (
+        {operations && props.game && props.onEvidence && (
           <OperationsPriorities
             key={`${props.game.scenarioId}:${props.game.seed}:${props.game.startingYear}`}
             game={props.game}
-            selectedFacilityId={props.selectedFacilityId}
-            ongoing={ongoing}
             upcoming={upcoming}
-            riskNotice={riskNotice}
             onEvidence={props.onEvidence}
-            onFacility={props.onFacility}
           />
         )}
         <div
@@ -199,7 +193,7 @@ export default function EventLog(props: Props): React.JSX.Element {
           ref={historyAnchor}
           tabIndex={operations ? -1 : undefined}
         >
-          {!operations && riskNotice && (
+          {riskNotice && (
             <section
               className="eventLogSection wildfireRiskNotice"
               aria-labelledby="wildfireRiskNoticeTitle"
@@ -214,7 +208,7 @@ export default function EventLog(props: Props): React.JSX.Element {
               </Typography>
             </section>
           )}
-          {!operations && ongoing.length > 0 && (
+          {ongoing.length > 0 && (
             <section
               className="eventLogSection ongoingEvents"
               aria-labelledby="ongoingEventsTitle"

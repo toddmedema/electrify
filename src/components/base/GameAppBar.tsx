@@ -12,7 +12,12 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
+import {
+  formatHour,
+  getDateFromMinute,
+  getTimeFromTimeline,
+} from "../../helpers/DateTime";
+import { projectedShortfall } from "../../helpers/MissionStatus";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import {
@@ -87,7 +92,8 @@ export interface Props extends StateProps, DispatchProps {}
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 
-type GridHealthState = "stable" | "low-reserve" | "at-limit" | "blackout";
+type GridHealthState =
+  "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
 
 interface GridHealth {
   state: GridHealthState;
@@ -104,7 +110,11 @@ export function reserveCapacityW(
   return now.reserveW ?? now.supplyW - now.demandW;
 }
 
-/** Turns the live supply margin into the few states a player can act on at a glance. */
+/**
+ * Turns the live supply margin into the few states a player can act on at a glance. A shortfall
+ * later in today's operating sample outranks any reserve reading now: a "Stable" grid that is
+ * about to black out would be false reassurance.
+ */
 export function getGridHealth(
   game: GameType,
   now: TickPresentFutureType,
@@ -115,6 +125,17 @@ export function getGridHealth(
       label: "Blackout",
       metric: `${formatWatts(now.demandW - now.supplyW)} short`,
       announcement: "Blackout. Demand is higher than supply.",
+    };
+  }
+
+  const ahead = projectedShortfall(game.timeline, game.date.minute);
+  if (ahead) {
+    const at = formatHour(getDateFromMinute(ahead.minute, game.startingYear));
+    return {
+      state: "blackout-ahead",
+      label: "Blackout ahead",
+      metric: `${formatWatts(ahead.demandW - ahead.supplyW)} short at ${at}`,
+      announcement: `Blackout expected at ${at}. Demand will be higher than supply.`,
     };
   }
 

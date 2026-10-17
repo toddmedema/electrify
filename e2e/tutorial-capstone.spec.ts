@@ -58,9 +58,9 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await expect(
-    page.locator(".tutorialHud").getByText("Find the supply and demand lines"),
+    page.locator(".tutorialHud").getByText("Tap the supply and demand chart"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.locator("#chartSupplyDemand").click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
   await expect(page.locator("#speedChangeButtons")).toBeVisible();
 

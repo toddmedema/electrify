@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { GameTool } from "./Navigation";
 
 interface ShortcutType {
   keys: string[];
@@ -9,13 +10,23 @@ interface ShortcutType {
 // Manual. They used to be two hand-maintained copies of the same table, which is exactly the
 // kind of thing that drifts. Keep in sync with keyMap in Compositor.tsx, which is the other
 // half of the contract -- the keys themselves.
+// The action bar's tools take the left-hand letter row in the bar's own order, so the keys read
+// left to right like the buttons do. Navigation shows each in its button's tooltip.
+export const TOOL_SHORTCUTS: Record<GameTool, string> = {
+  BUILD_GENERATORS: "Q",
+  PROGRAMS: "W",
+  INSIGHTS: "E",
+  EVENTS: "R",
+};
+
 export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["4"], description: "Ultra speed (desktop-sized screens)" },
-  { keys: ["Q"], description: "Return to Facilities" },
-  { keys: ["W", "E"], description: "Open Insights" },
-  { keys: ["R"], description: "Open Events" },
+  { keys: ["Q"], description: "Open / close Build" },
+  { keys: ["W"], description: "Open / close Programs" },
+  { keys: ["E"], description: "Open / close Insights" },
+  { keys: ["R"], description: "Open / close Events" },
   { keys: ["G"], description: "Build a generator" },
   { keys: ["S"], description: "Build storage" },
   {
@@ -27,7 +38,7 @@ export const SHORTCUTS: ShortcutType[] = [
     description: "Move the selected facility up / down the dispatch order",
   },
   { keys: ["?"], description: "Open the manual" },
-  { keys: ["Esc"], description: "Close the current screen" },
+  { keys: ["Esc"], description: "Close the current panel or screen" },
 ];
 
 // The shortcuts render as a component rather than as plain markup, so the manual's search has

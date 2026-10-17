@@ -263,7 +263,7 @@ test("internal decision benchmarks never appear in player requirements", () => {
   expect(getMissionStatus(custom).scoreNote).toContain("separate");
 });
 
-test("risk precedence distinguishes actual shortage, cash, required failure, sample and public event", () => {
+test("risk precedence distinguishes actual shortage, cash, required failure and public event", () => {
   const event = {
     key: "b",
     startsMinute: 60,
@@ -276,7 +276,8 @@ test("risk precedence distinguishes actual shortage, cash, required failure, sam
       Object.assign({}, g.timeline[0], { minute: 15, supplyW: 99 }),
     );
   });
-  expect(selectMissionRisk(future, [event])?.id).toContain("projection:");
+  // A shortfall later in the sample belongs to the grid readout, not the mission row.
+  expect(selectMissionRisk(future, [event])?.id).toBe("event:b");
   const cash = createNextState(future, (g) => {
     g.timeline[0].cash = -1;
   });
@@ -362,17 +363,15 @@ test("a rate below break-even warns immediately and clears when restored", () =>
   expect(selectMissionRisk(restored)?.id).not.toBe("cash-runway");
 });
 
-test("a same-day shortfall outranks a future cash deficit", () => {
+test("a same-day shortfall is left to the grid readout, not the mission row", () => {
   const burning = runwayGame(0, 1_000_000);
   const shortageAhead = createNextState(burning, (g) => {
     g.timeline[1].supplyW = 0;
     g.timeline[1].demandW = 100;
   });
+  expect(projectedShortfall(shortageAhead.timeline, 0)).toBeDefined();
   expect(cashRunwayMonths(shortageAhead)).toBeGreaterThanOrEqual(1);
-  expect(selectMissionRisk(shortageAhead)).toMatchObject({
-    shortLabel: "Projected shortfall",
-    target: "supply-demand",
-  });
+  expect(selectMissionRisk(shortageAhead)?.id).toBe("cash-runway");
   const cashNegativeNow = createNextState(shortageAhead, (g) => {
     g.timeline[0].cash = -1;
   });

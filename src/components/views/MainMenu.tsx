@@ -194,11 +194,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {desktopApp && (
-            <Button variant="text" onClick={() => void getDesktop()?.quit()}>
-              Quit
-            </Button>
-          )}
           {!steamAvailable && (
             <Button
               data-achievements-trigger
@@ -206,6 +201,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
               onClick={props.onAchievements}
             >
               Achievements
+            </Button>
+          )}
+          {desktopApp && (
+            <Button variant="text" onClick={() => void getDesktop()?.quit()}>
+              Quit
             </Button>
           )}
         </Stack>

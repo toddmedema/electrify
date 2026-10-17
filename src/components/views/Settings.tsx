@@ -225,9 +225,6 @@ export default function Settings(props: Props): React.JSX.Element {
             boxSizing: "border-box",
           }}
         >
-          <p className="menuKeyHint">
-            Arrow keys to choose · Enter to select · Esc to go back
-          </p>
           <SettingsGroup id="preferences-settings" title="Preferences">
             <Stack divider={<Divider flexItem />}>
               <SettingRow

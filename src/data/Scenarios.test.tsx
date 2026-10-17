@@ -222,6 +222,19 @@ describe("tutorial step actions", () => {
     });
   });
 
+  it("moves every guided first-mission step on from a tap on its target", () => {
+    TUTORIALS[0]
+      .tutorialSteps!.filter((step) => !step.capstone)
+      .forEach((step, index) => {
+        expect({
+          index,
+          continuesOnTap:
+            isGatedStep(step) ||
+            (!!step.continueOnClick && step.continueOnClick === step.target),
+        }).toEqual({ index, continuesOnTap: true });
+      });
+  });
+
   it("opens the first mission without navigation, building or speed controls", () => {
     const [first] = TUTORIALS[0].tutorialSteps!;
     expect(first.hideUi).toEqual(

@@ -1,4 +1,5 @@
-import { SHORTCUTS } from "./KeyboardShortcuts";
+import { SHORTCUTS, TOOL_SHORTCUTS } from "./KeyboardShortcuts";
+import { GAME_TOOLS } from "./Navigation";
 import { keyMap } from "../Compositor";
 
 /**
@@ -53,6 +54,20 @@ describe("the keyboard shortcuts", () => {
     expect(keyMap.ULTRA).toEqual("4");
     expect(bound.has("shift+1")).toBe(true);
     expect(bound.has("shift+9")).toBe(true);
+  });
+
+  it("maps Q, W, E and R to the action bar's tools in its order", () => {
+    expect(GAME_TOOLS.map((tool) => TOOL_SHORTCUTS[tool.id])).toEqual([
+      "Q",
+      "W",
+      "E",
+      "R",
+    ]);
+    GAME_TOOLS.forEach((tool) => {
+      expect(keyMap[`TOOL_${tool.id}` as keyof typeof keyMap]).toBe(
+        TOOL_SHORTCUTS[tool.id].toLowerCase(),
+      );
+    });
   });
 
   it("gives the desktop-only actions keys of their own", () => {

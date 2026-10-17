@@ -69,23 +69,9 @@
     outline-offset: 2px;
   }
 
-  &.selected {
-    background: var(--bg-selected);
-    border-color: var(--interactive-strong);
-  }
-
-  &.warning {
-    border-inline-start: 4px solid var(--warning-icon);
-  }
-
-  &.danger,
   &.status-failed {
     border-inline-start: 4px solid var(--blackout-red);
   }
-}
-
-.operationsPriorities .operationsRow + .operationsRow {
-  margin-top: 8px;
 }
 
 .operationsRowTitle {
@@ -111,8 +97,7 @@
 
 .operationsGoalTarget,
 .operationsEmpty,
-.operationsMeta,
-.operationsAssetId {
+.operationsMeta {
   color: var(--font-color-faded);
   font-size: var(--font-size-caption);
 }
@@ -121,30 +106,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-
-  > svg {
-    width: 14px;
-    height: 14px;
-  }
-}
-
-.operationsAssetId {
-  margin-inline-start: auto;
-  white-space: nowrap;
-}
-
-.operationsDecisionTrail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-caption);
-
-  > svg {
-    width: 14px;
-    height: 14px;
-    color: var(--font-color-faded);
-  }
 }
 
 .operationsPinCheck {

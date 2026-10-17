@@ -27,6 +27,8 @@ import {
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import GameWorkspace from "./base/GameWorkspace";
+import { GAME_TOOLS, GameTool } from "./base/Navigation";
+import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
@@ -142,9 +144,12 @@ export const keyMap = {
   NORMAL: "2",
   FAST: "3",
   ULTRA: "4",
-  FACILITIES: "q",
-  INSIGHTS: ["w", "e"],
-  EVENTS: "r",
+  ...Object.fromEntries(
+    GAME_TOOLS.map((tool) => [
+      `TOOL_${tool.id}`,
+      TOOL_SHORTCUTS[tool.id].toLowerCase(),
+    ]),
+  ),
   BUILD_GENERATOR: "g",
   BUILD_STORAGE: "s",
   PRIORITIZE_EARLIER: "[",
@@ -219,6 +224,21 @@ function reprioritizeSelected(delta: number) {
   store.dispatch(reprioritizeFacility({ spotInList, delta }));
 }
 
+// A tool key does exactly what its action bar button does -- open the tool, or close it when it
+// is already showing -- so it presses that button. One missing or hidden (Build in a replay, or
+// a tutorial that hasn't introduced the bar yet) has no key either.
+function toggleTool(tool: GameTool) {
+  const { card, game } = store.getState();
+  if (!game.inGame || !isGameCard(card.name)) {
+    return;
+  }
+  const trigger = GAME_TOOLS.find((item) => item.id === tool)!.triggerId;
+  const button = document.getElementById(trigger);
+  if (button && button.getClientRects().length > 0) {
+    button.click();
+  }
+}
+
 // A shortcut must not reach a control the tutorial is still keeping hidden: a new player who
 // presses space on Mission 1's first step would otherwise start a clock they haven't met yet
 function uiHidden(id: TutorialUiIdType): boolean {
@@ -257,21 +277,16 @@ const shortcutHandlers = {
       store.dispatch(setSpeed("ULTRA"));
     }
   },
-  FACILITIES: () => {
-    if (!uiHidden("nav")) {
-      store.dispatch(navigate("FACILITIES"));
-    }
-  },
-  INSIGHTS: () => {
-    if (!uiHidden("nav")) {
-      store.dispatch(navigate("INSIGHTS"));
-    }
-  },
-  EVENTS: () => {
-    if (!uiHidden("nav")) {
-      store.dispatch(navigate("EVENTS"));
-    }
-  },
+  ...Object.fromEntries(
+    GAME_TOOLS.map((tool) => [
+      `TOOL_${tool.id}`,
+      () => {
+        if (!uiHidden(tool.id === "BUILD_GENERATORS" ? "build" : "nav")) {
+          toggleTool(tool.id);
+        }
+      },
+    ]),
+  ),
   BUILD_GENERATOR: () => {
     if (canPlay() && !uiHidden("build")) {
       store.dispatch(

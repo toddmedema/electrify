@@ -174,7 +174,10 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         target: "#chartSupplyDemand",
         hideUi: MISSION_ONE_FIRST_LOOK,
-        action: "Find the supply and demand lines",
+        // Every Mission 1 step moves on from a tap on the thing it teaches; reading the chart
+        // is the deed here, so touching it (which also shows that moment's readings) continues.
+        continueOnClick: "#chartSupplyDemand",
+        action: "Tap the supply and demand chart",
         content: (
           <TutorialPrompt text="Weather-driven shows solar output; On-demand shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),

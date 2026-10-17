@@ -31,6 +31,9 @@ async function settleSheets(page: Page) {
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
   page,
 }) => {
+  // One tool at a time: switching tools hides the other instead of opening beside it.
+  if (page.viewportSize()!.width >= 1200)
+    await page.setViewportSize({ width: 1100, height: 800 });
   await startGame(page, "dark");
   const build = page.getByRole("region", { name: "Build", exact: true });
   await page.locator("#insightsNav").click();
@@ -168,10 +171,11 @@ test("Insights and Events reopen at the scroll position the player left", async 
 });
 
 async function expectFloatingDock(page: Page) {
-  const [stage, facilities, dock] = await Promise.all([
+  const [stage, facilities, dock, fleet] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
     page.locator(".gameStage .facilities").boundingBox(),
     page.locator("#navfooter").boundingBox(),
+    page.locator(".gameFleet").boundingBox(),
   ]);
   // The dock overlays the full-height fleet instead of reserving a blank footer band.
   expect(
@@ -179,14 +183,16 @@ async function expectFloatingDock(page: Page) {
   ).toBeLessThanOrEqual(1);
   expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
   expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
+  // Centered over the fleet, so side tools never sit under it.
   expect(
-    Math.abs(dock!.x + dock!.width / 2 - page.viewportSize()!.width / 2),
+    Math.abs(dock!.x + dock!.width / 2 - fleet!.x - fleet!.width / 2),
   ).toBeLessThanOrEqual(1);
 }
 
 async function expectSideRails(page: Page) {
   const fleet = (await page.locator(".gameFleet").boundingBox())!;
-  expect(fleet.width).toBeGreaterThanOrEqual(720);
+  // However many tools are open, the fleet keeps at least the widest phone's width.
+  expect(fleet.width).toBeGreaterThanOrEqual(430);
   const panels = await page
     .locator(".gameToolPanel:visible")
     .evaluateAll((elements) =>
@@ -347,14 +353,15 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
   await expect(status).toHaveCSS("border-right-width", "0px");
 
   if (!testInfo.project.use.hasTouch) {
+    // Pointer and keyboard users see each tool's shortcut key.
     await page.locator("#buildNav").hover();
     await expect(
-      page.getByRole("tooltip", { name: "Build", exact: true }),
+      page.getByRole("tooltip", { name: "Build (Q)", exact: true }),
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await page.locator("#programsNav").focus();
     await expect(
-      page.getByRole("tooltip", { name: "Programs", exact: true }),
+      page.getByRole("tooltip", { name: "Programs (W)", exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
@@ -480,7 +487,12 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await page.locator(".button-buildFacility").click();
   const build = page.getByRole("region", { name: "Build", exact: true });
   await expect(build).toBeVisible();
-  await expect(programs).toHaveCount(0);
+  // A sheet shows one tool at a time; side columns keep Programs open beside Build.
+  if (
+    (await page.locator(".gameStage").getAttribute("data-layout")) === "sheet"
+  )
+    await expect(programs).toHaveCount(0);
+  else await expect(programs).toBeVisible();
   const storageTab = page.getByRole("tab", { name: "Storage", exact: true });
   await storageTab.click();
   await expect(storageTab).toBeFocused();
@@ -497,7 +509,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
 });
 
-test("desktop side panels keep the dock centered and remember both rails across compact layouts", async ({
+test("wide screens keep several tools beside the fleet and remember them across compact layouts", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -506,13 +518,8 @@ test("desktop side panels keep the dock centered and remember both rails across 
   );
   await page.setViewportSize({ width: 2240, height: 1100 });
   await startGame(page, "light");
-  const originalDock = (await page.locator("#navfooter").boundingBox())!;
   await page.locator("#buildNav").click();
   await expectFloatingDock(page);
-  expect((await page.locator("#navfooter").boundingBox())!.x).toBeCloseTo(
-    originalDock.x,
-    0,
-  );
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
   await expect
@@ -535,32 +542,27 @@ test("desktop side panels keep the dock centered and remember both rails across 
   await settleSheets(page);
   await expect(page.locator(".gameStage")).toHaveAttribute(
     "data-layout",
-    "dual",
+    "side",
   );
   await expectSideRails(page);
   await expect(
     page.locator(".gameToolHeader").getByRole("tablist"),
   ).toHaveCount(0);
+  // Three tools fit beside a phone-width fleet at this width.
   await page.locator("#programsNav").click();
-  await expect(
-    page.getByRole("region", { name: "Programs", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Build", exact: true }),
-  ).toHaveCount(0);
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+  for (const name of ["Build", "Programs", "Insights"])
+    await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
+  // A fourth doesn't, so the least recently opened tool steps aside.
   await page.locator("#eventsNav").click();
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Insights", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
-  await expectFloatingDock(page);
-  expect((await page.locator("#navfooter").boundingBox())!.x).toBeCloseTo(
-    originalDock.x,
-    0,
-  );
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toBeHidden();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+  await expectSideRails(page);
   await expect(
     page.getByRole("button", { name: /^(?:Unpin|Pin) /i }),
   ).toHaveCount(0);
@@ -581,13 +583,10 @@ test("desktop side panels keep the dock centered and remember both rails across 
   await expect(
     page.getByRole("region", { name: "Programs", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("tablist", { name: "Decisions", exact: true }),
-  ).toHaveCount(0);
   await expect(rate).toBeFocused();
   await expect(rate).toHaveValue(value);
   await page.setViewportSize({ width: 2240, height: 1100 });
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();

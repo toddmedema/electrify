@@ -77,6 +77,7 @@
   --focus-ring: var(--interactive-blue);
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
+  --blackout-glow: rgba(229, 57, 53, 0.7);
   // The two directions a number can move in. Both are the darker end of their ramp so they
   // clear 4.5:1 on the page as text, since the arrow beside them is decoration rather than the
   // message -- red/green alone would leave a colourblind reader with only the arrow
@@ -135,6 +136,7 @@
   --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 45%, transparent);
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
+  --blackout-glow: rgba(244, 67, 54, 0.75);
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
   --warning-fill: #6d4c00; /* text 6.6:1 */
@@ -348,17 +350,6 @@ button,
 .keyboardMenu :is(.settingsRow, .settingsKeyboardRow):focus-within {
   background: var(--bg-raised);
   box-shadow: inset 3px 0 var(--interactive-blue);
-}
-.menuKeyHint {
-  margin: 8px 0;
-  text-align: center;
-  color: var(--font-color-faded);
-  font-size: var(--font-size-caption-sm);
-}
-@media (pointer: coarse) {
-  .menuKeyHint {
-    display: none;
-  }
 }
 
 // Anything wider than a phone gets the whole window: the frame's width cap - and the side
@@ -2304,7 +2295,7 @@ $pane_header_height: 48px;
   // blackout signal rather than freeze it - pin it to the shade the pulse peaks at instead
   .blackout-pulsing:before {
     animation: none;
-    background-color: var(--blackout-tint);
+    opacity: 1;
   }
 }
 
@@ -2463,19 +2454,21 @@ $pane_header_height: 48px;
   z-index: 1;
 }
 
+// A warning light washing down from the top edge: brightest at the top, gone by the toolbar's
+// own bottom edge so it never bleeds into the status row below. Isolated so the wash paints over
+// the bar's own background (in either theme) but stays under its text and controls.
 .blackout-pulsing {
+  isolation: isolate;
+
   &:before {
     content: "";
-    animation-name: pulsered;
-    animation-duration: 2s;
-    animation-iteration-count: infinite;
-    animation-timing-function: ease-in-out;
     position: absolute;
-    top: 0;
-    bottom: -4px;
-    left: 0;
-    right: 0;
+    inset: 0;
     z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--blackout-glow), transparent);
+    opacity: 0;
+    animation: pulsered 2s ease-in-out infinite;
   }
 }
 
@@ -5163,14 +5156,12 @@ $homeSmokeCycle: 5.6s;
 }
 
 @keyframes pulsered {
-  0% {
-    background-color: transparent;
+  0%,
+  100% {
+    opacity: 0;
   }
   50% {
-    background-color: var(--blackout-tint);
-  }
-  100% {
-    background-color: transparent;
+    opacity: 1;
   }
 }
 

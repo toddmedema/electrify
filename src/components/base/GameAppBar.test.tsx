@@ -237,6 +237,33 @@ describe("GameAppBar", () => {
     });
   });
 
+  it("reports a shortfall later today instead of a reassuring reserve", () => {
+    const game = createGame({ scenarioId: 101 });
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    now.supplyW = now.demandW;
+    now.reserveW = now.demandW * 0.5;
+    const later = game.timeline.find((tick) => tick.minute > now.minute)!;
+    later.demandW = later.supplyW + 120_000_000;
+    expect(getGridHealth(game, now)).toMatchObject({
+      state: "blackout-ahead",
+      label: "Blackout ahead",
+      metric: expect.stringMatching(/^120MW short at \d+ [AP]M$/),
+    });
+    // A blackout happening now still outranks the one expected later.
+    expect(
+      getGridHealth(game, {
+        ...now,
+        supplyW: now.demandW - 1_000_000,
+      } as TickPresentFutureType).state,
+    ).toBe("blackout");
+    renderAppBar({ game: { ...game, inGame: true } });
+    const readout = screen.getByLabelText(
+      /Current grid status: Blackout ahead, 120MW short at/,
+    );
+    expect(readout).toHaveClass("statusWarning");
+    expect(screen.queryByText(/^Stable/)).toBeNull();
+  });
+
   it("shows active events in the mission row and opens Events", () => {
     const onEvidence = jest.fn();
     renderAppBar({

@@ -2,34 +2,17 @@ import * as React from "react";
 import { Button, IconButton, Menu, MenuItem } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import {
-  EvidenceTargetType,
-  FacilityOperatingType,
-  GameType,
-} from "../../Types";
-import { currentTick } from "../../helpers/GameSelectors";
-import {
-  getMissionStatus,
-  projectedShortfall,
-} from "../../helpers/MissionStatus";
-import { formatWatts } from "../../helpers/Format";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { EvidenceTargetType, GameType } from "../../Types";
+import { getMissionStatus } from "../../helpers/MissionStatus";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
-import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 import ConceptIcon from "../base/ConceptIcon";
-import { getGridHealth } from "../base/GameAppBar";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import "./OperationsPriorities.scss";
 
 interface Props {
   game: GameType;
-  ongoing: UpcomingStoryEventType[];
   upcoming: UpcomingStoryEventType[];
-  selectedFacilityId?: number | null;
-  riskNotice?: WildfireRiskNoticeType;
   onEvidence: (target: EvidenceTargetType) => void;
-  onFacility: (id: number) => void;
 }
 
 const GOAL_STATUS = {
@@ -47,36 +30,17 @@ export function goalEvidence(id: string): EvidenceTargetType {
   return "mission-details";
 }
 
-/** Keep project order tied to asset identity, never to changing time remaining or output. */
-export function operationsProjects(game: GameType): FacilityOperatingType[] {
-  return game.facilities
-    .filter(
-      (facility) =>
-        facility.yearsToBuildLeft > 0 ||
-        (facility.minuteOperational !== undefined &&
-          facility.minuteOperational > 0 &&
-          facility.minuteOperational <= game.date.minute &&
-          game.date.minute - facility.minuteOperational < MINUTES_PER_MONTH),
-    )
-    .slice()
-    .sort((a, b) => a.id - b.id);
-}
-
 /**
- * An overview of decisions still in play. It reads the game's existing requirements, sampled
- * day and authored announcements; it never generates another economic forecast.
+ * An overview of decisions still in play. It reads the game's existing requirements and authored
+ * announcements; it never generates another economic forecast. The grid's current state lives in
+ * the top bar's status readout, so it is not repeated here.
  */
 export default function OperationsPriorities({
   game,
-  ongoing,
   upcoming,
-  selectedFacilityId,
-  riskNotice,
   onEvidence,
-  onFacility,
 }: Props) {
   const mission = getMissionStatus(game);
-  const now = currentTick(game);
   const preferenceKey = `operationsGoals:${game.scenarioId}`;
   const [pinned, setPinned] = React.useState<string[]>(() => {
     const initial = Array.from(
@@ -99,17 +63,6 @@ export default function OperationsPriorities({
   }, [preferenceKey, pinned]);
   const [goalAnchor, setGoalAnchor] = React.useState<HTMLElement | null>(null);
   const [heldNext, setHeldNext] = React.useState<UpcomingStoryEventType>();
-  const [heldProjects, setHeldProjects] =
-    React.useState<FacilityOperatingType[]>();
-  const pointerInProjects = React.useRef(false);
-  const currentProjects = operationsProjects(game);
-  // Hold identities during an interaction, while reading each asset's newest operating state.
-  // An expired outcome cannot slide the next asset under a stationary pointer or keyboard focus.
-  const projects = heldProjects || currentProjects;
-  // These slots are deliberately separate: a new incident cannot replace a pinned goal.
-  const health = now ? getGridHealth(game, now) : undefined;
-  const shortfall = projectedShortfall(game.timeline, game.date.minute);
-  const warning = health && health.state !== "stable";
   // A month rollover must not change the destination under a pointer or keyboard focus.
   const next = heldNext || upcoming[0];
 
@@ -201,74 +154,6 @@ export default function OperationsPriorities({
       </section>
 
       <section
-        aria-labelledby="operationsNowTitle"
-        className="operationsSection"
-      >
-        <header className="operationsSectionHeader">
-          <h3 id="operationsNowTitle">Right now</h3>
-        </header>
-        <Button
-          color="inherit"
-          className={`operationsRow operationsGrid${warning ? " warning" : ""}${health?.state === "blackout" ? " danger" : ""}`}
-          onClick={() => onEvidence("supply-demand")}
-        >
-          <span className="operationsRowTitle">
-            <ConceptIcon
-              concept={warning ? "danger" : "supply"}
-              fontSize="small"
-            />
-            <strong>{health?.label || "Grid status unavailable"}</strong>
-          </span>
-          <span className="operationsDetail">
-            {health?.metric || "No operating sample"}
-          </span>
-          <span className="operationsMeta">
-            Inspect supply & demand <ArrowForwardIcon />
-          </span>
-        </Button>
-        {shortfall && health?.state !== "blackout" && (
-          <Button
-            color="inherit"
-            className="operationsRow warning"
-            onClick={() => onEvidence("supply-demand")}
-          >
-            <strong>Shortfall in the sampled day</strong>
-            <span className="operationsDetail">
-              Check the demand peak before advancing time.
-            </span>
-          </Button>
-        )}
-        {ongoing.map((event) => (
-          <Button
-            color="inherit"
-            key={event.key}
-            className="operationsRow operationsIncident"
-            onClick={() => onEvidence(event.actionTarget || { card: "EVENTS" })}
-          >
-            <span className="operationsRowTitle">
-              <ConceptIcon
-                concept={event.concept || "forecast"}
-                fontSize="small"
-              />
-              <strong>{event.title || "Active event"}</strong>
-            </span>
-            <span className="operationsDetail">{event.message}</span>
-            <span className="operationsMeta">{event.label}</span>
-          </Button>
-        ))}
-        {riskNotice && (
-          <Button
-            color="inherit"
-            className="operationsRow warning"
-            onClick={() => onEvidence({ card: "FACILITIES", view: "FLEET" })}
-          >
-            <strong>{riskNotice.title}</strong>
-            <span className="operationsDetail">{riskNotice.message}</span>
-          </Button>
-        )}
-      </section>
-
-      <section
         aria-labelledby="operationsNextTitle"
         className="operationsSection"
       >
@@ -303,93 +188,6 @@ export default function OperationsPriorities({
           </Button>
         ) : (
           <p className="operationsEmpty">No announced events ahead.</p>
-        )}
-      </section>
-
-      <section
-        aria-labelledby="operationsProjectsTitle"
-        className="operationsSection"
-        onPointerEnter={() => {
-          pointerInProjects.current = true;
-          setHeldProjects((held) => held || currentProjects);
-        }}
-        onPointerLeave={(event) => {
-          pointerInProjects.current = false;
-          if (!event.currentTarget.contains(document.activeElement))
-            setHeldProjects(undefined);
-        }}
-        onFocusCapture={() =>
-          setHeldProjects((held) => held || currentProjects)
-        }
-        onBlurCapture={(event) => {
-          if (
-            !pointerInProjects.current &&
-            !event.currentTarget.contains(event.relatedTarget)
-          )
-            setHeldProjects(undefined);
-        }}
-      >
-        <header className="operationsSectionHeader">
-          <h3 id="operationsProjectsTitle">Projects & outcomes</h3>
-        </header>
-        {projects.map((project) => {
-          const live = game.facilities.find(
-            (facility) => facility.id === project.id,
-          );
-          const facility = live || project;
-          const building = facility.yearsToBuildLeft > 0;
-          return (
-            <Button
-              color="inherit"
-              key={facility.id}
-              disabled={!live}
-              className={`operationsRow operationsProject${selectedFacilityId === facility.id ? " selected" : ""}`}
-              aria-pressed={selectedFacilityId === facility.id}
-              onClick={() => onFacility(facility.id)}
-              aria-label={`Inspect ${facility.name} project and grid output`}
-              aria-describedby={`operationsProject${facility.id}Outcome`}
-            >
-              <span className="operationsRowTitle">
-                <ConceptIcon
-                  concept={building ? "construction" : "supply"}
-                  fontSize="small"
-                />
-                <strong>{facility.name}</strong>
-                <span className="operationsAssetId">#{facility.id}</span>
-              </span>
-              <span
-                className="operationsDecisionTrail"
-                id={`operationsProject${facility.id}Outcome`}
-              >
-                <span>Committed</span>
-                <ArrowForwardIcon />
-                <span>
-                  {!live
-                    ? "Removed from fleet"
-                    : building
-                      ? `${Math.ceil(facility.yearsToBuildLeft * 12)} mo to online`
-                      : "Online"}
-                </span>
-                <ArrowForwardIcon />
-                <span>
-                  {!live
-                    ? "Output unavailable"
-                    : building
-                      ? "No output yet"
-                      : `${formatWatts(facility.currentW)} now`}
-                </span>
-              </span>
-              <span className="operationsMeta">
-                {formatWatts(facility.peakW)} capacity · Inspect asset & grid{" "}
-                <ArrowForwardIcon />
-              </span>
-            </Button>
-          );
-        })}
-        {projects.length === 0 && (
-          <p className="operationsEmpty">
-            New projects stay here through their first operating month.
-          </p>
         )}
       </section>
     </div>

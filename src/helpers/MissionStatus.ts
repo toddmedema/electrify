@@ -239,7 +239,10 @@ const scanCache = new WeakMap<
   TickPresentFutureType[],
   { minute: number; result: TickPresentFutureType | undefined }
 >();
-/** Scan the existing operating sample only; no long-range forecast generation. */
+/**
+ * The first tick later in this month's operating sample where supply falls short of demand.
+ * Scans the existing sample only; no long-range forecast generation.
+ */
 export function projectedShortfall(
   timeline: TickPresentFutureType[],
   minute: number,
@@ -323,15 +326,8 @@ export function selectMissionRisk(
       shortLabel: "Reliability missed",
       target: "mission-details",
     };
-  // A shortage in today's operating sample needs action before a future cash deficit.
-  const projected = projectedShortfall(game.timeline, game.date.minute);
-  if (projected)
-    return {
-      id: `projection:${game.date.year}:${game.date.monthNumber}`,
-      label: "Shortfall expected later today · View supply and demand",
-      shortLabel: "Projected shortfall",
-      target: "supply-demand",
-    };
+  // A shortage later in today's operating sample is reported by the grid readout beside this
+  // (see getGridHealth), the same way a shortage happening now is.
   const runway = cashRunwayMonths(game);
   if (runway !== undefined) {
     const months = Math.max(1, Math.round(runway));

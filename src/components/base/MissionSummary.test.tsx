@@ -6,7 +6,6 @@ import MissionSummary from "./MissionSummary";
 
 const mockSelectProjection = jest.fn();
 const mockSelectMissionRisk = jest.fn();
-const mockProjectedShortfall = jest.fn();
 const mockRequirements: { id: string; status: string }[] = [];
 jest.mock("../../helpers/Projection", () => ({
   projectionSignature: (game: GameType) => `month ${game.date.monthsElapsed}`,
@@ -18,7 +17,6 @@ jest.mock("../../helpers/MissionStatus", () => ({
     monthsRemaining: 12,
     requirements: mockRequirements,
   }),
-  projectedShortfall: (...args: unknown[]) => mockProjectedShortfall(...args),
   selectMissionRisk: (...args: unknown[]) => mockSelectMissionRisk(...args),
 }));
 
@@ -57,7 +55,6 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockSelectProjection.mockReset();
   mockSelectMissionRisk.mockReset();
-  mockProjectedShortfall.mockReset();
   mockRequirements.length = 0;
 });
 afterEach(() => jest.useRealTimers());
@@ -162,21 +159,6 @@ function steadyState(risk: MissionRisk) {
 }
 
 describe("an early risk that appears on the rollover frame replaces the kept one at once", () => {
-  it("a shortfall expected later today", () => {
-    const view = steadyState(event);
-    expect(screen.getByText("Upcoming: Winter freeze")).toBeTruthy();
-    mockProjectedShortfall.mockReturnValue({ minute: 5 });
-    mockSelectMissionRisk.mockReturnValue({
-      id: "projection:2006:2",
-      label: "Shortfall expected later today",
-      shortLabel: "Projected shortfall",
-      target: "supply-demand",
-    });
-    view.rerender(summary(makeGame(2)));
-    expect(screen.getByText("Projected shortfall")).toBeTruthy();
-    expect(mockSelectMissionRisk).toHaveBeenCalledTimes(1);
-  });
-
   it("negative cash now", () => {
     const view = steadyState(runway(4));
     mockSelectMissionRisk.mockReturnValue({

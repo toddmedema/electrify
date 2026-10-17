@@ -30,19 +30,6 @@ async function waitForSave(page: Page) {
   await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
 }
 
-// Brings the end of the fleet list into view. On a phone the whole Facilities body scrolls, so
-// that takes the supply chart off screen and a later request has to bring it back. A tall desktop
-// pane pins the chart above a list that scrolls on its own, so the chart must stay put there.
-// Asserted either way: a request to bring back a chart that never left would prove nothing.
-async function scrollChartAway(page: Page, chartPinned: boolean) {
-  await page
-    .locator(".unifiedFacilitiesList:visible [data-rfd-draggable-id]")
-    .last()
-    .scrollIntoViewIfNeeded();
-  const chart = expect(page.locator("#chartSupplyDemand"));
-  await (chartPinned ? chart.toBeInViewport() : chart.not.toBeInViewport());
-}
-
 async function range(page: Page) {
   return page
     .locator(".insights:visible .accessibleChart [role=img]")
@@ -343,7 +330,6 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   test.skip(
     !new Set(["desktop-chromium", "mobile-390px"]).has(info.project.name),
   );
-  const chartPinned = info.project.name === "desktop-chromium";
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
@@ -360,23 +346,15 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
-  await expect(page.locator(".missionRiskButton:visible")).toContainText(
-    "Projected shortfall",
+  // A shortfall later in the sampled day replaces the reassuring reserve reading.
+  await expect(page.locator(".gridHealth:visible")).toContainText(
+    "Blackout ahead",
   );
-  await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
-    /Shortfall expected later today/,
+  await expect(page.locator(".gridHealth:visible")).toHaveClass(
+    /statusWarning/,
   );
-  await scrollChartAway(page, chartPinned);
-  await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator("#chartSupplyDemand")).toBeVisible();
-  await expect(page.locator(".operatingEvidence")).toBeFocused();
-  // Scroll the chart away so the second request has to bring it back
-  await scrollChartAway(page, chartPinned);
-  await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator(".operatingEvidence")).toBeFocused();
-  await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
-  await expect(page.locator(".operatingEvidence")).toHaveAccessibleName(
-    "Supply and demand",
+  await expect(page.locator(".missionRiskButton:visible")).not.toContainText(
+    /shortfall/i,
   );
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
