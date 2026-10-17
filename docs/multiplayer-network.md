@@ -69,15 +69,48 @@ retries receive acknowledgements, and reconnects force a baseline. Worker/sessio
 cover keepalives and authenticated membership; browser journeys cover more than five seconds
 paused without a false warning and recovery after a deliberately interrupted host stream.
 
+## Acknowledged checkpoint reuse
+
+The host still persists every requested checkpoint. It now skips sending an identical checkpoint
+to a connected peer only after that peer has acknowledged successfully writing that exact digest.
+The proof belongs to the connection: a reconnect needs a complete copy, changed contents invalidate
+the old proof, and an unacknowledged or failed send is retried on the next checkpoint. Only a receipt
+for the current checkpoint queued on that connection counts. Repeated local saves do not advance
+the displayed remote confirmation time without a new receipt. No delta format is introduced.
+
+The native persistence guard now accepts the current world schema, version 2. Real filesystem tests
+cover host and guest writes, overlapping checkpoints, failed guest writes and subsequent retry.
+The bandwidth benchmark calls the native checkpoint, send and receive methods, then chunks and
+reassembles the actual compressed payloads. It checks initial copies, unacknowledged retries, zero
+bytes for acknowledged repeats, and a full copy after one peer reconnects. Disk writes are counted
+but stubbed in that wire benchmark; filesystem behavior is tested separately. Its
+`acknowledgedPausedWireBytesPerSecond` field compares successful complete-checkpoint transmission
+with acknowledged reuse. The previous native schema-1 guard rejected schema-2 worlds, so the
+comparison models the intended complete-checkpoint policy; it is not a claim about observed
+deployed traffic. The older `cadence` fields retain the historical publication-rate comparison.
+
+Windows x64, Node 24.14.0, real initialized worlds at months 0 and 48, decimal KB/s. These steady
+paused rates include the existing 1 Hz keepalive after each guest has confirmed its copy; they
+exclude initial copies, reconnects, changed contents and incoming guest traffic.
+
+| Players | Month | Complete-checkpoint policy | Acknowledged reuse | Reduction |
+| ------: | ----: | -------------------------: | -----------------: | --------: |
+|       2 |     0 |                 4.555 KB/s |         0.122 KB/s |     97.3% |
+|       2 |    48 |                10.433 KB/s |         0.125 KB/s |     98.8% |
+|       4 |     0 |                26.253 KB/s |         0.366 KB/s |     98.6% |
+|       4 |    48 |                61.498 KB/s |         0.375 KB/s |     99.4% |
+
+Running-state complete-view payloads and changed-checkpoint traffic are unchanged by this step.
+
 ## Remaining opportunities
 
 - Completed history, current-month timeline rows and static portfolio/context data still travel
   in every changed view. Versioned blocks could reduce late-match bandwidth further, but require
   explicit per-recipient baselines, schema validation and reconnect recovery tests. Measure that
   separately before adding a delta protocol.
-- Complete checkpoints dominate the remaining paused traffic. Suppressing duplicate checkpoint
-  writes requires acknowledging successful persistence and retaining failed-write/guest retry
-  behavior; merely skipping unchanged worker revisions would lose those guarantees.
+- Changed checkpoints still travel in full. Local checkpoint writes also remain in place, even
+  when all guests have confirmed identical contents, to preserve each explicit save request's
+  persistence and failure reporting.
 - Native send queues coalesce unsent views after encoding. A slow network can therefore still pay
   for encoding a replaced frame. Moving that work behind a bounded queue is a possible later CPU
   improvement if real transport measurements justify it.

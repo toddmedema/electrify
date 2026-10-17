@@ -497,7 +497,7 @@ class SteamMultiplayer {
   async persist(world) {
     if (
       !world ||
-      world.schema !== 1 ||
+      world.schema !== 2 ||
       !Array.isArray(world.seats) ||
       world.seats.length < 2 ||
       world.seats.length > 4 ||
@@ -525,11 +525,17 @@ class SteamMultiplayer {
     // The local save already succeeded. A guest that cannot take this copy receives the next
     // one; that must not turn the host's save, or the desktop quit handshake, into a failure.
     const payload = { kind: "checkpoint", world, digest };
-    const encoded = encode(payload);
+    let encoded;
+    // Only a receipt from this live connection proves the identical file is already there.
+    // Keep writing locally, and retry peers whose last send or disk write never completed.
     for (const c of this.connections.values())
-      if (c.connected)
+      if (c.connected && c.savedDigest !== digest)
         try {
+          encoded ||= encode(payload);
           this.send(c.id, payload, encoded);
+          c.checkpointDigest = digest;
+          // A different queued save can replace the file that the previous receipt proved.
+          c.savedDigest = undefined;
         } catch {
           // Retried by the next periodic checkpoint.
         }
@@ -566,7 +572,16 @@ class SteamMultiplayer {
     ) {
       // A guest can still be acknowledging the previous checkpoint when the next one starts.
       // That acknowledgement is stale, not hostile, so it must not drop the connection.
-      if (payload.digest === this.checkpointHash) {
+      const connection = [...this.connections.values()].find(
+        (c) => c.id === sender && c.connected,
+      );
+      if (
+        connection &&
+        typeof payload.digest === "string" &&
+        payload.digest === this.checkpointHash &&
+        payload.digest === connection.checkpointDigest
+      ) {
+        connection.savedDigest = payload.digest;
         this.sharedAt = this.checkpointAt;
         this.publish();
       }

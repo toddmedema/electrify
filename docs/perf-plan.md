@@ -461,3 +461,115 @@ later growth, so the effective ceiling moves 11.4% for initial JS (885.64 to 986
 12.2% for all JS, more than this feature's own cost. `perf:rebaseline` reconfirms every scenario's unchanged golden output.
 Tick ratios measure 1.367 and 1.036 and pass the existing 1.632/1.315 ceilings; those ceilings
 are retained because simulation economics and headless instrumentation have not changed.
+
+## October 16 follow-up audit
+
+Three focused changes remove repeated work without a new worker, cache invalidation scheme,
+or network delta format. A separate architecture reviewer reviewed both proposals and final code.
+
+- The closed mission dialog no longer computes mission status, scans monthly history or builds
+  score content on every app-bar render. Its content is a child mounted by the existing MUI Dialog
+  lifecycle, including the exit transition. Tests require zero hidden calculations and current
+  content when opening and reopening.
+- Daily demand shapes reuse a fixed 96-row table computed from the original expressions. Exact
+  quarter-hour inputs use the table; other inputs use the original formula without rounding.
+  Offshore and airborne wind-height powers are constants evaluated once. Arithmetic order,
+  simulation inputs and economic rules are unchanged. Exact formula tests cover every daily slot,
+  off-grid inputs and wind-curve boundaries.
+- Multiplayer checkpoints reuse per-connection acknowledgement proof. Confirmed identical saves
+  are not sent again; unconfirmed, changed and reconnected peers still receive full copies. Local
+  persistence remains unconditional. The obsolete native schema-1 guard is corrected to schema 2.
+  See [multiplayer measurements](multiplayer-network.md#acknowledged-checkpoint-reuse) for wire
+  measurements, retry tests and the distinction between policy estimates and deployed traffic.
+
+### Render and simulation measurements
+
+Windows x64, Node 24.14.0, with timing workloads run sequentially. The opt-in React/jsdom profiler
+uses scenario 103 and a genuine 239-month reducer playthrough, 100 warmups and 500 prop updates
+per sample. Both revisions use identical fixtures with the app bar in game. These are React render
+costs, not browser paint, compositor frame times or physical-device guarantees.
+
+| Median React render | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| Closed dialog, fresh | 0.2383 ms | 0.0885 ms | 63% |
+| Closed dialog, 239 months | 0.3661 ms | 0.0370 ms | 90% |
+| Whole app bar, fresh | 0.7337 ms | 0.5390 ms | 27% |
+| Whole app bar, 239 months | 0.9826 ms | 0.6246 ms | 36% |
+
+Reproduce with `npm run test:once -- --testMatch=**/src/testing/UiRenderBench.tsx --runInBand`.
+The unit suite gates eliminated hidden calculations rather than wall-clock timings.
+
+The primary simulation timing evidence is a same-process control using the actual `PerfBench`
+workload: scenario 103, seed 12345, 240 months and the financed battery at month 36. Each version
+and plain/Immer path received a full 240-month warmup. Three subsequent pairs alternated legacy
+and optimized helper exports directly, without spy wrappers or call recording. Every pair
+improved; all 12 measured runs completed 23,040 ticks and produced identical selected-state hashes
+(history, fleet, timeline and commitment metadata, transmission, date and events).
+
+| Paired full-workload metric | Median reduction | Pair range |
+| --- | ---: | ---: |
+| Headless time per simulated year | 7.72% | 6.84–11.08% |
+| Redux/Immer time per simulated year | 7.61% | 3.80–22.84% |
+| Headless median month rollover | 9.15% | 9.12–9.85% |
+| Redux/Immer median month rollover | 8.92% | 7.09–9.31% |
+
+Reductions are medians of paired ratios, not ratios of independently selected medians. This
+temporary control used the standard Jest VM globals (Math, Number, Object, Array, JSON and BigInt),
+while `perf:bench` retains its historical Math-only binding. Compare percentages within the paired
+control, not its absolute times with the benchmark below. Legacy helper copies and the temporary
+harness were removed after verification; the normal benchmark remains the reproducible workload.
+
+The initial separate-process `perf:bench` comparison used the same scenario, seed and 240 months,
+three warmed runs, with the financed battery at month 36. No early termination occurred. These
+are individual local observations; the later baseline refresh measured 201 ms per Redux/Immer
+year and 9.44 ms per month rollover on the same optimized code. That substantial absolute-time
+variation motivated an additional alternating same-process comparison before publishing claims.
+
+| Full simulation metric | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| Headless time per simulated year | 106.07 ms | 98.16 ms | 7.5% |
+| Redux/Immer time per simulated year | 151.87 ms | 136.12 ms | 10.4% |
+| Headless median month rollover | 6.207 ms | 5.316 ms | 14.3% |
+| Redux/Immer median month rollover | 6.584 ms | 5.648 ms | 14.2% |
+| Redux/Immer median ordinary tick | 0.0391 ms | 0.0364 ms | 6.9% |
+
+The initial separate-process benchmark's synchronous forecast measurements also fell: shared twenty-year
+projection 472.49 to 423.07 ms, hydro outlook 130.12 to 56.76 ms, intertie outlook 65.71 to
+32.15 ms, and the build catalog quote 295.51 to 177.10 ms. Most of these forecasts normally run
+in workers; these numbers measure calculation cost, not equivalent main-thread frame savings.
+
+Same-process alternating helper measurements (five warmed pairs) attributed the gains: 11,520
+demand evaluations fell from 33.525 to 20.235 ms, and 100,000 paired wind evaluations fell from
+58.988 to 0.757 ms, with identical result sums. These microbenchmarks explain the optimization;
+the full workload above is the measure of practical simulation benefit. The existing ratio gates
+passed before and after. Worst samples remain sensitive to garbage collection and host scheduling.
+
+### Production browser evidence and validation
+
+All seven production frame journeys passed at 12x on the 390 px phone viewport and 24x on the
+1440 px desktop viewport; the duplicate desktop Insights journey is intentionally skipped.
+Chromium's observed idle cadence was 59.88 Hz. None recorded a long task. Main panes held a
+16.8 ms worst callback gap on both layouts, as did phone hydro. Phone Insights/intertie and
+desktop intertie had isolated or repeated 33.3–33.4 ms gaps; desktop hydro reached 50.1 ms.
+These are final-build samples, not paired evidence of whole-frame improvement. The remaining
+desktop chart stalls and the 120 Hz physical-device target are still unresolved.
+
+The four mission-dialog browser journeys passed on desktop/phone in both themes, including score
+refresh after real gameplay and reopen. Its existing event assertion now scopes to the Events
+pane, accommodating both desktop Operations and the phone's Ongoing events section. Review
+screenshots are attached to the PR rather than committed.
+
+Validation used Node 24 and `npm ci`, formatting, all eight `npm run check` gates, all-scenario
+CLI invariants, the production build and existing bundle gate, and the shipping multiplayer
+codec benchmark. The tooling gate needed a rerun outside the sandbox because its localhost
+server test was denied network access; the other seven gates passed in the integrated run.
+Types and formatting were rechecked after repairing the browser selector. Golden outputs were
+unchanged before rebaselining.
+
+`npm run perf:rebaseline` ran last and left the golden snapshot unchanged. The final measured
+ratios were 1.425 overall and 1.036 at month rollover. The existing 1.632 overall ceiling is
+retained rather than accepting the generator's looser 1.782 suggestion; rollover tightens from
+1.315 to 1.294. The bundle baseline refresh records 903.686 kB initial JS, 1434.521 kB all JS and
+25.038 kB CSS, versus the October 14 baseline's 896.904/1424.972/23.947 kB. That comparison includes
+intervening feature work, not only this patch (which changes no CSS). The previous bundle gate
+passed before the refresh, and its 10% tolerance is unchanged. Browser census ceilings are unchanged.

@@ -1,5 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   SteamMultiplayer,
   DECLARATIONS,
@@ -7,6 +9,7 @@ const {
   encode,
   chunk,
   assemble,
+  stringify,
   lobbyFromArgs,
 } = require("./steam-multiplayer.cjs");
 test("Steam lobby codes preserve the full uint64, including 18-digit invites", () => {
@@ -69,7 +72,7 @@ test("malformed frame lengths and incomplete message floods are rejected before 
   corrupted[20] ^= 1;
   assert.throws(() => assemble(new Map(), corrupted), /checksum/);
 });
-function fixture() {
+function fixture(directory = "unused-test-path") {
   const events = [],
     calls = [];
   const api = {
@@ -109,7 +112,7 @@ function fixture() {
   const mp = new SteamMultiplayer(
     service,
     dispatcher,
-    "unused-test-path",
+    directory,
     (event) => events.push(event),
     api,
     {},
@@ -257,9 +260,149 @@ test("a stale save acknowledgement and a backed-up guest never fail the host's s
     assert.equal(mp.sharedAt, null);
     assert(!events.some((event) => event.kind === "message"));
     await mp.receive("76561198000000002", { kind: "saved", digest: "current" });
+    // A receipt for a checkpoint that never entered this connection's queue proves nothing.
+    assert.equal(mp.sharedAt, null);
+    mp.connections.get(100).queue = [];
+    await mp.checkpoint(world);
+    await mp.receive("76561198000000002", { kind: "saved", digest: "current" });
     assert.equal(mp.sharedAt, mp.checkpointAt);
   } finally {
     mp.dispose();
+  }
+});
+test("unchanged checkpoints skip only connected peers that confirmed their queued copy", async () => {
+  const { mp } = fixture();
+  const first = { id: "76561198000000002", connected: true, queue: [] };
+  const second = { id: "76561198000000003", connected: true, queue: [] };
+  let writes = 0;
+  mp.persist = async (world) => {
+    mp.savedAt = ++writes;
+    return world.digest;
+  };
+  try {
+    mp.connections.set(100, first);
+    mp.connections.set(101, second);
+    const world = { digest: "first" };
+    await mp.checkpoint(world);
+    await mp.receive(first.id, { kind: "saved", digest: "first" });
+    const confirmedAt = mp.sharedAt;
+    first.queue = [];
+    second.queue = [];
+    await mp.checkpoint(world);
+    assert.equal(writes, 2, "host still persists every request");
+    assert.equal(first.queue.length, 0);
+    assert.equal(second.queue.length, 1, "unacknowledged peers retry");
+    assert.equal(mp.sharedAt, confirmedAt, "no invented remote save time");
+
+    first.queue = [];
+    second.queue = [];
+    await mp.checkpoint({ digest: "changed" });
+    assert.equal(first.queue.length, 1);
+    assert.equal(second.queue.length, 1);
+    assert.equal(first.savedDigest, undefined);
+    await mp.receive(first.id, { kind: "saved", digest: "first" });
+    assert.equal(
+      first.savedDigest,
+      undefined,
+      "stale receipt cannot suppress retry",
+    );
+    first.connected = false;
+    await mp.receive(first.id, { kind: "saved", digest: "changed" });
+    assert.equal(
+      first.savedDigest,
+      undefined,
+      "disconnected receipt cannot confirm",
+    );
+    first.connected = true;
+    await mp.receive(first.id, { kind: "saved", digest: "changed" });
+    assert.equal(first.savedDigest, "changed");
+    mp.connections.set(100, { id: first.id, connected: true, queue: [] });
+    await mp.checkpoint({ digest: "changed" });
+    assert.equal(
+      mp.connections.get(100).queue.length,
+      1,
+      "reconnect needs its own copy",
+    );
+
+    const queued = second.queue.length;
+    mp.persist = async () => {
+      throw new Error("disk unavailable");
+    };
+    await assert.rejects(
+      mp.checkpoint({ digest: "changed" }),
+      /disk unavailable/,
+    );
+    assert.equal(
+      second.queue.length,
+      queued,
+      "failed host writes never publish",
+    );
+  } finally {
+    mp.dispose();
+  }
+});
+
+test("schema 2 checkpoints persist real files, including overlapping host saves and guest receipts", async () => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const directory = fs.mkdtempSync(path.join(temporaryRoot, "checkpoint-"));
+  const { mp } = fixture(directory);
+  const guest = { id: "76561198000000002", connected: true, queue: [] };
+  const world = {
+    schema: 2,
+    revision: 1,
+    seats: [{ id: mp.service.identity.steamId }, { id: guest.id }],
+  };
+  try {
+    mp.connections.set(100, guest);
+    await assert.rejects(
+      mp.persist({ ...world, schema: 1 }),
+      /Invalid shared save/,
+    );
+    await Promise.all([
+      mp.checkpoint(world),
+      mp.checkpoint({ ...world, revision: 2 }),
+    ]);
+    assert.equal(JSON.parse(fs.readFileSync(mp.filename, "utf8")).revision, 2);
+    assert.equal(guest.queue.length, 2);
+    const messages = guest.queue.map((message) =>
+      assemble(new Map(), chunk(message)),
+    );
+    assert.deepEqual(
+      messages.map((message) => message.world.revision),
+      [1, 2],
+    );
+    await mp.receive(guest.id, { kind: "saved", digest: messages[0].digest });
+    assert.equal(guest.savedDigest, undefined);
+    await mp.receive(guest.id, { kind: "saved", digest: messages[1].digest });
+    assert.equal(guest.savedDigest, messages[1].digest);
+    guest.queue = [];
+    await mp.checkpoint({ ...world, revision: 2 });
+    assert.equal(guest.queue.length, 0);
+
+    // Exercise the actual guest persistence path, including a failed write and retry.
+    mp.hostId = guest.id;
+    const savedFilename = mp.filename;
+    mp.filename = directory; // Writing a file over this directory must fail.
+    await assert.rejects(mp.receive(guest.id, messages[1]));
+    assert.equal(
+      guest.queue.length,
+      0,
+      "failed persistence is never acknowledged",
+    );
+    mp.filename = savedFilename;
+    await mp.receive(guest.id, messages[1]);
+    assert.equal(
+      fs.readFileSync(mp.filename, "utf8"),
+      stringify(messages[1].world),
+    );
+    assert.deepEqual(assemble(new Map(), chunk(guest.queue[0])), {
+      kind: "saved",
+      digest: messages[1].digest,
+    });
+  } finally {
+    mp.dispose();
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 test("only the host mirrors a bounded scenario selection to its guests", async () => {

@@ -5,7 +5,7 @@ import {
   LocationType,
   ScenarioLoadAdditionType,
 } from "../Types";
-import { DAYS_PER_YEAR } from "../Constants";
+import { DAYS_PER_YEAR, TICK_MINUTES, TICKS_PER_DAY } from "../Constants";
 import { pow } from "../helpers/Pow";
 
 export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
@@ -423,6 +423,27 @@ function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
   }
 }
 
+function calculateHourShapes(minuteOfDay: number): Readonly<DemandByTypeType> {
+  const shapes = {} as DemandByTypeType;
+  DEMAND_TYPES.forEach((type) => {
+    shapes[type] = hourShape(type, minuteOfDay);
+  });
+  return shapes;
+}
+
+// Daily shapes never depend on a run, location or forecast horizon. Compute the fixed tick
+// grid once; arbitrary-minute callers still use the exact formula without snapping time.
+const DAILY_SHAPES = Array.from({ length: TICKS_PER_DAY }, (_, i) =>
+  calculateHourShapes(i * TICK_MINUTES),
+);
+
+function hourShapesAt(minuteOfDay: number): Readonly<DemandByTypeType> {
+  const index = minuteOfDay / TICK_MINUTES;
+  return Number.isInteger(index) && index >= 0 && index < DAILY_SHAPES.length
+    ? DAILY_SHAPES[index]
+    : calculateHourShapes(minuteOfDay);
+}
+
 /**
  * Splits baseline demand into five end uses and applies their local trajectories.
  *
@@ -439,6 +460,7 @@ export function demandByTypeAt(
 ): DemandByTypeType {
   const mix = REGION_MIX[location?.region || ""] || DEFAULT_MIX;
   const growth = growthFor(location);
+  const shapes = hourShapesAt(date.minuteOfDay);
   // An authored absolute schedule describes the whole scenario-specific data-center load. The
   // generic regional curve is removed unless the schedule explicitly adds a marginal campus.
   const hasAuthoredDataCenters = loadAdditions.some(
@@ -469,14 +491,13 @@ export function demandByTypeAt(
     Mining: 0,
   } satisfies Record<DemandTypeNameType, number>;
   const shapedStartingTotal = DEMAND_TYPES.reduce(
-    (sum, type) =>
-      sum + startingWeights[type] * hourShape(type, date.minuteOfDay),
+    (sum, type) => sum + startingWeights[type] * shapes[type],
     0,
   );
 
   const result = {} as DemandByTypeType;
   DEMAND_TYPES.forEach((type) => {
-    const shape = hourShape(type, date.minuteOfDay);
+    const shape = shapes[type];
     if (type === "Data Centers") {
       // When a game begins before 2000 there is no starting component to grow, so introduce the
       // later load directly. Otherwise scale the opening component along the measured curve.
