@@ -10,6 +10,7 @@ files are large, so broad rewrites create expensive review diffs.
   changes; reuse that install across turns while it still matches the lockfile.
 - In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
   Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
+  For missing files, stage intentional deletions or renames; otherwise restore the files.
 - Run `npm run check` once on the integrated code before handing work off. Allow several minutes,
   depending on machine load. It runs the same gates as CI:
   types (including `e2e/`), lint, formatting, the covered Jest suite, the long simulation suites
@@ -20,11 +21,13 @@ files are large, so broad rewrites create expensive review diffs.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
   `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
   remain unchanged. A test-query lint fix does not require repeating successful simulations;
-  changes to simulation inputs do. A partial check is never evidence that all gates ran.
+  changes to simulation inputs do. The runner does not track invalidation; rerun the full check
+  if unsure. A partial check is never evidence that all gates ran.
 - For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
   and simulations are unnecessary. Changes to scripts, configuration or executable examples
   need the relevant checks. Do not run the full game suite just to save a proposal.
-- Local checks default to at most four Jest workers and keep heavy suites serial. Override with
+- Local checks default to at most four Jest workers to limit shared-machine contention, and keep
+  heavy suites serial. The simulation CLI runs its single suite in process. Override the cap with
   `ELECTRIFY_CHECK_WORKERS` only for a measured need. Avoid overlapping full checks, production
   builds and broad browser suites on the same machine. When using subagents, give them focused
   checks and let the integrating agent own the final full check.

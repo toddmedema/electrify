@@ -132,6 +132,9 @@ async function main(argv = process.argv.slice(2)) {
   );
   if (failed.length) {
     console.error(
+      "This retry covers only failed gates. Also rerun any passing gates whose inputs changed during the repair; use npm run check if unsure.",
+    );
+    console.error(
       `After fixing these failures, rerun: npm run check -- --steps ${failed.map((step) => step.id).join(",")}`,
     );
     process.exitCode = 1;

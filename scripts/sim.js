@@ -136,6 +136,9 @@ const result = spawnSync(
     }),
     "test",
     "--watchAll=false",
+    // The CLI runs one suite; avoid worker startup and the shared OS temporary cache.
+    "--runInBand",
+    "--cacheDirectory=.tmp/jest-sim-cli",
     "--testMatch",
     "**/src/testing/SimCli.tsx",
   ],

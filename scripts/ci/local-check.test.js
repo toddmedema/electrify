@@ -111,7 +111,50 @@ test("asset preflight rejects pointers and missing tracked files, ignoring untra
   );
   checkAssets(root);
   fs.unlinkSync(asset);
-  assert.throws(() => checkAssets(root), /missing[\s\S]*public\/sound.wav/);
+  assert.throws(
+    () => checkAssets(root),
+    (error) => {
+      assert.match(
+        error.message,
+        /Missing tracked files[\s\S]*public\/sound.wav/,
+      );
+      assert.match(error.message, /intentional[\s\S]*git add -u/);
+      assert.doesNotMatch(error.message, /git lfs (pull|checkout)/);
+      return true;
+    },
+  );
+  git("add", "-u");
+  checkAssets(root);
+});
+
+test("the simulation CLI uses an in-process Jest run and a worktree-local cache", () => {
+  // Ask the CLI's actual Jest invocation for its resolved config, without running a simulation.
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `const cp = require('node:child_process');
+       const spawn = cp.spawnSync;
+       cp.spawnSync = (command, args, options) => {
+         const result = spawn(command, [...args, '--showConfig'], {
+           ...options, stdio: 'pipe', encoding: 'utf8'
+         });
+         process.stdout.write(result.stdout || '');
+         process.stderr.write(result.stderr || '');
+         return result;
+       };
+       require('./scripts/sim');`,
+    ],
+    { encoding: "utf8", windowsHide: true },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const config = JSON.parse(result.stdout);
+  assert.equal(config.globalConfig.maxWorkers, 1);
+  assert.equal(
+    path.resolve(config.configs[0].cacheDirectory),
+    path.resolve(".tmp/jest-sim-cli"),
+  );
+  assert.deepEqual(config.configs[0].testMatch, ["**/src/testing/SimCli.tsx"]);
 });
 
 test("the CLI returns failure, finishes other selected gates, and prints an exact partial retry", (t) => {
@@ -144,5 +187,9 @@ test("the CLI returns failure, finishes other selected gates, and prints an exac
   assert.match(result.stderr, /ok\s+Formatting/);
   assert.match(result.stderr, /Failed 1\/2 gates/);
   assert.match(result.stderr, /Partial check only/);
+  assert.match(
+    result.stderr,
+    /Also rerun any passing gates whose inputs changed/,
+  );
   assert.match(result.stderr, /rerun: npm run check -- --steps lint\s*$/);
 });

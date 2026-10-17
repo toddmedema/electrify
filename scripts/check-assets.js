@@ -19,6 +19,7 @@ function checkAssets(root = process.cwd()) {
     .split("\0")
     .filter(Boolean);
   const missing = [];
+  const pointers = [];
   for (const file of files) {
     let fd;
     try {
@@ -31,7 +32,7 @@ function checkAssets(root = process.cwd()) {
           .toString()
           .startsWith("version https://git-lfs.github.com/spec/")
       )
-        missing.push(file);
+        pointers.push(file);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       missing.push(file);
@@ -39,13 +40,30 @@ function checkAssets(root = process.cwd()) {
       if (fd !== undefined) fs.closeSync(fd);
     }
   }
-  if (missing.length)
+  const describe = (label, paths) =>
+    paths.length
+      ? [
+          `${label} (${paths.length}):`,
+          ...paths.slice(0, 12),
+          ...(paths.length > 12 ? [`...and ${paths.length - 12} more`] : []),
+        ]
+      : [];
+  if (missing.length || pointers.length)
     throw new Error(
       [
-        `Asset preflight failed: ${missing.length} tracked files are missing or Git LFS pointers.`,
-        ...missing.slice(0, 12),
-        ...(missing.length > 12 ? [`...and ${missing.length - 12} more`] : []),
-        "Run git lfs pull, then git lfs checkout in this worktree before retrying.",
+        "Asset preflight failed.",
+        ...describe("Git LFS pointers", pointers),
+        ...(pointers.length
+          ? [
+              "Run git lfs checkout for cached objects, then git lfs pull if needed.",
+            ]
+          : []),
+        ...describe("Missing tracked files", missing),
+        ...(missing.length
+          ? [
+              "If these deletions or renames are intentional, stage them with git add -u and retry. Otherwise restore the missing files.",
+            ]
+          : []),
       ].join("\n"),
     );
   console.error(`Asset preflight passed (${files.length} tracked files).`);
