@@ -175,3 +175,44 @@ it("always counts a public rate's points over a full year, even as the run ends"
 
   expect(points(ending)).toBe(points(established));
 });
+
+it("labels the public slider axis in cents with a short cap", () => {
+  renderRates(107);
+  const marks = within(screen.getByTestId("rate-slider-control"))
+    .getAllByText(/./, { selector: ".insightsRateMarkDesktop" })
+    .map((mark) => mark.textContent);
+  expect(marks).toEqual([
+    "0¢",
+    expect.stringMatching(/^\d+¢ target$/),
+    expect.stringMatching(/^\d+¢ cap$/),
+  ]);
+});
+
+it("offers a public utility a switch to follow its target, off once a rate is chosen", () => {
+  const game = createGame({ scenarioId: 107 });
+  const onDelta = jest.fn();
+  const view = render(<RateControls game={game} onDelta={onDelta} />);
+  const follow = screen.getByRole("switch", { name: "Follow target rate" });
+  expect(follow).toBeChecked();
+  expect(follow).toHaveAccessibleDescription(
+    "Your rate moves with the target each month.",
+  );
+  fireEvent.click(follow);
+  expect(onDelta).toHaveBeenCalledWith({ rateFollowsTarget: false });
+  view.rerender(
+    <RateControls
+      game={{ ...game, rateFollowsTarget: false }}
+      onDelta={onDelta}
+    />,
+  );
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Rate no longer follows the target.",
+  );
+  fireEvent.click(screen.getByRole("switch", { name: "Follow target rate" }));
+  expect(onDelta).toHaveBeenLastCalledWith({ rateFollowsTarget: true });
+});
+
+it("doesn't offer an investor-owned utility a target to follow", () => {
+  renderRates(100);
+  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+});

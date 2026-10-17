@@ -62,7 +62,10 @@ const MAX_REPLAY_MONTHS = 2400;
 // Only the fields of a `delta` that change how the simulation runs. Everything else the action
 // carries -- the tutorial step, the custom scenario, the difficulty picked before the game began
 // -- either doesn't affect the sim or is already in the replay header.
-export const RECORDED_DELTA_KEYS = ["dollarsPerkWh"] as const;
+export const RECORDED_DELTA_KEYS = [
+  "dollarsPerkWh",
+  "rateFollowsTarget",
+] as const;
 
 export type RecordedDeltaType = Partial<
   Pick<GameType, (typeof RECORDED_DELTA_KEYS)[number]>
@@ -96,9 +99,12 @@ export function recordedDelta(
   payload: Partial<GameType>,
 ): RecordedDeltaType | null {
   const rate = payload.dollarsPerkWh;
-  return typeof rate === "number" && Number.isFinite(rate) && rate >= 0
-    ? { dollarsPerkWh: rate }
-    : null;
+  const recorded: RecordedDeltaType = {};
+  if (typeof rate === "number" && Number.isFinite(rate) && rate >= 0)
+    recorded.dollarsPerkWh = rate;
+  if (typeof payload.rateFollowsTarget === "boolean")
+    recorded.rateFollowsTarget = payload.rateFollowsTarget;
+  return Object.keys(recorded).length ? recorded : null;
 }
 
 /**

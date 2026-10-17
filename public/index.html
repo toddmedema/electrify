@@ -7,6 +7,8 @@
     <meta name="theme-color" content="#ffffff" />
     <script>
       (function () {
+        // Scripts run: show the startup entrance below instead of the no-JS summary.
+        document.documentElement.classList.add("js");
         let choice;
         try {
           choice = localStorage.getItem("theme");
@@ -37,6 +39,29 @@
       }
       html[data-theme="dark"] {
         background: var(--bg-primary, #0b1016);
+      }
+      /* The summary stays in the document for crawlers and readers without scripts. */
+      html.js .app-loading {
+        display: none;
+      }
+      /* Lay out the startup entrance before the app stylesheet arrives. */
+      #appStartup {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #576574;
+        font-family: Inter, sans-serif;
+      }
+      html[data-theme="dark"] #appStartup {
+        color: #9aa9ba;
+      }
+      #appStartup img {
+        max-width: calc(100vw - 48px);
+        height: auto;
       }
       .app-loading {
         max-width: 36rem;
@@ -190,7 +215,6 @@
           Build power plants, balance supply and demand, manage costs, and make
           your grid cleaner in a free, research-backed strategy game.
         </p>
-        <p role="status" hidden>Loading Electrify…</p>
         <noscript>
           <p><strong>Enable JavaScript to load and play Electrify.</strong></p>
         </noscript>
@@ -204,11 +228,12 @@
       </main>
     </div>
 
-    <!-- Inert on the web: only the native preload installs this entrance. Keep the logo
-         geometry in step with MainMenu; both use the same homeLogo styles and animation. -->
-    <template id="desktopStartupTemplate">
-      <div id="desktopStartup">
-        <div class="desktopStartupLogo">
+    <!-- Installed on web and desktop as soon as scripts run, and removed at the app's first
+         commit. Keep the logo geometry in step with MainMenu; both use the same homeLogo
+         styles and animation. -->
+    <template id="appStartupTemplate">
+      <div id="appStartup">
+        <div class="appStartupLogo">
           <div class="homeLogo">
             <img alt="Electrify" width="300" height="70" />
             <svg
@@ -241,17 +266,21 @@
       </div>
     </template>
     <script>
-      document.querySelector(".app-loading [role='status']").hidden = false;
-      if (window.electrifyDesktop && window.electrifyDesktop.apiVersion === 1) {
-        const template = document.getElementById("desktopStartupTemplate");
+      (function () {
+        const template = document.getElementById("appStartupTemplate");
         const entrance = template.content.cloneNode(true);
         entrance.querySelector("img").src =
           document.documentElement.dataset.theme === "dark"
             ? "%PUBLIC_URL%/images/logo-home-dark.svg"
             : "%PUBLIC_URL%/images/logo-home.svg";
+        if (!(
+          window.electrifyDesktop && window.electrifyDesktop.apiVersion === 1
+        ))
+          entrance.querySelector("[data-startup-status]").textContent =
+            "Loading Electrify…";
         document.body.append(entrance);
-      }
-      document.getElementById("desktopStartupTemplate").remove();
+        template.remove();
+      })();
     </script>
 
     <!-- Prefetch low priority assets -->

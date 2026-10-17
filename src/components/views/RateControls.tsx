@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Slider, Typography } from "@mui/material";
+import { FormControlLabel, Slider, Switch, Typography } from "@mui/material";
 import { GameType } from "../../Types";
 import { TICK_MINUTES } from "../../Constants";
 import {
@@ -13,6 +13,7 @@ import {
   getMarketRate,
   projectCustomerChange,
   publicRateCap,
+  publicTargetRate,
 } from "../../helpers/Customers";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { formatCustomerChange } from "../../helpers/HistoryMetrics";
@@ -32,9 +33,14 @@ function formatRateCompact(rate: number): string {
   return `${Number((rate * 100).toFixed(1))}¢`;
 }
 
+/** Axis labels read in cents below a dollar, so they fit beneath the slider. */
+function formatRateAxis(rate: number): string {
+  return rate < 1 ? formatRateCompact(rate) : formatMoneyConcise(rate);
+}
+
 function rateMarkLabel(
   rate: number,
-  desktopLabel = formatMoneyConcise(rate),
+  desktopLabel = formatRateAxis(rate),
   mobileLabel = "",
 ) {
   return (
@@ -57,6 +63,14 @@ export interface RateControlsProps {
 /** Pricing reads the same deferred forecast as Insights and the global status bar. */
 export default function RateControls({ game, onDelta }: RateControlsProps) {
   const now = currentTick(game);
+  // Announce only the change a drag makes, not a state the panel opened in.
+  const followSetting = !!game.rateFollowsTarget;
+  const wasFollowing = React.useRef(followSetting);
+  const [announcedStop, setAnnouncedStop] = React.useState(false);
+  React.useEffect(() => {
+    setAnnouncedStop(wasFollowing.current && !followSetting);
+    wasFollowing.current = followSetting;
+  }, [followSetting]);
   const investorOwned = activeScenarioOrDefault(game).ownership === "Investor";
   const [, refresh] = React.useReducer((value: number) => value + 1, 0);
   React.useEffect(() => subscribeProjection(refresh), []);
@@ -109,7 +123,15 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     game.startingYear,
     game.seed,
   );
-  const targetRate = scenario.dollarsPerkWh * inflationIndex;
+  const targetRate = publicTargetRate(
+    scenario.dollarsPerkWh,
+    game.date,
+    game.startingYear,
+    game.seed,
+  );
+  // Tutorials and multiplayer matches set their own rates, so only a solo public run can follow.
+  const canFollow = !investor && !scenario.tutorialSteps && !game.multiplayer;
+  const following = canFollow && !!game.rateFollowsTarget;
   const max = publicRateCap(
     scenario.dollarsPerkWh,
     game.date,
@@ -139,12 +161,12 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
     : "Calculating…";
   const marks = investor
     ? [
-        { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
+        { value: 0, label: rateMarkLabel(0, "0¢", "0¢") },
         {
           value: marketRate,
           label: rateMarkLabel(
             marketRate,
-            `${formatMoneyConcise(marketRate)} market`,
+            `${formatRateAxis(marketRate)} market`,
             `market ${formatRateCompact(marketRate)}`,
           ),
         },
@@ -152,18 +174,18 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           value: max,
           label: rateMarkLabel(
             max,
-            formatMoneyConcise(max),
+            formatRateAxis(max),
             formatRateCompact(max),
           ),
         },
       ]
     : [
-        { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
+        { value: 0, label: rateMarkLabel(0, "0¢", "0¢") },
         {
           value: targetRate,
           label: rateMarkLabel(
             targetRate,
-            `${formatMoneyConcise(targetRate)} target`,
+            `${formatRateAxis(targetRate)} target`,
             `target ${formatRateCompact(targetRate)}`,
           ),
         },
@@ -171,7 +193,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           value: max,
           label: rateMarkLabel(
             max,
-            `${formatMoneyConcise(max)} board cap`,
+            `${formatRateAxis(max)} cap`,
             `cap ${formatRateCompact(max)}`,
           ),
         },
@@ -182,7 +204,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   );
   const rateSummary = investor
     ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${projection ? `rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "following the target each month; " : ""}${projection ? `rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
   const rateScoreClass = `insightsRateScore ${
     rateScore(game.dollarsPerkWh) > 0
       ? "good"
@@ -204,6 +226,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         </span>
         <span className="insightsRateMetricValue">
           {formatRateCompact(investor ? marketRate : targetRate)}
+          {following && <span className="programsRateMatched"> · matched</span>}
         </span>
       </span>
       {investor ? (
@@ -230,12 +253,62 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
       aria-label="Electricity pricing"
       aria-describedby="programsRateSummary"
     >
-      <Typography component="h3" variant="subtitle2">
-        Electricity pricing
-      </Typography>
+      <div className="programsPricingHeader">
+        <Typography component="h3" variant="subtitle2">
+          Electricity pricing
+        </Typography>
+        {canFollow && (
+          <FormControlLabel
+            className="programsRateFollow"
+            labelPlacement="start"
+            disabled={!!game.replayPlayback}
+            label={
+              <>
+                <span className="programsRateFollowFull">Follow target</span>
+                <span className="programsRateFollowShort" aria-hidden="true">
+                  Follow
+                </span>
+              </>
+            }
+            control={
+              <Switch
+                color="primary"
+                checked={following}
+                slotProps={{
+                  input: {
+                    "aria-label": "Follow target rate",
+                    "aria-describedby": following
+                      ? "programsRateFollowNote"
+                      : undefined,
+                  },
+                }}
+                onChange={(event) =>
+                  onDelta({ rateFollowsTarget: event.target.checked })
+                }
+              />
+            }
+          />
+        )}
+      </div>
       <div className="insightsRateMetrics" aria-hidden="true">
         {rateMetrics}
       </div>
+      {following && (
+        <Typography
+          id="programsRateFollowNote"
+          className="programsRateFollowNote"
+          variant="caption"
+        >
+          Your rate moves with the target each month.
+        </Typography>
+      )}
+      {canFollow && (
+        <span className="srOnly" role="status" aria-live="polite">
+          {!following && announcedStop
+            ? "Rate no longer follows the target."
+            : ""}
+        </span>
+      )}
       <span id="programsRateSummary" className="srOnly">
         {rateSummary}
       </span>
@@ -264,13 +337,13 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           valueLabelDisplay="auto"
           valueLabelFormat={(rate) =>
             investor
-              ? `${formatMoneyConcise(rate)}/kWh`
-              : `${formatMoneyConcise(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
+              ? `${formatRateAxis(rate)}/kWh`
+              : `${formatRateAxis(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
           }
           getAriaValueText={(rate) =>
             investor
               ? `${formatMoneyConcise(rate)} per kilowatt hour`
-              : `${formatMoneyConcise(rate)} per kilowatt hour, rate score ${formatRateScore(rateScore(rate))} over the next year`
+              : `${formatMoneyConcise(rate)} per kilowatt hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
           }
           marks={marks}
           min={0}
