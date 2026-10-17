@@ -80,6 +80,7 @@ export interface DesktopBridge {
     challengeId?: string;
   }): Promise<DesktopScore[]>;
   submitScore(score: {
+    appVersion?: string;
     scenarioId: number;
     difficulty: DifficultyType;
     score: number;

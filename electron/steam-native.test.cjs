@@ -110,6 +110,22 @@ function mockNative(platform) {
   return { api, calls, dispatcher };
 }
 
+test("Steam uploads the full build version in integer score details", async () => {
+  const { api, calls, dispatcher } = mockNative("win32");
+  const boards = new SteamLeaderboards(api, dispatcher, "win32");
+  const appVersion = "26sept26-1507";
+  await boards.upload({
+    scenarioId: 101,
+    difficulty: "CEO",
+    score: 800,
+    appVersion,
+  });
+  const upload = calls.find((entry) => entry[0] === "upload");
+  const details = upload[5];
+  assert.equal(upload[6], details.length / 4);
+  assert.equal(details.toString("ascii").replace(/\0+$/, ""), appVersion);
+});
+
 for (const platform of ["win32", "linux", "darwin"]) {
   test(`SDK ${platform} packing reads friends with Steam identities and real rank`, async () => {
     const { api, calls, dispatcher } = mockNative(platform);

@@ -96,8 +96,8 @@ prod() {
   # Set WebP's type explicitly: older mimetypes tables used by the aws cli don't know it.
   aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.webp' --content-type image/webp --cache-control 'public, max-age=15552000'
 
-  # Upload package.json for API's version check
-  aws s3 cp package.json s3://electrifygame.com/package.json
+  # build/package.json carries the same stamped version as the deployed bundle.
+  aws s3 cp build/package.json s3://electrifygame.com/package.json --cache-control 'no-cache'
 
   # Invalidate files on cloudfront
   aws cloudfront create-invalidation --distribution-id E38D57AILAHD00 --paths /\*

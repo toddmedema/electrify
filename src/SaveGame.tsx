@@ -20,7 +20,7 @@ import {
   serializeCommitmentMetadata,
   validCommitmentMetadata,
 } from "./helpers/Commitment";
-import packageJson from "../package.json";
+import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
@@ -283,7 +283,7 @@ export function serializeSave(game: GameType): SaveGameType {
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
-    appVersion: packageJson.version,
+    appVersion: APP_VERSION,
     game,
     commitmentForecast: serializeCommitmentMetadata(game.timeline),
   };

@@ -232,8 +232,21 @@ class SteamLeaderboards {
     return this.serialize(async () => {
       const handle = await this.handle(selection);
       if (this.stopped) throw new Error("Steam is shutting down");
+      // Steam score details are int32 slots. Store the ASCII build version as
+      // zero-padded bytes; old queued scores can still upload without metadata.
+      const details = selection.appVersion
+        ? Buffer.alloc(Math.ceil((selection.appVersion.length + 1) / 4) * 4)
+        : null;
+      if (details) details.write(selection.appVersion, "ascii");
       const result = await this.callResult(
-        this.api.upload(this.stats, handle, 1, selection.score, null, 0),
+        this.api.upload(
+          this.stats,
+          handle,
+          1,
+          selection.score,
+          details,
+          details ? details.length / 4 : 0,
+        ),
         this.packing.upload,
       );
       if (!result[0]) throw new Error("Steam did not accept the score");

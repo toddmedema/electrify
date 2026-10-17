@@ -3,6 +3,7 @@
 // translating only those retired options to their current equivalents.
 process.env.BABEL_ENV = "development";
 process.env.NODE_ENV = "development";
+process.env.REACT_APP_VERSION = require("./build-version").buildVersion();
 require("react-scripts/config/env");
 
 const devServerConfigPath =

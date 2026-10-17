@@ -6,6 +6,45 @@ async function openSettings(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 }
 
+test("settings footer shows the complete version and clear cache in both themes", async ({
+  page,
+}, testInfo) => {
+  await openSettings(page);
+  const footer = page.locator(".screenPage footer");
+  const version = footer.getByText(/^Electrify v/);
+  const response = await page.request.get("/package.json");
+  const metadata = response
+    .headers()
+    ["content-type"]?.includes("application/json")
+    ? ((await response.json()) as { version: string })
+    : undefined;
+  for (const theme of ["Light", "Dark"]) {
+    await page.getByRole("button", { name: theme, exact: true }).click();
+    await footer.scrollIntoViewIfNeeded();
+    await expect(version).toHaveText(/^Electrify v\d{2}[a-z]{3,4}\d{2}-\d{4}$/);
+    if (metadata)
+      await expect(version).toHaveText(`Electrify v${metadata.version}`);
+    await expect(
+      footer.getByRole("button", { name: "Clear cache", exact: true }),
+    ).toBeVisible();
+    const bounds = (await version.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    if (
+      process.env.PR_SCREENSHOTS &&
+      ((testInfo.project.name === "desktop-chromium" && theme === "Light") ||
+        (testInfo.project.name === "mobile-390px" && theme === "Dark"))
+    ) {
+      await page.screenshot({
+        path: `pr-version-${testInfo.project.name}.png`,
+        animations: "disabled",
+      });
+    }
+  }
+});
+
 test("settings fill the shared menu container on desktop", async ({
   page,
 }, testInfo) => {

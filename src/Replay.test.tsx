@@ -17,6 +17,8 @@ import {
   ReplayType,
 } from "./Types";
 
+jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
+
 const generatorQuote = {
   name: "Oil",
   description: "Generator",
@@ -274,6 +276,7 @@ describe("replay checkpoints", () => {
       monthlyHistory: months(3.456, 2, 1.004),
     } as GameType;
     expect(serializeReplay(game, result)).toMatchObject({
+      appVersion: "26sept26-1507",
       monthlyCash: [100, 200, 346],
       result,
     });

@@ -3,8 +3,10 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { verifyBuild } = require("./desktop-verify");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
+const { buildVersion, writeBuildVersion } = require("./build-version");
 
 function desktopBuild() {
+  const version = buildVersion();
   if (Number(process.versions.node.split(".")[0]) !== 24)
     throw new Error("Use Node 24 to build Electrify");
   for (const script of [
@@ -24,12 +26,14 @@ function desktopBuild() {
         PUBLIC_URL: "",
         GENERATE_SOURCEMAP: "false",
         REACT_APP_DESKTOP: "true",
+        REACT_APP_VERSION: version,
       },
     });
     if (result.error || result.status !== 0)
       throw result.error || new Error(`Desktop build failed: ${script}`);
   }
   verifyEditionBundle("build", "desktop");
+  writeBuildVersion(version);
   const assets = verifyBuild("build", "public");
   fs.writeFileSync(
     path.join("build", "desktop-assets.json"),

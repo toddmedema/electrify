@@ -14,6 +14,18 @@ const {
   MAX_LIBRARY_BYTES,
 } = require("./runtime.cjs");
 
+test("score metadata survives validation and rejects invalid build versions", () => {
+  const score = { scenarioId: 101, difficulty: "CEO", score: 100 };
+  const appVersion = "26sept26-1507";
+  assert.equal(validateScore({ ...score, appVersion }).appVersion, appVersion);
+  assert.equal(validateScore(score).appVersion, undefined);
+  for (const invalid of [null, 12, "", "x".repeat(65), "bad\u0000version"])
+    assert.throws(
+      () => validateScore({ ...score, appVersion: invalid }),
+      /app version/,
+    );
+});
+
 test("bundled origin rejects foreign origins, credentials and asset traversal", () => {
   const root = path.resolve("build");
   assert.equal(
@@ -35,6 +47,20 @@ test("bundled origin rejects foreign origins, credentials and asset traversal", 
   ])
     assert.throws(() => resolveAsset(root, url), undefined, url);
   assert.equal(isAppUrl("not a URL"), false);
+});
+
+test("URL-normalized parent segments still resolve inside the renderer bundle", () => {
+  const root = path.resolve("build");
+  for (const asset of ["package.json", "electron/main.cjs"]) {
+    const url = `electrify://app/../../${asset}`;
+    assert.equal(new URL(url).pathname, `/${asset}`);
+    assert.equal(resolveAsset(root, url), path.join(root, asset));
+    assert.notEqual(resolveAsset(root, url), path.resolve(asset));
+    assert.throws(
+      () => resolveAsset(root, `electrify://app/%2e%2e%2f${asset}`),
+      /escapes the bundle/,
+    );
+  }
 });
 
 test("privileged IPC requires the actual game main frame, never child or foreign frames", () => {

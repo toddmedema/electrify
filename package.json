@@ -47,7 +47,7 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "react-scripts build && node scripts/verify-edition-bundle.js web",
+    "build": "node scripts/build.js",
     "test": "react-scripts test",
     "test:once": "react-scripts test --watchAll=false",
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\" --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=\"\\.sim\\.test\\.\"",
@@ -206,6 +206,7 @@
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
+      "!src/components/base/OutlookWorkerClient.ts",
       "!src/multiplayer/WorkerClient.ts",
       "!src/workers/**/*.ts",
       "!src/testing/SimCli.tsx"

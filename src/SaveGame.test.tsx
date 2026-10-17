@@ -9,6 +9,8 @@ import { isResumedGame, parseSave, serializeSave } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
 
+jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
+
 jest.setTimeout(60000);
 
 // Rise of Renewables, entirely inside the recorded data so setup stays quick
@@ -24,6 +26,7 @@ describe("SaveGame", () => {
   it("round trips a detached game without dropping serialized state", () => {
     const save = parseSave(JSON.parse(JSON.stringify(serializeSave(game))));
     expect(save).not.toBeNull();
+    expect(save!.appVersion).toBe("26sept26-1507");
     expect(save!.game).not.toBe(game);
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });

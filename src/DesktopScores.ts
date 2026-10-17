@@ -1,4 +1,5 @@
 import { getDesktop } from "./Desktop";
+import { APP_VERSION } from "./AppVersion";
 import type { DifficultyType, ScoreType } from "./Types";
 import manifest from "./data/RunCompatibility.json";
 import { Timestamp } from "firebase/firestore";
@@ -33,6 +34,7 @@ export async function submitDesktopScore(submission: {
   const request = (async () => {
     await getDesktop()?.submitScore({
       ...submission,
+      appVersion: APP_VERSION,
       challengeId: manifest.compatibilityId,
     });
   })();

@@ -21,7 +21,7 @@ import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
 import ScreenPage from "../base/ScreenPage";
 import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
-import packageJson from "../../../package.json";
+import { APP_VERSION } from "../../AppVersion";
 import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
@@ -534,7 +534,7 @@ export default function Settings(props: Props): React.JSX.Element {
             }}
           >
             <Typography variant="caption" sx={{ px: 1 }}>
-              Electrify v{packageJson.version}
+              Electrify v{APP_VERSION}
             </Typography>
             <Button
               component="a"
@@ -554,7 +554,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 onClick={() => void clearAppCache()}
                 sx={{ color: "text.secondary", fontSize: "0.75rem" }}
               >
-                Clear cached data
+                Clear cache
               </Button>
             )}
           </Stack>

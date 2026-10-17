@@ -6,7 +6,7 @@ import {
 } from "./helpers/BuildValidation";
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
-import packageJson from "../package.json";
+import { APP_VERSION } from "./AppVersion";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
 import { validReplayResult } from "./SaveModel";
@@ -158,7 +158,7 @@ export function serializeReplay(
       .map((month) => cents(month.cash))
       .reverse(),
     result: cloneDeep(result),
-    appVersion: packageJson.version,
+    appVersion: APP_VERSION,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     seed: game.seed,
