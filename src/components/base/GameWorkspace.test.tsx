@@ -143,24 +143,19 @@ it("leaves an open tool in place while a visible modal owns Escape", async () =>
   expect(screen.queryByRole("region", { name: "Programs" })).toBeNull();
 });
 
-it("keeps one tool per semantic rail and uses desktop tabs to switch siblings", async () => {
+it("switches desktop tools only from the action bar, without panel header tabs", async () => {
   const { user, action } = setup(2240);
   await user.click(action("Build"));
   await user.click(action("Insights"));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  const decisions = screen.getByRole("tablist", { name: "Decisions" });
-  const intelligence = screen.getByRole("tablist", { name: "Intelligence" });
-  await user.click(within(decisions).getByRole("tab", { name: "Programs" }));
+  expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
+  expect(screen.queryByRole("tablist", { name: "Intelligence" })).toBeNull();
+  await user.click(action("Programs"));
   expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
   expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
-  expect(
-    within(decisions).getByRole("tab", { name: "Programs" }),
-  ).toHaveFocus();
-  expect(
-    within(decisions).getByRole("tab", { name: "Programs" }),
-  ).toHaveAttribute("aria-selected", "true");
-  await user.click(within(intelligence).getByRole("tab", { name: "Events" }));
+  expect(screen.getByRole("heading", { name: "Programs" })).toHaveFocus();
+  await user.click(action("Events"));
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
   expect(screen.getByRole("region", { name: "Events" })).toBeVisible();
   expect(screen.getAllByRole("region")).toHaveLength(2);
@@ -215,9 +210,9 @@ it("switches at layout boundaries without discarding the other group's selection
   expect(screen.getAllByRole("region")).toHaveLength(2);
   resize(1799);
   expect(screen.getAllByRole("region")).toHaveLength(1);
-  expect(screen.getByRole("tablist", { name: "Decisions" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
   resize(1200);
-  expect(screen.getByRole("tablist", { name: "Decisions" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
   resize(1199);
   expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();

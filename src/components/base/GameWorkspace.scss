@@ -176,10 +176,6 @@
   }
 }
 
-.gameToolTabs {
-  display: none;
-}
-
 .gameToolBody {
   flex: 1 1 0;
   min-height: 0;
@@ -230,7 +226,7 @@
   }
 }
 
-// With room for a readable fleet, tools become tabs beside it instead of overlapping windows.
+// With room for a readable fleet, tools sit beside it instead of overlapping windows.
 .gameStage:not([data-layout="sheet"]) {
   .gameToolTray {
     display: contents;
@@ -242,43 +238,6 @@
     border-bottom: 0;
     box-shadow: none;
     animation: none;
-  }
-  .gameToolHeader {
-    padding: 0 8px;
-    gap: 4px;
-
-    > svg {
-      display: none;
-    }
-    h2 {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-    > .MuiIconButton-root {
-      flex: 0 0 auto;
-    }
-  }
-  .gameToolTabs {
-    display: flex;
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 56px;
-
-    .MuiTab-root {
-      min-width: 0;
-      min-height: 56px;
-      padding: 8px 12px;
-      text-transform: none;
-      color: var(--font-color-faded);
-
-      &.Mui-selected {
-        color: var(--interactive-strong);
-      }
-    }
   }
 }
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { IconButton, Tab, Tabs } from "@mui/material";
+import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
@@ -23,13 +23,9 @@ import "./GameWorkspace.scss";
 
 type ToolGroup = "decision" | "intelligence";
 type ToolSelections = Partial<Record<ToolGroup, GameTool>>;
-const TOOL_GROUPS: { id: ToolGroup; label: string; tools: GameTool[] }[] = [
-  {
-    id: "decision",
-    label: "Decisions",
-    tools: ["BUILD_GENERATORS", "PROGRAMS"],
-  },
-  { id: "intelligence", label: "Intelligence", tools: ["INSIGHTS", "EVENTS"] },
+const TOOL_GROUPS: { id: ToolGroup }[] = [
+  { id: "decision" },
+  { id: "intelligence" },
 ];
 const groupFor = (tool: GameTool): ToolGroup =>
   tool === "BUILD_GENERATORS" || tool === "PROGRAMS"
@@ -75,11 +71,10 @@ export default function GameWorkspace() {
     return () => window.removeEventListener("resize", resize);
   }, [active, buildCategory, dispatch]);
   React.useLayoutEffect(() => {
-    // A header tab disappears when it becomes a compact sheet; keep keyboard focus in
-    // that same tool without stealing it from a retained pricing slider or chart.
+    // Keep focus in the active tool when the layout changes, without stealing it
+    // from a retained pricing slider or chart.
     if (active && document.activeElement === document.body) {
-      const tab = document.getElementById(`tool-tab-${active}`);
-      (tab ?? headings.current.get(active))?.focus({ preventScroll: true });
+      headings.current.get(active)?.focus({ preventScroll: true });
     }
   }, [layout, active]);
   React.useEffect(() => {
@@ -91,8 +86,7 @@ export default function GameWorkspace() {
   React.useEffect(() => {
     if (retainFocus.current) retainFocus.current = false;
     else if (active) {
-      const tab = document.getElementById(`tool-tab-${active}`);
-      (tab ?? headings.current.get(active))?.focus({ preventScroll: true });
+      headings.current.get(active)?.focus({ preventScroll: true });
     }
   }, [active]);
   const destination = (tool: GameTool) =>
@@ -157,13 +151,6 @@ export default function GameWorkspace() {
         >
           <div className="gameFleet">
             <Facilities />
-            <Navigation
-              openTools={visible}
-              onToggle={(tool) => {
-                if (visible.includes(tool)) close(tool);
-                else dispatch(navigate(destination(tool)));
-              }}
-            />
           </div>
           <div className="gameToolTray">
             {TOOL_GROUPS.map((group) => {
@@ -193,35 +180,6 @@ export default function GameWorkspace() {
                       <span className="gameToolTitleIcon">{config.icon}</span>
                       {config.label}
                     </h2>
-                    {layout !== "sheet" && (
-                      <Tabs
-                        className="gameToolTabs"
-                        value={tool}
-                        aria-label={group.label}
-                        variant="fullWidth"
-                        onChange={(_event, next: GameTool) => {
-                          retainFocus.current = true;
-                          dispatch(navigate(destination(next)));
-                        }}
-                      >
-                        {group.tools.map((id) => {
-                          const item = GAME_TOOLS.find(
-                            (entry) => entry.id === id,
-                          )!;
-                          return (
-                            <Tab
-                              key={id}
-                              id={`tool-tab-${id}`}
-                              aria-controls={`tool-content-${group.id}`}
-                              value={id}
-                              label={item.label}
-                              icon={item.icon}
-                              iconPosition="start"
-                            />
-                          );
-                        })}
-                      </Tabs>
-                    )}
                     <IconButton
                       aria-label={`Close ${config.label}`}
                       onClick={() => close(tool)}
@@ -229,14 +187,7 @@ export default function GameWorkspace() {
                       <CloseIcon />
                     </IconButton>
                   </header>
-                  <div
-                    className="gameToolBody"
-                    id={`tool-content-${group.id}`}
-                    role={layout !== "sheet" ? "tabpanel" : undefined}
-                    aria-labelledby={
-                      layout !== "sheet" ? `tool-tab-${tool}` : undefined
-                    }
-                  >
+                  <div className="gameToolBody">
                     {/* Hidden compact rails release decision pause tokens; the visible tool keeps
                       its DOM, input focus and scroll position when it moves into a side column. */}
                     {shown && (
@@ -262,6 +213,13 @@ export default function GameWorkspace() {
             })}
           </div>
         </div>
+        <Navigation
+          openTools={visible}
+          onToggle={(tool) => {
+            if (visible.includes(tool)) close(tool);
+            else dispatch(navigate(destination(tool)));
+          }}
+        />
       </div>
     </GameWorkspaceContext.Provider>
   );

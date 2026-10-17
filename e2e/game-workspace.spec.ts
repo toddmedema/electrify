@@ -25,9 +25,8 @@ async function settleSheets(page: Page) {
 }
 
 async function expectFloatingDock(page: Page) {
-  const [stage, fleet, facilities, dock] = await Promise.all([
+  const [stage, facilities, dock] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
-    page.locator(".gameFleet").boundingBox(),
     page.locator(".gameStage .facilities").boundingBox(),
     page.locator("#navfooter").boundingBox(),
   ]);
@@ -38,7 +37,7 @@ async function expectFloatingDock(page: Page) {
   expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
   expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
   expect(
-    Math.abs(dock!.x + dock!.width / 2 - fleet!.x - fleet!.width / 2),
+    Math.abs(dock!.x + dock!.width / 2 - page.viewportSize()!.width / 2),
   ).toBeLessThanOrEqual(1);
 }
 
@@ -141,6 +140,9 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeLessThanOrEqual(1);
     await page.screenshot({
       path: testInfo.outputPath(`workspace-insights-${theme}.png`),
+      // Keep review images focused on the layout after keyboard assertions above.
+      style:
+        ".gameToolTitle:focus { outline: none !important; box-shadow: none !important; }",
       animations: "disabled",
     });
     await page
@@ -231,7 +233,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
 });
 
-test("desktop side tabs preserve the fleet and remember both rails across compact layouts", async ({
+test("desktop side panels keep the dock centered and remember both rails across compact layouts", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -240,7 +242,13 @@ test("desktop side tabs preserve the fleet and remember both rails across compac
   );
   await page.setViewportSize({ width: 2240, height: 1100 });
   await startGame(page, "light");
+  const originalDock = (await page.locator("#navfooter").boundingBox())!;
   await page.locator("#buildNav").click();
+  await expectFloatingDock(page);
+  expect((await page.locator("#navfooter").boundingBox())!.x).toBeCloseTo(
+    originalDock.x,
+    0,
+  );
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
   await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible({
@@ -252,20 +260,17 @@ test("desktop side tabs preserve the fleet and remember both rails across compac
     "dual",
   );
   await expectSideRails(page);
-  await page
-    .getByRole("tablist", { name: "Decisions" })
-    .getByRole("tab", { name: "Programs", exact: true })
-    .click();
+  await expect(
+    page.locator(".gameToolHeader").getByRole("tablist"),
+  ).toHaveCount(0);
+  await page.locator("#programsNav").click();
   await expect(
     page.getByRole("region", { name: "Programs", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Build", exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByRole("tablist", { name: "Intelligence" })
-    .getByRole("tab", { name: "Events", exact: true })
-    .click();
+  await page.locator("#eventsNav").click();
   await expect(
     page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();
@@ -273,6 +278,11 @@ test("desktop side tabs preserve the fleet and remember both rails across compac
     page.getByRole("region", { name: "Insights", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+  await expectFloatingDock(page);
+  expect((await page.locator("#navfooter").boundingBox())!.x).toBeCloseTo(
+    originalDock.x,
+    0,
+  );
   await expect(
     page.getByRole("button", { name: /^(?:Unpin|Pin) /i }),
   ).toHaveCount(0);
@@ -282,6 +292,8 @@ test("desktop side tabs preserve the fleet and remember both rails across compac
   const value = await rate.inputValue();
   await page.screenshot({
     path: testInfo.outputPath("workspace-side-rails-desktop.png"),
+    style:
+      ".gameToolTitle:focus { outline: none !important; box-shadow: none !important; }",
     animations: "disabled",
   });
   await rate.focus();
@@ -335,7 +347,7 @@ test("desktop side tabs preserve the fleet and remember both rails across compac
   await expect(decision).toBeVisible();
   await page.locator("#insightsNav").click();
   await expect(
-    page.getByRole("tab", { name: "Insights", exact: true }),
+    page.getByRole("heading", { name: "Insights", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(
