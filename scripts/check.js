@@ -1,38 +1,88 @@
 #!/usr/bin/env node
-/**
- * Runs every pre-handoff check and reports all failures in one pass, the way CI does, instead of
- * stopping at the first. Passing steps print one line; a failing step prints its captured output
- * followed by the command that usually fixes it. See AGENTS.md.
- */
-const { spawn } = require("child_process");
-const workers = process.env.ELECTRIFY_CHECK_WORKERS;
-if (workers && !/^[1-9]\d*$/.test(workers))
-  throw new Error("ELECTRIFY_CHECK_WORKERS must be a positive integer");
-const jestArgs = workers ? ["--", `--maxWorkers=${workers}`] : [];
+const { spawn } = require("node:child_process");
+const os = require("node:os");
+const { checkAssets } = require("./check-assets");
 
 const steps = [
-  { name: "Types", script: "typecheck" },
-  { name: "Lint", script: "lint", fix: "npm run lint:fix" },
-  { name: "Formatting", script: "format:check", fix: "npm run format" },
-  { name: "Desktop runtime", script: "test:desktop:native" },
-  { name: "CI tooling", script: "test:ci-tools" },
-  { name: "Tests", script: "test:ci", args: jestArgs },
-  { name: "Simulation tests", script: "test:sim", args: jestArgs },
+  { id: "types", name: "Types", script: "typecheck", parallel: true },
   {
+    id: "lint",
+    name: "Lint",
+    script: "lint",
+    parallel: true,
+    fix: "npm run lint:fix",
+  },
+  {
+    id: "formatting",
+    name: "Formatting",
+    script: "format:check",
+    parallel: true,
+    fix: "npm run format",
+  },
+  { id: "desktop", name: "Desktop runtime", script: "test:desktop:native" },
+  { id: "tooling", name: "CI tooling", script: "test:ci-tools" },
+  { id: "tests", name: "Tests", script: "test:ci", jest: true, assets: true },
+  {
+    id: "simulations",
+    name: "Simulation tests",
+    script: "test:sim",
+    jest: true,
+    assets: true,
+  },
+  {
+    id: "sim",
     name: "Simulation CLI",
+    assets: true,
     script: "sim",
     args: ["--", "--scenario", "101", "--months", "12"],
   },
 ];
 
-function run(step) {
+function selectSteps(argv) {
+  if (!argv.length) return steps;
+  if (argv.length !== 2 || argv[0] !== "--steps")
+    throw new Error("Usage: npm run check -- [--steps types,lint,...]");
+  const ids = argv[1].split(",");
+  if (ids.some((id) => !steps.some((step) => step.id === id)))
+    throw new Error(
+      `Unknown check step. Choose from: ${steps.map((step) => step.id).join(", ")}`,
+    );
+  return steps.filter((step) => ids.includes(step.id));
+}
+
+function workerCount(env, cores = os.availableParallelism()) {
+  const value = env.ELECTRIFY_CHECK_WORKERS;
+  if (
+    value !== undefined &&
+    (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)))
+  )
+    throw new Error("ELECTRIFY_CHECK_WORKERS must be a positive safe integer");
+  return value === undefined ? Math.min(4, cores) : Number(value);
+}
+
+function run(step, workers) {
   const started = Date.now();
+  console.error(
+    `Starting ${step.name}${step.jest ? ` (${workers} workers)` : ""}...`,
+  );
   return new Promise((resolve) => {
-    const args = ["run", "--silent", step.script, ...(step.args || [])];
-    const options = { env: { ...process.env, CI: "true", NO_COLOR: "1" } };
-    // Windows can only start npm.cmd through a shell, and Node deprecates (DEP0190) passing an
-    // argument array alongside `shell`, so it gets one command line. Every argument here is a
-    // fixed script name or flag, so nothing needs quoting.
+    const args = [
+      "run",
+      "--silent",
+      step.script,
+      ...(step.jest
+        ? [
+            "--",
+            `--maxWorkers=${workers}`,
+            `--cacheDirectory=.tmp/jest-check-${step.id}`,
+          ]
+        : step.args || []),
+    ];
+    const options = {
+      env: { ...process.env, CI: "true", NO_COLOR: "1" },
+      windowsHide: true,
+    };
+    // Only allowlisted script names, flags and validated worker counts reach the Windows shell.
     const child =
       process.platform === "win32"
         ? spawn(["npm", ...args].join(" "), { ...options, shell: true })
@@ -40,38 +90,60 @@ function run(step) {
     let output = "";
     child.stdout.on("data", (chunk) => (output += chunk));
     child.stderr.on("data", (chunk) => (output += chunk));
-    child.on("close", (code) =>
-      resolve({
-        ...step,
-        ok: code === 0,
-        output,
-        seconds: (Date.now() - started) / 1000,
-      }),
-    );
+    child.on("error", (error) => (output += `\n${error.message}`));
+    child.on("close", (code) => {
+      const seconds = (Date.now() - started) / 1000;
+      if (code !== 0)
+        console.error(`\n===== ${step.name} failed =====\n${output.trimEnd()}`);
+      console.error(
+        `${code === 0 ? "ok  " : "FAIL"} ${step.name.padEnd(18)} ${seconds.toFixed(0)}s${code !== 0 && step.fix ? `  fix: ${step.fix}` : ""}`,
+      );
+      resolve({ ...step, ok: code === 0, seconds });
+    });
   });
 }
 
-async function main() {
-  // Static checks barely contend. Each Jest run uses every core by default, so it runs alone.
-  // Workstations sharing CPU/memory with other tasks can bound workers through the env above.
-  const results = [...(await Promise.all(steps.slice(0, 3).map(run)))];
-  for (const step of steps.slice(3)) {
-    results.push(await run(step));
-  }
-  for (const result of results.filter((r) => !r.ok)) {
-    console.error(
-      `\n===== ${result.name} failed =====\n${result.output.trimEnd()}`,
-    );
-  }
-  console.error("");
-  for (const result of results) {
-    const status = result.ok ? "ok  " : "FAIL";
-    const hint = !result.ok && result.fix ? `  fix: ${result.fix}` : "";
-    console.error(
-      `${status} ${result.name.padEnd(18)} ${result.seconds.toFixed(0)}s${hint}`,
-    );
-  }
-  process.exitCode = results.every((r) => r.ok) ? 0 : 1;
+async function execute(selected, runStep) {
+  const results = await Promise.all(
+    selected.filter((step) => step.parallel).map(runStep),
+  );
+  // Keep CPU-heavy suites serial, including when retrying a subset of gates.
+  for (const step of selected.filter((step) => !step.parallel))
+    results.push(await runStep(step));
+  return results;
 }
 
-main();
+async function main(argv = process.argv.slice(2)) {
+  if (argv.length === 1 && argv[0] === "--help") {
+    console.error(
+      `Usage: npm run check -- [--steps ${steps.map((step) => step.id).join(",")}]`,
+    );
+    return;
+  }
+  const selected = selectSteps(argv);
+  const workers = workerCount(process.env);
+  if (selected.some((step) => step.assets)) checkAssets();
+  const started = Date.now();
+  console.error(`Running ${selected.length}/${steps.length} check gates.`);
+  const results = await execute(selected, (step) => run(step, workers));
+  const failed = results.filter((result) => !result.ok);
+  console.error(
+    `\n${failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${selected.length < steps.length ? " Partial check only." : ""}`,
+  );
+  if (failed.length) {
+    console.error(
+      "This retry covers only failed gates. Also rerun any passing gates whose inputs changed during the repair; use npm run check if unsure.",
+    );
+    console.error(
+      `After fixing these failures, rerun: npm run check -- --steps ${failed.map((step) => step.id).join(",")}`,
+    );
+    process.exitCode = 1;
+  }
+}
+
+if (require.main === module)
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+module.exports = { steps, selectSteps, workerCount, execute };
