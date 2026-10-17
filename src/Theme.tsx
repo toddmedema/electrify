@@ -177,17 +177,21 @@ const LOGO_BLUE: { [mode in ThemeModeType]: string } = {
 };
 
 // Wind's teal and nuclear's slate, softened for large chart fields rather than icon fills.
+// The two groups differ in value as well as hue so they stay apart without colour vision:
+// dispatchable is always the heavier tone against the plot (darker on light, brighter on dark),
+// in its line and in its fill. Lines 2.2:1 (light) and 1.8:1 (dark) apart; fills 1.3:1 and 1.5:1, kept
+// light enough that the demand line and blackout shading still stand out over dispatchable.
 const PRODUCTION_COLORS = {
-  light: { weatherDriven: "#007f73", onDemand: "#526776" },
-  dark: { weatherDriven: "#69c8b7", onDemand: "#a7b7c2" },
+  light: { weatherDriven: "#00897b", onDemand: "#37474f" },
+  dark: { weatherDriven: "#4db6a6", onDemand: "#d5dee5" },
 };
 const GRID_STEEL = { light: "#455a64", dark: "#90a4ae" };
 
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     ...PRODUCTION_COLORS.light,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.24),
-    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.132),
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.18),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.29),
     powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
     storage: blue[800],
@@ -217,8 +221,8 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     ...PRODUCTION_COLORS.dark,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.216),
-    onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.144),
+    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.17),
+    onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.25),
     powerFlowFill: withAlpha(GRID_STEEL.dark, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.dark, 0.8),
     storage: blue[300],

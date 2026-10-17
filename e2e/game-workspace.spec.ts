@@ -121,6 +121,43 @@ test("Build and Programs restore selections and scrolling without reopening hidd
   await expect(page.locator("#buildNav")).toHaveCSS("color", closedColor);
 });
 
+test("Insights and Events reopen at the scroll position the player left", async ({
+  page,
+}) => {
+  await startGame(page, "light");
+  for (const [nav, pane] of [
+    ["#insightsNav", "#insightsPane"],
+    ["#eventsNav", "#eventsPane"],
+  ] as const) {
+    await page.locator(nav).click();
+    const scroller = page.locator(`${pane} .scrollable`).first();
+    // Insights renders a placeholder until its forecast arrives.
+    await expect
+      .poll(() =>
+        scroller
+          .first()
+          .evaluate((element) => element.scrollHeight - element.clientHeight),
+      )
+      .toBeGreaterThan(120);
+    const left = await scroller.evaluate((element) => {
+      element.scrollTop = 120;
+      return element.scrollTop;
+    });
+    expect(left).toBe(120);
+    // Let the scroll event land before the pane unmounts.
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+    );
+    await page.locator(nav).click();
+    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+    await page.locator(nav).click();
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBe(left);
+    await page.locator(nav).click();
+  }
+});
+
 async function expectFloatingDock(page: Page) {
   const [stage, facilities, dock] = await Promise.all([
     page.locator(".gameStage").boundingBox(),

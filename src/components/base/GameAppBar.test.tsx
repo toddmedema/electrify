@@ -7,13 +7,16 @@ import {
   getGridHealth,
   Props,
   reserveCapacityW,
+  stableGridSummary,
 } from "./GameAppBar";
 
 let mockDesktop = false;
+let mockPaneLayout = true;
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
   isBigScreen: () => true,
   isDesktopScreen: () => mockDesktop,
+  isPaneLayout: () => mockPaneLayout,
 }));
 
 function renderAppBar(overrides: Partial<Props> = {}) {
@@ -160,6 +163,38 @@ describe("GameAppBar", () => {
     expect(
       screen.getByLabelText(/Current grid status: Stable, .* reserve/),
     ).toBeVisible();
+  });
+
+  it("shrinks a stable grid to a checked icon on phones, with the full readout on hover", async () => {
+    mockPaneLayout = false;
+    try {
+      const game = createGame({ scenarioId: 101 });
+      const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+      now.supplyW = now.demandW;
+      now.demandW = 72e6;
+      now.reserveW = 10e6;
+      expect(stableGridSummary(game, now)).toBe(
+        "Stable, 72 MW demand met with 10 MW reserve",
+      );
+      renderAppBar({ game: { ...game, inGame: true } });
+      expect(screen.queryByText(/^Stable, /)).not.toBeInTheDocument();
+      const status = screen.getByRole("button", {
+        name: "Current grid status: Stable, 72 MW demand met with 10 MW reserve",
+      });
+      fireEvent.mouseOver(status);
+      expect(
+        await screen.findByRole("tooltip", {
+          name: "Stable, 72 MW demand met with 10 MW reserve",
+        }),
+      ).toBeVisible();
+
+      // Any warning keeps its words on screen.
+      now.reserveW = now.demandW * 0.05;
+      renderAppBar({ game: { ...game, inGame: true } });
+      expect(screen.getByText(/^Low reserve, /)).toBeVisible();
+    } finally {
+      mockPaneLayout = true;
+    }
   });
 
   it("warns when reachable reserve falls to five percent of demand", () => {

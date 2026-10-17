@@ -124,6 +124,7 @@ import PowerExchangeSummary, {
 } from "../base/PowerExchangeSummary";
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
+import { ToolScrollMemory } from "../base/GameToolMemory";
 import "./Insights.scss";
 
 export type InsightLayerId =
@@ -1984,6 +1985,7 @@ export default class Insights extends React.Component<Props, State> {
               Calculating forecast…
             </Typography>
           </div>
+          <ToolScrollMemory scrollRef={this.paneRef} id="insights.scroll" />
         </GameCard>
       );
     }
@@ -2332,6 +2334,7 @@ export default class Insights extends React.Component<Props, State> {
             </ChartAnnotationsContext.Provider>
           </ChartViewportContext.Provider>
         </div>
+        <ToolScrollMemory scrollRef={this.paneRef} id="insights.scroll" />
         {this.renderPresetDialogs()}
       </GameCard>
     );

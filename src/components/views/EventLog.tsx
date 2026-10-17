@@ -24,6 +24,7 @@ import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import { isPaneLayout } from "../../Globals";
 import { EvidenceTargetType, GameType } from "../../Types";
 import OperationsPriorities from "./OperationsPriorities";
+import { ToolScrollMemory } from "../base/GameToolMemory";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -490,6 +491,10 @@ export default function EventLog(props: Props): React.JSX.Element {
           </section>
         </div>
       </div>
+      <ToolScrollMemory
+        scrollRef={evidenceAnchor}
+        id={operations ? "operations.scroll" : "events.scroll"}
+      />
     </GameCard>
   );
 }
