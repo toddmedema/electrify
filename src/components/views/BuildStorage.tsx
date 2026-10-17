@@ -1,5 +1,6 @@
 import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
+import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
   Button,
   List,
@@ -271,13 +272,18 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const closeTool = React.useContext(GameToolCloseContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
-  const [sliderTick, setSliderTick] = React.useState<number>(() =>
+  const listRef = useToolScroll<HTMLUListElement>("storage.scroll");
+  const [sliderTick, setSliderTick] = useToolState<number>("storage.size", () =>
     wToSliderTick(mostRecentBuiltSize(game.facilities, true)),
   );
-  const [exactSizes, setExactSizes] = React.useState<Record<string, number>>(
+  const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
+    "storage.exactSizes",
     {},
   );
-  const [sort, setSort] = React.useState<StorageSortKey>("buildCost");
+  const [sort, setSort] = useToolState<StorageSortKey>(
+    "storage.sort",
+    "buildCost",
+  );
 
   if (!now) {
     return <span />;
@@ -309,7 +315,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         }}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
-      <List dense className="scrollable cardList">
+      <List ref={listRef} dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem
             storage={g}

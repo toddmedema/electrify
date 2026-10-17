@@ -1,5 +1,6 @@
 import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
+import { useToolState, useToolScroll } from "../base/GameToolMemory";
 import {
   Box,
   Button,
@@ -933,15 +934,24 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
-  const [sliderTick, setSliderTick] = React.useState<number>(() =>
-    wToSliderTick(mostRecentBuiltSize(game.facilities, false)),
+  const listRef = useToolScroll<HTMLUListElement>("generators.scroll");
+  const [sliderTick, setSliderTick] = useToolState<number>(
+    "generators.size",
+    () => wToSliderTick(mostRecentBuiltSize(game.facilities, false)),
   );
   // Sizes between slider ticks, chosen per generator: hydro's site maximum or a technology's cap
-  const [exactSizes, setExactSizes] = React.useState<Record<string, number>>(
+  const [exactSizes, setExactSizes] = useToolState<Record<string, number>>(
+    "generators.exactSizes",
     {},
   );
-  const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
-  const [comparedNames, setComparedNames] = React.useState<string[]>([]);
+  const [sort, setSort] = useToolState<GeneratorSortKey>(
+    "generators.sort",
+    "buildCost",
+  );
+  const [comparedNames, setComparedNames] = useToolState<string[]>(
+    "generators.compared",
+    [],
+  );
   const [primerVisible, dismissPrimer] = useHydroPrimer();
 
   if (!now) {
@@ -1099,7 +1109,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         outputShapes={outputShapes}
         onClear={() => setComparedNames([])}
       />
-      <List dense className="scrollable cardList">
+      <List ref={listRef} dense className="scrollable cardList">
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [
             g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,

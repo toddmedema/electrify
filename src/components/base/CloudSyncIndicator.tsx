@@ -35,13 +35,13 @@ const INDICATORS: Record<IndicatorState, Indicator> = {
   },
   syncing: {
     icon: SyncRoundedIcon,
-    color: "text.secondary",
+    color: "var(--interactive-strong)",
     label: "Syncing cloud backup",
     spin: true,
   },
   offline: {
     icon: CloudOffRoundedIcon,
-    color: "text.secondary",
+    color: "var(--interactive-strong)",
     label: "Cloud backup offline",
   },
   failed: {

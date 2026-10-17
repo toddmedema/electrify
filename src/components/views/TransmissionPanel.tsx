@@ -9,6 +9,7 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
+import { useToolState } from "../base/GameToolMemory";
 import {
   DragDropContext,
   Draggable,
@@ -518,7 +519,7 @@ function tradingFlowText(game: GameType): string | null {
   const lines = game.transmission?.lines ?? [];
   if (!lines.length) return null;
   if (lines.every((line) => line.yearsToBuildLeft > 0)) {
-    return "Not connected yet";
+    return null;
   }
   const now = currentTick(game);
   const importedW = now?.importedW || 0;
@@ -582,9 +583,15 @@ export default function TransmissionPanel({
   const [cancelLine, setCancelLine] =
     React.useState<TransmissionLineOperatingType | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
-  const [tier, setTier] = React.useState(1);
+  const [tier, setTier] = useToolState(
+    projectsOnly ? "interties.tier" : undefined,
+    1,
+  );
   const theme = useTheme();
-  const [sort, setSort] = React.useState<IntertieSortKey>("yearsToBuild");
+  const [sort, setSort] = useToolState<IntertieSortKey>(
+    projectsOnly ? "interties.sort" : undefined,
+    "yearsToBuild",
+  );
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForGame(game);

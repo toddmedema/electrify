@@ -154,7 +154,10 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
             borderRadius: 4,
             border: "1px solid var(--border-strong)",
             background: "var(--bg-raised)",
-            color: "inherit",
+            color:
+              !display || display.fullscreen
+                ? "var(--font-color-faded)"
+                : "var(--interactive-strong)",
             font: "inherit",
             maxWidth: "100%",
           }}

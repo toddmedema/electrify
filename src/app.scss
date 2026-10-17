@@ -715,8 +715,8 @@ span.weak {
   margin-left: 8px;
   padding: 1px 8px;
   border-radius: var(--radius-sm);
-  background: $interactive_blue;
-  color: $bg_primary;
+  background: var(--bg-selected);
+  color: $font_color_primary;
   font-size: 0.6em;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1043,8 +1043,7 @@ $topbar_height: 56px;
     padding-inline: 8px;
     white-space: nowrap;
   }
-  // Blue text is only 3.6:1 on the light bar, so the label stays body-coloured and the icon
-  // carries the interactive blue, as the active-events chip beside it does.
+  // The icon signals the action without making the entire status line look like a link.
   .missionRiskEvent .conceptIcon {
     color: $interactive_blue;
     // Capitals sit above the middle of their line box; lift the calendar's box outline
@@ -1668,6 +1667,10 @@ $pane_header_height: 48px;
     min-height: var(--insights-control-size) !important;
     flex: 0 0 auto;
     color: $interactive_blue;
+
+    &.Mui-disabled {
+      color: $font_color_faded;
+    }
   }
 }
 
@@ -1692,6 +1695,10 @@ $pane_header_height: 48px;
     min-height: var(--insights-control-size) !important;
     flex: 0 0 auto;
     color: $interactive_blue;
+
+    &.Mui-disabled {
+      color: $font_color_faded;
+    }
   }
 }
 
@@ -1719,8 +1726,8 @@ $pane_header_height: 48px;
 }
 
 .insightsPresetEdited {
-  background: $interactive_blue;
-  color: $bg_primary;
+  background: var(--bg-selected);
+  color: $font_color_primary;
 }
 
 .insightsPresetDialog {
@@ -1840,7 +1847,7 @@ $pane_header_height: 48px;
     flex: 0 0 40px;
   }
 
-  .MuiIconButton-root {
+  .MuiIconButton-root:not(.Mui-disabled) {
     color: $interactive_blue;
   }
 }
@@ -3119,13 +3126,13 @@ $pane_header_height: 48px;
     }
   }
 
-  // Quiet but legible: faded text passes 4.5:1, where the old 70% opacity on blue did not
+  // Keep secondary actions quiet through placement while retaining their blue affordance.
   .mainMenuFooter {
     flex: 0 0 auto;
 
     .MuiIconButton-root,
     .MuiButton-root {
-      color: $font_color_faded;
+      color: var(--interactive-strong);
     }
 
     box-sizing: border-box;
@@ -3337,7 +3344,7 @@ $pane_header_height: 48px;
   }
 
   .customSetupOutlook-covered .customSetupOutlookState {
-    color: $interactive_blue;
+    color: $font_color_primary;
   }
 
   .customSetupOutlookMetrics {
@@ -3825,23 +3832,26 @@ $pane_header_height: 48px;
 
   // Which speed the clock is running at, said as a selection rather than as three enabled
   // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
-  // The selected segment is a neutral selected state rather than a solid blue fill: the clock
-  // is status, and the screen's one filled action is Build.
+  // Selection uses a surface change; every enabled speed remains a blue control.
   .speedToggles {
     .MuiToggleButton-root {
       padding: $space-1 $space-3;
       border-color: var(--border-tile);
-      color: $interactive_blue;
+      color: var(--interactive-strong);
       font-size: var(--font-size-caption);
       line-height: 1.4;
 
       &.Mui-selected {
         background: var(--bg-selected);
-        color: $font_color_primary;
+        color: var(--interactive-strong);
 
         &:hover {
           background: var(--bg-selected);
         }
+      }
+
+      &.Mui-disabled {
+        color: $font_color_faded;
       }
     }
   }
@@ -3875,7 +3885,7 @@ $pane_header_height: 48px;
     }
 
     &[data-active-speed="true"] {
-      color: $font_color_primary;
+      color: var(--interactive-strong);
     }
 
     &.Mui-selected,
@@ -3961,7 +3971,7 @@ $pane_header_height: 48px;
     min-height: var(--control-size);
     padding-inline: 8px;
     margin: -5px -8px -5px 0;
-    color: $font_color_faded;
+    color: var(--interactive-strong);
 
     &.active {
       background: var(--interactive-tint);
@@ -4008,12 +4018,12 @@ $pane_header_height: 48px;
 
     .eventLogItem {
       border-style: solid;
-      border-left: 4px solid $interactive_blue;
+      border-left: 4px solid var(--border-strong);
       background: var(--bg-primary);
 
       &.importance-NOTABLE,
       &.importance-CRITICAL {
-        border-left-color: $interactive_blue;
+        border-left-color: var(--border-strong);
         background: var(--bg-primary);
       }
     }
@@ -4032,6 +4042,10 @@ $pane_header_height: 48px;
     &.actionable {
       cursor: pointer;
 
+      .eventLogIcon {
+        color: var(--interactive-strong);
+      }
+
       &:hover,
       &:focus-visible {
         background: var(--interactive-tint);
@@ -4043,7 +4057,7 @@ $pane_header_height: 48px;
     }
 
     &.importance-NOTABLE {
-      border-left: 4px solid $interactive_blue;
+      border-left: 4px solid var(--border-strong);
     }
 
     &.importance-CRITICAL {
@@ -4337,9 +4351,7 @@ $pane_header_height: 48px;
   overflow-wrap: anywhere;
 }
 
-// The action, its explanation and the hint read as one calm block of text: weight and size set
-// them apart instead of tinted boxes, and the icon is the only color, so a glance still lands
-// on what to do.
+// The instruction is static copy; weight and size separate it from the hint below.
 .tutorialHudAction {
   display: flex;
   align-items: flex-start;
@@ -4354,7 +4366,7 @@ $pane_header_height: 48px;
     flex: none;
     width: 20px;
     height: 20px;
-    color: var(--interactive-blue);
+    color: $font_color_faded;
   }
 }
 
@@ -5035,7 +5047,7 @@ $homeSmokeCycle: 5.6s;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--font-color-primary);
+    color: var(--interactive-strong);
     font: inherit;
     cursor: pointer;
   }
@@ -5543,7 +5555,7 @@ $homeSmokeCycle: 5.6s;
   }
   > summary::after {
     content: "+";
-    color: var(--font-color-faded);
+    color: var(--interactive-strong);
   }
   &[open] > summary::after {
     content: "−";
@@ -5696,7 +5708,7 @@ $homeSmokeCycle: 5.6s;
   .facilityChevron {
     flex-shrink: 0;
     width: 20px;
-    color: var(--font-color-faded);
+    color: var(--interactive-strong);
   }
 }
 .base_main .facilityDisclosure .facility {
@@ -6060,6 +6072,7 @@ $homeSmokeCycle: 5.6s;
   font-weight: 600;
 }
 .customerProgramHowItWorks > summary {
+  color: var(--interactive-strong);
   display: flex;
   align-items: center;
   padding: 8px 0;
@@ -6079,7 +6092,7 @@ $homeSmokeCycle: 5.6s;
   font-weight: 600;
 }
 .insights .insightsTrackActions .MuiIconButton-root:not(.Mui-disabled) {
-  color: var(--font-color-faded);
+  color: var(--interactive-strong);
 }
 .insights .insightsRateMetricLabel,
 .insights .insightsRateMarkMobile {
@@ -6639,6 +6652,9 @@ $programs_column: 800px;
       font: inherit;
       text-align: left;
       cursor: pointer;
+      > svg {
+        color: var(--interactive-strong);
+      }
       .insightsRateMetrics {
         flex: 1;
       }
@@ -6869,9 +6885,9 @@ $programs_column: 800px;
   }
 }
 
-// Row chevrons are tertiary: faded, 20px, so blue stays with real actions
+// Catalog rows open detail screens; the chevron carries their blue interaction affordance.
 .rowChevron.MuiSvgIcon-root {
-  color: $font_color_faded;
+  color: var(--interactive-strong);
   font-size: 20px;
 }
 

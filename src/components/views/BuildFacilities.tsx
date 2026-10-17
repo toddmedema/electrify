@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useToolScroll } from "../base/GameToolMemory";
 import { Tab, Tabs } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
@@ -49,6 +50,7 @@ export default function BuildFacilities({
     : visibleCategories.find(([name]) => name === (category ?? card))?.[0] ||
       "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
+  const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
 
   return (
@@ -108,7 +110,7 @@ export default function BuildFacilities({
         {active === "BUILD_GENERATORS" && <BuildGeneratorsContainer />}
         {active === "BUILD_STORAGE" && <BuildStorageContainer />}
         {active === "BUILD_INTERTIES" && (
-          <div className="scrollable constructionInterties">
+          <div ref={intertiesRef} className="scrollable constructionInterties">
             <TransmissionPanel
               game={game}
               projectsOnly

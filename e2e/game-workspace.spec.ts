@@ -28,6 +28,99 @@ async function settleSheets(page: Page) {
   });
 }
 
+test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await page.locator("#insightsNav").click();
+  await page.locator("#buildNav").click();
+  const size = build.locator(".constructionCapacitySlider input");
+  await size.focus();
+  await size.press("ArrowRight");
+  const generatorSize = await size.inputValue();
+  const list = build.locator(".cardList");
+  await list.evaluate((element) => {
+    element.scrollTop = 240;
+  });
+  await expect
+    .poll(() => list.evaluate((element) => element.scrollTop))
+    .toBe(240);
+  await page.getByRole("tab", { name: "Storage", exact: true }).click();
+  await size.focus();
+  await size.press("ArrowRight");
+  await size.press("ArrowRight");
+  const storageSize = await size.inputValue();
+  await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  await size.focus();
+  await size.press("ArrowRight");
+  const tier = await size.inputValue();
+  await page.locator("#buildNav").click();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  const closedColor = await page
+    .locator("#buildNav")
+    .evaluate((element) => getComputedStyle(element).color);
+  await page.locator("#buildNav").click();
+  await expect(
+    page.getByRole("tab", { name: "Interties", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(size).toHaveValue(tier);
+  await page.getByRole("tab", { name: "Generators", exact: true }).click();
+  await expect(size).toHaveValue(generatorSize);
+  await expect
+    .poll(() => list.evaluate((element) => element.scrollTop))
+    .toBe(240);
+  await page.getByRole("tab", { name: "Storage", exact: true }).click();
+  await expect(size).toHaveValue(storageSize);
+
+  await page.locator("#programsNav").click();
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  const body = programs.locator(".customerProgramsBody");
+  const rebate = programs.getByRole("button", {
+    name: /^Efficiency rebates ·/,
+  });
+  await rebate.scrollIntoViewIfNeeded();
+  const listScroll = await body.evaluate((element) => element.scrollTop);
+  await rebate.click();
+  await expect(
+    programs.getByRole("button", { name: "Start next month", exact: true }),
+  ).toBeEnabled({ timeout: 60_000 });
+  const detailScroll = await body.evaluate((element) => {
+    element.scrollTop = Math.min(
+      120,
+      element.scrollHeight - element.clientHeight,
+    );
+    return element.scrollTop;
+  });
+  expect(detailScroll).toBeGreaterThan(0);
+  await expect
+    .poll(() => body.evaluate((element) => element.scrollTop))
+    .toBe(detailScroll);
+  await page.locator("#buildNav").click();
+  await expect(size).toHaveValue(storageSize);
+  await page.locator("#programsNav").click();
+  await expect(
+    programs.getByRole("heading", { name: "Efficiency rebates", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() => body.evaluate((element) => element.scrollTop))
+    .toBe(detailScroll);
+  await programs
+    .getByRole("button", { name: "Back to programs", exact: true })
+    .click();
+  await expect
+    .poll(() => body.evaluate((element) => element.scrollTop))
+    .toBe(listScroll);
+  await page.locator("#programsNav").click();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  await page.locator("#programsNav").click();
+  await expect
+    .poll(() => body.evaluate((element) => element.scrollTop))
+    .toBe(listScroll);
+  // Blue remains the interaction cue even with the pointer resting on a closed dock action.
+  await expect(page.locator("#buildNav")).toHaveCSS("color", closedColor);
+});
+
 async function expectFloatingDock(page: Page) {
   const [stage, facilities, dock] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
@@ -453,9 +546,11 @@ test("desktop side panels keep the dock centered and remember both rails across 
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("region", { name: "Programs", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.locator("#eventsNav")).toBeFocused();
   await page.setViewportSize({ width: 1800, height: 900 });
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  await page.locator("#programsNav").click();
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
   await expectSideRails(page);
 

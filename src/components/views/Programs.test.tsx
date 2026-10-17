@@ -7,6 +7,7 @@ import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import Programs from "./Programs";
 import { manualHelpOpen } from "../../reducers/UI";
+import { GameToolMemoryContext } from "../base/GameToolMemory";
 
 afterEach(() => {
   jest.clearAllTimers();
@@ -75,4 +76,55 @@ test("manual help keeps ownership of Escape while a program decision is open", (
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.getByRole("region", { name: "Program details" })).toBeVisible();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+test("remembers a hidden program's draft and scroll while releasing its clock pause", () => {
+  jest.useFakeTimers();
+  const game = { ...createGame({ scenarioId: 106 }), speed: "FAST" as const };
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const memory = new Map<string, unknown>();
+  const onClose = jest.fn();
+  const content = (shown: boolean, cache = memory) => (
+    <Provider store={store}>
+      <GameToolMemoryContext.Provider value={cache}>
+        {shown && <Programs onClose={onClose} />}
+      </GameToolMemoryContext.Provider>
+    </Provider>
+  );
+  const view = render(content(true));
+  const overview = screen.getByRole("region", { name: "Customer programs" });
+  fireEvent.scroll(overview, { target: { scrollTop: 180 } });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+  );
+  fireEvent.click(screen.getByRole("radio", { name: "On" }));
+  fireEvent.change(screen.getByLabelText("Daily window"), {
+    target: { value: "22" },
+  });
+  fireEvent.scroll(screen.getByRole("region", { name: "Program details" }), {
+    target: { scrollTop: 95 },
+  });
+  expect(store.getState().game.speed).toBe("PAUSED");
+  view.rerender(content(false));
+  expect(store.getState().game.speed).toBe("FAST");
+  view.rerender(content(true));
+  expect(store.getState().game.speed).toBe("PAUSED");
+  expect(screen.getByRole("radio", { name: "On" })).toBeChecked();
+  expect(screen.getByLabelText("Daily window")).toHaveValue("22");
+  expect(
+    screen.getByRole("region", { name: "Program details" }).scrollTop,
+  ).toBe(95);
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(
+    screen.getByRole("region", { name: "Customer programs" }).scrollTop,
+  ).toBe(180);
+  view.rerender(content(false));
+  view.rerender(content(true, new Map()));
+  expect(screen.queryByRole("region", { name: "Program details" })).toBeNull();
+  expect(
+    screen.getByRole("region", { name: "Customer programs" }).scrollTop,
+  ).toBe(0);
 });

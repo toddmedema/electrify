@@ -203,6 +203,7 @@ export default function MissionSummary({
         <Tooltip title="All requirements">
           <IconButton
             className="missionDetailsButton"
+            color="primary"
             aria-label="All requirements"
             onClick={onDetails}
           >
