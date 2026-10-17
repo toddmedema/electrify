@@ -73,6 +73,8 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" \"electron/**/*.cjs\" \"electron-builder.config.cjs\" --fix",
     "typecheck": "tsc --noEmit && tsc -p e2e",
     "check": "node scripts/check.js",
+    "check:ci": "node scripts/check.js --ci",
+    "ci:failures": "node scripts/ci/failures.js",
     "check:assets": "node scripts/check-assets.js",
     "fix": "npm run lint:fix && npm run format",
     "deploy": "./scripts/deploy.sh",

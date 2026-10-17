@@ -12,12 +12,17 @@ files are large, so broad rewrites create expensive review diffs.
   Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
   For missing files, stage intentional deletions or renames; otherwise restore the files.
 - Run `npm run check` once on the integrated code before handing work off. Allow several minutes,
-  depending on machine load. It runs the same gates as CI:
-  types (including `e2e/`), lint, formatting, the covered Jest suite, the long simulation suites
-  (`npm run test:sim`, which includes every scenario through the headless simulation), and a
-  short run of the simulation CLI. CI also runs the Firestore rules tests (`npm run test:rules`,
-  which needs Java 21); run them yourself when you change `firebase/firestore.rules`. It checks
-  assets first, prints each gate's result as it finishes, and continues after gate failures.
+  depending on machine load. It runs types (including `e2e/`), lint, formatting, the covered Jest
+  suite, the long simulation suites (`npm run test:sim`, which includes every scenario through
+  the headless simulation), and a short run of the simulation CLI. CI also runs the Firestore
+  rules tests (`npm run test:rules`, which needs Java 21); run them yourself when you change
+  `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
+  and continues after gate failures.
+- Before pushing a pull request, run `npm run check:ci` instead. It adds the CI gates that most
+  often fail pull requests: tick performance, the production web build and bundle-size
+  ceilings, the headless production browser suites at 1280, 390 and 320 px, and the multiplayer
+  suite against the desktop renderer. Only the packaged Electron suite stays CI-only, because
+  it opens native windows.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
   `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
   remain unchanged. A test-query lint fix does not require repeating successful simulations;
@@ -45,9 +50,10 @@ files are large, so broad rewrites create expensive review diffs.
   build; `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output. Rebaseline all of
   them with `npm run perf:rebaseline`, last, and explain the move in the PR. Append `?perf=1`
   to a dev URL for the frame-budget overlay.
-- Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and
-  run with `npm run test:e2e -- <spec> --project=desktop-chromium` when the changed path warrants
-  them. CI runs `build-options.spec.ts` and `tutorial-exit.spec.ts` on desktop and 390 px phone.
+- Build with `npm run build`. Browser-level checks live under `e2e/`. While iterating, run one
+  spec with `npm run test:e2e -- <spec> --project=desktop-chromium`, or against a production
+  build, as CI does, with `npm run test:e2e:ci -- <spec> --project=mobile-390px`.
+  `e2e/ci.playwright.config.ts` lists the specs CI runs on every pull request.
 - Keep local validation windowless: use `npm run check` and headless Chromium through
   `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
   leave it to CI unless the user explicitly requests a local native-window test. It requires
@@ -80,9 +86,20 @@ failures should be rare; agents without that hook should format the files they c
 
 ## Pull requests
 
-- After required local checks pass, create or update the PR and report remote CI's current status.
-  Keep waiting or polling for remote CI only when asked to monitor it, merge, or deliver green CI.
-  Merge the base again when needed for conflicts or relevant changes, rather than restarting
+- You own a pull request until its CI passes. Once `npm run check:ci` passes, create or update
+  the PR. Then watch the run to completion (`gh pr checks --watch`, or the app's CI monitor or
+  Auto-fix when it is available) before reporting the work as done. Do not hand off a PR with
+  CI pending or red.
+- When CI fails, run `npm run ci:failures` (or `npm run ci:failures -- <pr>`). It lists the failed
+  jobs, gates, tests and assertion excerpts, plus the local command that reproduces each
+  failure. Reproduce the failure, fix the cause, rerun the matching local gate, push, and watch
+  again. Never weaken a test, raise a ceiling or rebaseline just to get green; when a change
+  intentionally moves a ceiling, explain the move in the PR.
+- If a failure is unrelated to your change (it also fails on `master`, or it is a known flake that
+  passes on retry), rerun only the failed jobs once with `gh run rerun <run-id> --failed`. If it
+  fails again, or after three fix attempts, stop and report the failing test, the evidence and
+  your diagnosis instead of retrying further.
+- Merge the base again when needed for conflicts or relevant changes, rather than restarting
   validation for every unrelated base commit. Stop temporary preview servers when finished.
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly

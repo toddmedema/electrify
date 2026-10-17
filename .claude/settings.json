@@ -3,6 +3,8 @@
   "permissions": {
     "allow": [
       "Bash(npm run check)",
+      "Bash(npm run check:ci)",
+      "Bash(npm run ci:failures:*)",
       "Bash(npm run fix)",
       "Bash(npm run typecheck)",
       "Bash(npm run lint)",
