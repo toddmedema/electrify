@@ -333,26 +333,41 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
     contentType: "application/json",
   });
 
-  // These requests must be refused, including another custom-protocol host and
-  // attempts to read files outside the bundle. No real network access is needed.
+  // Chromium normalizes literal parent segments before the protocol handler sees
+  // them. /package.json is a public build-version endpoint, not the app's private
+  // package manifest. Both spellings must return the same timestamp from build/.
+  const versions = await page.evaluate(async () =>
+    Promise.all(
+      [
+        "electrify://app/package.json",
+        "electrify://app/../../package.json",
+      ].map(async (url) => (await (await fetch(url)).json()).version as string),
+    ),
+  );
+  expect(versions[0]).toMatch(/^\d{2}[a-z]{3,4}\d{2}-\d{4}$/);
+  expect(versions[1]).toBe(versions[0]);
+
+  // Probe a real private app file, plus encoded traversal that survives URL
+  // normalization. No real network access is needed for the blocked origins.
   const denied = await page.evaluate(async () =>
     Promise.all(
       [
         "https://example.com/",
         "http://127.0.0.1:65534/",
         "electrify://other/index.html",
-        "electrify://app/../../package.json",
+        "electrify://app/../../electron/main.cjs",
+        "electrify://app/%2e%2e%2fpackage.json",
         "file:///C:/Windows/win.ini",
       ].map(async (url) => {
         try {
-          return !(await fetch(url)).ok;
+          return { url, denied: !(await fetch(url)).ok };
         } catch {
-          return true;
+          return { url, denied: true };
         }
       }),
     ),
   );
-  expect(denied).toEqual([true, true, true, true, true]);
+  for (const result of denied) expect(result.denied, result.url).toBe(true);
 });
 
 test("the first offline walkthrough leads to a mission that saves, resumes after relaunch, and quits from the game", async () => {

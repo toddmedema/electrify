@@ -49,6 +49,20 @@ test("bundled origin rejects foreign origins, credentials and asset traversal", 
   assert.equal(isAppUrl("not a URL"), false);
 });
 
+test("URL-normalized parent segments still resolve inside the renderer bundle", () => {
+  const root = path.resolve("build");
+  for (const asset of ["package.json", "electron/main.cjs"]) {
+    const url = `electrify://app/../../${asset}`;
+    assert.equal(new URL(url).pathname, `/${asset}`);
+    assert.equal(resolveAsset(root, url), path.join(root, asset));
+    assert.notEqual(resolveAsset(root, url), path.resolve(asset));
+    assert.throws(
+      () => resolveAsset(root, `electrify://app/%2e%2e%2f${asset}`),
+      /escapes the bundle/,
+    );
+  }
+});
+
 test("privileged IPC requires the actual game main frame, never child or foreign frames", () => {
   const mainFrame = { url: "electrify://app/index.html" };
   const webContents = { mainFrame };

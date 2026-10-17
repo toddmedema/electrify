@@ -206,6 +206,7 @@
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
+      "!src/components/base/OutlookWorkerClient.ts",
       "!src/multiplayer/WorkerClient.ts",
       "!src/workers/**/*.ts",
       "!src/testing/SimCli.tsx"
