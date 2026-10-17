@@ -1,5 +1,11 @@
 import * as React from "react";
-import { FormControlLabel, Slider, Switch, Typography } from "@mui/material";
+import {
+  FormControlLabel,
+  Slider,
+  SliderProps,
+  Switch,
+  Typography,
+} from "@mui/material";
 import { GameType } from "../../Types";
 import { TICK_MINUTES } from "../../Constants";
 import {
@@ -53,6 +59,41 @@ function rateMarkLabel(
 
 function formatRateScore(points: number): string {
   return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${Math.abs(points).toLocaleString("en-US")} pts`;
+}
+
+/**
+ * Keeps the thumb local while it is moving. Dispatching every pointer step makes the entire
+ * workbench reconcile and regenerate its long-range projection before the browser can paint
+ * the next thumb position, so only the released value is committed. The slider stays mounted
+ * across commits, which keeps keyboard focus on the thumb between arrow-key steps, and adopts
+ * a committed rate that changes from elsewhere.
+ */
+function CommittedSlider({
+  committed,
+  onCommit,
+  ...props
+}: Omit<SliderProps, "value" | "defaultValue" | "onChange"> & {
+  committed: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = React.useState(committed);
+  const [synced, setSynced] = React.useState(committed);
+  if (synced !== committed) {
+    setSynced(committed);
+    setDraft(committed);
+  }
+  return (
+    <Slider
+      {...props}
+      value={draft}
+      onChange={(_event, value) =>
+        setDraft(Array.isArray(value) ? value[0] : value)
+      }
+      onChangeCommitted={(_event, value) =>
+        onCommit(Array.isArray(value) ? value[0] : value)
+      }
+    />
+  );
 }
 
 export interface RateControlsProps {
@@ -324,15 +365,10 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         id="rateSliderControl"
         data-testid="rate-slider-control"
       >
-        <Slider
-          // Keep the thumb local while it is moving. Dispatching every pointer step makes
-          // the entire workbench reconcile and regenerate its long-range projection before
-          // the browser can paint the next thumb position. The committed rate remounts this
-          // uncontrolled slider through its key, so external changes still stay in sync.
-          key={game.dollarsPerkWh}
+        <CommittedSlider
           id="rateSlider"
           disabled={!!game.replayPlayback}
-          defaultValue={game.dollarsPerkWh}
+          committed={game.dollarsPerkWh}
           aria-label="The rate you charge for electricity generation"
           valueLabelDisplay="auto"
           valueLabelFormat={(rate) =>
@@ -349,11 +385,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           min={0}
           step={investor ? 0.001 : 0.01}
           max={max}
-          onChangeCommitted={(_event, value) =>
-            onDelta({
-              dollarsPerkWh: Array.isArray(value) ? value[0] : value,
-            })
-          }
+          onCommit={(dollarsPerkWh) => onDelta({ dollarsPerkWh })}
         />
       </div>
     </section>

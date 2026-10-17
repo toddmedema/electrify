@@ -216,3 +216,31 @@ it("doesn't offer an investor-owned utility a target to follow", () => {
   renderRates(100);
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
 });
+
+it("keeps keyboard focus on the slider across committed rate steps", () => {
+  const start = createGame({ scenarioId: 100 });
+  const committed: number[] = [];
+  function Harness() {
+    const [game, setGame] = React.useState(start);
+    return (
+      <RateControls
+        game={game}
+        onDelta={(change) => {
+          committed.push(change.dollarsPerkWh!);
+          setGame((current) => ({ ...current, ...change }));
+        }}
+      />
+    );
+  }
+  render(<Harness />);
+  screen.getByRole("slider").focus();
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
+  expect(screen.getByRole("slider")).toHaveFocus();
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowRight" });
+  expect(screen.getByRole("slider")).toHaveFocus();
+  expect(committed).toHaveLength(2);
+  expect(committed[1]).toBeGreaterThan(committed[0]);
+  expect(Number(screen.getByRole("slider").getAttribute("value"))).toBe(
+    committed[1],
+  );
+});
