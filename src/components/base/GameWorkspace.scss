@@ -48,7 +48,10 @@
   align-items: stretch;
   gap: 4px;
   bottom: var(--game-dock-bottom);
-  left: 50%;
+  left: calc(
+    var(--game-fleet-left, 0px) +
+      (100% - var(--game-fleet-left, 0px) - var(--game-fleet-right, 0px)) / 2
+  );
   transform: translateX(-50%);
   width: max-content;
   max-width: calc(100% - 16px);
@@ -161,8 +164,10 @@
       font-size: 20px;
     }
   }
+  // The heading only receives focus to place a keyboard user inside the tool; it is not a
+  // control, so it never wears the global ring (which opening a tool by its shortcut triggers).
   h2:focus {
-    outline: none;
+    outline: none !important;
   }
   .MuiIconButton-root {
     width: var(--control-size);
@@ -222,7 +227,7 @@
 }
 
 // With room for a readable fleet, tools sit beside it instead of overlapping windows.
-.gameStage:not([data-layout="sheet"]) {
+.gameStage[data-layout="side"] {
   .gameToolTray {
     display: contents;
   }
@@ -234,39 +239,12 @@
     box-shadow: none;
     animation: none;
   }
-}
-
-.gameStage[data-layout="side"]:not([data-panel-count="0"]) {
-  grid-template-columns: minmax(720px, 1fr) var(--game-tool-width);
-
-  .gameToolPanel {
-    grid-column: 2;
-    border-right: 0;
-  }
-}
-
-.gameStage[data-layout="dual"] {
-  --game-decision-width: 0px;
-  --game-intelligence-width: 0px;
-  grid-template-columns:
-    var(--game-decision-width) minmax(720px, 1fr)
-    var(--game-intelligence-width);
-
-  &[data-decision-open="true"] {
-    --game-decision-width: var(--game-tool-width);
-  }
-  &[data-intelligence-open="true"] {
-    --game-intelligence-width: var(--game-tool-width);
-  }
-  .gameFleet {
-    grid-column: 2;
-  }
-  .gameToolPanel[data-tool-group="decision"] {
-    grid-column: 1;
+  // GameWorkspace sets the columns: decision tools left of the fleet, intelligence tools right
+  // of it, with the fleet never narrower than a phone. Each panel keeps its fleet-facing border.
+  .gameToolPanel[data-tool-side="decision"] {
     border-left: 0;
   }
-  .gameToolPanel[data-tool-group="intelligence"] {
-    grid-column: 3;
+  .gameToolPanel[data-tool-side="intelligence"] {
     border-right: 0;
   }
 }

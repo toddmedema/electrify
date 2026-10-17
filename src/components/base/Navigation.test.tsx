@@ -53,16 +53,17 @@ describe("Navigation", () => {
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });
 
-  it("labels hovered and keyboard-focused icons without opening a tool", async () => {
+  it("labels hovered and keyboard-focused icons with their shortcut without opening a tool", async () => {
     const onToggle = jest.fn();
     renderNavigation(onToggle);
     const build = screen.getByRole("button", { name: "Build" });
+    expect(build).toHaveAttribute("aria-keyshortcuts", "Q");
     fireEvent.pointerEnter(build, { pointerType: "mouse" });
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Build");
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q\)$/);
     fireEvent.pointerLeave(build, { pointerType: "mouse" });
     const programs = screen.getByRole("button", { name: "Programs" });
     await act(async () => programs.focus());
-    expect(screen.getByRole("tooltip", { name: "Programs" })).toBeVisible();
+    expect(screen.getByRole("tooltip", { name: "Programs (W)" })).toBeVisible();
     expect(onToggle).not.toHaveBeenCalled();
   });
 
@@ -80,7 +81,8 @@ describe("Navigation", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
     hitTest.mockReturnValue(screen.getByTestId("BuildIcon"));
     fireEvent.pointerMove(dock, { clientX: 30, clientY: 30 });
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Build");
+    // A touch preview names the tool alone: there may be no keyboard to press it on.
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
     // Native touch capture transfers from the original button to the dock.
     fireEvent.lostPointerCapture(build);
     hitTest.mockReturnValue(events);

@@ -5,7 +5,6 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
-  projectedShortfall,
   selectMissionRisk,
 } from "../../helpers/MissionStatus";
 import type { MissionRisk } from "../../helpers/MissionStatus";
@@ -28,10 +27,7 @@ type MissionStatus = ReturnType<typeof getMissionStatus>;
 function readsProjection(risk: MissionRisk | undefined): boolean {
   return !(
     risk &&
-    (risk.id === "shortage" ||
-      risk.id === "cash" ||
-      risk.id === "reliability" ||
-      risk.id.startsWith("projection:"))
+    (risk.id === "shortage" || risk.id === "cash" || risk.id === "reliability")
   );
 }
 
@@ -50,10 +46,8 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
   ) {
     return true;
   }
-  return (
-    mission.requirements.some(
-      (row) => row.id === "reliability" && row.status === "failed",
-    ) || !!projectedShortfall(game.timeline, game.date.minute)
+  return mission.requirements.some(
+    (row) => row.id === "reliability" && row.status === "failed",
   );
 }
 
@@ -61,8 +55,8 @@ function earlyRiskDue(game: GameType, mission: MissionStatus): boolean {
  * selectMissionRisk, kept off the frame that invalidates the projection behind its runway check
  * (see DeferredProjection).
  *
- * The early risks (a shortage or negative cash now, a missed reliability window, a shortfall
- * expected later today) are always judged against the current state: when one is due,
+ * The early risks (a shortage or negative cash now, a missed reliability window) are always
+ * judged against the current state: when one is due,
  * selectMissionRisk runs as usual, since it returns before the runway check. Only when none is
  * due and the projection is stale does the previous risk stay up while the new projection is
  * computed in a worker. Until it arrives after a rollover or a rate change, only what comes

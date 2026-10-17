@@ -3,7 +3,12 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import cardReducer, { initialCard } from "../../reducers/Card";
-import GameWorkspace from "./GameWorkspace";
+import GameWorkspace, {
+  MIN_FLEET_WIDTH,
+  SIDE_LAYOUT_MIN_WIDTH,
+  maxOpenTools,
+  toolWidth,
+} from "./GameWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
 jest.mock("../views/FacilitiesContainer", () => () => (
@@ -143,26 +148,52 @@ it("leaves an open tool in place while a visible modal owns Escape", async () =>
   expect(screen.queryByRole("region", { name: "Programs" })).toBeNull();
 });
 
-it("switches desktop tools only from the action bar, without panel header tabs", async () => {
+it("keeps as many tools open as fit beside a phone-width fleet", async () => {
   const { user, action } = setup(2240);
   await user.click(action("Build"));
   await user.click(action("Insights"));
-  expect(screen.getAllByRole("region")).toHaveLength(2);
-  expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
-  expect(screen.queryByRole("tablist", { name: "Intelligence" })).toBeNull();
   await user.click(action("Programs"));
-  expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
-  expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
+  expect(screen.getAllByRole("region")).toHaveLength(3);
+  expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
   expect(screen.getByRole("heading", { name: "Programs" })).toHaveFocus();
+  // Decision tools sit left of the fleet and intelligence tools right of it, in bar order.
+  expect(screen.getByRole("region", { name: "Build" }).style.gridColumn).toBe(
+    "1",
+  );
+  expect(
+    screen.getByRole("region", { name: "Programs" }).style.gridColumn,
+  ).toBe("2");
+  expect(
+    screen.getByRole("region", { name: "Insights" }).style.gridColumn,
+  ).toBe("4");
+  // A fourth tool doesn't fit at this width, so the least recently opened one steps aside.
   await user.click(action("Events"));
-  expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
-  expect(screen.getByRole("region", { name: "Events" })).toBeVisible();
-  expect(screen.getAllByRole("region")).toHaveLength(2);
+  expect(screen.getAllByRole("region")).toHaveLength(3);
+  expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
+  expect(action("Build")).toHaveAttribute("aria-expanded", "false");
   expect(screen.queryByRole("button", { name: /^(?:Unpin|Pin) /i })).toBeNull();
   await user.click(action("Events"));
   expect(screen.queryByRole("region", { name: "Events" })).toBeNull();
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Insights" })).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
+});
+
+it.each([
+  [1199, 1],
+  [1229, 1],
+  [1280, 2],
+  [1512, 2],
+  [1920, 3],
+  [2560, 4],
+  [5120, 4],
+])("fits %ipx with %i tools open", (width, tools) => {
+  expect(maxOpenTools(width)).toBe(tools);
+  // Sheets float over the fleet; columns must leave it at least phone width.
+  expect(
+    width < SIDE_LAYOUT_MIN_WIDTH ||
+      width - tools * toolWidth(width) >= MIN_FLEET_WIDTH,
+  ).toBe(true);
 });
 
 it("keeps the active tool mounted when narrowing and restores both rails when widened", async () => {
@@ -186,7 +217,7 @@ it("keeps the active tool mounted when narrowing and restores both rails when wi
 });
 
 it("reveals a remembered compact tool instead of toggling an unseen rail closed", async () => {
-  const { user, action } = setup(1600);
+  const { user, action } = setup(1000);
   await user.click(action("Insights"));
   await user.click(action("Programs"));
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
@@ -203,26 +234,24 @@ it("reveals a remembered compact tool instead of toggling an unseen rail closed"
   expect(screen.queryByRole("region", { name: "Insights" })).toBeNull();
 });
 
-it("switches at layout boundaries without discarding the other group's selection", async () => {
-  const { user, action } = setup(1800);
+it("switches at layout boundaries without discarding the other open tool", async () => {
+  const { user, action } = setup(1230);
   await user.click(action("Events"));
   await user.click(action("Programs"));
   expect(screen.getAllByRole("region")).toHaveLength(2);
-  resize(1799);
+  resize(1229);
   expect(screen.getAllByRole("region")).toHaveLength(1);
-  expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
-  resize(1200);
   expect(screen.getByRole("heading", { name: "Programs" })).toBeVisible();
   resize(1199);
   expect(screen.queryByRole("tablist", { name: "Decisions" })).toBeNull();
   expect(screen.getByRole("region", { name: "Programs" })).toBeVisible();
-  resize(1800);
+  resize(1230);
   expect(screen.getAllByRole("region")).toHaveLength(2);
   expect(screen.getByRole("region", { name: "Events" })).toBeVisible();
 });
 
 it("retains Build tab focus and restores its category after closing another tool", async () => {
-  const { store, user, action } = setup(1600);
+  const { store, user, action } = setup(1000);
   await user.click(action("Build"));
   const storage = screen.getByRole("tab", { name: "Storage" });
   await user.click(storage);

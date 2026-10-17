@@ -42,7 +42,9 @@ it("describes native fullscreen and saves a window size through the preload brid
   await waitFor(() =>
     expect(screen.getByRole("switch", { name: "Fullscreen" })).toBeChecked(),
   );
-  expect(screen.getByRole("combobox", { name: "Resolution" })).toBeDisabled();
+  expect(
+    screen.queryByRole("combobox", { name: "Resolution" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByText(/monitor's native resolution/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("switch", { name: "Fullscreen" }));
   await waitFor(() =>
@@ -134,7 +136,9 @@ it("keeps focus and displays the canonical native result before later shortcuts 
   );
   act(() => update?.({ ...state, display: { ...state.display } }));
   expect(fullscreen).toBeChecked();
-  expect(screen.getByRole("combobox", { name: "Resolution" })).toBeDisabled();
+  expect(
+    screen.queryByRole("combobox", { name: "Resolution" }),
+  ).not.toBeInTheDocument();
 });
 
 it("serializes the latest fullscreen and resolution intent without reverting it on earlier native events", async () => {
@@ -146,13 +150,13 @@ it("serializes the latest fullscreen and resolution intent without reverting it 
     .mockReturnValueOnce(second.promise);
   render(<DesktopDisplaySettings />);
   const fullscreen = screen.getByRole("switch", { name: "Fullscreen" });
-  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   await waitFor(() => expect(fullscreen).toBeEnabled());
   fireEvent.click(fullscreen);
   fireEvent.click(fullscreen);
   expect(fullscreen).toBeChecked();
   fireEvent.click(fullscreen);
   expect(fullscreen).not.toBeChecked();
+  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   act(() => resolution.focus());
   fireEvent.change(resolution, { target: { value: "800x600" } });
   fireEvent.change(resolution, { target: { value: "800x600" } });
@@ -217,9 +221,9 @@ it("keeps the last confirmed display if a queued change fails and native state c
     .mockReturnValueOnce(second.promise);
   render(<DesktopDisplaySettings />);
   const fullscreen = screen.getByRole("switch", { name: "Fullscreen" });
-  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   await waitFor(() => expect(fullscreen).toBeEnabled());
   fireEvent.click(fullscreen);
+  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   act(() => resolution.focus());
   fireEvent.change(resolution, { target: { value: "800x600" } });
   await act(async () => first.resolve({ ...state.display, fullscreen: false }));
@@ -250,11 +254,11 @@ it("reflects the actual native display after both applying and rolling back fail
   );
   render(<DesktopDisplaySettings />);
   const fullscreen = screen.getByRole("switch", { name: "Fullscreen" });
-  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   await waitFor(() => expect(fullscreen).toBeEnabled());
   act(() => fullscreen.focus());
   fireEvent.click(fullscreen);
   expect(fullscreen).not.toBeChecked();
+  const resolution = screen.getByRole("combobox", { name: "Resolution" });
   expect(resolution).toHaveValue("1280x720");
   await act(async () => failed.reject(new Error("apply and rollback failed")));
   expect(await screen.findByRole("alert")).toHaveTextContent(

@@ -27,7 +27,7 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
   // Step one asks for a tap on the coal plant; step two is the supply/demand chart, which runs
   // edge to edge in every layout.
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await expect(hud.getByText("Find the supply and demand lines")).toBeVisible();
+  await expect(hud.getByText("Tap the supply and demand chart")).toBeVisible();
   const chart = page.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
   // On short viewports the chart can sit below the fold; bring it into view like a player

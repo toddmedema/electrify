@@ -8,7 +8,6 @@ import EventLog, { DispatchProps, StateProps } from "./EventLog";
 import type { AppDispatch } from "../../Store";
 import { markEventsRead } from "../../reducers/Game";
 import { focusEvidence, openEvidence } from "../../helpers/Evidence";
-import { selectFacility } from "../../reducers/UI";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
@@ -77,7 +76,6 @@ export const makeMapStateToProps = () => {
       game.seed !== previous.game.seed ||
       game.inGame !== previous.game.inGame ||
       state.ui.evidenceRequest !== previous.ui.evidenceRequest ||
-      state.ui.selectedFacilityId !== previous.ui.selectedFacilityId ||
       throttle.due(game.date.minute, 10)
     ) {
       const ongoing = selectOngoing(state);
@@ -97,7 +95,6 @@ export const makeMapStateToProps = () => {
     }
     return {
       ...presented,
-      selectedFacilityId: state.ui.selectedFacilityId,
       evidenceRequest: state.ui.evidenceRequest,
       facilityDragActive: state.ui.facilityDragActive,
     };
@@ -107,10 +104,6 @@ export const makeMapStateToProps = () => {
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
   onEvidence: (target) => {
     dispatch(openEvidence(target));
-  },
-  onFacility: (id) => {
-    dispatch(selectFacility(id));
-    dispatch(openEvidence({ card: "INSIGHTS", layer: "SUPPLY_DEMAND" }));
   },
   onEvidenceReady: (request, element) => {
     dispatch(focusEvidence(request, element));

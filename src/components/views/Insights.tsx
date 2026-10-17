@@ -1231,14 +1231,6 @@ export default class Insights extends React.Component<Props, State> {
         className="insightsLayerPanel"
         aria-label="Data layers"
       >
-        <Typography
-          className="insightsLayerHint"
-          variant="body2"
-          color="textSecondary"
-        >
-          Choose charts below, then use each chart’s arrows to change their
-          order.
-        </Typography>
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
             (layer) =>

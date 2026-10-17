@@ -97,43 +97,6 @@ for (const layout of [
   });
 }
 
-test("a committed project links its actual asset to grid evidence", async ({
-  page,
-}, testInfo) => {
-  await page.setViewportSize({ width: 1600, height: 1200 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.addInitScript(() => {
-    localStorage.clear();
-    localStorage.setItem("theme", "dark");
-  });
-  await page.goto("/?scenario=106");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await page.locator(".button-buildFacility").click();
-  await page.getByRole("slider", { name: /^Capacity/ }).press("Home");
-  await page
-    .getByRole("button", { name: "Review purchase of Solar", exact: true })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash", exact: true })
-    .click();
-  const project = page.getByRole("button", {
-    name: "Inspect Solar project and grid output",
-  });
-  await expect(project).toContainText("Committed");
-  await expect(project).toContainText("No output yet");
-  await project.click();
-  await expect(project).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator('[data-layer="supplyDemand"]')).toBeVisible();
-  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, {
-    timeout: 15000,
-  });
-  await page.getByRole("heading", { name: "Projects & outcomes" }).click();
-  await page.screenshot({
-    path: testInfo.outputPath("operations-project-dark.png"),
-  });
-});
-
 test("history stays below priorities in a short pane without duplicate upcoming events", async ({
   page,
 }, testInfo) => {

@@ -107,69 +107,67 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
           onChange={(_event, fullscreen) => void change({ fullscreen })}
         />
       </Box>
-      <Box
-        className="settingsRow"
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "minmax(0, 1fr)",
-            sm: "minmax(0, 1fr) auto",
-          },
-          gap: 1.5,
-          alignItems: "center",
-          p: 2,
-        }}
-      >
-        <Box>
-          <Typography
-            component="label"
-            htmlFor="desktop-resolution"
-            sx={{ fontWeight: 600 }}
-          >
-            Window resolution
-          </Typography>
-          <Typography
-            id="desktop-resolution-help"
-            variant="body2"
-            color="text.secondary"
-          >
-            Applies in windowed mode. Display choices are saved for your next
-            launch.
-          </Typography>
-        </Box>
-        <select
-          id="desktop-resolution"
-          aria-label="Resolution"
-          aria-describedby="desktop-resolution-help"
-          disabled={!display || display.fullscreen}
-          aria-busy={busy}
-          value={display ? `${display.width}x${display.height}` : ""}
-          onChange={(event) => {
-            const [width, height] = event.target.value.split("x").map(Number);
-            void change({ width, height });
-          }}
-          style={{
-            minHeight: 44,
-            padding: "8px 12px",
-            borderRadius: 4,
-            border: "1px solid var(--border-strong)",
-            background: "var(--bg-raised)",
-            color:
-              !display || display.fullscreen
-                ? "var(--font-color-faded)"
-                : "var(--interactive-strong)",
-            font: "inherit",
-            maxWidth: "100%",
+      {/* Fullscreen always uses the monitor's native resolution, so the window size only
+          matters (and only appears) in windowed mode. */}
+      {display && !display.fullscreen && (
+        <Box
+          className="settingsRow"
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "minmax(0, 1fr)",
+              sm: "minmax(0, 1fr) auto",
+            },
+            gap: 1.5,
+            alignItems: "center",
+            p: 2,
           }}
         >
-          {!display && <option value="">Loading display…</option>}
-          {display?.resolutions.map(({ width, height }) => (
-            <option key={`${width}x${height}`} value={`${width}x${height}`}>
-              {width} × {height}
-            </option>
-          ))}
-        </select>
-      </Box>
+          <Box>
+            <Typography
+              component="label"
+              htmlFor="desktop-resolution"
+              sx={{ fontWeight: 600 }}
+            >
+              Window resolution
+            </Typography>
+            <Typography
+              id="desktop-resolution-help"
+              variant="body2"
+              color="text.secondary"
+            >
+              Display choices are saved for your next launch.
+            </Typography>
+          </Box>
+          <select
+            id="desktop-resolution"
+            aria-label="Resolution"
+            aria-describedby="desktop-resolution-help"
+            aria-busy={busy}
+            value={`${display.width}x${display.height}`}
+            onChange={(event) => {
+              const [width, height] = event.target.value.split("x").map(Number);
+              void change({ width, height });
+            }}
+            style={{
+              minHeight: 44,
+              padding: "8px 12px",
+              borderRadius: 4,
+              border: "1px solid var(--border-strong)",
+              background: "var(--bg-raised)",
+              color: "var(--interactive-strong)",
+              font: "inherit",
+              maxWidth: "100%",
+            }}
+          >
+            {display.resolutions.map(({ width, height }) => (
+              <option key={`${width}x${height}`} value={`${width}x${height}`}>
+                {width} × {height}
+              </option>
+            ))}
+          </select>
+        </Box>
+      )}
       {error && (
         <Alert severity="error" role="alert" sx={{ m: 2 }}>
           {error}

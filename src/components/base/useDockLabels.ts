@@ -3,9 +3,14 @@ import * as React from "react";
 const LONG_PRESS_MS = 500;
 const MOVE_TOLERANCE_PX = 10;
 
-/** Hover/focus labels, plus a touch-only hold-and-slide preview that never activates a tool. */
+/**
+ * Hover/focus labels, plus a touch-only hold-and-slide preview that never activates a tool.
+ * `fromTouch` says the label came from that preview: a mouse or keyboard focus suggests a
+ * physical keyboard is at hand, so only those labels are worth a keyboard shortcut.
+ */
 export default function useDockLabels() {
   const [labelId, setLabelId] = React.useState<string>();
+  const [fromTouch, setFromTouch] = React.useState(false);
   const dockRef = React.useRef<HTMLElement>(null);
   const timer = React.useRef<ReturnType<typeof setTimeout>>();
   const gesture = React.useRef<{
@@ -36,16 +41,22 @@ export default function useDockLabels() {
 
   return {
     labelId,
+    fromTouch,
     buttonLabels: {
       onPointerEnter: (event: React.PointerEvent<HTMLButtonElement>) => {
-        if (event.pointerType === "mouse") setLabelId(event.currentTarget.id);
+        if (event.pointerType === "mouse") {
+          setFromTouch(false);
+          setLabelId(event.currentTarget.id);
+        }
       },
       onPointerLeave: (event: React.PointerEvent<HTMLButtonElement>) => {
         if (event.pointerType === "mouse") setLabelId(undefined);
       },
       onFocus: (event: React.FocusEvent<HTMLButtonElement>) => {
-        if (event.currentTarget.matches(":focus-visible"))
+        if (event.currentTarget.matches(":focus-visible")) {
+          setFromTouch(false);
           setLabelId(event.currentTarget.id);
+        }
       },
       onBlur: () => setLabelId(undefined),
     },
@@ -64,6 +75,7 @@ export default function useDockLabels() {
           if (!current) return;
           current.preview = true;
           suppressClick.current = true;
+          setFromTouch(true);
           dockRef.current?.setPointerCapture?.(pointerId);
           labelAt(x, y);
         }, LONG_PRESS_MS);
