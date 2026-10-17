@@ -821,31 +821,79 @@ function PolicyProgramDetail({
 
 type Selection = PolicyId | "wildfire";
 
-function ProgramsScreen({ onClose }: { onClose: () => void }) {
+export function ProgramsScreen({
+  onClose,
+  embedded = false,
+  pricing,
+}: {
+  onClose: () => void;
+  embedded?: boolean;
+  pricing?: React.ReactNode;
+}) {
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
+  const activeCard = useAppSelector((s) => s.card?.name);
   const token = React.useId();
+  const [selected, setSelected] = React.useState<Selection>();
+  const [tier, setTier] = React.useState<PolicyTier>("Off");
+  const [startHour, setStartHour] = React.useState(17);
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+  const screenRef = React.useRef<HTMLDivElement>(null);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const lastSelection = React.useRef<Selection>();
+  React.useLayoutEffect(() => {
+    if (!embedded) return;
+    if (selected) {
+      lastSelection.current = selected;
+      headingRef.current?.focus();
+    } else if (lastSelection.current) {
+      const name =
+        lastSelection.current === "wildfire"
+          ? "Wildfire preparedness"
+          : POLICIES[lastSelection.current].name;
+      Array.from(
+        bodyRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+      )
+        .find((button) =>
+          button.getAttribute("aria-label")?.startsWith(`${name} ·`),
+        )
+        ?.focus();
+    }
+  }, [embedded, selected]);
   React.useEffect(() => {
+    if (embedded && !selected) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !manualOpen) {
+      if (
+        embedded &&
+        event.target instanceof Node &&
+        !screenRef.current?.contains(event.target)
+      ) {
+        const otherTool =
+          event.target instanceof Element &&
+          event.target.closest("[data-game-tool]");
+        if (otherTool || activeCard !== "PROGRAMS") return;
+      }
+      if (event.key === "Escape" && !manualOpen && !event.defaultPrevented) {
         event.preventDefault();
         event.stopPropagation();
-        onClose();
+        if (embedded) setSelected(undefined);
+        else onClose();
       }
     };
     document.addEventListener("keydown", closeOnEscape, true);
     return () => document.removeEventListener("keydown", closeOnEscape, true);
-  }, [onClose, manualOpen]);
-  const [selected, setSelected] = React.useState<Selection>();
-  const [tier, setTier] = React.useState<PolicyTier>("Off");
-  const [startHour, setStartHour] = React.useState(17);
+  }, [onClose, manualOpen, embedded, selected, activeCard]);
+  // A docked overview may stay open while playing. Freeze time only while reviewing an
+  // individual decision; the standalone screen retains its existing pause behavior.
+  const reviewingDecision = !embedded || !!selected;
   React.useEffect(() => {
+    if (!reviewingDecision || game.replayPlayback) return;
     dispatch(openPolicyDecision(token));
     return () => {
       dispatch(closePolicyDecision(token));
     };
-  }, [dispatch, token]);
+  }, [dispatch, token, reviewingDecision, game.replayPlayback]);
   const snapshot = useEstimateSnapshot(game);
   const policiesOn = policyAvailable(game);
   const preparedness = wildfirePreparedness(game);
@@ -939,51 +987,61 @@ function ProgramsScreen({ onClose }: { onClose: () => void }) {
       ? "Wildfire preparedness"
       : POLICIES[selected].name
     : undefined;
-  return (
-    <Dialog
-      open
-      fullScreen
-      onClose={onClose}
-      aria-labelledby="program-title"
-      data-customer-programs="true"
-      className="customerProgramsScreen"
-    >
-      <header className="constructionHeader">
-        <CatalogTitleBar
-          disableGutters
-          icon={<GroupsIcon fontSize="small" aria-hidden />}
-          title={
-            // Phones abbreviate the title so it still shares a line with close
-            <>
-              <span className="programsTitleLong">Customer programs</span>
-              <span className="programsTitleShort">Programs</span>
-            </>
-          }
-          compactCash
-          titleComponent="h1"
-          titleId="program-title"
-          cash={cash}
-          onClose={onClose}
-          closeLabel="Close customer programs"
-        />
-      </header>
+  const content = (
+    <>
+      {!embedded && (
+        <header className="constructionHeader">
+          <CatalogTitleBar
+            disableGutters
+            icon={<GroupsIcon fontSize="small" aria-hidden />}
+            title={
+              // Phones abbreviate the title so it still shares a line with close
+              <>
+                <span className="programsTitleLong">Customer programs</span>
+                <span className="programsTitleShort">Programs</span>
+              </>
+            }
+            compactCash
+            titleComponent="h1"
+            titleId="program-title"
+            cash={cash}
+            onClose={onClose}
+            closeLabel="Close customer programs"
+          />
+        </header>
+      )}
       <div
+        ref={bodyRef}
         className="customerProgramsBody"
         role="region"
-        aria-label={title ?? "Programs"}
+        aria-label={
+          embedded
+            ? title
+              ? "Program details"
+              : "Customer programs"
+            : (title ?? "Programs")
+        }
       >
         {!selected ? (
-          <ProgramList
-            game={game}
-            programs={programs}
-            policiesOn={policiesOn}
-            preparedness={preparedness}
-            onOpen={open}
-            onOpenWildfire={() => setSelected("wildfire")}
-          />
+          <>
+            {pricing}
+            <ProgramList
+              game={game}
+              programs={programs}
+              policiesOn={policiesOn}
+              preparedness={preparedness}
+              onOpen={open}
+              onOpenWildfire={() => setSelected("wildfire")}
+            />
+          </>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography component="h2" variant="h6">
+            <Typography
+              component="h2"
+              variant="h6"
+              tabIndex={-1}
+              ref={headingRef}
+            >
               {title}
             </Typography>
             {selected === "wildfire" ? (
@@ -1099,6 +1157,27 @@ function ProgramsScreen({ onClose }: { onClose: () => void }) {
               )}
         </div>
       )}
+    </>
+  );
+  return embedded ? (
+    <div
+      ref={screenRef}
+      className="customerProgramsEmbedded"
+      data-customer-programs="true"
+      data-program-decision={selected ? "true" : undefined}
+    >
+      {content}
+    </div>
+  ) : (
+    <Dialog
+      open
+      fullScreen
+      onClose={onClose}
+      aria-labelledby="program-title"
+      data-customer-programs="true"
+      className="customerProgramsScreen"
+    >
+      {content}
     </Dialog>
   );
 }

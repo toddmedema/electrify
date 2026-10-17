@@ -1160,8 +1160,7 @@ $topbar_height: 56px;
   }
 }
 
-.gridHealthSummary,
-.gridHealthState {
+.gridHealthSummary {
   display: flex;
   align-items: center;
 }
@@ -1171,26 +1170,20 @@ $topbar_height: 56px;
   gap: 8px;
 }
 
-.gridHealthState {
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.gridHealth .statusLabel,
 .gridHealthMetric {
   font-weight: 400;
 }
 
 .gridHealthMetric {
-  margin-left: auto;
-  min-width: 8.5rem;
-  text-align: right;
+  margin-left: 0;
+  min-width: 0;
+  text-align: left;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .gridHealth-stable .conceptIcon {
-  color: $interactive_blue;
+  color: $font_color_faded;
 }
 
 // One warning language for the grid readout and the mission tracker, so "Low reserve" and
@@ -1348,7 +1341,6 @@ $topbar_height: 56px;
     padding-inline: max(16px, env(safe-area-inset-left))
       max(16px, env(safe-area-inset-right));
     border: 0;
-    border-right: 1px solid var(--border-subtle);
   }
   .gameStatusBar .gridHealthSummary {
     flex-wrap: wrap;
@@ -1363,8 +1355,7 @@ $topbar_height: 56px;
   }
 }
 
-// Phones and narrow tablets keep the readout in its own intentional row: state on the left,
-// operational cushion on the right.
+// Phones and narrow tablets keep the status together in one left-aligned readout.
 @media #{$single_pane_media} {
   .gridHealth {
     box-sizing: border-box;
@@ -1375,8 +1366,7 @@ $topbar_height: 56px;
       max(16px, env(safe-area-inset-left));
 
     .gridHealthSummary {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
+      display: flex;
       width: 100%;
     }
 
@@ -1386,7 +1376,7 @@ $topbar_height: 56px;
 
     .gridHealthMetric {
       min-width: 0;
-      text-align: right;
+      text-align: left;
     }
   }
   // With an event beside it the readout turns into one row: state and cushion on the left,
@@ -6989,7 +6979,7 @@ $programs_column: 800px;
   }
 }
 
-// Phones: grid health and the mission share one 44px status row ("Stable · +84MW" on the left,
+// Phones: grid health and the mission share one 44px status row ("Stable, 84 MW" on the left,
 // the mission and its info button on the right) instead of two 56px rows, so the game starts
 // higher up the screen. When the grid readout also carries an event chip there isn't room for
 // both, and the mission wraps onto its own row as before.
@@ -7023,7 +7013,7 @@ $programs_column: 800px;
     }
 
     .gridHealthMetric {
-      text-align: right;
+      text-align: left;
       white-space: nowrap;
     }
   }

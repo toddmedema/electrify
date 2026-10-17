@@ -180,7 +180,17 @@ describe("onTutorialStep", () => {
         currentCard: cardOf(steps[capstone - 1])!,
       });
 
-      expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
+      expect(dispatched.map((action) => action.type)).toEqual(
+        mission === "Mission 4: Finances"
+          ? ["card/navigate", "game/delta"]
+          : ["game/delta"],
+      );
+      expect(navigatedTo(dispatched)).toBe(
+        mission === "Mission 4: Finances" ? "PROGRAMS" : undefined,
+      );
+      expect(dispatched[dispatched.length - 1].payload).toEqual({
+        tutorialStep: capstone,
+      });
     },
   );
 

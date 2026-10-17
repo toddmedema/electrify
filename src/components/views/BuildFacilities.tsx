@@ -17,6 +17,7 @@ import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
+import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 
 const categories = [
   ["BUILD_GENERATORS", "Generators", "Generator"],
@@ -24,8 +25,15 @@ const categories = [
   ["BUILD_INTERTIES", "Interties", "Intertie"],
 ] as const;
 
-export default function BuildFacilities(): React.JSX.Element {
+export default function BuildFacilities({
+  embedded = false,
+  category,
+}: {
+  embedded?: boolean;
+  category?: string;
+}): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const closeTool = React.useContext(GameToolCloseContext);
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
   const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
@@ -38,23 +46,28 @@ export default function BuildFacilities(): React.JSX.Element {
   );
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
-    : visibleCategories.find(([name]) => name === card)?.[0] ||
+    : visibleCategories.find(([name]) => name === (category ?? card))?.[0] ||
       "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
-  const close = () => dispatch(navigate("FACILITIES"));
+  const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
 
   return (
-    <div id="topbar" className="flexContainer screenCatalog buildFacilities">
+    <div
+      id={embedded ? undefined : "topbar"}
+      className="flexContainer screenCatalog buildFacilities"
+    >
       <header className="constructionHeader">
-        <CatalogTitleBar
-          icon={<ConceptIcon concept="build" fontSize="small" />}
-          title="Build"
-          cash={cash}
-          onClose={close}
-          closeButtonId="close-button"
-          // The build screen stands in for the game bar, so tutorials find its speeds here
-          speedControlId="speedChangeButtons"
-        />
+        {!embedded && (
+          <CatalogTitleBar
+            icon={<ConceptIcon concept="build" fontSize="small" />}
+            title="Build"
+            cash={cash}
+            onClose={close}
+            closeButtonId="close-button"
+            // The build screen stands in for the game bar, so tutorials find its speeds here
+            speedControlId="speedChangeButtons"
+          />
+        )}
         {!introductoryChoices && (
           <Tabs
             className="constructionTabs"

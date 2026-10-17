@@ -1,3 +1,4 @@
+import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 import * as React from "react";
 import {
   Button,
@@ -267,6 +268,7 @@ export interface DispatchProps {
 export type Props = StateProps & DispatchProps;
 
 export default function StorageBuildDialog(props: Props): React.JSX.Element {
+  const closeTool = React.useContext(GameToolCloseContext);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const [sliderTick, setSliderTick] = React.useState<number>(() =>
@@ -321,7 +323,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             location={game.location}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
-              onBack();
+              (closeTool ?? onBack)();
             }}
           />
         ))}

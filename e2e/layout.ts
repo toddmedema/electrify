@@ -1,24 +1,11 @@
 import { expect, Locator, Page } from "@playwright/test";
 
 /**
- * Whether the app renders its game panes side by side at this page's viewport.
- *
- * Mirrors isPaneLayout() in src/Globals. The tutorial's navigation steps advance on their
- * own in that layout but wait for a tap in single-pane mode, so the specs that walk a
- * walkthrough must know which flow they are in rather than assume it from the project name.
+ * Tools open deliberately from the dock at every width. Keep this compatibility helper for
+ * existing walkthrough specs: a wide screen no longer opens Insights and Events automatically.
  */
-export function isPaneLayout(page: Page): boolean {
-  const { width, height } = page.viewportSize()!;
-  if (width >= 1024) {
-    return true;
-  }
-  const aspectRatio = width / height;
-  return (
-    width >= 700 &&
-    height >= 600 &&
-    aspectRatio >= 4 / 5 &&
-    aspectRatio <= 5 / 4
-  );
+export function isPaneLayout(_page: Page): boolean {
+  return false;
 }
 
 /**
@@ -68,7 +55,7 @@ export async function waitForSettled(
 }
 
 /**
- * Show a game pane, opening it from the bottom navigation only when this width needs to.
+ * Show a game tool, opening it from the dock when it is closed.
  * Returns whether the nav button was clicked.
  */
 export async function openPane(
@@ -78,6 +65,18 @@ export async function openPane(
   await waitForPaneOrNav(pane, navButton);
   const visiblePane = pane.filter({ visible: true });
   if ((await visiblePane.count()) > 0) {
+    // Facilities stays mounted behind the tools. Returning to the fleet means closing the
+    // sheets covering it, including pinned tools, before a caller tries its row actions.
+    if (
+      await visiblePane
+        .first()
+        .evaluate((element) => element.classList.contains("facilities"))
+    ) {
+      const closes = pane
+        .page()
+        .locator(".gameToolHeader button[aria-label^='Close ']");
+      while ((await closes.count()) > 0) await closes.first().click();
+    }
     return false;
   }
   await navButton.filter({ visible: true }).first().click();

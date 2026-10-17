@@ -86,8 +86,7 @@ for (const mission of [
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();
-      // The step after the pause is the navigation itself. Wide layouts advance it on their
-      // own; narrow layouts wait for the player to tap the bottom navigation.
+      // The step after the pause teaches opening Insights from the game dock.
       if (!isPaneLayout(page)) {
         await expect(
           page.getByRole("heading", { name: "Step 3 of 14" }),
@@ -103,10 +102,15 @@ for (const mission of [
         page.getByRole("heading", { name: "Step 4 of 14" }),
       ).toBeVisible();
     } else {
-      const nav = page.locator("#insightsNav");
-      await waitForPaneOrNav(page.locator(".insights"), nav);
-      // In the pane layout the navigation step advanced on its own, so there is no Next to
-      // press and the click is at most a no-op on the card it already opened
+      const nav = page.locator(
+        mission === "Pricing" ? "#programsNav" : "#insightsNav",
+      );
+      await waitForPaneOrNav(
+        page.locator(
+          mission === "Pricing" ? ".customerProgramsBody" : ".insights",
+        ),
+        nav,
+      );
       if (await nav.isVisible()) {
         await nav.click();
       }

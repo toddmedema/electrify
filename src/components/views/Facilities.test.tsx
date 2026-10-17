@@ -84,7 +84,6 @@ function renderFacilities(
       <Facilities
         game={game}
         selectedFacilityId={selected}
-        onGeneratorBuild={() => undefined}
         onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
@@ -241,7 +240,6 @@ describe("the fleet list", () => {
     const props: React.ComponentProps<typeof Facilities> = {
       game: initial,
       selectedFacilityId: null,
-      onGeneratorBuild: noop,
       onStorageBuild: noop,
       onTransmissionBuild: noop,
       onTransmissionUpgrade: noop,
@@ -319,7 +317,6 @@ describe("the fleet list", () => {
     const props: React.ComponentProps<typeof Facilities> = {
       game: fast,
       selectedFacilityId: null,
-      onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
       onTransmissionBuild: () => undefined,
       onTransmissionUpgrade: () => undefined,
@@ -630,10 +627,10 @@ describe("the interties view", () => {
     }
   });
 
-  it("hides the empty interties section while keeping the build action in Mission 7", () => {
+  it("hides the empty interties section in Mission 7", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
     expect(screen.queryByText(/Plants & storage/)).toBeNull();
     expect(screen.queryByText(/Interties/)).toBeNull();
   });

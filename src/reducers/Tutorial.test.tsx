@@ -1,7 +1,6 @@
 import { configureStore, UnknownAction } from "@reduxjs/toolkit";
 import * as React from "react";
 import { getPlayedScenarioIds } from "../LocalStorage";
-import { isPaneLayout } from "../Globals";
 import {
   AppStateType,
   CardNameType,
@@ -24,16 +23,6 @@ import {
 } from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
-
-// Registered above the imports by babel's jest.mock hoisting, so the scenario step predicates
-// (which call isPaneLayout) see the mock. Kept after the imports for import/first.
-jest.mock("../Globals", () => ({
-  ...jest.requireActual("../Globals"),
-  isPaneLayout: jest.fn(),
-}));
-const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
-  typeof isPaneLayout
->;
 
 function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
   return {
@@ -352,16 +341,15 @@ describe("tutorialGateMiddleware", () => {
   });
 });
 
-describe("navigation steps that teach the Insights and Events switch", () => {
-  afterEach(() => {
-    mockIsPaneLayout.mockReset();
-  });
-
-  it.each([4, 3])(
-    "gates the mission %s opening on the navigation itself",
-    (id) => {
+describe("navigation steps that teach the game dock", () => {
+  it.each([
+    [4, "INSIGHTS", "#insightsNav"],
+    [3, "PROGRAMS", "#programsNav"],
+  ] as const)(
+    "gates the mission %s opening on its dock action",
+    (id, _card, target) => {
       const [opening] = getScenario(id)!.tutorialSteps!;
-      expect(opening.target).toBe("#insightsNav");
+      expect(opening.target).toBe(target);
       // Gated, not a quiet Next that still jumps the player
       expect(opening.advanceOn).toBeDefined();
       expect(opening.continueOn).toBeUndefined();
@@ -380,27 +368,26 @@ describe("navigation steps that teach the Insights and Events switch", () => {
       const insights = name !== "EVENTS";
       expect(step.advanceOn).toBeDefined();
       expect(step.target).toBe(insights ? "#insightsNav" : "#eventsNav");
-      expect(step.desktop?.target).toBe(
-        insights ? "#insightsPane" : "#eventsPane",
-      );
+      expect(step.desktop).toBeUndefined();
     }
   });
 
-  it.each([4, 3])(
-    "advances the mission %s opening when the player navigates to Insights",
-    (id) => {
-      mockIsPaneLayout.mockReturnValue(false);
+  it.each([
+    [4, "INSIGHTS"],
+    [3, "PROGRAMS"],
+  ] as const)(
+    "advances the mission %s opening when the player opens %s",
+    (id, card) => {
       const steps = getScenario(id)!.tutorialSteps!;
       const store = tutorialStore(steps, { tutorialStep: 0 });
       expect(store.getState().game.tutorialStep).toBe(0);
-      store.dispatch({ type: "card/navigate", payload: "INSIGHTS" });
-      expect(store.getState().card.name).toBe("INSIGHTS");
+      store.dispatch({ type: "card/navigate", payload: card });
+      expect(store.getState().card.name).toBe(card);
       expect(store.getState().game.tutorialStep).toBe(1);
     },
   );
 
-  it("waits for the tap on a narrow layout", () => {
-    mockIsPaneLayout.mockReturnValue(false);
+  it("waits for the player to open the tool", () => {
     const steps = getScenario(5)!.tutorialSteps!;
     const store = tutorialStore(steps, { tutorialStep: 2 });
     // A dispatch that changes nothing: the step must still be where it was
@@ -409,21 +396,19 @@ describe("navigation steps that teach the Insights and Events switch", () => {
   });
 
   it.each([2, 5, 9] as const)(
-    "advances Mission 6's step %d on its own in a pane layout",
+    "keeps Mission 6's step %d waiting when its tool is closed",
     (index) => {
-      mockIsPaneLayout.mockReturnValue(true);
       const steps = getScenario(5)!.tutorialSteps!;
       expect(steps[index].card).toBeUndefined();
       const store = tutorialStore(steps, { tutorialStep: index });
       store.dispatch({ type: "test/pane-check" });
-      expect(store.getState().game.tutorialStep).toBe(index + 1);
+      expect(store.getState().game.tutorialStep).toBe(index);
     },
   );
 
   it.each([2, 5, 9] as const)(
     "advances Mission 6's step %d when the player makes its navigation",
     (index) => {
-      mockIsPaneLayout.mockReturnValue(false);
       const steps = getScenario(5)!.tutorialSteps!;
       const step = steps[index];
       const card = step.target === "#eventsNav" ? "EVENTS" : "INSIGHTS";
