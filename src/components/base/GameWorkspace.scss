@@ -48,10 +48,8 @@
   align-items: stretch;
   gap: 4px;
   bottom: var(--game-dock-bottom);
-  left: calc(
-    var(--game-fleet-left, 0px) +
-      (100% - var(--game-fleet-left, 0px) - var(--game-fleet-right, 0px)) / 2
-  );
+  // Centered on the whole window so opening or closing a side tool never moves it.
+  left: 50%;
   transform: translateX(-50%);
   width: max-content;
   max-width: calc(100% - 16px);
@@ -204,8 +202,9 @@
   }
 }
 
-// Sheets extend behind the floating dock. Only their final scrolling content needs clearance.
-.gameStage[data-layout="sheet"] .gameToolBody {
+// Sheets, and a side tool the window-centered dock floats over, extend behind it. Only their
+// final scrolling content needs clearance.
+.gameStage .gameToolBody {
   .insights > .scrollable,
   .eventLog > .scrollable,
   .buildFacilities .cardList,

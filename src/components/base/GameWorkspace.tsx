@@ -174,18 +174,7 @@ export default function GameWorkspace() {
   return (
     <GameToolMemoryContext.Provider value={memory.current}>
       <GameWorkspaceContext.Provider value={true}>
-        <div
-          className="gameWorkspace"
-          style={
-            layout === "side"
-              ? ({
-                  // The action dock floats over the fleet, not over the tools beside it.
-                  "--game-fleet-left": `${left.length * toolWidth(width)}px`,
-                  "--game-fleet-right": `${right.length * toolWidth(width)}px`,
-                } as React.CSSProperties)
-              : undefined
-          }
-        >
+        <div className="gameWorkspace">
           <GameAppBar />
           <div
             className="gameStage"
