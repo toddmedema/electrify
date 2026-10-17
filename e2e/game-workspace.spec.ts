@@ -77,6 +77,7 @@ for (const theme of ["light", "dark"] as const) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
       await expect(action).not.toContainText(label);
+      await expect(action).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       const box = (await action.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
@@ -358,6 +359,20 @@ test("desktop side panels keep the dock centered and remember both rails across 
   );
   await page.locator("#insightsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
+  await expect
+    .poll(() =>
+      page
+        .locator("#buildNav, #insightsNav")
+        .evaluateAll(
+          (elements) =>
+            new Set(
+              elements.map(
+                (element) => getComputedStyle(element).backgroundColor,
+              ),
+            ).size,
+        ),
+    )
+    .toBe(1);
   await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible({
     timeout: 60_000,
   });
