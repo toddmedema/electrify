@@ -139,7 +139,9 @@
           "src/data/**",
           "src/helpers/**",
           "src/reducers/**",
-          "src/SaveGame.tsx"
+          "src/SaveGame.tsx",
+          "src/testing/**",
+          "src/workers/**"
         ],
         "excludedFiles": [
           "*.test.*"
@@ -151,12 +153,17 @@
               "object": "Math",
               "property": "pow",
               "message": "Math.pow's last bit depends on the platform's C library. Use pow from helpers/Pow so simulations replay identically everywhere."
+            },
+            {
+              "object": "Math",
+              "property": "random",
+              "message": "Use addressed draws from helpers/Math with the stored seed. Ambient randomness breaks saves and replays."
             }
           ],
           "no-restricted-syntax": [
             "error",
             {
-              "selector": "BinaryExpression[operator='**'][right.type!='Literal'][right.type!='UnaryExpression'], AssignmentExpression[operator='**=']",
+              "selector": "BinaryExpression[operator='**'][right.type!='Literal']:not([right.type='UnaryExpression'][right.operator=/^[+-]$/][right.argument.type='Literal']), AssignmentExpression[operator='**=']",
               "message": "** with a computed exponent calls the platform's C pow. Use pow from helpers/Pow so simulations replay identically everywhere."
             }
           ]

@@ -34,26 +34,28 @@ export function getIntersectionX(
 // values are arbitrary but have to stay distinct, and have to stay put -- changing one changes
 // what every existing seed produces.
 //
-// `normalAt` costs two uniforms per draw and addresses them at `2 * index`, so a stream it is
-// used on is not a stream `randomAt` may also be used on: the two index spaces interleave and
-// half the uniforms come out shared. Weather needs both kinds, so it gets a stream per kind.
-export const RANDOM_STREAM = {
-  weather: 1, // normalAt only -- the per field anomalies
-  fuelPrices: 2, // normalAt only
-  economy: 3, // randomAt only
-  weatherShape: 4, // randomAt only -- which recorded day a forecast borrows its shape from
-  worldEvents: 5, // randomAt only -- discrete occurrences and each occurrence's attributes
-  // normalAt only -- separate so adding offshore wind cannot shift any existing weather field
-  weatherOffshore: 6,
-  transmissionMarkets: 7, // normalAt only -- neighbouring wholesale-price variation
-  transmissionYears: 8, // normalAt only -- a neighbour's wet or dry year
-  transmissionLulls: 9, // randomAt only -- whether a neighbour's simulated day is a calm spell
-  // randomAt only -- recurring regional wildfire hazards. Kept off the authored worldEvents stream
-  // so adding or reordering a hazard draw can never shift an authored story's seeded outcome.
+// Normal draws consume two uniform coordinates. Keep their stream IDs disjoint from streams
+// used for plain uniform draws, so the same underlying draw cannot drive two unrelated effects.
+const UNIFORM_STREAM = {
+  economy: 3,
+  weatherShape: 4,
+  worldEvents: 5,
+  transmissionLulls: 9,
   wildfireHazards: 10,
-  // randomAt only -- hail and extreme-cold hazards, separate for the same reason as wildfires.
   weatherHazards: 11,
-};
+} as const;
+
+const NORMAL_STREAM = {
+  weather: 1,
+  fuelPrices: 2,
+  weatherOffshore: 6,
+  transmissionMarkets: 7,
+  transmissionYears: 8,
+} as const;
+
+export const RANDOM_STREAM = { ...UNIFORM_STREAM, ...NORMAL_STREAM } as const;
+type UniformStream = (typeof UNIFORM_STREAM)[keyof typeof UNIFORM_STREAM];
+type NormalStream = (typeof NORMAL_STREAM)[keyof typeof NORMAL_STREAM];
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
 // splitmix32's finalizing mix, which spreads a counter-ish 32 bit value across the whole word.
@@ -72,7 +74,16 @@ function splitmix32Mix(a: number): number {
  * coordinates it is given. Neighbouring indexes are as unrelated as distant ones, so callers can
  * walk their index space in whatever order they need to.
  */
-export function randomAt(seed: number, stream: number, index: number): number {
+export function randomAt(
+  seed: number,
+  stream: UniformStream,
+  index: number,
+): number {
+  return uniformAt(seed, stream, index);
+}
+
+// Only normalAt may address uniforms in a normal stream; callers use the typed public APIs.
+function uniformAt(seed: number, stream: number, index: number): number {
   // Fold the coordinates together before mixing so that a change to any one of them disturbs the
   // whole word rather than just its low bits
   let h = seed | 0;
@@ -85,7 +96,7 @@ export function randomAt(seed: number, stream: number, index: number): number {
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomRangeAt(
   seed: number,
-  stream: number,
+  stream: UniformStream,
   index: number,
   min: number,
   max: number,
@@ -100,27 +111,28 @@ export function getRandomRangeAt(
  * taken from `2 * index` and `2 * index + 1` rather than from neighbouring indexes, so callers
  * can walk their own index space one normal at a time without two of them ever sharing a uniform.
  *
- * That holds only against other `normalAt` draws. Because it consumes `2 * index`, a stream that
- * also takes plain `randomAt` draws interleaves the two spaces and hands the same uniform out
- * twice -- so a caller needing both kinds takes a stream for each, the way weather does.
- *
  * Weather anomalies are the reason this exists. A uniform nudge gives every deviation inside its
  * range the same likelihood and nothing at all outside it, which is the wrong shape for a
  * departure from normal: real ones cluster near average with occasional outliers, and have no
  * hard cutoff. Scaling a normal by an observed standard deviation reproduces the spread that was
  * actually measured.
  */
-export function normalAt(seed: number, stream: number, index: number): number {
+export function normalAt(
+  seed: number,
+  stream: NormalStream,
+  index: number,
+): number {
   // Guarded because Box-Muller takes a log of the first uniform, and randomAt's range is
   // half open -- a draw of exactly 0 would return -Infinity
-  const u1 = Math.max(Number.MIN_VALUE, randomAt(seed, stream, index * 2));
-  const u2 = randomAt(seed, stream, index * 2 + 1);
+  const u1 = Math.max(Number.MIN_VALUE, uniformAt(seed, stream, index * 2));
+  const u2 = uniformAt(seed, stream, index * 2 + 1);
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
 // Seeds are mixed as 32 bit integers, so a wider one (a float, or Date.now() times something) is
 // silently truncated and no longer describes the run it is stored alongside. Mint them here.
 export function newSeed(): number {
+  // eslint-disable-next-line no-restricted-properties -- Fresh run identity; outcomes use the stored seed.
   return Math.floor(Math.random() * 2 ** 32);
 }
 
