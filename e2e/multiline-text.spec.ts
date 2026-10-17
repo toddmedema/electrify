@@ -1,6 +1,5 @@
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, Locator, test } from "./fixtures";
-import { openPane } from "./layout";
 
 async function expectTextToFit(elements: Locator) {
   await expect(elements.first()).toBeVisible();
@@ -40,36 +39,62 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start game", exact: true })
         .click();
-      const fleet = page.locator(".facilities:visible");
-      await openPane(
-        fleet,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
-      await fleet.getByRole("button", { name: "Build", exact: true }).click();
+      await page.getByRole("button", { name: "pause", exact: true }).click();
+      await page.getByRole("button", { name: "Build", exact: true }).click();
+      await expect(
+        page.getByRole("region", { name: "Build", exact: true }),
+      ).toBeVisible();
       await expect(page.locator("main.base_main")).toHaveCount(1);
     });
 
-    test(`Build header keeps title, cash and speed controls together in ${theme}`, async ({
+    test(`Build keeps its title and shared cash and speed controls readable in ${theme}`, async ({
       page,
     }, info) => {
-      const header = page.locator(".constructionTitleBar");
-      const title = header.locator(".constructionTitle");
-      const speeds = header.locator(".constructionSpeed");
-      const close = header.getByRole("button", { name: "close", exact: true });
+      const build = page.getByRole("region", { name: "Build", exact: true });
+      const header = build.locator(".gameToolHeader");
+      const title = header.getByRole("heading", { name: "Build", exact: true });
+      const close = header.getByRole("button", {
+        name: "Close Build",
+        exact: true,
+      });
+      const hud = page.locator("#topbar");
+      const status = hud.locator(".gameStatus");
+      const speeds = hud.getByRole("group", {
+        name: "game speed",
+        exact: true,
+      });
+      const cash = status.locator(".gameStatusValue").first();
       await expect(speeds).toBeVisible();
       const boxes = await Promise.all(
-        [header, title, speeds, close].map((el) => el.boundingBox()),
+        [title, close, hud, status, speeds].map((el) => el.boundingBox()),
       );
-      const [bar, heading, clock, dismiss] = boxes.map((box) => box!);
-      expect(bar.height).toBeLessThanOrEqual(56);
+      const [heading, dismiss, hudBar, statusBox, clock] = boxes.map(
+        (box) => box!,
+      );
+      // The tool header has a separator below its 56px control area.
       expect(
-        Math.abs(clock.y + clock.height / 2 - dismiss.y - dismiss.height / 2),
+        await header.evaluate((element) => element.clientHeight),
+      ).toBeLessThanOrEqual(56);
+      expect(hudBar.height).toBeLessThanOrEqual(56);
+      expect(
+        Math.abs(
+          heading.y + heading.height / 2 - dismiss.y - dismiss.height / 2,
+        ),
       ).toBeLessThanOrEqual(1);
-      expect(heading.x + heading.width).toBeLessThanOrEqual(clock.x + 1);
-      expect(clock.x + clock.width).toBeLessThanOrEqual(bar.x + bar.width);
-      await expectTextToFit(title.locator(".iconLabel, .constructionCash"));
+      expect(heading.x + heading.width + 8).toBeLessThanOrEqual(dismiss.x);
+      expect(statusBox.x + statusBox.width).toBeLessThanOrEqual(clock.x + 1);
+      expect(clock.x + clock.width).toBeLessThanOrEqual(
+        hudBar.x + hudBar.width,
+      );
+      await expectTextToFit(title);
+      await expectTextToFit(status.locator(".gameStatusValue"));
+      await expect(hud).toBeInViewport();
+      await expect(header).toBeInViewport();
       if (info.project.use.hasTouch) {
-        for (const button of await speeds.getByRole("button").all()) {
+        for (const button of [
+          ...(await speeds.getByRole("button").all()),
+          close,
+        ]) {
           const box = (await button.boundingBox())!;
           expect(box.width).toBeGreaterThanOrEqual(44);
           expect(box.height).toBeGreaterThanOrEqual(44);
@@ -81,11 +106,10 @@ for (const theme of ["light", "dark"] as const) {
       });
       // Stress the same layout with the formatter's wider negative-balance text.
       // This probe changes only text, keeping the real header, styles and controls.
-      const cash = title.locator(".constructionCash");
       await cash.evaluate((el) => {
-        el.textContent = "$-9.99M cash";
+        el.textContent = "$-9.99M";
       });
-      await expectTextToFit(title.locator(".iconLabel, .constructionCash"));
+      await expectTextToFit(status.locator(".gameStatusValue"));
       const cashBox = (await cash.boundingBox())!;
       expect(cashBox.x + cashBox.width + 4).toBeLessThanOrEqual(clock.x);
     });

@@ -771,29 +771,30 @@ test("production projection workers finish offline and native focus pauses and r
         (window as unknown as { desktopWorkerAudit: DesktopWorkerAudit })
           .desktopWorkerAudit,
     );
-  // Worker forecasts are demand-driven. Compact screens do not mount Insights
-  // until the player opens it, and the HUD may resolve an urgent risk without a
-  // projection. Make actual, bounded rate decisions in a visible Insights pane
-  // instead of assuming FAST play will eventually happen to request a forecast.
-  const insights = page.locator(".insights:visible");
-  await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
-  );
-  await expect(insights).toHaveCount(1);
-  const showRate = insights.getByRole("button", { name: "Show rate slider" });
-  if (await showRate.isVisible()) await showRate.click();
-  const rate = insights.getByRole("slider", {
+  // Investor pricing computes customer changes locally. Make a rate decision in Programs,
+  // then open Insights to request its forecast, just as a player does on a compact screen.
+  // FAST play or the HUD alone need not request a long-range projection.
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  const insights = page.getByRole("region", { name: "Insights", exact: true });
+  const rate = programs.getByRole("slider", {
     name: "The rate you charge for electricity generation",
   });
   // Both decisions use new rates, including when the preceding transport is
   // still being decoded across frames and the initial rate remains cached.
   for (const key of ["ArrowRight", "ArrowRight"]) {
+    await openPane(
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
+    );
     const audit = await workerState();
     const before = await rate.getAttribute("aria-valuenow");
     await rate.press(key);
     await expect(rate).not.toHaveAttribute("aria-valuenow", before!);
     const selectedRate = Number(await rate.getAttribute("aria-valuenow"));
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
     await expect
       .poll(async () =>
         (await workerState()).requests
