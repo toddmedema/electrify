@@ -36,18 +36,75 @@ const steps = [
     script: "sim",
     args: ["--", "--scenario", "101", "--months", "12"],
   },
+  // CI-only gates, added by --ci. They need a production build and headless Chromium, so the
+  // quick default check skips them; run them before opening or updating a pull request.
+  // The packaged Electron suite opens native windows and stays in CI.
+  {
+    id: "bench",
+    name: "Tick performance",
+    script: "perf:bench",
+    ci: true,
+    assets: true,
+  },
+  {
+    id: "build",
+    name: "Production build",
+    script: "build",
+    ci: true,
+    assets: true,
+    env: { DISABLE_ESLINT_PLUGIN: "true" },
+  },
+  { id: "bundle", name: "Bundle size", script: "perf:bundle", ci: true },
+  {
+    id: "browser",
+    name: "Production browser",
+    script: "test:e2e:ci",
+    ci: true,
+    assets: true,
+    needs: "build",
+    args: ["--", "--reporter=list"],
+  },
+  {
+    id: "desktop-build",
+    name: "Desktop renderer",
+    script: "desktop:build",
+    ci: true,
+    assets: true,
+    env: { DISABLE_ESLINT_PLUGIN: "true" },
+  },
+  {
+    id: "multiplayer",
+    name: "Multiplayer",
+    script: "test:multiplayer",
+    ci: true,
+    needs: "desktop-build",
+    env: { MULTIPLAYER_BUILD_DIR: "build" },
+  },
 ];
+const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]`;
 
+// The default check omits CI-only gates; --ci runs every gate, and --steps may name any gate.
+// Selecting a gate that tests a build also rebuilds it, because the two builds share build/.
 function selectSteps(argv) {
-  if (!argv.length) return steps;
-  if (argv.length !== 2 || argv[0] !== "--steps")
-    throw new Error("Usage: npm run check -- [--steps types,lint,...]");
+  if (!argv.length) return steps.filter((step) => !step.ci);
+  if (argv.length === 1 && argv[0] === "--ci") return steps;
+  if (argv.length !== 2 || argv[0] !== "--steps") throw new Error(usage);
   const ids = argv[1].split(",");
   if (ids.some((id) => !steps.some((step) => step.id === id)))
     throw new Error(
       `Unknown check step. Choose from: ${steps.map((step) => step.id).join(", ")}`,
     );
-  return steps.filter((step) => ids.includes(step.id));
+  const needed = steps
+    .filter((step) => ids.includes(step.id))
+    .map((step) => step.needs);
+  return steps.filter(
+    (step) => ids.includes(step.id) || needed.includes(step.id),
+  );
+}
+
+function isFullCheck(selected) {
+  const ci = selected.some((step) => step.ci);
+  return steps.every((step) => selected.includes(step) || (step.ci && !ci));
 }
 
 function workerCount(env, cores = os.availableParallelism()) {
@@ -79,7 +136,7 @@ function run(step, workers) {
         : step.args || []),
     ];
     const options = {
-      env: { ...process.env, CI: "true", NO_COLOR: "1" },
+      env: { ...process.env, CI: "true", NO_COLOR: "1", ...step.env },
       windowsHide: true,
     };
     // Only allowlisted script names, flags and validated worker counts reach the Windows shell.
@@ -108,27 +165,32 @@ async function execute(selected, runStep) {
     selected.filter((step) => step.parallel).map(runStep),
   );
   // Keep CPU-heavy suites serial, including when retrying a subset of gates.
-  for (const step of selected.filter((step) => !step.parallel))
-    results.push(await runStep(step));
+  for (const step of selected.filter((step) => !step.parallel)) {
+    const needed = results.find((result) => result.id === step.needs);
+    if (needed && !needed.ok) {
+      console.error(`skip ${step.name} (${needed.name} failed)`);
+      results.push({ ...step, ok: false, seconds: 0 });
+    } else results.push(await runStep(step));
+  }
   return results;
 }
 
 async function main(argv = process.argv.slice(2)) {
   if (argv.length === 1 && argv[0] === "--help") {
-    console.error(
-      `Usage: npm run check -- [--steps ${steps.map((step) => step.id).join(",")}]`,
-    );
+    console.error(usage);
     return;
   }
   const selected = selectSteps(argv);
   const workers = workerCount(process.env);
   if (selected.some((step) => step.assets)) checkAssets();
   const started = Date.now();
-  console.error(`Running ${selected.length}/${steps.length} check gates.`);
+  const full = isFullCheck(selected);
+  const available = full ? selected.length : steps.length;
+  console.error(`Running ${selected.length}/${available} check gates.`);
   const results = await execute(selected, (step) => run(step, workers));
   const failed = results.filter((result) => !result.ok);
   console.error(
-    `\n${failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${selected.length < steps.length ? " Partial check only." : ""}`,
+    `\n${failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Run npm run check:ci before pushing a pull request." : ""}`,
   );
   if (failed.length) {
     console.error(
@@ -146,4 +208,4 @@ if (require.main === module)
     console.error(error.message);
     process.exitCode = 1;
   });
-module.exports = { steps, selectSteps, workerCount, execute };
+module.exports = { steps, selectSteps, isFullCheck, workerCount, execute };

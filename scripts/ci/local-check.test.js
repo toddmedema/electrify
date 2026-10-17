@@ -3,7 +3,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");
-const { steps, selectSteps, workerCount, execute } = require("../check");
+const {
+  steps,
+  selectSteps,
+  isFullCheck,
+  workerCount,
+  execute,
+} = require("../check");
 const { checkAssets } = require("../check-assets");
 
 test("full checks retain every gate; partial checks reject unknown or injected names", () => {
@@ -24,12 +30,35 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     selectSteps(["--steps", "lint,tests,lint"]).map((step) => step.id),
     ["lint", "tests"],
   );
+  // --ci adds the gates that need a production build or browser, in CI's dependency order.
+  assert.deepEqual(
+    selectSteps(["--ci"])
+      .filter((step) => step.ci)
+      .map((step) => step.script),
+    [
+      "perf:bench",
+      "build",
+      "perf:bundle",
+      "test:e2e:ci",
+      "desktop:build",
+      "test:multiplayer",
+    ],
+  );
+  assert(isFullCheck(selectSteps([])));
+  assert(isFullCheck(selectSteps(["--ci"])));
+  assert(!isFullCheck(selectSteps(["--steps", "browser"])));
+  // Retrying a browser suite rebuilds the renderer it tests, since both builds share build/.
+  assert.deepEqual(
+    selectSteps(["--steps", "multiplayer,browser"]).map((step) => step.id),
+    ["build", "browser", "desktop-build", "multiplayer"],
+  );
   for (const args of [
     ["--steps", ""],
     ["--steps", "lnti"],
     ["--steps", "lint;echo bad"],
     ["--steps"],
     ["--skip", "tests"],
+    ["--ci", "--steps", "lint"],
   ])
     assert.throws(() => selectSteps(args));
   assert.equal(workerCount({}, 20), 4);
@@ -67,6 +96,19 @@ test("full and partial checks finish all gates after failures and never overlap 
     assert.equal(results.length, selected.length);
     assert.equal(results.find((result) => result.id === "lint").ok, false);
   }
+});
+
+test("a failed build skips the suites that test it and still runs later gates", async () => {
+  const visited = [];
+  const results = await execute(
+    selectSteps(["--steps", "browser,multiplayer"]),
+    async (step) => {
+      visited.push(step.id);
+      return { ...step, ok: step.id !== "build" };
+    },
+  );
+  assert.deepEqual(visited, ["build", "desktop-build", "multiplayer"]);
+  assert.equal(results.find((result) => result.id === "browser").ok, false);
 });
 
 test("asset preflight rejects pointers and missing tracked files, ignoring untracked files", (t) => {
