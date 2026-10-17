@@ -98,6 +98,8 @@ export interface Props extends StateProps, DispatchProps {}
 
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
+/** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
+const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionDetailsButton"];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -281,6 +283,26 @@ export function GameAppBar(props: Props) {
   const bigScreen = isBigScreen();
   // Tracks resizes even while paused, when the bar otherwise has no reason to re-render.
   const singleRow = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
+  // Crossing the breakpoint moves the status row to another parent, which remounts its
+  // controls; a player tabbed onto one keeps their place rather than dropping to the page.
+  const layoutSeen = React.useRef(singleRow);
+  const refocus = React.useRef<string>();
+  if (layoutSeen.current !== singleRow) {
+    layoutSeen.current = singleRow;
+    const focused = document.activeElement;
+    refocus.current = RESTORABLE_STATUS_FOCUS.find((selector) =>
+      focused?.matches(`#appbar ${selector}`),
+    );
+  }
+  React.useLayoutEffect(() => {
+    const selector = refocus.current;
+    refocus.current = undefined;
+    if (selector) {
+      document
+        .querySelector<HTMLElement>(`#appbar ${selector}`)
+        ?.focus({ preventScroll: true });
+    }
+  }, [singleRow]);
   const multiplayer = game.multiplayer;
   const clock = multiplayer?.clock;
   const speed = clock?.selectedSpeed ?? game.speed;

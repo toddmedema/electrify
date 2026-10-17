@@ -80,7 +80,13 @@ for (const theme of ["light", "dark"]) {
       const mission = await page
         .locator(".missionSummary:visible")
         .boundingBox();
-      expect(grid!.y).toBe(mission!.y);
+      // One line, whether in its own row or folded into the top bar on wide windows, where the
+      // grid readout is a shorter tinted box centred beside the mission.
+      expect(
+        Math.abs(
+          grid!.y + grid!.height / 2 - (mission!.y + mission!.height / 2),
+        ),
+      ).toBeLessThanOrEqual(1);
     }
     await settle(page);
     const details = page.getByRole("button", {

@@ -1398,8 +1398,12 @@ $topbar_height: 56px;
       background: var(--warning-fill);
     }
 
+    // Opaque under its tint: the whole bar pulses during a blackout, and a see-through fill
+    // would let that pulse wash out the red text.
     &.gridHealth-blackout {
-      background: var(--blackout-tint);
+      background:
+        linear-gradient(var(--blackout-tint), var(--blackout-tint)),
+        var(--bg-primary);
     }
   }
 

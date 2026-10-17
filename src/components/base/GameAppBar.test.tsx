@@ -147,6 +147,8 @@ describe("GameAppBar", () => {
     expect(onSpeedChange).toHaveBeenCalledWith("ULTRA");
   });
 
+  /* eslint-disable testing-library/no-container, testing-library/no-node-access --
+     where the status row sits in the bar is the behaviour under test */
   it("folds the status row into the top bar, between the date and the speeds, on wide windows", () => {
     const matchMedia = window.matchMedia;
     window.matchMedia = (query: string) =>
@@ -159,9 +161,7 @@ describe("GameAppBar", () => {
       const appbar = container.querySelector("#appbar")!;
       const toolbar = appbar.querySelector("#topbar .MuiToolbar-root")!;
       expect(appbar).toHaveClass("appbarSingleRow");
-      expect(
-        Array.from(toolbar.children, (child) => child.className),
-      ).toEqual([
+      expect(Array.from(toolbar.children, (child) => child.className)).toEqual([
         expect.stringContaining("gameMenuButton"),
         expect.stringContaining("gameStatus"),
         "gameStatusBar",
@@ -181,6 +181,46 @@ describe("GameAppBar", () => {
     }
   });
 
+  it("keeps keyboard focus on a status control when the window crosses the single-row width", () => {
+    const matchMedia = window.matchMedia;
+    let wide = false;
+    const listeners = new Set<() => void>();
+    window.matchMedia = (query: string) =>
+      ({
+        ...matchMedia(query),
+        get matches() {
+          return query.includes("min-width:1200px") && wide;
+        },
+        addListener: (listener: () => void) => listeners.add(listener),
+        removeListener: (listener: () => void) => listeners.delete(listener),
+        addEventListener: (_: string, listener: () => void) =>
+          listeners.add(listener),
+        removeEventListener: (_: string, listener: () => void) =>
+          listeners.delete(listener),
+      }) as unknown as MediaQueryList;
+    const resize = (next: boolean) =>
+      act(() => {
+        wide = next;
+        listeners.forEach((listener) => listener());
+      });
+    try {
+      const { container } = renderAppBar();
+      screen.getByRole("button", { name: "All requirements" }).focus();
+      resize(true);
+      expect(container.querySelector("#topbar .gameStatusBar")).not.toBeNull();
+      expect(
+        screen.getByRole("button", { name: "All requirements" }),
+      ).toHaveFocus();
+      resize(false);
+      expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "All requirements" }),
+      ).toHaveFocus();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
   it("keeps the status in its own row below the top bar on narrower windows", () => {
     const { container } = renderAppBar();
     const appbar = container.querySelector("#appbar")!;
@@ -188,6 +228,8 @@ describe("GameAppBar", () => {
     expect(appbar.querySelector("#topbar .gameStatusBar")).toBeNull();
     expect(appbar.querySelector(":scope > .gameStatusBar")).not.toBeNull();
   });
+
+  /* eslint-enable testing-library/no-container, testing-library/no-node-access */
 
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
