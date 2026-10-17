@@ -71,7 +71,20 @@ This starts Jest in watch mode. Test files use the `.test.ts` or `.test.tsx` suf
 npm run check
 ```
 
-Types, lint, formatting and tests, which is what CI runs on every pull request. Individually:
+Checks assets, types, lint, formatting, native unit tests, CI tooling, covered Jest tests,
+simulation suites and a simulation CLI smoke run. Results appear as each gate finishes.
+Local Jest runs use at most four workers and keep their caches inside `.tmp/`; set
+`ELECTRIFY_CHECK_WORKERS` to override the worker count.
+
+Run `npm run check:assets` in a fresh worktree before building or testing. If it reports
+Git LFS pointers, restore cached files with `git lfs checkout`, or fetch them with `git lfs pull`.
+The full check runs this preflight automatically before starting any gates.
+
+After repairing a failed gate, use the printed retry command, for example
+`npm run check -- --steps lint,tests`. This reports a partial check; retain earlier passing
+results only when their inputs have not changed. Use `npm run check -- --help` for gate IDs.
+See the [agent workflow review](docs/agent-workflow-review.md) for the measured causes and
+validation guidance. Individually:
 
 | Command                | Purpose                                                   |
 | ---------------------- | --------------------------------------------------------- |

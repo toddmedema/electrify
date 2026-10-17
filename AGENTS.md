@@ -6,13 +6,28 @@ files are large, so broad rewrites create expensive review diffs.
 
 ## Start here
 
-- Use Node 24 and install exactly the lockfile with `npm ci`.
-- Run `npm run check` before handing work off (about a minute). It runs the same gates as CI:
+- Use Node 24. Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile
+  changes; reuse that install across turns while it still matches the lockfile.
+- In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
+  Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
+- Run `npm run check` once on the integrated code before handing work off. Allow several minutes,
+  depending on machine load. It runs the same gates as CI:
   types (including `e2e/`), lint, formatting, the covered Jest suite, the long simulation suites
   (`npm run test:sim`, which includes every scenario through the headless simulation), and a
   short run of the simulation CLI. CI also runs the Firestore rules tests (`npm run test:rules`,
-  which needs Java 21); run them yourself when you change `firebase/firestore.rules`. It reports every failing step at once, prints only
-  failing output, and ends with a one-line-per-step summary and fix commands.
+  which needs Java 21); run them yourself when you change `firebase/firestore.rules`. It checks
+  assets first, prints each gate's result as it finishes, and continues after gate failures.
+- After a failed check, fix the issue and rerun the failed gates with the printed command, such as
+  `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
+  remain unchanged. A test-query lint fix does not require repeating successful simulations;
+  changes to simulation inputs do. A partial check is never evidence that all gates ran.
+- For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
+  and simulations are unnecessary. Changes to scripts, configuration or executable examples
+  need the relevant checks. Do not run the full game suite just to save a proposal.
+- Local checks default to at most four Jest workers and keep heavy suites serial. Override with
+  `ELECTRIFY_CHECK_WORKERS` only for a measured need. Avoid overlapping full checks, production
+  builds and broad browser suites on the same machine. When using subagents, give them focused
+  checks and let the integrating agent own the final full check.
 - `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
   does not fix types or tests.
 - Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
@@ -50,10 +65,15 @@ is missing. See `docs/run-compatibility.md` for why the hash is intentionally br
 
 This file is the only agent guide; do not add a `CLAUDE.md`. `.claude/settings.json` allows the
 npm scripts above without a prompt and formats each file Claude edits with Prettier, so formatting
-failures should be rare; agents without that hook should run `npm run format` before `check`.
+failures should be rare; agents without that hook should format the files they changed before
+`check` (for example, `npx prettier --write <files>`).
 
 ## Pull requests
 
+- After required local checks pass, create or update the PR and report remote CI's current status.
+  Keep waiting or polling for remote CI only when asked to monitor it, merge, or deliver green CI.
+  Merge the base again when needed for conflicts or relevant changes, rather than restarting
+  validation for every unrelated base commit. Stop temporary preview servers when finished.
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.
