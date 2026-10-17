@@ -55,6 +55,13 @@ files are large, so broad rewrites create expensive review diffs.
   or launch `desktop:start` during routine local validation. `test:desktop:native` is a
   windowless Node unit suite and remains part of `check`.
 
+## Verification design
+
+For behavior changes and new guardrails, use the repo-local
+[verify-electrify skill](.agents/skills/verify-electrify/SKILL.md) to choose the contract
+and demonstrate that its check catches a violation. Prefer types, owning APIs, lint rules,
+and behavioral tests over adding instructions here.
+
 ## Run compatibility manifest
 
 `src/data/RunCompatibility.json` is a generated, git-ignored hash of every simulation input:

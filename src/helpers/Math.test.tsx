@@ -1,6 +1,7 @@
 import {
   arrayMove,
   getIntersectionX,
+  getRandomRangeAt,
   newSeed,
   normalAt,
   randomAt,
@@ -8,7 +9,20 @@ import {
   roundToSignificantDigits,
 } from "./Math";
 
-const STREAM = 1;
+// These calls are never executed. Typecheck must reject stream mixing and unregistered IDs.
+function checkStreamTypes() {
+  // @ts-expect-error Normal streams cannot also supply uniform draws.
+  randomAt(12345, RANDOM_STREAM.weather, 0);
+  // @ts-expect-error Range draws are uniform too.
+  getRandomRangeAt(12345, RANDOM_STREAM.fuelPrices, 0, 0, 1);
+  // @ts-expect-error Uniform streams cannot also supply normal draws.
+  normalAt(12345, RANDOM_STREAM.economy, 0);
+  // @ts-expect-error Arbitrary numbers must be registered as a stream first.
+  randomAt(12345, 99, 0);
+  // @ts-expect-error Arbitrary numbers must be registered as a stream first.
+  normalAt(12345, 99, 0);
+}
+void checkStreamTypes;
 
 describe("getIntersectionX", () => {
   it("finds where crossing segments meet", () => {
@@ -34,6 +48,7 @@ describe("roundToSignificantDigits", () => {
 });
 
 describe("randomAt", () => {
+  const STREAM = RANDOM_STREAM.economy;
   it("stays inside [0, 1)", () => {
     for (let index = 0; index < 500; index++) {
       const result = randomAt(12345, STREAM, index);
@@ -54,7 +69,9 @@ describe("randomAt", () => {
     }
     expect(new Set(values).size).toEqual(values.length);
     expect(randomAt(1, STREAM, 0)).not.toEqual(randomAt(2, STREAM, 0));
-    expect(randomAt(1, STREAM, 0)).not.toEqual(randomAt(1, STREAM + 1, 0));
+    expect(randomAt(1, STREAM, 0)).not.toEqual(
+      randomAt(1, RANDOM_STREAM.weatherShape, 0),
+    );
   });
 
   // Cheap smoke test that the mixing actually spreads out, rather than clustering somewhere and
@@ -73,6 +90,7 @@ describe("randomAt", () => {
 });
 
 describe("normalAt", () => {
+  const STREAM = RANDOM_STREAM.weather;
   const sample = (seed: number, count: number) =>
     Array.from({ length: count }, (_, index) => normalAt(seed, STREAM, index));
 
@@ -109,22 +127,14 @@ describe("normalAt", () => {
     }
   });
 
-  // The reason RANDOM_STREAM is one entry per kind of draw rather than one per subsystem, and
-  // the bug that made it so: a normal is built from the uniforms at 2*index and 2*index+1, so a
-  // stream taking plain randomAt draws as well hands the same uniform out twice. Weather did
-  // exactly that -- half its shape-day picks were also the second half of another day's cloud
-  // cover normal -- and pinning the addressing here is what stops the two spaces silently
-  // merging again
-  it("is built from the uniforms at 2*index and 2*index+1", () => {
-    const seed = 12345;
-    for (const index of [0, 1, 3, 17]) {
-      const u1 = Math.max(Number.MIN_VALUE, randomAt(seed, STREAM, index * 2));
-      const u2 = randomAt(seed, STREAM, index * 2 + 1);
-      expect(normalAt(seed, STREAM, index)).toBeCloseTo(
-        Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2),
-        12,
-      );
-    }
+  it("preserves the existing addressed normal draws", () => {
+    // Captured before the API split; do not reconstruct the implementation as the oracle.
+    expect(
+      [0, 1, 3, 17].map((index) => normalAt(12345, STREAM, index)),
+    ).toEqual([
+      1.1741046902346923, -0.11241369338429044, 0.41101888611953896,
+      0.6720921081556102,
+    ]);
   });
 });
 
@@ -134,6 +144,19 @@ describe("RANDOM_STREAM", () => {
   it("names every stream once", () => {
     const ids = Object.values(RANDOM_STREAM);
     expect(new Set(ids).size).toEqual(ids.length);
+    expect(RANDOM_STREAM).toEqual({
+      weather: 1,
+      fuelPrices: 2,
+      economy: 3,
+      weatherShape: 4,
+      worldEvents: 5,
+      weatherOffshore: 6,
+      transmissionMarkets: 7,
+      transmissionYears: 8,
+      transmissionLulls: 9,
+      wildfireHazards: 10,
+      weatherHazards: 11,
+    });
   });
 });
 

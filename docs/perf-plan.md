@@ -100,9 +100,10 @@ V8 last-bit drift doesn't flake the gate while any real behavior change still do
 absorb drift that a run amplifies, though: V8 hands `Math.pow` and `**` to the C library's `pow`,
 whose last bit differs between glibc and Windows' CRT, and 32 such bits sent scenario 108 down a
 different path on Windows. Simulation code therefore calls `pow` from `src/helpers/Pow.ts` (a port
-of glibc's, bit-identical to CI's Linux `Math.pow`), and lint rejects `Math.pow` and computed `**`
-in `src/data`, `src/helpers` and `src/reducers`. The other Math functions are V8's own fdlibm port
-and agree everywhere.
+of glibc's, bit-identical to CI's Linux `Math.pow`), and lint rejects `Math.pow` and unsafe `**`
+in simulation data, helpers, reducers, save export, tools and workers. Only squares and literal
+integer powers of two may use `**`; other powers use the portable helper.
+The other Math functions are V8's own fdlibm port and agree everywhere.
 Rebaseline with `npm run perf:rebaseline` (Jest `-u` on that suite); CI's `--ci` mode never writes
 snapshots, so a changed hash fails. The snapshot diff shows which scenarios moved, which also helps
 review balance work. Regenerate last; never hand-edit.
