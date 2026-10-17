@@ -113,7 +113,7 @@ function mockNative(platform) {
 test("Steam uploads the full build version in integer score details", async () => {
   const { api, calls, dispatcher } = mockNative("win32");
   const boards = new SteamLeaderboards(api, dispatcher, "win32");
-  const appVersion = "1.1.0-21sept26-1705";
+  const appVersion = "26sept26-1507";
   await boards.upload({
     scenarioId: 101,
     difficulty: "CEO",

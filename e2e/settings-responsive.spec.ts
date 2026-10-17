@@ -1,5 +1,4 @@
 import { expect, test } from "./fixtures";
-import packageJson from "../package.json";
 
 async function openSettings(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -18,11 +17,13 @@ test("settings footer shows the complete version and clear cache in both themes"
     .headers()
     ["content-type"]?.includes("application/json")
     ? ((await response.json()) as { version: string })
-    : packageJson;
+    : undefined;
   for (const theme of ["Light", "Dark"]) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await footer.scrollIntoViewIfNeeded();
-    await expect(version).toHaveText(`Electrify v${metadata.version}`);
+    await expect(version).toHaveText(/^Electrify v\d{2}[a-z]{3,4}\d{2}-\d{4}$/);
+    if (metadata)
+      await expect(version).toHaveText(`Electrify v${metadata.version}`);
     await expect(
       footer.getByRole("button", { name: "Clear cache", exact: true }),
     ).toBeVisible();

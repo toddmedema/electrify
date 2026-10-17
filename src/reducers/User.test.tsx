@@ -12,7 +12,7 @@ import { MAX_REPLAY_BYTES } from "../Replay";
 import { LOCATIONS } from "../Constants";
 import { ReplayType, UserType } from "../Types";
 
-jest.mock("../AppVersion", () => ({ APP_VERSION: "1.1.0-21sept26-1705" }));
+jest.mock("../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
 const mockAddDoc = jest.fn();
 const mockGetDoc = jest.fn();
@@ -115,7 +115,7 @@ describe("submitHighscore", () => {
 
     const [scoreWrite] = writesTo("scores");
     expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("1.1.0-21sept26-1705");
+    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
     expect(scoreWrite[1].replayId).toBe("replay-1");
   });
 
@@ -140,7 +140,7 @@ describe("submitHighscore", () => {
     expect(writesTo("replays").length).toBe(0);
     const [scoreWrite] = writesTo("scores");
     expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("1.1.0-21sept26-1705");
+    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
     expect("replayId" in scoreWrite[1]).toBe(false);
   });
 
@@ -160,7 +160,7 @@ describe("submitHighscore", () => {
 
     const [scoreWrite] = writesTo("scores");
     expect(scoreWrite[1].score).toBe(420);
-    expect(scoreWrite[1].appVersion).toBe("1.1.0-21sept26-1705");
+    expect(scoreWrite[1].appVersion).toBe("26sept26-1507");
     expect("replayId" in scoreWrite[1]).toBe(false);
     warn.mockRestore();
   });
@@ -194,7 +194,7 @@ describe("submitHighscore", () => {
     const [ref, data] = mockSetDoc.mock.calls[0];
     expect(ref.path).toBe("users/player-1");
     expect(data.bests["101"].score).toBe(640);
-    expect(data.bests["101"].appVersion).toBe("1.1.0-21sept26-1705");
+    expect(data.bests["101"].appVersion).toBe("26sept26-1507");
   });
 
   it("replaces the personal best only when the run beat it", async () => {

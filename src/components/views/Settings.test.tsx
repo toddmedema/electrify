@@ -8,7 +8,7 @@ import { clearAppCache } from "../../helpers/Cache";
 import settingsReducer from "../../reducers/Settings";
 import type { DesktopBridge } from "../../Desktop";
 
-jest.mock("../../AppVersion", () => ({ APP_VERSION: "1.1.0-21sept26-1705" }));
+jest.mock("../../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
 jest.mock("../../helpers/Cache", () => ({
   clearAppCache: jest.fn(async () => undefined),
@@ -201,9 +201,7 @@ describe("Settings", () => {
   it("offers a subtle cache reset at the bottom", async () => {
     renderSettings();
 
-    expect(
-      screen.getByText("Electrify v1.1.0-21sept26-1705"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Electrify v26sept26-1507")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Clear cache" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {

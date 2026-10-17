@@ -17,11 +17,11 @@ const MONTHS = [
   "dec",
 ];
 
-function buildVersion(now = new Date(), version = packageJson.version) {
+function buildVersion(now = new Date()) {
   // PST is UTC-8 year-round, independent of the build machine and daylight saving time.
   const pst = new Date(now.getTime() - 8 * 60 * 60 * 1000);
   const pad = (value) => String(value).padStart(2, "0");
-  return `${version}-${pad(pst.getUTCDate())}${MONTHS[pst.getUTCMonth()]}${pad(pst.getUTCFullYear() % 100)}-${pad(pst.getUTCHours())}${pad(pst.getUTCMinutes())}`;
+  return `${pad(pst.getUTCDate())}${MONTHS[pst.getUTCMonth()]}${pad(pst.getUTCFullYear() % 100)}-${pad(pst.getUTCHours())}${pad(pst.getUTCMinutes())}`;
 }
 
 function writeBuildVersion(version, directory = "build") {

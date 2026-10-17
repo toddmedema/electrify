@@ -127,14 +127,12 @@ async function withOfflineMacSigning(
   }
 }
 
-function packageConfiguration(
-  mode,
-  version = require("../package.json").version,
-) {
+function packageConfiguration(mode, appVersion = "dev") {
   const buildConfig = require("../electron-builder.config.cjs");
   return {
     ...buildConfig,
-    extraMetadata: { ...buildConfig.extraMetadata, version },
+    // Electron requires a semver package version; the game's identity is separate.
+    extraMetadata: { ...buildConfig.extraMetadata, appVersion },
     win: {
       ...buildConfig.win,
       // Steam releases embed the game's icon/version and use configured release signing.

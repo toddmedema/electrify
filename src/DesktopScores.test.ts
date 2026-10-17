@@ -1,7 +1,7 @@
 import { DesktopBridge, DesktopScore } from "./Desktop";
 import { desktopGlobalRank, submitDesktopScore } from "./DesktopScores";
 
-jest.mock("./AppVersion", () => ({ APP_VERSION: "1.1.0-21sept26-1705" }));
+jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
 function bridge(entries: () => DesktopScore[]) {
   const desktop = {
@@ -51,7 +51,7 @@ it("waits for this run's submission before reading its Steam rank", async () => 
   await submission;
   expect(desktop.submitScore).toHaveBeenCalledWith(
     expect.objectContaining({
-      appVersion: "1.1.0-21sept26-1705",
+      appVersion: "26sept26-1507",
     }),
   );
   await expect(rank).resolves.toBe(7);

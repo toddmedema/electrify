@@ -16,7 +16,7 @@ const {
 
 test("score metadata survives validation and rejects invalid build versions", () => {
   const score = { scenarioId: 101, difficulty: "CEO", score: 100 };
-  const appVersion = "1.1.0-21sept26-1705";
+  const appVersion = "26sept26-1507";
   assert.equal(validateScore({ ...score, appVersion }).appVersion, appVersion);
   assert.equal(validateScore(score).appVersion, undefined);
   for (const invalid of [null, 12, "", "x".repeat(65), "bad\u0000version"])
