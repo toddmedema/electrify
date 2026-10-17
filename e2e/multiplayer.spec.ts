@@ -155,6 +155,7 @@ async function createSteamTransport(page: Page) {
 }
 
 class SteamRoom {
+  constructor(private readonly createTransport = createSteamTransport) {}
   private info = test.info();
   transportErrors: string[] = [];
   audioRequests: string[] = [];
@@ -323,12 +324,13 @@ class SteamRoom {
       isMobile: mobile,
     });
     const page = await context.newPage();
-    this.pages.set(id, page);
     page.on("request", (request) => {
       if (new URL(request.url()).pathname.startsWith("/audio/"))
         this.audioRequests.push(request.url());
     });
-    this.transports.set(id, await createSteamTransport(page));
+    this.transports.set(id, await this.createTransport(page));
+    // publish() may run during setup; expose the player only once delivery is ready.
+    this.pages.set(id, page);
     page.on("crash", () => {
       void this.transportFailure(id, new Error("Renderer crashed"));
     });
@@ -401,6 +403,39 @@ class SteamRoom {
     return page;
   }
 }
+
+test("mock Steam publishes only to players with an initialized transport", async ({
+  browser,
+}) => {
+  let releaseTransport!: () => void;
+  let transportStarted!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    releaseTransport = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    transportStarted = resolve;
+  });
+  const room = new SteamRoom(async (page) => {
+    const transport = await createSteamTransport(page);
+    transportStarted();
+    await blocked;
+    return transport;
+  });
+  const joining = room.player(browser, 0, false, false);
+  try {
+    await started;
+    // Another player's lobby update can arrive while this player's CDP setup is pending.
+    await expect(room.publish()).resolves.toBeUndefined();
+    expect(room.pages.size).toBe(0);
+    expect(room.transportErrors).toEqual([]);
+  } finally {
+    releaseTransport();
+    await joining;
+  }
+  expect(room.pages.size).toBe(1);
+  await expect(room.publish()).resolves.toBeUndefined();
+  expect(room.transportErrors).toEqual([]);
+});
 
 test("mock Steam delivery survives garbage collection while decompression is pending", async ({
   page,
