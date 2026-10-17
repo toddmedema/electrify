@@ -1,14 +1,10 @@
 import { expectDialogToFit } from "./dialog-layout";
-import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`scenario details reflow and dismiss in ${theme} mode`, async ({
     page,
   }, testInfo) => {
-    // Allow the existing 75-second event wait to finish before the test deadline.
-    test.setTimeout(120_000);
     await page.addInitScript((mode) => {
       window.localStorage.clear();
       window.localStorage.setItem("theme", mode);
@@ -48,67 +44,26 @@ for (const theme of ["light", "dark"] as const) {
     );
     await back.click();
     await expect(dialog).not.toBeVisible();
-    // Wide desktops already show the event pane beside the grid.
-    await openPane(
-      page.locator(".eventLog"),
-      page.getByRole("button", { name: "Events", exact: true }),
-    );
-    await page
-      .locator("#appbar:visible")
+    // Scoring needs one completed month, not the wildfire event 35 months later.
+    // Observe the real clock crossing the boundary without depending on event-pane layout.
+    const appbar = page.locator("#appbar:visible").first();
+    await expect(appbar).toContainText(/Jan \d{4}/);
+    await appbar
       .getByRole("button", { name: "fast speed", exact: true })
-      .first()
       .click();
-    // The preparedness decision comes due 35 game months in, so the fast-forward above takes
-    // about 35s of real time to reach it. The default 12s expect window is too short
-    // of margin, and a loaded machine has been observed to miss it; widen the window instead of
-    // racing the clock.
-    const preparedness = page.getByRole("dialog", {
-      name: "Wildfire preparedness",
-    });
-    // Weather/news may pause before this choice. Resume those ordinary pauses only.
-    const fast = page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "fast speed", exact: true })
-      .first();
-    await expect
-      .poll(
-        async () => {
-          if (await preparedness.isVisible()) return true;
-          if (
-            (await page.getByRole("dialog").count()) === 0 &&
-            (await fast.getAttribute("aria-pressed")) === "false"
-          )
-            await fast.click();
-          return preparedness.isVisible();
-        },
-        { timeout: 75000, intervals: [1000] },
-      )
-      .toBe(true);
-    await preparedness.getByRole("button", { name: "Keep cash" }).click();
-    await page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "fast speed", exact: true })
-      .first()
-      .click();
-    // Wait for a real completed month, then stop the clock before inspecting its score.
-    // The status bar's event chip names the emergency too. Scope to the Events pane,
-    // which shows the current event in Operations on desktop and Ongoing events on phones.
-    await expect(
-      page
-        .locator(".eventLog")
-        .getByText("Wildfire emergency", { exact: true })
-        .first(),
-    ).toBeAttached({ timeout: 25000 });
+    await expect(appbar).toContainText(/Feb \d{4}/);
     await page
       .locator("#appbar:visible")
       .getByRole("button", { name: "pause", exact: true })
       .first()
       .click();
     await details.click();
-    await expect(
-      dialog.getByText(/Score appears after your first month/),
-    ).not.toBeAttached();
-    await expect(dialog.getByText(/points per/).first()).toBeAttached();
+    const score = dialog.getByRole("region", { name: "Current score" });
+    await expect(score).not.toContainText(
+      "Score appears after your first month.",
+    );
+    await expect(score.getByText(/points per/).first()).toBeAttached();
+    await expectDialogToFit(dialog);
     const content = dialog.locator(".MuiDialogContent-root");
     expect(
       await content.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -117,25 +72,12 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("heading", { name: "Current score" })
       .scrollIntoViewIfNeeded();
     await expect(back).toBeInViewport();
-    const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-    if (
-      reviewDir &&
-      (testInfo.project.name === "desktop-chromium" ||
-        (theme === "dark" && testInfo.project.name === "mobile-390px"))
-    ) {
-      await content.evaluate((el) => {
-        el.scrollTop = 0;
-      });
-      // Finish the dialog/menu transitions before capturing the review frame.
-      await page.waitForTimeout(400);
-      await page.screenshot({
-        path: path.join(
-          reviewDir,
-          `scenario-details-${testInfo.project.name}-${theme}.png`,
-        ),
-      });
-    }
     await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await details.click();
+    await dialog
+      .getByRole("button", { name: "Close scenario details" })
+      .click();
     await expect(dialog).not.toBeVisible();
   });
 }

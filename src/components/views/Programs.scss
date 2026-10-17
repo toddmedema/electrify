@@ -1,0 +1,78 @@
+.customerProgramsEmbedded {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.programsPricing {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+
+  .insightsRateMetrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .insightsRateMetric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .insightsRateMetricLabel {
+    color: var(--font-color-faded);
+    font-size: var(--font-size-caption);
+  }
+
+  .insightsRateMetricValue {
+    font-size: var(--font-size-subtitle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .budgetSlider {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 0 24px;
+  }
+
+  .MuiSlider-root {
+    margin-bottom: 0;
+  }
+
+  .MuiSlider-markLabel {
+    color: var(--font-color-faded);
+  }
+}
+
+@media (max-width: 599px) {
+  .programsPricing {
+    .insightsRateMetrics {
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
+          0,
+          1.25fr
+        );
+      gap: 8px;
+    }
+
+    .insightsRateMetricValue {
+      font-size: var(--font-size-body2);
+    }
+
+    .insightsRateMarkDesktop {
+      display: none;
+    }
+
+    .insightsRateMarkMobile {
+      display: inline;
+      font-size: var(--font-size-caption);
+    }
+  }
+}

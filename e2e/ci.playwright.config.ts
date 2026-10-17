@@ -5,6 +5,7 @@ import base from "./playwright.config";
 const smoke = [
   "build-options.spec.ts",
   "escape-close.spec.ts",
+  "game-workspace.spec.ts",
   "tutorial-exit.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",

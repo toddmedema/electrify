@@ -1,0 +1,328 @@
+// The fleet fills the stage. Desktop tools occupy their own tracks; compact tools rise above it.
+.gameWorkspace {
+  --game-dock-bottom: max(12px, env(safe-area-inset-bottom));
+  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
+  --game-tool-width: clamp(400px, 28vw, 480px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.gameStage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gameFleet {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+
+  > .facilities {
+    height: 100%;
+  }
+
+  // The list scrolls below the dock instead of shortening the whole Facilities viewport.
+  .unifiedFacilitiesList {
+    padding-bottom: var(--game-dock-clearance);
+  }
+  .facilitiesBody,
+  .unifiedFacilitiesList {
+    scroll-padding-bottom: var(--game-dock-clearance);
+  }
+}
+
+.gameWorkspace #navfooter.gameActionDock {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  bottom: var(--game-dock-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 20px var(--shadow-ring);
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.gameActionDock .gameDockAction.MuiButton-root {
+  min-width: 48px;
+  width: 48px;
+  min-height: 48px;
+  padding: 8px;
+  display: flex;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--font-color-faded);
+  font-size: 12px;
+  line-height: 16px;
+
+  > .MuiBadge-root > svg {
+    font-size: 24px;
+  }
+  &:hover {
+    background: var(--bg-sunken);
+    color: var(--font-color-primary);
+  }
+  &.gameDockActionOpen {
+    color: var(--interactive-strong);
+    border-color: var(--border-selected);
+    background: var(--bg-selected);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.gameToolTray {
+  position: absolute;
+  z-index: 5;
+  bottom: 0;
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  display: flex;
+  height: min(72dvh, calc(100% - 8px));
+  max-width: 1120px;
+  margin-inline: auto;
+  pointer-events: none;
+}
+
+.gameStage[data-panel-count="0"] .gameToolTray {
+  display: none;
+}
+
+.gameToolPanel {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-primary);
+  box-shadow: 0 4px 24px var(--shadow-ring);
+  animation: gameToolRise 200ms ease-out;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.gameToolHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 48px;
+  padding: 4px 8px 4px 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+
+  > svg {
+    color: var(--font-color-faded);
+    font-size: 20px;
+  }
+  h2 {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    margin: 0;
+    min-width: 0;
+    gap: 8px;
+    font-size: 16px;
+    line-height: 24px;
+  }
+  .gameToolTitleIcon {
+    display: inline-flex;
+    color: var(--font-color-faded);
+
+    > svg {
+      font-size: 20px;
+    }
+  }
+  h2:focus {
+    outline: none;
+  }
+  .MuiIconButton-root {
+    width: var(--control-size);
+    height: var(--control-size);
+    color: var(--font-color-primary);
+  }
+}
+
+.gameToolBody {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+
+  > * {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+  > .pane > .paneHeader {
+    display: none;
+  }
+  .insightsTitle.MuiToolbar-root {
+    display: none !important;
+  }
+  .buildFacilities {
+    max-width: none;
+    margin: 0;
+  }
+  .insights {
+    container-type: inline-size;
+  }
+}
+
+// Sheets extend behind the floating dock. Only their final scrolling content needs clearance.
+.gameStage[data-layout="sheet"] .gameToolBody {
+  .insights > .scrollable,
+  .eventLog > .scrollable,
+  .buildFacilities .cardList,
+  .buildFacilities .constructionInterties,
+  .customerProgramsBody {
+    padding-bottom: var(--game-dock-clearance);
+    scroll-padding-bottom: var(--game-dock-clearance);
+  }
+
+  // A program's commit controls stay above the dock while their surface continues behind it.
+  .customerProgramsActions {
+    padding-bottom: var(--game-dock-clearance);
+  }
+  .customerProgramsEmbedded:has(.customerProgramsActions)
+    .customerProgramsBody {
+    padding-bottom: 16px;
+    scroll-padding-bottom: 16px;
+  }
+}
+
+// With room for a readable fleet, tools sit beside it instead of overlapping windows.
+.gameStage:not([data-layout="sheet"]) {
+  .gameToolTray {
+    display: contents;
+  }
+  .gameToolPanel {
+    grid-row: 1;
+    border-radius: 0;
+    border-top: 0;
+    border-bottom: 0;
+    box-shadow: none;
+    animation: none;
+  }
+}
+
+.gameStage[data-layout="side"]:not([data-panel-count="0"]) {
+  grid-template-columns: minmax(720px, 1fr) var(--game-tool-width);
+
+  .gameToolPanel {
+    grid-column: 2;
+    border-right: 0;
+  }
+}
+
+.gameStage[data-layout="dual"] {
+  --game-decision-width: 0px;
+  --game-intelligence-width: 0px;
+  grid-template-columns:
+    var(--game-decision-width) minmax(720px, 1fr)
+    var(--game-intelligence-width);
+
+  &[data-decision-open="true"] {
+    --game-decision-width: var(--game-tool-width);
+  }
+  &[data-intelligence-open="true"] {
+    --game-intelligence-width: var(--game-tool-width);
+  }
+  .gameFleet {
+    grid-column: 2;
+  }
+  .gameToolPanel[data-tool-group="decision"] {
+    grid-column: 1;
+    border-left: 0;
+  }
+  .gameToolPanel[data-tool-group="intelligence"] {
+    grid-column: 3;
+    border-right: 0;
+  }
+}
+
+.gameWorkspace .gameStatusBar .gridHealth {
+  flex: 0 1 auto;
+}
+.app_container:has(.gameWorkspace) .snackbar-above-nav {
+  bottom: 96px !important;
+}
+[data-tutorial-hide~="nav"] .gameWorkspace #navfooter {
+  display: flex !important;
+  visibility: visible;
+  pointer-events: auto;
+}
+[data-tutorial-hide~="nav"] .gameDockAction:not(.gameDockBuild),
+[data-tutorial-hide~="build"] .gameDockBuild {
+  display: none !important;
+}
+[data-tutorial-hide~="nav"][data-tutorial-hide~="build"]
+  .gameWorkspace
+  #navfooter {
+  display: none !important;
+}
+
+@keyframes gameToolRise {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 599px) {
+  .gameWorkspace {
+    --game-dock-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .gameWorkspace #navfooter.gameActionDock {
+    padding: 4px;
+    border-radius: 16px;
+  }
+  .gameToolTray {
+    left: max(4px, env(safe-area-inset-left));
+    right: max(4px, env(safe-area-inset-right));
+    height: calc(100% - 8px);
+  }
+  .gameToolPanel {
+    border-radius: 12px 12px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gameToolPanel {
+    animation: none;
+  }
+}

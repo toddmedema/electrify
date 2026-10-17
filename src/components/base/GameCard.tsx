@@ -6,23 +6,18 @@ import { AppStateType, GameType } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
 import GameAppBarContainer from "./GameAppBar";
 import NavigationContainer from "./NavigationContainer";
+import { GameWorkspaceContext } from "./GameWorkspaceContext";
 
 /**
- * The frame the three in-game panes sit in.
- *
- * On a phone there is one pane on screen at a time, so the card carries the app bar and the
- * bottom nav that switches between them. Anything wider puts at least two of them on screen at
- * once with the app bar spanning them (see Compositor.renderCard), so a card is just a pane
- * there: a header naming it and its own contents.
+ * A game view's content frame. The persistent workspace owns game chrome; the standalone
+ * fallback also supports previews and focused component tests.
  */
 
 export interface GameCardProps extends React.ComponentPropsWithoutRef<"div"> {
   children?: React.JSX.Element | React.JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
-  // Shown as this pane's own header in the side-by-side layouts, since there's no bottom nav
-  // above the desktop breakpoint to tell the panes apart. Panes whose contents already lead with a header of their own (see
-  // Facilities, whose header carries the build buttons) leave this unset.
+  // Optional heading for standalone content. The workspace supplies each tool's header.
   title?: string;
 }
 
@@ -30,6 +25,7 @@ export interface Props extends GameCardProps {}
 
 export function GameCard(props: Props) {
   const { game } = props;
+  const embedded = React.useContext(GameWorkspaceContext);
   const now = currentTick(game);
 
   if (!game.inGame || !now) {
@@ -38,10 +34,9 @@ export function GameCard(props: Props) {
 
   const classes = ["flexContainer", props.className].filter(Boolean).join(" ");
 
-  if (isPaneLayout()) {
+  if (embedded || isPaneLayout()) {
     return (
-      // id is how tutorial steps address an individual pane, since the bottom nav they'd
-      // otherwise point at is hidden in this layout
+      // Stable IDs also let tutorial steps address content inside the workspace.
       <div id={props.id} className={classes + " pane"}>
         {props.title && (
           <Toolbar className="paneHeader">

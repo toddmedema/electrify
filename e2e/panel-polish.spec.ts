@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
-test("responsive controls and panel navigation keep their geometry", async ({
+test("facility actions stay reachable while navigating game panels", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => window.localStorage.clear());
@@ -18,68 +18,48 @@ test("responsive controls and panel navigation keep their geometry", async ({
   await facilities.locator(".facilityDisclosure").first().click();
   const actions = facilities.locator(".facilityActions").first();
   await expect(actions).toBeVisible();
+  await expect(actions.getByRole("button", { name: /^Pause / })).toBeVisible();
   for (const label of await actions.locator(".facilityActionLabel").all()) {
     await expect(label).toBeVisible();
   }
-  if (page.viewportSize()!.width <= 600) {
-    const buttons = await actions.locator("button").evaluateAll((elements) =>
-      elements.map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          y: rect.y,
-          height: rect.height,
-          width: rect.width,
-          name: element.getAttribute("aria-label"),
-        };
-      }),
-    );
-    expect(new Set(buttons.map((button) => button.y)).size).toBe(2);
-    expect(
-      new Set(buttons.map((button) => Math.round(button.width))).size,
-    ).toBe(1);
-    expect(
-      buttons.every(
-        (button) => button.name && button.height >= 44 && button.width >= 44,
-      ),
-    ).toBe(true);
-    if (process.env.PR_SCREENSHOTS && page.viewportSize()!.width === 390) {
-      await page.screenshot({
-        path: testInfo.outputPath("mobile-controls.png"),
-      });
-    }
-  }
+  const minimum = testInfo.project.use.hasTouch ? 44 : 40;
+  const buttons = await actions.locator("button").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        height: rect.height,
+        width: rect.width,
+        name: element.getAttribute("aria-label"),
+      };
+    }),
+  );
+  expect(buttons.length).toBeGreaterThan(0);
+  expect(
+    buttons.every(
+      (button) =>
+        button.name && button.height >= minimum && button.width >= minimum,
+    ),
+  ).toBe(true);
   const insights = page.locator(".insights:visible");
   await openPane(
     insights,
     page.getByRole("button", { name: "Insights", exact: true }),
   );
   await expect(
-    page.getByText("Reserve: extra demand you could cover within 15 min."),
-  ).toHaveCount(0);
+    insights.locator("#chartForecastSupplyDemand canvas"),
+  ).toBeVisible();
+  await openPane(
+    page.locator(".eventLog:visible"),
+    page.getByRole("button", { name: "Events", exact: true }),
+  );
+  await expect(
+    page.getByRole("button", { name: "Filter event history, All events" }),
+  ).toBeVisible();
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   await expect(
     insights.locator("#chartForecastSupplyDemand canvas"),
   ).toBeVisible();
-  if (await page.locator(".desktop-panes").count()) {
-    const health = page.locator(".gridHealth");
-    await expect(health).toHaveCSS("justify-content", "flex-start");
-    await expect(health).toHaveCSS("text-align", "left");
-  }
-  if (await page.locator(".secondary-pane").count()) {
-    const nav = page.locator("#navfooter");
-    const before = (await nav.boundingBox())!;
-    const pane = (await insights.boundingBox())!;
-    expect(before.x).toBeCloseTo(pane.x, 0);
-    expect(before.width).toBeCloseTo(pane.width, 0);
-    expect(before.y).toBeCloseTo(pane.y + pane.height, 0);
-    expect(before.height).toBeGreaterThanOrEqual(56);
-    await nav.getByRole("button", { name: "Events" }).click();
-    await expect(page.locator(".eventLog:visible")).toBeVisible();
-    expect((await nav.boundingBox())!.height).toBe(before.height);
-    await nav.getByRole("button", { name: "Insights" }).click();
-    await expect(insights).toBeVisible();
-    expect((await nav.boundingBox())!.height).toBe(before.height);
-  }
-  if (process.env.PR_SCREENSHOTS && page.viewportSize()!.width >= 1280) {
-    await page.screenshot({ path: testInfo.outputPath("panels.png") });
-  }
 });

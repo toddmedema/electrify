@@ -359,22 +359,27 @@ export function GameAppBar(props: Props) {
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <div className="gridHealthSummary">
-            <span className="gridHealthState">
-              <span className="statusIcon" aria-hidden="true">
-                <ConceptIcon
-                  concept={
-                    inBlackout
-                      ? "blackout"
-                      : gridHealth.state === "stable"
-                        ? "supply"
-                        : "danger"
-                  }
-                  fontSize="small"
-                />
-              </span>
-              <strong className="statusLabel">{gridHealth.label}</strong>
+            <span className="statusIcon" aria-hidden="true">
+              <ConceptIcon
+                concept={
+                  inBlackout
+                    ? "blackout"
+                    : gridHealth.state === "stable"
+                      ? "supply"
+                      : "danger"
+                }
+                fontSize="small"
+              />
             </span>
-            <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+            <strong className="gridHealthMetric">
+              {gridHealth.label},{" "}
+              {gridHealth.state === "stable"
+                ? formatWatts(reserveCapacityW(game, now)).replace(
+                    /([kMGT]?W)$/,
+                    " $1",
+                  )
+                : gridHealth.metric}
+            </strong>
           </div>
         </div>
         {/* Tutorials have no term goal to track; their own HUD carries the objective. */}

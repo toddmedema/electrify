@@ -26,22 +26,16 @@ import {
   isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
-import DesktopPanes from "./base/DesktopPanes";
+import GameWorkspace from "./base/GameWorkspace";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
-import EventLogContainer from "./views/EventLogContainer";
-import NavigationContainer from "./base/NavigationContainer";
-import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import SaveTransitionDialog from "./base/SaveTransitionDialog";
-import BuildFacilities from "./views/BuildFacilities";
 import CustomGameContainer from "./views/CustomGameContainer";
 import DataCenterSetupContainer from "./views/DataCenterSetupContainer";
-import FacilitiesContainer from "./views/FacilitiesContainer";
-import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
 import ManualHelpPopover from "./base/ManualHelpPopover";
@@ -58,7 +52,7 @@ import {
 } from "../reducers/Game";
 import { selectTutorialHiddenUi } from "../reducers/Tutorial";
 import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
-import { isDesktopScreen, isPaneLayout } from "../Globals";
+import { isDesktopScreen } from "../Globals";
 import { store } from "../Store";
 
 const AchievementGallery = React.lazy(() =>
@@ -67,13 +61,7 @@ const AchievementGallery = React.lazy(() =>
   ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
 );
 
-// The in-game cards share one stable transition key above the desktop breakpoint. Facilities
-// and Insights stay mounted while Events replaces Insights, or joins it on an ultrawide screen.
-const DESKTOP_PANES_KEY = "DESKTOP_PANES";
-
-// And the same again for the two-column layout below it, where Facilities is pinned and the nav
-// swaps what is beside it -- the pinned column would otherwise slide off with the card transition
-const TABLET_PANES_KEY = "TABLET_PANES";
+const GAME_WORKSPACE_KEY = "GAME_WORKSPACE";
 
 // How many facilities the number row can reach. Nine because that is how many number keys
 // there are; a longer fleet is still reachable by mouse, and by the row actions
@@ -104,10 +92,16 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (document.querySelector(".MuiModal-root:not(.MuiModal-hidden)"))
+      return true;
     if (document.querySelector('[data-data-center-guide="true"]')) return true;
     if (document.querySelector('[data-scenario-choice="true"]')) return true;
     if (document.querySelector('[data-manual-help="true"]')) return true;
-    if (document.querySelector('[data-customer-programs="true"]')) return true;
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[data-program-decision="true"]')
+    )
+      return true;
     if (event.key === "Escape") {
       return false;
     }
@@ -290,17 +284,12 @@ const shortcutHandlers = {
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
-  // Match each screen's close/back control. The build catalog closes to Facilities with a
-  // fade, even when opened from another pane or after switching categories; other screens
-  // follow their Back button through history.
+  // The workspace handles tool dismissal, allowing nested controls to consume Escape first.
+  // Full-screen destinations follow their Back button through history.
   ESCAPE: () => {
     const { card, game } = store.getState();
-    if (game.inGame && !isNavCard(card.name)) {
-      store.dispatch(
-        card.name.startsWith("BUILD_")
-          ? navigate("FACILITIES")
-          : navigateBack(),
-      );
+    if (game.inGame && !isGameCard(card.name)) {
+      store.dispatch(navigateBack());
       // Escape may arrive before the gallery's entry focus settles.
       if (card.name === "ACHIEVEMENTS")
         window.setTimeout(
@@ -345,6 +334,10 @@ export interface Props extends StateProps, DispatchProps {}
 
 export function isNavCard(name: CardNameType) {
   return NAV_CARDS.indexOf(name) !== -1;
+}
+
+export function isGameCard(name: CardNameType) {
+  return isNavCard(name) || name.startsWith("BUILD_");
 }
 
 const SNACKBAR_SWIPE_DISTANCE = 56;
@@ -529,70 +522,8 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private renderCard(): React.JSX.Element {
-    const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
-    const { tutorialStep, tutorialSteps } = this.props;
-    // A step that keeps the side panes back gets the fleet on its own. Dropped here rather than
-    // hidden in CSS: the grid's tracks come from the pane count, so a hidden pane would leave an
-    // empty column and a splitter to nowhere
-    if (
-      isPanes &&
-      tutorialSteps?.[tutorialStep]?.hideUi?.includes("sidePanes")
-    ) {
-      return (
-        <div
-          className={`${isDesktopScreen() ? "desktop-layout" : "pane-layout"} flexContainer`}
-        >
-          <GameAppBarContainer />
-          <DesktopPanes>
-            <FacilitiesContainer />
-          </DesktopPanes>
-        </div>
-      );
-    }
-    // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
-    // instead of splitting the width between separate Finance and Forecast chart columns.
-    if (isPanes && isDesktopScreen()) {
-      return (
-        <div className="desktop-layout flexContainer">
-          <GameAppBarContainer />
-          <DesktopPanes>
-            <FacilitiesContainer />
-            <InsightsContainer />
-            <EventLogContainer />
-          </DesktopPanes>
-        </div>
-      );
-    }
-    // Laptops and landscape tablets keep the fleet pinned beside Insights or Events.
-    if (isPanes) {
-      return (
-        <div className="pane-layout flexContainer">
-          <GameAppBarContainer />
-          <DesktopPanes>
-            <FacilitiesContainer />
-            <div className="secondary-pane">
-              {this.props.card.name === "EVENTS" ? (
-                <EventLogContainer />
-              ) : (
-                <InsightsContainer />
-              )}
-              <NavigationContainer />
-            </div>
-          </DesktopPanes>
-        </div>
-      );
-    }
+    if (isGameCard(this.props.card.name)) return <GameWorkspace />;
     switch (this.props.card.name) {
-      case "BUILD_GENERATORS":
-      case "BUILD_STORAGE":
-      case "BUILD_INTERTIES":
-        return <BuildFacilities />;
-      case "INSIGHTS":
-        return <InsightsContainer />;
-      case "EVENTS":
-        return <EventLogContainer />;
-      case "FACILITIES":
-        return <FacilitiesContainer />;
       case "SETTINGS":
         return <SettingsContainer />;
       case "ACHIEVEMENTS":
@@ -668,26 +599,15 @@ export default class Compositor extends React.Component<Props, {}> {
     const transitionKey =
       this.props.card.name === "LOADING"
         ? `LOADING:${this.props.card.ts}`
-        : this.props.card.name.startsWith("BUILD_")
-          ? "BUILD_FACILITIES"
-          : !isNavCard(this.props.card.name)
-            ? this.props.card.name
-            : isDesktopScreen()
-              ? DESKTOP_PANES_KEY
-              : isPaneLayout()
-                ? TABLET_PANES_KEY
-                : this.props.card.name;
+        : isGameCard(this.props.card.name)
+          ? GAME_WORKSPACE_KEY
+          : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
     // Chrome the step hides is dropped by app.scss rules on this attribute, so no pane or bar
     // needs to know about tutorials to step aside
     const hiddenUi = currentTutorialStep?.hideUi;
-    const menuLayout =
-      !isNavCard(this.props.card.name) &&
-      !this.props.card.name.startsWith("BUILD_");
-    const singlePanel =
-      !isNavCard(this.props.card.name) ||
-      !isPaneLayout() ||
-      hiddenUi?.includes("sidePanes");
+    const menuLayout = !isGameCard(this.props.card.name);
+    const singlePanel = menuLayout;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -832,7 +752,7 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <Snackbar
-          className={`snackbar ${isNavCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
+          className={`snackbar ${isGameCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}

@@ -8,7 +8,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -747,7 +746,6 @@ export interface DispatchProps {
     request: EvidenceRequestType,
     element: HTMLElement | null,
   ) => void;
-  onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
@@ -920,7 +918,6 @@ export default class Facilities extends React.Component<Props> {
   public render() {
     const {
       game,
-      onGeneratorBuild,
       onSell,
       onTogglePause,
       onPause,
@@ -948,22 +945,6 @@ export default class Facilities extends React.Component<Props> {
     return (
       <GameCard className="facilities" id="facilitiesPane">
         <>
-          {/* The pane's own header rather than a row inside the list, so it lines up with the
-            other panes' headers and the build buttons stay put as the fleet scrolls */}
-          <Toolbar className="paneHeader">
-            <Typography variant="h6">Facilities</Typography>
-            {!readOnly && (
-              <Button
-                variant="contained"
-                color="primary"
-                className="button-buildFacility"
-                startIcon={<ConceptIcon concept="build" fontSize="small" />}
-                onClick={onGeneratorBuild}
-              >
-                Build
-              </Button>
-            )}
-          </Toolbar>
           <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             <List dense className="scrollable unifiedFacilitiesList">

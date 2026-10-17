@@ -332,7 +332,12 @@ export const WEATHER_DEPENDENT_FUELS: readonly FuelNameType[] = [
   "Airborne Wind",
 ];
 
-export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
+export const NAV_CARDS = [
+  "FACILITIES",
+  "INSIGHTS",
+  "EVENTS",
+  "PROGRAMS",
+] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const MUSIC_INTENSITY_MAX = 10;
