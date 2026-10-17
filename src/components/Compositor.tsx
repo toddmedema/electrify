@@ -97,7 +97,11 @@ configure({
     if (document.querySelector('[data-data-center-guide="true"]')) return true;
     if (document.querySelector('[data-scenario-choice="true"]')) return true;
     if (document.querySelector('[data-manual-help="true"]')) return true;
-    if (document.querySelector('[data-program-decision="true"]')) return true;
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[data-program-decision="true"]')
+    )
+      return true;
     if (event.key === "Escape") {
       return false;
     }

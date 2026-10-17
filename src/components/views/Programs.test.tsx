@@ -46,7 +46,19 @@ test("an embedded program decision pauses time and Escape returns to its overvie
   );
   expect(screen.getByRole("region", { name: "Program details" })).toBeVisible();
   expect(store.getState().game.speed).toBe("PAUSED");
-  fireEvent.keyDown(document, { key: "Escape" });
+  // A separate rail keeps ownership of its own Escape; only this decision's controls go Back.
+  const outside = new KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    cancelable: true,
+  });
+  document.body.dispatchEvent(outside);
+  expect(outside.defaultPrevented).toBe(false);
+  expect(screen.getByRole("region", { name: "Program details" })).toBeVisible();
+  fireEvent.keyDown(
+    screen.getByRole("heading", { name: "Time-of-use tariff" }),
+    { key: "Escape" },
+  );
   expect(
     screen.getByRole("region", { name: "Electricity pricing" }),
   ).toBeVisible();

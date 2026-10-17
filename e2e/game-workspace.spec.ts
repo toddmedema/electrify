@@ -24,6 +24,45 @@ async function settleSheets(page: Page) {
   });
 }
 
+async function expectFloatingDock(page: Page) {
+  const [stage, fleet, facilities, dock] = await Promise.all([
+    page.locator(".gameStage").boundingBox(),
+    page.locator(".gameFleet").boundingBox(),
+    page.locator(".gameStage .facilities").boundingBox(),
+    page.locator("#navfooter").boundingBox(),
+  ]);
+  // The dock overlays the full-height fleet instead of reserving a blank footer band.
+  expect(
+    Math.abs(facilities!.y + facilities!.height - stage!.y - stage!.height),
+  ).toBeLessThanOrEqual(1);
+  expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
+  expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
+  expect(
+    Math.abs(dock!.x + dock!.width / 2 - fleet!.x - fleet!.width / 2),
+  ).toBeLessThanOrEqual(1);
+}
+
+async function expectSideRails(page: Page) {
+  const fleet = (await page.locator(".gameFleet").boundingBox())!;
+  expect(fleet.width).toBeGreaterThanOrEqual(720);
+  const panels = await page
+    .locator(".gameToolPanel:visible")
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const { left, right, width } = element.getBoundingClientRect();
+        return { left, right, width };
+      }),
+    );
+  for (const panel of panels) {
+    expect(panel.width).toBeGreaterThanOrEqual(400);
+    expect(panel.width).toBeLessThanOrEqual(480);
+    expect(
+      panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
+    ).toBe(true);
+  }
+  await expectFloatingDock(page);
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`game dock and sheets stay usable in ${theme}`, async ({
     page,
@@ -39,6 +78,7 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
     }
+    await expectFloatingDock(page);
     await page.screenshot({
       path: testInfo.outputPath(`workspace-facilities-${theme}.png`),
       animations: "disabled",
@@ -81,12 +121,19 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("heading", { name: "Insights", exact: true })
       .focus();
     await settleSheets(page);
-    const [sheetBox, dockBox] = await Promise.all([
+    const [sheetBox, stageBox] = await Promise.all([
       insights.boundingBox(),
-      dock.boundingBox(),
+      page.locator(".gameStage").boundingBox(),
     ]);
     expect(sheetBox!.y).toBeGreaterThan(0);
-    expect(sheetBox!.y + sheetBox!.height).toBeLessThanOrEqual(dockBox!.y + 1);
+    expect(
+      Math.abs(sheetBox!.y + sheetBox!.height - stageBox!.y - stageBox!.height),
+    ).toBeLessThanOrEqual(1);
+    if (
+      (await page.locator(".gameStage").getAttribute("data-layout")) !== "sheet"
+    ) {
+      await expectSideRails(page);
+    }
     expect(
       await insights.evaluate(
         (element) => element.scrollWidth - element.clientWidth,
@@ -184,60 +231,127 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
 });
 
-test("wide desktops can pin tools and compact screens retain one active sheet", async ({
+test("desktop side tabs preserve the fleet and remember both rails across compact layouts", async ({
   page,
 }, testInfo) => {
   test.skip(
     !!testInfo.project.use.hasTouch,
-    "Desktop pinning uses a wide pointer workspace",
+    "Desktop rails use a wide pointer workspace",
   );
   await page.setViewportSize({ width: 2240, height: 1100 });
   await startGame(page, "light");
+  await page.locator("#buildNav").click();
   await page.locator("#insightsNav").click();
-  await page.getByRole("button", { name: "Pin Insights", exact: true }).click();
-  await page.locator("#eventsNav").click();
   await expect(page.locator(".gameToolPanel")).toHaveCount(2);
-  await page.getByRole("button", { name: "Pin Events", exact: true }).click();
-  await page.locator("#programsNav").click();
-  await expect(page.locator(".gameToolPanel")).toHaveCount(3);
   await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible({
     timeout: 60_000,
   });
   await settleSheets(page);
-  const boxes = await page.locator(".gameToolPanel").evaluateAll((panels) =>
-    panels.map((panel) => {
-      const box = panel.getBoundingClientRect();
-      return { x: box.x, y: box.y, width: box.width, right: box.right };
-    }),
+  await expect(page.locator(".gameStage")).toHaveAttribute(
+    "data-layout",
+    "dual",
   );
-  expect(boxes.every((box) => box.width >= 560)).toBe(true);
-  expect(boxes[0].right).toBeLessThanOrEqual(boxes[1].x);
-  expect(boxes[1].right).toBeLessThanOrEqual(boxes[2].x);
-  expect(boxes.every((box) => Math.abs(box.y - boxes[0].y) <= 1)).toBe(true);
-  await page.screenshot({
-    path: testInfo.outputPath("workspace-pinned-desktop.png"),
-    animations: "disabled",
-  });
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator(".gameToolPanel")).toHaveCount(1);
+  await expectSideRails(page);
+  await page
+    .getByRole("tablist", { name: "Decisions" })
+    .getByRole("tab", { name: "Programs", exact: true })
+    .click();
   await expect(
     page.getByRole("region", { name: "Programs", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Pin Programs", exact: true }),
+    page.getByRole("region", { name: "Build", exact: true }),
   ).toHaveCount(0);
+  await page
+    .getByRole("tablist", { name: "Intelligence" })
+    .getByRole("tab", { name: "Events", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Events", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Insights", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: /^(?:Unpin|Pin) /i }),
+  ).toHaveCount(0);
+  // Events is the most recently opened tool, but the player is working in Programs.
+  // Narrowing preserves the focused decision instead of hiding it for the newer tool.
+  const rate = page.locator("#rateSlider input");
+  const value = await rate.inputValue();
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-side-rails-desktop.png"),
+    animations: "disabled",
+  });
+  await rate.focus();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+  await expect(
+    page.getByRole("region", { name: "Programs", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tablist", { name: "Decisions", exact: true }),
+  ).toHaveCount(0);
+  await expect(rate).toBeFocused();
+  await expect(rate).toHaveValue(value);
   await page.setViewportSize({ width: 2240, height: 1100 });
-  await expect(page.locator(".gameToolPanel")).toHaveCount(3);
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
   await expect(
-    page.getByRole("button", { name: "Unpin Insights", exact: true }),
+    page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();
+  await expect(rate).toBeFocused();
+  await expectSideRails(page);
+
+  // A single desktop rail reveals a remembered tool rather than closing an unseen one.
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await expect(page.locator(".gameStage")).toHaveAttribute(
+    "data-layout",
+    "side",
+  );
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+  await expectSideRails(page);
+  await page.locator("#eventsNav").click();
   await expect(
-    page.getByRole("button", { name: "Unpin Events", exact: true }),
+    page.getByRole("region", { name: "Events", exact: true }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Programs", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("#eventsNav")).toBeFocused();
+  await page.setViewportSize({ width: 1800, height: 900 });
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
+  await expectSideRails(page);
+
+  // Reviewing a Programs decision must not consume Escape from the opposite rail.
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await programs.getByRole("button", { name: /^Efficiency rebates ·/ }).click();
+  const decision = programs.getByRole("heading", {
+    name: "Efficiency rebates",
+    exact: true,
+  });
+  await expect(decision).toBeVisible();
+  await page.locator("#insightsNav").click();
+  await expect(
+    page.getByRole("tab", { name: "Insights", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Insights", exact: true }),
+  ).toHaveCount(0);
+  await expect(decision).toBeVisible();
+  await expect(page.locator("#insightsNav")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(decision).toHaveCount(0);
+  await expect(programs.locator("#rateSlider input")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(programs).toHaveCount(0);
+  await expect(page.locator("#programsNav")).toBeFocused();
 });
 
-test("short desktop sheets keep their heading, scroll body, and game dock reachable", async ({
+test("short desktop rails keep their heading, scroll body, and floating dock reachable", async ({
   page,
 }, testInfo) => {
   test.skip(!!testInfo.project.use.hasTouch, "A short desktop viewport");
@@ -249,13 +363,15 @@ test("short desktop sheets keep their heading, scroll body, and game dock reacha
     timeout: 60_000,
   });
   await settleSheets(page);
-  const [panel, dock, stage] = await Promise.all([
+  const [panel, stage] = await Promise.all([
     insights.boundingBox(),
-    page.locator("#navfooter").boundingBox(),
     page.locator(".gameStage").boundingBox(),
   ]);
   expect(panel!.y).toBeGreaterThanOrEqual(stage!.y);
-  expect(panel!.y + panel!.height).toBeLessThanOrEqual(dock!.y);
+  expect(panel!.y + panel!.height).toBeLessThanOrEqual(
+    stage!.y + stage!.height,
+  );
+  await expectSideRails(page);
   await expect(
     page.getByRole("button", { name: "Close Insights", exact: true }),
   ).toBeInViewport();
@@ -277,3 +393,80 @@ test("short desktop sheets keep their heading, scroll body, and game dock reacha
     animations: "disabled",
   });
 });
+
+for (const width of [320, 390]) {
+  test(`compact ${width}px sheets and final actions remain usable behind the floating dock`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 640 });
+    await startGame(page, "dark");
+    await expect(page.locator(".gameStage")).toHaveAttribute(
+      "data-layout",
+      "sheet",
+    );
+    await expectFloatingDock(page);
+    await page
+      .getByRole("button", { name: "Inspect Coal", exact: true })
+      .click();
+    const fleet = page.locator(".facilities");
+    await fleet.locator(".facilitiesBody").evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const [lastRow, dock] = await Promise.all([
+      fleet.locator(".facilityRow").last().boundingBox(),
+      page.locator("#navfooter").boundingBox(),
+    ]);
+    expect(lastRow!.y + lastRow!.height).toBeLessThanOrEqual(dock!.y + 1);
+
+    await page.locator("#programsNav").click();
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await programs
+      .getByRole("button", { name: /^Efficiency rebates ·/ })
+      .click();
+    const commit = programs.getByRole("button", {
+      name: "Start next month",
+      exact: true,
+    });
+    await expect(commit).toBeEnabled({ timeout: 60_000 });
+    await settleSheets(page);
+    const [panel, stage, commitBox, dockBox] = await Promise.all([
+      programs.boundingBox(),
+      page.locator(".gameStage").boundingBox(),
+      commit.boundingBox(),
+      page.locator("#navfooter").boundingBox(),
+    ]);
+    expect(
+      Math.abs(panel!.y + panel!.height - stage!.y - stage!.height),
+    ).toBeLessThanOrEqual(1);
+    expect(commitBox!.y + commitBox!.height).toBeLessThanOrEqual(
+      dockBox!.y + 1,
+    );
+    expect(
+      await commit.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const top = document.elementFromPoint(
+          box.x + box.width / 2,
+          box.y + box.height / 2,
+        );
+        return top === element || element.contains(top);
+      }),
+    ).toBe(true);
+    await programs.locator(".customerProgramsBody").evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect(programs.getByText(/^Peak demand:/)).toBeInViewport();
+    expect(
+      await page
+        .locator(".gameWorkspace")
+        .evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await expect(page.locator("#eventsNav")).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`workspace-floating-dock-${width}.png`),
+      animations: "disabled",
+    });
+  });
+}

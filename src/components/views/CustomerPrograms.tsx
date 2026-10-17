@@ -833,11 +833,13 @@ export function ProgramsScreen({
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
   const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
+  const activeCard = useAppSelector((s) => s.card?.name);
   const token = React.useId();
   const [selected, setSelected] = React.useState<Selection>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
   const [startHour, setStartHour] = React.useState(17);
   const bodyRef = React.useRef<HTMLDivElement>(null);
+  const screenRef = React.useRef<HTMLDivElement>(null);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const lastSelection = React.useRef<Selection>();
   React.useLayoutEffect(() => {
@@ -862,6 +864,16 @@ export function ProgramsScreen({
   React.useEffect(() => {
     if (embedded && !selected) return;
     const closeOnEscape = (event: KeyboardEvent) => {
+      if (
+        embedded &&
+        event.target instanceof Node &&
+        !screenRef.current?.contains(event.target)
+      ) {
+        const otherTool =
+          event.target instanceof Element &&
+          event.target.closest("[data-game-tool]");
+        if (otherTool || activeCard !== "PROGRAMS") return;
+      }
       if (event.key === "Escape" && !manualOpen && !event.defaultPrevented) {
         event.preventDefault();
         event.stopPropagation();
@@ -871,7 +883,7 @@ export function ProgramsScreen({
     };
     document.addEventListener("keydown", closeOnEscape, true);
     return () => document.removeEventListener("keydown", closeOnEscape, true);
-  }, [onClose, manualOpen, embedded, selected]);
+  }, [onClose, manualOpen, embedded, selected, activeCard]);
   // A docked overview may stay open while playing. Freeze time only while reviewing an
   // individual decision; the standalone screen retains its existing pause behavior.
   const reviewingDecision = !embedded || !!selected;
@@ -1149,6 +1161,7 @@ export function ProgramsScreen({
   );
   return embedded ? (
     <div
+      ref={screenRef}
       className="customerProgramsEmbedded"
       data-customer-programs="true"
       data-program-decision={selected ? "true" : undefined}

@@ -17,7 +17,7 @@ export const GAME_TOOLS: {
   id: GameTool;
   label: string;
   triggerId: string;
-  icon: React.ReactNode;
+  icon: React.ReactElement;
 }[] = [
   {
     id: "BUILD_GENERATORS",

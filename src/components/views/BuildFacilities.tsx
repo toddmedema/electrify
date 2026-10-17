@@ -17,6 +17,7 @@ import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
+import { GameToolCloseContext } from "../base/GameWorkspaceContext";
 
 const categories = [
   ["BUILD_GENERATORS", "Generators", "Generator"],
@@ -32,6 +33,7 @@ export default function BuildFacilities({
   category?: string;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const closeTool = React.useContext(GameToolCloseContext);
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
   const introductoryChoices = game.scenarioId === 1 && game.tutorialStep === 1;
@@ -47,7 +49,7 @@ export default function BuildFacilities({
     : visibleCategories.find(([name]) => name === (category ?? card))?.[0] ||
       "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
-  const close = () => dispatch(navigate("FACILITIES"));
+  const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
 
   return (
     <div
