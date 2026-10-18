@@ -100,6 +100,7 @@ import {
   getMarketRate,
   nextCustomerCount,
   publicRateCap,
+  publicTargetRate,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1603,13 +1604,15 @@ export const gameSlice = createSlice({
       ) {
         state.runIdentity = undefined;
       }
-      if (typeof payload.dollarsPerkWh === "number") {
-        payload.dollarsPerkWh = capRateForScenario(state, payload);
-      }
+      normalizeRateDelta(state, payload);
       const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
+      const followedBefore = !!state.rateFollowsTarget;
       Object.assign(state, payload);
-      if (recorded && recorded.dollarsPerkWh !== rateBefore) {
+      const rateChanged =
+        recorded?.dollarsPerkWh !== undefined &&
+        recorded.dollarsPerkWh !== rateBefore;
+      if (rateChanged) {
         recordMeaningfulDecision(state, {
           lever: "rate",
           label: "Set the customer electricity rate",
@@ -1617,6 +1620,11 @@ export const gameSlice = createSlice({
           before: String(rateBefore),
           after: String(recorded.dollarsPerkWh),
         });
+      }
+      if (
+        recorded &&
+        (rateChanged || !!state.rateFollowsTarget !== followedBefore)
+      ) {
         recordReplayAction(state, "delta", recorded);
       }
     },
@@ -1688,6 +1696,9 @@ export const gameSlice = createSlice({
       // scored against, so the game has to actually start there rather than at the slice default
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
+      // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
+      state.rateFollowsTarget =
+        !checkpoint && followedTargetRate(state) !== undefined;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.demandShapeExponent = scenario.demandShapeExponent;
@@ -3098,16 +3109,15 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     }
     case "delta": {
       const requested = { ...((payload || {}) as Partial<GameType>) };
-      if (typeof requested.dollarsPerkWh === "number") {
-        requested.dollarsPerkWh = capRateForScenario(state, requested);
-      }
+      normalizeRateDelta(state, requested);
       const recorded = recordedDelta(requested);
+      if (!recorded) break;
+      const before = state.dollarsPerkWh;
+      Object.assign(state, recorded);
       if (
-        recorded?.dollarsPerkWh !== undefined &&
-        recorded.dollarsPerkWh !== state.dollarsPerkWh
+        recorded.dollarsPerkWh !== undefined &&
+        recorded.dollarsPerkWh !== before
       ) {
-        const before = state.dollarsPerkWh;
-        Object.assign(state, recorded);
         recordMeaningfulDecision(state, {
           lever: "rate",
           label: "Set the customer electricity rate",
@@ -3120,6 +3130,50 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     }
     default:
       break;
+  }
+}
+
+/**
+ * The rate a public utility following its target charges now, or undefined where there is no
+ * target to follow: investor-owned and multiplayer companies, and tutorials.
+ */
+function followedTargetRate(state: GameType): number | undefined {
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (
+    !scenario ||
+    scenario.ownership !== "Public" ||
+    scenario.tutorialSteps ||
+    state.multiplayer
+  )
+    return undefined;
+  return publicTargetRate(
+    scenario.dollarsPerkWh,
+    state.date,
+    state.startingYear,
+    state.seed,
+  );
+}
+
+/**
+ * Turning following on sets the rate to the target; setting a rate by hand turns it off.
+ * Deltas that also pick the scenario are setup, which initGame settles.
+ */
+function normalizeRateDelta(state: GameType, payload: Partial<GameType>) {
+  const setup = "scenarioId" in payload || "customScenario" in payload;
+  if (payload.rateFollowsTarget === true && !setup) {
+    const target = followedTargetRate(state);
+    if (target === undefined) delete payload.rateFollowsTarget;
+    else payload.dollarsPerkWh = target;
+  } else if (
+    typeof payload.dollarsPerkWh === "number" &&
+    payload.rateFollowsTarget === undefined &&
+    state.rateFollowsTarget &&
+    !setup
+  ) {
+    payload.rateFollowsTarget = false;
+  }
+  if (typeof payload.dollarsPerkWh === "number") {
+    payload.dollarsPerkWh = capRateForScenario(state, payload);
   }
 }
 
@@ -3472,6 +3526,10 @@ export function* tickStatePhases(
           `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
+      if (state.rateFollowsTarget) {
+        const target = followedTargetRate(state);
+        if (target !== undefined) state.dollarsPerkWh = target;
+      }
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);

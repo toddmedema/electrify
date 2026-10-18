@@ -9,15 +9,15 @@ import { getDesktop, isDesktopApp } from "./Desktop";
 import {
   prepareDesktopStartup,
   failDesktopStartup,
-  finishDesktopStartup,
+  finishStartup,
 } from "./desktop/Startup";
 
 const container = document.getElementById("root")!;
 const root = createRoot(container);
 
-function DesktopStartupHandoff(): null {
+function StartupHandoff(): null {
   React.useLayoutEffect(() => {
-    finishDesktopStartup();
+    finishStartup();
   }, []);
   return null;
 }
@@ -26,9 +26,7 @@ const app = (
   <React.StrictMode>
     <Provider store={store}>
       <App />
-      {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
-        <DesktopStartupHandoff />
-      )}
+      <StartupHandoff />
     </Provider>
   </React.StrictMode>
 );
@@ -92,6 +90,7 @@ else {
     void prepareAchievements()
       .then(renderApp)
       .catch(() => {
+        finishStartup();
         root.render(
           <div role="alert" style={{ padding: 24 }}>
             <h1>Electrify couldn't finish loading</h1>

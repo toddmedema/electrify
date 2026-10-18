@@ -5076,7 +5076,7 @@ $homeSmokeCycle: 5.6s;
   }
 }
 
-#desktopStartup {
+#appStartup {
   position: fixed;
   inset: 0;
   display: flex;
@@ -5089,7 +5089,7 @@ $homeSmokeCycle: 5.6s;
   font-family: var(--font-family);
   line-height: 1.45;
 
-  .desktopStartupLogo {
+  .appStartupLogo {
     flex: 0 0 auto;
     padding: 32px 24px 0;
   }
@@ -5126,7 +5126,7 @@ $homeSmokeCycle: 5.6s;
     margin: 0;
   }
 
-  .desktopStartupActions {
+  .appStartupActions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -5150,7 +5150,7 @@ $homeSmokeCycle: 5.6s;
     color: var(--interactive-contrast);
   }
 
-  &.desktopStartupFailed .homeLogo * {
+  &.appStartupFailed .homeLogo * {
     animation-play-state: paused;
   }
 

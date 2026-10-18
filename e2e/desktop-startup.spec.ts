@@ -43,7 +43,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
         );
       });
       await page.reload();
-      const entrance = page.locator("#desktopStartup");
+      const entrance = page.locator("#appStartup");
       await expect(entrance.getByRole("status")).toHaveText(
         "Reticulating splines...",
       );
@@ -118,7 +118,7 @@ test("startup failure retains branding and keyboard recovery", async () => {
       }));
     });
     await retry.press("Enter");
-    await expect(page.locator("#desktopStartup")).toHaveCount(0);
+    await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Start playing", exact: true }),
     ).toBeEnabled();

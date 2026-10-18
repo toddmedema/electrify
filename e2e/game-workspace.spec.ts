@@ -171,11 +171,11 @@ test("Insights and Events reopen at the scroll position the player left", async 
 });
 
 async function expectFloatingDock(page: Page) {
-  const [stage, facilities, dock, fleet] = await Promise.all([
+  const [stage, facilities, dock, width] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
     page.locator(".gameStage .facilities").boundingBox(),
     page.locator("#navfooter").boundingBox(),
-    page.locator(".gameFleet").boundingBox(),
+    page.evaluate(() => window.innerWidth),
   ]);
   // The dock overlays the full-height fleet instead of reserving a blank footer band.
   expect(
@@ -183,10 +183,10 @@ async function expectFloatingDock(page: Page) {
   ).toBeLessThanOrEqual(1);
   expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
   expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
-  // Centered over the fleet, so side tools never sit under it.
-  expect(
-    Math.abs(dock!.x + dock!.width / 2 - fleet!.x - fleet!.width / 2),
-  ).toBeLessThanOrEqual(1);
+  // Centered on the window, so opening or closing a side tool never moves it.
+  expect(Math.abs(dock!.x + dock!.width / 2 - width / 2)).toBeLessThanOrEqual(
+    1,
+  );
 }
 
 async function expectSideRails(page: Page) {
