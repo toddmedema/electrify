@@ -1348,6 +1348,102 @@ $topbar_height: 56px;
   }
 }
 
+// Wide windows fold the status row into the top bar (GameAppBar renders it inside the toolbar):
+// cash and date, a hairline, the grid readout, then the mission, with the speed controls pinned
+// right. The bar never wraps. Only the mission's text gives up width, then the months label
+// abbreviates and the hour goes, so the grid state and its figure always stay whole.
+#appbar.appbarSingleRow {
+  container: appbar / inline-size;
+
+  #topbar .gameStatus {
+    flex: 0 0 auto;
+  }
+
+  #speedChangeButtons {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .gameStatusBar {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    align-self: stretch;
+    gap: $space-3;
+    min-width: 0;
+    margin-inline: $space-4;
+    border: 0;
+    background: none;
+
+    &::before {
+      content: "";
+      flex: 0 0 auto;
+      width: 1px;
+      height: 24px;
+      background: var(--border-subtle);
+    }
+  }
+
+  // Warnings tint the readout itself, so the alarm stays the loudest thing in the bar without
+  // owning a row.
+  .gameStatusBar .gridHealth {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding-inline: $space-2;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+
+    &.statusWarning {
+      background: var(--warning-fill);
+    }
+
+    // Opaque under its tint: the whole bar pulses during a blackout, and a see-through fill
+    // would let that pulse wash out the red text.
+    &.gridHealth-blackout {
+      background:
+        linear-gradient(var(--blackout-tint), var(--blackout-tint)),
+        var(--bg-primary);
+    }
+  }
+
+  .gameStatusBar .gridHealthSummary {
+    flex-wrap: nowrap;
+  }
+
+  .gameStatusBar .missionSummary {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  // The same tint on the risk alone rather than across the months and info button beside it.
+  .gameStatusBar .missionSummary.statusWarning .missionRiskButton {
+    margin-inline-start: 0;
+    border-radius: var(--radius-sm);
+    background: var(--warning-fill);
+  }
+
+  .missionRiskText,
+  .missionSummaryHeadline {
+    min-width: 96px;
+  }
+}
+
+@container appbar (max-width: 1365px) {
+  .missionSummaryMonthsTail {
+    display: none;
+  }
+}
+
+@container appbar (max-width: 1279px) {
+  .gameStatusHour {
+    display: none;
+  }
+}
+
 // Phones and narrow tablets keep the status together in one left-aligned readout.
 @media #{$single_pane_media} {
   .gridHealth {
