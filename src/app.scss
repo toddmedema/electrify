@@ -1385,7 +1385,8 @@ $topbar_height: 56px;
   }
 
   // Warnings tint the readout itself, so the alarm stays the loudest thing in the bar without
-  // owning a row.
+  // owning a row. A blackout already pulses the whole bar, so its readout stays plain text on
+  // that pulse, with only the icon in red.
   .gameStatusBar .gridHealth {
     flex: 0 0 auto;
     min-height: 32px;
@@ -1398,12 +1399,12 @@ $topbar_height: 56px;
       background: var(--warning-fill);
     }
 
-    // Opaque under its tint: the whole bar pulses during a blackout, and a see-through fill
-    // would let that pulse wash out the red text.
     &.gridHealth-blackout {
-      background:
-        linear-gradient(var(--blackout-tint), var(--blackout-tint)),
-        var(--bg-primary);
+      color: $font_color_primary;
+
+      .conceptIcon {
+        color: var(--delta-bad);
+      }
     }
   }
 
@@ -3925,13 +3926,29 @@ $pane_header_height: 48px;
   // Which speed the clock is running at, said as a selection rather than as three enabled
   // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
   // Selection uses a surface change; every enabled speed remains a blue control.
+  // Opaque segments with no outline, so the blackout pulse behind the bar never shows through.
   .speedToggles {
+    .MuiToggleButton-root,
+    .MuiToggleButtonGroup-grouped {
+      margin: 0;
+      border: 0;
+    }
+
     .MuiToggleButton-root {
       padding: $space-1 $space-3;
-      border-color: var(--border-tile);
+      background: var(--bg-raised);
       color: var(--interactive-strong);
+
       font-size: var(--font-size-caption);
       line-height: 1.4;
+
+      &:hover {
+        background: color-mix(
+          in srgb,
+          var(--interactive-blue) 8%,
+          var(--bg-raised)
+        );
+      }
 
       &.Mui-selected {
         background: var(--bg-selected);
@@ -3959,7 +3976,7 @@ $pane_header_height: 48px;
     --clock-lift: 3px;
     --clock-ring: var(--font-color-primary);
     // What a marker's knockout outline matches, so the ring breaks cleanly behind a marker
-    --clock-segment: var(--bg-primary);
+    --clock-segment: var(--bg-raised);
 
     .multiplayerSpeedLabel {
       transform: translateY(calc(-1 * var(--clock-lift)));

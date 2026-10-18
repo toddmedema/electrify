@@ -745,7 +745,8 @@ async function expectClockMeaning(
         (element) => getComputedStyle(element, "::before").content,
       ),
     ).toBe("none");
-    expect(await active.evaluate(fill)).toBe("rgba(0, 0, 0, 0)");
+    // Every segment is opaque; only your own selection takes the filled colour.
+    expect(await active.evaluate(fill)).not.toBe(await selected.evaluate(fill));
     await expect(selected).not.toHaveAttribute("aria-current");
   }
 }
