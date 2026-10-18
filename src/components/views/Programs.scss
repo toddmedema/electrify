@@ -51,19 +51,6 @@
     display: none;
   }
 
-  .programsRateFollowNote {
-    color: var(--font-color-faded);
-  }
-
-  .insightsRateMetricValue:has(.programsRateMatched) {
-    white-space: nowrap;
-  }
-
-  .programsRateMatched {
-    color: var(--font-color-faded);
-    font-size: var(--font-size-caption);
-  }
-
   .insightsRateMetrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -142,16 +129,5 @@
     .programsRateFollowShort {
       display: inline;
     }
-
-    // The switch and caption already say so; the value keeps its column.
-    .programsRateMatched {
-      display: none;
-    }
-  }
-}
-
-@media (max-height: 600px) and (max-width: 599px) {
-  .programsPricing .programsRateFollowNote {
-    display: none;
   }
 }

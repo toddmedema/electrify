@@ -267,7 +267,6 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
         </span>
         <span className="insightsRateMetricValue">
           {formatRateCompact(investor ? marketRate : targetRate)}
-          {following && <span className="programsRateMatched"> · matched</span>}
         </span>
       </span>
       {investor ? (
@@ -315,14 +314,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
               <Switch
                 color="primary"
                 checked={following}
-                slotProps={{
-                  input: {
-                    "aria-label": "Follow target rate",
-                    "aria-describedby": following
-                      ? "programsRateFollowNote"
-                      : undefined,
-                  },
-                }}
+                slotProps={{ input: { "aria-label": "Follow target rate" } }}
                 onChange={(event) =>
                   onDelta({ rateFollowsTarget: event.target.checked })
                 }
@@ -334,15 +326,6 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
       <div className="insightsRateMetrics" aria-hidden="true">
         {rateMetrics}
       </div>
-      {following && (
-        <Typography
-          id="programsRateFollowNote"
-          className="programsRateFollowNote"
-          variant="caption"
-        >
-          Your rate moves with the target each month.
-        </Typography>
-      )}
       {canFollow && (
         <span className="srOnly" role="status" aria-live="polite">
           {!following && announcedStop

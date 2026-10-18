@@ -194,9 +194,6 @@ it("offers a public utility a switch to follow its target, off once a rate is ch
   const view = render(<RateControls game={game} onDelta={onDelta} />);
   const follow = screen.getByRole("switch", { name: "Follow target rate" });
   expect(follow).toBeChecked();
-  expect(follow).toHaveAccessibleDescription(
-    "Your rate moves with the target each month.",
-  );
   fireEvent.click(follow);
   expect(onDelta).toHaveBeenCalledWith({ rateFollowsTarget: false });
   view.rerender(
