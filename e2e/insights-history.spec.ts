@@ -70,8 +70,8 @@ test("public insights show the rate score and an absolute customer objective", a
     });
   }
   await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "All requirements" })
+    .locator("#navfooter:visible")
+    .getByRole("button", { name: "Scenario & score" })
     .first()
     .click();
   await expect(page.getByRole("dialog")).toContainText("14,850 customers");

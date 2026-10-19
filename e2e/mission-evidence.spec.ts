@@ -90,7 +90,7 @@ for (const theme of ["light", "dark"]) {
     }
     await settle(page);
     const details = page.getByRole("button", {
-      name: "All requirements",
+      name: "Scenario & score",
       exact: true,
     });
     await details.click();
@@ -303,7 +303,7 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.setViewportSize(viewport);
     await page.addStyleTag({ content: "html { font-size: 150% !important; }" });
     const details = page.getByRole("button", {
-      name: "All requirements",
+      name: "Scenario & score",
       exact: true,
     });
     await details.scrollIntoViewIfNeeded();

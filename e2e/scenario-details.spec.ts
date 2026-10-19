@@ -12,10 +12,10 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game" }).click();
-    // The mission summary's info button is the way into the full requirements
+    // The dock's scenario action is the way into the full requirements
     const details = page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "All requirements" })
+      .locator("#navfooter:visible")
+      .getByRole("button", { name: "Scenario & score" })
       .first();
     await details.click();
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });

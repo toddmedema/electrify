@@ -77,8 +77,8 @@ test("custom scenario events compose and persist without overflowing setup", asy
     ),
   ).toBe(true);
   await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "All requirements" })
+    .locator("#navfooter:visible")
+    .getByRole("button", { name: "Scenario & score" })
     .first()
     .click();
   await expect(page.getByRole("dialog")).not.toContainText(

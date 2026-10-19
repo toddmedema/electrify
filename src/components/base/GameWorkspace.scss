@@ -288,6 +288,10 @@
     padding: 4px;
     border-radius: 16px;
   }
+  // The phone dock leaves 4px around each button, which an outside ring would fill to the edge
+  .gameActionDock .gameDockAction.MuiButton-root:focus-visible {
+    outline-offset: -2px;
+  }
   .gameToolTray {
     left: max(4px, env(safe-area-inset-left));
     right: max(4px, env(safe-area-inset-right));
@@ -308,6 +312,6 @@
 // tools that open beside it
 .gameActionDock .gameDockDivider {
   flex: 0 0 1px;
-  margin: 8px 2px;
-  background: var(--border-subtle);
+  margin: 8px 0;
+  background: var(--border-strong);
 }

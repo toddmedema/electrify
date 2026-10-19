@@ -98,6 +98,8 @@
   --tooltip-border: rgba(0, 0, 0, 0.2);
   --tooltip-bg: #ffffff;
   --tooltip-shadow: rgba(15, 23, 42, 0.16);
+  // The soft edge a screen header gains once content scrolls beneath it
+  --header-scrim: rgba(15, 23, 42, 0.12);
   --cursor-line: #757575; /* grey600 */
   // Charts sit flush on the page in both themes: no panel, no edge
   --chart-surface: var(--bg-primary);
@@ -150,6 +152,7 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
+  --header-scrim: rgba(0, 0, 0, 0.5);
   --cursor-line: rgba(98, 155, 225, 0.55);
   --chart-surface: var(--bg-primary);
 }
@@ -3278,19 +3281,14 @@ $pane_header_height: 48px;
     // Sticky so the player can still tell which section they're scrolling through. The
     // line-height is the header's full height (MUI adds no vertical padding) and sets where
     // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx.
-    // A label on the page rather than a band across it: it shares the page's surface, and
-    // only once pinned does it frost the cards passing underneath so the words stay legible
+    // A label on the page rather than a band across it: it shares the page's surface, opaque
+    // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
       padding-inline: 0;
       background: var(--bg-primary);
       line-height: 32px;
       font-weight: 600;
       font-size: var(--font-size-caption-sm);
-
-      @supports (backdrop-filter: blur(1px)) {
-        background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-        backdrop-filter: blur(16px) saturate(1.4);
-      }
     }
 
     mark {
@@ -5540,16 +5538,17 @@ $homeSmokeCycle: 5.6s;
   a {
     color: var(--interactive-strong);
     text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+    text-underline-offset: 3px;
+    text-decoration-skip-ink: auto;
   }
 
   // A term that names another entry, linked the way a wiki links its articles. The underline
-  // stays, faint, so a link never depends on colour alone; it firms up under the pointer
+  // is softened but kept visible (the link colour alone is under 3:1 against body text), and
+  // firms up under the pointer
   .manual-entry-link {
     text-decoration-line: underline;
-    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
-    text-underline-offset: 3px;
-    border-radius: 2px;
+    text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
+    border-radius: 3px;
     transition: text-decoration-color 120ms ease-out;
 
     &:hover {
@@ -5558,7 +5557,7 @@ $homeSmokeCycle: 5.6s;
 
     &:focus-visible {
       outline: 2px solid var(--interactive-strong);
-      outline-offset: 2px;
+      outline-offset: 1px;
       text-decoration-color: currentColor;
     }
 
@@ -6892,10 +6891,28 @@ $programs_column: 800px;
 }
 
 // The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
+// No resting rule under the title: a game's menu is one stage, not an app toolbar over a list.
+// Once content scrolls beneath the header, a soft shadow fades in over the first 32px so cards
+// and pinned section labels slide under it rather than being cut by a line. Browsers without
+// scroll-driven animations simply show no edge.
 .screenHeader {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2; // above the sticky section labels it shades
   background: inherit;
-  border-bottom: 1px solid var(--border-subtle);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 16px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--header-scrim), transparent);
+    opacity: 0;
+    animation: screenHeaderScrim linear both;
+    animation-timeline: --screen-scroll;
+    animation-range: 0 32px;
+  }
 
   .screenHeaderBar {
     box-sizing: border-box;
@@ -6907,6 +6924,18 @@ $programs_column: 800px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.flexContainer:has(> .screenHeader) {
+  timeline-scope: --screen-scroll;
+}
+.flexContainer:has(> .screenHeader) > :is(.scrollable, .achievementGallery) {
+  scroll-timeline: --screen-scroll block;
+}
+@keyframes screenHeaderScrim {
+  to {
+    opacity: 1;
   }
 }
 
@@ -7073,9 +7102,11 @@ $programs_column: 800px;
 
   // Groups are separated by air rather than rules: the label sits close to the group it
   // names and well clear of the one above, the way grouped lists read on iOS
+  // Inset by the card's 1px border plus its title's 16px padding, so the label's first letter
+  // sits on the same line as the titles beneath it
   .manual-group {
     margin-top: $space-4;
-    padding: 0 $space-4 + $space-1;
+    padding: 0 calc(#{$space-4} + 1px);
   }
 }
 

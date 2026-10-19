@@ -35,8 +35,8 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       await page
-        .locator("#appbar:visible")
-        .getByRole("button", { name: "All requirements" })
+        .locator("#navfooter:visible")
+        .getByRole("button", { name: "Scenario & score" })
         .first()
         .click();
       const dialog = page.getByRole("dialog", { name: scenario.name });

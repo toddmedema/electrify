@@ -9,6 +9,7 @@ import {
   DialogTitle,
   IconButton,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { GameType, ScenarioType, ScoreCategoryType } from "../../Types";
@@ -85,6 +86,8 @@ function ScoreOutlook({
   const current = projection.actual[projection.actual.length - 1];
   const change = projection.final - current;
   const ended = projection.projected.length === 0;
+  // The chart's height scales with its width, so a phone needs more to keep its axis readable
+  const phone = useMediaQuery("(max-width: 599px)");
   return (
     <Box
       component="section"
@@ -116,6 +119,7 @@ function ScoreOutlook({
                 >
                   {change > 0 ? "+" : "−"}
                   {formatScore(Math.abs(change))}
+                  <span className="srOnly"> from now</span>
                 </span>
               )}
             </dd>
@@ -125,22 +129,23 @@ function ScoreOutlook({
       <ChartFinances
         hideTitle
         id="scenarioScoreChart"
-        height={110}
+        height={phone ? 150 : 110}
         timeline={timeline}
         title="score"
         format={formatScore}
+        projectedNote="Projected"
       />
       {!ended && (
         <Typography
           variant="caption"
-          color="text.secondary"
           component="p"
           className="scenarioOutlookNote"
+          sx={{ color: "text.secondary" }}
         >
           {projection.basisMonths < 12
             ? `An early estimate from your first ${projection.basisMonths} month${projection.basisMonths === 1 ? "" : "s"}`
-            : "If the last 12 months’ pace holds"}
-          . Solid line: your record. Dashed: the projection.
+            : "Projected if the last 12 months’ pace holds"}
+          . Solid: your record. Dashed: the projection.
         </Typography>
       )}
     </Box>
