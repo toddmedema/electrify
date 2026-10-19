@@ -718,15 +718,9 @@ export default function TransmissionPanel({
             variant="subtitle2"
           >
             Interties
-            <span className="facilitySectionMeta">
-              <span>Trading order</span>
-              {flowText && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span className="networkTradingFlow">{flowText}</span>
-                </>
-              )}
-            </span>
+            {flowText && (
+              <span className="facilitySectionFlow">{flowText}</span>
+            )}
           </Typography>
           <TradingControls game={game} onPolicy={onPolicy} />
           {!state.lines.length && (

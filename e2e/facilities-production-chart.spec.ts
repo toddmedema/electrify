@@ -164,6 +164,21 @@ for (const theme of ["light", "dark"]) {
         hoverBounds.y + hoverBounds.height + 1,
       );
     }
+    // A pointer that outruns the tooltip and lands on it still moves the cursor, so the tooltip
+    // follows instead of freezing under it.
+    {
+      await page.mouse.move(
+        hoverBounds.x + hoverBounds.width * 0.25,
+        hoverBounds.y + 4,
+      );
+      const tooltip = chart.locator(".chartTooltip");
+      const time = tooltip.locator(":scope > div").first();
+      const before = await time.textContent();
+      const tip = (await tooltip.boundingBox())!;
+      // One jump, so the only move event lands on the tooltip rather than the plot.
+      await page.mouse.move(tip.x + tip.width / 2, tip.y + tip.height / 2);
+      await expect(time).not.toHaveText(before!);
+    }
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "light" &&

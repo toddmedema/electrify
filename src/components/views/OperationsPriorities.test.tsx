@@ -35,7 +35,7 @@ test("a current shortage never replaces the two pinned requirements or repeats t
   ).toBeVisible();
   expect(
     screen.getByRole("button", {
-      name: /January and February.*wildfire emergency/,
+      name: /Keep the lights on through the wildfire emergency/,
     }),
   ).toBeVisible();
   expect(screen.queryByText("Blackout")).not.toBeInTheDocument();
@@ -51,7 +51,7 @@ test("players can choose concurrent goals and their choices survive remount", as
   );
   await user.click(
     screen.getByRole("menuitemcheckbox", {
-      name: /January and February.*wildfire emergency/,
+      name: /Keep the lights on through the wildfire emergency/,
     }),
   );
   await user.keyboard("{Escape}");
@@ -62,7 +62,7 @@ test("players can choose concurrent goals and their choices survive remount", as
   ).toBeVisible();
   expect(
     screen.queryByRole("button", {
-      name: /January and February.*wildfire emergency/,
+      name: /Keep the lights on through the wildfire emergency/,
     }),
   ).not.toBeInTheDocument();
   await user.click(

@@ -90,7 +90,7 @@ export function getMissionStatus(game: GameType) {
             : `${MONTHS[objective.month - 1]} ${objective.year}–${MONTHS[last % 12]} ${lastYear}`;
     requirements.push({
       id: "reliability",
-      label: objective.label,
+      label: objective.goal ?? `Serve demand during the ${objective.label}`,
       compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined

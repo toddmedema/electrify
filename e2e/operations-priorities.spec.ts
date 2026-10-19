@@ -24,7 +24,9 @@ for (const layout of [
       await expect(
         page.getByRole("heading", { name: "Pinned goals" }),
       ).toBeVisible();
-      await expect(page.locator(".operationsGoal")).toHaveCount(2);
+      await expect(
+        page.locator(".operationsGoals > .eventLogItem"),
+      ).toHaveCount(2);
       await page.locator(".eventHistory").scrollIntoViewIfNeeded();
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),
@@ -54,11 +56,25 @@ for (const layout of [
       await page.keyboard.press("Escape");
       await expect(goals).toBeFocused();
       for (const row of await page
-        .locator(".operationsPriorities .operationsRow, .operationsGoal")
+        .locator(".operationsPriorities .eventLogItem")
         .all()) {
         expect(
           await row.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
+        // Like the Events history, the icon keeps its own gutter: no text wraps beneath it.
+        expect(
+          await row.evaluate((el) => {
+            const icon = el.querySelector(".eventLogIcon")!;
+            const iconRight = icon.getBoundingClientRect().right;
+            return (
+              Math.min(
+                ...Array.from(el.children)
+                  .filter((child) => child !== icon)
+                  .map((child) => child.getBoundingClientRect().left),
+              ) - iconRight
+            );
+          }),
+        ).toBeGreaterThanOrEqual(0);
       }
       await expect(
         page.getByRole("button", { name: /Keep the utility solvent/ }),
