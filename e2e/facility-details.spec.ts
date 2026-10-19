@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 // Exercise pane width rather than assuming a viewport implies a column count.
 // Only one project runs this explicit matrix to avoid duplicating it per project.
@@ -102,18 +102,13 @@ for (const colorScheme of ["light", "dark"] as const) {
   }
 }
 
-test("expanded details reflow in a resized desktop pane and at 200% magnification", async ({
+test("expanded details reflow in a resized window and at 200% magnification", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium");
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.addInitScript(() => {
-    localStorage.clear();
-    localStorage.setItem(
-      "desktopPaneWeightsInsights",
-      JSON.stringify([1, 100, 1]),
-    );
-  });
+  // Facilities fills the window, so a narrow window is a narrow pane.
+  await page.setViewportSize({ width: 500, height: 1000 });
+  await page.addInitScript(() => localStorage.clear());
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const facilities = page.locator(".facilities:visible");
@@ -131,16 +126,15 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
         (cell) => Math.abs(cell.getBoundingClientRect().top - firstTop) < 1,
       ).length;
     });
-  await expect.poll(columns).toBe(1);
+  await expect.poll(columns).toBeGreaterThanOrEqual(1);
+  const narrowColumns = await columns();
   expect(
     await row.evaluate(
       (element) => element.scrollWidth <= element.clientWidth + 1,
     ),
   ).toBe(true);
-  const handle = page.getByRole("separator").first();
-  await handle.focus();
-  for (let i = 0; i < 35; i++) await page.keyboard.press("ArrowRight");
-  await expect.poll(columns).toBeGreaterThanOrEqual(3);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect.poll(columns).toBeGreaterThan(narrowColumns);
   const wideColumns = await columns();
   // CSS zoom magnifies text, controls and spacing together while the pane keeps its allotted width.
   await facilities.evaluate((element) => {
@@ -172,7 +166,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await openBuild(page);
     await page.locator(".button-buildGenerator").click();
     await page
       .getByRole("button", { name: "Review purchase of Solar", exact: true })

@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"]) {
       exact: true,
     });
     await openPane(pane, navigation);
-    await page.locator(".button-buildFacility").click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByRole("button", {
@@ -258,8 +258,9 @@ for (const theme of ["light", "dark"]) {
     ).toBeVisible();
     await expect(chart.getByText("Sun", { exact: true })).toHaveCount(0);
     await expect(chart.getByText("Wind", { exact: true })).toHaveCount(0);
+    // Fuels with output that day stay in the summary; wind can be calm all day.
     await expect(chart.getByRole("img")).toHaveAccessibleName(
-      /Sun: latest .*Wind: latest/,
+      /Sun: latest .*Natural Gas: latest/,
     );
     await expect(chart).not.toContainText("Bands: fuel output");
     await expect(chart).not.toContainText("Solid: recorded");
@@ -343,7 +344,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
     exact: true,
   });
   await openPane(pane, navigation);
-  await page.locator(".button-buildFacility").click();
+  await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page
     .getByRole("button", {

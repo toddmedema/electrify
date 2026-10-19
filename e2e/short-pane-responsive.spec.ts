@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`short panes keep the fleet and trading controls reachable in ${theme}`, async ({
@@ -13,9 +13,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible").last();
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByRole("button", {
@@ -90,9 +88,7 @@ for (const theme of ["light", "dark"] as const) {
       const chart = facilities.locator(".facilitySupplyChart");
       await chart.scrollIntoViewIfNeeded();
       await expect(chart).toBeInViewport();
-      await expect(
-        facilities.getByRole("button", { name: "Build", exact: true }),
-      ).toBeInViewport();
+      await expect(page.locator("#buildNav")).toBeInViewport();
     }
   });
 }

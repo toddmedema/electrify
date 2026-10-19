@@ -1,7 +1,7 @@
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie upgrades can be reviewed, purchased and resumed in ${theme}`, async ({
@@ -27,9 +27,7 @@ for (const theme of ["light", "dark"] as const) {
         page.getByRole("button", { name: "Facilities", exact: true }),
       );
     await showFacilities();
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByRole("button", {

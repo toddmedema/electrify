@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import path from "path";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`build a larger intertie tier in ${theme}`, async ({
@@ -18,9 +18,7 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const card = page.getByTestId("transmission-project-california-north");
     const importAccess = card
