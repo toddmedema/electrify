@@ -70,8 +70,6 @@ interface State {
   supply: number[];
   totalDemand: number[];
   loadStack: number[][];
-  fuels: FuelNameType[];
-  byFuel: number[][];
   startingYear: number;
 }
 
@@ -85,7 +83,7 @@ const SUPPLY_WIDTH = 1.5;
 const DEMAND_WIDTH = 3;
 const SUPPLY_FORECAST_DASH = [2, 3];
 const DEMAND_FORECAST_DASH = [8, 4];
-type SupplySource = "Weather-driven" | "Dispatchable" | "Storage" | "Interties";
+type SupplySource = "Variable" | "Dispatchable" | "Storage" | "Interties";
 
 function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
   if (source === "Storage") return "hatch";
@@ -94,7 +92,7 @@ function sourcePattern(source: SupplySource): LegendItemType["pattern"] {
 }
 
 function sourceColor(source: SupplySource): string {
-  if (source === "Weather-driven") return chartPalette().weatherDriven;
+  if (source === "Variable") return chartPalette().variable;
   if (source === "Dispatchable") return chartPalette().onDemand;
   return chartPalette().intertie;
 }
@@ -137,7 +135,7 @@ export function supplyDemandStack(
   const bySource: number[][] = [];
   const stacked: number[][] = [];
   const cumulative = timeline.map(() => 0);
-  (["Weather-driven", "Dispatchable"] as const).forEach((source, i) => {
+  (["Variable", "Dispatchable"] as const).forEach((source, i) => {
     if (!grouped[i].some((value) => value > 0)) return;
     sources.push(source);
     bySource.push(grouped[i]);
@@ -189,7 +187,7 @@ function sourceFill(
   allocation = false,
 ): uPlot.Series["fill"] {
   const palette = chartPalette();
-  if (source === "Weather-driven") return palette.weatherDrivenFill;
+  if (source === "Variable") return palette.variableFill;
   if (source === "Dispatchable") return palette.onDemandFill;
   const kind = sourcePattern(source);
   let pattern: CanvasPattern | null = null;
@@ -382,8 +380,6 @@ export function formatProductionTooltip(
     | "bySource"
     | "supply"
     | "totalDemand"
-    | "fuels"
-    | "byFuel"
     | "startingYear"
   >,
 ): string {
@@ -401,23 +397,9 @@ export function formatProductionTooltip(
   return [
     time,
     `Total supply: ${formatWatts(state.supply[idx])}`,
-    ...state.sources
-      .filter(
-        (source) => source === "Weather-driven" || source === "Dispatchable",
-      )
-      .map(
-        (source) =>
-          `${source}: ${formatWatts(state.bySource[state.sources.indexOf(source)][idx])}`,
-      ),
-    ...state.fuels.map(
-      (fuel, i) => `${fuel}: ${formatWatts(state.byFuel[i][idx])}`,
+    ...state.sources.map(
+      (source, i) => `${source}: ${formatWatts(state.bySource[i][idx])}`,
     ),
-    ...(d.storageDischargeW
-      ? [`Storage discharging: ${formatWatts(d.storageDischargeW)}`]
-      : []),
-    ...(d.importedW
-      ? [`Interties importing: ${formatWatts(d.importedW)}`]
-      : []),
     "",
     `Total load: ${formatWatts(state.totalDemand[idx])}`,
     `Demand: ${formatWatts(d.demandW)}`,
@@ -600,8 +582,6 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     supply,
     totalDemand,
     loadStack,
-    fuels,
-    byFuel,
     startingYear,
   };
 
@@ -625,7 +605,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         />
       )}
       <UPlotChart<State>
-        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Weather-driven and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
+        ariaLabel={`Chart of electricity supply and demand over the day. Generation is grouped as Variable and Dispatchable. Storage discharge and imports add to supply; charging and exports use matching patterned bands above customer demand. The top load boundary includes charging and exports. ${blackoutCount ? `${blackoutCount} blackout period${blackoutCount === 1 ? "" : "s"} shaded` : "No blackouts"}`}
         interactiveTooltip
         formatSummaryValue={formatWatts}
         height={height}
