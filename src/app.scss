@@ -876,6 +876,14 @@ $topbar_height: 56px;
   }
 }
 
+// Tablets and desktops set cash and date at the larger h6 size, where the shared 4px size(small)
+// gap reads as one run. A fixed 12px step keeps them two distinct readouts.
+@media screen and (min-width: 600px) {
+  #topbar .gameStatus {
+    gap: $space-3;
+  }
+}
+
 #navfooter {
   box-sizing: content-box;
   flex-shrink: 0;
@@ -6296,14 +6304,9 @@ $programs_column: 800px;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
-.facilitySectionMeta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+// The live flow beside each section heading: what the plants generate, what the interties trade.
+.facilitySectionFlow {
   min-width: 0;
-}
-.networkTradingFlow {
-  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 .transmissionLine > .facilityRowHeader > .facilityDisclosure {

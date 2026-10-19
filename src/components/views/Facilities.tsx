@@ -27,7 +27,10 @@ import {
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
 import { TickThrottle } from "../../helpers/RenderThrottle";
-import { activeScenario } from "../../helpers/GameSelectors";
+import {
+  activeScenario,
+  currentGenerationW,
+} from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
   FacilityOperatingType,
@@ -41,6 +44,7 @@ import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   formatMoneyConcise,
   formatWattHoursOfPeak,
+  formatWatts,
   formatWattsOfPeak,
   formatFacilitySize,
 } from "../../helpers/Format";
@@ -954,7 +958,10 @@ export default class Facilities extends React.Component<Props> {
                   className="facilitySectionLabel"
                   variant="overline"
                 >
-                  Plants & storage <span>Dispatch order</span>
+                  Plants & storage
+                  <span className="facilitySectionFlow">
+                    {"Generating " + formatWatts(currentGenerationW(game))}
+                  </span>
                 </Typography>
               )}
               <DragDropContext
