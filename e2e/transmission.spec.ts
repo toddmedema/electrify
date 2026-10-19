@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 test("California players can build and understand an intertie", async ({
   page,
@@ -19,7 +19,7 @@ test("California players can build and understand an intertie", async ({
     facilities,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  await facilities.getByRole("button", { name: "Build", exact: true }).click();
+  await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   const projects = page.getByRole("tabpanel", { name: "Interties" });
   await expect(
@@ -152,7 +152,7 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
     "aria-expanded",
     "false",
   );
-  await facilities.getByRole("button", { name: "Build", exact: true }).focus();
+  await facilities.locator("#chartSupplyDemand").getByRole("img").focus();
   for (let step = 0; step < 12; step++) {
     await page.keyboard.press("Tab");
     if (
@@ -203,9 +203,7 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByTestId("transmission-project-california-south")
@@ -263,9 +261,7 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     // Corridor cards are build cards now, so the heading and Review button come from
     // MUI's CardHeader exactly as they do on the generator and storage cards.

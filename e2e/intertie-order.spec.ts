@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`interties support keyboard and pointer trading reordering in ${theme}`, async ({
@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"] as const) {
     await speed.getByRole("button", { name: "pause", exact: true }).click();
 
     for (const neighbor of ["Pacific Northwest", "Desert Southwest"]) {
-      await pane.getByRole("button", { name: "Build", exact: true }).click();
+      await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
       await page
         .getByRole("button", {

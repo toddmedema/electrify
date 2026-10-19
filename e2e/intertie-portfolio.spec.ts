@@ -1,7 +1,7 @@
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
@@ -20,9 +20,7 @@ for (const theme of ["light", "dark"] as const) {
       facilities,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await facilities
-      .getByRole("button", { name: "Build", exact: true })
-      .click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const review = page.getByRole("button", {
       name: "Review purchase of Pacific Northwest intertie",
@@ -49,17 +47,12 @@ for (const theme of ["light", "dark"] as const) {
     expect(metricBoxes.every((cell) => cell.valueTop >= cell.labelBottom)).toBe(
       true,
     );
-    if (testInfo.project.use.viewport!.width < 600) {
-      expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
-      expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
-      expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
-      expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
-      expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
-    } else if (testInfo.project.use.viewport!.width >= 1280) {
-      expect(metricBoxes.every((cell) => cell.y === metricBoxes[0].y)).toBe(
-        true,
-      );
-    }
+    // Build is a narrow sheet or side panel at every width, so the metrics pair into rows.
+    expect(metricBoxes[0].y).toBe(metricBoxes[1].y);
+    expect(metricBoxes[2].y).toBe(metricBoxes[3].y);
+    expect(metricBoxes[4].y).toBe(metricBoxes[5].y);
+    expect(metricBoxes[2].y).toBeGreaterThan(metricBoxes[0].y);
+    expect(metricBoxes[4].y).toBeGreaterThan(metricBoxes[2].y);
     await expect(card).not.toContainText("Portfolio outlook");
     await card
       .getByRole("button", { name: "Show Pacific Northwest details" })
@@ -148,8 +141,11 @@ for (const theme of ["light", "dark"] as const) {
     expect(Number(quoted![2])).toBeCloseTo((cash - 1_800_000) / 1_000_000, 1);
     await expect(dialog).toContainText("Payments start now");
     await expect(dialog).toContainText("$2.88k/mo");
-    // Every purchase fact fits alongside both actions on desktop and a 390px phone.
+    // Every purchase fact fits alongside both actions on desktop and a 390px phone; a shorter
+    // phone scrolls the facts between the title and the pinned actions.
+    const short = testInfo.project.use.viewport!.height < 600;
     for (const fact of await dialog.locator(".decisionImpactFact").all()) {
+      if (short) await fact.scrollIntoViewIfNeeded();
       await expect(fact).toBeInViewport();
     }
     await expect(dialog).not.toContainText(/NaN|Infinity/);

@@ -216,6 +216,8 @@ test("insights header controls stay aligned in one compact row", async ({
   await page.evaluate(() => document.fonts.ready);
 
   const expectChartHeaderSpacing = async () => {
+    // Tracks render once the opening forecast has been calculated.
+    await expect(insights.locator(".insightsTrack").first()).toBeVisible();
     const insets = await insights
       .locator(".insightsTrack")
       .evaluateAll((tracks) =>
@@ -303,55 +305,7 @@ test("insights header controls stay aligned in one compact row", async ({
     expect(header!.height).toBeGreaterThanOrEqual(minimumControlHeight + 8);
     expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 10);
 
-    const levers = page.locator(".insightsLevers");
-    await expect(levers).toHaveCSS("display", "grid");
-    await expect(levers).toHaveCSS("row-gap", "0px");
-    const rateToggle = levers.locator(".insightsRateToggle");
-    const rateMetrics = levers.locator(".insightsRateMetrics:visible");
-    await expect(rateToggle).not.toBeVisible();
-    const [leversBox, metricsBox, rateSlider, trackTitle] = await Promise.all([
-      levers.boundingBox(),
-      rateMetrics.boundingBox(),
-      levers.locator(".budgetSlider").boundingBox(),
-      page
-        .locator('.insightsTrack[data-layer="supplyDemand"] h6')
-        .boundingBox(),
-    ]);
-    expect(leversBox).not.toBeNull();
-    expect(metricsBox).not.toBeNull();
-    expect(rateSlider).not.toBeNull();
-    expect(trackTitle).not.toBeNull();
-    expect(leversBox!.height).toBeLessThanOrEqual(110);
-    expect(metricsBox!.height).toBeGreaterThanOrEqual(44);
-    expect(metricsBox!.x - leversBox!.x).toBeCloseTo(16, 1);
-    expect(
-      await levers.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(0);
-    expect(
-      await rateMetrics.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(0);
-    await expect(rateMetrics).toContainText(/RATE/i);
-    await expect(rateMetrics).toContainText(/MARKET/i);
-    await expect(rateMetrics).toContainText(/CUSTOMERS \/ MO/i);
-    await expect(rateMetrics).toContainText(/\+.*\(\+.*%\)/);
-    const visibleRateMarks = levers.locator(".insightsRateMarkMobile:visible");
-    await expect(visibleRateMarks).toHaveCount(3);
-    await expect(visibleRateMarks.nth(1)).toContainText(/market/i);
-    const markBoxes = await Promise.all(
-      (await visibleRateMarks.all()).map((mark) => mark.boundingBox()),
-    );
-    expect(markBoxes.every(Boolean)).toBe(true);
-    const marksBottom = Math.max(
-      ...markBoxes.map((box) => box!.y + box!.height),
-    );
-    expect(
-      leversBox!.y + leversBox!.height - marksBottom,
-    ).toBeGreaterThanOrEqual(4);
-
+    // Rate and program levers live in the Programs tool, not under the Insights header.
     if (testInfo.project.name === "mobile-320px") {
       const trackHeader = page.locator(
         '.insightsTrack[data-layer="supplyDemand"] .insightsTrackHeader',
@@ -427,7 +381,7 @@ test("insights header controls stay aligned in one compact row", async ({
   await expectChartHeaderSpacing();
 });
 
-test("compact facility build buttons stay above the chart", async ({
+test("the compact dock's Build action stays touch-sized and clear of the chart", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile-"));
@@ -443,24 +397,12 @@ test("compact facility build buttons stay above the chart", async ({
     facilities,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  const buildButtons = [
-    facilities.getByRole("button", { name: "Build", exact: true }),
-  ];
   const chart = facilities.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
-  const chartBox = await chart.boundingBox();
-  const buttonBoxes = await Promise.all(
-    buildButtons.map((button) => button.boundingBox()),
-  );
-  expect(chartBox).not.toBeNull();
-  expect(buttonBoxes.every(Boolean)).toBe(true);
-  buttonBoxes.forEach((box) => {
-    expect(box!.height).toBeGreaterThanOrEqual(44);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y + 0.5);
-  });
-  expect(
-    (await facilities.locator(".paneHeader").boundingBox())!.height,
-  ).toBeLessThanOrEqual(57); // Touch-sized Build action plus the divider
+  const chartBox = (await chart.boundingBox())!;
+  const buildBox = (await page.locator("#buildNav").boundingBox())!;
+  expect(buildBox.height).toBeGreaterThanOrEqual(44);
+  expect(buildBox.y).toBeGreaterThanOrEqual(chartBox.y + chartBox.height - 0.5);
 });
 
 test("expanded finance and economic rates remain readable", async ({
@@ -524,35 +466,4 @@ test("expanded finance and economic rates remain readable", async ({
   await expect(
     insights.getByLabel("Inflation & interest rate", { exact: true }),
   ).toBeChecked();
-});
-
-test("short phones disclose rate controls while tall phones keep them inline", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
-  await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/?scenario=106");
-  await page.getByRole("button", { name: "Start game" }).click();
-  const insights = page.locator(".insights:visible");
-  await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
-  );
-  const toggle = insights.getByRole("button", { name: "Show rate slider" });
-  const slider = insights.getByRole("slider", {
-    name: "The rate you charge for electricity generation",
-  });
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await expect(slider).not.toBeVisible();
-  await expect(insights.locator(".insightsRateMetrics:visible")).toContainText(
-    "Your rate",
-  );
-  await toggle.click();
-  await expect(slider).toBeVisible();
-  await insights.getByRole("button", { name: "Hide rate slider" }).click();
-  await expect(slider).not.toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(slider).toBeVisible();
-  await expect(insights.locator(".insightsShortRateToggle")).not.toBeVisible();
 });

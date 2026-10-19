@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 import { editSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
@@ -22,7 +22,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await openBuild(page);
     await page
       .getByRole("button", { name: /^Review purchase of / })
       .first()
@@ -102,7 +102,7 @@ test("exchange direction stays readable on narrow screens and with reduced motio
     fleet,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  await fleet.getByRole("button", { name: "Build", exact: true }).click();
+  await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page
     .getByRole("button", {

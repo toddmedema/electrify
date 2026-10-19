@@ -55,6 +55,17 @@ export async function waitForSettled(
 }
 
 /**
+ * Open the Build tool from the dock, leaving it open when it already is: the dock button
+ * toggles, so a second click would close it. Returns the Build region.
+ */
+export async function openBuild(page: Page): Promise<Locator> {
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  if (!(await build.isVisible())) await page.locator("#buildNav").click();
+  await expect(build).toBeVisible();
+  return build;
+}
+
+/**
  * Show a game tool, opening it from the dock when it is closed.
  * Returns whether the nav button was clicked.
  */
@@ -72,9 +83,12 @@ export async function openPane(
         .first()
         .evaluate((element) => element.classList.contains("facilities"))
     ) {
+      // A phone keeps a tool it switched away from mounted but hidden; only visible
+      // sheets cover the fleet.
       const closes = pane
         .page()
-        .locator(".gameToolHeader button[aria-label^='Close ']");
+        .locator(".gameToolHeader button[aria-label^='Close ']")
+        .filter({ visible: true });
       while ((await closes.count()) > 0) await closes.first().click();
     }
     return false;

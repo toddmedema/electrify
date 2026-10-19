@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie construction controls and motion in ${theme}`, async ({
@@ -19,7 +19,7 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
     const build = async () => {
-      await pane.getByRole("button", { name: "Build", exact: true }).click();
+      await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
       await page
         .getByRole("button", {
@@ -153,17 +153,18 @@ for (const theme of ["light", "dark"] as const) {
     }
     await facility.locator(".facilityDisclosure").click();
     if (testInfo.project.name === "desktop-chromium") {
-      const handle = page.getByRole("separator").first();
-      await handle.focus();
-      for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowRight");
+      // The Facilities pane fills the desktop window, past the widest breakpoint above.
+      const width = await line
+        .locator(".transmissionLineDetails")
+        .evaluate((el) => el.getBoundingClientRect().width);
+      expect(width).toBeGreaterThanOrEqual(608);
       await expect
         .poll(() =>
           metrics.evaluate(
             (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length,
           ),
         )
-        .toBe(3);
-      await handle.evaluate((el) => (el as HTMLElement).blur());
+        .toBeGreaterThanOrEqual(4);
       await line.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: testInfo.outputPath("intertie-metrics-wide.png"),
