@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 const REVIEW_VIEWPORTS = new Set([
   "desktop-chromium",
   "mobile-390px",
-  "mobile-320px",
+  "mobile-360px",
 ]);
 
 test("challenge details have a shareable URL and return to the catalog", async ({

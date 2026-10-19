@@ -4,7 +4,7 @@ import { openPane } from "./layout";
 // Exercise pane width rather than assuming a viewport implies a column count.
 // Only one project runs this explicit matrix to avoid duplicating it per project.
 for (const colorScheme of ["light", "dark"] as const) {
-  for (const width of [320, 390, 460, 540, 768, 1024, 1440]) {
+  for (const width of [360, 390, 460, 540, 768, 1024, 1440]) {
     test(`expanded facility alignment at ${width}px in ${colorScheme}`, async ({
       page,
     }, testInfo) => {

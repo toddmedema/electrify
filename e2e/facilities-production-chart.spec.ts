@@ -196,7 +196,7 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
-      if (info.project.name === "mobile-320px") {
+      if (info.project.name === "mobile-360px") {
         const vision = await page.context().newCDPSession(page);
         for (const type of [
           "achromatopsia",

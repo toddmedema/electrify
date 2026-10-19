@@ -69,8 +69,7 @@ standalone screens. Keyboard entry focuses Back; Escape returns to the opener.
 Live local unlocks queue one popup 16 px from the bottom right. It rises above the phone tab bar
 only while that bar is on screen; tutorials and build screens hide it. It never pauses gameplay or steals focus, waits behind dialogs/menus and ordinary
 snackbars, pauses its eight-second timer while hovered or focused, and offers View achievements
-and an always-visible 44 px close button. At 320 px the popup omits the visible requirement
-sentence to cover less gameplay; the gallery and polite announcement retain it.
+and an always-visible 44 px close button.
 Reloads, cloud downloads and restored native history
 do not replay notifications. Steam availability clears/suppresses the web popup queue; Steam
 Offline Mode continues using Steam's notification interface.
@@ -82,4 +81,4 @@ Native paths, SDK pointers and acknowledgement metadata never enter the renderer
 Tests cover evaluator thresholds, merges, local reloads, guest claims, account switches, late
 responses, writes during sync, storage failures and rules enforcement. Browser tests exercise
 real mission completion, popup placement, gallery filters, focus return, light/dark palettes and
-390/320 px layouts. Live Steam partner acceptance is documented in `desktop-steam.md`.
+390/360 px layouts. Live Steam partner acceptance is documented in `desktop-steam.md`.

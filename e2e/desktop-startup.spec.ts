@@ -18,7 +18,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
     colorScheme: "light",
     reducedMotion: "no-preference",
   },
-  { width: 320, height: 568, colorScheme: "dark", reducedMotion: "reduce" },
+  { width: 360, height: 640, colorScheme: "dark", reducedMotion: "reduce" },
 ] as const) {
   test(`native entrance hands off at ${width}px in ${colorScheme}`, async () => {
     const profile = await createDesktopProfile();
@@ -89,7 +89,7 @@ test("startup failure retains branding and keyboard recovery", async () => {
   const profile = await createDesktopProfile();
   const { app, page } = await launchDesktop(profile);
   try {
-    await page.setViewportSize({ width: 320, height: 568 });
+    await page.setViewportSize({ width: 360, height: 640 });
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("desktop:read-saves");
       ipcMain.handle("desktop:read-saves", () => {

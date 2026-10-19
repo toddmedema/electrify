@@ -20,7 +20,7 @@ files are large, so broad rewrites create expensive review diffs.
   and continues after gate failures.
 - Before pushing a pull request, run `npm run check:ci` instead. It adds the CI gates that most
   often fail pull requests: tick performance, the production web build and bundle-size
-  ceilings, the headless production browser suites at 1280, 390 and 320 px, and the multiplayer
+  ceilings, the headless production browser suites at 1280, 390 and 360 px, and the multiplayer
   suite against the desktop renderer. Only the packaged Electron suite stays CI-only, because
   it opens native windows.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as

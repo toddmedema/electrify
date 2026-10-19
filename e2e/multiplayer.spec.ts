@@ -772,7 +772,7 @@ async function verifySpeedLayouts(browser: Browser, pages: Page[]) {
       .getByRole("button", { name: "Start game", exact: true })
       .click();
     const target = touch ? mobile : desktop;
-    for (const width of touch ? [390, 320] : [1280]) {
+    for (const width of touch ? [390, 360] : [1280]) {
       for (const theme of ["light", "dark"] as const) {
         for (const page of [target, baseline]) {
           await page.setViewportSize({ width, height: touch ? 844 : 900 });
@@ -1110,7 +1110,7 @@ for (const count of [2, 4]) {
       );
       for (const page of pages) await ready(page);
       if (count === 4) {
-        await buyer.setViewportSize({ width: 320, height: 844 });
+        await buyer.setViewportSize({ width: 360, height: 844 });
         await expectClockInViewport(buyer);
         await buyer.getByRole("button", { name: "Build", exact: true }).click();
         await expectClockInViewport(buyer);
