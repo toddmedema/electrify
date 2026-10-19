@@ -41,9 +41,19 @@ for (const theme of ["light", "dark"] as const) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    const build = pane.getByRole("button", { name: "Build", exact: true });
+    // The dock's Build action is an icon on the dock surface: measure the icon against the
+    // nearest painted background, to the 3:1 non-text contrast an icon-only control needs.
+    const build = page.locator("#buildNav");
     const contrast = await build.evaluate((element) => {
       const style = getComputedStyle(element);
+      let surface: Element | null = element;
+      while (
+        surface &&
+        /^rgba\(.*,\s*0\)$|^transparent$/.test(
+          getComputedStyle(surface).backgroundColor,
+        )
+      )
+        surface = surface.parentElement;
       const luminance = (rgb: string) => {
         const channels = rgb
           .match(/[\d.]+/g)!
@@ -59,13 +69,15 @@ for (const theme of ["light", "dark"] as const) {
         );
       };
       const foreground = luminance(style.color);
-      const background = luminance(style.backgroundColor);
+      const background = luminance(
+        getComputedStyle(surface ?? document.body).backgroundColor,
+      );
       return (
         (Math.max(foreground, background) + 0.05) /
         (Math.min(foreground, background) + 0.05)
       );
     });
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    expect(contrast).toBeGreaterThanOrEqual(3);
     await build.click();
     await page.locator(".button-buildGenerator").click();
     await expect(page.locator(".buildOption").first()).toBeVisible();
