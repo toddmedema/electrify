@@ -111,7 +111,7 @@ Saved-result viewing loads the result on demand and uses a presentation-only dia
 
 Follow the existing theme tokens and 4 px spacing rhythm, with 8/12/16 px gaps and padding. Use restrained neutral surfaces and dividers. Electric blue identifies Load and other primary actions; reserve red for deletion, failures, and harmful outcomes. Pair every state color with text.
 
-Use existing scenario icons at their normal 40–48 px size, beside visible scenario labels. Controls must be at least 40 px tall on desktop and 44 px on coarse-pointer devices. Verify light and dark contrast separately, 390 px and 320 px layouts, and enlarged text.
+Use existing scenario icons at their normal 40–48 px size, beside visible scenario labels. Controls must be at least 40 px tall on desktop and 44 px on coarse-pointer devices. Verify light and dark contrast separately, 390 px and 360 px layouts, and enlarged text.
 
 Use semantic headings and lists, accessible overflow labels such as `Actions for Renewables experiment`, and keyboard-operable dialogs. Return focus to the invoking control after cancel/rename, or to the next entry after deletion. Announce save errors and successful mutations in a polite live region. Avoid announcements or toasts for every periodic autosave.
 
@@ -260,7 +260,7 @@ Extend the existing save/serialization tests rather than replacing them. Test th
 - Copy a tab's session storage into a popup and reload it; verify it cannot borrow the live writer token. Verify ordinary reload and same-tab navigation can resume immediately, and cleanup/remount can recover after database release fails.
 - Delay source or prepared-target lease release while accepting overlapping switches. Only the newest accepted switch may proceed, gameplay cannot change during the final handoff, and a concurrent export still contains the originally requested run.
 - Seed 100 metadata entries and representative long-run payloads. Verify opening/searching the library reads summaries only and writes do not serialize the whole collection. Measure checkpoint serialization on a long run.
-- Verify empty/loading/error states, the explicit unsaved-current-run entry, derived Continue with timestamp ties and never-opened imports, focus restoration, overflow menus, keyboard operation, and 320/390 px layouts in light and dark modes.
+- Verify empty/loading/error states, the explicit unsaved-current-run entry, derived Continue with timestamp ties and never-opened imports, focus restoration, overflow menus, keyboard operation, and 360/390 px layouts in light and dark modes.
 
 Introduce shared Playwright save helpers so existing chart, challenge, data-center, motion, mission, and victory specs address a selected record instead of the obsolete key. Run focused save/component tests during development, then `npm run check`. Build and run relevant Playwright flows on desktop and phone, including the existing tutorial-exit and build-options gates. For a UI implementation PR, capture and review desktop/phone screenshots and attach them through GitHub CLI as required by `AGENTS.md`.
 

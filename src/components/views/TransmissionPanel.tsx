@@ -16,7 +16,10 @@ import {
   Droppable,
   DropResult,
 } from "@hello-pangea/dnd";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   Box,
@@ -46,8 +49,8 @@ import {
 } from "../../data/IntertieTrends";
 import {
   formatMoneyConcise,
-  formatSignedWattsOfPeak,
   formatWatts,
+  formatWattsOfPeak,
 } from "../../helpers/Format";
 import {
   adjacentMarketPricePerMWh,
@@ -111,6 +114,16 @@ const POLICY_LABELS: Record<TradingPolicyType, string> = {
   RELIABILITY_FIRST: "Buy for shortages only",
   SURPLUS_ONLY: "Sell extra only",
   CLOSED: "No trading",
+};
+
+// The row's flow reading leads with one of these, in the import/export vocabulary the section
+// header, exchange summary and chart already use: "Sell" on this list means disposing of a
+// facility. "Exporting 150/150MW" fits a 360px phone, so there is no short form.
+type IntertieDirection = "IMPORTING" | "EXPORTING" | "IDLE";
+const DIRECTION_WORDS: Record<IntertieDirection, string> = {
+  IMPORTING: "Importing",
+  EXPORTING: "Exporting",
+  IDLE: "Idle",
 };
 
 function priceRange(outlook: IntertieOutlook): string {
@@ -772,14 +785,6 @@ export default function TransmissionPanel({
                     const constructionStyle = building
                       ? { opacity: theme.palette.action.disabledOpacity }
                       : undefined;
-                    const icon = (
-                      <img
-                        className="transmissionListIcon facilityRowIcon"
-                        style={constructionStyle}
-                        src="/images/transmission.svg"
-                        alt=""
-                      />
-                    );
                     const importableW = peer
                       ? Math.min(rating, peer.availableSupplyW ?? 0)
                       : now
@@ -795,7 +800,7 @@ export default function TransmissionPanel({
                         ? outlookFor(line.corridorId, line.capacityW)
                         : undefined;
                     // Signed against capacity in the direction of flow, so the row reads the same way a
-                    // facility row does: positive is power arriving, negative is power being sold.
+                    // facility row does: positive is power arriving, negative is power being exported.
                     const flowW = building ? 0 : line.currentFlowW || 0;
                     const flowCapacityW =
                       flowW < 0
@@ -805,22 +810,50 @@ export default function TransmissionPanel({
                       flowCapacityW > 0
                         ? Math.max(-1, Math.min(1, flowW / flowCapacityW))
                         : 0;
-                    const flowLabel = formatSignedWattsOfPeak(
-                      flowW,
-                      flowCapacityW,
-                    );
+                    const direction: IntertieDirection =
+                      flowW > 0
+                        ? "IMPORTING"
+                        : flowW < 0
+                          ? "EXPORTING"
+                          : "IDLE";
+                    const word = DIRECTION_WORDS[direction];
+                    const flowReading = formatWattsOfPeak(flowW, flowCapacityW);
                     // aria-label replaces a button's descendant content for its accessible name, so a
-                    // visually hidden span inside the row would never be announced. The reading and the
-                    // direction the bar and the sign carry visually have to be in the label itself.
+                    // visually hidden span inside the row would never be announced. The label repeats
+                    // the visible direction word, so speech input can name what the screen shows.
                     const flowDescription = building
                       ? constructionLabel
-                      : flowW > 0
-                        ? `importing ${formatWatts(flowW)} of ${formatWatts(flowCapacityW)}`
-                        : flowW < 0
-                          ? `selling ${formatWatts(-flowW)} of ${formatWatts(flowCapacityW)}`
-                          : line.paused
-                            ? "paused"
-                            : "no power flowing";
+                      : line.paused
+                        ? "paused"
+                        : direction === "IDLE"
+                          ? `idle, ${formatWatts(flowCapacityW)} available`
+                          : `${word.toLowerCase()} ${formatWatts(Math.abs(flowW))} of ${formatWatts(flowCapacityW)}`;
+                    // Badged like a storage row's activity, but on the left/right axis the exchange
+                    // summary uses, so exporting never borrows a battery's up/down "charging" arrow.
+                    // Decorative: the reading and the button's name already say it.
+                    const icon = (
+                      <span className="transmissionIcon">
+                        <img
+                          className="transmissionListIcon facilityRowIcon"
+                          style={constructionStyle}
+                          src="/images/transmission.svg"
+                          alt=""
+                        />
+                        {!building && (
+                          <span className="facilityActivity" aria-hidden>
+                            {line.paused ? (
+                              <ConceptIcon concept="pause" />
+                            ) : direction === "IMPORTING" ? (
+                              <ArrowBackIcon />
+                            ) : direction === "EXPORTING" ? (
+                              <ArrowForwardIcon />
+                            ) : (
+                              <RemoveIcon />
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    );
                     return (
                       <Draggable
                         key={line.id}
@@ -879,7 +912,9 @@ export default function TransmissionPanel({
                                       constructionLabel
                                     ) : (
                                       <span className="transmissionLineFlow">
-                                        {line.paused ? "Paused" : flowLabel}
+                                        {line.paused
+                                          ? "Paused"
+                                          : `${word} ${flowReading}`}
                                       </span>
                                     )}
                                   </Typography>

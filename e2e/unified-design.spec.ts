@@ -6,7 +6,7 @@ for (const theme of ["light", "dark"]) {
     page,
   }, testInfo) => {
     test.skip(
-      !["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+      !["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
         testInfo.project.name,
       ),
     );

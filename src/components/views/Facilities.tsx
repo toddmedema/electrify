@@ -394,7 +394,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     facility.peakW > 0
       ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
       : 0;
-  // The row's second line has to stay one line on a 320px phone, so it leads with the reading
+  // The row's second line has to stay one line on a 360px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
   // storage power and the reservoir's absolute size are both in the opened details.
   const builtFraction = upgrading

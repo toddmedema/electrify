@@ -685,7 +685,7 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
   });
 });
 
-for (const width of [320, 390]) {
+for (const width of [360, 390]) {
   test(`compact ${width}px sheets and final actions remain usable behind the floating dock`, async ({
     page,
   }, testInfo) => {

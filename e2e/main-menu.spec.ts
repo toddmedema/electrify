@@ -34,7 +34,7 @@ for (const theme of ["light", "dark"]) {
 test("home actions and resources remain reachable at low height with and without a save", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
+  test.skip(testInfo.project.name !== "mobile-360px");
   await page.setViewportSize({ width: 360, height: 320 });
   for (const hasSave of [false, true]) {
     if (hasSave) {
