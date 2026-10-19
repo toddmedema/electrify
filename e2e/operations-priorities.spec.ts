@@ -18,8 +18,11 @@ for (const layout of [
     }, layout.theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    if (layout.width < 1300)
-      await page.getByRole("button", { name: "Events", exact: true }).click();
+    // Tools open from the dock at every width; nothing opens Events automatically.
+    await page
+      .locator("#navfooter")
+      .getByRole("button", { name: "Events", exact: true })
+      .click();
     if (layout.pane) {
       await expect(
         page.getByRole("heading", { name: "Pinned goals" }),
@@ -82,10 +85,6 @@ for (const layout of [
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
       });
-      if (layout.width >= 1300)
-        await expect(page.locator('[data-layer="supplyDemand"]')).toBeVisible({
-          timeout: 45000,
-        });
       await page.getByRole("heading", { name: "Pinned goals" }).click();
       await page.screenshot({
         path: testInfo.outputPath(
@@ -146,6 +145,10 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   }
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page
+    .locator("#navfooter")
+    .getByRole("button", { name: "Events", exact: true })
+    .click();
   const scroller = page.locator(".operationsPane > .scrollable");
   await expect(scroller).toBeVisible();
   await scroller.evaluate((element) => {

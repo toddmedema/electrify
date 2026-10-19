@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"] as const) {
     await speed.getByRole("button", { name: "pause", exact: true }).click();
 
     for (const neighbor of ["Pacific Northwest", "Desert Southwest"]) {
-      await pane.getByRole("button", { name: "Build", exact: true }).click();
+      await page.locator(".button-buildFacility").click();
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
       await page
         .getByRole("button", {

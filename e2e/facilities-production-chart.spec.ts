@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"]) {
       exact: true,
     });
     await openPane(pane, navigation);
-    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await page.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByRole("button", {
@@ -343,7 +343,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
     exact: true,
   });
   await openPane(pane, navigation);
-  await pane.getByRole("button", { name: "Build", exact: true }).click();
+  await page.locator(".button-buildFacility").click();
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page
     .getByRole("button", {
