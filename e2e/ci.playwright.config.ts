@@ -11,6 +11,9 @@ const smoke = [
   "menu-keyboard.spec.ts",
   "music.spec.ts",
   "achievements.spec.ts",
+  "facilities-production-chart.spec.ts",
+  "intertie-order.spec.ts",
+  "operations-priorities.spec.ts",
 ];
 const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
 const port = process.env.E2E_PORT || "3100";
