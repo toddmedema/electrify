@@ -8,7 +8,7 @@ import { createGame } from "../testing/Simulator";
 import { isStorage, ScenarioType } from "../Types";
 
 it.each(SCENARIOS)(
-  "starts $name with weather-driven generation first",
+  "starts $name with variable generation first",
   (scenario) => {
     const state = createGame({ scenarioId: scenario.id, scenario });
     const priorities = state.facilities.map((facility) =>

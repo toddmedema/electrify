@@ -41,7 +41,7 @@ describe("ChartForecastRenewableCapacityFactor", () => {
     expect(points[0].factors.Hydro).toBeGreaterThan(0);
   });
 
-  it("uses every weather-driven technology available in the current location", () => {
+  it("uses every variable technology available in the current location", () => {
     const game = createGame({ scenarioId: 100 });
     const names = availableWeatherRenewables(game, game.timeline).map(
       (technology) => technology.name,

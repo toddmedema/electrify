@@ -179,7 +179,7 @@ export const SCENARIOS: ScenarioType[] = [
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",
         content: (
-          <TutorialPrompt text="Weather-driven shows solar output; On-demand shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
+          <TutorialPrompt text="Variable shows solar output; Dispatchable shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),
       },
       {
