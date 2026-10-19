@@ -6487,9 +6487,6 @@ $programs_column: 800px;
 }
 .transmissionLine .transmissionLineText {
   min-width: 0;
-  // Lets the flow reading swap to its short "In"/"Out" form on the same breakpoint as a
-  // facility row's status
-  container-type: inline-size;
 }
 .transmissionLine .transmissionLineText > .MuiTypography-body2 {
   font-size: var(--font-size-caption);

@@ -118,15 +118,12 @@ const POLICY_LABELS: Record<TradingPolicyType, string> = {
 
 // The row's flow reading leads with one of these, in the import/export vocabulary the section
 // header, exchange summary and chart already use: "Sell" on this list means disposing of a
-// facility. Phones get the short form.
+// facility. "Exporting 150/150MW" fits a 360px phone, so there is no short form.
 type IntertieDirection = "IMPORTING" | "EXPORTING" | "IDLE";
-const DIRECTION_WORDS: Record<
-  IntertieDirection,
-  { long: string; short: string }
-> = {
-  IMPORTING: { long: "Importing", short: "In" },
-  EXPORTING: { long: "Exporting", short: "Out" },
-  IDLE: { long: "Idle", short: "Idle" },
+const DIRECTION_WORDS: Record<IntertieDirection, string> = {
+  IMPORTING: "Importing",
+  EXPORTING: "Exporting",
+  IDLE: "Idle",
 };
 
 function priceRange(outlook: IntertieOutlook): string {
@@ -819,7 +816,7 @@ export default function TransmissionPanel({
                         : flowW < 0
                           ? "EXPORTING"
                           : "IDLE";
-                    const words = DIRECTION_WORDS[direction];
+                    const word = DIRECTION_WORDS[direction];
                     const flowReading = formatWattsOfPeak(flowW, flowCapacityW);
                     // aria-label replaces a button's descendant content for its accessible name, so a
                     // visually hidden span inside the row would never be announced. The label repeats
@@ -830,7 +827,7 @@ export default function TransmissionPanel({
                         ? "paused"
                         : direction === "IDLE"
                           ? `idle, ${formatWatts(flowCapacityW)} available`
-                          : `${words.long.toLowerCase()} ${formatWatts(Math.abs(flowW))} of ${formatWatts(flowCapacityW)}`;
+                          : `${word.toLowerCase()} ${formatWatts(Math.abs(flowW))} of ${formatWatts(flowCapacityW)}`;
                     // Badged like a storage row's activity, but on the left/right axis the exchange
                     // summary uses, so exporting never borrows a battery's up/down "charging" arrow.
                     // Decorative: the reading and the button's name already say it.
@@ -915,19 +912,9 @@ export default function TransmissionPanel({
                                       constructionLabel
                                     ) : (
                                       <span className="transmissionLineFlow">
-                                        {line.paused ? (
-                                          "Paused"
-                                        ) : (
-                                          <>
-                                            <span className="facilityStatusLong">
-                                              {words.long}
-                                            </span>
-                                            <span className="facilityStatusShort">
-                                              {words.short}
-                                            </span>{" "}
-                                            {flowReading}
-                                          </>
-                                        )}
+                                        {line.paused
+                                          ? "Paused"
+                                          : `${word} ${flowReading}`}
                                       </span>
                                     )}
                                   </Typography>

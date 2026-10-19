@@ -814,7 +814,7 @@ describe("unified connections", () => {
     /* eslint-enable testing-library/no-node-access */
     // A built line reports the power actually moving over it instead of a static "Connected"
     // that never changes
-    expect(connections[0]).toHaveTextContent(/Idle\s*Idle 0\/270MW/);
+    expect(connections[0]).toHaveTextContent("Idle 0/270MW");
     expect(connections[0]).not.toHaveTextContent("Connected");
     expect(connections[1]).toHaveTextContent("Building");
     await user.click(screen.getByText(game.transmission!.lines[0].name));
@@ -840,18 +840,18 @@ describe("unified connections", () => {
   });
 
   it.each([
-    [42e6, "Importing", "In", "42/270MW", "importing 42MW of 270MW"],
-    [-42e6, "Exporting", "Out", "42/150MW", "exporting 42MW of 150MW"],
+    [42e6, "Importing", "42/270MW", "importing 42MW of 270MW"],
+    [-42e6, "Exporting", "42/150MW", "exporting 42MW of 150MW"],
   ])(
     "names a line's flow direction in words (%d W)",
-    (flowW, long, short, reading, spoken) => {
+    (flowW, word, reading, spoken) => {
       const game = connectedGame();
       game.transmission!.lines[0].currentFlowW = flowW;
       renderFacilities(game, null);
       // eslint-disable-next-line testing-library/no-node-access
       const line = document.querySelector(".transmissionLine")!;
       // Unsigned: the word carries direction, not a minus sign against the rating
-      expect(line).toHaveTextContent(`${long}${short} ${reading}`);
+      expect(line).toHaveTextContent(`${word} ${reading}`);
       expect(line).not.toHaveTextContent("-42");
       expect(
         screen.getByRole("button", {
