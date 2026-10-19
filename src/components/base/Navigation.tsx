@@ -7,7 +7,6 @@ import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import { getScenario } from "../../data/Scenarios";
-import { openEvidence } from "../../helpers/Evidence";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
@@ -16,7 +15,8 @@ export interface StateProps {
   card: CardType;
 }
 export interface Props extends StateProps {}
-export type GameTool = "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS";
+export type GameTool =
+  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
 export const GAME_TOOLS: {
   id: GameTool;
   label: string;
@@ -47,11 +47,13 @@ export const GAME_TOOLS: {
     triggerId: "eventsNav",
     icon: <HistoryIcon />,
   },
+  {
+    id: "SCENARIO",
+    label: "Scenario",
+    triggerId: "scenarioNav",
+    icon: <ConceptIcon concept="goal" />,
+  },
 ];
-// Not a tool panel: it opens the scenario's goals and score outlook over the game, so it sits
-// apart from the tools after a divider
-const SCENARIO_ACTION_ID = "scenarioNav";
-
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"
@@ -88,7 +90,9 @@ export default function Navigation({
       {...dockLabels}
     >
       {GAME_TOOLS.filter(
-        (tool) => !readOnly || tool.id !== "BUILD_GENERATORS",
+        (tool) =>
+          (!readOnly || tool.id !== "BUILD_GENERATORS") &&
+          (hasScenarioDetails || tool.id !== "SCENARIO"),
       ).map((tool) => {
         const open = opened.includes(tool.id);
         return (
@@ -141,31 +145,6 @@ export default function Navigation({
           </Tooltip>
         );
       })}
-      {hasScenarioDetails && (
-        <>
-          <span className="gameDockDivider" aria-hidden="true" />
-          <Tooltip
-            title="Scenario & score"
-            placement="top"
-            open={labelId === SCENARIO_ACTION_ID}
-            disableHoverListener
-            disableFocusListener
-            disableTouchListener
-            disableInteractive
-          >
-            <Button
-              id={SCENARIO_ACTION_ID}
-              {...buttonLabels}
-              className="gameDockAction gameDockScenario"
-              aria-label="Scenario & score"
-              aria-haspopup="dialog"
-              onClick={() => dispatch(openEvidence("mission-details"))}
-            >
-              <ConceptIcon concept="goal" />
-            </Button>
-          </Tooltip>
-        </>
-      )}
     </nav>
   );
 }

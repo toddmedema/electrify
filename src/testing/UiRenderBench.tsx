@@ -6,7 +6,6 @@ import { render } from "@testing-library/react";
 import { createGame } from "./Simulator";
 import { tickState } from "../reducers/Game";
 import { GameType } from "../Types";
-import ScenarioDetailsDialog from "../components/base/ScenarioDetailsDialog";
 import { GameAppBar } from "../components/base/GameAppBar";
 
 jest.setTimeout(120000);
@@ -34,7 +33,9 @@ it("reports closed details render cost", () => {
     ["fresh", fresh],
     ["239-month", developed],
   ] as const) {
-    for (const view of ["dialog", "appbar"]) {
+    // The scenario details live in a tool panel that unmounts when closed, so only the app bar
+    // still renders on every tick
+    for (const view of ["appbar"]) {
       const samples: number[] = [];
       let collecting = false;
       const onRender: React.ProfilerOnRenderCallback = (
@@ -46,18 +47,14 @@ it("reports closed details render cost", () => {
       };
       const tree = (state: GameType) => (
         <React.Profiler id="closed-details" onRender={onRender}>
-          {view === "dialog" ? (
-            <ScenarioDetailsDialog open={false} game={state} onClose={noop} />
-          ) : (
-            <GameAppBar
-              game={state}
-              onManual={noop}
-              onNextTutorial={noop}
-              onQuit={noop}
-              onSettings={noop}
-              onSpeedChange={noop}
-            />
-          )}
+          <GameAppBar
+            game={state}
+            onManual={noop}
+            onNextTutorial={noop}
+            onQuit={noop}
+            onSettings={noop}
+            onSpeedChange={noop}
+          />
         </React.Profiler>
       );
       const mounted = render(tree(game));

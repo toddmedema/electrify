@@ -17,6 +17,7 @@ export const TOOL_SHORTCUTS: Record<GameTool, string> = {
   PROGRAMS: "W",
   INSIGHTS: "E",
   EVENTS: "R",
+  SCENARIO: "T",
 };
 
 export const SHORTCUTS: ShortcutType[] = [
@@ -27,6 +28,7 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["W"], description: "Open / close Programs" },
   { keys: ["E"], description: "Open / close Insights" },
   { keys: ["R"], description: "Open / close Events" },
+  { keys: ["T"], description: "Open / close Scenario" },
   { keys: ["G"], description: "Build a generator" },
   { keys: ["S"], description: "Build storage" },
   {

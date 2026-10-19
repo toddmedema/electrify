@@ -207,6 +207,7 @@
 .gameStage .gameToolBody {
   .insights > .scrollable,
   .eventLog > .scrollable,
+  .scenarioDetails > .scrollable,
   .buildFacilities .cardList,
   .buildFacilities .constructionInterties,
   .customerProgramsBody {
@@ -306,12 +307,4 @@
   .gameToolPanel {
     animation: none;
   }
-}
-
-// Separates the one action that opens over the game (the scenario and its score) from the
-// tools that open beside it
-.gameActionDock .gameDockDivider {
-  flex: 0 0 1px;
-  margin: 8px 0;
-  background: var(--border-strong);
 }

@@ -1087,8 +1087,9 @@ $topbar_height: 56px;
 }
 
 @media (max-width: 768px) {
+  // The months left end on the same 16px inset the row's first icon starts on
   .missionSummary {
-    padding: 4px 8px 4px 16px;
+    padding: 4px max(16px, env(safe-area-inset-right)) 4px 16px;
     gap: 0 8px;
   }
 }
@@ -6704,10 +6705,40 @@ $programs_column: 800px;
   }
 }
 
+// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+.scenarioDetailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: $space-4;
+}
+
+.scenarioDetailsName {
+  margin-bottom: -12px; // sits with the facts it names
+}
+
+.scenarioFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-3 $space-4;
+  margin: 0;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-body2);
+  }
+
+  dd {
+    margin: $space-1 0 0;
+    font-size: var(--font-size-body2);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+}
+
 // The scenario's score so far and where it is heading: two large figures over the line they
 // summarise, so the answer reads before the chart has to
 .scenarioOutlook {
-  margin-bottom: 24px;
   padding: $space-4;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -6753,10 +6784,6 @@ $programs_column: 800px;
   &[data-direction="down"] {
     color: var(--delta-bad);
   }
-}
-
-.scenarioOutlookNote {
-  margin: $space-2 0 0;
 }
 
 .transmissionUpgrade {
@@ -7219,6 +7246,7 @@ $programs_column: 800px;
     min-height: 44px;
     padding-block: 0;
     padding-left: $space-2;
+    padding-right: max(16px, env(safe-area-inset-right));
     border: 0;
   }
 

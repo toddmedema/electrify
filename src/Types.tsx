@@ -196,6 +196,7 @@ export type CardNameType =
   | "FACILITIES"
   | "INSIGHTS"
   | "EVENTS"
+  | "SCENARIO"
   | "PROGRAMS"
   | "LOADING"
   | "MAIN_MENU"

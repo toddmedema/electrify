@@ -10,7 +10,7 @@ import { acknowledgeEvidence, requestEvidence } from "../reducers/UI";
 export function evidenceCard(
   target: EvidenceTargetType,
 ): CardNameType | undefined {
-  if (target === "mission-details") return undefined;
+  if (target === "mission-details") return "SCENARIO";
   if (target === "supply-demand") return "FACILITIES";
   if (target === "finances") return "INSIGHTS";
   return target.card === "FACILITIES" && target.view === "BUILD_GENERATORS"

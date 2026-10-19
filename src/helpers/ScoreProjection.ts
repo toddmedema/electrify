@@ -20,8 +20,6 @@ export interface ScoreProjectionType {
   projected: number[];
   /** Where the run is heading: the last projected score, or the current one at the end */
   final: number;
-  /** How many completed months the pace is read from; fewer than a year is a rough guide */
-  basisMonths: number;
 }
 
 /**
@@ -105,6 +103,5 @@ export function projectScore(
     actual,
     projected,
     final: projected[projected.length - 1] ?? actual[actual.length - 1],
-    basisMonths: months,
   };
 }

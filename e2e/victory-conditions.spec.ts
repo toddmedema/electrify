@@ -36,10 +36,14 @@ for (const theme of ["light", "dark"] as const) {
         .click();
       await page
         .locator("#navfooter:visible")
-        .getByRole("button", { name: "Scenario & score" })
+        .getByRole("button", { name: "Scenario", exact: true })
         .first()
         .click();
-      const dialog = page.getByRole("dialog", { name: scenario.name });
+      const dialog = page.getByRole("region", {
+        name: "Scenario",
+        exact: true,
+      });
+      await expect(dialog).toContainText(scenario.name);
       await expectDialogToFit(dialog);
       const rules = dialog.locator(".missionRequirements dt");
       const progress = dialog.locator(".missionRequirements dd");

@@ -322,7 +322,7 @@ export function selectMissionRisk(
   )
     return {
       id: "reliability",
-      label: "Required reliability window missed · Scenario & score",
+      label: "Required reliability window missed · Scenario",
       shortLabel: "Reliability missed",
       target: "mission-details",
     };

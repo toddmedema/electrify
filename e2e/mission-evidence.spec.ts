@@ -90,11 +90,11 @@ for (const theme of ["light", "dark"]) {
     }
     await settle(page);
     const details = page.getByRole("button", {
-      name: "Scenario & score",
+      name: "Scenario",
       exact: true,
     });
     await details.click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("region", { name: "Scenario", exact: true });
     await expect(dialog).toContainText("90%");
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
@@ -303,12 +303,14 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.setViewportSize(viewport);
     await page.addStyleTag({ content: "html { font-size: 150% !important; }" });
     const details = page.getByRole("button", {
-      name: "Scenario & score",
+      name: "Scenario",
       exact: true,
     });
     await details.scrollIntoViewIfNeeded();
     await details.click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Scenario", exact: true }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
     await page.locator("#eventsNav:visible").scrollIntoViewIfNeeded();
     await page.locator("#eventsNav:visible").click();

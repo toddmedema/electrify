@@ -54,13 +54,21 @@ describe("Navigation", () => {
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });
 
-  it("opens the scenario and its score over the game rather than as a tool", () => {
+  it("opens the scenario as a tool like the others", () => {
     const onToggle = jest.fn();
     store.dispatch(delta({ scenarioId: 103 }));
     renderNavigation(onToggle);
-    fireEvent.click(screen.getByRole("button", { name: "Scenario & score" }));
-    expect(onToggle).not.toHaveBeenCalled();
-    expect(store.getState().ui.evidenceRequest?.target).toBe("mission-details");
+    const scenario = screen.getByRole("button", { name: "Scenario" });
+    expect(scenario).toHaveAttribute("aria-keyshortcuts", "T");
+    fireEvent.click(scenario);
+    expect(onToggle).toHaveBeenCalledWith("SCENARIO");
+  });
+
+  it("leaves the scenario out of tutorials, which have no score", () => {
+    store.dispatch(delta({ scenarioId: 0 }));
+    renderNavigation();
+    expect(screen.queryByRole("button", { name: "Scenario" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Events" })).toBeVisible();
   });
 
   it("labels hovered and keyboard-focused icons with their shortcut without opening a tool", async () => {

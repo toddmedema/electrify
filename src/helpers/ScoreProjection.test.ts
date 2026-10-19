@@ -62,7 +62,6 @@ describe("projectScore", () => {
   it("extends a steady pace in a straight line to the end of the term", () => {
     const projection = projectScore(investor, steadyRun(18), 2020, 1)!;
     expect(projection.projected).toHaveLength(30);
-    expect(projection.basisMonths).toBe(12);
     // Every month adds 1 point of supply, 40 of net worth and 2 of customers
     expect(projection.projected[0]).toBe(projection.actual[17] + 43);
     expect(projection.final).toBe(48 * 43);
@@ -77,7 +76,6 @@ describe("projectScore", () => {
   it("reads a pace from the months there are, and nothing from none", () => {
     expect(projectScore(investor, [], 2020, 1)).toBeNull();
     const early = projectScore(investor, steadyRun(3), 2020, 1)!;
-    expect(early.basisMonths).toBe(3);
     expect(early.final).toBe(48 * 43);
     // A single month has no trend in its levels yet, only its flows
     const first = projectScore(investor, steadyRun(1), 2020, 1)!;
