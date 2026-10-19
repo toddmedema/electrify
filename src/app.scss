@@ -4298,26 +4298,39 @@ $pane_header_height: 48px;
           background-color 0.6s linear;
       }
     }
+  }
 
-    // What this facility is doing, badged onto its own icon rather than given a column of its
-    // own, so the row gains a state without getting wider
+  // What a facility or intertie is doing, badged onto its own icon rather than given a column
+  // of its own, so the row gains a state without getting wider
+  .MuiListItemAvatar-root .facilityActivity,
+  .transmissionIcon .facilityActivity {
+    position: absolute;
+    bottom: -2px;
+    left: 23px; // tucked against the avatar, stopping short of the storage bar at 42px
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: $bg_primary;
+    box-shadow: 0 0 0 1px var(--shadow-ring);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .MuiSvgIcon-root {
+      font-size: var(--font-size-caption);
+    }
+  }
+
+  // Neutral, not a state colour: exporting is neither harm nor automatically a gain
+  .transmissionIcon {
+    position: relative;
+    display: block;
+    width: 40px;
+    height: 40px;
+
     .facilityActivity {
-      position: absolute;
-      bottom: -2px;
-      left: 23px; // tucked against the avatar, stopping short of the storage bar at 42px
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: $bg_primary;
-      box-shadow: 0 0 0 1px var(--shadow-ring);
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .MuiSvgIcon-root {
-        font-size: var(--font-size-caption);
-      }
+      color: $font_color_primary;
     }
   }
 }
@@ -6474,6 +6487,9 @@ $programs_column: 800px;
 }
 .transmissionLine .transmissionLineText {
   min-width: 0;
+  // Lets the flow reading swap to its short "In"/"Out" form on the same breakpoint as a
+  // facility row's status
+  container-type: inline-size;
 }
 .transmissionLine .transmissionLineText > .MuiTypography-body2 {
   font-size: var(--font-size-caption);

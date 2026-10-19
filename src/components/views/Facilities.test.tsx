@@ -812,15 +812,15 @@ describe("unified connections", () => {
       connections[0].querySelector(".facilityDragHandle"),
     ).toHaveAccessibleName("Reorder " + game.transmission!.lines[0].name);
     /* eslint-enable testing-library/no-node-access */
-    // A built line reports the power actually moving over it, signed, instead of a static
-    // "Connected" that never changes
-    expect(connections[0]).toHaveTextContent(/0\/270MW/);
+    // A built line reports the power actually moving over it instead of a static "Connected"
+    // that never changes
+    expect(connections[0]).toHaveTextContent(/Idle\s*Idle 0\/270MW/);
     expect(connections[0]).not.toHaveTextContent("Connected");
     expect(connections[1]).toHaveTextContent("Building");
     await user.click(screen.getByText(game.transmission!.lines[0].name));
     expect(
       screen.getByRole("button", {
-        name: `Inspect ${game.transmission!.lines[0].name}, no power flowing`,
+        name: `Inspect ${game.transmission!.lines[0].name}, idle, 270MW available`,
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
@@ -838,6 +838,28 @@ describe("unified connections", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it.each([
+    [42e6, "Importing", "In", "42/270MW", "importing 42MW of 270MW"],
+    [-42e6, "Exporting", "Out", "42/150MW", "exporting 42MW of 150MW"],
+  ])(
+    "names a line's flow direction in words (%d W)",
+    (flowW, long, short, reading, spoken) => {
+      const game = connectedGame();
+      game.transmission!.lines[0].currentFlowW = flowW;
+      renderFacilities(game, null);
+      // eslint-disable-next-line testing-library/no-node-access
+      const line = document.querySelector(".transmissionLine")!;
+      // Unsigned: the word carries direction, not a minus sign against the rating
+      expect(line).toHaveTextContent(`${long}${short} ${reading}`);
+      expect(line).not.toHaveTextContent("-42");
+      expect(
+        screen.getByRole("button", {
+          name: `Inspect ${game.transmission!.lines[0].name}, ${spoken}`,
+        }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("shows a building line's outlook without claiming it can import yet", async () => {
     const game = connectedGame();
