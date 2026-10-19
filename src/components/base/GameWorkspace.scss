@@ -303,3 +303,11 @@
     animation: none;
   }
 }
+
+// Separates the one action that opens over the game (the scenario and its score) from the
+// tools that open beside it
+.gameActionDock .gameDockDivider {
+  flex: 0 0 1px;
+  margin: 8px 2px;
+  background: var(--border-subtle);
+}

@@ -1022,11 +1022,6 @@ $topbar_height: 56px;
     text-align: left;
     line-height: 1.4;
   }
-  .missionDetailsButton {
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-  }
   // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
   // a plain headline and with the grid readout's icon when the two rows stack.
   .missionRiskButton {
@@ -1085,10 +1080,6 @@ $topbar_height: 56px;
 @media (pointer: coarse) {
   .missionSummary .MuiButton-root {
     min-height: 44px;
-  }
-  .missionSummary .missionDetailsButton {
-    width: 44px;
-    height: 44px;
   }
 }
 
@@ -3286,13 +3277,20 @@ $pane_header_height: 48px;
 
     // Sticky so the player can still tell which section they're scrolling through. The
     // line-height is the header's full height (MUI adds no vertical padding) and sets where
-    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx
+    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx.
+    // A label on the page rather than a band across it: it shares the page's surface, and
+    // only once pinned does it frost the cards passing underneath so the words stay legible
     .manual-group {
       padding-inline: 0;
-      background: var(--bg-sunken);
+      background: var(--bg-primary);
       line-height: 32px;
       font-weight: 600;
       font-size: var(--font-size-caption-sm);
+
+      @supports (backdrop-filter: blur(1px)) {
+        background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+        backdrop-filter: blur(16px) saturate(1.4);
+      }
     }
 
     mark {
@@ -5435,8 +5433,7 @@ $homeSmokeCycle: 5.6s;
 }
 
 // Quiet, readable help beside a decision; touch targets stay usable on phones.
-.manual-link-text,
-.manual-related-link.MuiButton-root {
+.manual-link-text {
   min-height: 40px;
   padding: 8px;
   font-size: var(--font-size-caption);
@@ -5512,26 +5509,6 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
-.manual-related {
-  display: flex;
-  flex-wrap: wrap;
-  // Baseline, so the "Related entries" label sits on the same line as the link text inside
-  // the taller buttons rather than riding above it
-  align-items: baseline;
-  gap: 4px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 8px;
-
-  // Each link's box hangs out by its own padding, so a wrapped row's text starts on the label's
-  // left edge instead of 8px in; the label's end margin restores the gap the first link loses
-  > .MuiTypography-root {
-    margin-inline-end: 8px;
-  }
-
-  > .manual-related-link.MuiButton-root {
-    margin-inline: -8px 8px;
-  }
-}
 // Manual prose, in the full manual and the help popover alike: a line height and half-line
 // paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
 // windows don't stretch lines past comfortable reading, and links in the interaction blue
@@ -5566,6 +5543,30 @@ $homeSmokeCycle: 5.6s;
     text-underline-offset: 2px;
   }
 
+  // A term that names another entry, linked the way a wiki links its articles. The underline
+  // stays, faint, so a link never depends on colour alone; it firms up under the pointer
+  .manual-entry-link {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 3px;
+    border-radius: 2px;
+    transition: text-decoration-color 120ms ease-out;
+
+    &:hover {
+      text-decoration-color: currentColor;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: 2px;
+      text-decoration-color: currentColor;
+    }
+
+    strong {
+      color: inherit;
+    }
+  }
+
   // The source line is a citation: secondary text, but its link keeps full link contrast,
   // which the old 0.7 opacity took away from both
   figcaption {
@@ -5595,10 +5596,6 @@ $homeSmokeCycle: 5.6s;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-
-  .manual-related {
-    margin-top: $space-4;
-  }
 }
 // The first paragraph's margin used to be the gap under an open entry's title divider, so
 // entries that open on a table or legend started flush against it. The gap lives here now.
@@ -5606,8 +5603,7 @@ $homeSmokeCycle: 5.6s;
   padding-top: $space-4;
 }
 @media (pointer: coarse) {
-  .manual-link-text,
-  .manual-related-link.MuiButton-root {
+  .manual-link-text {
     min-height: 44px;
   }
 }
@@ -6709,6 +6705,61 @@ $programs_column: 800px;
   }
 }
 
+// The scenario's score so far and where it is heading: two large figures over the line they
+// summarise, so the answer reads before the chart has to
+.scenarioOutlook {
+  margin-bottom: 24px;
+  padding: $space-4;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  // The chart sits on the panel rather than in a darker box of its own
+  --chart-surface: var(--bg-raised);
+}
+
+.scenarioOutlookFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2 32px;
+  margin: $space-2 0 $space-3;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-caption);
+  }
+
+  dd {
+    display: flex;
+    align-items: baseline;
+    gap: $space-2;
+    margin: 0;
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// The sign carries the direction on its own; the colour is a second, faster read of it
+.scenarioOutlookChange {
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+  letter-spacing: 0;
+
+  &[data-direction="up"] {
+    color: var(--delta-good);
+  }
+
+  &[data-direction="down"] {
+    color: var(--delta-bad);
+  }
+}
+
+.scenarioOutlookNote {
+  margin: $space-2 0 0;
+}
+
 .transmissionUpgrade {
   display: grid;
   gap: 8px;
@@ -7020,7 +7071,10 @@ $programs_column: 800px;
     border-bottom-right-radius: var(--radius-lg);
   }
 
+  // Groups are separated by air rather than rules: the label sits close to the group it
+  // names and well clear of the one above, the way grouped lists read on iOS
   .manual-group {
+    margin-top: $space-4;
     padding: 0 $space-4 + $space-1;
   }
 }

@@ -1,7 +1,6 @@
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import { Button, IconButton, Tooltip } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Button } from "@mui/material";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
@@ -106,14 +105,12 @@ export default function MissionSummary({
   upcoming = [],
   activeEvents = [],
   onActiveEvents,
-  onDetails,
   onEvidence,
 }: {
   game: GameType;
   upcoming?: UpcomingStoryEventType[];
   activeEvents?: ActiveEventGroupType[];
   onActiveEvents?: () => void;
-  onDetails: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
 }) {
   const mission = getMissionStatus(game);
@@ -152,7 +149,7 @@ export default function MissionSummary({
       <div className="missionSummaryHeader">
         <div className="missionSummaryCopy">
           {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
-              itself is always one tap away in All requirements. */}
+              itself is always one tap away in the dock's Scenario action. */}
           {shownRisk ? (
             <Button
               className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
@@ -204,16 +201,6 @@ export default function MissionSummary({
             )}
           </span>
         </div>
-        <Tooltip title="All requirements">
-          <IconButton
-            className="missionDetailsButton"
-            color="primary"
-            aria-label="All requirements"
-            onClick={onDetails}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
       </div>
       <span className="srOnly" aria-live="polite">
         {announcement}

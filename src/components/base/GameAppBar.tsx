@@ -99,7 +99,7 @@ export interface Props extends StateProps, DispatchProps {}
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
-const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionDetailsButton"];
+const RESTORABLE_STATUS_FOCUS = [".missionRiskButton"];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -502,7 +502,6 @@ export function GameAppBar(props: Props) {
           activeEvents={activeEvents}
           onActiveEvents={openEvents}
           onEvidence={props.onEvidence}
-          onDetails={() => setScenarioDetailsOpen(true)}
         />
       )}
     </div>

@@ -69,6 +69,31 @@ it("retains contents through the exit transition, then stops work until reopenin
   expect(mission).toHaveBeenCalledWith(latest);
 });
 
+it("shows the score so far beside where the current pace ends it", () => {
+  const game = createGame({ scenarioId: 103 });
+  // Newest first: three months, each supplying 1 TWh and adding $1B of net worth
+  const monthlyHistory = [3, 2, 1].map((month) => ({
+    ...DateTime.EMPTY_HISTORY,
+    deliveredWhByFuel: {},
+    year: game.startingYear,
+    month,
+    supplyWh: 1e12,
+    demandWh: 1e12,
+    netWorth: 1e9 * month,
+  }));
+  render(
+    <ScenarioDetailsDialog
+      open
+      game={{ ...game, monthlyHistory }}
+      onClose={jest.fn()}
+    />,
+  );
+  const outlook = screen.getByRole("region", { name: "Score outlook" });
+  expect(outlook).toHaveTextContent("Score now");
+  expect(outlook).toHaveTextContent("Projected final");
+  expect(outlook).toHaveTextContent(/early estimate from your first 3 months/);
+});
+
 it("keeps an unknown scenario closed", () => {
   const game = { ...createGame({ scenarioId: 103 }), scenarioId: -999 };
   render(<ScenarioDetailsDialog open game={game} onClose={jest.fn()} />);

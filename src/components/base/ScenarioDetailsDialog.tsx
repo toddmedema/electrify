@@ -23,7 +23,6 @@ import {
   scoreLabel,
   scoreRuleText,
   startingDollarRevenue,
-  totalScore,
 } from "../../helpers/Scoring";
 import { useUnits } from "./UnitsContext";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
@@ -31,6 +30,11 @@ import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore } from "../../helpers/Format";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import type { MissionRequirement } from "../../helpers/MissionStatus";
+import {
+  projectScore,
+  ScoreProjectionType,
+} from "../../helpers/ScoreProjection";
+import ChartFinances from "./ChartFinances";
 
 export interface Props {
   open: boolean;
@@ -51,6 +55,96 @@ function statusLabel(requirement: MissionRequirement): string {
   return requirement.id === "retention" && requirement.status === "failed"
     ? "Out of reach"
     : STATUS_LABELS[requirement.status];
+}
+
+/**
+ * The run's score so far, drawn month by month, and where it is heading if the last year's pace
+ * holds: one solid line for the record, one dashed for the projection, meeting at today.
+ */
+function ScoreOutlook({
+  projection,
+  history,
+}: {
+  projection: ScoreProjectionType;
+  history: GameType["monthlyHistory"];
+}): React.JSX.Element {
+  const timeline = React.useMemo(() => {
+    const last = history[0];
+    const first = last.year * 12 + last.month - projection.actual.length + 1;
+    const point = (index: number, value: number, projected: boolean) => {
+      const month = first + index;
+      return { month, year: Math.floor((month - 1) / 12), value, projected };
+    };
+    return [
+      ...projection.actual.map((value, i) => point(i, value, false)),
+      ...projection.projected.map((value, i) =>
+        point(projection.actual.length + i, value, true),
+      ),
+    ];
+  }, [projection, history]);
+  const current = projection.actual[projection.actual.length - 1];
+  const change = projection.final - current;
+  const ended = projection.projected.length === 0;
+  return (
+    <Box
+      component="section"
+      aria-labelledby="scenario-outlook-title"
+      className="scenarioOutlook"
+    >
+      <Typography
+        id="scenario-outlook-title"
+        variant="h6"
+        component="h3"
+        sx={{ fontWeight: 600 }}
+      >
+        Score outlook
+      </Typography>
+      <Box component="dl" className="scenarioOutlookFigures">
+        <div>
+          <dt>{ended ? "Final score" : "Score now"}</dt>
+          <dd>{formatScore(current)}</dd>
+        </div>
+        {!ended && (
+          <div>
+            <dt>Projected final</dt>
+            <dd>
+              {formatScore(projection.final)}
+              {change !== 0 && (
+                <span
+                  className="scenarioOutlookChange"
+                  data-direction={change > 0 ? "up" : "down"}
+                >
+                  {change > 0 ? "+" : "−"}
+                  {formatScore(Math.abs(change))}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
+      </Box>
+      <ChartFinances
+        hideTitle
+        id="scenarioScoreChart"
+        height={110}
+        timeline={timeline}
+        title="score"
+        format={formatScore}
+      />
+      {!ended && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          component="p"
+          className="scenarioOutlookNote"
+        >
+          {projection.basisMonths < 12
+            ? `An early estimate from your first ${projection.basisMonths} month${projection.basisMonths === 1 ? "" : "s"}`
+            : "If the last 12 months’ pace holds"}
+          . Solid line: your record. Dashed: the projection.
+        </Typography>
+      )}
+    </Box>
+  );
 }
 
 /** An in-game reminder of the mission and its score through completed months. */
@@ -115,6 +209,10 @@ function ScenarioDetailsContent({
         startingDollarRevenue(history, game.startingYear, game.seed),
       )
     : null;
+  const projection = React.useMemo(
+    () => projectScore(scenario, history, game.startingYear, game.seed),
+    [scenario, history, game.startingYear, game.seed],
+  );
   const rules = scoreRuleText(
     scenario.ownership,
     scenario.dollarsPerkWh,
@@ -199,6 +297,9 @@ function ScenarioDetailsContent({
             </Box>
           ))}
         </Box>
+        {projection && (
+          <ScoreOutlook projection={projection} history={history} />
+        )}
         <Box
           sx={{
             display: "grid",
@@ -266,25 +367,11 @@ function ScenarioDetailsContent({
               component="h3"
               sx={{ fontWeight: 600 }}
             >
-              Current score
+              Score breakdown
             </Typography>
             {breakdown ? (
               <>
-                <Typography
-                  component="p"
-                  sx={{ mt: 1, mb: 0.5, fontVariantNumeric: "tabular-nums" }}
-                >
-                  <Box
-                    component="strong"
-                    sx={{ fontSize: 36, lineHeight: 1.2 }}
-                  >
-                    {formatScore(totalScore(breakdown))}
-                  </Box>{" "}
-                  <Box component="span" sx={{ color: "text.secondary" }}>
-                    points
-                  </Box>
-                </Typography>
-                <Box component="dl" sx={{ m: 0, mt: 2 }}>
+                <Box component="dl" sx={{ m: 0, mt: 1 }}>
                   {Object.entries(breakdown).map(([category, score = 0]) => (
                     <Box
                       key={category}

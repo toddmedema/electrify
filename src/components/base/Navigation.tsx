@@ -6,6 +6,8 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
+import { getScenario } from "../../data/Scenarios";
+import { openEvidence } from "../../helpers/Evidence";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
@@ -46,6 +48,10 @@ export const GAME_TOOLS: {
     icon: <HistoryIcon />,
   },
 ];
+// Not a tool panel: it opens the scenario's goals and score outlook over the game, so it sits
+// apart from the tools after a divider
+const SCENARIO_ACTION_ID = "scenarioNav";
+
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"
@@ -65,6 +71,12 @@ export default function Navigation({
   const unreadEvents = useAppSelector(
     (state) =>
       (state.game.eventLog[0]?.id || 0) > state.game.eventLogReadThroughId,
+  );
+  // Tutorials have no term goal or score to show; their own HUD carries the objective
+  const hasScenarioDetails = useAppSelector(
+    (state) =>
+      !getScenario(state.game.scenarioId, state.game.customScenario)
+        ?.tutorialSteps,
   );
   const opened = openTools ?? [gameToolForCard(cardName)];
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
@@ -129,6 +141,31 @@ export default function Navigation({
           </Tooltip>
         );
       })}
+      {hasScenarioDetails && (
+        <>
+          <span className="gameDockDivider" aria-hidden="true" />
+          <Tooltip
+            title="Scenario & score"
+            placement="top"
+            open={labelId === SCENARIO_ACTION_ID}
+            disableHoverListener
+            disableFocusListener
+            disableTouchListener
+            disableInteractive
+          >
+            <Button
+              id={SCENARIO_ACTION_ID}
+              {...buttonLabels}
+              className="gameDockAction gameDockScenario"
+              aria-label="Scenario & score"
+              aria-haspopup="dialog"
+              onClick={() => dispatch(openEvidence("mission-details"))}
+            >
+              <ConceptIcon concept="goal" />
+            </Button>
+          </Tooltip>
+        </>
+      )}
     </nav>
   );
 }

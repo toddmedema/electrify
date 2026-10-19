@@ -2,6 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
+import { delta } from "../../reducers/Game";
 import Navigation from "./Navigation";
 
 function renderNavigation(onToggle = jest.fn()) {
@@ -51,6 +52,15 @@ describe("Navigation", () => {
       expect(button).not.toHaveTextContent(name);
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
+  });
+
+  it("opens the scenario and its score over the game rather than as a tool", () => {
+    const onToggle = jest.fn();
+    store.dispatch(delta({ scenarioId: 103 }));
+    renderNavigation(onToggle);
+    fireEvent.click(screen.getByRole("button", { name: "Scenario & score" }));
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(store.getState().ui.evidenceRequest?.target).toBe("mission-details");
   });
 
   it("labels hovered and keyboard-focused icons with their shortcut without opening a tool", async () => {

@@ -204,18 +204,26 @@ describe("GameAppBar", () => {
         listeners.forEach((listener) => listener());
       });
     try {
-      const { container } = renderAppBar();
-      screen.getByRole("button", { name: "All requirements" }).focus();
+      const { container } = renderAppBar({
+        activeEvents: [
+          {
+            key: "fire",
+            title: "Wildfire emergency",
+            importance: "CRITICAL",
+            count: 1,
+            throughLabel: "through Mar 2026",
+          },
+        ],
+      });
+      const risk = () =>
+        screen.getByRole("button", { name: /Wildfire emergency/ });
+      risk().focus();
       resize(true);
       expect(container.querySelector("#topbar .gameStatusBar")).not.toBeNull();
-      expect(
-        screen.getByRole("button", { name: "All requirements" }),
-      ).toHaveFocus();
+      expect(risk()).toHaveFocus();
       resize(false);
       expect(container.querySelector("#topbar .gameStatusBar")).toBeNull();
-      expect(
-        screen.getByRole("button", { name: "All requirements" }),
-      ).toHaveFocus();
+      expect(risk()).toHaveFocus();
     } finally {
       window.matchMedia = matchMedia;
     }

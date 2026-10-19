@@ -47,9 +47,7 @@ function makeGame(
   } as unknown as GameType;
 }
 
-const summary = (game: GameType) => (
-  <MissionSummary game={game} onDetails={jest.fn()} />
-);
+const summary = (game: GameType) => <MissionSummary game={game} />;
 
 beforeEach(() => {
   jest.useFakeTimers();

@@ -266,6 +266,9 @@ export interface NavigateActionType {
   replaceCurrentCard?: boolean;
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
+  // Set when a link inside one manual entry opens another: the entry the link sat in, which
+  // Back returns to before it leaves the manual
+  fromEntry?: string;
   storyTarget?: StoryActionTargetType;
 }
 
@@ -276,6 +279,9 @@ export interface CardType {
   history?: CardNameType[];
   toPrevious?: boolean;
   entry?: string;
+  // Entries this manual visit followed links away from, newest first. Back walks these before
+  // it leaves the manual; they never enter `history`, so the header's back button skips them.
+  manualTrail?: string[];
   storyTarget?: StoryActionTargetType;
 }
 
