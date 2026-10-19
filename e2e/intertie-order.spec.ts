@@ -42,7 +42,11 @@ for (const theme of ["light", "dark"] as const) {
     const rows = pane.locator(".transmissionLine");
     await expect(rows).toHaveCount(2);
     await expect(pane.locator("#your-interties-title")).toContainText(
-      "Trading order",
+      "Interties",
+    );
+    // Each section heading carries its live flow rather than a static "order" caption.
+    await expect(pane.locator("#dispatch-order")).toHaveText(
+      /^Plants & storage\s*Generating \d/,
     );
     const originalFirstId = await rows
       .first()

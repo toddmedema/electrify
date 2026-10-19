@@ -20,7 +20,7 @@ files are large, so broad rewrites create expensive review diffs.
   and continues after gate failures.
 - Before pushing a pull request, run `npm run check:ci` instead. It adds the CI gates that most
   often fail pull requests: tick performance, the production web build and bundle-size
-  ceilings, the headless production browser suites at 1280, 390 and 320 px, and the multiplayer
+  ceilings, the headless production browser suites at 1280, 390 and 360 px, and the multiplayer
   suite against the desktop renderer. Only the packaged Electron suite stays CI-only, because
   it opens native windows.
 - After a failed check, fix the issue and rerun the failed gates with the printed command, such as
@@ -184,6 +184,8 @@ failures should be rare; agents without that hook should format the files they c
 - Reflow by priority instead of shrinking the desktop composition. On phones, show one primary
   pane, abbreviate or collapse secondary controls, allow appropriate rails to scroll, and stack
   actions before they crowd or overflow. Keep charts and critical status legible.
+- Design for a minimum viewport width of 360 px, the narrowest common modern smartphone (many
+  Samsung Galaxy models). Don't add short forms or layouts just for narrower widths.
 - Never make color or an icon the only carrier of meaning. Pair symbols and state colors with text;
   distinguish chart series with direct labels, patterns, or line styles as well as color.
 

@@ -473,3 +473,34 @@ describe("briefing objectives", () => {
     });
   });
 });
+
+describe("reliability objective copy", () => {
+  // The goal heads the pinned-goals list on its own; the label is read inside sentences such
+  // as "You served 99.40% of demand during the {label}".
+  const objectives = SCENARIOS.filter(
+    (scenario) => scenario.reliabilityObjective,
+  ).map((scenario) => ({
+    id: scenario.id,
+    ...scenario.reliabilityObjective!,
+  }));
+
+  it("gives every reliability objective a short imperative goal", () => {
+    expect(objectives.length).toBeGreaterThan(0);
+    objectives.forEach(({ id, goal }) => {
+      expect({ id, goal }).toEqual({
+        id,
+        goal: expect.stringMatching(/^(Keep|Serve|Hold|Avoid|Retain) /),
+      });
+      expect({ id, short: goal!.length <= 50 }).toEqual({ id, short: true });
+    });
+  });
+
+  it("keeps every label readable after 'during the'", () => {
+    objectives.forEach(({ id, label }) => {
+      expect({ id, label }).toEqual({
+        id,
+        label: expect.not.stringMatching(/^(the |\d{4},)/i),
+      });
+    });
+  });
+});

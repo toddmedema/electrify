@@ -7,7 +7,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
   page,
 }, testInfo) => {
   test.skip(
-    !["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+    !["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
       testInfo.project.name,
     ),
   );

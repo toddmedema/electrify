@@ -3,6 +3,11 @@
   margin-inline: auto;
   padding: 0 12px 12px;
   color: var(--font-color-primary);
+
+  // Goal and event cards are the Events history's own; the pane already supplies the gutter.
+  .eventLogList {
+    padding: 0;
+  }
 }
 
 .operationsSection {
@@ -36,78 +41,16 @@
   }
 }
 
-.operationsGoals {
-  display: grid;
-  gap: 8px;
-}
-
-.operationsPriorities .operationsGoal,
-.operationsPriorities .operationsRow {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: 100%;
-  min-height: var(--control-size);
-  padding: 12px;
-  gap: 4px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  color: var(--font-color-primary);
-  text-align: left;
-  line-height: 1.45;
-  font-size: var(--font-size-body2);
-  text-transform: none;
-
-  &:hover {
-    border-color: var(--border-selected);
-    background: var(--bg-selected);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
-  }
-
-  &.status-failed {
-    border-inline-start: 4px solid var(--blackout-red);
-  }
-}
-
-.operationsRowTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-wrap: anywhere;
-
-  > svg {
-    flex-shrink: 0;
-    color: var(--interactive-strong);
-  }
-
-  strong {
-    font-weight: var(--font-weight-emphasis);
-  }
-}
-
-.operationsDetail,
 .operationsGoalTarget {
   display: block;
+  margin-top: 4px;
 }
 
 .operationsGoalTarget,
-.operationsEmpty,
-.operationsMeta {
+.operationsEmpty {
   color: var(--font-color-faded);
   font-size: var(--font-size-caption);
 }
-
-.operationsMeta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .operationsPinCheck {
   width: 28px;
   display: inline-flex;

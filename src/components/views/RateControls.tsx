@@ -302,14 +302,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
             className="programsRateFollow"
             labelPlacement="start"
             disabled={!!game.replayPlayback}
-            label={
-              <>
-                <span className="programsRateFollowFull">Follow target</span>
-                <span className="programsRateFollowShort" aria-hidden="true">
-                  Follow
-                </span>
-              </>
-            }
+            label="Follow target"
             control={
               <Switch
                 color="primary"

@@ -3,7 +3,7 @@ import { expect, test, type Page } from "./fixtures";
 import { openPane } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([
-  "mobile-320px",
+  "mobile-360px",
   "mobile-390px",
   "tablet-768px",
   "desktop-chromium",
@@ -20,7 +20,7 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
       testInfo.project.name,
     ),
   );
@@ -306,7 +306,7 @@ test("insights header controls stay aligned in one compact row", async ({
     expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 10);
 
     // Rate and program levers live in the Programs tool, not under the Insights header.
-    if (testInfo.project.name === "mobile-320px") {
+    if (testInfo.project.name === "mobile-360px") {
       const trackHeader = page.locator(
         '.insightsTrack[data-layer="supplyDemand"] .insightsTrackHeader',
       );
@@ -341,7 +341,7 @@ test("insights header controls stay aligned in one compact row", async ({
 
   const presetName = page.locator(".insightsPresetName");
   await expect(presetName).toHaveCSS("text-overflow", "ellipsis");
-  if (testInfo.project.name === "mobile-320px") {
+  if (testInfo.project.name === "mobile-360px") {
     await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
     const dateRange = page.getByLabel(/Displayed date range:/);
     await expect(dateRange).toHaveAttribute(

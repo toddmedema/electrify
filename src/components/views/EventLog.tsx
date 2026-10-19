@@ -24,6 +24,8 @@ import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import { isPaneLayout } from "../../Globals";
 import { EvidenceTargetType, GameType } from "../../Types";
 import OperationsPriorities from "./OperationsPriorities";
+import EventCard from "../base/EventCard";
+import StoryEventCard from "./StoryEventCard";
 import { ToolScrollMemory } from "../base/GameToolMemory";
 
 /**
@@ -220,49 +222,16 @@ export default function EventLog(props: Props): React.JSX.Element {
               </header>
               <ul className="eventLogList">
                 {ongoing.map((event) => (
-                  <li
-                    className={`eventLogItem ongoing importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                  <StoryEventCard
+                    className="ongoing"
+                    event={event}
                     key={event.key}
-                    onClick={() => onSelect(event.actionTarget)}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                      if (
-                        event.actionTarget &&
-                        (e.key === "Enter" || e.key === " ")
-                      ) {
-                        e.preventDefault();
-                        onSelect(event.actionTarget);
-                      }
-                    }}
-                    role={event.actionTarget ? "button" : undefined}
-                    tabIndex={event.actionTarget ? 0 : undefined}
-                  >
-                    <span className="eventLogIcon">
-                      <ConceptIcon
-                        concept={event.concept || "forecast"}
-                        fontSize="small"
-                      />
-                    </span>
-                    <span>
-                      {event.title && <strong>{event.title}</strong>}
-                      <span className="eventLogCopy">
-                        <Typography
-                          variant="body2"
-                          component="span"
-                          sx={{ display: "block" }}
-                        >
-                          {event.message}
-                        </Typography>
-                      </span>
-                    </span>
-                    <Typography
-                      className="eventLogWhen"
-                      variant="body2"
-                      color="textSecondary"
-                      component="span"
-                    >
-                      {event.label}
-                    </Typography>
-                  </li>
+                    onActivate={
+                      event.actionTarget
+                        ? () => onSelect(event.actionTarget)
+                        : undefined
+                    }
+                  />
                 ))}
               </ul>
             </section>
@@ -279,49 +248,16 @@ export default function EventLog(props: Props): React.JSX.Element {
               </header>
               <ul className="eventLogList">
                 {upcoming.map((event) => (
-                  <li
-                    className={`eventLogItem upcoming importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                  <StoryEventCard
+                    className="upcoming"
+                    event={event}
                     key={event.key}
-                    onClick={() => onSelect(event.actionTarget)}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                      if (
-                        event.actionTarget &&
-                        (e.key === "Enter" || e.key === " ")
-                      ) {
-                        e.preventDefault();
-                        onSelect(event.actionTarget);
-                      }
-                    }}
-                    role={event.actionTarget ? "button" : undefined}
-                    tabIndex={event.actionTarget ? 0 : undefined}
-                  >
-                    <span className="eventLogIcon">
-                      <ConceptIcon
-                        concept={event.concept || "forecast"}
-                        fontSize="small"
-                      />
-                    </span>
-                    <span>
-                      {event.title && <strong>{event.title}</strong>}
-                      <span className="eventLogCopy">
-                        <Typography
-                          variant="body2"
-                          component="span"
-                          sx={{ display: "block" }}
-                        >
-                          {event.message}
-                        </Typography>
-                      </span>
-                    </span>
-                    <Typography
-                      className="eventLogWhen"
-                      variant="body2"
-                      color="textSecondary"
-                      component="span"
-                    >
-                      {event.label}
-                    </Typography>
-                  </li>
+                    onActivate={
+                      event.actionTarget
+                        ? () => onSelect(event.actionTarget)
+                        : undefined
+                    }
+                  />
                 ))}
               </ul>
             </section>
@@ -437,49 +373,25 @@ export default function EventLog(props: Props): React.JSX.Element {
             )}
             <ul className="eventLogList">
               {visibleEvents.map((event: GameEventType) => (
-                <li
-                  className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                <EventCard
+                  className={`kind-${event.kind} importance-${event.importance || "ROUTINE"}`}
                   key={event.id}
-                  onClick={() => onSelect(event.actionTarget)}
-                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                    if (
-                      event.actionTarget &&
-                      (e.key === "Enter" || e.key === " ")
-                    ) {
-                      e.preventDefault();
-                      onSelect(event.actionTarget);
-                    }
-                  }}
-                  role={event.actionTarget ? "button" : undefined}
-                  tabIndex={event.actionTarget ? 0 : undefined}
-                >
-                  <span className="eventLogIcon">
+                  icon={
                     <ConceptIcon
                       concept={event.concept || KIND_CONCEPTS[event.kind]}
                       fontSize="small"
                     />
-                  </span>
-                  <span>
-                    {event.title && <strong>{event.title}</strong>}
-                    <span className="eventLogCopy">
-                      <Typography
-                        variant="body2"
-                        component="span"
-                        sx={{ display: "block" }}
-                      >
-                        {event.message}
-                      </Typography>
-                    </span>
-                  </span>
-                  <Typography
-                    className="eventLogWhen"
-                    variant="body2"
-                    color="textSecondary"
-                    component="span"
-                  >
-                    {event.label}
-                  </Typography>
-                </li>
+                  }
+                  heading={event.title}
+                  meta={event.label}
+                  onActivate={
+                    event.actionTarget
+                      ? () => onSelect(event.actionTarget)
+                      : undefined
+                  }
+                >
+                  {event.message}
+                </EventCard>
               ))}
             </ul>
           </section>

@@ -160,11 +160,6 @@ export function formatWattHoursOfPeak(current: number, peak: number): string {
   return formatWattsOfPeak(current, peak).replace(/W/g, "Wh");
 }
 
-export function formatSignedWattsOfPeak(current: number, peak: number): string {
-  const pair = formatWattsOfPeak(current, peak);
-  return current < 0 && !/^0(\.0*)?\//.test(pair) ? "-" + pair : pair;
-}
-
 /** A 0-1 fraction as a whole (or `digits`-decimal) percentage: 0.456 → "46%". */
 export function formatPercent(fraction: number, digits = 0): string {
   return digits > 0

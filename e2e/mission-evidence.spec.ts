@@ -6,7 +6,7 @@ import { openPane, openBuild } from "./layout";
 const reviewProjects = new Set([
   "desktop-chromium",
   "mobile-390px",
-  "mobile-320px",
+  "mobile-360px",
 ]);
 async function settle(page: Page) {
   await page.waitForTimeout(400);

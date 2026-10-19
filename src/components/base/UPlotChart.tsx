@@ -103,6 +103,16 @@ function tooltipPlugin<S>(
             return { total, rows };
           });
           el.append(header, values);
+          // uPlot ignores moves whose target isn't the plot itself. This breakdown takes pointer
+          // events so it can scroll, so a fast pointer landing on it would otherwise strand the
+          // cursor and leave the tooltip behind; hand those moves back to the plot instead.
+          el.addEventListener("mousemove", (event) => {
+            const bounds = u.over.getBoundingClientRect();
+            u.setCursor({
+              left: event.clientX - bounds.left,
+              top: event.clientY - bounds.top,
+            });
+          });
           dismiss = (event) => {
             if (event.key === "Escape") u.setCursor({ left: -10, top: -10 });
           };

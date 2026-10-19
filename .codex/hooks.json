@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'C:\\Users\\toddm\\electrify\\.claude\\worktrees\\elated-elion-cf529e\\.codex\\hooks\\format-edited-file.js'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
