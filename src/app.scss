@@ -1425,6 +1425,12 @@ $topbar_height: 56px;
   .missionSummaryHeadline {
     min-width: 96px;
   }
+
+  // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
+  // inset); the months left end the same 20px before the speed controls
+  .gameStatusBar .missionSummaryMonths {
+    padding-inline-end: $space-1;
+  }
 }
 
 @container appbar (max-width: 1365px) {

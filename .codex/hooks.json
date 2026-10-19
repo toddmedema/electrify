@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'C:\\Users\\toddm\\electrify\\.claude\\worktrees\\pr-543-code-review-fbd241\\.codex\\hooks\\format-edited-file.js'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
