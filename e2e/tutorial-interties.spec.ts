@@ -5,7 +5,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
       testInfo.project.name,
     ),
   );
@@ -125,9 +125,11 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   ).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText(/Importing /)).toBeVisible({
-    timeout: 10000,
-  });
+  // The line's own reading names the direction; the section header repeats it as a total
+  await expect(page.locator(".transmissionLineFlow")).toHaveText(
+    /^Importing /,
+    { timeout: 10000 },
+  );
   // Wait for a full importing month to settle into history; seeing live flow alone must not
   // satisfy the observation gate.
   await expect(page.locator(".gameStatus")).toContainText("Mar 2020", {

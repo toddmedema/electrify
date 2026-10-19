@@ -916,7 +916,10 @@ export interface ScenarioType {
     /** Consecutive calendar months that must each meet the target. Defaults to one. */
     durationMonths?: number;
     minimumDemandServed: number;
+    /** Noun phrase naming the event window, read inside sentences: "during the {label}". */
     label: string;
+    /** Imperative pinned-goal heading in sentence case, e.g. "Keep the lights on through the freeze". */
+    goal?: string;
   };
   dollarsPerkWh: number;
   durationMonths: number;

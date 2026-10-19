@@ -1,11 +1,13 @@
 import * as React from "react";
-import { Button, IconButton, Menu, MenuItem } from "@mui/material";
+import { IconButton, Menu, MenuItem } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import { EvidenceTargetType, GameType } from "../../Types";
 import { getMissionStatus } from "../../helpers/MissionStatus";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import ConceptIcon from "../base/ConceptIcon";
+import EventCard from "../base/EventCard";
+import StoryEventCard from "./StoryEventCard";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
 import "./OperationsPriorities.scss";
 
@@ -123,34 +125,30 @@ export default function OperationsPriorities({
             </MenuItem>
           ))}
         </Menu>
-        <div className="operationsGoals">
+        <ul className="eventLogList operationsGoals">
           {pinned.map((id) => {
             const goal = mission.requirements.find((item) => item.id === id);
             if (!goal) return null;
             return (
-              <Button
-                color="inherit"
+              <EventCard
                 key={id}
-                className={`operationsGoal status-${goal.status}`}
-                onClick={() => onEvidence(goalEvidence(id))}
-                title={`${goal.target}. ${goal.timing}`}
+                // A failed goal is harmful, so it takes the same red edge as a critical event.
+                className={`status-${goal.status}${goal.status === "failed" ? " importance-CRITICAL" : ""}`}
+                icon={<ConceptIcon concept="goal" fontSize="small" />}
+                heading={goal.label}
+                meta={GOAL_STATUS[goal.status]}
+                onActivate={() => onEvidence(goalEvidence(id))}
+                tooltip={`${goal.target}. ${goal.timing}`}
               >
-                <span className="operationsRowTitle">
-                  <ConceptIcon concept="goal" fontSize="small" />
-                  <strong>{goal.label}</strong>
-                </span>
-                <span className="operationsDetail">{goal.current}</span>
+                {goal.current}
                 <span className="operationsGoalTarget">{goal.target}</span>
-                <span className="operationsMeta">
-                  {GOAL_STATUS[goal.status]}
-                </span>
-              </Button>
+              </EventCard>
             );
           })}
-          {pinned.length === 0 && (
-            <p className="operationsEmpty">Pin a goal to keep it in view.</p>
-          )}
-        </div>
+        </ul>
+        {pinned.length === 0 && (
+          <p className="operationsEmpty">Pin a goal to keep it in view.</p>
+        )}
       </section>
 
       <section
@@ -161,31 +159,27 @@ export default function OperationsPriorities({
           <h3 id="operationsNextTitle">Coming up</h3>
         </header>
         {next ? (
-          <Button
-            color="inherit"
-            className="operationsRow"
-            onPointerEnter={() => setHeldNext(next)}
-            onPointerLeave={(event) => {
-              if (!event.currentTarget.contains(document.activeElement))
-                setHeldNext(undefined);
-            }}
-            onFocus={() => setHeldNext(next)}
-            onBlur={(event) => {
-              if (!event.currentTarget.matches(":hover"))
-                setHeldNext(undefined);
-            }}
-            onClick={() => onEvidence(next.actionTarget || { card: "EVENTS" })}
-          >
-            <span className="operationsRowTitle">
-              <ConceptIcon
-                concept={next.concept || "forecast"}
-                fontSize="small"
-              />
-              <strong>{next.title || "Next announced event"}</strong>
-            </span>
-            <span className="operationsDetail">{next.message}</span>
-            <span className="operationsMeta">{next.label}</span>
-          </Button>
+          <ul className="eventLogList">
+            <StoryEventCard
+              event={{
+                ...next,
+                title: next.title || "Next announced event",
+              }}
+              onPointerEnter={() => setHeldNext(next)}
+              onPointerLeave={(event) => {
+                if (!event.currentTarget.contains(document.activeElement))
+                  setHeldNext(undefined);
+              }}
+              onFocus={() => setHeldNext(next)}
+              onBlur={(event) => {
+                if (!event.currentTarget.matches(":hover"))
+                  setHeldNext(undefined);
+              }}
+              onActivate={() =>
+                onEvidence(next.actionTarget || { card: "EVENTS" })
+              }
+            />
+          </ul>
         ) : (
           <p className="operationsEmpty">No announced events ahead.</p>
         )}

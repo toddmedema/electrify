@@ -19,6 +19,20 @@ export function currentCash(game: Pick<GameType, "date" | "timeline">): number {
   return currentTick(game)?.cash ?? 0;
 }
 
+/** What the player's plants and storage are putting on the grid now, or 0 before a timeline exists. */
+export function currentGenerationW(
+  game: Pick<GameType, "date" | "timeline">,
+): number {
+  const now = currentTick(game);
+  if (!now) return 0;
+  return (
+    Object.values(now.supplyByFuel).reduce<number>(
+      (sum, watts) => sum + (watts || 0),
+      0,
+    ) + (now.storageDischargeW || 0)
+  );
+}
+
 /** The scenario being played, including a custom one, or undefined for an unknown ID. */
 export function activeScenario(
   game: Pick<GameType, "scenarioId" | "customScenario">,

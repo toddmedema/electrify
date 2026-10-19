@@ -1834,15 +1834,15 @@ export const gameSlice = createSlice({
         state.facilities = [...generators.reverse(), ...storage];
       }
 
-      // Weather-driven generation must be counted before dispatchable plants cover the
+      // Variable generation must be counted before dispatchable plants cover the
       // remaining demand. Apply to every starting fleet, including tutorials and custom games,
       // while preserving the relative order within both groups and leaving storage at the end.
-      const weatherDriven = (facility: FacilityOperatingType) =>
+      const variable = (facility: FacilityOperatingType) =>
         facility.fuel !== undefined &&
         WEATHER_DEPENDENT_FUELS.includes(facility.fuel);
       state.facilities = [
-        ...state.facilities.filter(weatherDriven),
-        ...state.facilities.filter((facility) => !weatherDriven(facility)),
+        ...state.facilities.filter(variable),
+        ...state.facilities.filter((facility) => !variable(facility)),
       ];
 
       desktopSimulationHooks()?.initialize(state);

@@ -179,7 +179,7 @@ export const SCENARIOS: ScenarioType[] = [
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",
         content: (
-          <TutorialPrompt text="Weather-driven shows solar output; On-demand shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
+          <TutorialPrompt text="Variable shows solar output; Dispatchable shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),
       },
       {
@@ -1272,6 +1272,7 @@ export const SCENARIOS: ScenarioType[] = [
       month: 2,
       minimumDemandServed: 0.995,
       label: "February 2021 freeze",
+      goal: "Keep the lights on through the freeze",
     },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
@@ -1332,6 +1333,7 @@ export const SCENARIOS: ScenarioType[] = [
       durationMonths: 3,
       minimumDemandServed: 0.995,
       label: "2026 heatwave and drought",
+      goal: "Keep the lights on through the heatwave",
     },
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
@@ -1399,7 +1401,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 7,
       durationMonths: 18,
       minimumDemandServed: 0.995,
-      label: "possible nuclear shutdown period and recovery",
+      label: "reactor shutdown window and recovery",
+      goal: "Keep the lights on through the reactor shutdown",
     },
     facilities: [
       {
@@ -1456,6 +1459,7 @@ export const SCENARIOS: ScenarioType[] = [
       durationMonths: 2,
       minimumDemandServed: 0.995,
       label: "January and February 2025 wildfire emergency",
+      goal: "Keep the lights on through the wildfire emergency",
     },
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
     // resources using its 2024 power-content mix as the portfolio anchor.
@@ -1526,7 +1530,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 1,
       durationMonths: 12,
       minimumDemandServed: 0.995,
-      label: "2022, the worst year of the shortage",
+      label: "2022 power shortage",
+      goal: "Keep the lights on through the 2022 shortage",
     },
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
     // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
@@ -1620,7 +1625,8 @@ export const SCENARIOS: ScenarioType[] = [
       // that is grading the weather rather than the decisions. Passive play sheds 86% in the
       // October of this year, so this stays a long way from a formality.
       minimumDemandServed: 0.98,
-      label: "2016, the year the reservoir bottomed out",
+      label: "2016 drought",
+      goal: "Keep the grid running through the drought",
     },
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
@@ -1695,7 +1701,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 5,
       durationMonths: 3,
       minimumDemandServed: 0.995,
-      label: "the record summer of 2024",
+      label: "record summer of 2024",
+      goal: "Keep the lights on through the record summer",
     },
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop

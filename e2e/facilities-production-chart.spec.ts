@@ -79,9 +79,7 @@ for (const theme of ["light", "dark"]) {
     const image = chart.getByRole("img");
     await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
     await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
-    await expect(
-      chart.getByText("Weather-driven", { exact: true }),
-    ).toBeVisible();
+    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
       chart.getByText("Dispatchable", { exact: true }),
     ).toBeVisible();
@@ -110,7 +108,7 @@ for (const theme of ["light", "dark"]) {
     await selectPoint(exporting);
     await expect(details).toContainText("Interties exporting:");
     await selectPoint(discharging);
-    await expect(details).toContainText("Storage discharging:");
+    await expect(details).toContainText("Storage:");
     await image.press("End");
     await image.press("Escape");
     await expect(details).toBeHidden();
@@ -164,6 +162,21 @@ for (const theme of ["light", "dark"]) {
         hoverBounds.y + hoverBounds.height + 1,
       );
     }
+    // A pointer that outruns the tooltip and lands on it still moves the cursor, so the tooltip
+    // follows instead of freezing under it.
+    {
+      await page.mouse.move(
+        hoverBounds.x + hoverBounds.width * 0.25,
+        hoverBounds.y + 4,
+      );
+      const tooltip = chart.locator(".chartTooltip");
+      const time = tooltip.locator(":scope > div").first();
+      const before = await time.textContent();
+      const tip = (await tooltip.boundingBox())!;
+      // One jump, so the only move event lands on the tooltip rather than the plot.
+      await page.mouse.move(tip.x + tip.width / 2, tip.y + tip.height / 2);
+      await expect(time).not.toHaveText(before!);
+    }
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "light" &&
@@ -196,7 +209,7 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
-      if (info.project.name === "mobile-320px") {
+      if (info.project.name === "mobile-360px") {
         const vision = await page.context().newCDPSession(page);
         for (const type of [
           "achromatopsia",
@@ -239,9 +252,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Production by fuel", { exact: true }),
     ).toHaveCount(0);
-    await expect(
-      chart.getByText("Weather-driven", { exact: true }),
-    ).toBeVisible();
+    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
       chart.getByText("Dispatchable", { exact: true }),
     ).toBeVisible();
@@ -386,9 +397,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
       (bounds.width * (tick.minute - rangeMin)) / (rangeMax - rangeMin),
     bounds.y + 4,
   );
-  await expect(chart.locator(".chartTooltip")).toContainText(
-    "Interties importing:",
-  );
+  await expect(chart.locator(".chartTooltip")).toContainText("Interties:");
   await expect(chart.locator(".chartTooltip")).toContainText("Blackout:");
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
@@ -464,9 +473,9 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await chart.getByRole("img").press("Home");
   const details = chart.locator(".chartTooltip");
   for (const direction of [
-    "Storage discharging:",
+    "Storage:",
     "Storage charging:",
-    "Interties importing:",
+    "Interties:",
     "Interties exporting:",
   ]) {
     await expect(details).toContainText(direction);

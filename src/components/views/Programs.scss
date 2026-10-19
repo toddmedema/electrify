@@ -47,10 +47,6 @@
     }
   }
 
-  .programsRateFollowShort {
-    display: none;
-  }
-
   .insightsRateMetrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -116,18 +112,6 @@
     .insightsRateMarkMobile {
       display: inline;
       font-size: var(--font-size-caption);
-    }
-  }
-}
-
-@media (max-width: 359px) {
-  .programsPricing {
-    .programsRateFollowFull {
-      display: none;
-    }
-
-    .programsRateFollowShort {
-      display: inline;
     }
   }
 }

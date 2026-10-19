@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node 'C:\\Users\\toddm\\electrify\\.claude\\worktrees\\pr-543-code-review-fbd241\\.codex\\hooks\\format-edited-file.js'",
+            "command": "node 'C:\\Users\\toddm\\electrify\\.claude\\worktrees\\elated-elion-cf529e\\.codex\\hooks\\format-edited-file.js'",
             "timeout": 30
           }
         ]

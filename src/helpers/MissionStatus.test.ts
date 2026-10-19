@@ -79,6 +79,12 @@ test.each<[number, string]>([
   },
 );
 
+test("the reliability requirement is headed by its imperative goal", () => {
+  expect(requirement(fixture(), "reliability").label).toBe(
+    "Keep the lights on through the wildfire emergency",
+  );
+});
+
 test("reliability progress never rounds a failed month up to its target", () => {
   const game = createNextState(fixture(37), (g) => {
     g.monthlyHistory = [monthRow(2025, 1, 99.499, 100)];

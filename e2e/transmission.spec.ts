@@ -5,7 +5,7 @@ test("California players can build and understand an intertie", async ({
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
       testInfo.project.name,
     ),
   );
@@ -43,7 +43,7 @@ test("California players can build and understand an intertie", async ({
     northernProject.getByText("Down payment", { exact: true }),
   ).toHaveCount(0);
   await expect(northernProject.locator(".intertieAvailability")).toBeVisible();
-  if (testInfo.project.name === "mobile-320px") {
+  if (testInfo.project.name === "mobile-360px") {
     const firstBuild = projects
       .getByRole("button", {
         name: "Review purchase of Pacific Northwest intertie",
@@ -103,7 +103,7 @@ test("island grids do not offer interties or power exchange", async ({
   page,
 }, testInfo) => {
   test.skip(
-    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
       testInfo.project.name,
     ),
   );

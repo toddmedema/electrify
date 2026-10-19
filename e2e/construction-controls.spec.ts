@@ -116,7 +116,7 @@ for (const theme of ["light", "dark"] as const) {
     const facility = pane.locator(".facilityRow").first();
     await facility.locator(".facilityDisclosure").click();
     const facilityDetails = facility.locator(".facilityDetails");
-    for (const width of [320, 459, 460, 608]) {
+    for (const width of [360, 459, 460, 608]) {
       const layouts = [];
       for (const details of [
         facilityDetails,

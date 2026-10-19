@@ -5,6 +5,7 @@ import {
   activeScenario,
   activeScenarioOrDefault,
   currentCash,
+  currentGenerationW,
   currentTick,
 } from "./GameSelectors";
 
@@ -47,5 +48,27 @@ describe("activeScenario", () => {
   it("falls back to the first scenario only when asked", () => {
     expect(activeScenario({ scenarioId: -12345 })).toBeUndefined();
     expect(activeScenarioOrDefault({ scenarioId: -12345 })).toBe(SCENARIOS[0]);
+  });
+});
+
+describe("currentGenerationW", () => {
+  it("sums plant output and storage discharge, but not imports", () => {
+    const game = {
+      date: { minute: 1000 },
+      timeline: [
+        {
+          minute: 1000,
+          supplyByFuel: { Coal: 300, Wind: 200 },
+          storageDischargeW: 50,
+          importedW: 1000,
+        },
+      ],
+    } as unknown as GameType;
+    expect(currentGenerationW(game)).toBe(550);
+  });
+
+  it("is zero before a timeline exists", () => {
+    const game = { date: { minute: 0 }, timeline: [] } as unknown as GameType;
+    expect(currentGenerationW(game)).toBe(0);
   });
 });

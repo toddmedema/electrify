@@ -51,7 +51,7 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "multiline-text.spec.ts",
       "modal-layout.spec.ts",
       ...projects,
-      "--project=mobile-320px",
+      "--project=mobile-360px",
     ]),
   ].sort();
   const actual = [1, 2]
