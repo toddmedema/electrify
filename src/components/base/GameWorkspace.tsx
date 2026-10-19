@@ -18,6 +18,7 @@ import Insights from "../views/InsightsContainer";
 import EventLog from "../views/EventLogContainer";
 import BuildFacilities from "../views/BuildFacilities";
 import Programs from "../views/Programs";
+import ScenarioDetails from "./ScenarioDetails";
 import {
   GameWorkspaceContext,
   GameToolCloseContext,
@@ -276,6 +277,7 @@ export default function GameWorkspace() {
                           )}
                           {tool === "INSIGHTS" && <Insights />}
                           {tool === "EVENTS" && <EventLog />}
+                          {tool === "SCENARIO" && <ScenarioDetails />}
                         </GameToolCloseContext.Provider>
                       )}
                     </div>

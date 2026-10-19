@@ -70,11 +70,13 @@ test("public insights show the rate score and an absolute customer objective", a
     });
   }
   await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "All requirements" })
+    .locator("#navfooter:visible")
+    .getByRole("button", { name: "Scenario", exact: true })
     .first()
     .click();
-  await expect(page.getByRole("dialog")).toContainText("14,850 customers");
+  await expect(
+    page.getByRole("region", { name: "Scenario", exact: true }),
+  ).toContainText("14,850 customers");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
     await page.waitForTimeout(400);
     await page.screenshot({

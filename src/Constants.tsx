@@ -336,6 +336,7 @@ export const NAV_CARDS = [
   "FACILITIES",
   "INSIGHTS",
   "EVENTS",
+  "SCENARIO",
   "PROGRAMS",
 ] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;

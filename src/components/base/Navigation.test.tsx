@@ -2,6 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
+import { delta } from "../../reducers/Game";
 import Navigation from "./Navigation";
 
 function renderNavigation(onToggle = jest.fn()) {
@@ -51,6 +52,23 @@ describe("Navigation", () => {
       expect(button).not.toHaveTextContent(name);
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
+  });
+
+  it("opens the scenario as a tool like the others", () => {
+    const onToggle = jest.fn();
+    store.dispatch(delta({ scenarioId: 103 }));
+    renderNavigation(onToggle);
+    const scenario = screen.getByRole("button", { name: "Scenario" });
+    expect(scenario).toHaveAttribute("aria-keyshortcuts", "T");
+    fireEvent.click(scenario);
+    expect(onToggle).toHaveBeenCalledWith("SCENARIO");
+  });
+
+  it("leaves the scenario out of tutorials, which have no score", () => {
+    store.dispatch(delta({ scenarioId: 0 }));
+    renderNavigation();
+    expect(screen.queryByRole("button", { name: "Scenario" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Events" })).toBeVisible();
   });
 
   it("labels hovered and keyboard-focused icons with their shortcut without opening a tool", async () => {

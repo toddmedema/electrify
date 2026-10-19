@@ -1,7 +1,12 @@
 import * as React from "react";
-import { Button, IconButton, Popover, Typography } from "@mui/material";
+import { IconButton, Popover, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { MANUAL_ENTRIES, ManualEntryType } from "./ManualEntries";
+import {
+  MANUAL_ENTRIES,
+  ManualEntryTitleType,
+  ManualEntryType,
+} from "./ManualEntries";
+import { ManualEntryNavigation } from "./ManualEntryLink";
 
 // The (?) the player tapped. A DOM node has no place in the store, so it lives here beside the
 // popover that reads it; ManualLink records it just before asking for the entry
@@ -23,7 +28,8 @@ export function manualEntryByTitle(title: string): ManualEntryType | undefined {
 interface ContentProps {
   entry: ManualEntryType;
   onClose: () => void;
-  onRelated: (title: string) => void;
+  // Opens an entry the body links to, in place of this one
+  onRelated: (title: ManualEntryTitleType) => void;
   scrollRef?: React.Ref<HTMLDivElement>;
 }
 
@@ -47,26 +53,9 @@ export function ManualHelpContent(props: ContentProps): React.JSX.Element {
         </IconButton>
       </div>
       <div className="manual-popover-body" ref={props.scrollRef}>
-        {entry.entry}
-        {!!entry.related?.length && (
-          <nav
-            aria-label={`Related to ${entry.title}`}
-            className="manual-related"
-          >
-            <Typography variant="body2" color="textSecondary">
-              Related entries
-            </Typography>
-            {entry.related.map((title) => (
-              <Button
-                key={title}
-                className="manual-related-link"
-                onClick={() => onRelated(title)}
-              >
-                {title}
-              </Button>
-            ))}
-          </nav>
-        )}
+        <ManualEntryNavigation.Provider value={onRelated}>
+          {entry.entry}
+        </ManualEntryNavigation.Provider>
       </div>
     </>
   );
@@ -93,7 +82,7 @@ export default function ManualHelpPopover(
   }
   const scrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    // A related entry replaces this one in place, and should start at its top
+    // A linked entry replaces this one in place, and should start at its top
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }

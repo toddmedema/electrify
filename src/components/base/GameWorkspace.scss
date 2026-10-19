@@ -207,6 +207,7 @@
 .gameStage .gameToolBody {
   .insights > .scrollable,
   .eventLog > .scrollable,
+  .scenarioDetails > .scrollable,
   .buildFacilities .cardList,
   .buildFacilities .constructionInterties,
   .customerProgramsBody {
@@ -287,6 +288,10 @@
   .gameWorkspace #navfooter.gameActionDock {
     padding: 4px;
     border-radius: 16px;
+  }
+  // The phone dock leaves 4px around each button, which an outside ring would fill to the edge
+  .gameActionDock .gameDockAction.MuiButton-root:focus-visible {
+    outline-offset: -2px;
   }
   .gameToolTray {
     left: max(4px, env(safe-area-inset-left));

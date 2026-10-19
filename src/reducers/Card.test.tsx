@@ -1,7 +1,70 @@
-import cardReducer, { navigate, navigateBack } from "./Card";
+import cardReducer, {
+  manualTrailCleared,
+  navigate,
+  navigateBack,
+  navigationDestinationMiddleware,
+} from "./Card";
 import { quit } from "./GameActions";
 
 describe("card reducer", () => {
+  it("retraces links between manual entries before leaving the manual", () => {
+    const menu = cardReducer(undefined, navigate("MAIN_MENU"));
+    const manual = cardReducer(
+      menu,
+      navigate({ name: "MANUAL", entry: "Score" }),
+    );
+    const linked = cardReducer(
+      manual,
+      navigate({ name: "MANUAL", entry: "Blackouts", fromEntry: "Score" }),
+    );
+    const deeper = cardReducer(
+      linked,
+      navigate({ name: "MANUAL", entry: "Interties", fromEntry: "Blackouts" }),
+    );
+    // A link is a step within the manual, not another visit to it
+    expect(deeper.history).toEqual(manual.history);
+    expect(deeper.manualTrail).toEqual(["Blackouts", "Score"]);
+
+    const back = cardReducer(deeper, navigateBack());
+    expect(back).toMatchObject({ name: "MANUAL", entry: "Blackouts" });
+    const backAgain = cardReducer(back, navigateBack());
+    expect(backAgain).toMatchObject({ name: "MANUAL", entry: "Score" });
+    expect(cardReducer(backAgain, navigateBack()).name).toBe("MAIN_MENU");
+  });
+
+  it("leaves the manual from its header however many links deep", () => {
+    const manual = cardReducer(
+      cardReducer(undefined, navigate("MAIN_MENU")),
+      navigate({ name: "MANUAL", entry: "Score" }),
+    );
+    const linked = cardReducer(
+      manual,
+      navigate({ name: "MANUAL", entry: "Blackouts", fromEntry: "Score" }),
+    );
+    const left = cardReducer(
+      cardReducer(linked, manualTrailCleared()),
+      navigateBack(),
+    );
+    expect(left.name).toBe("MAIN_MENU");
+    // A later visit starts without the old trail
+    const revisit = cardReducer(left, navigate("MANUAL"));
+    expect(revisit.manualTrail).toBeUndefined();
+  });
+
+  it("tells the game a manual step back stays in the manual", () => {
+    const card = cardReducer(
+      cardReducer(undefined, navigate({ name: "MANUAL", entry: "Score" })),
+      navigate({ name: "MANUAL", entry: "Blackouts", fromEntry: "Score" }),
+    );
+    const next = jest.fn();
+    navigationDestinationMiddleware({
+      getState: () => ({ card }),
+    } as never)(next)(navigateBack());
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: "MANUAL" }),
+    );
+  });
+
   it("goes to the custom game screen and back to the scenario list", () => {
     const list = cardReducer(undefined, navigate("NEW_GAME"));
     const custom = cardReducer(list, navigate("CUSTOM_GAME"));

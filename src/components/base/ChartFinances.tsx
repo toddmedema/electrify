@@ -20,7 +20,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { MONTHS } from "../../Constants";
-import { chartPalette } from "../../Theme";
+import { chartPalette, withAlpha } from "../../Theme";
 
 interface ChartData {
   month: number; // unique across years
@@ -53,6 +53,12 @@ export interface Props {
   startingYear?: number;
   domain?: [number, number];
   syncKey?: string;
+  /**
+   * Names the projected months in the tooltip, and sets the projection back from the record:
+   * fainter, with longer dashes, so the two read apart even where a long projection's short
+   * dashes would blur into a dotted line. For a chart whose projection is the point of it.
+   */
+  projectedNote?: string;
 }
 
 interface State {
@@ -70,6 +76,7 @@ interface State {
   pastSpans: Array<[number, number]>;
   projectedSpans: Array<[number, number]>;
   negativeNote?: string;
+  projectedNote?: string;
 }
 
 /**
@@ -145,14 +152,16 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {},
       {
         stroke: chartPalette().demand,
-        width: 2,
+        width: getState().projectedNote ? 2.5 : 2,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: chartPalette().demand,
+        stroke: getState().projectedNote
+          ? withAlpha(chartPalette().demand, 0.6)
+          : chartPalette().demand,
         width: 2,
-        dash: [4, 4],
+        dash: getState().projectedNote ? [6, 4] : [4, 4],
         paths: anchoredForecastPaths(1),
         points: { show: false },
         spanGaps: false,
@@ -178,7 +187,9 @@ function tooltip(idx: number, state: State): string {
   // A banded month says so, since the line itself is clipped at the axis
   const note =
     state.negativeNote && d.value < 0 ? `\n${state.negativeNote}` : "";
-  return `${monthName} ${d.year}\n${state.format(d.value)}${note}`;
+  const projected =
+    state.projectedNote && d.projected ? `\n${state.projectedNote}` : "";
+  return `${monthName} ${d.year}\n${state.format(d.value)}${note}${projected}`;
 }
 
 const ChartFinances = (props: Props): React.JSX.Element => {
@@ -233,6 +244,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
       ? spansBelow(months, split.projected)
       : [],
     negativeNote: props.negativeNote,
+    projectedNote: props.projectedNote,
   };
 
   return (

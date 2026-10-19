@@ -56,12 +56,13 @@ describe("the keyboard shortcuts", () => {
     expect(bound.has("shift+9")).toBe(true);
   });
 
-  it("maps Q, W, E and R to the action bar's tools in its order", () => {
+  it("maps Q, W, E, R and T to the action bar's tools in its order", () => {
     expect(GAME_TOOLS.map((tool) => TOOL_SHORTCUTS[tool.id])).toEqual([
       "Q",
       "W",
       "E",
       "R",
+      "T",
     ]);
     GAME_TOOLS.forEach((tool) => {
       expect(keyMap[`TOOL_${tool.id}` as keyof typeof keyMap]).toBe(

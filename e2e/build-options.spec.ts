@@ -210,14 +210,6 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "close" })
         .click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
-      // A pointer left resting on the top bar when the dialog closes can open a label tooltip
-      // over the sheet header. Labels never intercept the pointer, so Close stays clickable.
-      await page
-        .getByRole("button", { name: "All requirements", exact: true })
-        .hover();
-      await expect(
-        page.getByRole("tooltip", { name: "All requirements" }),
-      ).toBeVisible();
       await page
         .getByRole("button", { name: "Close Build", exact: true })
         .click();
