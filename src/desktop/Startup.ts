@@ -68,7 +68,7 @@ export function finishStartup(): void {
       logo.animate(
         [
           {
-            transform: `translate(${before.x - after.x}px, ${before.y - after.y}px)`,
+            transform: `translateY(${before.y - after.y}px)`,
           },
           { transform: "none" },
         ],

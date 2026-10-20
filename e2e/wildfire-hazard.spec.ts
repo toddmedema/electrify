@@ -78,10 +78,10 @@ async function setFastSpeed(page: Page): Promise<void> {
     .click();
 }
 
-async function openInsightsPane(page: Page): Promise<void> {
+async function openProgramsPane(page: Page): Promise<void> {
   await openPane(
-    page.locator(".insights:visible"),
-    page.getByRole("button", { name: "Insights", exact: true }),
+    page.getByRole("region", { name: "Programs", exact: true }),
+    page.getByRole("button", { name: "Programs", exact: true }),
   );
 }
 
@@ -149,24 +149,29 @@ for (const theme of ["light", "dark"] as const) {
       /(Mar|Apr|May|Jun) 2020/,
       { timeout: 60_000 },
     );
-    await openInsightsPane(page);
-    // Opening the programs screen pauses the clock, like the build screen.
+    // The overview resumes the player's speed after each decision. Pause explicitly
+    // so starting and immediately reopening preparedness measures its initial state.
     await page
-      .locator(".insights:visible")
-      .getByRole("button", { name: "Customer programs", exact: true })
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "pause" })
       .click();
-    const programs = page.getByRole("dialog");
+    await openProgramsPane(page);
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
     await expect(
-      programs.getByRole("button", { name: "Close customer programs" }),
+      programs.getByRole("button", { name: "Close Programs" }),
     ).toBeVisible();
-    await expect(
-      programs.getByRole("button", { name: "pause" }),
-    ).toHaveAttribute("aria-pressed", "true");
     await programs
       .getByRole("button", {
         name: /^Wildfire preparedness · Off · .*\/yr$/,
       })
       .click();
+    // Reviewing a program decision pauses the clock; the overview can stay open while playing.
+    await expect(
+      page.locator("#appbar:visible").getByRole("button", { name: "pause" }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(programs).toContainText("Annual budget");
     await expect(programs).toContainText("no upfront payment");
     await expect(programs).toContainText("Next wildfire season");
@@ -178,9 +183,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible({
       timeout: 30_000,
     });
-    await expect(
-      programs.getByText(/^Utility cash if this fire strikes:/),
-    ).toBeVisible();
+    await expect(programs.getByText(/^Cash benefit:/)).toBeVisible();
     if (fund) {
       await programs
         .getByRole("button", { name: /^Start preparedness \(/ })
@@ -195,7 +198,7 @@ for (const theme of ["light", "dark"] as const) {
       await programs
         .getByRole("button", { name: /^Wildfire preparedness · On/ })
         .click();
-      await expect(programs).toContainText("On · stays on until turned off");
+      await expect(programs.getByText("On", { exact: true })).toBeVisible();
       await expect(
         programs.getByRole("progressbar", {
           name: "Wildfire preparedness effectiveness",
@@ -228,9 +231,7 @@ for (const theme of ["light", "dark"] as const) {
       testInfo,
       `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
     );
-    await programs
-      .getByRole("button", { name: "Close customer programs" })
-      .click();
+    await programs.getByRole("button", { name: "Close Programs" }).click();
     await expect(programs).toHaveCount(0);
     await openEventsPane(page);
 
@@ -257,26 +258,18 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await expect(ongoing).not.toContainText("Prepared crews are in place");
     }
-    // The status bar names the incident beside the grid readout. Desktop keeps its height; on a
-    // phone the grid readout and mission share one 44px row until an event chip needs the room,
-    // then the mission wraps onto its own 44px row by design.
-    const activeEvents = page.locator(".activeEventsChip:visible");
+    // The mission status names the active incident and its date, while the Events card
+    // carries severity. The shared status row keeps its height at every viewport.
+    const activeEvents = page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: /^Active: Wildfire emergency\./ });
     await expect(activeEvents).toHaveAccessibleName(
-      /Active events: Wildfire emergency \(critical\), through Sep 2020/,
+      /Active: Wildfire emergency\. Wildfire emergency, through Sep 2020/,
     );
-    await expect(activeEvents).toHaveClass(/activeEventsChip-critical/);
-    if (testInfo.project.name.startsWith("mobile")) {
-      const heights = await page.evaluate(() =>
-        ["#topbar", ".gridHealth", ".missionSummary"].map(
-          (selector) =>
-            document.querySelector(selector)!.getBoundingClientRect().height,
-        ),
-      );
-      // The wrapped mission row adds a 1px hairline above its 44px row
-      expect(heights).toEqual([heightsBeforeEvents[0], 44, 45]);
-    } else {
-      expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
-    }
+    await expect(
+      ongoing.getByRole("button", { name: /^Wildfire emergency/ }),
+    ).toHaveClass(/importance-CRITICAL/);
+    expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
@@ -292,14 +285,14 @@ for (const theme of ["light", "dark"] as const) {
     );
 
     if (fund) {
-      await openInsightsPane(page);
-      await page
-        .locator(".insights:visible")
-        .getByRole("button", { name: "Customer programs", exact: true })
-        .click();
-      await programs
-        .getByRole("button", { name: /^Wildfire preparedness · On/ })
-        .click();
+      await openProgramsPane(page);
+      // Reopening the tool restores the wildfire detail that was being reviewed.
+      await expect(
+        programs.getByRole("heading", {
+          name: "Wildfire preparedness",
+          exact: true,
+        }),
+      ).toBeVisible();
       const protection = programs.getByRole("progressbar", {
         name: "Wildfire preparedness effectiveness",
       });
@@ -329,9 +322,7 @@ for (const theme of ["light", "dark"] as const) {
         testInfo,
         `wildfire-decay-${theme}-${testInfo.project.name}.png`,
       );
-      await programs
-        .getByRole("button", { name: "Close customer programs" })
-        .click();
+      await programs.getByRole("button", { name: "Close Programs" }).click();
       await openEventsPane(page);
     }
 
@@ -341,9 +332,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("heading", { name: "Ongoing events" }),
     ).toBeHidden({ timeout: 60_000 });
-    await expect(page.locator(".activeEventsChip:visible")).toHaveCount(0);
+    await expect(activeEvents).toHaveCount(0);
     await expect(
-      page.getByText("Wildfire restoration complete", { exact: true }),
+      page
+        .getByRole("region", { name: "Event history", exact: true })
+        .getByText("Wildfire restoration complete", { exact: true }),
     ).toBeVisible();
   });
 }

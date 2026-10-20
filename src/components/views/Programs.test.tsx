@@ -67,7 +67,6 @@ test("Escape dismisses the app menu before leaving an unsaved program decision",
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: "On" }));
   fireEvent.change(screen.getByLabelText("Daily window"), {
     target: { value: "22" },
   });
@@ -76,7 +75,7 @@ test("Escape dismisses the app menu before leaving an unsaved program decision",
   act(() => jest.advanceTimersByTime(300));
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Program details" })).toBeVisible();
-  expect(screen.getByRole("radio", { name: "On" })).toBeChecked();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(store.getState().game.speed).toBe("PAUSED");
   fireEvent.keyDown(
@@ -149,7 +148,6 @@ test("remembers a hidden program's draft and scroll while releasing its clock pa
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: "On" }));
   fireEvent.change(screen.getByLabelText("Daily window"), {
     target: { value: "22" },
   });
@@ -161,7 +159,7 @@ test("remembers a hidden program's draft and scroll while releasing its clock pa
   expect(store.getState().game.speed).toBe("FAST");
   view.rerender(content(true));
   expect(store.getState().game.speed).toBe("PAUSED");
-  expect(screen.getByRole("radio", { name: "On" })).toBeChecked();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(
     screen.getByRole("region", { name: "Program details" }).scrollTop,

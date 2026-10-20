@@ -12,11 +12,13 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await page.getByRole("button", { name: "Programs", exact: true }).click();
     const dialog = page.getByRole("region", { name: "Programs", exact: true });
-    const equipment = dialog.getByRole("region", {
-      name: "Flexible customer equipment",
+    const peakPrograms = dialog.getByRole("region", {
+      name: "Offset peak demand",
     });
-    await expect(equipment.getByRole("button")).toHaveCount(3);
-    await equipment.scrollIntoViewIfNeeded();
+    await expect(peakPrograms.getByRole("button")).toHaveCount(5);
+    await dialog
+      .getByRole("heading", { name: "Reduce overall demand", exact: true })
+      .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: testInfo.outputPath(`flexibility-catalog-${theme}.png`),
     });
@@ -29,14 +31,19 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: new RegExp(`^${name} ·`) })
         .click();
       await expect(
-        dialog.getByText("Local equipment", { exact: true }),
+        dialog.getByText("Installation budget", { exact: true }),
       ).toBeVisible();
       await expect(
-        dialog.getByText(
-          "Participation payments continue after rollout while the program is on.",
-        ),
+        dialog.getByText(/at full rollout · while on/),
       ).toBeVisible();
-      await dialog.getByRole("radio", { name: "On", exact: true }).check();
+      await expect(
+        dialog.getByText("Local equipment", { exact: true }),
+      ).toBeHidden();
+      await dialog.getByText("Equipment & rollout", { exact: true }).click();
+      await expect(
+        dialog.getByText("Local equipment", { exact: true }),
+      ).toBeVisible();
+      await dialog.getByText("Equipment & rollout", { exact: true }).click();
       await expect(
         dialog.getByRole("button", { name: "Turn on next month", exact: true }),
       ).toBeEnabled({ timeout: 30000 });
@@ -49,9 +56,11 @@ for (const theme of ["light", "dark"]) {
         });
       }
       if (name === "Managed EV charging") {
+        await dialog.getByText("Equipment & rollout", { exact: true }).click();
         await expect(
           dialog.getByText("Electric-car fleet", { exact: true }),
         ).toBeVisible();
+        await dialog.getByText("Equipment & rollout", { exact: true }).click();
         await page.screenshot({
           path: testInfo.outputPath(`managed-charging-${theme}.png`),
           animations: "disabled",

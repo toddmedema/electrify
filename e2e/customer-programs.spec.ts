@@ -29,27 +29,32 @@ for (const theme of ["light", "dark"]) {
     const scheduled = dialog.getByRole("button", {
       name: "Rooftop solar rebates · Not started · starts Feb 2020",
     });
+    await expect(
+      dialog.locator(".customerProgramItem .MuiCardHeader-subheader"),
+    ).toHaveCount(0);
     await solar.click();
     await expect(dialog.getByText("How it works")).toHaveCount(0);
     await expect(
       dialog.getByRole("button", { name: "View demand" }),
     ).toHaveCount(0);
-    await expect(dialog).toContainText("they do not cover evening peaks");
-    await expect(dialog).toContainText("Facility comparable");
-    await expect(dialog).toContainText("/mo profit)");
-    await expect(dialog).toContainText("48 months (Jan 2024)");
+    await expect(dialog).toContainText(
+      "Reduce daytime demand with rooftop panels",
+    );
+    await expect(dialog.getByText(/^Facility comparable/)).toBeHidden();
+    await expect(dialog).toContainText("Current profit:");
+    await expect(dialog).toContainText("48 months");
+    await expect(dialog).toContainText("Finishes Jan 2024");
     const facts = dialog.locator(".customerProgramFacts").first();
     expect(
       await facts.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     const term = (await facts.locator("dt").first().boundingBox())!;
     const value = (await facts.locator("dd").first().boundingBox())!;
-    if (page.viewportSize()!.width < 600) {
-      expect(value.x).toBeCloseTo(term.x, 0);
-      expect(value.y).toBeGreaterThanOrEqual(term.y + term.height);
-    } else {
-      expect(value.x).toBeGreaterThan(term.x + term.width);
-    }
+    expect(value.x).toBeCloseTo(term.x, 0);
+    expect(value.y).toBeGreaterThanOrEqual(term.y + term.height);
+    await dialog.getByText("Compare utility solar", { exact: true }).click();
+    await expect(dialog.getByText(/^Facility comparable/)).toBeVisible();
+    await dialog.getByText("Compare utility solar", { exact: true }).click();
     await expect(dialog.getByRole("radio")).toHaveCount(0);
     const apply = dialog.getByRole("button", {
       name: "Start next month",

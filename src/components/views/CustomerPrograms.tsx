@@ -11,10 +11,7 @@ import {
   Box,
   Button,
   Dialog,
-  FormControlLabel,
   LinearProgress,
-  Radio,
-  RadioGroup,
   Skeleton,
   TextField,
   Typography,
@@ -44,7 +41,7 @@ import {
   PolicyProgramType,
   PolicyTier,
 } from "../../Types";
-import { POLICIES, POLICY_IDS, POLICY_TIERS } from "../../data/Policies";
+import { POLICIES, POLICY_IDS } from "../../data/Policies";
 import {
   FLEXIBILITY_IDS,
   isFlexibilityPolicy,
@@ -129,7 +126,7 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   battery: BatteryChargingFullIcon,
 };
 const WILDFIRE_SUMMARY =
-  "Crews, inspections and vegetation clearing halve wildfire disconnections and generator losses at full strength. Protection builds over 12 months and fades over 12 months after funding stops; fires and restoration costs remain.";
+  "Crews, inspections and vegetation clearing reduce wildfire damage. Fires and restoration costs remain.";
 
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
@@ -137,6 +134,71 @@ const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
   efficiency: "Efficiency",
   solar: "Rooftop solar",
 };
+
+interface ProgramFact {
+  label: string;
+  value: string;
+  detail?: string;
+  wide?: boolean;
+}
+
+function ProgramFacts({
+  facts,
+  secondary = false,
+}: {
+  facts: ProgramFact[];
+  secondary?: boolean;
+}) {
+  return (
+    <Box
+      component="dl"
+      className={
+        secondary
+          ? "customerProgramFacts customerProgramFactsSecondary"
+          : "customerProgramFacts"
+      }
+    >
+      {facts.map(({ label, value, detail, wide }) => (
+        <div
+          key={label}
+          className="customerProgramFact"
+          data-wide={wide || undefined}
+        >
+          <Typography component="dt" variant="body2">
+            {label}
+          </Typography>
+          <Typography component="dd">
+            {value}
+            {detail && (
+              <Typography
+                component="span"
+                variant="body2"
+                className="customerProgramFactDetail"
+              >
+                {detail}
+              </Typography>
+            )}
+          </Typography>
+        </div>
+      ))}
+    </Box>
+  );
+}
+
+function ProgramDetails({
+  children,
+  label = "Program details",
+}: {
+  children: React.ReactNode;
+  label?: string;
+}) {
+  return (
+    <Box component="details" className="customerProgramDetails">
+      <summary>{label}</summary>
+      <div>{children}</div>
+    </Box>
+  );
+}
 
 function FlexibilitySummary({
   game,
@@ -178,65 +240,50 @@ function FlexibilitySummary({
           game.location,
         )
       : undefined;
-  const facts: [string, string][] = [
-    [
-      "Local equipment",
-      `${year} · ${available ? "Compatible participants available" : "No compatible participants yet"}`,
-    ],
-    [
-      "Rollout",
-      `${formatPercent(program.adoption)} of program · ${flexibilityMonths(id)} months of funding`,
-    ],
-    [
-      "Installation budget while funding",
-      `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo while installing`,
-    ],
-    [
-      "Current participation payments",
-      `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
-    ],
-    [
-      "Full-rollout participation estimate",
-      `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at ${year} eligibility`,
-    ],
+  const facts: ProgramFact[] = [
+    {
+      label: "Installation budget",
+      value: `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo`,
+      detail: `${flexibilityMonths(id)} months of funding`,
+    },
+    {
+      label: "Participation payments",
+      value: `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
+      detail: `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at full rollout · while on`,
+    },
+  ];
+  const equipment: ProgramFact[] = [
+    {
+      label: "Local equipment",
+      value: `${year} · ${available ? "Available" : "Not yet available"}`,
+    },
+    { label: "Rollout", value: formatPercent(program.adoption) },
   ];
   if (id === "evCharging")
-    facts.push([
-      "Electric-car fleet",
-      `${formatPercent(electricVehicleEligibility(year, game.location).fleetShare)} of local cars · compatible chargers only`,
-    ]);
+    equipment.push({
+      label: "Electric-car fleet",
+      value: `${formatPercent(electricVehicleEligibility(year, game.location).fleetShare)} of local cars`,
+      detail: "Compatible chargers only",
+    });
   if (battery)
-    facts.push([
-      "Enrolled storage",
-      `${formatWatts(battery.powerW)} / ${formatWattHours(battery.capacityWh)} · 20% household reserve`,
-    ]);
+    equipment.push({
+      label: "Enrolled storage",
+      value: `${formatWatts(battery.powerW)} / ${formatWattHours(battery.capacityWh)}`,
+      detail: "20% household reserve",
+    });
   return (
     <>
       {!available && (
         <Alert severity="info">
           {id === "battery" && year >= 2013 && year < 2016
-            ? "Home batteries are an early market. This virtual power plant program becomes available in 2016."
-            : `This location has no eligible equipment in ${year}. Availability follows the game year.`}
+            ? "Home battery programs become available in 2016."
+            : `No eligible equipment in ${year}.`}
         </Alert>
       )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
-      <Typography variant="body2" color="text.secondary">
-        {POLICIES[id].tradeoff}
-      </Typography>
-      <Typography variant="body2">
-        Participation payments continue after rollout while the program is on.
-      </Typography>
+      <ProgramFacts facts={facts} />
+      <ProgramDetails label="Equipment & rollout">
+        <ProgramFacts facts={equipment} secondary />
+      </ProgramDetails>
     </>
   );
 }
@@ -316,29 +363,35 @@ function BuildoutSummary({
       : program.tier === "On"
         ? undefined
         : "If resumed now";
-  const facts: [string, string][] = complete
+  const facts: ProgramFact[] = complete
     ? [
-        ["Result", impact],
-        ["Cost", formatMoneyConcise(program.spent)],
+        { label: "Total spent", value: formatMoneyConcise(program.spent) },
+        { label: "Result", value: impact, wide: true },
       ]
     : [
-        [
-          "Cost",
-          `${formatMoneyConcise(total)} (${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo vs ${formatMoneyConcise(profit)}/mo profit)`,
-        ],
-        ["At completion", impact],
+        {
+          label: "Monthly budget",
+          value: `${formatMoneyConcise(policyBudget(game, id, "On", effective))}/mo`,
+          detail: `Current profit: ${formatMoneyConcise(profit)}/mo`,
+        },
+        { label: "Total budget", value: formatMoneyConcise(total) },
+        {
+          label: "Duration",
+          value: `${months} months`,
+          detail:
+            program.adoption === 0
+              ? finish < end
+                ? `Finishes ${labelMonth(game, finish)}`
+                : "Ends after this run"
+              : undefined,
+        },
+        { label: "At completion", value: impact, wide: true },
       ];
-  if (!complete && program.adoption === 0)
-    facts.unshift([
-      "Duration",
-      `${months} months (${finish < end ? labelMonth(game, finish) : "After this run ends"})`,
-    ]);
   if (!complete && program.adoption > 0 && finishLabel)
-    facts.push([
-      finishLabel,
-      finish < end ? labelMonth(game, finish) : "After this run ends",
-    ]);
-  if (solar) facts.push([solar.label, solar.cost]);
+    facts.splice(3, 0, {
+      label: finishLabel,
+      value: finish < end ? labelMonth(game, finish) : "After this run ends",
+    });
   const progress = complete
     ? programStatus(game, id, program)
     : `${program.tier === "On" ? "Month" : "Paused after month"} ${done} of ${months} · ${formatMoneyConcise(program.spent)} spent`;
@@ -354,26 +407,17 @@ function BuildoutSummary({
             color={complete ? "success" : "primary"}
             sx={{ height: 8, borderRadius: 1 }}
           />
-          <Typography variant="body2">{progress}</Typography>
+          {!complete && <Typography variant="body2">{progress}</Typography>}
         </Box>
       )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
+      <ProgramFacts facts={facts} />
       {solar && (
-        <Typography variant="body2" color="text.secondary">
-          Rooftops produce less per MW because of shading and orientation, but
-          the utility does not pay full installation cost nor maintenance.
-        </Typography>
+        <ProgramDetails label="Compare utility solar">
+          <ProgramFacts
+            facts={[{ label: solar.label, value: solar.cost, wide: true }]}
+            secondary
+          />
+        </ProgramDetails>
       )}
     </Box>
   );
@@ -474,26 +518,26 @@ function WildfireDetails({
       : "No protection";
   const offLabel = active ? "Stop now" : "Keep off";
   const onLabel = active ? "Keep on" : "Start now";
-  const facts: [string, string][] = [
-    ["Status", preparedness.active ? "On · stays on until turned off" : "Off"],
-    ["Annual budget", `${formatMoneyConcise(preparedness.annualCost)}/yr`],
-    [
-      "Billing",
-      active
-        ? `${formatMoneyConcise(preparedness.annualCost / 12)}/month · no upfront payment`
-        : "No charges while off · no upfront payment",
-    ],
-    [
-      "At full effectiveness",
-      "50% fewer disconnections and generator output losses",
-    ],
-    ["Ramp-up / decay", "12 months each · linear"],
-    [
-      importedFire ? "Scenario wildfire" : "Next wildfire season",
-      importedFire
+  const facts: ProgramFact[] = [
+    {
+      label: "Annual budget",
+      value: `${formatMoneyConcise(preparedness.annualCost)}/yr`,
+      detail: `${formatMoneyConcise(preparedness.annualCost / 12)}/mo while on · no upfront payment`,
+    },
+    {
+      label: "At full effectiveness",
+      value: "50% fewer disconnections",
+      detail: "Generator losses also halved",
+    },
+  ];
+  const terms: ProgramFact[] = [
+    { label: "Builds and fades", value: "12 months each" },
+    {
+      label: importedFire ? "Scenario wildfire" : "Next wildfire season",
+      value: importedFire
         ? `${labelMonth(game, fireMonth)} to ${labelMonth(game, fireMonth + 1)}`
         : `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
-    ],
+    },
   ];
   const standard = result?.standardIncident;
   const prepared = result?.preparedIncident;
@@ -517,31 +561,19 @@ function WildfireDetails({
         />
         <Typography variant="body2">{progress}</Typography>
       </Box>
-      {!importedFire && (
-        <Typography>{wildfireSeasonOdds(preparedness.profile)}</Typography>
-      )}
-      {importedFire && (
-        <Typography variant="body2" color="textSecondary">
-          Protection at the start of the scenario wildfire determines how much
-          it reduces disconnections and generator losses for that incident.
+      <ProgramFacts facts={facts} />
+      <ProgramDetails label="Protection & fire season">
+        <ProgramFacts facts={terms} secondary />
+        <Typography variant="body2" color="text.secondary">
+          {importedFire
+            ? "Protection when the fire starts determines its impact."
+            : wildfireSeasonOdds(preparedness.profile)}
         </Typography>
-      )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
+      </ProgramDetails>
       {!importedFire && month === undefined && (
         <Typography variant="body2" color="textSecondary">
-          The next wildfire season starts after this run ends. The program can
-          still protect against new fires before then.
+          The next wildfire season starts after this run ends; protection still
+          applies to earlier fires.
         </Typography>
       )}
       {!importedFire && month !== undefined && (
@@ -551,9 +583,8 @@ function WildfireDetails({
               Next wildfire season · simulated fire in {labelMonth(game, month)}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              A typical fire in the next season's highest-risk month. It
-              illustrates the program's effects, not whether or when a real fire
-              will start.
+              A simulated fire in the season’s highest-risk month; actual fires
+              may differ.
             </Typography>
           </Box>
           {error ? (
@@ -565,7 +596,7 @@ function WildfireDetails({
               </Typography>
               <PolicyDemandChartPlaceholder />
               <Box aria-hidden>
-                {Array.from({ length: 4 }, (_, i) => (
+                {Array.from({ length: 2 }, (_, i) => (
                   <Typography key={i}>
                     <Skeleton width={i % 2 ? "60%" : "80%"} />
                   </Typography>
@@ -585,43 +616,50 @@ function WildfireDetails({
               />
               <Box role="status">
                 <Typography>
-                  Effectiveness at this fire: {offLabel}{" "}
-                  {formatPercent(result.standardEffectiveness)} → {onLabel}{" "}
-                  {formatPercent(result.preparedEffectiveness)}
-                </Typography>
-                <Typography>
                   Customer load disconnected:{" "}
                   {formatPercent(standard.disconnectedDemand)} →{" "}
                   {formatPercent(prepared.disconnectedDemand)}
                 </Typography>
-                {standard.selectedFacilityNames.length > 0 && (
-                  <Typography>
-                    {standard.selectedFacilityNames.join(", ")} limited to{" "}
-                    {formatPercent(standard.outputMultiplier)} →{" "}
-                    {formatPercent(prepared.outputMultiplier)} output
-                  </Typography>
-                )}
                 <Typography>
-                  Electricity supplied:{" "}
-                  {formatWattHours(result.standard.supplyWh)} →{" "}
-                  {formatWattHours(result.prepared.supplyWh)} in{" "}
-                  {labelMonth(game, month)}, against{" "}
-                  {formatWattHours(result.noFire.supplyWh)} with no fire
-                </Typography>
-                {standard.restorationCostPerMonth > 0 && (
-                  <Typography>
-                    Restoration:{" "}
-                    {formatMoneyConcise(standard.restorationCostPerMonth)}{" "}
-                    either way
-                  </Typography>
-                )}
-                <Typography>
-                  Utility cash if this fire strikes:{" "}
-                  {formatMoneyConcise(result.cashBenefit)} better with
-                  preparedness, before the{" "}
-                  {formatMoneyConcise(preparedness.annualCost)}/yr program cost
+                  Cash benefit: {formatMoneyConcise(result.cashBenefit)} before
+                  program cost
                 </Typography>
               </Box>
+              <ProgramDetails label="Fire impact details">
+                <ProgramFacts
+                  facts={[
+                    {
+                      label: "Effectiveness at this fire",
+                      value: `${formatPercent(result.standardEffectiveness)} → ${formatPercent(result.preparedEffectiveness)}`,
+                      detail: `${offLabel} → ${onLabel}`,
+                    },
+                    ...(standard.selectedFacilityNames.length > 0
+                      ? [
+                          {
+                            label: "Generator output",
+                            value: `${formatPercent(standard.outputMultiplier)} → ${formatPercent(prepared.outputMultiplier)}`,
+                            detail: standard.selectedFacilityNames.join(", "),
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Electricity supplied",
+                      value: `${formatWattHours(result.standard.supplyWh)} → ${formatWattHours(result.prepared.supplyWh)}`,
+                      detail: `${labelMonth(game, month)} · ${formatWattHours(result.noFire.supplyWh)} with no fire`,
+                    },
+                    ...(standard.restorationCostPerMonth > 0
+                      ? [
+                          {
+                            label: "Restoration",
+                            value: `${formatMoneyConcise(standard.restorationCostPerMonth)}/mo`,
+                            detail: "Same with either plan",
+                          },
+                        ]
+                      : []),
+                  ]}
+                  secondary
+                />
+              </ProgramDetails>
             </>
           )}
         </>
@@ -630,7 +668,7 @@ function WildfireDetails({
   );
 }
 
-/** The catalog of programs, grouped by what kind of commitment each one is. */
+/** The catalog of programs, grouped by the problem each one helps solve. */
 function ProgramList({
   game,
   programs,
@@ -655,7 +693,6 @@ function ProgramList({
     id,
     name,
     status,
-    description,
     Icon,
     done,
     active,
@@ -664,7 +701,6 @@ function ProgramList({
     id: string;
     name: string;
     status: string;
-    description?: string;
     Icon: typeof ScheduleIcon;
     done?: boolean;
     active?: boolean;
@@ -676,7 +712,6 @@ function ProgramList({
       done={done}
       active={active}
       ariaLabel={`${name} · ${status}`}
-      ariaDescribedBy={description ? `program-description-${id}` : undefined}
       onOpen={open}
       avatar={
         <Avatar className="customerProgramIcon">
@@ -689,11 +724,6 @@ function ProgramList({
           <span className="customerProgramStatus">{status}</span>
         </span>
       }
-      description={
-        description && (
-          <span id={`program-description-${id}`}>{description}</span>
-        )
-      }
     />
   );
   const choice = (id: PolicyId) => {
@@ -702,7 +732,6 @@ function ProgramList({
       id,
       name: POLICIES[id].name,
       status: choiceStatus(game, id, programs[id]),
-      description: done ? undefined : POLICIES[id].description,
       Icon: PROGRAM_ICONS[id],
       done,
       active: !done && (programs[id].tier === "On" || !!programs[id].pending),
@@ -726,23 +755,22 @@ function ProgramList({
     <Box className="customerProgramList">
       {policiesOn &&
         section(
-          "Rebate projects",
+          "Reduce overall demand",
           BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
         )}
       {policiesOn &&
         section(
-          "Rates and contracts",
-          POLICY_IDS.filter(isOperatingPolicy).map(choice),
+          "Offset peak demand",
+          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS].map(
+            choice,
+          ),
         )}
-      {policiesOn &&
-        section("Flexible customer equipment", FLEXIBILITY_IDS.map(choice))}
       {preparedness &&
-        section("Hazard readiness", [
+        section("Resilience", [
           row({
             id: "wildfire",
             name: "Wildfire preparedness",
             status: preparednessStatus(preparedness),
-            description: WILDFIRE_SUMMARY,
             Icon: LocalFireDepartmentIcon,
             active: preparedness.active,
             onOpen: onOpenWildfire,
@@ -767,7 +795,6 @@ function PolicyProgramDetail({
   end,
   month,
   tier,
-  onTierChange,
   startHour,
   onStartHourChange,
   result,
@@ -784,7 +811,6 @@ function PolicyProgramDetail({
   end: number;
   month: number;
   tier: PolicyTier;
-  onTierChange: (tier: PolicyTier) => void;
   startHour: number;
   onStartHourChange: (hour: number) => void;
   result: PolicyPreviewResult | undefined;
@@ -796,9 +822,18 @@ function PolicyProgramDetail({
     <>
       <Typography>
         {complete
-          ? `This one-time project is finished. Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
+          ? `Installed ${selected === "solar" ? "rooftop panels keep generating" : "upgrades keep saving energy"} with no further cost.`
           : POLICIES[selected].description}
       </Typography>
+      {!complete && (
+        <Typography
+          variant="body2"
+          className="customerProgramTradeoff"
+          color="text.secondary"
+        >
+          {POLICIES[selected].tradeoff}
+        </Typography>
+      )}
       {current.pending && (
         // A standing notice, not an interruption: it is already true when the card opens.
         <Alert severity="info" role="status">
@@ -823,51 +858,37 @@ function PolicyProgramDetail({
         />
       ) : (
         <>
-          <RadioGroup
-            row
-            aria-label="Program status"
-            value={tier}
-            onChange={(e) => {
-              const next = POLICY_TIERS.find((t) => t === e.target.value);
-              if (next) onTierChange(next);
-            }}
-          >
-            {POLICY_TIERS.map((choice) => (
-              <FormControlLabel
-                key={choice}
-                value={choice}
-                control={<Radio />}
-                sx={{ minHeight: 44, m: 0, flex: 1 }}
-                label={choice}
-              />
-            ))}
-          </RadioGroup>
-          {tier !== "Off" && (
-            <TextField
-              select
-              fullWidth
-              label="Daily window"
-              value={startHour}
-              onChange={(event) =>
-                onStartHourChange(Number(event.target.value))
-              }
-              slotProps={{
-                select: { native: true },
-                htmlInput: { style: { minHeight: 24 } },
-              }}
-              helperText={
-                selected === "timeOfUse"
-                  ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
-                  : undefined
-              }
-            >
-              {Array.from({ length: 24 }, (_, hour) => (
-                <option key={hour} value={hour}>
-                  {policyWindowLabel(hour)}
-                </option>
-              ))}
-            </TextField>
-          )}
+          <Box className="customerProgramSettings">
+            <Typography variant="body2" color="text.secondary">
+              Changes start {labelMonth(game, effective)}
+            </Typography>
+            {tier !== "Off" && (
+              <TextField
+                select
+                fullWidth
+                label="Daily window"
+                value={startHour}
+                onChange={(event) =>
+                  onStartHourChange(Number(event.target.value))
+                }
+                slotProps={{
+                  select: { native: true },
+                  htmlInput: { style: { minHeight: 28 } },
+                }}
+                helperText={
+                  selected === "timeOfUse"
+                    ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                    : undefined
+                }
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {policyWindowLabel(hour)}
+                  </option>
+                ))}
+              </TextField>
+            )}
+          </Box>
         </>
       )}
       {complete || cancelling ? null : effective >= end ? (
@@ -1123,7 +1144,7 @@ export function ProgramsScreen({
     // Build-outs offer one decision: the opposite of the plan, or undoing a scheduled change.
     setTier(
       isOperatingPolicy(id) || isFlexibilityPolicy(id)
-        ? (program.pending?.tier ?? program.tier)
+        ? (program.pending?.tier ?? "On")
         : program.pending
           ? program.tier
           : program.tier === "On"
@@ -1190,15 +1211,30 @@ export function ProgramsScreen({
             />
           </>
         ) : (
-          <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography
-              component="h2"
-              variant="h6"
-              tabIndex={-1}
-              ref={headingRef}
-            >
-              {title}
-            </Typography>
+          <Box className="customerProgramDetail">
+            <Box className="customerProgramHeading">
+              <Typography
+                component="h2"
+                variant="h6"
+                tabIndex={-1}
+                ref={headingRef}
+              >
+                {title}
+              </Typography>
+              <Typography
+                component="span"
+                variant="body2"
+                className="customerProgramState"
+              >
+                {selected === "wildfire"
+                  ? preparedness?.active
+                    ? "On"
+                    : "Off"
+                  : operating
+                    ? current!.tier
+                    : programStatus(game, selected, current!)}
+              </Typography>
+            </Box>
             {selected === "wildfire" ? (
               preparedness && (
                 <WildfireDetails
@@ -1222,7 +1258,6 @@ export function ProgramsScreen({
                 end={end}
                 month={month}
                 tier={tier}
-                onTierChange={setTier}
                 startHour={startHour}
                 onStartHourChange={setStartHour}
                 result={result}
@@ -1245,6 +1280,28 @@ export function ProgramsScreen({
               Cancel scheduled change
             </Button>
           )}
+          {policy &&
+            operating &&
+            current!.tier === "On" &&
+            !current!.pending && (
+              <Button
+                variant={unchanged ? "contained" : "outlined"}
+                disabled={effective >= end || !!game.replayPlayback}
+                onClick={() => {
+                  dispatch(
+                    schedulePolicy({
+                      id: policy,
+                      tier: "Off",
+                      month: effective,
+                      startHour,
+                    }),
+                  );
+                  setSelected(undefined);
+                }}
+              >
+                Turn off next month
+              </Button>
+            )}
           {selected === "wildfire"
             ? preparedness?.choice && (
                 <Button
@@ -1265,7 +1322,8 @@ export function ProgramsScreen({
                     : `Start preparedness (${formatMoneyConcise(preparedness.annualCost)}/yr)`}
                 </Button>
               )
-            : !complete && (
+            : !complete &&
+              (!operating || !unchanged) && (
                 <Button
                   variant="contained"
                   disabled={
