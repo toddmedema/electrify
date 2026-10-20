@@ -157,6 +157,7 @@ export function policyTotalCost(
       : POLICIES.efficiency.costPerCustomer;
   return (
     programCustomers(game) *
+    (game.customScenario?.modPackage?.programs?.[id] ?? 1) *
     perCustomer *
     getInflationIndex(date, game.startingYear, game.seed)
   );

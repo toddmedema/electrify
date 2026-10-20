@@ -793,6 +793,10 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
+    const mod = state.customScenario?.modPackage?.facilities?.[g.name];
+    g.buildCost *= mod?.buildCost ?? 1;
+    g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
+    g.yearsToBuild *= mod?.yearsToBuild ?? 1;
     g.buildCost *= difficulty.buildCost * inflation;
     g.buildCost *=
       currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
@@ -917,6 +921,10 @@ export function STORAGE(state: GameType, peakWh: number) {
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
+    const mod = state.customScenario?.modPackage?.facilities?.[g.name];
+    g.buildCost *= mod?.buildCost ?? 1;
+    g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
+    g.yearsToBuild *= mod?.yearsToBuild ?? 1;
     g.buildCost *= difficulty.buildCost * inflation;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;

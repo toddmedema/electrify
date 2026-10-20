@@ -24,7 +24,7 @@ if (productionRoot) {
 // CI reuses its verified production desktop artifact; local dev remains available by default.
 export default defineConfig({
   testDir: ".",
-  testMatch: "multiplayer.spec.ts",
+  testMatch: ["multiplayer.spec.ts", "mods.spec.ts"],
   outputDir: "../test-results/multiplayer",
   fullyParallel: false,
   workers: 1,

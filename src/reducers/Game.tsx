@@ -3456,6 +3456,16 @@ export function* tickStatePhases(
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
+      state.customScenario?.modPackage?.notifications?.forEach(
+        (notice, index) => {
+          if (notice.month === state.date.monthsElapsed)
+            logGameEvent(state, "WORLD_EVENT", notice.message, {
+              title: notice.title,
+              importance: "NOTABLE",
+              reportedKey: `mod-notice:${index}`,
+            });
+        },
+      );
       const storyPriceFuels = updateWorldEvents(state);
       // The recurring regional hazard resolves on its own path, after the authored story, so a
       // custom game in a profiled area can meet a wildfire without inheriting any authored arc.

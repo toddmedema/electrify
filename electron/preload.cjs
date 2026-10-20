@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld(
   "electrifyDesktop",
   Object.freeze({
     apiVersion: 1,
+    mods: (input) => ipcRenderer.invoke("desktop:mods", input),
     getState: () => ipcRenderer.invoke("desktop:state"),
     setDisplay: (display) => ipcRenderer.invoke("desktop:display", display),
     quit: () => ipcRenderer.invoke("desktop:quit"),

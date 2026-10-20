@@ -12,6 +12,7 @@ export interface DesktopDisplay {
   resolutions: { width: number; height: number }[];
 }
 export interface DesktopState {
+  modsAvailable?: boolean;
   display: DesktopDisplay;
   steam: {
     available: boolean;
@@ -47,6 +48,9 @@ export interface DesktopTimelineEvent {
   year: number;
 }
 export interface DesktopBridge {
+  mods?(
+    input: import("./mods/Types").ModRequest,
+  ): Promise<import("./mods/Types").ModLibrary>;
   multiplayerRequest?(
     input: import("./multiplayer/Native").NativeRequest,
   ): Promise<unknown>;

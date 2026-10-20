@@ -863,6 +863,8 @@ export interface ScenarioBriefingType {
 }
 
 export interface ScenarioType {
+  /** Immutable data-only mod snapshot; installed updates never mutate a running game. */
+  modPackage?: import("./data/ModSchema").ModPackage;
   /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
   eventScenarioIds?: number[];
   hydroInventoryKey?: string;

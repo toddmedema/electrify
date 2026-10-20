@@ -26,6 +26,11 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
+const ModManager =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("../base/ModManager"))
+    : () => null;
+
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -426,6 +431,13 @@ export default function Settings(props: Props): React.JSX.Element {
             )}
           </SettingsGroup>
 
+          {desktopApp && desktop?.modsAvailable && (
+            <SettingsGroup id="mods-settings" title="Mods and Workshop">
+              <React.Suspense fallback={null}>
+                <ModManager />
+              </React.Suspense>
+            </SettingsGroup>
+          )}
           <SettingsGroup id="saved-game-settings" title="Game data">
             <SettingRow
               label="Saved games"

@@ -69,6 +69,9 @@ if (
 // the running game's rich presence, or clear it again while it exits.
 const primaryInstance = app.requestSingleInstanceLock();
 const steam = new SteamService();
+let modStore;
+let workshop;
+
 if (primaryInstance)
   steam.initialize(
     app,
@@ -133,6 +136,7 @@ function state() {
       resolutions: resolutionsFor(display, preferences),
     },
     steam: steam.state(),
+    modsAvailable: true,
   };
 }
 
@@ -297,6 +301,28 @@ handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
+handle("desktop:mods", (input) => {
+  if (!modStore) throw new Error("Mod management is not ready.");
+  return modStore.request(
+    input,
+    async () => {
+      const result = await dialog.showOpenDialog(window, {
+        title: "Import data-only scenario mod",
+        properties: ["openFile"],
+        filters: [{ name: "Scenario package", extensions: ["json"] }],
+      });
+      return result.canceled ? undefined : result.filePaths[0];
+    },
+    async () => {
+      const result = await dialog.showSaveDialog(window, {
+        title: "Save scenario mod template",
+        defaultPath: "scenario.json",
+        filters: [{ name: "Scenario package", extensions: ["json"] }],
+      });
+      return result.canceled ? undefined : result.filePath;
+    },
+  );
+});
 function multiplayerRequest(input) {
   if (!steam.multiplayer && (!steam.state().online || !steam.dispatcher)) {
     if (input?.kind === "state")
@@ -370,6 +396,23 @@ async function createWindow() {
     preferences = normalizeDisplay(null, display);
   }
   saves = new DesktopSaveStore(app.getPath("userData"), steam);
+  {
+    const { ModStore } = require("./mods.cjs");
+    const modRules = readJson(
+      path.join(app.getAppPath(), "build", "mod-rules.json"),
+      null,
+    );
+    modStore = new ModStore(
+      app.getPath("userData"),
+      () => {
+        if (!steam.state().online || !steam.dispatcher) return null;
+        const { SteamWorkshop } = require("./steam-workshop.cjs");
+        workshop ??= new SteamWorkshop(steam, config.appId);
+        return workshop;
+      },
+      modRules?.compatibilityId,
+    );
+  }
   steam.configureScoreQueue(saves.directory);
   steam.configureAchievements(saves.directory, config.appId);
   if (steam.state().online) {

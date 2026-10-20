@@ -184,3 +184,24 @@ test("timed out or unknown handles cannot consume another request's result", asy
   );
   dispatcher.dispose();
 });
+
+test("long Workshop uploads can wait beyond ordinary requests without changing their timeout", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { dispatcher, complete } = fixture();
+  dispatcher.requestTimeoutMs = 15;
+  const ordinary = assert.rejects(
+    dispatcher.callResult(1n, { size: 16, callback: 1104 }),
+    /timed out/,
+  );
+  const upload = dispatcher.callResult(2n, {
+    size: 16,
+    callback: 3404,
+    timeoutMs: 600000,
+  });
+  t.mock.timers.tick(16);
+  await ordinary;
+  complete(2n, 3404, 16);
+  dispatcher.pump();
+  assert.equal((await upload).readBigUInt64LE(0), 999n);
+  dispatcher.dispose();
+});

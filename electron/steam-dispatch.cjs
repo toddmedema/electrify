@@ -57,7 +57,7 @@ class SteamDispatcher {
       const timeout = setTimeout(() => {
         this.pending.delete(key);
         reject(new Error("Steam request timed out"));
-      }, this.requestTimeoutMs);
+      }, layout.timeoutMs ?? this.requestTimeoutMs);
       this.pending.set(key, { layout, resolve, reject, timeout });
     });
   }
