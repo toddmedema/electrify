@@ -1273,7 +1273,7 @@ $topbar_height: 56px;
   .gameStatusBar .gridHealth {
     justify-content: flex-start;
     text-align: left;
-    flex: 0 0 var(--facilities-pane-width, auto);
+    flex: 0 0 auto;
     box-sizing: border-box;
     min-width: 0;
     // The same 16px inset as the pane headers below and the mission row beside it.
@@ -4747,86 +4747,6 @@ $sizemap: (
     height: 100%;
     max-width: 100%;
     max-height: 100%;
-  }
-}
-
-// ===============================================
-// Landscape tablets and wider screens get columns rather than one card at a time: two up to
-// $desktop_breakpoint (the fleet pinned beside whichever pane the nav is on), and all three
-// destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
-// ===============================================
-
-@media #{$pane_media} {
-  .desktop-layout,
-  .pane-layout {
-    height: 100%;
-    width: 100%;
-  }
-
-  .desktop-panes {
-    display: grid;
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  .desktop-pane {
-    display: flex;
-    min-width: 0;
-    overflow: hidden;
-
-    > * {
-      flex: 1 1 auto;
-      min-width: 0;
-      height: 100%;
-    }
-  }
-
-  .secondary-pane {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-
-    > .pane {
-      flex: 1 1 0;
-      min-height: 0;
-    }
-  }
-
-  // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
-  // never changes the total width the panes have to share
-  .pane-splitter {
-    position: relative;
-    border-left: $border_accent;
-  }
-  .pane-splitter-handle {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: var(--control-size);
-    height: var(--control-size);
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: col-resize;
-    touch-action: none;
-    border-radius: var(--radius-md);
-    &::after {
-      content: "";
-      width: 4px;
-      height: 24px;
-      border-radius: var(--radius-sm);
-      background: var(--font-color-faded);
-    }
-    &:hover,
-    &:focus-visible {
-      background: var(--bg-raised);
-    }
-    &:focus-visible {
-      outline-offset: -2px;
-    }
   }
 }
 
