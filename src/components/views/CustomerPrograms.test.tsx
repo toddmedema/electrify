@@ -403,6 +403,41 @@ test("a scheduled operating change is named in the card and cancelled from the f
   view.unmount();
 });
 
+test("a replay cannot cancel its scheduled operating change or close its detail", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.policies = emptyPolicies(game.date.monthsElapsed);
+  game.policies.programs.timeOfUse.pending = {
+    tier: "On",
+    month: game.date.monthsElapsed + 1,
+    startHour: 17,
+  };
+  game.replayPlayback = { actions: [], index: 0 };
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <ProgramsScreen onClose={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /Time-of-use tariff · Off · turns on Feb 2020/,
+    }),
+  );
+  const cancel = screen.getByRole("button", {
+    name: "Cancel scheduled change",
+  });
+  expect(cancel).toBeDisabled();
+  fireEvent.click(cancel);
+  expect(
+    store.getState().game.policies!.programs.timeOfUse.pending,
+  ).toBeDefined();
+  expect(screen.getByText("Turns on Feb 2020 · 17:00–21:00")).toBeVisible();
+  view.unmount();
+});
+
 test("in-progress and completed build-outs read as projects in the list", () => {
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies(game.date.monthsElapsed);

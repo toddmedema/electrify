@@ -1,11 +1,102 @@
 import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_DAY } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
+import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { generateNewTimeline, tickState } from "./Game";
 import { createGame } from "../testing/Simulator";
 
 describe("story effects in dispatch", () => {
+  it("preserves the closing clock's fuel price when rollover rebooks the last timeline frame", () => {
+    const game = createGame({
+      scenarioId: 103,
+      difficulty: "Manager",
+      seed: 2468,
+      initialBuild: {
+        name: "Natural Gas Peaker",
+        peakW: 500_000_000,
+        financed: true,
+      },
+    });
+    const gas = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas",
+    )!;
+    game.facilities = [gas];
+    gas.yearsToBuildLeft = 0;
+    gas.minuteOperational = 0;
+    game.timeline = generateNewTimeline(game, 1_000_000_000, 2_000_000);
+    for (let index = 0; index < TICKS_PER_DAY - 1; index++) tickState(game);
+    const closingFrame = game.timeline.at(-1)!;
+    expect(closingFrame.supplyByFuel["Natural Gas"]).toBeGreaterThan(0);
+    const expensePerOutput =
+      closingFrame.expensesFuel / closingFrame.supplyByFuel["Natural Gas"]!;
+    const openingPrice = getFuelPricesPerMBTU(
+      game.date,
+      game.seed,
+      game.location,
+    )["Natural Gas"];
+    tickState(game);
+    expect(game.date.monthsElapsed).toBe(1);
+    const closingPrice = getFuelPricesPerMBTU(
+      game.date,
+      game.seed,
+      game.location,
+    )["Natural Gas"];
+    expect(closingPrice).not.toBe(openingPrice);
+    expect(
+      closingFrame.expensesFuel /
+        closingFrame.supplyByFuel["Natural Gas"]! /
+        expensePerOutput,
+    ).toBeCloseTo(closingPrice! / openingPrice!, 10);
+  });
+
+  it("books future fuel at the sample month's price including the scheduled freeze", () => {
+    const game = createGame({
+      scenarioId: 103,
+      difficulty: "Manager",
+      seed: 2468,
+      initialBuild: {
+        name: "Natural Gas Peaker",
+        peakW: 500_000_000,
+        financed: true,
+      },
+    });
+    const gas = game.facilities.find(
+      (facility) => facility.fuel === "Natural Gas",
+    )!;
+    game.facilities = [gas];
+    gas.yearsToBuildLeft = 0;
+    gas.minuteOperational = 0;
+    game.date = getDateFromMinute(95 * MINUTES_PER_MONTH, game.startingYear);
+    const samples = generateNewTimeline(
+      game,
+      1_000_000_000,
+      2_000_000,
+      5,
+      MINUTES_PER_MONTH,
+    );
+    const perOutput = (tick: (typeof samples)[number]) =>
+      tick.expensesFuel / tick.supplyByFuel["Natural Gas"]!;
+    for (let index = 1; index < samples.length; index++) {
+      const atSample = cloneDeep(game);
+      atSample.date = getDateFromMinute(
+        samples[index].minute,
+        game.startingYear,
+      );
+      const direct = generateNewTimeline(
+        atSample,
+        1_000_000_000,
+        2_000_000,
+        1,
+        MINUTES_PER_MONTH,
+      )[0];
+      expect(direct.supplyByFuel["Natural Gas"]).toBeGreaterThan(0);
+      expect(perOutput(samples[index])).toBeCloseTo(perOutput(direct), 10);
+    }
+    // The first future month is the authored freeze; pricing must not stay at the initial month.
+    expect(perOutput(samples[1])).toBeGreaterThan(perOutput(samples[0]));
+  });
+
   it("caps every gas plant during the Shale freeze, including a newly commissioned one", () => {
     const game = createGame({
       scenarioId: 103,

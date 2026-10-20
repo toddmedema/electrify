@@ -31,6 +31,23 @@ describe("SaveGame", () => {
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
 
+  it.each([undefined, null, 123, "", "   "])(
+    "rejects malformed saved facility names %p",
+    (name) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.facilities[0].name = name;
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
+  it("accepts narrative facility names", () => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    raw.game.facilities[0].name = "The town's original power station";
+    expect(parseSave(raw)?.game.facilities[0].name).toBe(
+      raw.game.facilities[0].name,
+    );
+  });
+
   it.each([NaN, Infinity, 0, -1, 9, "2", null])(
     "rejects an invalid saved demand shape %p",
     (demandShapeExponent) => {

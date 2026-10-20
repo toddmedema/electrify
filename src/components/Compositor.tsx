@@ -104,6 +104,15 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return true;
+    if (
+      event.key === " " &&
+      event.target instanceof Element &&
+      event.target.closest(
+        'button, input, select, textarea, summary, [role="button"], [role="checkbox"], [role="radio"], [role="switch"]',
+      )
+    )
+      return true;
     if (document.querySelector(".MuiModal-root:not(.MuiModal-hidden)"))
       return true;
     if (document.querySelector('[data-data-center-guide="true"]')) return true;

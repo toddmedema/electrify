@@ -1,5 +1,7 @@
 const CACHE_VERSION = "electrify-v2";
 const WEATHER_INDEX = "/data/weather/index.json";
+// Separate from the normally refreshed catalog: only durable, complete syncs advance this.
+const OFFLINE_DATA_REVISION = "/__offline-data-revision";
 // Generated from public/images at build time (scripts/generate-icon-manifest.js).
 const ICON_MANIFEST = "/icons.json";
 const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
@@ -23,17 +25,42 @@ function absoluteUrl(request) {
   ).href;
 }
 
-async function fetchAndCache(cache, url) {
-  const key = absoluteUrl(url);
+async function matchesIntegrity(response, integrity) {
+  if (!integrity) return true;
+  const hashes = integrity
+    .trim()
+    .split(/\s+/)
+    .map((entry) => entry.split("-"));
+  const algorithm = ["sha512", "sha384", "sha256"].find((name) =>
+    hashes.some(([candidate]) => candidate === name),
+  );
+  if (!algorithm) return false;
+  const digest = await crypto.subtle.digest(
+    algorithm.replace("sha", "SHA-"),
+    await response.clone().arrayBuffer(),
+  );
+  const encoded = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  return hashes.some(
+    ([name, expected]) => name === algorithm && expected === encoded,
+  );
+}
+
+async function fetchAndCache(cache, url, durable = false) {
+  const integrity = typeof url === "string" ? "" : url.integrity || "";
+  // Neither prefetches nor a different build may lend unchecked bytes to an SRI request.
+  const key = `${absoluteUrl(url)}|${integrity}|${durable}`;
   let pending = inFlightFetches.get(key);
   if (!pending) {
     pending = fetch(url, { cache: "no-cache" }).then(async (response) => {
       if (!response.ok) {
         throw new Error(`${response.status} fetching ${key}`);
       }
+      if (!(await matchesIntegrity(response, integrity)))
+        throw new Error(`Integrity mismatch fetching ${absoluteUrl(url)}`);
       try {
         await cache.put(url, response.clone());
       } catch {
+        if (durable) throw new Error(`Could not cache ${absoluteUrl(url)}`);
         // A full or unavailable cache must not turn a successful network response into a failed
         // game load. Prefetching is best-effort; the caller can still use the downloaded response.
       }
@@ -123,7 +150,7 @@ async function cacheIcons() {
  */
 async function syncOfflineData() {
   const cache = await caches.open(CACHE_VERSION);
-  const cachedIndex = await cache.match(WEATHER_INDEX);
+  const cachedIndex = await cache.match(OFFLINE_DATA_REVISION);
   const cachedText = cachedIndex ? await cachedIndex.clone().text() : "";
   const indexResponse = await fetchAndCache(cache, WEATHER_INDEX);
   const indexText = await indexResponse.clone().text();
@@ -139,9 +166,18 @@ async function syncOfflineData() {
       ? weatherUrls
       : weatherUrls.filter((url) => !cachedUrls.has(url));
 
-  await Promise.allSettled(
-    [...MARKET_DATA, ...weatherToFetch].map((url) => fetchAndCache(cache, url)),
+  const downloads = await Promise.allSettled(
+    [...MARKET_DATA, ...weatherToFetch].map((url) =>
+      fetchAndCache(cache, url, true),
+    ),
   );
+  if (downloads.every((result) => result.status === "fulfilled")) {
+    try {
+      await cache.put(OFFLINE_DATA_REVISION, new Response(indexText));
+    } catch {
+      // Retry next time: network success alone does not establish an offline copy.
+    }
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -192,10 +228,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (/\/data\/weather\/.*\.bin$/.test(url.pathname)) {
+  if (request.integrity || /\/data\/weather\/.*\.bin$/.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then(async (cached) => {
-        if (cached) {
+        if (cached && (await matchesIntegrity(cached, request.integrity))) {
           return cached;
         }
         const cache = await caches.open(CACHE_VERSION);

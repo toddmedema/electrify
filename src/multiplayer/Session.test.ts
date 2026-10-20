@@ -5,6 +5,7 @@ import type { RoomView, World } from "./Types";
 import type { BrowseState } from "./Browse";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
+import { coopSelection } from "./Choosing";
 
 const host = "host",
   guest = "guest";
@@ -28,11 +29,11 @@ function fixture(isHost = false, deferLeave = false) {
   const selfId = isHost ? host : guest;
   const worker = {
     onmessage: null as ((event: MessageEvent<WorkerResponse>) => void) | null,
-    onerror: null,
+    onerror: null as ((event: Event) => void) | null,
     terminate: jest.fn(),
     postMessage: (request: WorkerRequest) => {
       posts.push(request);
-      if (request.kind === "create")
+      if (request.kind === "create" && !delayStart)
         worker.onmessage?.({
           data: { kind: "views", views: { [host]: view() } },
         } as unknown as MessageEvent<WorkerResponse>);
@@ -46,7 +47,10 @@ function fixture(isHost = false, deferLeave = false) {
         } as unknown as MessageEvent<WorkerResponse>);
     },
   };
-  let failSave = false,
+  let delayStart = false,
+    failLock = false,
+    failFactory = false,
+    failSave = false,
     failLeave = false;
   let releaseLeave = () => {};
   const bridge = {
@@ -56,6 +60,7 @@ function fixture(isHost = false, deferLeave = false) {
     },
     multiplayerRequest: async (request: NativeRequest) => {
       requests.push(request);
+      if (request.kind === "lock" && failLock) throw new Error("Lock failed");
       if (request.kind === "leave" && deferLeave)
         await new Promise<void>((resolve) => {
           releaseLeave = resolve;
@@ -78,10 +83,10 @@ function fixture(isHost = false, deferLeave = false) {
         };
     },
   } as unknown as DesktopBridge;
-  const session = new MultiplayerSession(
-    bridge,
-    async () => worker as unknown as Worker,
-  );
+  const session = new MultiplayerSession(bridge, async () => {
+    if (failFactory) throw new Error("Factory failed");
+    return worker as unknown as Worker;
+  });
   return {
     session,
     worker,
@@ -94,6 +99,11 @@ function fixture(isHost = false, deferLeave = false) {
     },
     failLeave: () => {
       failLeave = true;
+    },
+    startup: (failure?: "lock" | "factory" | "delayed") => {
+      failLock = failure === "lock";
+      failFactory = failure === "factory";
+      delayStart = failure === "delayed";
     },
   };
 }
@@ -570,6 +580,122 @@ test("queued normal actions settle only after their authoritative view reaches s
   });
   await expect(second).rejects.toThrow("Rejected");
   stop();
+  f.session.dispose();
+});
+
+test("a locally rejected queued Ready does not strand the next command", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, { grids: ownGrid() });
+  const first = f.session.submit({ kind: "rate", value: 0.2 });
+  const ready = f.session.submit({ kind: "ready" });
+  const rejected = ready.catch((error: Error) => error.message);
+  const last = f.session.submit({ kind: "speed", speed: "SLOW" });
+  deliver(f, {
+    revision: 2,
+    lastSequence: 1,
+    receipt: { sequence: 1 },
+    disconnected: [host],
+    grids: ownGrid(),
+  });
+  await first;
+  await expect(rejected).resolves.toContain("reconnect");
+  expect(sentCommands(f)).toEqual([
+    { kind: "rate", value: 0.2 },
+    { kind: "speed", speed: "SLOW" },
+  ]);
+  deliver(f, {
+    revision: 3,
+    lastSequence: 2,
+    receipt: { sequence: 2 },
+    grids: ownGrid(),
+  });
+  await last;
+  f.session.dispose();
+});
+
+test.each(["lock", "factory", "response", "onerror"] as const)(
+  "rolls back %s startup failures and permits a retry",
+  async (failure) => {
+    const f = fixture(true);
+    await f.session.initialize();
+    f.session.publishBrowse({
+      phase: "playing",
+      card: "CUSTOM_GAME",
+      custom: COOP_TEST_SPEC.customScenario,
+      difficulty: COOP_TEST_SPEC.difficulty,
+    });
+    const playing = f.session.getSnapshot().browse!;
+    f.startup(
+      failure === "lock" || failure === "factory" ? failure : "delayed",
+    );
+    let stale: typeof f.worker.onmessage = null;
+    const startError = await f.session
+      .start({ spec: COOP_TEST_SPEC })
+      .catch((error: Error) => error.message);
+    expect(startError).toBe(
+      failure === "lock"
+        ? "Lock failed"
+        : failure === "factory"
+          ? "Factory failed"
+          : undefined,
+    );
+    if (failure === "response" || failure === "onerror") {
+      stale = f.worker.onmessage;
+      if (failure === "response")
+        f.worker.onmessage!({
+          data: { kind: "error", message: "Initialization failed" },
+        } as MessageEvent<WorkerResponse>);
+      else f.worker.onerror!(new Event("error"));
+    }
+    const state = f.session.getSnapshot();
+    expect(state.busy).toBe(false);
+    expect(coopSelection(state).starting).toBe(false);
+    expect(state.view).toBeUndefined();
+    expect(state.error).toBeTruthy();
+    expect(state.browse).toMatchObject({
+      ...playing,
+      phase: "browsing",
+      revision: playing.revision + 1,
+    });
+    jest.advanceTimersByTime(200);
+    expect(f.requests).toContainEqual({
+      kind: "send",
+      to: guest,
+      payload: { kind: "browse", browse: state.browse },
+    });
+    expect(
+      f.requests.filter((request) => request.kind === "unlock"),
+    ).toHaveLength(failure === "lock" ? 0 : 1);
+    expect(f.worker.terminate).toHaveBeenCalledTimes(
+      failure === "response" || failure === "onerror" ? 1 : 0,
+    );
+    f.startup();
+    await f.session.start({ spec: COOP_TEST_SPEC });
+    expect(f.session.getSnapshot().view).toBeDefined();
+    stale?.({
+      data: { kind: "views", views: { [host]: view({ epoch: "stale" }) } },
+    } as unknown as MessageEvent<WorkerResponse>);
+    expect(f.session.getSnapshot().view?.epoch).toBe("epoch");
+    stale?.({
+      data: { kind: "error", message: "Late failure" },
+    } as MessageEvent<WorkerResponse>);
+    expect(f.session.getSnapshot().error).toBeUndefined();
+    f.session.dispose();
+  },
+);
+
+test("a worker error after its first view preserves the established match", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  f.worker.onmessage!({
+    data: { kind: "error", message: "Runtime failed" },
+  } as MessageEvent<WorkerResponse>);
+  expect(f.session.getSnapshot().view).toBeDefined();
+  expect(f.session.getSnapshot().error).toBe("Runtime failed");
+  expect(f.worker.terminate).not.toHaveBeenCalled();
+  expect(f.requests).not.toContainEqual({ kind: "unlock" });
   f.session.dispose();
 });
 
