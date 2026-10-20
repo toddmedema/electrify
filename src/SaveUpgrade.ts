@@ -19,6 +19,26 @@ const migrations: ((
         }),
       })
     : (save) => save,
+  // 2 -> 3: existing programs retain their progress; new flexibility offers start off.
+  (save) => {
+    if (!object(save.game) || !object(save.game.policies)) return save;
+    const policies = save.game.policies;
+    if (!object(policies.programs)) return save;
+    const programs = { ...policies.programs };
+    for (const id of ["thermal", "evCharging", "battery"])
+      if (!(id in programs))
+        programs[id] = {
+          tier: "Off",
+          adoption: 0,
+          spending: 0,
+          spent: 0,
+          installs: [],
+        };
+    return {
+      ...save,
+      game: { ...save.game, policies: { ...policies, programs } },
+    };
+  },
 ];
 
 /** Save structure evolves independently of simulation rules and app releases. */

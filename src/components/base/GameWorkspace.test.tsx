@@ -186,7 +186,7 @@ it.each([
   [1512, 2],
   [1920, 3],
   [2560, 4],
-  [5120, 4],
+  [5120, 5],
 ])("fits %ipx with %i tools open", (width, tools) => {
   expect(maxOpenTools(width)).toBe(tools);
   // Sheets float over the fleet; columns must leave it at least phone width.

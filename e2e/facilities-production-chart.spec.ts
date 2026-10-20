@@ -388,18 +388,15 @@ test("blackout periods remain visible when imports supplement fuel production", 
     (tick) => tick.demandW > tick.supplyW && (tick.importedW || 0) > 0,
   );
   expect(shortage).toBeGreaterThanOrEqual(0);
-  const tick = game.timeline[shortage];
-  const rangeMin = game.timeline[0].minute;
-  const rangeMax = game.timeline[game.timeline.length - 1].minute;
-  await chart.scrollIntoViewIfNeeded();
-  const bounds = (await chart.locator(".u-over").boundingBox())!;
-  await page.mouse.move(
-    bounds.x +
-      (bounds.width * (tick.minute - rangeMin)) / (rangeMax - rangeMin),
-    bounds.y + 4,
-  );
+  // The last sample maps to the plot's excluded right edge. Select the actual point through
+  // the chart's keyboard controls rather than depending on a pixel hit at that boundary.
+  const plot = chart.getByRole("img");
+  await plot.focus();
+  await plot.press("Home");
+  for (let index = 0; index < shortage; index++) await plot.press("ArrowRight");
   await expect(chart.locator(".chartTooltip")).toContainText("Interties:");
   await expect(chart.locator(".chartTooltip")).toContainText("Blackout:");
+  await plot.press("Escape");
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);

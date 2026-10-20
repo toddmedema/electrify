@@ -122,14 +122,25 @@ for (const mission of [
         await expect(hud).toContainText("Find customer growth");
       } else {
         await expect(hud).toContainText("Change the chart time period");
-        // Short tutorials open on their whole run, already the narrowest span.
+        // A one-month tutorial is already at the minimum zoom and spans the whole scenario.
+        // Fit full timeline expands to the longer forecast rather than pressing disabled zoom.
         await page
-          .getByRole("button", { name: "Zoom out", exact: true })
+          .getByRole("button", { name: "Fit full timeline", exact: true })
           .click();
         await expect(hud).toContainText(
           "Tap Layers, or choose a preset question",
         );
         await page.locator("#insightsLayersButton").click();
+        await expect(hud).toContainText("Tap Programs");
+        await expect(page.locator("#programsNav")).toHaveClass(
+          /tutorialTarget/,
+        );
+        await page.locator("#programsNav").click();
+        await expect(hud).toContainText("Raise the electricity rate");
+        await expect(page.locator("#rateSlider")).toHaveClass(/tutorialTarget/);
+        const rate = page.locator("#rateSlider input");
+        await rate.focus();
+        await rate.press("ArrowRight");
         await expect(hud).toContainText("Tap 1× to run the month");
       }
     }
@@ -143,7 +154,6 @@ for (const mission of [
       path: testInfo.outputPath(`${mission}-advanced.png`),
     });
     if (mission === "Finances") {
-      await page.locator("#insightsLayersButton").click();
       await page
         .getByRole("button", { name: "slow speed", exact: true })
         .click();

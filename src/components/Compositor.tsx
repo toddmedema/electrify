@@ -52,7 +52,10 @@ import {
   setSpeed,
   togglePauseFacility,
 } from "../reducers/Game";
-import { selectTutorialHiddenUi } from "../reducers/Tutorial";
+import {
+  selectTutorialActions,
+  selectTutorialHiddenUi,
+} from "../reducers/Tutorial";
 import { snackbarOpen, manualHelpClose, manualHelpOpen } from "../reducers/UI";
 import {
   flingSwipe,
@@ -245,6 +248,15 @@ function uiHidden(id: TutorialUiIdType): boolean {
   return selectTutorialHiddenUi(store.getState()).includes(id);
 }
 
+function canBuild(): boolean {
+  const actions = selectTutorialActions(store.getState());
+  return (
+    canPlay() &&
+    !uiHidden("build") &&
+    (!actions || actions.includes("BUILD_GENERATORS"))
+  );
+}
+
 const shortcutHandlers = {
   // Space is one of this handler's own keys, and the browser's default action for it is to
   // scroll the page -- which fires alongside the pause because react-hotkeys doesn't call
@@ -288,14 +300,14 @@ const shortcutHandlers = {
     ]),
   ),
   BUILD_GENERATOR: () => {
-    if (canPlay() && !uiHidden("build")) {
+    if (canBuild()) {
       store.dispatch(
         navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
       );
     }
   },
   BUILD_STORAGE: () => {
-    if (canPlay() && !uiHidden("build")) {
+    if (canBuild()) {
       store.dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
     }
   },

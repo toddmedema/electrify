@@ -558,7 +558,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       // Every tooltip here is a plain label. MUI's default keeps a tooltip open while the pointer
       // is over the label itself, so one opened by an incidental hover (a dialog closing under a
       // resting pointer) sat on top of the control beside it and swallowed its clicks -- the
-      // phone Build sheet's close button, under the mission row's "All requirements" label.
+      // phone Build sheet's close button, under a label from the mission row.
       MuiTooltip: {
         defaultProps: { disableInteractive: true },
       },

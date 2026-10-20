@@ -7,10 +7,14 @@ const smoke = [
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
   "tutorial-exit.spec.ts",
+  "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
   "music.spec.ts",
   "achievements.spec.ts",
+  "facilities-production-chart.spec.ts",
+  "intertie-order.spec.ts",
+  "operations-priorities.spec.ts",
 ];
 const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
 const port = process.env.E2E_PORT || "3100";
@@ -30,7 +34,9 @@ export default defineConfig({
     .map((project) => ({
       ...project,
       testMatch:
-        project.name === "mobile-360px" ? layout : [...smoke, ...layout],
+        project.name === "mobile-360px"
+          ? [...layout, "tutorial-actions.spec.ts"]
+          : [...smoke, ...layout],
     })),
   webServer: {
     command: "node scripts/ci/serve.js",

@@ -77,12 +77,14 @@ test("custom scenario events compose and persist without overflowing setup", asy
     ),
   ).toBe(true);
   await page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "All requirements" })
+    .locator("#navfooter:visible")
+    .getByRole("button", { name: "Scenario", exact: true })
     .first()
     .click();
-  await expect(page.getByRole("dialog")).not.toContainText(
-    "Meaningful decisions",
-  );
-  await expect(page.getByRole("dialog")).not.toContainText("decisions across");
+  await expect(
+    page.getByRole("region", { name: "Scenario", exact: true }),
+  ).not.toContainText("Meaningful decisions");
+  await expect(
+    page.getByRole("region", { name: "Scenario", exact: true }),
+  ).not.toContainText("decisions across");
 });

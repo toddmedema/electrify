@@ -69,10 +69,20 @@ export const cardSlice = createSlice({
       ) {
         return state;
       }
-      logEvent("card_view", { card: a.name });
       if (!a.skipBrowserHistory) {
         getHistoryApi().pushState(null, "", a.url || "#");
       }
+      // Following a link between manual entries is a step within the manual, like a wiki's: Back
+      // (browser, device or Esc) retraces it, while the card history stays one manual visit deep
+      if (a.fromEntry !== undefined && state.name === "MANUAL") {
+        return {
+          ...state,
+          ts: now,
+          entry: a.entry,
+          manualTrail: [a.fromEntry, ...(state.manualTrail || [])],
+        };
+      }
+      logEvent("card_view", { card: a.name });
       // TODO better implementation for don't remember, right now it still makes an entry!
       return {
         ...state,
@@ -82,6 +92,7 @@ export const cardSlice = createSlice({
         // Cleared rather than carried over, so a plain visit to the manual doesn't reopen
         // whichever entry the last deep link pointed at
         entry: a.entry,
+        manualTrail: undefined,
         storyTarget: a.storyTarget,
         history: [
           a.dontRemember ? state.name : a.name,
@@ -93,12 +104,27 @@ export const cardSlice = createSlice({
       };
     },
     navigateBack: (state, _action: PayloadAction<CardNameType | undefined>) => {
+      const [previousEntry, ...trail] = state.manualTrail || [];
+      if (state.name === "MANUAL" && previousEntry !== undefined) {
+        return {
+          ...state,
+          ts: Date.now(),
+          entry: previousEntry,
+          manualTrail: trail,
+          toPrevious: true,
+        };
+      }
       return {
         name: (state.history || [])[1] || "MAIN_MENU", // Look 2 back since first is current card
         ts: Date.now(),
         history: (state.history || []).slice(1),
         toPrevious: true,
       };
+    },
+    // The manual header's back button leaves the manual outright, however many entries deep
+    // the player followed links
+    manualTrailCleared: (state) => {
+      state.manualTrail = undefined;
     },
   },
   extraReducers: (builder) => {
@@ -171,7 +197,7 @@ export const cardSlice = createSlice({
   },
 });
 
-export const { navigate, navigateBack } = cardSlice.actions;
+export const { navigate, navigateBack, manualTrailCleared } = cardSlice.actions;
 
 export const selectCardName = (state: RootState) => state.card.name;
 
@@ -182,10 +208,15 @@ export const navigationDestinationMiddleware: Middleware<
   object,
   AppStateType
 > = (api) => (next) => (action) => {
-  if (navigateBack.match(action))
+  if (navigateBack.match(action)) {
+    const card = api.getState().card;
     return next({
       ...action,
-      payload: api.getState().card.history?.[1] || "MAIN_MENU",
+      payload:
+        card.name === "MANUAL" && card.manualTrail?.length
+          ? "MANUAL"
+          : card.history?.[1] || "MAIN_MENU",
     });
+  }
   return next(action);
 };

@@ -30,6 +30,10 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     selectSteps(["--steps", "lint,tests,lint"]).map((step) => step.id),
     ["lint", "tests"],
   );
+  assert.deepEqual(
+    selectSteps(["--ci", "--steps", "multiplayer,browser"]),
+    selectSteps(["--steps", "multiplayer,browser"]),
+  );
   // --ci adds the gates that need a production build or browser, in CI's dependency order.
   assert.deepEqual(
     selectSteps(["--ci"])
@@ -52,13 +56,19 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     selectSteps(["--steps", "multiplayer,browser"]).map((step) => step.id),
     ["build", "browser", "desktop-build", "multiplayer"],
   );
+  assert.deepEqual(
+    selectSteps(["--steps", "bundle"]).map((step) => step.id),
+    ["build", "bundle"],
+  );
   for (const args of [
     ["--steps", ""],
     ["--steps", "lnti"],
     ["--steps", "lint;echo bad"],
     ["--steps"],
     ["--skip", "tests"],
-    ["--ci", "--steps", "lint"],
+    ["--ci", "--steps", ""],
+    ["--ci", "--steps", "lnti"],
+    ["--ci", "--ci"],
   ])
     assert.throws(() => selectSteps(args));
   assert.equal(workerCount({}, 20), 4);
@@ -101,7 +111,7 @@ test("full and partial checks finish all gates after failures and never overlap 
 test("a failed build skips the suites that test it and still runs later gates", async () => {
   const visited = [];
   const results = await execute(
-    selectSteps(["--steps", "browser,multiplayer"]),
+    selectSteps(["--steps", "bundle,browser,multiplayer"]),
     async (step) => {
       visited.push(step.id);
       return { ...step, ok: step.id !== "build" };
@@ -109,6 +119,7 @@ test("a failed build skips the suites that test it and still runs later gates", 
   );
   assert.deepEqual(visited, ["build", "desktop-build", "multiplayer"]);
   assert.equal(results.find((result) => result.id === "browser").ok, false);
+  assert.equal(results.find((result) => result.id === "bundle").ok, false);
 });
 
 test("asset preflight rejects pointers and missing tracked files, ignoring untracked files", (t) => {
@@ -216,22 +227,30 @@ test("the CLI returns failure, finishes other selected gates, and prints an exac
       },
     }),
   );
-  const result = spawnSync(
-    process.execPath,
-    [path.resolve("scripts/check.js"), "--steps", "lint,formatting"],
-    {
-      cwd: root,
-      encoding: "utf8",
-      windowsHide: true,
-    },
-  );
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /ok\s+Formatting/);
-  assert.match(result.stderr, /Failed 1\/2 gates/);
-  assert.match(result.stderr, /Partial check only/);
-  assert.match(
-    result.stderr,
-    /Also rerun any passing gates whose inputs changed/,
-  );
-  assert.match(result.stderr, /rerun: npm run check -- --steps lint\s*$/);
+  for (const prefix of [[], ["--ci"]]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.resolve("scripts/check.js"),
+        ...prefix,
+        "--steps",
+        "lint,formatting",
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        windowsHide: true,
+      },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /ok\s+Formatting/);
+    assert.match(result.stderr, /Failed 1\/2 gates/);
+    assert.match(result.stderr, /Partial check only/);
+    assert.match(
+      result.stderr,
+      /Also rerun any passing gates whose inputs changed/,
+    );
+    assert.match(result.stderr, /rerun: npm run check -- --steps lint\s*$/);
+    assert.doesNotMatch(result.stderr, /Starting (Types|Production)/);
+  }
 });

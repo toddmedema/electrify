@@ -154,17 +154,16 @@ test("a deep-linked entry lands below the pinned group header", async ({
 }) => {
   await openManual(page);
 
-  // Open the pinned overview, then follow one of its related links. The target is a grouped
-  // entry, so it must land under the group header rather than with its title hidden behind
-  // it. The related link shares the target's name, but in DOM order it comes first
+  // Open the pinned overview, then follow one of its inline links. The target is a grouped
+  // entry, so it must land under the group header rather than with its title hidden behind it
   await page
     .getByRole("button", { name: /how to play/i })
     .first()
     .click();
   await waitForEntrySettled(page, ".manual-pinned");
   await page
-    .getByRole("button", { name: "Insights & data layers" })
-    .first()
+    .locator(".manual-pinned")
+    .getByRole("link", { name: "forecasts" })
     .click();
 
   const entryHeader = page.locator("#manual-insights-data-layers-header");

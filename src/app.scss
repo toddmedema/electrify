@@ -98,6 +98,8 @@
   --tooltip-border: rgba(0, 0, 0, 0.2);
   --tooltip-bg: #ffffff;
   --tooltip-shadow: rgba(15, 23, 42, 0.16);
+  // The soft edge a screen header gains once content scrolls beneath it
+  --header-scrim: rgba(15, 23, 42, 0.12);
   --cursor-line: #757575; /* grey600 */
   // Charts sit flush on the page in both themes: no panel, no edge
   --chart-surface: var(--bg-primary);
@@ -150,6 +152,7 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
+  --header-scrim: rgba(0, 0, 0, 0.5);
   --cursor-line: rgba(98, 155, 225, 0.55);
   --chart-surface: var(--bg-primary);
 }
@@ -973,11 +976,6 @@ $topbar_height: 56px;
     text-align: left;
     line-height: 1.4;
   }
-  .missionDetailsButton {
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-  }
   // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
   // a plain headline and with the grid readout's icon when the two rows stack.
   .missionRiskButton {
@@ -1037,15 +1035,12 @@ $topbar_height: 56px;
   .missionSummary .MuiButton-root {
     min-height: 44px;
   }
-  .missionSummary .missionDetailsButton {
-    width: 44px;
-    height: 44px;
-  }
 }
 
 @media (max-width: 768px) {
+  // The months left end on the same 16px inset the row's first icon starts on
   .missionSummary {
-    padding: 4px 8px 4px 16px;
+    padding: 4px max(16px, env(safe-area-inset-right)) 4px 16px;
     gap: 0 8px;
   }
 }
@@ -1380,6 +1375,12 @@ $topbar_height: 56px;
   .missionRiskText,
   .missionSummaryHeadline {
     min-width: 96px;
+  }
+
+  // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
+  // inset); the months left end the same 20px before the speed controls
+  .gameStatusBar .missionSummaryMonths {
+    padding-inline-end: $space-1;
   }
 }
 
@@ -3211,10 +3212,12 @@ $pane_header_height: 48px;
 
     // Sticky so the player can still tell which section they're scrolling through. The
     // line-height is the header's full height (MUI adds no vertical padding) and sets where
-    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx
+    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx.
+    // A label on the page rather than a band across it: it shares the page's surface, opaque
+    // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
       padding-inline: 0;
-      background: var(--bg-sunken);
+      background: var(--bg-primary);
       line-height: 32px;
       font-weight: 600;
       font-size: var(--font-size-caption-sm);
@@ -5222,8 +5225,7 @@ $homeSmokeCycle: 5.6s;
 }
 
 // Quiet, readable help beside a decision; touch targets stay usable on phones.
-.manual-link-text,
-.manual-related-link.MuiButton-root {
+.manual-link-text {
   min-height: 40px;
   padding: 8px;
   font-size: var(--font-size-caption);
@@ -5299,26 +5301,6 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
-.manual-related {
-  display: flex;
-  flex-wrap: wrap;
-  // Baseline, so the "Related entries" label sits on the same line as the link text inside
-  // the taller buttons rather than riding above it
-  align-items: baseline;
-  gap: 4px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 8px;
-
-  // Each link's box hangs out by its own padding, so a wrapped row's text starts on the label's
-  // left edge instead of 8px in; the label's end margin restores the gap the first link loses
-  > .MuiTypography-root {
-    margin-inline-end: 8px;
-  }
-
-  > .manual-related-link.MuiButton-root {
-    margin-inline: -8px 8px;
-  }
-}
 // Manual prose, in the full manual and the help popover alike: a line height and half-line
 // paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
 // windows don't stretch lines past comfortable reading, and links in the interaction blue
@@ -5350,7 +5332,32 @@ $homeSmokeCycle: 5.6s;
   a {
     color: var(--interactive-strong);
     text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+    text-underline-offset: 3px;
+    text-decoration-skip-ink: auto;
+  }
+
+  // A term that names another entry, linked the way a wiki links its articles. The underline
+  // is softened but kept visible (the link colour alone is under 3:1 against body text), and
+  // firms up under the pointer
+  .manual-entry-link {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
+    border-radius: 3px;
+    transition: text-decoration-color 120ms ease-out;
+
+    &:hover {
+      text-decoration-color: currentColor;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: 1px;
+      text-decoration-color: currentColor;
+    }
+
+    strong {
+      color: inherit;
+    }
   }
 
   // The source line is a citation: secondary text, but its link keeps full link contrast,
@@ -5382,10 +5389,6 @@ $homeSmokeCycle: 5.6s;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-
-  .manual-related {
-    margin-top: $space-4;
-  }
 }
 // The first paragraph's margin used to be the gap under an open entry's title divider, so
 // entries that open on a table or legend started flush against it. The gap lives here now.
@@ -5393,8 +5396,7 @@ $homeSmokeCycle: 5.6s;
   padding-top: $space-4;
 }
 @media (pointer: coarse) {
-  .manual-link-text,
-  .manual-related-link.MuiButton-root {
+  .manual-link-text {
     min-height: 44px;
   }
 }
@@ -6485,6 +6487,87 @@ $programs_column: 800px;
   }
 }
 
+// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+.scenarioDetailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: $space-4;
+}
+
+.scenarioDetailsName {
+  margin-bottom: -12px; // sits with the facts it names
+}
+
+.scenarioFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-3 $space-4;
+  margin: 0;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-body2);
+  }
+
+  dd {
+    margin: $space-1 0 0;
+    font-size: var(--font-size-body2);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+}
+
+// The scenario's score so far and where it is heading: two large figures over the line they
+// summarise, so the answer reads before the chart has to
+.scenarioOutlook {
+  padding: $space-4;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  // The chart sits on the panel rather than in a darker box of its own
+  --chart-surface: var(--bg-raised);
+}
+
+.scenarioOutlookFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2 32px;
+  margin: $space-2 0 $space-3;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-caption);
+  }
+
+  dd {
+    display: flex;
+    align-items: baseline;
+    gap: $space-2;
+    margin: 0;
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// The sign carries the direction on its own; the colour is a second, faster read of it
+.scenarioOutlookChange {
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+  letter-spacing: 0;
+
+  &[data-direction="up"] {
+    color: var(--delta-good);
+  }
+
+  &[data-direction="down"] {
+    color: var(--delta-bad);
+  }
+}
+
 .transmissionUpgrade {
   display: grid;
   gap: 8px;
@@ -6617,10 +6700,28 @@ $programs_column: 800px;
 }
 
 // The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
+// No resting rule under the title: a game's menu is one stage, not an app toolbar over a list.
+// Once content scrolls beneath the header, a soft shadow fades in over the first 32px so cards
+// and pinned section labels slide under it rather than being cut by a line. Browsers without
+// scroll-driven animations simply show no edge.
 .screenHeader {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2; // above the sticky section labels it shades
   background: inherit;
-  border-bottom: 1px solid var(--border-subtle);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 16px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--header-scrim), transparent);
+    opacity: 0;
+    animation: screenHeaderScrim linear both;
+    animation-timeline: --screen-scroll;
+    animation-range: 0 32px;
+  }
 
   .screenHeaderBar {
     box-sizing: border-box;
@@ -6632,6 +6733,18 @@ $programs_column: 800px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.flexContainer:has(> .screenHeader) {
+  timeline-scope: --screen-scroll;
+}
+.flexContainer:has(> .screenHeader) > :is(.scrollable, .achievementGallery) {
+  scroll-timeline: --screen-scroll block;
+}
+@keyframes screenHeaderScrim {
+  to {
+    opacity: 1;
   }
 }
 
@@ -6796,8 +6909,13 @@ $programs_column: 800px;
     border-bottom-right-radius: var(--radius-lg);
   }
 
+  // Groups are separated by air rather than rules: the label sits close to the group it
+  // names and well clear of the one above, the way grouped lists read on iOS
+  // Inset by the card's 1px border plus its title's 16px padding, so the label's first letter
+  // sits on the same line as the titles beneath it
   .manual-group {
-    padding: 0 $space-4 + $space-1;
+    margin-top: $space-4;
+    padding: 0 calc(#{$space-4} + 1px);
   }
 }
 
@@ -6910,6 +7028,7 @@ $programs_column: 800px;
     min-height: 44px;
     padding-block: 0;
     padding-left: $space-2;
+    padding-right: max(16px, env(safe-area-inset-right));
     border: 0;
   }
 

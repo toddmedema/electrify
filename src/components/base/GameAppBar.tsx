@@ -38,7 +38,6 @@ import {
   TickPresentFutureType,
 } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
-import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import { useOnline } from "./OnlineStatus";
 import { buildSpeedOptions, sharedClockSpeedProps } from "./SpeedControls";
@@ -99,7 +98,7 @@ export interface Props extends StateProps, DispatchProps {}
 const LOW_RESERVE_RATIO = 0.1;
 const NO_ACTIVE_EVENTS: ActiveEventGroupType[] = [];
 /** Status row controls that keep keyboard focus when the row moves into or out of the top bar. */
-const RESTORABLE_STATUS_FOCUS = [".missionRiskButton", ".missionDetailsButton"];
+const RESTORABLE_STATUS_FOCUS = [".missionRiskButton"];
 
 type GridHealthState =
   "stable" | "low-reserve" | "at-limit" | "blackout-ahead" | "blackout";
@@ -196,18 +195,18 @@ const STABLE_TOOLTIP_MS = 2500;
 
 /**
  * A stable grid on a phone: a checked bolt whose tooltip carries the full readout. Hover and
- * keyboard focus open it as usual; a tap opens it too, until a tap elsewhere or a few seconds.
+ * keyboard focus open it as usual; a tap toggles it, until a tap elsewhere or a few seconds.
  * Unmounted whenever the grid leaves the stable state, so it never reopens on its own.
  */
 function CompactStableStatus({ summary }: { summary: string }) {
   const [open, setOpen] = React.useState(false);
   // A tap pins the tooltip: the browser follows a touch with a synthetic mouseleave, which
   // would otherwise close it the moment the finger lifts.
-  const [pinned, setPinned] = React.useState(0);
+  const [pinned, setPinned] = React.useState(false);
   React.useEffect(() => {
     if (!pinned) return;
     const timer = setTimeout(() => {
-      setPinned(0);
+      setPinned(false);
       setOpen(false);
     }, STABLE_TOOLTIP_MS);
     return () => clearTimeout(timer);
@@ -216,7 +215,7 @@ function CompactStableStatus({ summary }: { summary: string }) {
     <div className="gridHealth gridHealth-stable gridHealth-compact">
       <ClickAwayListener
         onClickAway={() => {
-          setPinned(0);
+          setPinned(false);
           setOpen(false);
         }}
       >
@@ -241,8 +240,8 @@ function CompactStableStatus({ summary }: { summary: string }) {
             className="gridHealthStableButton"
             aria-label={`Current grid status: ${summary}`}
             onClick={() => {
-              setOpen(true);
-              setPinned((count) => count + 1);
+              setOpen(!pinned);
+              setPinned(!pinned);
             }}
           >
             <span className="gridHealthStableIcon" aria-hidden="true">
@@ -271,12 +270,11 @@ export function GameAppBar(props: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
     null,
   );
-  const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
   const online = useOnline();
+  // The Scenario tool opens by navigation (see evidenceCard); there is nothing in it to point at
   React.useEffect(() => {
     if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
       onEvidenceAcknowledged?.(evidenceRequest);
-      setScenarioDetailsOpen(true);
     }
   }, [evidenceRequest, facilityDragActive, onEvidenceAcknowledged]);
 
@@ -437,7 +435,6 @@ export function GameAppBar(props: Props) {
       nextTutorial,
       isReplay,
       isTutorial,
-      setScenarioDetailsOpen,
     ],
   );
 
@@ -502,7 +499,6 @@ export function GameAppBar(props: Props) {
           activeEvents={activeEvents}
           onActiveEvents={openEvents}
           onEvidence={props.onEvidence}
-          onDetails={() => setScenarioDetailsOpen(true)}
         />
       )}
     </div>
@@ -582,11 +578,6 @@ export function GameAppBar(props: Props) {
           style={{ width: `${date.percentOfYear * 100}%` }}
         />
       </div>
-      <ScenarioDetailsDialog
-        open={scenarioDetailsOpen}
-        game={game}
-        onClose={() => setScenarioDetailsOpen(false)}
-      />
     </div>
   );
 }

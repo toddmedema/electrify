@@ -1,6 +1,7 @@
 import * as React from "react";
 import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
 import ConceptLegend from "./ConceptLegend";
+import EntryLink from "./ManualEntryLink";
 import { useUnits } from "./UnitsContext";
 import {
   formatLargeMassApprox,
@@ -67,9 +68,10 @@ export const MANUAL_GROUPS = ["Gameplay", "Money", "Physics & Units"] as const;
 export type ManualGroupType = (typeof MANUAL_GROUPS)[number];
 
 // Entry titles are the deep link ids -- anywhere in the game that shows one of these terms can
-// send the player straight to it with navigate({name: "MANUAL", entry: MANUAL_ENTRY.X}). Naming
-// them here rather than passing raw strings means renaming an entry breaks the build instead of
-// silently breaking the link.
+// send the player straight to it with navigate({name: "MANUAL", entry: MANUAL_ENTRY.X}), and an
+// entry's prose links the terms it shares with others through <EntryLink to={...}>, the way a
+// wiki does, at most once per target and never to itself. Naming them here rather than passing
+// raw strings means renaming an entry breaks the build instead of silently breaking the link.
 export const MANUAL_ENTRY = {
   OPERATING_COSTS: "Operating costs",
   FUEL_COSTS: "Fuel costs",
@@ -116,7 +118,6 @@ export interface ManualEntryType {
   // Pins the entry above the grouped list. Only "How to Play" uses it; a new player shouldn't
   // have to scroll past the glossary to find the overview.
   pinned?: boolean;
-  related?: ManualEntryTitleType[];
 }
 
 // The source line for an image, shown to the player rather than hidden in the alt attribute:
@@ -184,8 +185,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           You can meet growing demand by building more power plants, or by
-          helping customers use less electricity. Set these programs in
-          Insights; changes start next month.
+          helping <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>customers</EntryLink>{" "}
+          use less electricity. Set these programs in{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink>; changes
+          start next month.
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> Each is a
@@ -208,7 +211,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <strong>Time-of-use tariff:</strong> Hourly prices nudge people to
           shift when they use electricity. Half of homes move 20% of their use
           from your chosen four-hour window to the next three hours. Total
-          energy use stays the same. They pay 30% above the base rate during the
+          energy use stays the same. They pay 30% above the{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>base rate</EntryLink> during the
           window, 10% below it for the next three hours, and the base rate
           otherwise. Choose the hours when your grid is busiest.
         </p>
@@ -242,28 +246,40 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.HOW_TO_PLAY,
     group: "Gameplay",
     pinned: true,
-    related: [
-      MANUAL_ENTRY.POWER_AND_ENERGY,
-      MANUAL_ENTRY.FORECASTS,
-      MANUAL_ENTRY.SCORE,
-    ],
     keywords: "getting started tutorial basics overview intro new player",
     entry: (
       <div>
         <p>
           You're the CEO of an electric utility, the company that keeps a
           region's lights on. Your job: supply the electricity customers need
-          without running out of money. Build generators, store extra energy and
-          trade with neighboring grids. Fall short and you'll cause blackouts.
+          without running out of money. Build generators,{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>
+            store extra energy
+          </EntryLink>{" "}
+          and{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>
+            trade with neighboring grids
+          </EntryLink>
+          . Fall short and you'll cause{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>. Your{" "}
+          <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink> rewards a
+          reliable, affordable, clean grid.
         </p>
         <p>
-          <strong>Facilities:</strong> Build and manage your plants here.
-          Generators higher in the list run first when they can. To fit decades
-          into one sitting, one simulated day represents a month.
+          <strong>Facilities:</strong> Build and manage your plants here.{" "}
+          <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
+            Generators higher in the list run first
+          </EntryLink>{" "}
+          when they can. To fit decades into one sitting, one simulated day
+          represents a month.
         </p>
         <p>
-          <strong>Insights:</strong> Manage finances, rates, customer programs
-          and forecasts here.
+          <strong>Insights:</strong> Manage finances,{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>rates</EntryLink>,{" "}
+          <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
+            customer programs
+          </EntryLink>{" "}
+          and <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> here.
         </p>
       </div>
     ),
@@ -288,14 +304,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           <strong>Baseload</strong> is the demand that's there around the clock,
-          even at 3am. Nuclear and coal plants often cover it. They're slow or
-          costly to start and stop, so it makes sense to keep them running.
+          even at 3am. Nuclear and coal plants often cover it. They're{" "}
+          <EntryLink to={MANUAL_ENTRY.RAMP_RATE}>
+            slow or costly to start and stop
+          </EntryLink>
+          , so it makes sense to keep them running.
         </p>
         <p>
           <strong>Peakers</strong>, usually gas turbines, start quickly to cover
-          short peaks like hot summer evenings. They're cheap to build but burn
-          expensive fuel. Keeping one ready for a few critical hours can be
-          cheaper than a blackout, even if it sits idle most of the year.
+          short peaks like hot summer evenings. They're cheap to build but burn{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>expensive fuel</EntryLink>.
+          Keeping one ready for a few critical hours can be cheaper than a{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackout</EntryLink>, even if
+          it sits idle most of the year.
         </p>
         <p>
           Gas comes in both roles. A <strong>Natural Gas Peaker</strong> is a
@@ -303,12 +324,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <strong>Natural Gas CC</strong> (combined cycle) reuses the turbine's
           hot exhaust to drive a second, steam-powered turbine. It burns about a
           third less gas per MWh, but takes longer to start, so it's better for
-          demand that lasts several hours. A new gas peaker joins the dispatch
-          order below your other generators; other new plants join at the top.
+          demand that lasts several hours. A new gas peaker joins the{" "}
+          <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
+            dispatch order
+          </EntryLink>{" "}
+          below your other generators; other new plants join at the top.
         </p>
         <p>
-          Most grids need both steady and flexible plants. Hydro can do either
-          job: run steadily or change output quickly.
+          Most grids need both steady and flexible plants.{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>Hydro</EntryLink> can do
+          either job: run steadily or change output quickly.
         </p>
       </div>
     ),
@@ -319,10 +344,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Electricity has to be supplied as it's used. A blackout happens when
-          demand exceeds your available supply, including storage and imports.
-          Outages cost you customers, revenue and points. Your job security is
-          at stake too: too many blackouts and you're fired.
+          Electricity has to be supplied as it's used. A blackout happens when{" "}
+          <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>demand</EntryLink> exceeds your
+          available supply, including storage and{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>imports</EntryLink>. Keep some{" "}
+          <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink> for
+          surprises. Outages cost you customers, revenue and{" "}
+          <EntryLink to={MANUAL_ENTRY.SCORE}>points</EntryLink>. Your job
+          security is at stake too: too many blackouts and you're fired.
         </p>
       </div>
     ),
@@ -335,10 +364,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           A British thermal unit (Btu) measures heat energy, roughly what one
-          kitchen match gives off. Fuel prices use MMBtu: a million Btu, or
-          about 293 kWh of heat. A generator turns only some of that heat into
-          electricity: about a third for old coal plants, over half for
-          combined-cycle gas plants.
+          kitchen match gives off.{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>Fuel prices</EntryLink> use
+          MMBtu: a million Btu, or about 293{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>kWh</EntryLink> of heat.
+          A generator turns only some of that heat into electricity: about a
+          third for old coal plants, over half for combined-cycle gas plants.
         </p>
       </div>
     ),
@@ -367,11 +398,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          The build screen uses expected capacity factor to estimate cost per
-          MWh. The less it runs, the fewer MWh you have to spread its build cost
-          over. Fuel costs and your choices affect how often coal and gas run.
-          Wind and solar follow the weather; hot panels produce less power from
-          the same sunlight.
+          The build screen uses expected capacity factor to estimate{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
+            cost per MWh
+          </EntryLink>
+          . The less it runs, the fewer MWh you have to spread its build cost
+          over. <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>Fuel costs</EntryLink>{" "}
+          and your{" "}
+          <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
+            choices
+          </EntryLink>{" "}
+          affect how often coal and gas run. Wind and solar follow the weather;
+          hot panels produce less power from the same sunlight.
         </p>
         <p>
           Wind estimates use simplified weather calculations. Real output also
@@ -387,15 +425,25 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          A carbon fee puts a price on pollution, per <LargeMassUnit /> of
-          carbon dioxide equivalent (CO2e) emitted. Coal emits about twice as
-          much per MWh as gas, so at <ExampleCarbonFee />, coal can cost more to
-          run than gas.
+          A carbon fee puts a price on pollution, per <LargeMassUnit /> of{" "}
+          <EntryLink to={MANUAL_ENTRY.EMISSIONS}>
+            carbon dioxide equivalent (CO2e)
+          </EntryLink>{" "}
+          emitted. Coal emits about twice as much per MWh as gas, so at{" "}
+          <ExampleCarbonFee />, coal can cost more to run than gas.
         </p>
         <p>
-          You'll find the fee in operating expenses. Imported electricity adds
-          emissions to your score, but isn't charged a separate local carbon
-          fee. You pay the wholesale price.
+          You'll find the fee in{" "}
+          <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+            operating expenses
+          </EntryLink>
+          .{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>
+            Imported electricity
+          </EntryLink>{" "}
+          adds emissions to your{" "}
+          <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>, but isn't
+          charged a separate local carbon fee. You pay the wholesale price.
         </p>
       </div>
     ),
@@ -410,15 +458,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Hydroelectric dams release stored water through turbines. Rain and
           melting snow refill the reservoir from its watershed: the land that
-          drains into it. In effect, a dam is a battery the weather recharges.
-          Generating uses up stored water. Drought leaves you with less to
-          generate, while a full reservoir spills any extra.
+          drains into it. In effect, a dam is a{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>battery</EntryLink> the
+          weather recharges. Generating uses up stored water. Drought leaves you
+          with less to generate, while a full reservoir spills any extra.
         </p>
         <p>
-          Once you own hydro, the <strong>Water</strong> chart shows
-          precipitation, snow and reservoir levels. Snow falling in winter won't
-          refill your reservoir until it melts. California's hydro output rises
-          after the spring melt:
+          Once you own hydro, the{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>
+            <strong>Water</strong> chart
+          </EntryLink>{" "}
+          shows precipitation, snow and reservoir levels. Snow falling in winter
+          won't refill your reservoir until it melts. California's hydro output
+          rises after the spring melt:
         </p>
         <Figure
           src="/images/manual-hydro-snowpack.webp"
@@ -443,8 +495,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           The game simplifies reservoir sizes. Pumped Hydro works differently:
           you use electricity to pump water uphill, then let it flow back down
-          when you need power. In Electrify, it gets no river or rain inflow and
-          loses stored energy to evaporation.
+          when you need power,{" "}
+          <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>
+            losing some energy on the way
+          </EntryLink>
+          . In Electrify, it gets no river or rain inflow and loses stored
+          energy to evaporation.
         </p>
       </div>
     ),
@@ -487,9 +543,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          In investor-owned scenarios, you compete for a limited market. Lower
-          prices gradually win customers; higher prices and blackouts drive them
-          away. Switching takes months, so small changes may not show up
+          In investor-owned scenarios, you compete for a limited market.{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>Lower prices</EntryLink> gradually
+          win customers; higher prices and{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink> drive
+          them away. Switching takes months, so small changes may not show up
           immediately in the rounded customer count.
         </p>
       </div>
@@ -506,13 +564,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           CO2e means carbon dioxide equivalent: a common scale for the warming
           effect of different greenhouse gases. A kilogram of methane causes
           more warming than a kilogram of CO2, so it counts as more CO2e. Plants
-          list emissions in <MassUnitName /> per megawatt-hour (MWh).
+          list emissions in <MassUnitName /> per{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>
+            megawatt-hour (MWh)
+          </EntryLink>
+          .
         </p>
         <p>
-          Your total includes your own generation and the electricity you buy.
-          Insights shows them separately. Find each neighbor's emissions
-          estimate in Interties, with sources in its manual entry. Import
-          emissions per MWh use annual estimates, rather than changing hourly.
+          Your total includes your own generation and the electricity you buy.{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink> shows them
+          separately. Find each neighbor's emissions estimate in{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>Interties</EntryLink>, with
+          sources in its manual entry. Import emissions per MWh use annual
+          estimates, rather than changing hourly.
         </p>
         <p>
           Local estimates count CO2 from burning fuel, including biomass, with
@@ -525,8 +589,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Making steel and concrete and drilling wells also cause emissions.
           Each build card shows the total, spread evenly over construction. Even
           wind, solar, nuclear and storage have construction emissions. These
-          carry no carbon fee in the game; the fee applies only to burning fuel
-          locally.
+          carry no{" "}
+          <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fee</EntryLink> in the
+          game; the fee applies only to burning fuel locally.
         </p>
         <p>
           Even counting fuel supply and construction, wind, solar and nuclear
@@ -543,19 +608,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          Emissions affect your fees and score, but don't change local weather
-          in the game.
+          Emissions affect your fees and{" "}
+          <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>, but don't change
+          local weather in the game.
         </p>
       </div>
     ),
   },
   {
     title: MANUAL_ENTRY.FORECASTS,
-    related: [
-      MANUAL_ENTRY.RESERVE_CAPACITY,
-      MANUAL_ENTRY.INTERTIES,
-      MANUAL_ENTRY.POWER_AND_ENERGY,
-    ],
     group: "Gameplay",
     keywords: "projection supply demand fuel prices weather peak shortage",
     entry: (
@@ -567,20 +628,32 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           see the effect before running the clock.
         </p>
         <p>
-          <strong>Supply &amp; Demand:</strong> Shading marks predicted
-          blackouts, with the missing energy and the largest power shortage.
-          Check when the gaps happen before choosing what to build. Missing
-          energy is scaled to a month, because one simulated day represents a
-          month. Shaded hours don't show a real outage's duration.
+          <strong>Supply &amp; Demand:</strong> Shading marks predicted{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>, with the
+          missing{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>
+            energy and the largest power shortage
+          </EntryLink>
+          . Check when the gaps happen, and how much{" "}
+          <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink> you
+          have left, before choosing what to build. Missing energy is scaled to
+          a month, because one simulated day represents a month. Shaded hours
+          don't show a real outage's duration.
         </p>
         <p>
-          <strong>Supply by Fuel:</strong> Local generation appears in dispatch
-          order (merit order). Supply available to customers also includes
-          storage discharge and imports, minus charging and exports.
+          <strong>Supply by Fuel:</strong> Local generation appears in{" "}
+          <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
+            dispatch order
+          </EntryLink>{" "}
+          (merit order). Supply available to customers also includes storage
+          discharge and{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>imports</EntryLink>, minus
+          charging and exports.
         </p>
         <p>
-          <strong>Stored Energy:</strong> Energy left in batteries and
-          reservoirs. Power ratings limit how quickly you can use it.
+          <strong>Stored Energy:</strong> Energy left in batteries and{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>reservoirs</EntryLink>. Power
+          ratings limit how quickly you can use it.
         </p>
         <p>
           <strong>Fuel Prices:</strong> Historical prices and future estimates.
@@ -592,14 +665,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Temperature</strong> and{" "}
-          <strong>Renewable Capacity Factors</strong> show weather and expected
-          output. Demand follows a simplified local heating and cooling pattern.
-          Owning hydro adds a <strong>Water</strong> chart for precipitation,
-          snow and reservoirs.
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+            <strong>Renewable Capacity Factors</strong>
+          </EntryLink>{" "}
+          show weather and expected output. Demand follows a simplified local
+          heating and cooling pattern. Owning hydro adds a{" "}
+          <strong>Water</strong> chart for precipitation, snow and reservoirs.
         </p>
         <p>
-          Forecasts use one day per month (see How to Play), so they can't test
-          a week of clouds or still air.
+          Forecasts use one day per month (see{" "}
+          <EntryLink to={MANUAL_ENTRY.HOW_TO_PLAY}>How to Play</EntryLink>), so
+          they can't test a week of clouds or still air.
         </p>
       </div>
     ),
@@ -629,13 +705,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           for everyone. In Electrify you choose the order yourself.
         </p>
         <p>
-          Plants lower down cover the demand that's left. They still need time
-          to change output, and some can't run below a minimum level. Wind and
-          solar depend on the weather. Plants start and stop automatically.
+          Plants lower down cover the demand that's left. They still{" "}
+          <EntryLink to={MANUAL_ENTRY.RAMP_RATE}>
+            need time to change output
+          </EntryLink>
+          , and some can't run below a minimum level. Wind and solar{" "}
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+            depend on the weather
+          </EntryLink>
+          . Plants start and stop automatically.
         </p>
         <p>
-          This 2008 chart from PJM, an eastern US market, ranks generators by
-          cost:
+          This 2008 chart from PJM, an eastern US market, ranks generators by{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>cost</EntryLink>:
         </p>
         <Figure
           src="/images/manual-generation-stack.webp"
@@ -658,7 +740,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Ramp rate is how quickly a generator raises or lowers output. The
-          build screen estimates its time from zero to full power. Batteries
+          build screen estimates its time from zero to full power.{" "}
+          <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>
+            Batteries
+          </EntryLink>{" "}
           respond almost instantly; coal and nuclear plants need time, often
           hours, to heat equipment safely.
         </p>
@@ -666,12 +751,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Fuel-burning and nuclear plants also have a{" "}
           <strong>minimum stable output</strong>: the lowest power they can hold
           while running. In Electrify, it's 15%–50% of rated power. When demand
-          is low, the game compares staying at minimum with shutting down and
-          paying to restart.
+          is low, the game compares staying at minimum with shutting down and{" "}
+          <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+            paying to restart
+          </EntryLink>
+          .
         </p>
         <p>
-          A slow plant can't help much with a sudden jump in demand.
-          California's &ldquo;duck curve&rdquo; shows the problem: solar output
+          A slow plant can't help much with a sudden jump in demand, which is
+          why <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>{" "}
+          counts only what can respond within 15 minutes. California's
+          &ldquo;duck curve&rdquo; shows the problem:{" "}
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>solar output</EntryLink>{" "}
           falls just as people get home and use more electricity. Other plants
           and batteries have to make up the difference quickly:
         </p>
@@ -712,8 +803,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           when rates are low can save a fortune.
         </p>
         <p>
-          <strong>Inflation</strong> means rising prices. It pushes up fuel,
-          construction and operating costs in the game. Your electricity rate
+          <strong>Inflation</strong> means rising prices. It pushes up{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink>, construction
+          and{" "}
+          <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+            operating costs
+          </EntryLink>{" "}
+          in the game. Your{" "}
+          <EntryLink to={MANUAL_ENTRY.RATES}>electricity rate</EntryLink>{" "}
           doesn't rise on its own; you set it in Insights. A public utility's
           target rate and an investor's market rate both rise with inflation.
           Future economic conditions are estimates.
@@ -728,20 +825,29 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Your rate is the price per kWh customers pay. Revenue is that price
-          times electricity delivered, adjusted for time-of-use tariffs and
-          curtailment credits.
+          Your rate is the price per{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>kWh</EntryLink>{" "}
+          customers pay. Revenue is that price times electricity delivered,
+          adjusted for{" "}
+          <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
+            time-of-use tariffs and curtailment credits
+          </EntryLink>
+          .
         </p>
         <p>
-          <strong>Investor-owned:</strong> Price below the market rate to win
-          customers from rivals, or above it to earn more from each while some
-          leave. The market rate rises with inflation; switching takes months.
+          <strong>Investor-owned:</strong> Price below the market rate to win{" "}
+          <EntryLink to={MANUAL_ENTRY.CUSTOMERS}>customers</EntryLink> from
+          rivals, or above it to earn more from each while some leave. The
+          market rate rises with{" "}
+          <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>inflation</EntryLink>;
+          switching takes months.
         </p>
         <p>
           <strong>Publicly owned:</strong> Customers can't switch to another
-          utility. Your score rewards affordable power: a lifetime average rate
-          below the scenario's target earns points; above it loses points. You
-          still need enough revenue to cover costs. Set your rate in Insights.
+          utility. Your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>{" "}
+          rewards affordable power: a lifetime average rate below the scenario's
+          target earns points; above it loses points. You still need enough
+          revenue to cover costs. Set your rate in Insights.
         </p>
       </div>
     ),
@@ -751,7 +857,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Physics & Units",
     keywords:
       "MW MWh watts watt hours megawatt megawatt-hour battery duration discharge power energy capacity",
-    related: [MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY, MANUAL_ENTRY.FORECASTS],
     entry: (
       <div>
         <p>
@@ -764,8 +869,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           A full 20 MW battery holding 80 MWh can supply 20 MW for about four
-          hours, allowing for storage losses. Holding 80 MWh does not let it
-          supply 80 MW.
+          hours, allowing for{" "}
+          <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>
+            storage losses
+          </EntryLink>
+          . Holding 80 MWh does not let it supply 80 MW.{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink> charts
+          power in MW and energy in MWh.
         </p>
         <Figure
           src="/images/manual-power-energy.webp"
@@ -781,24 +891,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Gameplay",
     keywords:
       "headroom spare capacity cushion fifteen minutes reliability warning",
-    related: [
-      MANUAL_ENTRY.RAMP_RATE,
-      MANUAL_ENTRY.INTERTIES,
-      MANUAL_ENTRY.FORECASTS,
-    ],
     entry: (
       <div>
         <p>
           Reserve is how much extra demand you could cover within 15 minutes. It
-          includes extra output from your plants and storage, charging you could
-          stop, and exports you could redirect to your customers. Unused import
-          access doesn't count.
+          includes extra output your plants can{" "}
+          <EntryLink to={MANUAL_ENTRY.RAMP_RATE}>ramp up</EntryLink> to,
+          storage, charging you could stop, and{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>exports</EntryLink> you could
+          redirect to your customers. Unused import access doesn't count.
         </p>
         <p>
           Real grids keep reserve for plant failures and unexpected demand. A
           low-reserve warning marks hours when demand is close to available
-          supply. The game's 10% threshold isn't a real reliability standard;
-          staying above it doesn't guarantee you'll avoid blackouts.
+          supply, and{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> show
+          where that is coming. The game's 10% threshold isn't a real
+          reliability standard; staying above it doesn't guarantee you'll avoid{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>blackouts</EntryLink>.
         </p>
       </div>
     ),
@@ -808,23 +918,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Gameplay",
     keywords:
       "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype source citation CO2e proxy quebec california washington IEA EIA",
-    related: [
-      MANUAL_ENTRY.RESERVE_CAPACITY,
-      MANUAL_ENTRY.EMISSIONS,
-      MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY,
-    ],
     entry: (
       <div>
         <p>
           Interties connect neighboring grids. Your trading rule buys during
-          shortages and sells surplus after serving customers and charging
-          storage.
+          shortages and sells surplus after serving customers and charging{" "}
+          <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
+          . Exports you could redirect to your own customers count toward your{" "}
+          <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>.
         </p>
         <p>
-          <strong>Import capacity</strong> is the maximum power you can buy;{" "}
-          <strong>export capacity</strong> is the maximum surplus power you can
-          sell. Weather and the neighbor’s spare supply determine what is
-          available now.
+          <strong>Import capacity</strong> is the maximum{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>power</EntryLink> you
+          can buy; <strong>export capacity</strong> is the maximum surplus power
+          you can sell. Weather and the neighbor’s spare supply determine what
+          is available now.
         </p>
         <p>
           These capacities combine two underlying limits.{" "}
@@ -885,10 +993,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           historical data from about 1990 and official projections based on
           announced policies through 2050. After that, estimates stay flat.
           You'll see events like the 2022 energy crisis affect import prices,
-          and each year's estimated emissions count toward your score. You can
-          only build a connection once it existed in the real world. The game
-          uses annual averages and simplifies the transmission network. Here are
-          the sources:
+          and each year's estimated{" "}
+          <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> count
+          toward your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>. You
+          can only build a connection once it existed in the real world. The
+          game uses annual averages and simplifies the transmission network.
+          Here are the sources:
         </p>
         <IntertieTrendSources />
       </div>
@@ -896,10 +1006,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   },
   {
     title: MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY,
-    related: [
-      MANUAL_ENTRY.POWER_AND_ENERGY,
-      MANUAL_ENTRY.PRIORITIZING_GENERATORS,
-    ],
     group: "Physics & Units",
     keywords: "storage losses battery pumped hydro charge discharge",
     entry: (
@@ -908,12 +1014,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Round-trip efficiency tells you how much charging energy you get back.
           At 80%, charging with 10 MWh leaves 8 MWh to use. Electrify deducts
           the loss when you charge; the energy bar shows what's left. Batteries
-          return about 85%, pumped hydro about 80%.
+          return about 85%,{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>pumped hydro</EntryLink> about
+          80%.
         </p>
         <p>
-          Charging needs spare power and can't exceed the storage facility's
-          power rating. Electricity used to charge it can't also serve customers
-          or be exported.
+          Charging needs spare power and can't exceed the storage facility's{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>power rating</EntryLink>
+          . Electricity used to charge it can't also serve customers or be{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>exported</EntryLink>.{" "}
         </p>
         <p>
           Pausing storage stops charging and discharging. Self-discharge or
@@ -921,8 +1030,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Why store energy if you lose some? Saving midday solar can cost less
-          than running a gas plant in the evening, even with storage losses and
-          construction costs. Here it is in California:
+          than running a{" "}
+          <EntryLink to={MANUAL_ENTRY.BASELOAD_VS_PEAKER}>gas plant</EntryLink>{" "}
+          in the evening, even with storage losses and{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
+            construction costs
+          </EntryLink>
+          . Here it is in California:
         </p>
         <Figure
           src="/images/manual-battery-evening.webp"
@@ -951,12 +1065,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           In every scenario, you fail if you go bankrupt or serve less than 90%
-          of demand three months in a row (95% on Expert difficulty).
+          of demand three months in a row (95% on Expert difficulty). See{" "}
+          <EntryLink to={MANUAL_ENTRY.BLACKOUTS}>Blackouts</EntryLink>.
         </p>
         <p>
-          The tables below show how points add up, with reliability, costs and
-          emissions shown separately. Log in to submit your score and replay.
-          Use the leaderboard's play buttons to see how others beat your score!
+          The tables below show how points add up, with reliability, costs and{" "}
+          <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> shown
+          separately. Log in to submit your score and replay. Use the
+          leaderboard's play buttons to see how others beat your score!
         </p>
         <p>
           Saves and replays need matching game rules. After a rules update,
@@ -996,8 +1112,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             <tr>
               <td>±80</td>
               <td>
-                per $0.01/kWh your rate is below/above the target rate (adjusted
-                for inflation)
+                per $0.01/kWh your{" "}
+                <EntryLink to={MANUAL_ENTRY.RATES}>rate</EntryLink> is
+                below/above the target rate (adjusted for inflation)
               </td>
             </tr>
             <tr>
@@ -1024,24 +1141,28 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Money",
     keywords:
       "O&M fixed base variable operations maintenance non-fuel start annual upkeep",
-    related: [
-      MANUAL_ENTRY.CAPACITY_FACTOR,
-      MANUAL_ENTRY.TOTAL_COST_OF_ENERGY,
-      MANUAL_ENTRY.WEATHER_DAMAGE,
-    ],
     entry: (
       <div>
         <p>
           Operations and maintenance (O&amp;M) covers staff, repairs and other
-          upkeep. Some costs continue even when the plant isn't generating.
-          Fuel, carbon fees and loans are separate.
+          upkeep. Some costs continue even when the plant isn't generating.{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>Fuel</EntryLink>,{" "}
+          <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink>, and{" "}
+          <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>loans</EntryLink> are
+          separate; repairs after{" "}
+          <EntryLink to={MANUAL_ENTRY.WEATHER_DAMAGE}>weather damage</EntryLink>{" "}
+          count here.
         </p>
         <ul>
           <li>
             <strong>Fixed:</strong> Annual cost whether the plant runs or not.
           </li>
           <li>
-            <strong>Base:</strong> Annual quote at the expected capacity factor.
+            <strong>Base:</strong> Annual quote at the expected{" "}
+            <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+              capacity factor
+            </EntryLink>
+            .
           </li>
           <li>
             <strong>Variable:</strong> Cost per MWh generated.
@@ -1055,7 +1176,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           The annual estimate assumes expected output and 365 starts per year;
           actual costs depend on how you run it. Oil plants pay fixed and
           variable O&amp;M; pausing halves the fixed charge and stops the
-          variable one.
+          variable one. O&amp;M is part of a plant's{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
+            total cost of energy
+          </EntryLink>
+          .
         </p>
       </div>
     ),
@@ -1065,7 +1190,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Gameplay",
     keywords:
       "hail storm freeze cold snap winterization repair resilience retrofit hardening hail-resistant panels cold-weather package solar trackers downtime",
-    related: [MANUAL_ENTRY.OPERATING_COSTS, MANUAL_ENTRY.FUEL_COSTS],
     entry: (
       <div>
         <p>
@@ -1076,13 +1200,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <li>
             <strong>Hail:</strong> Breaks part of a solar farm. The broken share
             produces nothing until repairs finish, usually within weeks, and you
-            pay the full repair cost.
+            pay the full repair cost as part of{" "}
+            <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>O&amp;M</EntryLink>.
           </li>
           <li>
             <strong>Extreme cold:</strong> Gas plants colder than their rating
             lose output for the month. Frozen equipment caused these kinds of
             failures in Texas in 2021. A cold-weather package halves the loss. A
-            regional freeze also raises gas prices as demand for heating rises.
+            regional freeze also raises{" "}
+            <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>gas prices</EntryLink> as
+            demand for heating rises.
           </li>
         </ul>
         <p>
@@ -1096,9 +1223,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Solar trackers, available from 2014, turn panels to follow the sun for
-          more morning and evening power, about 20% more a year. They also tilt
-          panels steeply to reduce hail damage. You can only add them when
-          building.
+          more morning and evening power, about 20% more a year (a higher{" "}
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+            capacity factor
+          </EntryLink>
+          ). They also tilt panels steeply to reduce hail damage. You can only
+          add them when building.
         </p>
       </div>
     ),
@@ -1107,14 +1237,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.FUEL_COSTS,
     group: "Money",
     keywords: "fuel price per MWh gas coal oil uranium heat rate",
-    related: [MANUAL_ENTRY.BTU, MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
     entry: (
       <div>
         <p>
-          The fuel cost shown is what a plant would spend to produce one MWh at
-          current fuel prices. Its heat rate measures how much fuel energy it
-          needs to do that. A more efficient plant needs less fuel, so two gas
-          plants can have very different costs.
+          The fuel cost shown is what a plant would spend to produce one{" "}
+          <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>MWh</EntryLink> at
+          current fuel prices. Its heat rate measures how much{" "}
+          <EntryLink to={MANUAL_ENTRY.BTU}>fuel energy</EntryLink> it needs to
+          do that. A more efficient plant needs less fuel, so two gas plants can
+          have very different costs. Fuel is one part of a plant's{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
+            total cost of energy
+          </EntryLink>
+          .
         </p>
       </div>
     ),
@@ -1123,7 +1258,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.ACCOUNTING_LIFETIME,
     group: "Money",
     keywords: "lifespan years depreciation retirement aging",
-    related: [MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
     entry: (
       <div>
         <p>
@@ -1133,16 +1267,25 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           depreciation; it doesn't take money out of your cash balance.
         </p>
         <p>
-          Electrify uses those years to estimate lifetime cost and cost per MWh,
-          including construction, upkeep and fuel. It also sets resale value: a
-          plant's book value declines evenly to zero over its accounting
-          lifetime, so selling early returns more of the build cost. Any
-          outstanding loan is paid off from the sale first.
+          Electrify uses those years to estimate lifetime cost and{" "}
+          <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
+            cost per MWh
+          </EntryLink>
+          , including construction,{" "}
+          <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>upkeep</EntryLink> and{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink>. It also sets
+          resale value: a plant's book value declines evenly to zero over its
+          accounting lifetime, so selling early returns more of the build cost.
+          Any outstanding{" "}
+          <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>loan</EntryLink> is paid
+          off from the sale first.
         </p>
         <p>
           Reaching the end of its accounting lifetime doesn't retire a plant.
-          Some real hydro dams are over a century old. Some technologies do lose
-          a little output each year as they age.
+          Some real{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>hydro dams</EntryLink> are
+          over a century old. Some technologies do lose a little output each
+          year as they age.
         </p>
       </div>
     ),
@@ -1162,9 +1305,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           retiring a plant won't free it.
         </p>
         <p>
-          You can only build new Hydro where we've researched available sites.
-          An empty list doesn't necessarily mean the area has no hydro
-          potential.
+          You can only build new{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>Hydro</EntryLink> where we've
+          researched available sites. An empty list doesn't necessarily mean the
+          area has no hydro potential.
         </p>
       </div>
     ),
@@ -1178,10 +1322,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Total cost of energy, or levelized cost of energy (LCOE), estimates
-          average cost per MWh over a plant's accounting lifetime. It includes
-          construction, upkeep, startups, fuel and carbon fees; loan interest is
-          separate. Use it to compare a solar farm's upfront cost with a gas
-          peaker's ongoing fuel bills.
+          average cost per MWh over a plant's{" "}
+          <EntryLink to={MANUAL_ENTRY.ACCOUNTING_LIFETIME}>
+            accounting lifetime
+          </EntryLink>
+          . It includes construction, upkeep, startups,{" "}
+          <EntryLink to={MANUAL_ENTRY.FUEL_COSTS}>fuel</EntryLink> and{" "}
+          <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink>;{" "}
+          <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>loan interest</EntryLink>{" "}
+          is separate. Use it to compare a solar farm's upfront cost with a{" "}
+          <EntryLink to={MANUAL_ENTRY.BASELOAD_VS_PEAKER}>gas peaker</EntryLink>
+          's ongoing fuel bills.
         </p>
         <p>
           Those costs change over time. The global average cost of power from
@@ -1198,9 +1349,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          The estimate depends on expected output and quoted fuel prices. Actual
-          bills depend on how you run the plant; fixed and variable O&amp;M are
-          explained under Operating costs.
+          The estimate depends on{" "}
+          <EntryLink to={MANUAL_ENTRY.CAPACITY_FACTOR}>
+            expected output
+          </EntryLink>{" "}
+          and quoted fuel prices. Actual bills depend on how you run the plant;
+          fixed and variable O&amp;M are explained under{" "}
+          <EntryLink to={MANUAL_ENTRY.OPERATING_COSTS}>
+            Operating costs
+          </EntryLink>
+          .
         </p>
         <p>
           A plant's lifetime revenue is its share of electricity sales,

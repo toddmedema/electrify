@@ -1,5 +1,4 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`customer programs can be explored, scheduled and cancelled in ${theme}`, async ({
@@ -11,46 +10,18 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const insights = page.locator(".insights:visible");
-    await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
-    );
-    const entry = insights.getByRole("button", {
-      name: "Customer programs",
+    const entry = page.getByRole("button", {
+      name: "Programs",
       exact: true,
     });
     await entry.click();
-    const dialog = page.getByRole("dialog");
-    const header = dialog.locator(".constructionTitleBar");
-    const closeBounds = await dialog
-      .getByRole("button", { name: "Close customer programs" })
-      .boundingBox();
-    const speedBounds = await header
-      .getByRole("group", { name: "game speed" })
-      .boundingBox();
-    expect(closeBounds).not.toBeNull();
-    expect(speedBounds).not.toBeNull();
-    expect(
-      Math.abs(
-        closeBounds!.y +
-          closeBounds!.height / 2 -
-          speedBounds!.y -
-          speedBounds!.height / 2,
-      ),
-    ).toBeLessThanOrEqual(1);
+    const dialog = page.getByRole("region", { name: "Programs", exact: true });
+    const header = dialog.locator(".gameToolHeader");
+    await expect(
+      header.getByRole("button", { name: "Close Programs", exact: true }),
+    ).toBeVisible();
     expect(
       await header.evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
-    const title = header.locator(".iconLabel");
-    if (await title.locator("svg").isVisible()) {
-      const icon = (await title.locator("svg").boundingBox())!;
-      const label = (await title.locator(".programsTitleLong").boundingBox())!;
-      const gap = label.x - icon.x - icon.width;
-      expect(gap).toBeCloseTo(8, 0);
-    }
-    expect(
-      await title.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     const solar = dialog.getByRole("button", {
       name: /^Rooftop solar rebates · Not started/,
@@ -85,6 +56,7 @@ for (const theme of ["light", "dark"]) {
     });
     await expect(apply).toBeEnabled({ timeout: 30000 });
     const backBounds = (await dialog
+      .locator(".customerProgramsActions")
       .getByRole("button", { name: "Back", exact: true })
       .boundingBox())!;
     const applyBounds = (await apply.boundingBox())!;
@@ -114,7 +86,10 @@ for (const theme of ["light", "dark"]) {
     await expect(
       dialog.getByRole("button", { name: "Cancel scheduled start" }),
     ).toBeEnabled({ timeout: 30000 });
-    await dialog.getByRole("button", { name: "Back", exact: true }).click();
+    await dialog
+      .locator(".customerProgramsActions")
+      .getByRole("button", { name: "Back", exact: true })
+      .click();
     await expect(scheduled).toBeVisible();
     await solar.click();
     await dialog

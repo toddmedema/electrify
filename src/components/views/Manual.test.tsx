@@ -1,11 +1,58 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MANUAL_ENTRY } from "../base/ManualEntries";
+import * as React from "react";
+import {
+  MANUAL_ENTRY,
+  MANUAL_ENTRIES,
+  ManualEntryTitleType,
+} from "../base/ManualEntries";
+import ManualEntryLink from "../base/ManualEntryLink";
 import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
 import Manual, { clearManualMemory } from "./Manual";
 
-function renderManual(focusEntry?: string) {
-  return render(<Manual onBack={() => undefined} focusEntry={focusEntry} />);
+function renderManual(
+  focusEntry?: string,
+  onFollowLink: (
+    to: ManualEntryTitleType,
+    from: ManualEntryTitleType,
+  ) => void = () => undefined,
+) {
+  return render(
+    <LinkedManual focusEntry={focusEntry} onFollowLink={onFollowLink} />,
+  );
+}
+
+// Plays the container's part: a followed link becomes the next focus entry, as the card
+// reducer makes it
+function LinkedManual(props: {
+  focusEntry?: string;
+  onFollowLink: (to: ManualEntryTitleType, from: ManualEntryTitleType) => void;
+}) {
+  const [focus, setFocus] = React.useState({ entry: props.focusEntry, key: 0 });
+  return (
+    <Manual
+      onBack={() => undefined}
+      focusEntry={focus.entry}
+      focusKey={focus.key}
+      onFollowLink={(to, from) => {
+        props.onFollowLink(to, from);
+        setFocus((previous) => ({ entry: to, key: previous.key + 1 }));
+      }}
+    />
+  );
+}
+
+// Every link an entry's prose makes, in order
+function linkTargets(node: React.ReactNode): ManualEntryTitleType[] {
+  if (Array.isArray(node)) return node.flatMap(linkTargets);
+  if (!React.isValidElement(node)) return [];
+  const props = node.props as {
+    children?: React.ReactNode;
+    to?: ManualEntryTitleType;
+  };
+  return node.type === ManualEntryLink && props.to
+    ? [props.to, ...linkTargets(props.children)]
+    : linkTargets(props.children);
 }
 
 function entryHeader(title: string): HTMLElement {
@@ -57,12 +104,8 @@ describe("Manual", () => {
   it("links weather damage from operating costs and finds it by hazard", () => {
     renderManual(MANUAL_ENTRY.OPERATING_COSTS);
     expect(
-      within(
-        screen.getByRole("navigation", {
-          name: "Related to Operating costs",
-        }),
-      ).getByRole("button", { name: MANUAL_ENTRY.WEATHER_DAMAGE }),
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: "weather damage" }),
+    ).toHaveAttribute("href", "#manual-weather-damage");
     search("hail");
     expect(
       screen.getByRole("button", {
@@ -171,30 +214,38 @@ describe("Manual", () => {
   });
 });
 
-it("opens a related entry outside the search results and focuses its expanded heading", async () => {
+it("links each entry to others inline, once per target and never to itself", () => {
+  const titles = new Set<string>(MANUAL_ENTRIES.map((entry) => entry.title));
+  for (const entry of MANUAL_ENTRIES) {
+    const targets = linkTargets(entry.entry);
+    targets.forEach((target) => expect(titles.has(target)).toBe(true));
+    expect(targets).not.toContain(entry.title);
+    expect(new Set(targets).size).toBe(targets.length);
+  }
+});
+
+it("follows an inline link out of the search results and focuses its expanded heading", async () => {
   clearManualMemory();
-  renderManual();
+  const onFollowLink = jest.fn();
+  renderManual(undefined, onFollowLink);
   search("round-trip");
-  await userEvent.click(
-    within(
-      screen.getByRole("navigation", {
-        name: "Related to Round-trip Efficiency",
-      }),
-    ).getByRole("button", { name: "Power and Energy" }),
+  await userEvent.click(screen.getByRole("link", { name: "power rating" }));
+  expect(onFollowLink).toHaveBeenCalledWith(
+    MANUAL_ENTRY.POWER_AND_ENERGY,
+    MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY,
   );
   expect(screen.getByLabelText("Search the manual")).toHaveValue("");
   const heading = screen.getByRole("button", {
     name: "Power and Energy",
     expanded: true,
   });
-  expect(heading).toHaveAttribute("aria-expanded", "true");
   expect(heading).toHaveFocus();
   expect(
     screen.getByText(/Holding 80 MWh does not let it supply 80 MW/),
   ).toBeVisible();
 });
 
-it("refocuses and scrolls to the same related entry after search hid it", async () => {
+it("refocuses and scrolls to the entry already in focus after search hid it", async () => {
   clearManualMemory();
   renderManual(MANUAL_ENTRY.POWER_AND_ENERGY);
   search("round-trip");
@@ -202,19 +253,12 @@ it("refocuses and scrolls to the same related entry after search hid it", async 
   const original = HTMLElement.prototype.scrollIntoView;
   HTMLElement.prototype.scrollIntoView = scrollIntoView;
   try {
-    await userEvent.click(
-      within(
-        screen.getByRole("navigation", {
-          name: "Related to Round-trip Efficiency",
-        }),
-      ).getByRole("button", { name: "Power and Energy" }),
-    );
+    await userEvent.click(screen.getByRole("link", { name: "power rating" }));
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
     const heading = screen.getByRole("button", {
       name: "Power and Energy",
       expanded: true,
     });
-    expect(heading).toHaveAttribute("aria-expanded", "true");
     expect(heading).toHaveFocus();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   } finally {

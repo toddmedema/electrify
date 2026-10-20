@@ -18,8 +18,17 @@ import {
 import { getInflationIndex } from "../data/Economy";
 import { TICK_MINUTES } from "../Constants";
 import { getSolarOutputFactor } from "./Energy";
-import { CUSTOMER_MARKET_MULTIPLIER } from "./Customers";
+import { programCustomers } from "./ProgramCustomers";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import {
+  flexibilityMonths,
+  flexibilityCapitalCost,
+  flexibilityMonthlyCost,
+  flexibilityAvailable,
+  isFlexibilityPolicy,
+} from "./CustomerFlexibility";
+
+export { programCustomers } from "./ProgramCustomers";
 
 export function emptyPolicies(month = 0): PoliciesType {
   return {
@@ -33,6 +42,27 @@ export function emptyPolicies(month = 0): PoliciesType {
         installs: [],
       },
       solar: { tier: "Off", adoption: 0, spending: 0, spent: 0, installs: [] },
+      thermal: {
+        tier: "Off",
+        adoption: 0,
+        spending: 0,
+        spent: 0,
+        installs: [],
+      },
+      evCharging: {
+        tier: "Off",
+        adoption: 0,
+        spending: 0,
+        spent: 0,
+        installs: [],
+      },
+      battery: {
+        tier: "Off",
+        adoption: 0,
+        spending: 0,
+        spent: 0,
+        installs: [],
+      },
       timeOfUse: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
       curtailment: { tier: "Off", adoption: 0, spending: 0, spent: 0 },
     },
@@ -114,7 +144,9 @@ export function validPolicies(
           (validPolicyChange({ id, ...s.pending }) &&
             s.pending.month === currentMonth + 1 &&
             // A finished build-out has nothing left to start or pause.
-            (isOperatingPolicy(id) || !buildoutComplete(s.adoption))))
+            (isOperatingPolicy(id) ||
+              isFlexibilityPolicy(id) ||
+              !buildoutComplete(s.adoption))))
       );
     })
   );
@@ -131,16 +163,16 @@ export function policyBudget(
   month: number,
 ): number {
   if (tier === "Off" || isOperatingPolicy(id)) return 0;
+  if (isFlexibilityPolicy(id))
+    return (
+      flexibilityCapitalCost(game, id, month) / flexibilityMonths(id) +
+      flexibilityMonthlyCost(game, id, month)
+    );
   return (
     policyTotalCost(game, id as BuildoutPolicyId, month) /
     buildoutMonths(id as BuildoutPolicyId)
   );
 }
-/** Programs are sized by the customers the utility served when the run opened, scaled like
- * demand. The market also counts customers the utility could win, so it overstates the pool. */
-export const programCustomers = (game: GameType) =>
-  (game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER) *
-  game.startingDemandScale;
 /** Whole build-out cost at the given month's technology prices, in that month's dollars. Like
  * facility costs, the real price tables are start-year dollars carried forward by inflation. */
 export function policyTotalCost(
@@ -202,7 +234,11 @@ export const buildoutCompletionMonth = (
 /** Activation, then funded installations, then their spending. Idempotent per month.
  * Forecast callers own a private copy. Installed cohorts remain recorded so efficiency savings
  * can age independently of build-out progress. */
-export function advancePolicies(game: GameType, month: number): PolicyId[] {
+export function advancePolicies(
+  game: GameType,
+  month: number,
+  representedTransportationW?: number,
+): PolicyId[] {
   if (!game.policies) return [];
   const activated: PolicyId[] = [];
   const p = game.policies;
@@ -211,7 +247,7 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
       const s = p.programs[id];
       if (s.pending && s.pending.month <= m) {
         s.tier = s.pending.tier;
-        if (isOperatingPolicy(id)) {
+        if (isOperatingPolicy(id) || isFlexibilityPolicy(id)) {
           if (s.pending.startHour === undefined) delete s.startHour;
           else s.startHour = s.pending.startHour;
         }
@@ -221,6 +257,23 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
       if (isOperatingPolicy(id)) {
         s.adoption = participation(s.tier);
         s.spending = 0;
+        return;
+      }
+      if (isFlexibilityPolicy(id)) {
+        const enabled = s.tier === "On";
+        const increment =
+          enabled && flexibilityAvailable(game, id, m)
+            ? Math.min(1 - s.adoption, 1 / flexibilityMonths(id))
+            : 0;
+        const capital = flexibilityCapitalCost(game, id, m) * increment;
+        if (increment > 0) {
+          (s.installs ??= []).push([m, increment]);
+          s.adoption = Math.min(1, s.adoption + increment);
+        }
+        s.spending =
+          capital +
+          flexibilityMonthlyCost(game, id, m, representedTransportationW);
+        s.spent += s.spending;
         return;
       }
       const rate =
@@ -267,7 +320,8 @@ export const samePolicyChoice = (
   b: { tier: PolicyTier; startHour?: number },
 ) =>
   a.tier === b.tier &&
-  (!isOperatingPolicy(id) || policyStartHour(a) === policyStartHour(b));
+  (!(isOperatingPolicy(id) || isFlexibilityPolicy(id)) ||
+    policyStartHour(a) === policyStartHour(b));
 
 export function validDeferredResidential(value: unknown): boolean {
   if (value === undefined) return true;
@@ -359,8 +413,12 @@ export function customerBillingRate(
   game: GameType,
   tick: Pick<
     TickPresentFutureType,
-    "minute" | "demandByType" | "shiftedResidentialW"
+    | "minute"
+    | "demandByType"
+    | "shiftedResidentialW"
+    | "customerBatteryDischargeW"
   >,
+  baseRate = game.dollarsPerkWh,
 ) {
   const p = game.policies?.programs;
   const enrolledTariff = participation(p?.timeOfUse?.tier ?? "Off");
@@ -378,7 +436,16 @@ export function customerBillingRate(
     : tariffOffset >= 240 && tariffOffset < 420
       ? -0.1
       : 0;
-  const returnedW = tick.shiftedResidentialW ?? 0;
+  const residentialBeforeBattery =
+    tick.demandByType.Residential + (tick.customerBatteryDischargeW ?? 0);
+  const returnedW =
+    (tick.customerBatteryDischargeW ?? 0) === 0
+      ? (tick.shiftedResidentialW ?? 0)
+      : residentialBeforeBattery > 0
+        ? (Math.min(tick.shiftedResidentialW ?? 0, residentialBeforeBattery) *
+            tick.demandByType.Residential) /
+          residentialBeforeBattery
+        : 0;
   const enrolledResidentialW =
     (tick.demandByType.Residential - returnedW) *
     fraction(enrolledTariff, tariffPeak);
@@ -391,7 +458,7 @@ export function customerBillingRate(
     0,
   );
   return (
-    game.dollarsPerkWh *
+    baseRate *
     (total > 0
       ? 1 +
         (enrolledResidentialW * tariffDelta -
@@ -434,6 +501,7 @@ export function applyPolicyDemand(
   tick.rebateEligibleW = eligible;
   tick.efficiencySavedW = eligible - load;
   tick.rooftopSolarW = load * (1 - remaining);
+  tick.rooftopSurplusW = Math.max(0, solar - load);
   tick.demandByType = {
     ...tick.demandByType,
     Residential: residential * remaining,

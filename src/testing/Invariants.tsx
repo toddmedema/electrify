@@ -387,6 +387,7 @@ export function checkTick(
   const expectedSupplyW =
     supplyByFuelTotal +
     storageGridW +
+    -(now.customerBatteryGridChargeW || 0) +
     (now.importedW || 0) -
     (now.exportedW || 0);
   if (

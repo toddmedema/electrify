@@ -2,13 +2,17 @@ import { expect, Page, test } from "./fixtures";
 
 test.setTimeout(90_000);
 
-async function startGame(page: Page, theme: "light" | "dark") {
+async function startGame(
+  page: Page,
+  theme: "light" | "dark",
+  scenarioId = 100,
+) {
   await page.addInitScript((mode) => {
     localStorage.clear();
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
   }, theme);
-  await page.goto("/?scenario=100");
+  await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
   await page.keyboard.press("0");
@@ -27,6 +31,35 @@ async function settleSheets(page: Page) {
     );
   });
 }
+
+test("Escape closes the game menu before an unsaved program decision", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  await page.locator("#programsNav").click();
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await programs.getByRole("button", { name: /^Time-of-use tariff ·/ }).click();
+  await programs.getByRole("radio", { name: "On", exact: true }).check();
+  await programs.getByLabel("Daily window").selectOption("22");
+  await page.locator(".gameMenuButton").click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(
+    programs.getByRole("region", { name: "Program details" }),
+  ).toBeVisible();
+  await expect(
+    programs.getByRole("radio", { name: "On", exact: true }),
+  ).toBeChecked();
+  await expect(programs.getByLabel("Daily window")).toHaveValue("22");
+  await programs
+    .getByRole("heading", { name: "Time-of-use tariff", exact: true })
+    .focus();
+  await page.keyboard.press("Escape");
+  await expect(
+    programs.getByRole("region", { name: "Electricity pricing" }),
+  ).toBeVisible();
+});
 
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
   page,
@@ -337,6 +370,10 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
     await bolt.tap();
     await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
+    await bolt.tap();
+    await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
+    await bolt.tap();
+    await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
     await page
       .locator(".gameStage .facilities")
       .tap({ position: { x: 8, y: 8 } });
@@ -438,6 +475,69 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     page.getByRole("region", { name: "Build", exact: true }),
   ).toBeVisible();
   await session.detach();
+});
+
+test("Programs keeps points visible through monthly forecast refreshes", async ({
+  page,
+}, testInfo) => {
+  await startGame(page, testInfo.project.use.hasTouch ? "light" : "dark", 107);
+  await page.locator("#programsNav").click();
+  const pricing = page.getByRole("region", { name: "Electricity pricing" });
+  const points = pricing.locator(".insightsRateScore");
+  await expect(points).toHaveText(/[±+−]\d[\d,]* pts/);
+  await pricing.getByRole("slider").press("ArrowLeft");
+  await expect(points).toHaveText(/\+\d[\d,]* pts/);
+  await pricing.evaluate((element) => {
+    const months = new Set<string>();
+    const sample = () => {
+      if (
+        element
+          .querySelector(".insightsRateScore")
+          ?.textContent?.includes("Calculating")
+      ) {
+        element.setAttribute("data-score-blanked", "true");
+      }
+      const month = document
+        .querySelector(".gameStatus .weak")
+        ?.textContent?.match(/^\w+ \d+/)?.[0];
+      if (month) months.add(month);
+      element.setAttribute("data-observed-months", String(months.size));
+    };
+    sample();
+    const observer = new MutationObserver(sample);
+    const options = { subtree: true, childList: true, characterData: true };
+    observer.observe(element, options);
+    observer.observe(document.querySelector("#appbar")!, options);
+  });
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await expect
+    .poll(
+      async () => Number(await pricing.getAttribute("data-observed-months")),
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThanOrEqual(3);
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  await expect(pricing).not.toHaveAttribute("data-score-blanked", "true");
+  await settleSheets(page);
+  await page.mouse.move(0, 0);
+  await page.screenshot({
+    path: testInfo.outputPath("programs-points-estimate.png"),
+    animations: "disabled",
+  });
+  await page.locator("#insightsNav").click();
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect(
+    page.getByLabel("Displayed date range: 2017–23", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Monthly forecast ranges show/)).toHaveCount(0);
+  if (testInfo.project.use.hasTouch) {
+    await settleSheets(page);
+    await page.mouse.move(0, 0);
+    await page.screenshot({
+      path: testInfo.outputPath("insights-scenario-range.png"),
+      animations: "disabled",
+    });
+  }
 });
 
 test("Programs owns pricing and Build keeps purchase dialogs above its sheet", async ({

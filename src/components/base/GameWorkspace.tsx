@@ -5,6 +5,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { GameToolMemoryContext } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
+import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
@@ -18,6 +19,7 @@ import Insights from "../views/InsightsContainer";
 import EventLog from "../views/EventLogContainer";
 import BuildFacilities from "../views/BuildFacilities";
 import Programs from "../views/Programs";
+import ScenarioDetails from "./ScenarioDetails";
 import {
   GameWorkspaceContext,
   GameToolCloseContext,
@@ -64,6 +66,7 @@ export default function GameWorkspace() {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
+  const tutorialActions = useAppSelector(selectTutorialActions);
   // Open tools, least recently opened first. The newest ones win when they don't all fit.
   const [remembered, setRemembered] = React.useState<GameTool[]>([]);
   const [width, setWidth] = React.useState(window.innerWidth);
@@ -77,9 +80,9 @@ export default function GameWorkspace() {
   const capacity = maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
-  const tools: GameTool[] = active
-    ? [...remembered.filter((tool) => tool !== active), active]
-    : [];
+  const tools: GameTool[] = (
+    active ? [...remembered.filter((tool) => tool !== active), active] : []
+  ).filter((tool) => !tutorialActions || tutorialActions.includes(tool));
   const visible = tools.slice(-capacity);
   const ordered = GAME_TOOLS.map((tool) => tool.id).filter((id) =>
     tools.includes(id),
@@ -276,6 +279,7 @@ export default function GameWorkspace() {
                           )}
                           {tool === "INSIGHTS" && <Insights />}
                           {tool === "EVENTS" && <EventLog />}
+                          {tool === "SCENARIO" && <ScenarioDetails />}
                         </GameToolCloseContext.Provider>
                       )}
                     </div>
