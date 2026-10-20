@@ -46,7 +46,33 @@ export interface DesktopTimelineEvent {
   scenarioId: number;
   year: number;
 }
+export type DesktopInputContext = "Menu" | "Gameplay";
+export type DesktopInputAction =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  | "confirm"
+  | "back"
+  | "pause"
+  | "speedUp"
+  | "speedDown"
+  | "previousPane"
+  | "nextPane"
+  | "build"
+  | "previousChart"
+  | "nextChart";
+export interface DesktopInputFrame {
+  connected: boolean;
+  disconnected?: boolean;
+  actions: DesktopInputAction[];
+  glyphs: Partial<
+    Record<DesktopInputAction, { label: string; image?: string }>
+  >;
+}
 export interface DesktopBridge {
+  setInputContext?(context: DesktopInputContext): Promise<DesktopInputFrame>;
+  onInput?(callback: (frame: DesktopInputFrame) => void): () => void;
   multiplayerRequest?(
     input: import("./multiplayer/Native").NativeRequest,
   ): Promise<unknown>;

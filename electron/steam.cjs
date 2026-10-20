@@ -16,6 +16,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { SteamDispatcher } = require("./steam-dispatch.cjs");
 const { SteamAchievements } = require("./steam-achievements.cjs");
+const {
+  SteamInput,
+  loadInputFunctions,
+  validateInputContext,
+} = require("./steam-input.cjs");
 
 const CLOUD_PREFIX = /^electrify\/device-[a-f0-9]{32}\.json$/;
 const MAX_CLOUD_FILE_BYTES = 100 * 1024 * 1024;
@@ -34,6 +39,7 @@ class SteamService {
       this.multiplayer?.dispose();
       this.achievements?.dispose();
       this.activity?.dispose();
+      this.input?.dispose();
       this.stopped = true;
       this.leaderboards?.dispose();
       this.dispatcher?.dispose();
@@ -118,6 +124,36 @@ class SteamService {
       timelineSupported: !!this.activity?.supported,
       ...this.identity,
     };
+  }
+
+  configureInput(manifest, publish) {
+    if (!this.client || this.stopped) return;
+    try {
+      this.input = new SteamInput(
+        loadInputFunctions(),
+        manifest,
+        publish,
+        (error) => console.warn(`Steam Input unavailable: ${error.message}`),
+      );
+      this.input.start();
+    } catch (error) {
+      console.warn(`Steam Input unavailable: ${error.message}`);
+    }
+  }
+
+  setInputContext(context) {
+    validateInputContext(context);
+    return (
+      this.input?.setContext(context) ?? {
+        connected: false,
+        actions: [],
+        glyphs: {},
+      }
+    );
+  }
+
+  setInputEnabled(enabled) {
+    this.input?.setEnabled(enabled && !this.stopped);
   }
 
   cloudState() {

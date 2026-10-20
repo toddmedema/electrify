@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld(
     setActivity: (activity) => ipcRenderer.invoke("desktop:activity", activity),
     addTimelineEvent: (event) =>
       ipcRenderer.invoke("desktop:timeline-event", event),
+    setInputContext: (context) =>
+      ipcRenderer.invoke("desktop:input-context", context),
+    onInput: (callback) => subscribe("desktop:input-event", callback),
     onStateChanged: (callback) => subscribe("desktop:state-changed", callback),
     onBeforeQuit: (callback) => subscribe("desktop:before-quit", callback),
     onGameFocusChanged: (callback) =>

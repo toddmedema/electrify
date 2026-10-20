@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart from "./UPlotChart";
 import { ChartViewportContext } from "./ChartViewportContext";
@@ -79,6 +79,38 @@ describe("UPlotChart resizing", () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it("uses Escape for an open chart tooltip, then lets Back leave the chart", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Demand chart"
+        state={{}}
+        interactiveTooltip
+        tooltip={(index) => `Point ${index}`}
+        data={[
+          [0, 1],
+          [2, 3],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+    );
+    const plot = currentPlot();
+    plot.cursor = { left: -10, idx: null };
+    plot.valToPos = jest.fn((value: number) => value);
+    plot.setCursor = jest.fn((position: { left: number; top: number }) => {
+      plot.cursor = {
+        ...position,
+        idx: position.left < 0 ? null : position.left,
+      };
+    });
+    const chart = screen.getByRole("img", { name: /Demand chart/ });
+    expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
+    fireEvent.keyDown(chart, { key: "Enter" });
+    expect(screen.getByRole("status")).toHaveTextContent("Point 0");
+    expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(false);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
   });
 
   it("remeasures a plot when the bundled font finishes loading after its first draw", async () => {

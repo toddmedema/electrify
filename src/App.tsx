@@ -56,6 +56,10 @@ const MultiplayerRoot =
   process.env.REACT_APP_DESKTOP === "true"
     ? lazy(() => import("./multiplayer/Root"))
     : undefined;
+const DesktopInputHints =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? lazy(() => import("./desktop/InputHints"))
+    : undefined;
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -476,6 +480,11 @@ export default function App() {
               <div className="appFrameBody">
                 <CompositorContainer store={store} />
               </div>
+              {DesktopInputHints && isDesktopApp() && (
+                <Suspense fallback={null}>
+                  <DesktopInputHints />
+                </Suspense>
+              )}
               <ScenarioChoiceDialog />
               <CloudSavePrompt />
               <SharedGameDialog />

@@ -262,6 +262,68 @@ References: [Rich Presence localization](https://partner.steamgames.com/doc/api/
 [Steam Timeline guidance](https://partner.steamgames.com/doc/features/timeline), and the
 [Valve v001 SDK header](https://github.com/rlabrecque/Steamworks.NET/blob/7e5ab1859e30dab8162de2327d7fcfd176ce1064/CodeGen/steam/isteamtimeline.h).
 
+### Semantic Steam Input
+
+The desktop edition uses native Steam Input actions rather than mapping controller buttons to
+keyboard shortcuts. [`steamworks/input/actions.vdf`](../steamworks/input/actions.vdf) defines the
+`Menu` and `Gameplay` action sets. Menu navigation, selection and Back are shared; gameplay adds
+pause/resume, speed, pane switching, Build and chart switching. Build opens the catalog, and
+purchases still require an explicit review and confirmation. The existing controls also handle
+rate and capacity adjustments, chart inspection and Save & Quit.
+
+On Windows and Linux, the packaged manifest lives at `resources/steam-input/actions.vdf`; on
+macOS it lives at `Electrify.app/Contents/Resources/steam-input/actions.vdf`. The native process
+registers its absolute path with Steam Input. Button hints use Steam's current action origins and labels,
+so they follow the controller and the player's bindings. The hints appear after controller
+input and yield to keyboard or pointer input. Directional actions repeat while held; selection,
+Back and gameplay shortcuts require a new press. Returning from an overlay, changing action sets
+or reconnecting requires held buttons to be released first. A disconnected controller pauses
+the game; reconnecting does not resume it automatically.
+
+In the actual App ID's Steamworks **Steam Input** settings, enable **Custom Configuration
+(Bundled with game)** and set the manifest path to the packaged location for that platform.
+Publish the changes before accepting a Steam build. The adjacent `controller_*.vdf` files supply
+defaults for Xbox 360/One, Steam Deck (`neptune`), PlayStation 4/5 and Switch Pro. Keep the action
+names stable when updating bindings: configurations refer to the action-set-prefixed API names
+such as `Menu_confirm` and `Gameplay_confirm`. The repository files alone do not publish a
+Steamworks configuration. See Valve's [action manifest setup](https://partner.steamgames.com/doc/features/steam_controller/action_manifest_file).
+
+The default Xbox layout uses the D-pad or left stick to navigate, A to select, B to go back,
+X to open Build, Y or Start to pause/resume, bumpers for panes, triggers for charts and the right
+stick's up/down directions for speed. Steam's displayed origins describe the equivalent inputs
+on other controllers and follow player customization.
+
+Windowless browser coverage uses a replacement native bridge while retaining the production
+desktop renderer, real controls, reducers and save repository:
+
+```powershell
+$env:E2E_PORT = "3197" # Choose an unused task-specific port.
+npm run desktop:build
+$env:STEAM_INPUT_BUILD_DIR = "build"
+npx playwright test --config e2e/steam-input.playwright.config.ts
+Remove-Item Env:STEAM_INPUT_BUILD_DIR
+```
+
+This covers a controller-only title → challenge → construction → pricing → chart → Save & Quit
+journey at desktop and phone widths, active-device hints and pause on disconnect. Native unit
+tests exercise action polling and lifecycle guards. These checks do not validate a physical
+controller, Steam's configuration delivery or Steam Deck gaming mode.
+
+Before release, launch a private Steam build with the real App ID and test:
+
+- Steam Deck's built-in controls and supported Xbox, PlayStation and Switch controllers. Check
+  that displayed origins match each device and a player-edited binding.
+- Start a new game, inspect and buy a facility, adjust its size and the electricity rate, inspect
+  chart points, change game speed, pause/resume and Save & Quit without a mouse or touchscreen.
+  Confirm that visible focus and hints remain readable in light and dark themes.
+- Hold Select while opening a purchase review or another dialog: it must require a fresh press
+  to confirm. Check Back through chart details, nested decisions, tool panels and the game menu.
+- Open/close the Steam overlay, change action sets, disconnect/reconnect and hot-swap controllers
+  while holding controls. There must be no unintended action on return, and disconnect must
+  leave the game paused until the player resumes it.
+- Reload the saved game and verify its purchases and rate. Repeat offline, where locally
+  installed configurations and local saves must remain usable.
+
 ### Partner setup and release acceptance
 
 Steam services need configuration and a live test against the actual App ID. Automated offline
