@@ -45,10 +45,9 @@ test("catalog shows only title and status, and starting a program is one explici
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   for (const policy of Object.values(POLICIES))
     expect(screen.queryByText(policy.description)).not.toBeInTheDocument();
   fireEvent.click(
@@ -342,10 +341,9 @@ test("turning off an active program schedules the change and can be cancelled", 
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · On" }),
   );

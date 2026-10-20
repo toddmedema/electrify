@@ -41,7 +41,9 @@ for (const theme of ["light", "dark"]) {
     await expect(pricing.locator(".insightsRateScore")).toHaveClass(/good/);
     await expect(slider).toHaveAttribute("aria-valuetext", /rate score \+/);
     expect(
-      await pricing.evaluate((el) => el.scrollWidth - el.clientWidth),
+      await programs
+        .locator(".customerProgramsBody")
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     // Persist a negative cash fixture so both the clipped chart and its textual alternative
     // can be inspected without relying on a particular scenario's path to insolvency.

@@ -38,14 +38,16 @@ test("public pricing shows the rate score and an absolute customer objective", a
   // The first completed month records history
   await expect(
     page.locator(".gameStatusValue.weak:visible").first(),
-  ).not.toContainText("January");
+  ).not.toContainText(/Jan 2020/);
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "pause", exact: true })
     .first()
     .click();
   expect(
-    await pricing.evaluate((el) => el.scrollWidth - el.clientWidth),
+    await programs
+      .locator(".customerProgramsBody")
+      .evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(1);
   if (testInfo.project.name === "mobile-390px") {
     const metrics = await pricing.locator(".insightsRateMetric:visible").all();
