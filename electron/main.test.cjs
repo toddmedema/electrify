@@ -171,6 +171,16 @@ async function startup(
     },
     "./steam.cjs": { SteamService },
     "./steam-multiplayer.cjs": {},
+    // Startup may initialize other disk-backed services; keep this fixture windowless
+    // and in memory while the real main/display/runtime own the display lifecycle.
+    "./mods.cjs": {
+      ModStore: class {
+        cleanupStages() {
+          return Promise.resolve();
+        }
+      },
+    },
+    "./steam-workshop.cjs": { SteamWorkshop: class {} },
   };
   const filename = path.join(__dirname, "main.cjs");
   const run = vm.runInNewContext(
