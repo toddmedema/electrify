@@ -7,6 +7,7 @@ const {
   applyNativeDisplay,
   applyConfirmedDisplay,
   createDisplayQueue,
+  showWithConfirmedDisplay,
 } = require("./display.cjs");
 
 function fixture() {
@@ -111,6 +112,144 @@ function nativeFixture(fullscreen = false) {
   window.center = () => {};
   return window;
 }
+
+test("fullscreen startup requests entry after showing and commits only after native confirmation", async () => {
+  const window = nativeFixture();
+  const next = { fullscreen: true, width: 1024, height: 720 };
+  const calls = [];
+  let visible = false;
+  window.show = () => {
+    visible = true;
+    calls.push("show");
+  };
+  window.setFullScreen = (fullscreen) => {
+    assert.equal(
+      visible,
+      true,
+      "A hidden constructor intent is not a visible native request",
+    );
+    calls.push(fullscreen);
+  };
+  const queue = createDisplayQueue((display) =>
+    applyConfirmedDisplay(window, next, display, () => calls.push("commit")),
+  );
+  let finished = false;
+  const starting = showWithConfirmedDisplay(window, next, queue.apply).then(
+    () => {
+      finished = true;
+    },
+  );
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.deepEqual(calls, ["show", true]);
+  assert.equal(finished, false);
+  window.fullscreen = true;
+  window.emit("enter-full-screen");
+  await starting;
+  assert.deepEqual(calls, ["show", true, "commit"]);
+});
+
+test("saved windowed startup finishes its size correction before showing", async () => {
+  const window = nativeFixture();
+  const next = { fullscreen: false, width: 800, height: 600 };
+  const calls = [];
+  let complete;
+  const applying = new Promise((resolve) => {
+    complete = resolve;
+  });
+  window.show = () => calls.push(["show", ...window.getContentSize()]);
+  const starting = showWithConfirmedDisplay(window, next, async (display) => {
+    calls.push("apply");
+    await applying;
+    window.setContentSize(display.width, display.height);
+  });
+  assert.deepEqual(calls, ["apply"]);
+  complete();
+  await starting;
+  assert.deepEqual(calls, ["apply", ["show", 800, 600]]);
+});
+
+test("a queued startup exit waits for entry and quit drains both transitions", async () => {
+  const window = nativeFixture();
+  const initial = { fullscreen: true, width: 1024, height: 720 };
+  const requests = [];
+  let visible = false;
+  window.show = () => {
+    visible = true;
+  };
+  window.setFullScreen = (fullscreen) => {
+    assert.equal(visible, true);
+    requests.push(fullscreen);
+  };
+  const queue = createDisplayQueue((next) =>
+    applyNativeDisplay(window, next, () => Promise.resolve()),
+  );
+  const starting = showWithConfirmedDisplay(window, initial, queue.apply);
+  const exiting = queue.apply({ ...initial, fullscreen: false });
+  let quit = false;
+  const draining = queue.drain().then(() => {
+    quit = true;
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.deepEqual(requests, [true]);
+  assert.equal(quit, false);
+  window.fullscreen = true;
+  window.emit("enter-full-screen");
+  await starting;
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.deepEqual(requests, [true, false]);
+  assert.equal(quit, false);
+  window.fullscreen = false;
+  window.emit("leave-full-screen");
+  await Promise.all([exiting, draining]);
+  assert.equal(quit, true);
+  assert.equal(window.eventNames().length, 0);
+});
+
+test("a failed saved display remains visible after rollback, unless its window closed", async () => {
+  for (const closed of [false, true]) {
+    const window = nativeFixture();
+    let destroyed = false;
+    let shown = 0;
+    window.isDestroyed = () => destroyed;
+    window.show = () => {
+      shown++;
+    };
+    await assert.rejects(
+      showWithConfirmedDisplay(
+        window,
+        { fullscreen: false, width: 800, height: 600 },
+        async () => {
+          destroyed = closed;
+          throw new Error("Native resize rejected");
+        },
+      ),
+      /Native resize rejected/,
+    );
+    assert.equal(shown, closed ? 0 : 1);
+  }
+});
+
+test("startup never shows a window destroyed before or during its pending display operation", async () => {
+  for (const alreadyClosed of [true, false]) {
+    const window = nativeFixture();
+    let destroyed = alreadyClosed;
+    window.isDestroyed = () => destroyed;
+    window.show = () =>
+      assert.fail("A closed startup must not show a stale window");
+    const apply = async () => {
+      destroyed = true;
+    };
+    if (alreadyClosed)
+      await assert.rejects(
+        showWithConfirmedDisplay(window, { fullscreen: false }, apply),
+        /closed/,
+      );
+    else await showWithConfirmedDisplay(window, { fullscreen: false }, apply);
+  }
+});
 
 test("display preferences commit only after the asynchronous native operation succeeds", async () => {
   const window = nativeFixture();

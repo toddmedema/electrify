@@ -1532,6 +1532,20 @@ function setForegroundSpeed(state: GameType, speed: SpeedType) {
   }
 }
 
+function enterBlockingCard(state: GameType, name: string) {
+  if (!state.inGame) return;
+  const enteringFlow = speedBeforeBlockingCard === undefined;
+  if (enteringFlow) {
+    speedBeforeBlockingCard =
+      state.policyPause?.speed ?? foregroundSpeed(state);
+    delete state.policyPause;
+  }
+  blockingCardAllowsSpeed = name.startsWith("BUILD_");
+  // Build tabs retain a chosen speed; strict destinations always freeze their own clock.
+  if (enteringFlow || !blockingCardAllowsSpeed)
+    setForegroundSpeed(state, "PAUSED");
+}
+
 // Puts the clock back the way the player left it before a full-screen card paused it
 function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
@@ -2192,17 +2206,12 @@ export const gameSlice = createSlice({
       if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
-      } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        blockingCardAllowsSpeed = name.startsWith("BUILD_");
-        speedBeforeBlockingCard =
-          state.policyPause?.speed ?? foregroundSpeed(state);
-        delete state.policyPause;
-        setForegroundSpeed(state, "PAUSED");
-      }
+      } else enterBlockingCard(state, name);
     });
     builder.addCase(navigateBack, (state, action) => {
       if (!action.payload || !BLOCKING_CARDS.has(action.payload))
         restoreSpeedAfterBlockingCard(state);
+      else enterBlockingCard(state, action.payload);
     });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
@@ -4286,7 +4295,7 @@ function* supplyFacilitiesFinancesPhases(
   stepMinutes = TICK_MINUTES,
   advanceConstruction = true,
 ): Generator<PeerPlan, TickPresentFutureType, PeerSettlement | undefined> {
-  const { facilities, date } = state;
+  const { facilities } = state;
   const tickScale = stepMinutes / TICK_MINUTES;
   const ticksPerHour = 60 / stepMinutes;
   const ticksPerMonth = TICKS_PER_MONTH / tickScale;
@@ -5117,10 +5126,14 @@ function* supplyFacilitiesFinancesPhases(
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
+  // At rollover the live clock has advanced beyond the timeline and rebooks its last frame
+  // using the closing clock's price. Preserve that accounting while pricing future samples
+  // at their own month, rather than the forecast's starting month.
+  const fuelDate = now.minute < state.date.minute ? state.date : tickDate;
   const fuelPrices = getEffectiveFuelPrices(
-    date,
+    fuelDate,
     state,
-    date.minute === now.minute ? tickStoryEffects : undefined,
+    fuelDate.minute === now.minute ? tickStoryEffects : undefined,
   );
   // Attribute sales proportionally to gross local output and imports. Using net supply
   // after charging or exports would credit local facilities with more than the company earned.

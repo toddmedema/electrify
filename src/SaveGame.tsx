@@ -452,6 +452,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
+        typeof current.name !== "string" ||
+        current.name.trim().length === 0 ||
         !validConstruction(
           current,
           Number(current.peakW) * 20 + Number(current.peakWh || 0),

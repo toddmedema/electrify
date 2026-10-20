@@ -56,6 +56,8 @@ export class MultiplayerSession {
   private connected = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private lifecycle = 0;
+  private startGeneration = 0;
+  private startupCleanup: Promise<unknown> = Promise.resolve();
   private saveRequests = new Map<
     string,
     { resolve: () => void; reject: (error: Error) => void }
@@ -285,7 +287,7 @@ export class MultiplayerSession {
           : this.state.error,
     });
     this.flushActivity();
-    if (!this.pending && this.queued.length) {
+    while (!this.pending && !this.closing && this.queued.length) {
       const queued = this.queued.shift()!;
       this.completion = queued;
       this.sendCommand(queued.command);
@@ -438,8 +440,37 @@ export class MultiplayerSession {
   }
   /** Starts the host's chosen scenario for the lobby, or resumes the last shared save. */
   async start(choice: { spec: MatchSpec } | { saved: true }) {
+    const generation = ++this.startGeneration;
+    const lifecycle = this.lifecycle;
+    const current = () =>
+      generation === this.startGeneration && lifecycle === this.lifecycle;
+    let locked = false;
+    let receivedView = false;
+    const rollback = (message: string) => {
+      if (!current()) return;
+      this.startGeneration++;
+      this.worker?.terminate();
+      this.worker = undefined;
+      this.update({ busy: false, error: message });
+      const browse = this.state.browse;
+      if (browse)
+        this.publishBrowse({
+          phase: "browsing",
+          card: browse.card,
+          scenarioId: browse.scenarioId,
+          difficulty: browse.difficulty,
+          custom: browse.custom,
+        });
+      if (locked)
+        this.startupCleanup = this.request({ kind: "unlock" }).catch(
+          () => undefined,
+        );
+    };
     this.update({ busy: true, error: undefined });
     try {
+      // A retry must acquire its lock after the failed attempt releases its own.
+      await this.startupCleanup;
+      if (!current()) return;
       const world =
         "saved" in choice
           ? ((await this.request({ kind: "read-checkpoint" })) as World | null)
@@ -462,13 +493,25 @@ export class MultiplayerSession {
           "The lobby must contain only the saved match's players",
         );
       await this.request({ kind: "lock", ids: seats.map((s) => s.id) });
+      locked = true;
+      if (!current()) {
+        await this.request({ kind: "unlock" }).catch(() => undefined);
+        return;
+      }
       // A previous start can fail inside the worker; never leave that thread running.
       this.worker?.terminate();
-      this.worker = await this.workerFactory();
+      const worker = await this.workerFactory();
+      if (!current()) {
+        worker.terminate();
+        return;
+      }
+      this.worker = worker;
       this.connected = new Set(this.state.lobby.connected);
       this.worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+        if (!current() || this.worker !== worker) return;
         if (data.kind === "error") {
-          this.update({ error: data.message, busy: false });
+          if (!receivedView) rollback(data.message);
+          else this.update({ error: data.message, busy: false });
           return;
         }
         if (data.kind === "checkpoint") {
@@ -507,8 +550,10 @@ export class MultiplayerSession {
                 !this.state.lobby.connected.includes(g.seat.id),
             )
             .map((g) => g.seat.id);
-          if (id === this.state.lobby.selfId) this.acceptView(view);
-          else if (this.state.lobby.connected.includes(id))
+          if (id === this.state.lobby.selfId) {
+            receivedView = true;
+            this.acceptView(view);
+          } else if (this.state.lobby.connected.includes(id))
             void this.request({
               kind: "send",
               to: id,
@@ -516,12 +561,13 @@ export class MultiplayerSession {
             }).catch(() => this.post({ kind: "disconnect", sender: id }));
         }
       };
-      this.worker.onerror = () =>
-        this.update({
-          busy: false,
-          error:
-            "The simulation worker stopped. Resume the shared save to continue.",
-        });
+      this.worker.onerror = () => {
+        if (!current() || this.worker !== worker) return;
+        const error =
+          "The simulation worker stopped. Resume the shared save to continue.";
+        if (!receivedView) rollback(error);
+        else this.update({ busy: false, error });
+      };
       const epoch = crypto.randomUUID();
       this.post(
         world
@@ -535,9 +581,7 @@ export class MultiplayerSession {
             },
       );
     } catch (error) {
-      this.worker?.terminate();
-      this.worker = undefined;
-      this.update({ busy: false });
+      rollback(error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -599,6 +643,7 @@ export class MultiplayerSession {
       this.closing = false;
       throw error;
     }
+    this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
     this.pending = undefined;
@@ -719,6 +764,7 @@ export class MultiplayerSession {
     }
   }
   private endLocalMatch() {
+    this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
     this.pending = undefined;

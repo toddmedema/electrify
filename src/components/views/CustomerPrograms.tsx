@@ -1267,6 +1267,7 @@ export function ProgramsScreen({
           <Button onClick={() => setSelected(undefined)}>Back</Button>
           {policy && operating && current!.pending && (
             <Button
+              disabled={!!game.replayPlayback}
               onClick={() => {
                 dispatch(cancelPolicy({ id: policy, ...current!.pending! }));
                 setSelected(undefined);

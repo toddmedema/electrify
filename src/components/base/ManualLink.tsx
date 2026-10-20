@@ -58,6 +58,21 @@ export default function ManualLink(props: Props): React.JSX.Element {
   };
   React.useEffect(() => cancel, [cancel]);
 
+  React.useEffect(() => {
+    if (!preview || pinned) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancel();
+      suppressed.current = true;
+      setPreview(false);
+    };
+    // Focus may still be in the workspace; consume Escape before its document listener.
+    document.addEventListener("keydown", dismiss, true);
+    return () => document.removeEventListener("keydown", dismiss, true);
+  }, [preview, pinned, cancel]);
+
   const pin = (entry: string) => {
     cancel();
     suppressed.current = true;

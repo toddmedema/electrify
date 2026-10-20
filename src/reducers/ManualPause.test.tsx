@@ -1,13 +1,59 @@
 import gameReducer, { setSpeed } from "./Game";
 import cardReducer, { navigate, navigateBack } from "./Card";
 import { manualHelpOpen, manualHelpClose } from "./UI";
-import { quit } from "./GameActions";
+import { pageHidden, pageVisible, quit } from "./GameActions";
 import { GameType } from "../Types";
 
 function running(speed: "SLOW" | "NORMAL" | "FAST" = "FAST"): GameType {
   const state = gameReducer(undefined, setSpeed(speed));
   return { ...state, inGame: true };
 }
+
+describe("blocking card destination permissions", () => {
+  beforeEach(() => {
+    gameReducer(undefined, quit());
+  });
+
+  it.each(["MANUAL", "ACHIEVEMENTS", "SAVED_GAMES"] as const)(
+    "freezes %s entered from a running build catalog",
+    (destination) => {
+      let state = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
+      state = gameReducer(state, setSpeed("FAST"));
+      state = gameReducer(state, navigate(destination));
+      expect(state.speed).toBe("PAUSED");
+      expect(gameReducer(state, setSpeed("FAST")).speed).toBe("PAUSED");
+      state = gameReducer(state, navigateBack("BUILD_STORAGE"));
+      state = gameReducer(state, setSpeed("SLOW"));
+      expect(state.speed).toBe("SLOW");
+      expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("SLOW");
+    },
+  );
+
+  it("keeps explicit build speed across tabs and restores the original choice after a strict screen", () => {
+    let state = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
+    state = gameReducer(state, setSpeed("FAST"));
+    state = gameReducer(state, navigate("BUILD_GENERATORS"));
+    expect(state.speed).toBe("FAST");
+    state = gameReducer(state, navigate("MANUAL"));
+    expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("NORMAL");
+  });
+
+  it("applies strict Back destinations while hidden and never revives them on visibility", () => {
+    let state = gameReducer(running("NORMAL"), navigate("MANUAL"));
+    state = gameReducer(state, navigate("BUILD_STORAGE"));
+    state = gameReducer(state, setSpeed("FAST"));
+    state = gameReducer(state, pageHidden());
+    state = gameReducer(state, navigateBack("MANUAL"));
+    state = gameReducer(state, setSpeed("FAST"));
+    state = gameReducer(state, pageVisible());
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(state, pageHidden());
+    state = gameReducer(state, navigate("BUILD_STORAGE"));
+    state = gameReducer(state, pageVisible());
+    expect(gameReducer(state, setSpeed("SLOW")).speed).toBe("SLOW");
+    expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("NORMAL");
+  });
+});
 
 describe("the manual pausing the game", () => {
   it("pauses on the way in and restores the speed on the way back", () => {

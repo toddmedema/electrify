@@ -199,6 +199,10 @@ async function main(argv = process.argv.slice(2)) {
   console.error(
     `\n${failed.length ? `Failed ${failed.length}/${results.length}` : `Passed ${results.length}`} gates in ${((Date.now() - started) / 1000).toFixed(0)}s.${full ? "" : " Partial check only."}${full && !selected.some((step) => step.ci) ? " Run npm run check:ci before pushing a pull request." : ""}`,
   );
+  if (full && selected.some((step) => step.ci))
+    console.error(
+      "Packaged Electron UI tests are CI-only and are not included in this check.",
+    );
   if (failed.length) {
     console.error(
       "This retry covers only failed gates. Also rerun any passing gates whose inputs changed during the repair; use npm run check if unsure.",
