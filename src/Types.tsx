@@ -469,6 +469,21 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
     deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
     shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
+    deferredThermal?: DeferredResidentialLoad[];
+    deferredThermalStart?: DeferredResidentialLoad[];
+    deferredCharging?: DeferredResidentialLoad[];
+    deferredChargingStart?: DeferredResidentialLoad[];
+    thermalShiftedW?: number;
+    thermalRecoveredW?: number;
+    evShiftedW?: number;
+    evRecoveredW?: number;
+    customerBatteryWh?: number; // Customer storage, separate from utility-owned facilities.
+    customerBatteryWhStart?: number;
+    customerBatteryChargeW?: number;
+    customerBatteryGridChargeW?: number;
+    customerBatteryDischargeW?: number;
+    customerBatteryLossWh?: number;
+    rooftopSurplusW?: number;
     // Home and business load before rebate programs, and what efficiency and rooftop solar removed
     // from it this tick. Present only while a rebate program has installed anything.
     rebateEligibleW?: number;
@@ -1166,7 +1181,14 @@ export interface WorldEventStateType {
   checkedKeys: string[];
 }
 
-export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
+export type PolicyId =
+  | "efficiency"
+  | "solar"
+  | "timeOfUse"
+  | "curtailment"
+  | "thermal"
+  | "evCharging"
+  | "battery";
 export type PolicyTier = "Off" | "On";
 export interface DeferredResidentialLoad {
   energyWh: number; // Unscaled representative-day energy.
@@ -1176,11 +1198,11 @@ export interface DeferredResidentialLoad {
 export interface PolicyProgramType {
   tier: PolicyTier;
   startHour?: number; // Four-hour local-clock window; absent means 17 for earlier callers.
-  adoption: number; // Build-out progress (0-1) for rebates; current enrolled share for operating offers.
-  spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
-  spent: number; // Cumulative rebate spending over the run.
+  adoption: number; // Rollout progress (0-1) for rebates/flexibility; enrollment for legacy operating offers.
+  spending: number; // This month's installations and flexibility payments; legacy tariff credits reduce revenue.
+  spent: number; // Cumulative program spending over the run.
   completedMonth?: number; // Last month a finished build-out installed upgrades.
-  installs?: [month: number, share: number][]; // Build-out cohorts, for measures that wear out.
+  installs?: [month: number, share: number][]; // Cohorts preserve installation-year eligibility and equipment age.
   pending?: { tier: PolicyTier; month: number; startHour?: number };
 }
 export interface PoliciesType {

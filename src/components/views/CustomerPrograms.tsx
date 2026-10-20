@@ -24,6 +24,9 @@ import EnergySavingsLeafIcon from "@mui/icons-material/EnergySavingsLeaf";
 import SolarPowerIcon from "@mui/icons-material/SolarPower";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import FactoryIcon from "@mui/icons-material/Factory";
+import ThermostatIcon from "@mui/icons-material/Thermostat";
+import ElectricCarIcon from "@mui/icons-material/ElectricCar";
+import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import NavigableCardRow from "../base/NavigableCardRow";
@@ -42,6 +45,16 @@ import {
   PolicyTier,
 } from "../../Types";
 import { POLICIES, POLICY_IDS, POLICY_TIERS } from "../../data/Policies";
+import {
+  FLEXIBILITY_IDS,
+  isFlexibilityPolicy,
+  flexibilityMonths,
+  flexibilityAvailable,
+  flexibilityCapitalCost,
+  flexibilityMonthlyCost,
+} from "../../helpers/CustomerFlexibility";
+import { electricVehicleEligibility } from "../../data/ElectricVehicles";
+import { customerBatteryFleet } from "../../helpers/CustomerBatteries";
 import { GENERATORS } from "../../data/Facilities";
 import { SCENARIO_PREPARATION_MONTHS } from "../../data/ScenarioPreparation";
 import {
@@ -111,6 +124,9 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   solar: SolarPowerIcon,
   timeOfUse: ScheduleIcon,
   curtailment: FactoryIcon,
+  thermal: ThermostatIcon,
+  evCharging: ElectricCarIcon,
+  battery: BatteryChargingFullIcon,
 };
 const WILDFIRE_SUMMARY =
   "Crews, inspections and vegetation clearing halve wildfire disconnections and generator losses at full strength. Protection builds over 12 months and fades over 12 months after funding stops; fires and restoration costs remain.";
@@ -121,6 +137,109 @@ const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
   efficiency: "Efficiency",
   solar: "Rooftop solar",
 };
+
+function FlexibilitySummary({
+  game,
+  id,
+  program,
+  month,
+}: {
+  game: GameType;
+  id: "thermal" | "evCharging" | "battery";
+  program: PolicyProgramType;
+  month: number;
+}) {
+  const year = game.startingYear + Math.floor(month / 12);
+  const available = flexibilityAvailable(game, id, month);
+  const fullRollout: GameType = {
+    ...game,
+    policies: {
+      month: game.date.monthsElapsed,
+      programs: {
+        ...(game.policies?.programs ?? emptyPolicies().programs),
+        [id]: {
+          ...program,
+          tier: "On",
+          adoption: 1,
+          installs: (program.installs ?? []).concat([
+            [month, Math.max(0, 1 - program.adoption)],
+          ]),
+        },
+      },
+    },
+  };
+  const battery =
+    id === "battery"
+      ? customerBatteryFleet(
+          program,
+          month,
+          game.startingYear,
+          programCustomers(game),
+          game.location,
+        )
+      : undefined;
+  const facts: [string, string][] = [
+    [
+      "Local equipment",
+      `${year} · ${available ? "Compatible participants available" : "No compatible participants yet"}`,
+    ],
+    [
+      "Rollout",
+      `${formatPercent(program.adoption)} of program · ${flexibilityMonths(id)} months of funding`,
+    ],
+    [
+      "Installation budget while funding",
+      `${formatMoneyConcise(buildoutComplete(program.adoption) ? 0 : flexibilityCapitalCost(game, id, month) / flexibilityMonths(id))}/mo while installing`,
+    ],
+    [
+      "Current participation payments",
+      `${formatMoneyConcise(flexibilityMonthlyCost(game, id, game.date.monthsElapsed))}/mo`,
+    ],
+    [
+      "Full-rollout participation estimate",
+      `${formatMoneyConcise(flexibilityMonthlyCost(fullRollout, id, month))}/mo at ${year} eligibility`,
+    ],
+  ];
+  if (id === "evCharging")
+    facts.push([
+      "Electric-car fleet",
+      `${formatPercent(electricVehicleEligibility(year, game.location).fleetShare)} of local cars · compatible chargers only`,
+    ]);
+  if (battery)
+    facts.push([
+      "Enrolled storage",
+      `${formatWatts(battery.powerW)} / ${formatWattHours(battery.capacityWh)} · 20% household reserve`,
+    ]);
+  return (
+    <>
+      {!available && (
+        <Alert severity="info">
+          {id === "battery" && year >= 2013 && year < 2016
+            ? "Home batteries are an early market. This virtual power plant program becomes available in 2016."
+            : `This location has no eligible equipment in ${year}. Availability follows the game year.`}
+        </Alert>
+      )}
+      <Box component="dl" className="customerProgramFacts">
+        {facts.map(([term, value]) => (
+          <React.Fragment key={term}>
+            <Typography component="dt" variant="body2">
+              {term}
+            </Typography>
+            <Typography component="dd" variant="body2">
+              {value}
+            </Typography>
+          </React.Fragment>
+        ))}
+      </Box>
+      <Typography variant="body2" color="text.secondary">
+        {POLICIES[id].tradeoff}
+      </Typography>
+      <Typography variant="body2">
+        Participation payments continue after rollout while the program is on.
+      </Typography>
+    </>
+  );
+}
 
 /** Project facts and progress for a finite rebate build-out. */
 function BuildoutSummary({
@@ -528,7 +647,9 @@ function ProgramList({
   onOpenWildfire: () => void;
 }) {
   const finished = (id: PolicyId) =>
-    !isOperatingPolicy(id) && buildoutComplete(programs[id].adoption);
+    !isOperatingPolicy(id) &&
+    !isFlexibilityPolicy(id) &&
+    buildoutComplete(programs[id].adoption);
   // Rows share the scenario pick list's card, so both catalogs scan the same way.
   const row = ({
     id,
@@ -613,6 +734,8 @@ function ProgramList({
           "Rates and contracts",
           POLICY_IDS.filter(isOperatingPolicy).map(choice),
         )}
+      {policiesOn &&
+        section("Flexible customer equipment", FLEXIBILITY_IDS.map(choice))}
       {preparedness &&
         section("Hazard readiness", [
           row({
@@ -681,6 +804,14 @@ function PolicyProgramDetail({
         <Alert severity="info" role="status">
           {pendingLabel(game, selected, current)}
         </Alert>
+      )}
+      {isFlexibilityPolicy(selected) && (
+        <FlexibilitySummary
+          game={game}
+          id={selected}
+          program={current}
+          month={effective}
+        />
       )}
       {buildout ? (
         <BuildoutSummary
@@ -916,7 +1047,7 @@ export function ProgramsScreen({
   const policy = selected && selected !== "wildfire" ? selected : undefined;
   const current = policy ? programs[policy] : undefined;
   const buildout =
-    policy && !isOperatingPolicy(policy)
+    policy && !isOperatingPolicy(policy) && !isFlexibilityPolicy(policy)
       ? (policy as BuildoutPolicyId)
       : undefined;
   // The estimate always shows the end of the program rather than its first month. For a
@@ -924,9 +1055,16 @@ export function ProgramsScreen({
   // finish, or when a pause cuts off what would otherwise have finished then); an operating
   // offer has no end, so its first effective month. Either way it is capped at the run's last
   // month.
-  const completion = buildout
-    ? buildoutCompletionMonth(buildout, current!.adoption, effective)
-    : effective;
+  const completion =
+    policy && isFlexibilityPolicy(policy)
+      ? effective +
+        Math.max(
+          0,
+          Math.ceil((1 - current!.adoption) * flexibilityMonths(policy)) - 1,
+        )
+      : buildout
+        ? buildoutCompletionMonth(buildout, current!.adoption, effective)
+        : effective;
   const month = Math.max(effective, Math.min(completion, end - 1));
   const policyEstimate = useEstimate<PolicyPreviewResult>(
     policy &&
@@ -938,7 +1076,9 @@ export function ProgramsScreen({
             id: policy,
             tier,
             month: effective,
-            ...(isOperatingPolicy(policy) ? { startHour } : {}),
+            ...(isOperatingPolicy(policy) || isFlexibilityPolicy(policy)
+              ? { startHour }
+              : {}),
           };
           return {
             key: `${policy}/${tier}/${startHour}/${month}/${snapshot.date.minute}`,
@@ -964,7 +1104,9 @@ export function ProgramsScreen({
         },
     snapshot,
   );
-  const operating = policy ? isOperatingPolicy(policy) : false;
+  const operating = policy
+    ? isOperatingPolicy(policy) || isFlexibilityPolicy(policy)
+    : false;
   const complete = !!buildout && buildoutComplete(current!.adoption);
   const cancelling = !!buildout && !!current!.pending;
   const planned = current?.pending?.tier ?? current?.tier ?? "Off";
@@ -979,7 +1121,7 @@ export function ProgramsScreen({
     setSelected(id);
     // Build-outs offer one decision: the opposite of the plan, or undoing a scheduled change.
     setTier(
-      isOperatingPolicy(id)
+      isOperatingPolicy(id) || isFlexibilityPolicy(id)
         ? (program.pending?.tier ?? program.tier)
         : program.pending
           ? program.tier
@@ -1129,6 +1271,11 @@ export function ProgramsScreen({
                     // Undoing a scheduled change needs no estimate.
                     (!cancelling && (unchanged || !result)) ||
                     effective >= end ||
+                    (policy &&
+                      isFlexibilityPolicy(policy) &&
+                      tier === "On" &&
+                      !flexibilityAvailable(game, policy, effective) &&
+                      current!.adoption === 0) ||
                     !!game.replayPlayback
                   }
                   onClick={() => {
@@ -1211,7 +1358,9 @@ export default function CustomerPrograms({ game }: { game: GameType }) {
   const active =
     (policiesOn
       ? POLICY_IDS.filter(
-          (id) => isOperatingPolicy(id) && programs[id].tier !== "Off",
+          (id) =>
+            (isOperatingPolicy(id) || isFlexibilityPolicy(id)) &&
+            programs[id].tier !== "Off",
         ).length
       : 0) +
     building.length +
@@ -1225,6 +1374,18 @@ export default function CustomerPrograms({ game }: { game: GameType }) {
     (id) =>
       ` · ${BUILDOUT_SHORT_NAME[id]} build-out · month ${buildoutMonthsDone(id, programs[id].adoption)} of ${buildoutMonths(id)}`,
   );
+  const flexibilityBudget = FLEXIBILITY_IDS.reduce(
+    (sum, id) =>
+      sum +
+      (programs[id].tier === "On"
+        ? flexibilityMonthlyCost(game, id, game.date.monthsElapsed) +
+          (buildoutComplete(programs[id].adoption)
+            ? 0
+            : flexibilityCapitalCost(game, id, game.date.monthsElapsed) /
+              flexibilityMonths(id))
+        : 0),
+    0,
+  );
   return (
     <Box className="customerProgramsControl">
       <Button
@@ -1232,7 +1393,7 @@ export default function CustomerPrograms({ game }: { game: GameType }) {
         title={
           pending
             ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
-            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
+            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${flexibilityBudget > 0 ? ` · ${formatMoneyConcise(flexibilityBudget)}/month in flexibility programs` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
         }
         color="primary"
         variant="contained"

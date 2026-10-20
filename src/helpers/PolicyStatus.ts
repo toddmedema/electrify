@@ -11,6 +11,10 @@ import {
   programCustomers,
 } from "./Policies";
 import { policyWindowLabel } from "./PolicyWindow";
+import {
+  isFlexibilityPolicy,
+  flexibilityAvailable,
+} from "./CustomerFlexibility";
 
 /**
  * A run-relative month as "Jan 2031". A fire season can open before the run did, so months may be
@@ -31,6 +35,11 @@ export function programStatus(
   program: PolicyProgramType,
 ): string {
   if (isOperatingPolicy(id)) return program.tier;
+  if (isFlexibilityPolicy(id)) {
+    if (!flexibilityAvailable(game, id) && program.adoption === 0)
+      return "No eligible equipment yet";
+    return `${program.tier} · rollout ${formatPercent(program.adoption)}`;
+  }
   const buildout = id as BuildoutPolicyId;
   if (buildoutComplete(program.adoption))
     return program.completedMonth === undefined
@@ -52,7 +61,7 @@ export function pendingLabel(
   const pending = program.pending;
   if (!pending) return undefined;
   const when = labelMonth(game, pending.month);
-  if (isOperatingPolicy(id))
+  if (isOperatingPolicy(id) || isFlexibilityPolicy(id))
     return pending.tier === "Off"
       ? `Turns off ${when}`
       : `${program.tier === "On" ? "Window moves" : "Turns on"} ${when} · ${policyWindowLabel(pending.startHour ?? program.startHour ?? 17)}`;

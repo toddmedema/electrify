@@ -164,6 +164,10 @@ function accumulateTick(
     // Recovery batches belong to resumable ticks, not averaged chart history.
     delete sample.deferredResidential;
     delete sample.deferredResidentialStart;
+    delete sample.deferredThermal;
+    delete sample.deferredThermalStart;
+    delete sample.deferredCharging;
+    delete sample.deferredChargingStart;
     sample.renewableCapacityFactors = factors;
     summary.chartAverage = {
       ...sample,
