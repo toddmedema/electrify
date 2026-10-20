@@ -24,7 +24,11 @@ const {
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
-const { applyConfirmedDisplay, createDisplayQueue } = require("./display.cjs");
+const {
+  applyConfirmedDisplay,
+  createDisplayQueue,
+  showWithConfirmedDisplay,
+} = require("./display.cjs");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -173,11 +177,17 @@ function applyDisplay(input) {
 async function updateDisplay(input) {
   const display = screen.getDisplayMatching(window.getBounds());
   const next = normalizeDisplay(input, display);
+  const [width, height] = window.getContentSize();
+  // Saved startup preferences are intent until the first native transition completes.
+  // Roll back to the actual mode, retaining the stored windowed size while fullscreen.
+  const previous = window.isFullScreen()
+    ? { ...preferences, fullscreen: true }
+    : { fullscreen: false, width, height };
   displayUpdating = true;
   manualResize = false;
   clearTimeout(resizeTimer);
   try {
-    await applyConfirmedDisplay(window, preferences, next, (confirmed) => {
+    await applyConfirmedDisplay(window, previous, next, (confirmed) => {
       preferences = confirmed;
       savePreferences();
     });
@@ -448,7 +458,6 @@ async function createWindow() {
     width: preferences.width,
     height: preferences.height,
     useContentSize: true,
-    fullscreen: preferences.fullscreen,
     fullscreenable: true,
     show: false,
     minWidth: Math.min(800, display.workAreaSize.width),
@@ -564,15 +573,11 @@ async function createWindow() {
     }
   });
   window.once("ready-to-show", () => {
-    if (preferences.fullscreen) window.show();
-    else
-      void applyDisplay(preferences)
-        .catch((error) =>
-          console.error("Display change failed:", error.message),
-        )
-        .then(() => {
-          if (!window.isDestroyed()) window.show();
-        });
+    void showWithConfirmedDisplay(
+      window,
+      { ...preferences },
+      applyDisplay,
+    ).catch((error) => console.error("Display change failed:", error.message));
   });
   await window.loadURL(APP_URL);
   let previousSteamState = JSON.stringify(steam.state());

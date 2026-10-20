@@ -42,6 +42,19 @@ function setFullscreen(window, fullscreen, timeoutMs = 5000) {
   );
 }
 
+/** Native fullscreen starts only after showing; saved windowed sizing settles before showing. */
+async function showWithConfirmedDisplay(window, display, apply) {
+  if (window.isDestroyed())
+    throw new Error("The game window closed before the display was ready");
+  if (display.fullscreen) window.show();
+  try {
+    return await apply(display);
+  } finally {
+    // A rejected size change can roll back to a usable window. Never revive a closed one.
+    if (!display.fullscreen && !window.isDestroyed()) window.show();
+  }
+}
+
 async function applyNativeDisplay(
   window,
   next,
@@ -149,4 +162,5 @@ module.exports = {
   applyNativeDisplay,
   applyConfirmedDisplay,
   createDisplayQueue,
+  showWithConfirmedDisplay,
 };
