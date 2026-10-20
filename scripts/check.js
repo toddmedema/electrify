@@ -54,7 +54,13 @@ const steps = [
     assets: true,
     env: { DISABLE_ESLINT_PLUGIN: "true" },
   },
-  { id: "bundle", name: "Bundle size", script: "perf:bundle", ci: true },
+  {
+    id: "bundle",
+    name: "Bundle size",
+    script: "perf:bundle",
+    ci: true,
+    needs: "build",
+  },
   {
     id: "browser",
     name: "Production browser",
@@ -86,8 +92,9 @@ const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => ste
 // The default check omits CI-only gates; --ci runs every gate, and --steps may name any gate.
 // Selecting a gate that tests a build also rebuilds it, because the two builds share build/.
 function selectSteps(argv) {
-  if (!argv.length) return steps.filter((step) => !step.ci);
-  if (argv.length === 1 && argv[0] === "--ci") return steps;
+  const ci = argv[0] === "--ci";
+  if (ci) argv = argv.slice(1);
+  if (!argv.length) return ci ? steps : steps.filter((step) => !step.ci);
   if (argv.length !== 2 || argv[0] !== "--steps") throw new Error(usage);
   const ids = argv[1].split(",");
   if (ids.some((id) => !steps.some((step) => step.id === id)))

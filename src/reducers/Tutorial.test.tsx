@@ -5,12 +5,14 @@ import {
   AppStateType,
   CardNameType,
   GameType,
+  GameToolType,
   TutorialStepType,
 } from "../Types";
 import {
   DEFAULT_CUSTOM_SCENARIO,
   CUSTOM_SCENARIO_ID,
   getScenario,
+  TUTORIALS,
 } from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
@@ -19,6 +21,7 @@ import {
   recordTutorialExited,
   restartTutorialAtStep,
   selectTutorialHiddenUi,
+  selectTutorialActions,
   tutorialGateMiddleware,
 } from "./Tutorial";
 import uiReducer from "./UI";
@@ -472,6 +475,37 @@ describe("restartTutorialAtStep", () => {
     ]);
     expect(dispatched[1].payload).toBe(1);
     expect(dispatched[2].payload).toEqual({ tutorialStep: 5 });
+  });
+});
+
+describe("selectTutorialActions", () => {
+  it("retains taught tools across every authored mission and into free practice", () => {
+    let state = initialState([]);
+    let taught: GameToolType[] = [];
+    for (const mission of TUTORIALS) {
+      for (let index = 0; index <= mission.tutorialSteps!.length; index++) {
+        state = {
+          ...state,
+          game: { ...state.game, scenarioId: mission.id, tutorialStep: index },
+        };
+        const actions = selectTutorialActions(state)!;
+        expect(actions).toEqual(expect.arrayContaining(taught));
+        expect(actions).not.toContain("SCENARIO");
+        taught = actions;
+      }
+    }
+    expect(taught).toEqual([
+      "BUILD_GENERATORS",
+      "INSIGHTS",
+      "PROGRAMS",
+      "EVENTS",
+    ]);
+  });
+
+  it("does not restrict tools in real scenarios", () => {
+    const state = initialState([]);
+    state.game.scenarioId = 103;
+    expect(selectTutorialActions(state)).toBeUndefined();
   });
 });
 

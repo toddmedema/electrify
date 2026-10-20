@@ -8,16 +8,12 @@ import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
 import * as preview from "../../helpers/PolicyPreview";
 import { previewPolicy } from "../../helpers/PolicyPreview";
-import CustomerPrograms from "./CustomerPrograms";
+import { ProgramsScreen } from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
 import { GENERATORS } from "../../data/Facilities";
 import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
-import {
-  emptyPolicies,
-  policyBudget,
-  programCustomers,
-} from "../../helpers/Policies";
+import { emptyPolicies, programCustomers } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -40,6 +36,36 @@ const fact = (label: string) => {
 jest.mock("../../helpers/PolicyPreviewClient", () => ({
   createPolicyPreviewWorker: jest.fn(),
 }));
+
+test("catalog shows only title and status, and starting a program is one explicit decision", () => {
+  const game = createGame({ scenarioId: 106 });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <ProgramsScreen onClose={jest.fn()} />
+    </Provider>,
+  );
+  for (const policy of Object.values(POLICIES))
+    expect(screen.queryByText(policy.description)).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+  );
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Daily window")).toHaveValue(
+    String(suggestedPolicyStartHour(game)),
+  );
+  expect(
+    screen.getByRole("button", { name: "Turn on next month" }),
+  ).toBeDisabled();
+  expect(
+    store.getState().game.policies?.programs.timeOfUse.pending,
+  ).toBeUndefined();
+  view.unmount();
+});
 
 test("window defaults to the forecast peak and only a fresh preview can schedule a changed window", () => {
   jest.useFakeTimers();
@@ -66,15 +92,12 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
-  expect(screen.queryByLabelText("Daily window")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("radio", { name: /^On$/ }));
   expect(screen.getByLabelText("Daily window")).toHaveValue(
     String(suggestedPolicyStartHour(game)),
   );
@@ -110,8 +133,8 @@ test("window defaults to the forecast peak and only a fresh preview can schedule
   );
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(
-    screen.getByRole("button", { name: "Update next month" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Update next month" }),
+  ).not.toBeInTheDocument();
   view.unmount();
   stub.mockRestore();
   jest.useRealTimers();
@@ -147,16 +170,15 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
   });
+  const onClose = jest.fn();
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={onClose} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: /^On$/ }));
   const dailyWindow = screen.getByLabelText(
     "Daily window",
   ) as HTMLSelectElement;
@@ -202,9 +224,10 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   });
   expect(apply).toBeEnabled();
   fireEvent.keyDown(document, { key: "Escape" });
+  expect(onClose).toHaveBeenCalled();
+  view.unmount();
   expect(workers[workers.length - 1].terminate).toHaveBeenCalled();
   expect(store.getState().game.policyPause).toBeUndefined();
-  view.unmount();
   stub.mockRestore();
   jest.useRealTimers();
 });
@@ -233,10 +256,9 @@ test.each<PolicyId>(["solar", "efficiency"])(
     });
     const view = render(
       <Provider store={store}>
-        <CustomerPrograms game={game} />
+        <ProgramsScreen onClose={jest.fn()} />
       </Provider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
     fireEvent.click(
       screen.getByRole("button", {
         name: `${POLICIES[id].name} · Not started`,
@@ -249,7 +271,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       screen.queryByRole("button", { name: "View demand" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("How it works")).not.toBeInTheDocument();
-    expect(fact("Cost")).toMatch(/\/mo vs .*\/mo profit\)/);
+    expect(fact("Monthly budget")).toMatch(/\/moCurrent profit: .*\/mo/);
     expect(screen.queryByText(/^Facility comparable/) !== null).toBe(
       id === "solar",
     );
@@ -278,10 +300,9 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", {
       name: "Efficiency rebates · Paused · month 8 of 48",
@@ -307,6 +328,49 @@ test("a paused build-out keeps its progress and offers to resume", () => {
   view.unmount();
 });
 
+test("turning off an active program schedules the change and can be cancelled", () => {
+  const game = createGame({ scenarioId: 106 });
+  game.policies = emptyPolicies();
+  Object.assign(game.policies.programs.timeOfUse, {
+    tier: "On",
+    startHour: 17,
+  });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <ProgramsScreen onClose={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · On" }),
+  );
+  fireEvent.change(screen.getByLabelText("Daily window"), {
+    target: { value: "22" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Turn off next month" }));
+  expect(store.getState().game.policies!.programs.timeOfUse.tier).toBe("On");
+  expect(
+    store.getState().game.policies!.programs.timeOfUse.pending,
+  ).toMatchObject({ tier: "Off", month: 1 });
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /^Time-of-use tariff · On · turns off/,
+    }),
+  );
+  expect(screen.getByText("Turns off Feb 2020")).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Cancel scheduled change" }),
+  );
+  expect(
+    store.getState().game.policies!.programs.timeOfUse.pending,
+  ).toBeUndefined();
+  expect(store.getState().game.policies!.programs.timeOfUse.tier).toBe("On");
+  view.unmount();
+});
+
 test("a scheduled operating change is named in the card and cancelled from the footer", () => {
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies(game.date.monthsElapsed);
@@ -319,10 +383,9 @@ test("a scheduled operating change is named in the card and cancelled from the f
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   // The list names the scheduled change in the program's status line.
   fireEvent.click(
     screen.getByRole("button", {
@@ -340,7 +403,7 @@ test("a scheduled operating change is named in the card and cancelled from the f
   view.unmount();
 });
 
-test("in-progress and completed build-outs read as projects in the list and toolbar", () => {
+test("in-progress and completed build-outs read as projects in the list", () => {
   const game = createGame({ scenarioId: 106 });
   game.policies = emptyPolicies(game.date.monthsElapsed);
   Object.assign(game.policies.programs.solar, {
@@ -360,17 +423,9 @@ test("in-progress and completed build-outs read as projects in the list and tool
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  const entry = screen.getByRole("button", { name: "Customer programs" });
-  // The finished project is neither active nor part of the monthly rebate total.
-  expect(entry.title).toBe(
-    `Customer programs: 1 active · Rooftop solar build-out · month 8 of 48 · ${formatMoneyConcise(
-      policyBudget(game, "solar", "On", 0),
-    )}/month in rebates`,
-  );
-  fireEvent.click(entry);
   const completed = screen.getByRole("region", { name: "Completed" });
   expect(
     within(completed).getByRole("button", {
@@ -400,7 +455,7 @@ test("in-progress and completed build-outs read as projects in the list and tool
   );
   expect(screen.getByText("Completed Jan 2022")).toBeVisible();
   expect(screen.getByText("Result")).toBeVisible();
-  expect(screen.getByText(/one-time project is finished/)).toBeVisible();
+  expect(screen.getByText(/keep saving energy.*no further cost/)).toBeVisible();
   expect(screen.queryByText("How it works")).not.toBeInTheDocument();
   expect(screen.queryByText(/next month$/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Estimated demand/)).not.toBeInTheDocument();
@@ -425,10 +480,9 @@ test("estimates on the page when the preview worker cannot load its data", () =>
   });
   render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
@@ -468,10 +522,9 @@ test.each([
     });
     const view = render(
       <Provider store={store}>
-        <CustomerPrograms game={game} />
+        <ProgramsScreen onClose={jest.fn()} />
       </Provider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
     // The list names the scheduled change in the program's status line.
     const entry = screen.getByRole("button", {
       name: `Rooftop solar rebates · ${pending === "Off" ? "In progress" : "Paused"} · month 8 of 48 · ${status[0].toLowerCase()}${status.slice(1)}`,
@@ -502,14 +555,13 @@ test("the completion preview is capped at the run's last month", () => {
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
-  expect(fact("Duration")).toBe("48 months (After this run ends)");
+  expect(fact("Duration")).toBe("48 monthsEnds after this run");
   expect(screen.getByText("Estimated demand · Dec 2035")).toBeInTheDocument();
   view.unmount();
 });
@@ -541,10 +593,9 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   // A full screen like Build: close on the left, the speed control beside the title.
   expect(
     screen.getByRole("button", { name: "Close customer programs" }),
@@ -553,16 +604,24 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   expect(
     screen.queryByText(/Changes start next month/),
   ).not.toBeInTheDocument();
-  const hazards = screen.getByRole("region", { name: "Hazard readiness" });
+  const hazards = screen.getByRole("region", { name: "Resilience" });
   fireEvent.click(
     within(hazards).getByRole("button", {
       name: /^Wildfire preparedness · Off · .*\/yr$/,
     }),
   );
   const { annualCost } = wildfirePreparedness(store.getState().game)!;
-  expect(fact("Annual budget")).toBe(`${formatMoneyConcise(annualCost)}/yr`);
+  expect(fact("Annual budget")).toContain(
+    `${formatMoneyConcise(annualCost)}/yr`,
+  );
+  expect(fact("Annual budget")).toContain(
+    `${formatMoneyConcise(annualCost / 12)}/mo while on · no upfront payment`,
+  );
+  expect(
+    screen.getByText("Next wildfire season", { exact: true }),
+  ).not.toBeVisible();
+  fireEvent.click(screen.getByText("Protection & fire season"));
   expect(fact("Next wildfire season")).toBe("Aug 2022 to Feb 2023");
-  expect(fact("Billing")).toBe("No charges while off · no upfront payment");
   expect(fact("One-time cost")).toBeUndefined();
   expect(fact("If funded now")).toBeUndefined();
   act(() => jest.advanceTimersByTime(250));
@@ -578,7 +637,15 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   expect(screen.getByText(/^Customer load disconnected:/)).toHaveTextContent(
     `${Math.round(result.standardIncident.disconnectedDemand * 100)}% → ${Math.round(result.preparedIncident.disconnectedDemand * 100)}%`,
   );
-  expect(screen.getByText(/^Utility cash if this fire strikes:/)).toBeVisible();
+  expect(screen.getByText(/^Cash benefit:/)).toHaveTextContent(
+    `${formatMoneyConcise(result.cashBenefit)} before program cost`,
+  );
+  expect(screen.getByText(/^Cash benefit:/)).toBeVisible();
+  expect(screen.getByText("Effectiveness at this fire")).not.toBeVisible();
+  fireEvent.click(screen.getByText("Fire impact details"));
+  expect(fact("Effectiveness at this fire")).toContain(
+    `${Math.round(result.standardEffectiveness * 100)}% → ${Math.round(result.preparedEffectiveness * 100)}%`,
+  );
   fireEvent.click(
     screen.getByRole("button", {
       name: `Start preparedness (${formatMoneyConcise(annualCost)}/yr)`,
@@ -593,7 +660,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   fireEvent.click(
     screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
   );
-  expect(fact("Status")).toBe("On · stays on until turned off");
+  expect(screen.getByText("On", { exact: true })).toBeVisible();
   expect(
     screen.getByRole("progressbar", {
       name: "Wildfire preparedness effectiveness",
@@ -627,13 +694,13 @@ test("an imported wildfire offers preparedness for its scheduled incident outsid
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
   );
+  fireEvent.click(screen.getByText("Protection & fire season"));
   expect(fact("Scenario wildfire")).toBe("Jan 2033 to Feb 2033");
   expect(screen.queryByText("Next wildfire season")).not.toBeInTheDocument();
   expect(
@@ -652,19 +719,19 @@ test("solar facts compare a same-size facility and distinguish annual energy fro
   });
   const view = render(
     <Provider store={store}>
-      <CustomerPrograms game={game} />
+      <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Rooftop solar rebates · Not started" }),
   );
-  expect(fact("Duration")).toBe("48 months (Jan 2024)");
+  expect(fact("Duration")).toBe("48 monthsFinishes Jan 2024");
   expect(fact("If started now")).toBeUndefined();
   expect(fact("While active")).toBeUndefined();
-  expect(fact("Cost")).toMatch(
-    /\$[\d.]+[kKMB]? \(\$[\d.]+[kKMB]?\/mo vs \$[\d.]+[kKMB]?\/mo profit\)/,
+  expect(fact("Monthly budget")).toMatch(
+    /\$[\d.]+[kKMB]?\/moCurrent profit: \$[\d.]+[kKMB]?\/mo/,
   );
+  fireEvent.click(screen.getByText("Compare utility solar"));
   const impact = fact("At completion")!;
   const comparable = screen
     .getAllByRole("term")

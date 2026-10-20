@@ -32,9 +32,8 @@ const MISSION_ONE_FIRST_LOOK: TutorialUiIdType[] = [
   "speed",
 ];
 
-// Missions 2 and 3 hand over building, the clock and the menu, but still keep the player on the
-// fleet: navigation and the Insights and Events panes arrive with the Finances mission.
-const EARLY_MISSION_HIDDEN: TutorialUiIdType[] = ["nav", "sidePanes"];
+// Build now lives inside the dock. Keep its button available while later tools stay unrevealed.
+const EARLY_MISSION_HIDDEN: TutorialUiIdType[] = ["sidePanes"];
 
 const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
@@ -179,7 +178,7 @@ export const SCENARIOS: ScenarioType[] = [
         continueOnClick: "#chartSupplyDemand",
         action: "Tap the supply and demand chart",
         content: (
-          <TutorialPrompt text="Weather-driven shows solar output; On-demand shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
+          <TutorialPrompt text="Variable shows solar output; Dispatchable shows coal. Their top edge is total supply. Keep it at or above the demand line, or the city goes dark." />
         ),
       },
       {
@@ -237,10 +236,11 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: ".button-buildFacility",
+        revealActions: ["BUILD_GENERATORS"],
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
         action: "Tap Build",
         content: (
-          <TutorialPrompt text="Your grid needs more power. New plants come from the generator shop." />
+          <TutorialPrompt text="Add generation to cover demand. Tap Build again to return to your fleet." />
         ),
       },
       {
@@ -456,6 +456,7 @@ export const SCENARIOS: ScenarioType[] = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
+        revealActions: ["INSIGHTS"],
         advanceOn: onInsights,
         action: "Tap Insights",
         content: (
@@ -479,6 +480,25 @@ export const SCENARIOS: ScenarioType[] = [
         action: "Tap Layers, or choose a preset question",
         content: (
           <TutorialPrompt text="Layers let you compare the information you care about." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#programsNav",
+        revealActions: ["PROGRAMS"],
+        advanceOn: (s: AppStateType) => s.card.name === "PROGRAMS",
+        action: "Tap Programs",
+        content: (
+          <TutorialPrompt text="Programs contains your electricity rate. Raise revenue by charging more per kWh." />
+        ),
+      },
+      {
+        card: "PROGRAMS",
+        target: "#rateSlider",
+        advanceOn: (s: AppStateType) => s.game.dollarsPerkWh > 0.03,
+        action: "Raise the electricity rate",
+        content: (
+          <TutorialPrompt text="Drag the rate slider right, then compare revenue with expenses in Insights." />
         ),
       },
       {
@@ -539,7 +559,7 @@ export const SCENARIOS: ScenarioType[] = [
           s.card.name === "PROGRAMS" || s.game.dollarsPerkWh < 0.07,
         action: "Tap Programs",
         content: (
-          <TutorialPrompt text="Your electricity rate lives in Programs, alongside ways to manage demand." />
+          <TutorialPrompt text="Set your electricity rate in Programs. In scenarios, it also offers ways to manage demand." />
         ),
       },
       {
@@ -658,6 +678,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         // No card: the player makes the switch, and the step is done when they are on Events
         target: "#eventsNav",
+        revealActions: ["EVENTS"],
         advanceOn: onEvents,
         action: "Tap Events",
         content: (
@@ -671,12 +692,6 @@ export const SCENARIOS: ScenarioType[] = [
         content: (
           <TutorialPrompt text="Each dated event explains what changed." />
         ),
-        desktop: {
-          target: "#eventsPane",
-          content: (
-            <TutorialPrompt text="Each dated event explains what changed." />
-          ),
-        },
       },
       {
         card: "FACILITIES",
@@ -1272,6 +1287,7 @@ export const SCENARIOS: ScenarioType[] = [
       month: 2,
       minimumDemandServed: 0.995,
       label: "February 2021 freeze",
+      goal: "Keep the lights on through the freeze",
     },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
@@ -1332,6 +1348,7 @@ export const SCENARIOS: ScenarioType[] = [
       durationMonths: 3,
       minimumDemandServed: 0.995,
       label: "2026 heatwave and drought",
+      goal: "Keep the lights on through the heatwave",
     },
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
@@ -1399,7 +1416,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 7,
       durationMonths: 18,
       minimumDemandServed: 0.995,
-      label: "possible nuclear shutdown period and recovery",
+      label: "reactor shutdown window and recovery",
+      goal: "Keep the lights on through the reactor shutdown",
     },
     facilities: [
       {
@@ -1456,6 +1474,7 @@ export const SCENARIOS: ScenarioType[] = [
       durationMonths: 2,
       minimumDemandServed: 0.995,
       label: "January and February 2025 wildfire emergency",
+      goal: "Keep the lights on through the wildfire emergency",
     },
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
     // resources using its 2024 power-content mix as the portfolio anchor.
@@ -1526,7 +1545,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 1,
       durationMonths: 12,
       minimumDemandServed: 0.995,
-      label: "2022, the worst year of the shortage",
+      label: "2022 power shortage",
+      goal: "Keep the lights on through the 2022 shortage",
     },
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
     // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
@@ -1620,7 +1640,8 @@ export const SCENARIOS: ScenarioType[] = [
       // that is grading the weather rather than the decisions. Passive play sheds 86% in the
       // October of this year, so this stays a long way from a formality.
       minimumDemandServed: 0.98,
-      label: "2016, the year the reservoir bottomed out",
+      label: "2016 drought",
+      goal: "Keep the grid running through the drought",
     },
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
@@ -1695,7 +1716,8 @@ export const SCENARIOS: ScenarioType[] = [
       month: 5,
       durationMonths: 3,
       minimumDemandServed: 0.995,
-      label: "the record summer of 2024",
+      label: "record summer of 2024",
+      goal: "Keep the lights on through the record summer",
     },
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop

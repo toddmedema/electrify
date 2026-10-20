@@ -76,7 +76,13 @@ export default function ModManager() {
       )}
       {error && <Alert severity="error">{error}</Alert>}
       {message && <Alert severity="success">{message}</Alert>}
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+      <Stack
+        className="settingsKeyboardRow"
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: "wrap" }}
+      >
         <Button
           variant={entries.length ? "outlined" : "contained"}
           disabled={busy}
@@ -99,7 +105,13 @@ export default function ModManager() {
           Refresh downloads
         </Button>
       </Stack>
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+      <Stack
+        className="settingsKeyboardRow"
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: "wrap" }}
+      >
         <TextField
           label="Workshop item ID"
           value={id}
@@ -179,6 +191,7 @@ export default function ModManager() {
               </Typography>
             )}
             <Stack
+              className="settingsKeyboardRow"
               direction="row"
               spacing={1}
               useFlexGap

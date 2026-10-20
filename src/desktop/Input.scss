@@ -1,0 +1,36 @@
+html[data-controller-input="true"] :focus,
+html[data-controller-input="true"] .MuiSlider-thumb:focus-within,
+html[data-controller-input="true"] .MuiButtonBase-root:has(> input:focus) {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 2px;
+}
+.controllerHints {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  color: var(--font-color-primary);
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--font-size-caption-sm);
+  p {
+    margin: 0 0 4px;
+  }
+}
+.controllerHintActions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.controllerHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+}
+.controllerHintBinding {
+  font-weight: 600;
+}

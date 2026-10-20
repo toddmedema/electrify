@@ -47,8 +47,24 @@ import {
   samePolicyChoice,
   isOperatingPolicy,
   buildoutComplete,
+  programCustomers,
+  policyPeakHour,
+  policyStartHour,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
+import {
+  isFlexibilityPolicy,
+  flexibilityAvailable,
+} from "../helpers/CustomerFlexibility";
+import { shiftThermalDemand } from "../helpers/ThermalFlexibility";
+import { shiftManagedCharging } from "../helpers/ManagedCharging";
+import { MANAGED_CHARGING } from "../data/ElectricVehicles";
+import {
+  customerBatteryFleet,
+  dispatchCustomerBattery,
+  EMPTY_CUSTOMER_BATTERY_FLEET,
+  EMPTY_CUSTOMER_BATTERY_DISPATCH,
+} from "../helpers/CustomerBatteries";
 import { policyChoiceLabel } from "../helpers/PolicyWindow";
 import {
   schedulePolicy,
@@ -100,6 +116,7 @@ import {
   getMarketRate,
   nextCustomerCount,
   publicRateCap,
+  publicTargetRate,
   updateCustomerRate,
 } from "../helpers/Customers";
 import {
@@ -1603,13 +1620,15 @@ export const gameSlice = createSlice({
       ) {
         state.runIdentity = undefined;
       }
-      if (typeof payload.dollarsPerkWh === "number") {
-        payload.dollarsPerkWh = capRateForScenario(state, payload);
-      }
+      normalizeRateDelta(state, payload);
       const recorded = recordedDelta(payload);
       const rateBefore = state.dollarsPerkWh;
+      const followedBefore = !!state.rateFollowsTarget;
       Object.assign(state, payload);
-      if (recorded && recorded.dollarsPerkWh !== rateBefore) {
+      const rateChanged =
+        recorded?.dollarsPerkWh !== undefined &&
+        recorded.dollarsPerkWh !== rateBefore;
+      if (rateChanged) {
         recordMeaningfulDecision(state, {
           lever: "rate",
           label: "Set the customer electricity rate",
@@ -1617,6 +1636,11 @@ export const gameSlice = createSlice({
           before: String(rateBefore),
           after: String(recorded.dollarsPerkWh),
         });
+      }
+      if (
+        recorded &&
+        (rateChanged || !!state.rateFollowsTarget !== followedBefore)
+      ) {
         recordReplayAction(state, "delta", recorded);
       }
     },
@@ -1688,6 +1712,9 @@ export const gameSlice = createSlice({
       // scored against, so the game has to actually start there rather than at the slice default
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
+      // A tutorial checkpoint's rate is part of its lesson, so it stays where it was authored.
+      state.rateFollowsTarget =
+        !checkpoint && followedTargetRate(state) !== undefined;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.demandShapeExponent = scenario.demandShapeExponent;
@@ -1823,15 +1850,15 @@ export const gameSlice = createSlice({
         state.facilities = [...generators.reverse(), ...storage];
       }
 
-      // Weather-driven generation must be counted before dispatchable plants cover the
+      // Variable generation must be counted before dispatchable plants cover the
       // remaining demand. Apply to every starting fleet, including tutorials and custom games,
       // while preserving the relative order within both groups and leaving storage at the end.
-      const weatherDriven = (facility: FacilityOperatingType) =>
+      const variable = (facility: FacilityOperatingType) =>
         facility.fuel !== undefined &&
         WEATHER_DEPENDENT_FUELS.includes(facility.fuel);
       state.facilities = [
-        ...state.facilities.filter(weatherDriven),
-        ...state.facilities.filter((facility) => !weatherDriven(facility)),
+        ...state.facilities.filter(variable),
+        ...state.facilities.filter((facility) => !variable(facility)),
       ];
 
       desktopSimulationHooks()?.initialize(state);
@@ -2968,10 +2995,19 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
+  if (
+    !cancel &&
+    payload.tier === "On" &&
+    isFlexibilityPolicy(payload.id) &&
+    !(existing?.adoption ?? 0) &&
+    !flexibilityAvailable(state, payload.id, payload.month)
+  )
+    return false;
   // A finished build-out has nothing left to fund, pause or resume.
   if (
     !cancel &&
     !isOperatingPolicy(payload.id) &&
+    !isFlexibilityPolicy(payload.id) &&
     buildoutComplete(existing?.adoption ?? 0)
   )
     return false;
@@ -3098,16 +3134,15 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     }
     case "delta": {
       const requested = { ...((payload || {}) as Partial<GameType>) };
-      if (typeof requested.dollarsPerkWh === "number") {
-        requested.dollarsPerkWh = capRateForScenario(state, requested);
-      }
+      normalizeRateDelta(state, requested);
       const recorded = recordedDelta(requested);
+      if (!recorded) break;
+      const before = state.dollarsPerkWh;
+      Object.assign(state, recorded);
       if (
-        recorded?.dollarsPerkWh !== undefined &&
-        recorded.dollarsPerkWh !== state.dollarsPerkWh
+        recorded.dollarsPerkWh !== undefined &&
+        recorded.dollarsPerkWh !== before
       ) {
-        const before = state.dollarsPerkWh;
-        Object.assign(state, recorded);
         recordMeaningfulDecision(state, {
           lever: "rate",
           label: "Set the customer electricity rate",
@@ -3120,6 +3155,62 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     }
     default:
       break;
+  }
+}
+
+/**
+ * The rate a public utility following its target charges now, or undefined where there is no
+ * target to follow: investor-owned and multiplayer companies, and tutorials.
+ */
+function followedTargetRate(
+  state: GameType,
+  date: DateType = state.date,
+): number | undefined {
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (
+    !scenario ||
+    scenario.ownership !== "Public" ||
+    scenario.tutorialSteps ||
+    state.multiplayer
+  )
+    return undefined;
+  return publicTargetRate(
+    scenario.dollarsPerkWh,
+    date,
+    state.startingYear,
+    state.seed,
+  );
+}
+
+/** Current-month edits stay in force; future months apply the same target as live rollover. */
+function customerBaseRateAt(state: GameType, date: DateType): number {
+  return (
+    (state.rateFollowsTarget && date.monthsElapsed > state.date.monthsElapsed
+      ? followedTargetRate(state, date)
+      : undefined) ?? state.dollarsPerkWh
+  );
+}
+
+/**
+ * Turning following on sets the rate to the target; setting a rate by hand turns it off.
+ * Deltas that also pick the scenario are setup, which initGame settles.
+ */
+function normalizeRateDelta(state: GameType, payload: Partial<GameType>) {
+  const setup = "scenarioId" in payload || "customScenario" in payload;
+  if (payload.rateFollowsTarget === true && !setup) {
+    const target = followedTargetRate(state);
+    if (target === undefined) delete payload.rateFollowsTarget;
+    else payload.dollarsPerkWh = target;
+  } else if (
+    typeof payload.dollarsPerkWh === "number" &&
+    payload.rateFollowsTarget === undefined &&
+    state.rateFollowsTarget &&
+    !setup
+  ) {
+    payload.rateFollowsTarget = false;
+  }
+  if (typeof payload.dollarsPerkWh === "number") {
+    payload.dollarsPerkWh = capRateForScenario(state, payload);
   }
 }
 
@@ -3482,6 +3573,10 @@ export function* tickStatePhases(
           `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
+      if (state.rateFollowsTarget) {
+        const target = followedTargetRate(state);
+        if (target !== undefined) state.dollarsPerkWh = target;
+      }
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
@@ -3882,6 +3977,8 @@ function getDemandW(
     game.location,
     game.loadAdditions,
   );
+  // Demand is rebuilt here; the supply pass must not restore a previous forecast's discharge.
+  delete now.customerBatteryDischargeW;
   // The 20 W floor is the temperature term's baseline, not heating or cooling.
   applyPolicyDemand(
     game,
@@ -3896,7 +3993,65 @@ function getDemandW(
     prev.deferredResidential,
     TICK_MINUTES * tickScale,
   );
-  now.customerBillingRate = customerBillingRate(game, now);
+  const programs = game.policies?.programs;
+  if ((programs?.thermal?.adoption ?? 0) > 0 || prev.deferredThermal?.length) {
+    const thermal = shiftThermalDemand({
+      minute: now.minute,
+      residentialW: Math.max(
+        0,
+        now.demandByType.Residential - (now.shiftedResidentialW ?? 0),
+      ),
+      weatherShare:
+        demandMultiple > 0
+          ? Math.min(1, Math.max(0, (temperatureDemandW - 20) / demandMultiple))
+          : 0,
+      temperatureC: now.temperatureC,
+      location: game.location,
+      startingYear: game.startingYear,
+      program: programs?.thermal ?? emptyPolicies().programs.thermal,
+      deferred: prev.deferredThermal,
+      stepMinutes: TICK_MINUTES * tickScale,
+    });
+    now.deferredThermalStart = (prev.deferredThermal ?? []).map((entry) => ({
+      ...entry,
+    }));
+    now.deferredThermal = thermal.deferred;
+    now.thermalShiftedW = thermal.shiftedW;
+    now.thermalRecoveredW = thermal.recoveredW;
+    now.demandByType.Residential =
+      thermal.residentialW + (now.shiftedResidentialW ?? 0);
+  }
+  if (
+    (programs?.evCharging?.adoption ?? 0) > 0 ||
+    prev.deferredCharging?.length
+  ) {
+    const charging = shiftManagedCharging({
+      minute: now.minute,
+      transportationW: now.demandByType.Transportation,
+      customers: programCustomers(game),
+      year: date.year,
+      location: game.location,
+      enrollment:
+        programs?.evCharging?.tier === "On"
+          ? MANAGED_CHARGING.maxEnrollment * programs.evCharging.adoption
+          : 0,
+      startHour: policyStartHour(programs?.evCharging),
+      deferred: prev.deferredCharging,
+      stepMinutes: TICK_MINUTES * tickScale,
+    });
+    now.deferredChargingStart = (prev.deferredCharging ?? []).map((entry) => ({
+      ...entry,
+    }));
+    now.deferredCharging = charging.deferred;
+    now.evShiftedW = charging.shiftedW;
+    now.evRecoveredW = charging.recoveredW;
+    now.demandByType.Transportation = charging.transportationW;
+  }
+  now.customerBillingRate = customerBillingRate(
+    game,
+    now,
+    customerBaseRateAt(game, date),
+  );
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
     0,
@@ -3973,16 +4128,25 @@ function reforecastDemand(
   state: GameType,
   tickScale = 1,
   initialDeferred: TickPresentFutureType["deferredResidential"] = [],
+  initialThermal: TickPresentFutureType["deferredThermal"] = [],
+  initialCharging: TickPresentFutureType["deferredCharging"] = [],
+  representedTransportationW?: number,
 ): TickPresentFutureType[] {
   const projection = { ...state, policies: cloneDeep(state.policies) };
   let prev = {
     ...state.timeline[0],
     deferredResidential: initialDeferred,
+    deferredThermal: initialThermal,
+    deferredCharging: initialCharging,
   } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      advancePolicies(projection, date.monthsElapsed);
+      advancePolicies(
+        projection,
+        date.monthsElapsed,
+        representedTransportationW,
+      );
       t = { ...t };
       t.expensesPolicy =
         (POLICY_IDS.reduce(
@@ -4109,6 +4273,61 @@ function* supplyFacilitiesFinancesPhases(
   const ticksPerMonth = TICKS_PER_MONTH / tickScale;
   const ticksPerYear = TICKS_PER_YEAR / tickScale;
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
+  // Reforecast passes receive a previously dispatched tick. Restore its native net load
+  // before applying the customer fleet once against the preceding tick's stored energy.
+  const oldBatteryDischarge = now.customerBatteryDischargeW ?? 0;
+  if (oldBatteryDischarge > 0) {
+    now.demandByType = {
+      ...now.demandByType,
+      Residential: now.demandByType.Residential + oldBatteryDischarge,
+    };
+    now.demandW += oldBatteryDischarge;
+  }
+  const batteryProgram = state.policies?.programs.battery;
+  const batteryStartWh =
+    prev.minute < now.minute
+      ? (prev.customerBatteryWh ?? 0)
+      : (now.customerBatteryWhStart ?? 0);
+  const trackCustomerBattery =
+    (batteryProgram?.adoption ?? 0) > 0 ||
+    batteryStartWh > 0 ||
+    oldBatteryDischarge > 0;
+  const batteryFleet =
+    batteryProgram && trackCustomerBattery
+      ? customerBatteryFleet(
+          batteryProgram,
+          tickDate.monthsElapsed,
+          state.startingYear,
+          programCustomers(state),
+          state.location,
+        )
+      : EMPTY_CUSTOMER_BATTERY_FLEET;
+  const batteryEnabled = batteryProgram?.tier === "On";
+  const batteryPeak = policyPeakHour(
+    now.minute,
+    policyStartHour(batteryProgram),
+  );
+  const batteryBefore = trackCustomerBattery
+    ? dispatchCustomerBattery(batteryFleet, batteryStartWh, {
+        deficitW: now.demandByType.Residential,
+        stepMinutes,
+        enabled: batteryEnabled,
+        peak: batteryPeak,
+      })
+    : EMPTY_CUSTOMER_BATTERY_DISPATCH;
+  if (trackCustomerBattery) {
+    now.customerBatteryWhStart = batteryStartWh;
+    now.customerBatteryDischargeW = batteryBefore.dischargeW;
+    now.customerBatteryWh = batteryBefore.storedWh;
+    now.customerBatteryLossWh = batteryBefore.lossWh;
+  }
+  if (batteryBefore.dischargeW > 0) {
+    now.demandByType = {
+      ...now.demandByType,
+      Residential: now.demandByType.Residential - batteryBefore.dischargeW,
+    };
+    now.demandW -= batteryBefore.dischargeW;
+  }
   const difficulty = DIFFICULTIES[state.difficulty];
   // Only a live co-op tick settles with peers. Forecasts and pre-rolls estimate peer supply as
   // zero, so they charge storage and value spare output like a single-player grid.
@@ -4709,10 +4928,28 @@ function* supplyFacilitiesFinancesPhases(
   ).exportedW.reduce((sum, w) => sum + w, 0);
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
+  const batteryAfter = trackCustomerBattery
+    ? dispatchCustomerBattery(batteryFleet, batteryBefore.storedWh, {
+        rooftopSurplusW: now.rooftopSurplusW ?? 0,
+        gridSurplusW: Math.max(
+          0,
+          supply - charge - now.demandW - (peer?.importedW ?? 0),
+        ),
+        stepMinutes,
+        enabled: batteryEnabled && batteryBefore.dischargeW === 0,
+        peak: batteryPeak,
+      })
+    : EMPTY_CUSTOMER_BATTERY_DISPATCH;
+  if (trackCustomerBattery) {
+    now.customerBatteryWh = batteryAfter.storedWh;
+    now.customerBatteryChargeW = batteryAfter.chargeW;
+    now.customerBatteryGridChargeW = batteryAfter.gridChargeW;
+    now.customerBatteryLossWh = batteryBefore.lossWh + batteryAfter.lossWh;
+  }
   const grossLocalSupplyW =
     supply - (peer?.importedW || 0) + (peer?.exportedW || 0);
   const clearing = clearTransmissionMarket({
-    localSupplyW: supply - charge,
+    localSupplyW: supply - charge - batteryAfter.gridChargeW,
     demandW: now.demandW,
     capacityW: transmissionCapacity,
     importLimitW: marketImportLimitW,
@@ -4790,7 +5027,11 @@ function* supplyFacilitiesFinancesPhases(
   const demandWh = (now.demandW / ticksPerHour) * GAME_TO_REAL_YEARS;
   // Re-read the base rate for live slider edits; demand forecasts may have been
   // generated before that edit. Forecast passes advance their own policy copy.
-  now.customerBillingRate = customerBillingRate(state, now);
+  now.customerBillingRate = customerBillingRate(
+    state,
+    now,
+    customerBaseRateAt(state, tickDate),
+  );
   const customerRevenue =
     (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
@@ -5232,6 +5473,7 @@ export function forecastMonthClosingCashAtCustomerRate(
 ): number {
   const forecast = cloneDeep(state);
   forecast.dollarsPerkWh = dollarsPerkWh;
+  forecast.rateFollowsTarget = false;
   forecast.timeline = reforecastSupply(forecast, true);
   const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
   for (
@@ -5430,7 +5672,30 @@ export function generateNewTimeline(
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
         ?.deferredResidentialStart ??
       [],
+    previousDemandTick?.deferredThermal ??
+      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
+        ?.deferredThermalStart ??
+      [],
+    previousDemandTick?.deferredCharging ??
+      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
+        ?.deferredChargingStart ??
+      [],
+    readOnlyState.timeline.length
+      ? readOnlyState.timeline.reduce(
+          (sum, tick) => sum + tick.demandByType.Transportation,
+          0,
+        ) / readOnlyState.timeline.length
+      : 0,
   );
+  const batteryCarry =
+    previousDemandTick?.customerBatteryWh ??
+    getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
+      ?.customerBatteryWhStart ??
+    0;
+  if (state.timeline[0] && batteryCarry > 0) {
+    state.timeline[0].customerBatteryWhStart = batteryCarry;
+    state.timeline[0].customerBatteryWh = batteryCarry;
+  }
   state.timeline = reforecastSupply(state, true, stepMinutes);
   return state.timeline;
 }

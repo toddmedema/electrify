@@ -196,6 +196,7 @@ export type CardNameType =
   | "FACILITIES"
   | "INSIGHTS"
   | "EVENTS"
+  | "SCENARIO"
   | "PROGRAMS"
   | "LOADING"
   | "MAIN_MENU"
@@ -266,6 +267,9 @@ export interface NavigateActionType {
   replaceCurrentCard?: boolean;
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
+  // Set when a link inside one manual entry opens another: the entry the link sat in, which
+  // Back returns to before it leaves the manual
+  fromEntry?: string;
   storyTarget?: StoryActionTargetType;
 }
 
@@ -276,6 +280,9 @@ export interface CardType {
   history?: CardNameType[];
   toPrevious?: boolean;
   entry?: string;
+  // Entries this manual visit followed links away from, newest first. Back walks these before
+  // it leaves the manual; they never enter `history`, so the header's back button skips them.
+  manualTrail?: string[];
   storyTarget?: StoryActionTargetType;
 }
 
@@ -462,6 +469,21 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
     deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
     shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
+    deferredThermal?: DeferredResidentialLoad[];
+    deferredThermalStart?: DeferredResidentialLoad[];
+    deferredCharging?: DeferredResidentialLoad[];
+    deferredChargingStart?: DeferredResidentialLoad[];
+    thermalShiftedW?: number;
+    thermalRecoveredW?: number;
+    evShiftedW?: number;
+    evRecoveredW?: number;
+    customerBatteryWh?: number; // Customer storage, separate from utility-owned facilities.
+    customerBatteryWhStart?: number;
+    customerBatteryChargeW?: number;
+    customerBatteryGridChargeW?: number;
+    customerBatteryDischargeW?: number;
+    customerBatteryLossWh?: number;
+    rooftopSurplusW?: number;
     // Home and business load before rebate programs, and what efficiency and rooftop solar removed
     // from it this tick. Present only while a rebate program has installed anything.
     rebateEligibleW?: number;
@@ -736,7 +758,13 @@ interface SharedShoppingType {
   spinMinutes: number; // 1 for renewables, avoiding repeated fallback coercion in the tick loop
 }
 
+export type GameToolType =
+  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
+
 export interface TutorialStepType {
+  // Introduced here and retained through this and every later mission in authored order.
+  // The scenario objective/score belongs to real scenarios, never tutorials.
+  revealActions?: Exclude<GameToolType, "SCENARIO">[];
   skipBeacon?: boolean;
   // The card this step's target lives on. Every step change navigates here, in both
   // directions, so stepping backwards over a step that navigated forwards still lands on
@@ -797,10 +825,8 @@ export interface TutorialStepType {
     successMessage: string;
     failureMessage: string;
   };
-  // Above the desktop breakpoint the bottom nav is hidden and Facilities / Insights render
-  // side by side, so a step whose target lives in that nav - or whose
-  // selector matches more than one pane - needs a different target there, and usually
-  // different wording too, since there are no tabs left to switch between
+  // Optional wording or target for a genuinely different desktop control. The action dock
+  // itself is shared across widths, so navigation lessons use the same target everywhere.
   desktop?: {
     target: string;
     action?: string;
@@ -911,7 +937,10 @@ export interface ScenarioType {
     /** Consecutive calendar months that must each meet the target. Defaults to one. */
     durationMonths?: number;
     minimumDemandServed: number;
+    /** Noun phrase naming the event window, read inside sentences: "during the {label}". */
     label: string;
+    /** Imperative pinned-goal heading in sentence case, e.g. "Keep the lights on through the freeze". */
+    goal?: string;
   };
   dollarsPerkWh: number;
   durationMonths: number;
@@ -1158,7 +1187,14 @@ export interface WorldEventStateType {
   checkedKeys: string[];
 }
 
-export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
+export type PolicyId =
+  | "efficiency"
+  | "solar"
+  | "timeOfUse"
+  | "curtailment"
+  | "thermal"
+  | "evCharging"
+  | "battery";
 export type PolicyTier = "Off" | "On";
 export interface DeferredResidentialLoad {
   energyWh: number; // Unscaled representative-day energy.
@@ -1168,11 +1204,11 @@ export interface DeferredResidentialLoad {
 export interface PolicyProgramType {
   tier: PolicyTier;
   startHour?: number; // Four-hour local-clock window; absent means 17 for earlier callers.
-  adoption: number; // Build-out progress (0-1) for rebates; current enrolled share for operating offers.
-  spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
-  spent: number; // Cumulative rebate spending over the run.
+  adoption: number; // Rollout progress (0-1) for rebates/flexibility; enrollment for legacy operating offers.
+  spending: number; // This month's installations and flexibility payments; legacy tariff credits reduce revenue.
+  spent: number; // Cumulative program spending over the run.
   completedMonth?: number; // Last month a finished build-out installed upgrades.
-  installs?: [month: number, share: number][]; // Build-out cohorts, for measures that wear out.
+  installs?: [month: number, share: number][]; // Cohorts preserve installation-year eligibility and equipment age.
   pending?: { tier: PolicyTier; month: number; startHour?: number };
 }
 export interface PoliciesType {
@@ -1276,6 +1312,11 @@ export interface GameType {
   inGame: boolean;
   feePerKgCO2e: number;
   dollarsPerkWh: number;
+  /**
+   * A public utility's rate tracks its inflating target each month until the player sets one.
+   * Absent in saves from before the option existed, which keep the rate they chose.
+   */
+  rateFollowsTarget?: boolean;
   // Customer price competition starts from the scenario's rate and half of this addressable pool.
   /** The last month offered a cash warning; persisted so reloading cannot repeat it. */
   lowCashWarningMonth?: number;

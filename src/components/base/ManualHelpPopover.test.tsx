@@ -31,7 +31,7 @@ describe("ManualHelpPopover", () => {
     anchor.remove();
   });
 
-  it("opens related entries in place and closes from its button", async () => {
+  it("opens linked entries in place and closes from its button", async () => {
     const onClose = jest.fn();
     const onRelated = jest.fn();
     render(
@@ -43,9 +43,7 @@ describe("ManualHelpPopover", () => {
     );
     const help = screen.getByRole("dialog", { name: "Manual help" });
     await userEvent.click(
-      within(
-        within(help).getByRole("navigation", { name: /Related to/ }),
-      ).getByRole("button", { name: MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY }),
+      within(help).getByRole("link", { name: "storage losses" }),
     );
     expect(onRelated).toHaveBeenCalledWith(MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY);
     await userEvent.click(within(help).getByRole("button", { name: "close" }));

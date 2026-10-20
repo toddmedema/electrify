@@ -54,6 +54,18 @@ for (const layout of [
             steam: { available: false, online: false, cloudEnabled: false },
           }),
           setDisplay: async () => display,
+          setInputContext: async () => ({
+            connected: true,
+            actions: [],
+            glyphs: {},
+          }),
+          onInput: (callback) => {
+            const listener = (event: Event) =>
+              callback((event as CustomEvent).detail);
+            window.addEventListener("mockModController", listener);
+            return () =>
+              window.removeEventListener("mockModController", listener);
+          },
           onStateChanged: noop,
           onGameFocusChanged: noop,
           onBeforeQuit: noop,
@@ -98,6 +110,50 @@ for (const layout of [
       mods.getByText("Community Grid", { exact: true }),
     ).toBeVisible();
     const play = mods.getByRole("button", { name: "Play Community Grid" });
+    const controller = async (action: "down" | "right") => {
+      await page.evaluate(
+        (action) =>
+          window.dispatchEvent(
+            new CustomEvent("mockModController", {
+              detail: { connected: true, actions: [action], glyphs: {} },
+            }),
+          ),
+        action,
+      );
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+    };
+    const importButton = mods.getByRole("button", {
+      name: "Import mod",
+      exact: true,
+    });
+    for (
+      let i = 0;
+      i < 30 &&
+      !(await importButton.evaluate((e) => e === document.activeElement));
+      i++
+    )
+      await controller("down");
+    await expect(importButton).toBeFocused();
+    await controller("right");
+    await expect(
+      mods.getByRole("button", { name: "Save authoring template" }),
+    ).toBeFocused();
+    await controller("down");
+    await expect(
+      mods.getByRole("textbox", { name: "Workshop item ID" }),
+    ).toBeFocused();
+    for (
+      let i = 0;
+      i < 8 && !(await play.evaluate((e) => e === document.activeElement));
+      i++
+    )
+      await controller("down");
+    await expect(play).toBeFocused();
     await expect(play).toBeEnabled();
     await mods.getByRole("switch", { name: "Enabled" }).click();
     await expect(play).toBeDisabled();

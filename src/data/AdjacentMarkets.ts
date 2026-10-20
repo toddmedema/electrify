@@ -155,13 +155,6 @@ export function corridorsForLocation(
   return profileId ? (TRANSMISSION_PROFILES[profileId]?.corridors ?? []) : [];
 }
 
-export function adjacentMarketsForLocation(
-  location: Pick<LocationType, "id">,
-): readonly AdjacentMarketDefinitionType[] {
-  const profileId = transmissionProfileIdForLocation(location);
-  return profileId ? (TRANSMISSION_PROFILES[profileId]?.markets ?? []) : [];
-}
-
 /** The authored corridor an operating line was built from, by id. */
 export function corridorById(
   corridorId: string,

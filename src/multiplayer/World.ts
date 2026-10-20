@@ -168,6 +168,7 @@ export function matchScenario(spec: MatchSpec): {
   if (
     !scenario ||
     scenario.tutorialSteps ||
+    scenario.modPackage !== undefined ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
     !isValidLocation(location)

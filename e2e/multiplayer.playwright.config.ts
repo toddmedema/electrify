@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
 
+const port = process.env.E2E_PORT || "3115";
 const productionBuild =
   process.env.MULTIPLAYER_BUILD_DIR ||
   (process.env.GITHUB_ACTIONS === "true" ? "build" : undefined);
@@ -20,11 +21,11 @@ if (productionRoot) {
   }
 }
 // Headless desktop renderer with an in-memory replacement for the native Steam bridge.
-// The real host worker, gameplay, command routing and checkpoint protocol still run.
+// The real gameplay, input navigation, host worker and checkpoint protocol still run.
 // CI reuses its verified production desktop artifact; local dev remains available by default.
 export default defineConfig({
   testDir: ".",
-  testMatch: ["multiplayer.spec.ts", "mods.spec.ts"],
+  testMatch: ["multiplayer.spec.ts", "steam-input.spec.ts", "mods.spec.ts"],
   outputDir: "../test-results/multiplayer",
   fullyParallel: false,
   workers: 1,
@@ -32,7 +33,7 @@ export default defineConfig({
   expect: { timeout: 20000 },
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:3115",
+    baseURL: `http://127.0.0.1:${port}`,
     headless: true,
     viewport: { width: 1280, height: 900 },
     trace: "retain-on-failure",
@@ -40,17 +41,17 @@ export default defineConfig({
   webServer: {
     command: productionRoot ? "node scripts/ci/serve.js" : "npm start",
     cwd: path.resolve(__dirname, ".."),
-    url: "http://127.0.0.1:3115",
+    url: `http://127.0.0.1:${port}`,
     timeout: 180000,
     reuseExistingServer: false,
     env: {
       BROWSER: "none",
       HOST: "127.0.0.1",
-      PORT: "3115",
+      PORT: port,
       ELECTRIFY_E2E: "1",
       REACT_APP_DESKTOP: "true",
       ...(productionRoot
-        ? { E2E_BUILD_DIR: productionRoot, E2E_PORT: "3115" }
+        ? { E2E_BUILD_DIR: productionRoot, E2E_PORT: port }
         : {}),
     },
   },

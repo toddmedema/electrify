@@ -191,6 +191,13 @@ if (typeof window !== "undefined") {
   window.addEventListener("orientationchange", invalidate);
 }
 
+/**
+ * From this width the game workspace opens tools in side columns beside the fleet, and the app
+ * bar folds its status row into the top bar so the window gains one row of game.
+ */
+export const SIDE_LAYOUT_MIN_WIDTH = 1200;
+export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
+
 export function isBigScreen(): boolean {
   return getViewportWidth() > 650;
 }

@@ -52,6 +52,16 @@ export function publicRateCap(
   return cap;
 }
 
+/** A public utility's scored target rate in today's dollars: the authored rate, inflated. */
+export function publicTargetRate(
+  targetRate: number,
+  date: Pick<DateType, "year" | "monthNumber">,
+  startingYear: number,
+  seed: number,
+): number {
+  return targetRate * getRateInflationIndex(date, startingYear, seed);
+}
+
 export interface CustomerTickInputType {
   customers: number;
   customerRate: number;

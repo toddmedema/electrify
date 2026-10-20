@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * The header every standalone screen (Settings, Manual, Choose a game, Game details, Custom setup)
- * shares: one chevron, one left-aligned h6 title at every width, a hairline divider and the same
+ * shares: one chevron, one left-aligned h6 title at every width, a soft shadow once content scrolls under it and the same
  * 16px inset as the body below it. The id keeps the safe-area and inset rules on #topbar.
  */
 export default function ScreenHeader({

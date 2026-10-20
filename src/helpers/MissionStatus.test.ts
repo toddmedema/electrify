@@ -79,6 +79,12 @@ test.each<[number, string]>([
   },
 );
 
+test("the reliability requirement is headed by its imperative goal", () => {
+  expect(requirement(fixture(), "reliability").label).toBe(
+    "Keep the lights on through the wildfire emergency",
+  );
+});
+
 test("reliability progress never rounds a failed month up to its target", () => {
   const game = createNextState(fixture(37), (g) => {
     g.monthlyHistory = [monthRow(2025, 1, 99.499, 100)];
@@ -282,10 +288,16 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
     g.timeline[0].cash = -1;
   });
   expect(selectMissionRisk(cash, [event])?.id).toBe("cash");
+  expect(selectMissionRisk(cash, [event], getMissionStatus(cash))?.id).toBe(
+    "cash",
+  );
   const shortage = createNextState(cash, (g) => {
     g.timeline[0].supplyW = 99;
   });
   expect(selectMissionRisk(shortage, [event])?.id).toBe("shortage");
+  expect(
+    selectMissionRisk(shortage, [event], getMissionStatus(shortage))?.id,
+  ).toBe("shortage");
   const failed = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
     g.timeline.push(
@@ -310,6 +322,24 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
   expect(selectMissionRisk(fixture())).toBeUndefined(); // zero reserve is not shortage
 });
 
+test("reuses the current mission status without reading completed history again", () => {
+  const game = createNextState(fixture(38), (g) => {
+    g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
+  });
+  const mission = getMissionStatus(game);
+  const expected = selectMissionRisk(game);
+  expect(expected?.id).toBe("reliability");
+  const alreadySummarized = {
+    ...game,
+    get monthlyHistory(): MonthlyHistoryType[] {
+      throw new Error(
+        "Completed history was already summarized for this render",
+      );
+    },
+  };
+  expect(selectMissionRisk(alreadySummarized, [], mission)).toEqual(expected);
+});
+
 // The runway reads the forward projection, not the average of recent months. Scenario 111's
 // LADWP-scale utility surpluses at its scenario rate and deficits at zero, with the difference
 // between the two measured by the projection the same way a player's slider would move it.
@@ -320,6 +350,7 @@ const runwayGame = (
 ) =>
   createNextState(createGame({ scenarioId: 111, seed: 7 }), (g) => {
     g.dollarsPerkWh = rate;
+    g.rateFollowsTarget = false;
     g.monthlyHistory = history;
     // A flat current tick: a zero reserve is not a shortage, so no other risk outranks the
     // runway in the assertions below

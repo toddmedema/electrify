@@ -1,12 +1,12 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 
 const reviewProjects = new Set([
   "desktop-chromium",
   "mobile-390px",
-  "mobile-320px",
+  "mobile-360px",
 ]);
 async function settle(page: Page) {
   await page.waitForTimeout(400);
@@ -19,7 +19,7 @@ async function openInsights(page: Page) {
 async function openBuildGenerators(page: Page) {
   const fleet = page.locator(".facilities:visible");
   await openPane(fleet, page.locator("#faciltiesNav"));
-  await fleet.getByRole("button", { name: "Build", exact: true }).click();
+  await openBuild(page);
   await page.locator(".button-buildGenerator").click();
   await expect(page.locator(".buildOption").first()).toBeVisible();
 }
@@ -80,15 +80,21 @@ for (const theme of ["light", "dark"]) {
       const mission = await page
         .locator(".missionSummary:visible")
         .boundingBox();
-      expect(grid!.y).toBe(mission!.y);
+      // One line, whether in its own row or folded into the top bar on wide windows, where the
+      // grid readout is a shorter tinted box centred beside the mission.
+      expect(
+        Math.abs(
+          grid!.y + grid!.height / 2 - (mission!.y + mission!.height / 2),
+        ),
+      ).toBeLessThanOrEqual(1);
     }
     await settle(page);
     const details = page.getByRole("button", {
-      name: "All requirements",
+      name: "Scenario",
       exact: true,
     });
     await details.click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("region", { name: "Scenario", exact: true });
     await expect(dialog).toContainText("90%");
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
@@ -117,8 +123,14 @@ for (const theme of ["light", "dark"]) {
       await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     }
     if (info.project.name.startsWith("mobile")) {
+      // Facilities is the base layer: closing the open tool returns to it.
       for (const nav of ["Insights", "Events", "Facilities"]) {
-        await page.getByRole("button", { name: nav, exact: true }).click();
+        if (nav === "Facilities")
+          await openPane(
+            page.locator(".facilities"),
+            page.locator("#faciltiesNav"),
+          );
+        else await page.getByRole("button", { name: nav, exact: true }).click();
         await settle(page);
         await expect(page.locator(".missionSummary:visible")).toContainText(
           "months left",
@@ -147,68 +159,6 @@ for (const theme of ["light", "dark"]) {
   });
 }
 
-test("status boundary follows the saved movable pane divider and window width", async ({
-  page,
-}, info) => {
-  test.skip(
-    !["desktop-chromium", "desktop-1440px"].includes(info.project.name),
-  );
-  await page.goto("/?scenario=100");
-  await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const splitter = page.getByRole("separator").first();
-  const aligned = async () => {
-    // Crossing the desktop breakpoint swaps the pane layout under a card transition, which
-    // keeps the outgoing layout -- app bar and splitters included -- mounted for its duration.
-    // Measure only once a single layout and a single app bar remain, so the check can never
-    // pass against the outgoing one, and a persistent duplicate app bar still fails it.
-    await expect
-      .poll(async () => {
-        const layouts = page.locator(".cardTransitions > main");
-        if ((await layouts.count()) !== 1) return Infinity;
-        const grids = page.locator(".gridHealth:visible");
-        if ((await grids.count()) !== 1) return Infinity;
-        // A transition can mount a second app bar between the count and the measurement;
-        // strict mode then throws, which should retry rather than fail the poll.
-        const grid = await grids.boundingBox().catch(() => null);
-        const divider = await page
-          .locator(".pane-splitter")
-          .first()
-          .boundingBox();
-        if (!grid || !divider) return Infinity;
-        return Math.abs(grid.x + grid.width - divider.x);
-      })
-      .toBeLessThanOrEqual(1);
-  };
-  await aligned();
-  await settle(page);
-  const before = (await splitter.boundingBox())!;
-  await page.mouse.move(before.x + before.width / 2, before.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(before.x + before.width / 2 + 100, before.y + 20, {
-    steps: 8,
-  });
-  await page.mouse.up();
-  await aligned();
-  expect((await splitter.boundingBox())!.x).toBeGreaterThan(before.x + 80);
-  await splitter.focus();
-  await page.keyboard.press("ArrowRight");
-  await aligned();
-  const savedX = (await splitter.boundingBox())!.x;
-  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-  await page.reload();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await aligned();
-  expect(
-    Math.abs((await splitter.boundingBox())!.x - savedX),
-  ).toBeLessThanOrEqual(1);
-  await page.setViewportSize({ width: 1600, height: 900 });
-  await aligned();
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await aligned();
-  await splitter.dblclick();
-  await aligned();
-});
-
 test("Insights keeps its date range while the build screen is open", async ({
   page,
 }, info) => {
@@ -225,7 +175,7 @@ test("Insights keeps its date range while the build screen is open", async ({
   await page.getByRole("button", { name: "Pan later", exact: true }).click();
   const origin = await range(page);
   await openBuildGenerators(page);
-  await page.getByRole("button", { name: "close", exact: true }).click();
+  await page.getByRole("button", { name: "Close Build", exact: true }).click();
   await openInsights(page);
   expect(await range(page)).toEqual(origin);
 });
@@ -297,24 +247,29 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.setViewportSize(viewport);
     await page.addStyleTag({ content: "html { font-size: 150% !important; }" });
     const details = page.getByRole("button", {
-      name: "All requirements",
+      name: "Scenario",
       exact: true,
     });
     await details.scrollIntoViewIfNeeded();
     await details.click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Scenario", exact: true }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
     await page.locator("#eventsNav:visible").scrollIntoViewIfNeeded();
     await page.locator("#eventsNav:visible").click();
     await settle(page);
-    await page.locator("#faciltiesNav:visible").scrollIntoViewIfNeeded();
-    await page.locator("#faciltiesNav:visible").click();
+    await page
+      .getByRole("button", { name: "Close Events", exact: true })
+      .click();
     await settle(page);
     await page.locator(".button-buildFacility").scrollIntoViewIfNeeded();
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(page.locator(".buildOption").first()).toBeVisible();
-    await page.getByRole("button", { name: "close", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Close Build", exact: true })
+      .click();
     await settle(page);
     expect(
       await page.evaluate(

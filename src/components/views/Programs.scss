@@ -14,6 +14,39 @@
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-subtle);
 
+  .programsPricingHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  // Quieter than the rate itself: a mode beside the heading, not a second decision.
+  .programsRateFollow {
+    min-height: 40px;
+    margin: 0 -8px 0 0;
+    gap: 4px;
+
+    .MuiFormControlLabel-label {
+      color: var(--font-color-faded);
+      font-size: var(--font-size-body2);
+    }
+
+    // Off reads as neutral, on as interactive blue, by thumb and track rather than position alone.
+    .MuiSwitch-switchBase:not(.Mui-checked):not(.Mui-disabled) {
+      color: var(--font-color-faded);
+    }
+    .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track {
+      background-color: var(--border-strong);
+      opacity: 1;
+    }
+    .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track {
+      background-color: var(--interactive-strong);
+      opacity: 0.6;
+    }
+  }
+
   .insightsRateMetrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -49,6 +82,12 @@
 
   .MuiSlider-markLabel {
     color: var(--font-color-faded);
+  }
+}
+
+@media (pointer: coarse) {
+  .programsPricing .programsRateFollow {
+    min-height: 44px;
   }
 }
 

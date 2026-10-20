@@ -13,6 +13,7 @@ const {
   assertAsset,
   verifyBuild,
   verifyArchiveAssets,
+  verifyInputResources,
   digest,
 } = require("../scripts/desktop-verify.js");
 
@@ -28,6 +29,31 @@ test("packaged app metadata uses the renderer artifact's build version", () => {
     require("../electron-builder.config.cjs").extraMetadata.version,
     undefined,
   );
+});
+
+test("packaged Steam Input actions and defaults remain external to ASAR and match authored bytes", (t) => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const resources = fs.mkdtempSync(path.join(temporaryRoot, "steam-input-"));
+  t.after(() => fs.rmSync(resources, { recursive: true, force: true }));
+  const source = path.join(__dirname, "../steamworks/input");
+  const config = packageConfiguration("steam");
+  const mapping = config.extraResources.find(
+    (entry) => entry.from === "steamworks/input",
+  );
+  assert.equal(mapping.to, "steam-input");
+  const target = path.join(resources, mapping.to);
+  fs.cpSync(source, target, { recursive: true });
+  assert.doesNotThrow(() => verifyInputResources(resources, source));
+  const file = path.join(target, "controller_neptune.vdf");
+  fs.appendFileSync(file, "\nchanged during packaging\n");
+  assert.throws(
+    () => verifyInputResources(resources, source),
+    /Steam Input configuration mismatch/,
+  );
+  fs.copyFileSync(path.join(source, "controller_neptune.vdf"), file);
+  fs.unlinkSync(path.join(target, "actions.vdf"));
+  assert.throws(() => verifyInputResources(resources, source), /ENOENT/);
 });
 
 test("packaging refuses Git LFS pointer text and empty assets", () => {

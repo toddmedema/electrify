@@ -8,22 +8,44 @@ import { createGame } from "../../testing/Simulator";
 import Programs from "./Programs";
 import { manualHelpOpen } from "../../reducers/UI";
 import { GameToolMemoryContext } from "../base/GameToolMemory";
+import cardReducer, { initialCard } from "../../reducers/Card";
+import { GameAppBar } from "../base/GameAppBar";
 
 afterEach(() => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
 
-function showPrograms(scenarioId: number) {
+function showPrograms(scenarioId: number, withAppBar = false) {
   jest.useFakeTimers();
-  const game = { ...createGame({ scenarioId }), speed: "FAST" as const };
+  const game = {
+    ...createGame({ scenarioId }),
+    inGame: true,
+    speed: "FAST" as const,
+  };
   const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
+    reducer: { game: gameReducer, ui: uiReducer, card: cardReducer },
+    preloadedState: {
+      game,
+      card: {
+        ...initialCard,
+        name: withAppBar ? ("PROGRAMS" as const) : ("FACILITIES" as const),
+      },
+    },
   });
   const onClose = jest.fn();
   const view = render(
     <Provider store={store}>
+      {withAppBar && (
+        <GameAppBar
+          game={game}
+          onManual={jest.fn()}
+          onNextTutorial={jest.fn()}
+          onQuit={jest.fn()}
+          onSettings={jest.fn()}
+          onSpeedChange={jest.fn()}
+        />
+      )}
       <Programs onClose={onClose} />
     </Provider>,
   );
@@ -37,6 +59,32 @@ test("the embedded overview offers pricing without policies or a modal focus tra
     screen.getByRole("region", { name: "Electricity pricing" }),
   ).toBeVisible();
   expect(screen.getByRole("slider")).toBeEnabled();
+  expect(store.getState().game.speed).toBe("FAST");
+});
+
+test("Escape dismisses the app menu before leaving an unsaved program decision", () => {
+  const { store } = showPrograms(106, true);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+  );
+  fireEvent.change(screen.getByLabelText("Daily window"), {
+    target: { value: "22" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "menu" }));
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+  act(() => jest.advanceTimersByTime(300));
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Program details" })).toBeVisible();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Daily window")).toHaveValue("22");
+  expect(store.getState().game.speed).toBe("PAUSED");
+  fireEvent.keyDown(
+    screen.getByRole("heading", { name: "Time-of-use tariff" }),
+    { key: "Escape" },
+  );
+  expect(
+    screen.getByRole("region", { name: "Electricity pricing" }),
+  ).toBeVisible();
   expect(store.getState().game.speed).toBe("FAST");
 });
 
@@ -100,7 +148,6 @@ test("remembers a hidden program's draft and scroll while releasing its clock pa
   fireEvent.click(
     screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: "On" }));
   fireEvent.change(screen.getByLabelText("Daily window"), {
     target: { value: "22" },
   });
@@ -112,7 +159,7 @@ test("remembers a hidden program's draft and scroll while releasing its clock pa
   expect(store.getState().game.speed).toBe("FAST");
   view.rerender(content(true));
   expect(store.getState().game.speed).toBe("PAUSED");
-  expect(screen.getByRole("radio", { name: "On" })).toBeChecked();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Daily window")).toHaveValue("22");
   expect(
     screen.getByRole("region", { name: "Program details" }).scrollTop,

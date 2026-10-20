@@ -3,7 +3,6 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  Button,
   IconButton,
   InputAdornment,
   InputBase,
@@ -18,19 +17,27 @@ import ScreenPage from "../base/ScreenPage";
 import {
   MANUAL_ENTRIES,
   MANUAL_GROUPS,
+  ManualEntryTitleType,
   ManualEntryType,
   ManualGroupType,
   manualEntryText,
 } from "../base/ManualEntries";
+import { ManualEntryNavigation } from "../base/ManualEntryLink";
 
 export interface StateProps {
   // Set when the player arrived via a deep link from a term shown elsewhere in the game
   // (see ManualLink) - that entry opens and scrolls into view
   focusEntry?: string;
+  // Changes with every navigation, so following a link to the entry already in focusEntry (after
+  // scrolling or searching away from it) still brings it back into view
+  focusKey?: number;
 }
 
 export interface DispatchProps {
+  // Leaves the manual, however many links deep the player went
   onBack: () => void;
+  // Follows a link in one entry's prose to another, as a step Back can retrace
+  onFollowLink: (to: ManualEntryTitleType, from: ManualEntryTitleType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -163,12 +170,16 @@ interface ManualItemProps {
   expanded: boolean;
   onToggle: (title: string, expanded: boolean) => void;
   itemRef?: React.Ref<HTMLDivElement>;
-  onRelated: (title: string) => void;
+  onFollowLink: (to: ManualEntryTitleType, from: ManualEntryTitleType) => void;
 }
 
 function ManualItem(props: ManualItemProps): React.JSX.Element {
-  const { entry, searchTerm, expanded } = props;
+  const { entry, searchTerm, expanded, onFollowLink } = props;
   const id = entryId(entry.title);
+  const followLink = React.useCallback(
+    (to: ManualEntryTitleType) => onFollowLink(to, entry.title),
+    [onFollowLink, entry.title],
+  );
   return (
     <Accordion
       className={entry.pinned ? "manual-entry manual-pinned" : "manual-entry"}
@@ -191,33 +202,16 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
         </Typography>
       </AccordionSummary>
       <AccordionDetails id={`${id}-content`}>
-        {highlight(entry.entry, searchTerm, id)}
-        {!!entry.related?.length && (
-          <nav
-            aria-label={`Related to ${entry.title}`}
-            className="manual-related"
-          >
-            <Typography variant="body2" color="textSecondary">
-              Related entries
-            </Typography>
-            {entry.related.map((title) => (
-              <Button
-                key={title}
-                className="manual-related-link"
-                onClick={() => props.onRelated(title)}
-              >
-                {title}
-              </Button>
-            ))}
-          </nav>
-        )}
+        <ManualEntryNavigation.Provider value={followLink}>
+          {highlight(entry.entry, searchTerm, id)}
+        </ManualEntryNavigation.Provider>
       </AccordionDetails>
     </Accordion>
   );
 }
 
 export default function Manual(props: Props): React.JSX.Element {
-  const { onBack } = props;
+  const { onBack, onFollowLink } = props;
   const [focusEntry, setFocusEntry] = React.useState(props.focusEntry);
   const [focusRequest, setFocusRequest] = React.useState(0);
   // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
@@ -252,7 +246,7 @@ export default function Manual(props: Props): React.JSX.Element {
 
   React.useEffect(() => {
     if (props.focusEntry) openEntry(props.focusEntry);
-  }, [props.focusEntry, openEntry]);
+  }, [props.focusEntry, props.focusKey, openEntry]);
 
   React.useEffect(() => {
     lastSearchTerm = searchTerm;
@@ -314,7 +308,7 @@ export default function Manual(props: Props): React.JSX.Element {
         searchTerm={term}
         expanded={toggled[entry.title] ?? (searching || isFocused)}
         onToggle={onToggle}
-        onRelated={openEntry}
+        onFollowLink={onFollowLink}
         itemRef={isFocused ? focusRef : undefined}
       />
     );

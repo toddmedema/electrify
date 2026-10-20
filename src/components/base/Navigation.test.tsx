@@ -2,6 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
+import { delta } from "../../reducers/Game";
 import Navigation from "./Navigation";
 
 function renderNavigation(onToggle = jest.fn()) {
@@ -39,6 +40,9 @@ afterEach(() => {
 });
 
 describe("Navigation", () => {
+  beforeEach(() => {
+    store.dispatch(delta({ scenarioId: 103, tutorialStep: 0 }));
+  });
   it("groups the four game tools in a labeled action dock", () => {
     renderNavigation();
 
@@ -52,6 +56,52 @@ describe("Navigation", () => {
     }
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });
+
+  it("opens the scenario as a tool like the others", () => {
+    const onToggle = jest.fn();
+    store.dispatch(delta({ scenarioId: 103 }));
+    renderNavigation(onToggle);
+    const scenario = screen.getByRole("button", { name: "Scenario" });
+    expect(scenario).toHaveAttribute("aria-keyshortcuts", "T");
+    fireEvent.click(scenario);
+    expect(onToggle).toHaveBeenCalledWith("SCENARIO");
+  });
+
+  it("leaves the scenario out of tutorials, which have no score", () => {
+    store.dispatch(delta({ scenarioId: 0 }));
+    renderNavigation();
+    expect(screen.queryByRole("button", { name: "Scenario" })).toBeNull();
+    expect(screen.queryByRole("navigation")).toBeNull();
+  });
+
+  it.each<[number, number, string[]]>([
+    [1, 0, ["Build"]],
+    [2, 0, ["Build"]],
+    [4, 0, ["Build", "Insights"]],
+    [4, 3, ["Build", "Programs", "Insights"]],
+    [3, 0, ["Build", "Programs", "Insights"]],
+    [5, 0, ["Build", "Programs", "Insights"]],
+    [5, 5, ["Build", "Programs", "Insights", "Events"]],
+    [112, 0, ["Build", "Programs", "Insights", "Events"]],
+    [112, 19, ["Build", "Programs", "Insights", "Events"]],
+  ])(
+    "shows only taught actions in tutorial %s step %s",
+    (scenarioId, tutorialStep, actions) => {
+      store.dispatch(
+        delta({
+          scenarioId,
+          tutorialStep,
+        }),
+      );
+      renderNavigation();
+      expect(
+        screen
+          .getAllByRole("button")
+          .map((button) => button.getAttribute("aria-label")),
+      ).toEqual(actions);
+      expect(screen.queryByRole("button", { name: "Scenario" })).toBeNull();
+    },
+  );
 
   it("labels hovered and keyboard-focused icons with their shortcut without opening a tool", async () => {
     const onToggle = jest.fn();

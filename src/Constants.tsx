@@ -275,7 +275,7 @@ export const INIT_DELAY = {
 // Excludes upstream methane, construction, regrowth credits and other lifecycle effects.
 // Coal is modeled as bituminous; geothermal as zero-venting/binary cycle.
 // https://www.eia.gov/electricity/annual/table.php?t=epa_a_03.html
-// Weather-driven fuels burn nothing and have no entry
+// Variable fuels burn nothing and have no entry
 export const FUELS: Partial<Record<FuelNameType, FuelType>> = {
   Coal: {
     kgCO2ePerBtu: 0.00009324, // Bituminous coal: 93.24 kg CO2/MMBtu.
@@ -336,6 +336,7 @@ export const NAV_CARDS = [
   "FACILITIES",
   "INSIGHTS",
   "EVENTS",
+  "SCENARIO",
   "PROGRAMS",
 ] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;

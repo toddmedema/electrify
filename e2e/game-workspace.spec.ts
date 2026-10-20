@@ -2,13 +2,17 @@ import { expect, Page, test } from "./fixtures";
 
 test.setTimeout(90_000);
 
-async function startGame(page: Page, theme: "light" | "dark") {
+async function startGame(
+  page: Page,
+  theme: "light" | "dark",
+  scenarioId = 100,
+) {
   await page.addInitScript((mode) => {
     localStorage.clear();
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
   }, theme);
-  await page.goto("/?scenario=100");
+  await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
   await page.keyboard.press("0");
@@ -27,6 +31,32 @@ async function settleSheets(page: Page) {
     );
   });
 }
+
+test("Escape closes the game menu before an unsaved program decision", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  await page.locator("#programsNav").click();
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await programs.getByRole("button", { name: /^Time-of-use tariff ·/ }).click();
+  await programs.getByLabel("Daily window").selectOption("22");
+  await page.locator(".gameMenuButton").click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(
+    programs.getByRole("region", { name: "Program details" }),
+  ).toBeVisible();
+  await expect(programs.getByLabel("Daily window")).toBeVisible();
+  await expect(programs.getByLabel("Daily window")).toHaveValue("22");
+  await programs
+    .getByRole("heading", { name: "Time-of-use tariff", exact: true })
+    .focus();
+  await page.keyboard.press("Escape");
+  await expect(
+    programs.getByRole("region", { name: "Electricity pricing" }),
+  ).toBeVisible();
+});
 
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
   page,
@@ -171,11 +201,11 @@ test("Insights and Events reopen at the scroll position the player left", async 
 });
 
 async function expectFloatingDock(page: Page) {
-  const [stage, facilities, dock, fleet] = await Promise.all([
+  const [stage, facilities, dock, width] = await Promise.all([
     page.locator(".gameStage").boundingBox(),
     page.locator(".gameStage .facilities").boundingBox(),
     page.locator("#navfooter").boundingBox(),
-    page.locator(".gameFleet").boundingBox(),
+    page.evaluate(() => window.innerWidth),
   ]);
   // The dock overlays the full-height fleet instead of reserving a blank footer band.
   expect(
@@ -183,10 +213,10 @@ async function expectFloatingDock(page: Page) {
   ).toBeLessThanOrEqual(1);
   expect(dock!.y).toBeLessThan(facilities!.y + facilities!.height);
   expect(dock!.y + dock!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
-  // Centered over the fleet, so side tools never sit under it.
-  expect(
-    Math.abs(dock!.x + dock!.width / 2 - fleet!.x - fleet!.width / 2),
-  ).toBeLessThanOrEqual(1);
+  // Centered on the window, so opening or closing a side tool never moves it.
+  expect(Math.abs(dock!.x + dock!.width / 2 - width / 2)).toBeLessThanOrEqual(
+    1,
+  );
 }
 
 async function expectSideRails(page: Page) {
@@ -337,6 +367,10 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
     await bolt.tap();
     await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
+    await bolt.tap();
+    await expect(page.getByRole("tooltip", { name: summary })).toHaveCount(0);
+    await bolt.tap();
+    await expect(page.getByRole("tooltip", { name: summary })).toBeVisible();
     await page
       .locator(".gameStage .facilities")
       .tap({ position: { x: 8, y: 8 } });
@@ -438,6 +472,69 @@ test("icon labels support hover, keyboard focus, and touch hold-and-slide withou
     page.getByRole("region", { name: "Build", exact: true }),
   ).toBeVisible();
   await session.detach();
+});
+
+test("Programs keeps points visible through monthly forecast refreshes", async ({
+  page,
+}, testInfo) => {
+  await startGame(page, testInfo.project.use.hasTouch ? "light" : "dark", 107);
+  await page.locator("#programsNav").click();
+  const pricing = page.getByRole("region", { name: "Electricity pricing" });
+  const points = pricing.locator(".insightsRateScore");
+  await expect(points).toHaveText(/[±+−]\d[\d,]* pts/);
+  await pricing.getByRole("slider").press("ArrowLeft");
+  await expect(points).toHaveText(/\+\d[\d,]* pts/);
+  await pricing.evaluate((element) => {
+    const months = new Set<string>();
+    const sample = () => {
+      if (
+        element
+          .querySelector(".insightsRateScore")
+          ?.textContent?.includes("Calculating")
+      ) {
+        element.setAttribute("data-score-blanked", "true");
+      }
+      const month = document
+        .querySelector(".gameStatus .weak")
+        ?.textContent?.match(/^\w+ \d+/)?.[0];
+      if (month) months.add(month);
+      element.setAttribute("data-observed-months", String(months.size));
+    };
+    sample();
+    const observer = new MutationObserver(sample);
+    const options = { subtree: true, childList: true, characterData: true };
+    observer.observe(element, options);
+    observer.observe(document.querySelector("#appbar")!, options);
+  });
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await expect
+    .poll(
+      async () => Number(await pricing.getAttribute("data-observed-months")),
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThanOrEqual(3);
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  await expect(pricing).not.toHaveAttribute("data-score-blanked", "true");
+  await settleSheets(page);
+  await page.mouse.move(0, 0);
+  await page.screenshot({
+    path: testInfo.outputPath("programs-points-estimate.png"),
+    animations: "disabled",
+  });
+  await page.locator("#insightsNav").click();
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect(
+    page.getByLabel("Displayed date range: 2017–23", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Monthly forecast ranges show/)).toHaveCount(0);
+  if (testInfo.project.use.hasTouch) {
+    await settleSheets(page);
+    await page.mouse.move(0, 0);
+    await page.screenshot({
+      path: testInfo.outputPath("insights-scenario-range.png"),
+      animations: "disabled",
+    });
+  }
 });
 
 test("Programs owns pricing and Build keeps purchase dialogs above its sheet", async ({
@@ -685,7 +782,7 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
   });
 });
 
-for (const width of [320, 390]) {
+for (const width of [360, 390]) {
   test(`compact ${width}px sheets and final actions remain usable behind the floating dock`, async ({
     page,
   }, testInfo) => {

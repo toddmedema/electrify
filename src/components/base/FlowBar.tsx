@@ -5,7 +5,7 @@ import { chartPalette, withAlpha } from "../../Theme";
  * The tint behind a fleet row saying how hard the thing is working, signed so that power moving
  * the other way -- a battery charging, an intertie selling to a neighbour -- is as visible as
  * power moving out. Both directions fill from the left edge at |flow| / rating, which keeps one
- * bar grammar across generator, storage and intertie rows and keeps full resolution at 320px.
+ * bar grammar across generator, storage and intertie rows and keeps full resolution at 360px.
  *
  * Direction needs more than hue (WCAG 1.4.1), and most of all at 100%, where a reverse bar
  * and a forward bar cover exactly the same pixels. This component contributes the colour and a

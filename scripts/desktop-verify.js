@@ -92,6 +92,15 @@ function verifyArchiveAssets(archive) {
   return manifest.length;
 }
 
+function verifyInputResources(resources, source = "steamworks/input") {
+  for (const name of files(source)) {
+    const bundled = fs.readFileSync(path.join(resources, "steam-input", name));
+    assertAsset(bundled, name);
+    if (digest(bundled) !== digest(fs.readFileSync(path.join(source, name))))
+      throw new Error(`Packaged Steam Input configuration mismatch: ${name}`);
+  }
+}
+
 function verifyPackaged(directory) {
   const resources =
     process.platform === "darwin"
@@ -99,6 +108,7 @@ function verifyPackaged(directory) {
       : path.join(directory, "resources");
   const archive = path.join(resources, "app.asar");
   const count = verifyArchiveAssets(archive);
+  verifyInputResources(resources);
   const platform = process.platform;
   const native =
     platform === "win32"
@@ -188,6 +198,7 @@ function verifySignedMacPackage(directory) {
     throw new Error(
       `The macOS app is not universal: ${lipo.stdout.trim() || "no slices"}`,
     );
+  verifyInputResources(path.join(application, "Contents", "Resources"));
   return verifyArchiveAssets(
     path.join(application, "Contents", "Resources", "app.asar"),
   );
@@ -215,6 +226,7 @@ module.exports = {
   assertAsset,
   verifyBuild,
   verifyArchiveAssets,
+  verifyInputResources,
   verifyPackaged,
   verifySignedMacPackage,
 };

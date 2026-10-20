@@ -51,7 +51,6 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     // Mission 1 keeps the action dock for later: the fleet has the screen to itself.
     await expect(page.locator("#facilitiesPane")).toBeVisible();
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
-    await expect(page.locator(".pane-splitter")).toHaveCount(0);
     await expect(page.locator("#insightsPane")).toHaveCount(0);
     await expect(page.locator("#eventsPane")).toHaveCount(0);
   }

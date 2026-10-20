@@ -1,18 +1,18 @@
-/** The native entrance is already painted from index.html before the game bundle runs. */
+/** The startup entrance is already painted from index.html before the game bundle runs. */
 export function prepareDesktopStartup(): void {
-  const entrance = document.getElementById("desktopStartup");
+  const entrance = document.getElementById("appStartup");
   if (!entrance) return;
-  entrance.classList.remove("desktopStartupFailed");
+  entrance.classList.remove("appStartupFailed");
   const status = entrance.querySelector("[data-startup-status]");
   status?.setAttribute("role", "status");
   status?.replaceChildren("Reticulating splines...");
 }
 
 export function failDesktopStartup(retry: () => void, quit: () => void): void {
-  const entrance = document.getElementById("desktopStartup");
+  const entrance = document.getElementById("appStartup");
   const status = entrance?.querySelector("[data-startup-status]");
   if (!entrance || !status) return;
-  entrance.classList.add("desktopStartupFailed");
+  entrance.classList.add("appStartupFailed");
   status.setAttribute("role", "alert");
   const heading = document.createElement("h1");
   heading.textContent = "Saved games couldn't be restored";
@@ -20,7 +20,7 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
   message.textContent =
     "Your desktop backup has been kept. Retry before starting a game.";
   const actions = document.createElement("div");
-  actions.className = "desktopStartupActions";
+  actions.className = "appStartupActions";
   for (const [label, action] of [
     ["Retry", retry],
     ["Quit", quit],
@@ -35,9 +35,12 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
   actions.querySelector("button")?.focus();
 }
 
-/** Called at the app's first commit, with no timeout or animation completion gate. */
-export function finishDesktopStartup(): void {
-  const entrance = document.getElementById("desktopStartup");
+/**
+ * Called at the app's first commit on web and desktop, with no timeout or animation
+ * completion gate.
+ */
+export function finishStartup(): void {
+  const entrance = document.getElementById("appStartup");
   if (!entrance) return;
   const menu = document.querySelector("#menuCard");
   const logo = menu?.querySelector(".homeLogo");
@@ -65,7 +68,7 @@ export function finishDesktopStartup(): void {
       logo.animate(
         [
           {
-            transform: `translate(${before.x - after.x}px, ${before.y - after.y}px)`,
+            transform: `translateY(${before.y - after.y}px)`,
           },
           { transform: "none" },
         ],

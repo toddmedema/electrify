@@ -18,13 +18,18 @@ for (const layout of [
     }, layout.theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    if (layout.width < 1300)
-      await page.getByRole("button", { name: "Events", exact: true }).click();
+    // Tools open from the dock at every width; nothing opens Events automatically.
+    await page
+      .locator("#navfooter")
+      .getByRole("button", { name: "Events", exact: true })
+      .click();
     if (layout.pane) {
       await expect(
         page.getByRole("heading", { name: "Pinned goals" }),
       ).toBeVisible();
-      await expect(page.locator(".operationsGoal")).toHaveCount(2);
+      await expect(
+        page.locator(".operationsGoals > .eventLogItem"),
+      ).toHaveCount(2);
       await page.locator(".eventHistory").scrollIntoViewIfNeeded();
       await expect(
         page.getByRole("button", { name: "Filter event history, All events" }),
@@ -54,11 +59,25 @@ for (const layout of [
       await page.keyboard.press("Escape");
       await expect(goals).toBeFocused();
       for (const row of await page
-        .locator(".operationsPriorities .operationsRow, .operationsGoal")
+        .locator(".operationsPriorities .eventLogItem")
         .all()) {
         expect(
           await row.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
+        // Like the Events history, the icon keeps its own gutter: no text wraps beneath it.
+        expect(
+          await row.evaluate((el) => {
+            const icon = el.querySelector(".eventLogIcon")!;
+            const iconRight = icon.getBoundingClientRect().right;
+            return (
+              Math.min(
+                ...Array.from(el.children)
+                  .filter((child) => child !== icon)
+                  .map((child) => child.getBoundingClientRect().left),
+              ) - iconRight
+            );
+          }),
+        ).toBeGreaterThanOrEqual(0);
       }
       await expect(
         page.getByRole("button", { name: /Keep the utility solvent/ }),
@@ -66,10 +85,6 @@ for (const layout of [
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
       });
-      if (layout.width >= 1300)
-        await expect(page.locator('[data-layer="supplyDemand"]')).toBeVisible({
-          timeout: 45000,
-        });
       await page.getByRole("heading", { name: "Pinned goals" }).click();
       await page.screenshot({
         path: testInfo.outputPath(
@@ -130,6 +145,10 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   }
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page
+    .locator("#navfooter")
+    .getByRole("button", { name: "Events", exact: true })
+    .click();
   const scroller = page.locator(".operationsPane > .scrollable");
   await expect(scroller).toBeVisible();
   await scroller.evaluate((element) => {

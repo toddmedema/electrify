@@ -66,73 +66,6 @@ const GEOTHERMAL_COUNTRIES = new Set([
   "Turkey",
 ]);
 
-const HYDRO_COUNTRIES = new Set([
-  "Austria",
-  "Bhutan",
-  "Brazil",
-  "Canada",
-  "Chile",
-  "China",
-  "Colombia",
-  "Costa Rica",
-  "Ecuador",
-  "Ethiopia",
-  "Iceland",
-  "Laos",
-  "Nepal",
-  "New Zealand",
-  "Norway",
-  "Paraguay",
-  "Peru",
-  "Sweden",
-  "Switzerland",
-  "Tajikistan",
-  "Venezuela",
-  // The two halves of Kariba. Hydro is about 85% of Zambia's generation and the larger share of
-  // Zimbabwe's, which is the whole premise of the scenario set in Lusaka.
-  "Zambia",
-  "Zimbabwe",
-]);
-
-// A country-wide US fallback would make hydro available almost everywhere. Use state profiles
-// instead: these states generated at least 1 TWh of conventional hydro in 2024 (EIA table 3.14),
-// a deliberately material threshold that excludes small producers such as Ohio (0.468 TWh).
-// https://www.eia.gov/electricity/annual/table.php?t=epa_03_14.html
-const US_HYDRO_STATES = new Set([
-  "AK",
-  "AL",
-  "AR",
-  "AZ",
-  "CA",
-  "CO",
-  "GA",
-  "ID",
-  "IA",
-  "KY",
-  "ME",
-  "MI",
-  "MO",
-  "MT",
-  "NC",
-  "ND",
-  "NE",
-  "NH",
-  "NV",
-  "NY",
-  "OK",
-  "OR",
-  "PA",
-  "SC",
-  "SD",
-  "TN",
-  "VA",
-  "VT",
-  "WA",
-  "WI",
-  "WV",
-  "WY",
-]);
-
 // The seven states with utility-scale geothermal generation in 2025.
 // https://www.eia.gov/energyexplained/geothermal/use-of-geothermal-energy.php
 const US_GEOTHERMAL_STATES = new Set([
@@ -227,15 +160,4 @@ export function hasGeothermalResource(location?: LocationType): boolean {
     return !!state && US_GEOTHERMAL_STATES.has(state);
   }
   return !!location?.country && GEOTHERMAL_COUNTRIES.has(location.country);
-}
-
-export function hasHydroResource(location?: LocationType): boolean {
-  if (location?.resources?.hydro !== undefined) {
-    return location.resources.hydro;
-  }
-  if (location?.country === "United States") {
-    const state = stateFor(location);
-    return !!state && US_HYDRO_STATES.has(state);
-  }
-  return !!location?.country && HYDRO_COUNTRIES.has(location.country);
 }

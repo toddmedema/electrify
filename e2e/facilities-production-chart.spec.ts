@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"]) {
       exact: true,
     });
     await openPane(pane, navigation);
-    await pane.getByRole("button", { name: "Build", exact: true }).click();
+    await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
       .getByRole("button", {
@@ -79,9 +79,7 @@ for (const theme of ["light", "dark"]) {
     const image = chart.getByRole("img");
     await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
     await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
-    await expect(
-      chart.getByText("Weather-driven", { exact: true }),
-    ).toBeVisible();
+    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
       chart.getByText("Dispatchable", { exact: true }),
     ).toBeVisible();
@@ -110,7 +108,7 @@ for (const theme of ["light", "dark"]) {
     await selectPoint(exporting);
     await expect(details).toContainText("Interties exporting:");
     await selectPoint(discharging);
-    await expect(details).toContainText("Storage discharging:");
+    await expect(details).toContainText("Storage:");
     await image.press("End");
     await image.press("Escape");
     await expect(details).toBeHidden();
@@ -164,6 +162,21 @@ for (const theme of ["light", "dark"]) {
         hoverBounds.y + hoverBounds.height + 1,
       );
     }
+    // A pointer that outruns the tooltip and lands on it still moves the cursor, so the tooltip
+    // follows instead of freezing under it.
+    {
+      await page.mouse.move(
+        hoverBounds.x + hoverBounds.width * 0.25,
+        hoverBounds.y + 4,
+      );
+      const tooltip = chart.locator(".chartTooltip");
+      const time = tooltip.locator(":scope > div").first();
+      const before = await time.textContent();
+      const tip = (await tooltip.boundingBox())!;
+      // One jump, so the only move event lands on the tooltip rather than the plot.
+      await page.mouse.move(tip.x + tip.width / 2, tip.y + tip.height / 2);
+      await expect(time).not.toHaveText(before!);
+    }
     if (
       process.env.REVIEW_SCREENSHOT_DIR &&
       theme === "light" &&
@@ -196,7 +209,7 @@ for (const theme of ["light", "dark"]) {
         ),
         animations: "disabled",
       });
-      if (info.project.name === "mobile-320px") {
+      if (info.project.name === "mobile-360px") {
         const vision = await page.context().newCDPSession(page);
         for (const type of [
           "achromatopsia",
@@ -239,16 +252,15 @@ for (const theme of ["light", "dark"]) {
     await expect(
       chart.getByText("Production by fuel", { exact: true }),
     ).toHaveCount(0);
-    await expect(
-      chart.getByText("Weather-driven", { exact: true }),
-    ).toBeVisible();
+    await expect(chart.getByText("Variable", { exact: true })).toBeVisible();
     await expect(
       chart.getByText("Dispatchable", { exact: true }),
     ).toBeVisible();
     await expect(chart.getByText("Sun", { exact: true })).toHaveCount(0);
     await expect(chart.getByText("Wind", { exact: true })).toHaveCount(0);
+    // Fuels with output that day stay in the summary; wind can be calm all day.
     await expect(chart.getByRole("img")).toHaveAccessibleName(
-      /Sun: latest .*Wind: latest/,
+      /Sun: latest .*Natural Gas: latest/,
     );
     await expect(chart).not.toContainText("Bands: fuel output");
     await expect(chart).not.toContainText("Solid: recorded");
@@ -332,7 +344,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
     exact: true,
   });
   await openPane(pane, navigation);
-  await pane.getByRole("button", { name: "Build", exact: true }).click();
+  await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page
     .getByRole("button", {
@@ -376,20 +388,15 @@ test("blackout periods remain visible when imports supplement fuel production", 
     (tick) => tick.demandW > tick.supplyW && (tick.importedW || 0) > 0,
   );
   expect(shortage).toBeGreaterThanOrEqual(0);
-  const tick = game.timeline[shortage];
-  const rangeMin = game.timeline[0].minute;
-  const rangeMax = game.timeline[game.timeline.length - 1].minute;
-  await chart.scrollIntoViewIfNeeded();
-  const bounds = (await chart.locator(".u-over").boundingBox())!;
-  await page.mouse.move(
-    bounds.x +
-      (bounds.width * (tick.minute - rangeMin)) / (rangeMax - rangeMin),
-    bounds.y + 4,
-  );
-  await expect(chart.locator(".chartTooltip")).toContainText(
-    "Interties importing:",
-  );
+  // The last sample maps to the plot's excluded right edge. Select the actual point through
+  // the chart's keyboard controls rather than depending on a pixel hit at that boundary.
+  const plot = chart.getByRole("img");
+  await plot.focus();
+  await plot.press("Home");
+  for (let index = 0; index < shortage; index++) await plot.press("ArrowRight");
+  await expect(chart.locator(".chartTooltip")).toContainText("Interties:");
   await expect(chart.locator(".chartTooltip")).toContainText("Blackout:");
+  await plot.press("Escape");
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
@@ -464,9 +471,9 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await chart.getByRole("img").press("Home");
   const details = chart.locator(".chartTooltip");
   for (const direction of [
-    "Storage discharging:",
+    "Storage:",
     "Storage charging:",
-    "Interties importing:",
+    "Interties:",
     "Interties exporting:",
   ]) {
     await expect(details).toContainText(direction);

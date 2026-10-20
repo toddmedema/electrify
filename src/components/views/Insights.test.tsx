@@ -12,6 +12,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { Provider } from "react-redux";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
@@ -695,15 +696,46 @@ describe("Insights layers", () => {
 
     await user.click(labelledButton("Pan later"));
     expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
-    await user.click(labelledButton("Fit full timeline"));
+    await user.click(labelledButton("Zoom out"));
     expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
     );
+    expect(
+      screen.getByLabelText("Displayed date range: 2020–31"),
+    ).toBeVisible();
+    expect(labelledButton("Zoom out")).toBeDisabled();
+    expect(
+      screen.queryByText(/Monthly forecast ranges show/),
+    ).not.toBeInTheDocument();
+    await user.click(labelledButton("Fit full timeline"));
     expect(
       screen.getByLabelText("Displayed date range: 2020–39"),
     ).toBeVisible();
   });
+
+  it.each([60, 0])(
+    "zooms out to the scenario span, with a 20-year fallback for duration %s",
+    async (durationMonths) => {
+      const game = gameWithHistory();
+      const months = durationMonths || 20 * 12;
+      renderInsights(100, {
+        ...game,
+        scenarioId: CUSTOM_SCENARIO_ID,
+        customScenario: {
+          ...getScenario(100)!,
+          id: CUSTOM_SCENARIO_ID,
+          durationMonths,
+        },
+      });
+      await user.click(labelledButton("Zoom out"));
+      expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+        "data-domain",
+        JSON.stringify([0, months * MINUTES_PER_MONTH]),
+      );
+      expect(labelledButton("Zoom out")).toBeDisabled();
+    },
+  );
 
   it("opens on the operating year and follows it as the game advances", () => {
     const game = createGame({ scenarioId: 100 });
@@ -1239,7 +1271,7 @@ describe("Insights layers", () => {
 
 function labelledButton(label: string | RegExp): HTMLElement {
   const button = screen.getByLabelText(label, {
-    selector: "button:not(.insightsShortRateToggle)",
+    selector: "button",
   });
   expect(button).toBeVisible();
   expect(isInaccessible(button)).toBe(false);

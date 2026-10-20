@@ -5,7 +5,9 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { GameToolMemoryContext } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
+import { selectTutorialActions } from "../../reducers/Tutorial";
 import { CardNameType } from "../../Types";
+import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
   GAME_TOOLS,
@@ -17,6 +19,7 @@ import Insights from "../views/InsightsContainer";
 import EventLog from "../views/EventLogContainer";
 import BuildFacilities from "../views/BuildFacilities";
 import Programs from "../views/Programs";
+import ScenarioDetails from "./ScenarioDetails";
 import {
   GameWorkspaceContext,
   GameToolCloseContext,
@@ -30,7 +33,7 @@ const sideFor = (tool: GameTool): ToolSide =>
     : "intelligence";
 
 /** Below this, tools rise as one sheet over the fleet instead of taking their own columns. */
-export const SIDE_LAYOUT_MIN_WIDTH = 1200;
+export { SIDE_LAYOUT_MIN_WIDTH };
 /** The fleet never gets narrower than the widest common phone, so it stays fully usable. */
 export const MIN_FLEET_WIDTH = 430;
 const MIN_TOOL_WIDTH = 400;
@@ -63,6 +66,7 @@ export default function GameWorkspace() {
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
+  const tutorialActions = useAppSelector(selectTutorialActions);
   // Open tools, least recently opened first. The newest ones win when they don't all fit.
   const [remembered, setRemembered] = React.useState<GameTool[]>([]);
   const [width, setWidth] = React.useState(window.innerWidth);
@@ -76,9 +80,9 @@ export default function GameWorkspace() {
   const capacity = maxOpenTools(width);
   // Derive the newly requested tool immediately; remembering it in an effect must not flash
   // the previous rail or unmount the fleet during navigation.
-  const tools: GameTool[] = active
-    ? [...remembered.filter((tool) => tool !== active), active]
-    : [];
+  const tools: GameTool[] = (
+    active ? [...remembered.filter((tool) => tool !== active), active] : []
+  ).filter((tool) => !tutorialActions || tutorialActions.includes(tool));
   const visible = tools.slice(-capacity);
   const ordered = GAME_TOOLS.map((tool) => tool.id).filter((id) =>
     tools.includes(id),
@@ -174,18 +178,7 @@ export default function GameWorkspace() {
   return (
     <GameToolMemoryContext.Provider value={memory.current}>
       <GameWorkspaceContext.Provider value={true}>
-        <div
-          className="gameWorkspace"
-          style={
-            layout === "side"
-              ? ({
-                  // The action dock floats over the fleet, not over the tools beside it.
-                  "--game-fleet-left": `${left.length * toolWidth(width)}px`,
-                  "--game-fleet-right": `${right.length * toolWidth(width)}px`,
-                } as React.CSSProperties)
-              : undefined
-          }
-        >
+        <div className="gameWorkspace">
           <GameAppBar />
           <div
             className="gameStage"
@@ -286,6 +279,7 @@ export default function GameWorkspace() {
                           )}
                           {tool === "INSIGHTS" && <Insights />}
                           {tool === "EVENTS" && <EventLog />}
+                          {tool === "SCENARIO" && <ScenarioDetails />}
                         </GameToolCloseContext.Provider>
                       )}
                     </div>

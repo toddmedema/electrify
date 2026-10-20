@@ -44,6 +44,9 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "menu-keyboard.spec.ts",
       "music.spec.ts",
       "achievements.spec.ts",
+      "facilities-production-chart.spec.ts",
+      "intertie-order.spec.ts",
+      "operations-priorities.spec.ts",
       ...projects,
     ]),
     ...list([
@@ -51,7 +54,14 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       "multiline-text.spec.ts",
       "modal-layout.spec.ts",
       ...projects,
-      "--project=mobile-320px",
+      "--project=mobile-360px",
+    ]),
+    ...list([
+      "--config=e2e/playwright.config.ts",
+      "tutorial-actions.spec.ts",
+      "main-menu.spec.ts",
+      ...projects,
+      "--project=mobile-360px",
     ]),
   ].sort();
   const actual = [1, 2]

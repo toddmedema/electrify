@@ -170,7 +170,6 @@ No deleted/renamed spec was explicitly selected by CI or referenced in `.github/
 | new-game-responsive.spec.ts         | Keep: shareable scenario URL/history plus prioritized/filterable/sortable catalog.                                                      |
 | page-pause.spec.ts                  | Keep: browser lifecycle/nested navigation preserves explicit/catalog pause and restores only eligible previous speed.                   |
 | pane-header-spacing.spec.ts         | Remove: exact pixel seams; sticky/resizing/control behavior and year progress retained elsewhere.                                       |
-| pane-sizing.spec.ts                 | Keep: saved extreme pane weights, live breakpoints, compact controls, menu focus and keyboard splitter minima.                          |
 | pane-sticky-headers.spec.ts         | Keep meaningful pinning/handoff checks; fix helper to select an ancestor with real scroll range on short phones.                        |
 | panel-polish.spec.ts                | Keep: action targets/labels and secondary-pane nav stay usable while switching panels.                                                  |
 | peak-demand.spec.ts                 | Keep: distinct time-of-use/curtailment daily-window previews, scheduling/update/cancel and manual return state.                         |
@@ -260,7 +259,6 @@ Every entry below was reviewed for duplicate setup/coverage, weak assertions, an
 | `base/DecisionImpactPreview.test.tsx`                | Removed redundant presenter smoke; real caller coverage described above.                                                                                                                    |
 | `base/DeferredProjection.test.ts`                    | Keep: subscriber sharing, stale reads/import identity, cancellation, worker/decode errors and incremental decode cancellation.                                                              |
 | `base/DesktopDisplaySettings.test.tsx`               | Keep: native bridge serialization, optimistic state, canonical return, focus, queue/rejection/rollback distinctions.                                                                        |
-| `base/DesktopPanes.test.tsx`                         | Keep: constrained widths conserve available width and unconstrained proportions.                                                                                                            |
 | `base/DifficultyPicker.test.tsx`                     | Consolidated toggle interaction; retain distinct labels/select and authored ID completeness.                                                                                                |
 | `base/DisplayNameDialog.test.tsx`                    | Consolidated Enter success into duplicate-save protection; retain error/validation/source/cancel cases.                                                                                     |
 | `base/FacilityDetails.test.tsx`                      | Consolidated duplicate active outage renders; retain all distinct upgrade/affordability/hazard gates.                                                                                       |

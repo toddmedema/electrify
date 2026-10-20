@@ -11,6 +11,7 @@ import { challengeComparison } from "./helpers/Challenge";
 import type { GameType, VictoryType } from "./Types";
 import { achievementHooks } from "./achievements/Achievements";
 import { installSimulationHooks } from "./achievements/SimulationHooks";
+import { emptyPolicies } from "./helpers/Policies";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const OLD_RULES = legacyFile.save.game.runIdentity.compatibilityId;
@@ -30,6 +31,152 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
+  it("upgrades schema 2 programs with new offers Off while preserving existing cohorts and spending", () => {
+    const game = createGame({
+      scenarioId: 100,
+      initialPrograms: { efficiency: "On", solar: "On", timeOfUse: "On" },
+    });
+    runMonths(game, 1);
+    const save = clone(serializeSave(game));
+    const policies = save.game.policies!;
+    const programs = policies.programs;
+    const oldPrograms = {
+      efficiency: programs.efficiency,
+      solar: programs.solar,
+      timeOfUse: programs.timeOfUse,
+      curtailment: programs.curtailment,
+    };
+    const old = {
+      ...save,
+      schemaVersion: 2,
+      game: { ...save.game, policies: { ...policies, programs: oldPrograms } },
+    };
+    const snapshot = JSON.stringify(old);
+    const upgraded = parseSave(old)!;
+    expect(upgraded.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    for (const id of [
+      "efficiency",
+      "solar",
+      "timeOfUse",
+      "curtailment",
+    ] as const)
+      expect(upgraded.game.policies!.programs[id]).toEqual(oldPrograms[id]);
+    for (const id of ["thermal", "evCharging", "battery"] as const)
+      expect(upgraded.game.policies!.programs[id]).toEqual({
+        tier: "Off",
+        adoption: 0,
+        spending: 0,
+        spent: 0,
+        installs: [],
+      });
+    expect(JSON.stringify(old)).toBe(snapshot);
+  });
+
+  it("current saves retain valid flexibility queues and storage through a round trip", () => {
+    const game = createGame({ scenarioId: 100 });
+    runMonths(game, 1);
+    game.policies = emptyPolicies(game.date.monthsElapsed);
+    game.policies.programs.battery.adoption = 0.5;
+    game.policies.programs.battery.installs = [[1, 0.5]];
+    const tick = game.timeline[0];
+    tick.deferredThermal = [
+      { energyWh: 10, recoveryStartMinute: 60, recoveryEndMinute: 240 },
+    ];
+    tick.deferredThermalStart = clone(tick.deferredThermal);
+    tick.deferredCharging = [
+      { energyWh: 20, recoveryStartMinute: 60, recoveryEndMinute: 420 },
+    ];
+    tick.deferredChargingStart = clone(tick.deferredCharging);
+    tick.customerBatteryWh = 100;
+    tick.customerBatteryWhStart = 90;
+    const save = clone(serializeSave(game));
+    const restored = parseSave(save)!;
+    expect(restored.game.policies).toEqual(game.policies);
+    expect(restored.game.timeline[0]).toEqual(clone(tick));
+    expect(
+      parseSave(clone(serializeSave(restored.game)))!.game.timeline[0],
+    ).toEqual(clone(tick));
+  });
+
+  it.each(["thermal", "evCharging", "battery"] as const)(
+    "accepts a completed %s rollout with a pending Off or window change in JSON saves",
+    (id) => {
+      const game = createGame({ scenarioId: 100 });
+      runMonths(game, 1);
+      game.policies = emptyPolicies(game.date.monthsElapsed);
+      game.policies.programs[id] = {
+        tier: "On",
+        adoption: 1,
+        spending: 0,
+        spent: 1234,
+        installs: [[1, 1]],
+        completedMonth: 1,
+      };
+      for (const pending of [
+        { tier: "Off" as const, month: 2 },
+        { tier: "On" as const, month: 2, startHour: 8 },
+      ]) {
+        game.policies.programs[id].pending = pending;
+        const raw = clone(serializeSave(game));
+        const restored = parseSave(raw);
+        expect(restored).not.toBeNull();
+        expect(restored!.game.policies!.programs[id]).toEqual(
+          game.policies.programs[id],
+        );
+      }
+    },
+  );
+
+  it.each([
+    [
+      "deferredThermal",
+      [{ energyWh: -1, recoveryStartMinute: 60, recoveryEndMinute: 240 }],
+    ],
+    [
+      "deferredThermalStart",
+      [{ energyWh: 1, recoveryStartMinute: 60, recoveryEndMinute: 420 }],
+    ],
+    [
+      "deferredCharging",
+      [{ energyWh: 1, recoveryStartMinute: 60, recoveryEndMinute: 240 }],
+    ],
+    [
+      "deferredChargingStart",
+      [{ energyWh: Infinity, recoveryStartMinute: 60, recoveryEndMinute: 420 }],
+    ],
+    ["customerBatteryWh", -1],
+    ["customerBatteryWhStart", NaN],
+    ["customerBatteryChargeW", Infinity],
+    ["customerBatteryGridChargeW", -1],
+    ["customerBatteryDischargeW", -1],
+    ["customerBatteryLossWh", NaN],
+  ])("rejects malformed current flexibility field %s", (field, value) => {
+    const raw = clone(serializeSave(createGame({ scenarioId: 100 })));
+    raw.game.timeline[0] = {
+      ...raw.game.timeline[0],
+      [field as string]: value,
+    };
+    expect(parseSave(raw)).toBeNull();
+  });
+
+  it("does not fill missing new offers in a corrupt current-schema policy record", () => {
+    const game = createGame({ scenarioId: 100 });
+    game.policies = emptyPolicies();
+    const save = serializeSave(game);
+    expect(
+      parseSave({
+        ...save,
+        game: {
+          ...game,
+          policies: {
+            ...game.policies,
+            programs: { ...game.policies.programs, battery: undefined },
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
   it("web imports retain valid shared achievement evidence and drop malformed evidence", () => {
     const desktopEdition = process.env.REACT_APP_DESKTOP;
     process.env.REACT_APP_DESKTOP = "false";

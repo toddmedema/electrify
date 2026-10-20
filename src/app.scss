@@ -98,6 +98,8 @@
   --tooltip-border: rgba(0, 0, 0, 0.2);
   --tooltip-bg: #ffffff;
   --tooltip-shadow: rgba(15, 23, 42, 0.16);
+  // The soft edge a screen header gains once content scrolls beneath it
+  --header-scrim: rgba(15, 23, 42, 0.12);
   --cursor-line: #757575; /* grey600 */
   // Charts sit flush on the page in both themes: no panel, no edge
   --chart-surface: var(--bg-primary);
@@ -150,6 +152,7 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
+  --header-scrim: rgba(0, 0, 0, 0.5);
   --cursor-line: rgba(98, 155, 225, 0.55);
   --chart-surface: var(--bg-primary);
 }
@@ -587,11 +590,6 @@ button,
   flex: 1;
   min-width: 0;
 }
-@media screen and (max-width: 359px) {
-  .achievementToastRequirement {
-    display: none;
-  }
-}
 .achievementToastClose.MuiIconButton-root {
   position: absolute;
   right: 4px;
@@ -621,10 +619,6 @@ button,
 
 .MuiDialogTitle-root {
   padding: 16px;
-}
-
-.bold {
-  font-weight: 600;
 }
 
 // Keep changing amounts steady without turning prose into a numeric readout.
@@ -670,13 +664,6 @@ table {
   margin-bottom: 16px;
   th {
     font-weight: 600 !important;
-  }
-  // A transparent border instead of extra padding-top: padding controls where the text sits
-  // inside its own row, and stretching only the top of that would leave the text sitting low --
-  // noticeably off-centre next to every nested row underneath it, which is symmetric. A border
-  // adds the same breathing room above the row without moving the text inside it.
-  tr.bold td {
-    border-top: 10px solid transparent;
   }
 }
 
@@ -829,32 +816,9 @@ $topbar_height: 56px;
   }
 }
 
-@media screen and (max-width: 359px) {
-  .constructionTitle {
-    gap: $space-1;
-    font-size: var(--font-size-subtitle) !important;
-  }
-
-  .constructionCash {
-    font-size: var(--font-size-caption-sm);
-  }
-
-  .constructionControls {
-    gap: $space-1;
-    padding-left: max($space-2, env(safe-area-inset-left));
-    padding-right: max($space-2, env(safe-area-inset-right));
-  }
-
-  .constructionCapacity {
-    flex-direction: column;
-    gap: 0;
-    line-height: 1.05;
-  }
-}
-
 // Four direct speed choices still fit beside the live status at phone width. The currency and
 // date already name their concepts in text, so their duplicate glyphs are omitted in the
-// component and the remaining chrome tightens just enough for a 320px viewport.
+// component and the remaining chrome tightens just enough for a 360px viewport.
 @media screen and (max-width: 599px) {
   #topbar .MuiToolbar-root {
     padding-left: max(4px, env(safe-area-inset-left)) !important;
@@ -879,18 +843,10 @@ $topbar_height: 56px;
   #topbar .gameStatus {
     flex: 1 1 auto;
     overflow: hidden;
-    gap: 4px;
-    font-size: clamp(0.75rem, 3.5vw, 1rem);
+    // Every supported phone has room to make the two most important readouts easy to scan
+    gap: 8px;
+    font-size: clamp(1rem, 4.2vw, 1.25rem);
     white-space: nowrap;
-  }
-
-  // Modern large phones have room to make the two most important readouts substantially easier
-  // to scan. Keep the compressed scale below 360px, where the four speed controls need it.
-  @media screen and (min-width: 360px) {
-    #topbar .gameStatus {
-      gap: 8px;
-      font-size: clamp(1rem, 4.2vw, 1.25rem);
-    }
   }
 
   #speedChangeButtons {
@@ -910,26 +866,13 @@ $topbar_height: 56px;
   #topbar .gameStatus .weak {
     font-size: var(--font-size-body2);
   }
-  @media screen and (max-width: 359px) {
-    #topbar:has(.multiplayerSpeedToggles)
-      .constructionTitleBar.MuiToolbar-root {
-      flex-wrap: wrap !important;
-    }
+}
 
-    #topbar:has(.multiplayerSpeedToggles) .constructionSpeed {
-      margin-left: auto;
-    }
-
-    #topbar .gameStatus {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0;
-      font-size: var(--font-size-subtitle);
-      line-height: 1.2;
-    }
-    #topbar .gameStatus .weak {
-      font-size: var(--font-size-caption-sm);
-    }
+// Tablets and desktops set cash and date at the larger h6 size, where the shared 4px size(small)
+// gap reads as one run. A fixed 12px step keeps them two distinct readouts.
+@media screen and (min-width: 600px) {
+  #topbar .gameStatus {
+    gap: $space-3;
   }
 }
 
@@ -1022,11 +965,6 @@ $topbar_height: 56px;
     text-align: left;
     line-height: 1.4;
   }
-  .missionDetailsButton {
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-  }
   // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
   // a plain headline and with the grid readout's icon when the two rows stack.
   .missionRiskButton {
@@ -1086,15 +1024,12 @@ $topbar_height: 56px;
   .missionSummary .MuiButton-root {
     min-height: 44px;
   }
-  .missionSummary .missionDetailsButton {
-    width: 44px;
-    height: 44px;
-  }
 }
 
 @media (max-width: 768px) {
+  // The months left end on the same 16px inset the row's first icon starts on
   .missionSummary {
-    padding: 4px 8px 4px 16px;
+    padding: 4px max(16px, env(safe-area-inset-right)) 4px 16px;
     gap: 0 8px;
   }
 }
@@ -1203,118 +1138,6 @@ $topbar_height: 56px;
   line-height: 1.25;
 }
 
-// Ongoing events ride at the trailing end of the grid readout instead of adding a row. The slot
-// takes its width from the row, not its content, so its container queries can shed the lead
-// title for a plain count before anything wraps. Like .missionRiskButton, the chip is a
-// borderless 40px text button pulled out by its own padding, so its glyphs end on the row's
-// inset and its hit area fills the row without drawing an edge against the row dividers.
-.activeEventsSlot {
-  container: active-events / inline-size;
-  display: flex;
-  flex: 1 1 0;
-  justify-content: flex-end;
-  align-self: center;
-  min-width: 4rem;
-  margin-inline-end: -8px;
-  overflow: hidden;
-}
-
-.gridHealth .activeEventsChip {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  min-width: 0;
-  max-width: 100%;
-  height: var(--control-size);
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: $font_color_primary;
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  line-height: 1.25;
-  text-transform: none;
-  white-space: nowrap;
-
-  .conceptIcon {
-    color: $interactive_blue;
-  }
-
-  &:hover {
-    background: color-mix(in srgb, currentColor 8%, transparent);
-  }
-
-  // The slot clips overflow, so the global outside ring would vanish; draw it inside instead.
-  &:focus-visible {
-    outline-offset: -2px;
-  }
-
-  &.activeEventsChip-critical {
-    color: $delta_bad;
-
-    .conceptIcon {
-      color: inherit;
-    }
-  }
-}
-
-// A warning or blackout already colours the whole row, so the chip speaks in the row's voice and
-// its label keeps body-text contrast on the amber fill.
-.gridHealth.statusWarning .activeEventsChip,
-.gridHealth.gridHealth-blackout .activeEventsChip {
-  color: inherit;
-}
-.gridHealth.statusWarning .activeEventsChip .conceptIcon {
-  color: var(--warning-icon);
-}
-.gridHealth.gridHealth-blackout .activeEventsChip .conceptIcon {
-  color: $blackout_red;
-}
-
-.activeEventsTitle {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activeEventsMore {
-  flex-shrink: 0;
-  font-weight: 400;
-}
-
-.activeEventsCount {
-  display: none;
-}
-
-@container active-events (max-width: 149px) {
-  .activeEventsTitle,
-  .activeEventsMore {
-    display: none;
-  }
-  .activeEventsCount {
-    display: inline;
-  }
-}
-
-@container active-events (max-width: 87px) {
-  .activeEventsIcon {
-    display: none;
-  }
-}
-
-// The grid state and its size keep their room; the metric's "reserve" suffix goes first.
-.gridHealth.hasActiveEvents .gridHealthMetric {
-  min-width: 6ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (pointer: coarse) {
-  .gridHealth .activeEventsChip {
-    height: 44px;
-  }
-}
-
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
 @media #{$pane_media} {
@@ -1327,7 +1150,7 @@ $topbar_height: 56px;
   .gameStatusBar .gridHealth {
     justify-content: flex-start;
     text-align: left;
-    flex: 0 0 var(--facilities-pane-width, auto);
+    flex: 0 0 auto;
     box-sizing: border-box;
     min-width: 0;
     // The same 16px inset as the pane headers below and the mission row beside it.
@@ -1348,6 +1171,108 @@ $topbar_height: 56px;
   }
 }
 
+// Wide windows fold the status row into the top bar (GameAppBar renders it inside the toolbar):
+// cash and date, a hairline, the grid readout, then the mission, with the speed controls pinned
+// right. The bar never wraps. Only the mission's text gives up width, then the months label
+// abbreviates and the hour goes, so the grid state and its figure always stay whole.
+#appbar.appbarSingleRow {
+  container: appbar / inline-size;
+
+  #topbar .gameStatus {
+    flex: 0 0 auto;
+  }
+
+  #speedChangeButtons {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .gameStatusBar {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    align-self: stretch;
+    gap: $space-3;
+    min-width: 0;
+    margin-inline: $space-4;
+    border: 0;
+    background: none;
+
+    &::before {
+      content: "";
+      flex: 0 0 auto;
+      width: 1px;
+      height: 24px;
+      background: var(--border-subtle);
+    }
+  }
+
+  // Warnings tint the readout itself, so the alarm stays the loudest thing in the bar without
+  // owning a row.
+  .gameStatusBar .gridHealth {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding-inline: $space-2;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+
+    &.statusWarning {
+      background: var(--warning-fill);
+    }
+
+    // Opaque under its tint: the whole bar pulses during a blackout, and a see-through fill
+    // would let that pulse wash out the red text.
+    &.gridHealth-blackout {
+      background:
+        linear-gradient(var(--blackout-tint), var(--blackout-tint)),
+        var(--bg-primary);
+    }
+  }
+
+  .gameStatusBar .gridHealthSummary {
+    flex-wrap: nowrap;
+  }
+
+  .gameStatusBar .missionSummary {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  // The same tint on the risk alone rather than across the months and info button beside it.
+  .gameStatusBar .missionSummary.statusWarning .missionRiskButton {
+    margin-inline-start: 0;
+    border-radius: var(--radius-sm);
+    background: var(--warning-fill);
+  }
+
+  .missionRiskText,
+  .missionSummaryHeadline {
+    min-width: 96px;
+  }
+
+  // The first status icon sits 20px past the divider (the bar's gap plus the readout's own
+  // inset); the months left end the same 20px before the speed controls
+  .gameStatusBar .missionSummaryMonths {
+    padding-inline-end: $space-1;
+  }
+}
+
+@container appbar (max-width: 1365px) {
+  .missionSummaryMonthsTail {
+    display: none;
+  }
+}
+
+@container appbar (max-width: 1279px) {
+  .gameStatusHour {
+    display: none;
+  }
+}
+
 // Phones and narrow tablets keep the status together in one left-aligned readout.
 @media #{$single_pane_media} {
   .gridHealth {
@@ -1363,31 +1288,8 @@ $topbar_height: 56px;
       width: 100%;
     }
 
-    .gridHealthSeparator {
-      display: none;
-    }
-
     .gridHealthMetric {
       min-width: 0;
-      text-align: left;
-    }
-  }
-  // With an event beside it the readout turns into one row: state and cushion on the left,
-  // the event on the right, still inside the row's 56px.
-  .gridHealth.hasActiveEvents {
-    flex-direction: row;
-    gap: 12px;
-    padding-block: 0;
-
-    .gridHealthSummary {
-      flex: 0 1 auto;
-      width: auto;
-      min-width: 0;
-      grid-template-columns: auto minmax(0, auto);
-      gap: 8px;
-    }
-
-    .gridHealthMetric {
       text-align: left;
     }
   }
@@ -1593,36 +1495,10 @@ $pane_header_height: 48px;
   padding: 12px 16px 16px;
 }
 
-@media screen and (max-width: 359px) {
-  .transmissionPanel {
-    gap: 8px;
-    padding: 12px;
-  }
-
-  .powerExchangeMetrics {
-    grid-template-columns: 1fr;
-  }
-}
-
 // Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
 @media (pointer: coarse) {
   .facilities .paneHeader .button-buildFacility {
     height: 44px;
-  }
-}
-
-@media (pointer: coarse) and (max-width: 359px) {
-  .facilities .paneHeader {
-    flex-flow: row nowrap !important;
-    gap: 4px;
-    padding-right: 8px;
-    padding-left: 8px;
-
-    > h6 {
-      min-width: 0;
-      font-size: var(--font-size-title);
-      white-space: nowrap;
-    }
   }
 }
 
@@ -1771,19 +1647,6 @@ $pane_header_height: 48px;
   background: var(--bg-primary);
 }
 
-.insightsLevers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  padding: 4px 12px 8px;
-  border-bottom: $border_accent;
-
-  .budgetSlider {
-    width: 100%;
-  }
-}
-
 .insightsRateMetrics,
 .insightsRateMarkMobile {
   display: none;
@@ -1797,10 +1660,6 @@ $pane_header_height: 48px;
   &.bad {
     color: $delta_bad;
   }
-}
-
-.insightsRateSliderCollapsed {
-  display: none;
 }
 
 .insightsViewportToolbar {
@@ -2110,94 +1969,6 @@ $pane_header_height: 48px;
     padding-right: 8px;
   }
 
-  .insightsLevers {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-    padding: 4px 12px 12px;
-
-    > .insightsRateToggle {
-      display: none;
-    }
-
-    .insightsRateToggleLabel,
-    .insightsRateSummaryDesktop {
-      display: none;
-    }
-
-    .insightsRateMetrics {
-      display: grid;
-      min-width: 0;
-      height: 44px;
-      grid-column: 1;
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
-          0,
-          1.25fr
-        );
-      gap: 4px;
-      align-items: stretch;
-    }
-
-    .insightsRateMetric {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      justify-content: center;
-      padding-left: 4px;
-      border-left: 1px solid var(--border-subtle);
-    }
-
-    .insightsRateMetric:first-child {
-      padding-left: 0;
-      border-left: 0;
-    }
-
-    .insightsRateMetricLabel,
-    .insightsRateMetricValue {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .insightsRateMetricLabel {
-      color: var(--font-color-faded);
-      font-size: var(--font-size-caption);
-      line-height: 1.15;
-    }
-
-    .insightsRateMetricValue {
-      font-size: var(--font-size-caption-sm);
-      line-height: 1.35;
-    }
-
-    .budgetSlider {
-      box-sizing: border-box;
-      width: 100%;
-      min-height: 48px;
-      min-width: 0;
-      grid-column: 1;
-      padding: 0 20px;
-
-      .MuiSlider-root {
-        margin-bottom: 0;
-      }
-    }
-
-    .insightsRateSliderCollapsed {
-      display: block;
-    }
-
-    .insightsRateMarkDesktop {
-      display: none;
-    }
-
-    .insightsRateMarkMobile {
-      display: inline;
-      font-size: var(--font-size-caption);
-      white-space: nowrap;
-    }
-  }
-
   @container insights (max-width: 359px) {
     .insightsViewportDate {
       white-space: normal;
@@ -2217,10 +1988,6 @@ $pane_header_height: 48px;
       }
     }
   }
-}
-
-.flex-newline {
-  flex-basis: 100%;
 }
 
 .MuiAvatar-root {
@@ -3190,10 +2957,12 @@ $pane_header_height: 48px;
 
     // Sticky so the player can still tell which section they're scrolling through. The
     // line-height is the header's full height (MUI adds no vertical padding) and sets where
-    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx
+    // entry titles pin below it - keep in sync with GROUP_HEADER_HEIGHT in views/Manual.tsx.
+    // A label on the page rather than a band across it: it shares the page's surface, opaque
+    // so nothing scrolling beneath a pinned label shows through its narrow strip
     .manual-group {
       padding-inline: 0;
-      background: var(--bg-sunken);
+      background: var(--bg-primary);
       line-height: 32px;
       font-weight: 600;
       font-size: var(--font-size-caption-sm);
@@ -3371,12 +3140,6 @@ $pane_header_height: 48px;
     margin-top: 8px;
     color: $font_color_faded;
     line-height: 1.3;
-  }
-
-  @media screen and (max-width: 340px) {
-    .customSetupOutlookMetrics {
-      grid-template-columns: 1fr;
-    }
   }
 
   .customSetupActions {
@@ -4202,88 +3965,44 @@ $pane_header_height: 48px;
           background-color 0.6s linear;
       }
     }
+  }
 
-    // What this facility is doing, badged onto its own icon rather than given a column of its
-    // own, so the row gains a state without getting wider
+  // What a facility or intertie is doing, badged onto its own icon rather than given a column
+  // of its own, so the row gains a state without getting wider
+  .MuiListItemAvatar-root .facilityActivity,
+  .transmissionIcon .facilityActivity {
+    position: absolute;
+    bottom: -2px;
+    left: 23px; // tucked against the avatar, stopping short of the storage bar at 42px
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: $bg_primary;
+    box-shadow: 0 0 0 1px var(--shadow-ring);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .MuiSvgIcon-root {
+      font-size: var(--font-size-caption);
+    }
+  }
+
+  // Neutral, not a state colour: exporting is neither harm nor automatically a gain
+  .transmissionIcon {
+    position: relative;
+    display: block;
+    width: 40px;
+    height: 40px;
+
     .facilityActivity {
-      position: absolute;
-      bottom: -2px;
-      left: 23px; // tucked against the avatar, stopping short of the storage bar at 42px
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: $bg_primary;
-      box-shadow: 0 0 0 1px var(--shadow-ring);
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .MuiSvgIcon-root {
-        font-size: var(--font-size-caption);
-      }
+      color: $font_color_primary;
     }
   }
 }
 
 @include styling();
-
-// A 320px phone cannot fit the setup's longest row label beside a useful city picker. Stack each
-// label over its control at that last narrow breakpoint, and let build-card actions take a second
-// row instead of pushing titles and buttons past the viewport edge.
-@media screen and (max-width: 359px) {
-  #gameSetupTable {
-    width: 100%;
-    margin: 8px 0;
-    table-layout: fixed;
-
-    tr {
-      display: grid;
-      height: auto;
-      padding: 8px 0;
-    }
-
-    .MuiTableCell-root {
-      display: block;
-      box-sizing: border-box;
-      width: 100%;
-      padding: 4px 12px;
-      border-bottom: 0;
-    }
-
-    .MuiInputBase-root,
-    .MuiAutocomplete-root {
-      width: 100%;
-      min-width: 0 !important;
-      max-width: 100%;
-    }
-  }
-
-  .build-list-item .MuiCardHeader-root {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-
-    .MuiCardHeader-content {
-      min-width: 0;
-    }
-
-    .MuiCardHeader-action {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      width: 100%;
-      margin: 8px 0 0 !important;
-
-      & > span,
-      .MuiStack-root {
-        display: flex;
-        flex-wrap: wrap;
-        gap: $space-2;
-        align-items: flex-start;
-        justify-content: flex-end;
-      }
-    }
-  }
-}
 
 // A tutorial step is game chrome, not a modal. It occupies its own row above the active card,
 // so its instructions never cover the control they name and the whole grid remains interactive.
@@ -4394,14 +4113,6 @@ $pane_header_height: 48px;
 .tutorialHudHint {
   max-width: 72ch;
   padding-left: 28px;
-}
-
-// Below 360px the indent costs more words per line than the alignment is worth
-@media screen and (max-width: 359.98px) {
-  .tutorialHud .tutorialPrompt,
-  .tutorialHudHint {
-    padding-left: 0;
-  }
 }
 
 .tutorialHudFooter {
@@ -4751,7 +4462,6 @@ $pane_header_height: 48px;
 // ===============================================
 
 // On large screens, shrink a bit...
-$abs_scale_vw: calc($abswidthmax / 120vmin);
 $abs_scale_vh: calc($absheightmax / 120vmin);
 
 $sizemap: (
@@ -4781,86 +4491,6 @@ $sizemap: (
     height: 100%;
     max-width: 100%;
     max-height: 100%;
-  }
-}
-
-// ===============================================
-// Landscape tablets and wider screens get columns rather than one card at a time: two up to
-// $desktop_breakpoint (the fleet pinned beside whichever pane the nav is on), and all three
-// destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
-// ===============================================
-
-@media #{$pane_media} {
-  .desktop-layout,
-  .pane-layout {
-    height: 100%;
-    width: 100%;
-  }
-
-  .desktop-panes {
-    display: grid;
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  .desktop-pane {
-    display: flex;
-    min-width: 0;
-    overflow: hidden;
-
-    > * {
-      flex: 1 1 auto;
-      min-width: 0;
-      height: 100%;
-    }
-  }
-
-  .secondary-pane {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-
-    > .pane {
-      flex: 1 1 0;
-      min-height: 0;
-    }
-  }
-
-  // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
-  // never changes the total width the panes have to share
-  .pane-splitter {
-    position: relative;
-    border-left: $border_accent;
-  }
-  .pane-splitter-handle {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: var(--control-size);
-    height: var(--control-size);
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: col-resize;
-    touch-action: none;
-    border-radius: var(--radius-md);
-    &::after {
-      content: "";
-      width: 4px;
-      height: 24px;
-      border-radius: var(--radius-sm);
-      background: var(--font-color-faded);
-    }
-    &:hover,
-    &:focus-visible {
-      background: var(--bg-raised);
-    }
-    &:focus-visible {
-      outline-offset: -2px;
-    }
   }
 }
 
@@ -4980,7 +4610,7 @@ $homeSmokeCycle: 5.6s;
   }
 }
 
-#desktopStartup {
+#appStartup {
   position: fixed;
   inset: 0;
   display: flex;
@@ -4993,8 +4623,10 @@ $homeSmokeCycle: 5.6s;
   font-family: var(--font-family);
   line-height: 1.45;
 
-  .desktopStartupLogo {
+  .appStartupLogo {
     flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100%;
     padding: 32px 24px 0;
   }
 
@@ -5030,7 +4662,7 @@ $homeSmokeCycle: 5.6s;
     margin: 0;
   }
 
-  .desktopStartupActions {
+  .appStartupActions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -5054,7 +4686,7 @@ $homeSmokeCycle: 5.6s;
     color: var(--interactive-contrast);
   }
 
-  &.desktopStartupFailed .homeLogo * {
+  &.appStartupFailed .homeLogo * {
     animation-play-state: paused;
   }
 
@@ -5129,29 +4761,6 @@ $homeSmokeCycle: 5.6s;
   }
   to {
     opacity: 1;
-  }
-}
-@keyframes fadeout {
-  0% {
-    opacity: 1;
-    height: 100%;
-  }
-  99% {
-    opacity: 0;
-    height: 100%;
-  }
-  100% {
-    opacity: 0;
-    height: 0;
-  }
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0);
-  }
-  to {
-    transform: rotate(360deg);
   }
 }
 
@@ -5339,8 +4948,7 @@ $homeSmokeCycle: 5.6s;
 }
 
 // Quiet, readable help beside a decision; touch targets stay usable on phones.
-.manual-link-text,
-.manual-related-link.MuiButton-root {
+.manual-link-text {
   min-height: 40px;
   padding: 8px;
   font-size: var(--font-size-caption);
@@ -5416,26 +5024,6 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
-.manual-related {
-  display: flex;
-  flex-wrap: wrap;
-  // Baseline, so the "Related entries" label sits on the same line as the link text inside
-  // the taller buttons rather than riding above it
-  align-items: baseline;
-  gap: 4px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 8px;
-
-  // Each link's box hangs out by its own padding, so a wrapped row's text starts on the label's
-  // left edge instead of 8px in; the label's end margin restores the gap the first link loses
-  > .MuiTypography-root {
-    margin-inline-end: 8px;
-  }
-
-  > .manual-related-link.MuiButton-root {
-    margin-inline: -8px 8px;
-  }
-}
 // Manual prose, in the full manual and the help popover alike: a line height and half-line
 // paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
 // windows don't stretch lines past comfortable reading, and links in the interaction blue
@@ -5467,7 +5055,32 @@ $homeSmokeCycle: 5.6s;
   a {
     color: var(--interactive-strong);
     text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+    text-underline-offset: 3px;
+    text-decoration-skip-ink: auto;
+  }
+
+  // A term that names another entry, linked the way a wiki links its articles. The underline
+  // is softened but kept visible (the link colour alone is under 3:1 against body text), and
+  // firms up under the pointer
+  .manual-entry-link {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 65%, transparent);
+    border-radius: 3px;
+    transition: text-decoration-color 120ms ease-out;
+
+    &:hover {
+      text-decoration-color: currentColor;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: 1px;
+      text-decoration-color: currentColor;
+    }
+
+    strong {
+      color: inherit;
+    }
   }
 
   // The source line is a citation: secondary text, but its link keeps full link contrast,
@@ -5499,10 +5112,6 @@ $homeSmokeCycle: 5.6s;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-
-  .manual-related {
-    margin-top: $space-4;
-  }
 }
 // The first paragraph's margin used to be the gap under an open entry's title divider, so
 // entries that open on a table or legend started flush against it. The gap lives here now.
@@ -5510,8 +5119,7 @@ $homeSmokeCycle: 5.6s;
   padding-top: $space-4;
 }
 @media (pointer: coarse) {
-  .manual-link-text,
-  .manual-related-link.MuiButton-root {
+  .manual-link-text {
     min-height: 44px;
   }
 }
@@ -6020,6 +5628,24 @@ $homeSmokeCycle: 5.6s;
 .base_main .customSetupSettings #gameSetupTable td + td {
   padding-left: 12px;
 }
+// On a phone the widest control (a long ownership choice) would size its column past the pane,
+// so the columns are fixed and each control wraps or shrinks to fit its own.
+@media screen and (max-width: 599px) {
+  .base_main .customSetupSettings #gameSetupTable {
+    table-layout: fixed;
+
+    td:first-child {
+      width: 35%;
+    }
+
+    .MuiInputBase-root,
+    .MuiAutocomplete-root {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+}
 .base_main .customFacilityPicker {
   padding: 8px 0;
   display: flex;
@@ -6064,22 +5690,6 @@ $homeSmokeCycle: 5.6s;
 .buildOption .MuiCardHeader-title {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
-}
-.customerProgramHowItWorks > summary {
-  color: var(--interactive-strong);
-  display: flex;
-  align-items: center;
-  padding: 8px 0;
-}
-.customerProgramHowItWorks > summary::before {
-  content: "›";
-  margin-right: 8px;
-}
-.customerProgramHowItWorks[open] > summary::before {
-  transform: rotate(90deg);
-}
-.insights .insightsLevers {
-  padding: 0 16px 12px;
 }
 .insights .insightsTrackHeader > h6 {
   font-size: var(--font-size-subtitle);
@@ -6226,28 +5836,122 @@ $programs_column: 800px;
     margin-right: auto;
   }
 }
-.customerProgramFacts {
+.customerProgramDetail {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: $space-4;
-  row-gap: $space-1;
-  margin: 0;
+  gap: $space-4;
+}
+.customerProgramHeading {
+  display: grid;
+  gap: $space-2;
 
-  dt {
-    color: var(--font-color-faded);
-  }
-
-  dd {
-    margin: 0;
+  h2 {
+    font-size: 24px;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 600;
   }
 }
-@media screen and (max-width: 599px) {
-  .customerProgramFacts {
-    grid-template-columns: minmax(0, 1fr);
+.customerProgramState {
+  color: var(--font-color-faded);
+}
+.customerProgramFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-4;
+  margin: 0;
+  padding: $space-4;
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+.customerProgramFact {
+  min-width: 0;
 
-    dd + dt {
-      margin-top: $space-2;
+  &[data-wide] {
+    grid-column: 1 / -1;
+  }
+  dt {
+    color: var(--font-color-faded);
+    margin-bottom: $space-1;
+  }
+  dd {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  &[data-wide] dd {
+    font-size: var(--font-size-body1);
+    font-weight: 500;
+  }
+}
+.customerProgramFactDetail.MuiTypography-root {
+  display: block;
+  margin-top: $space-1;
+  color: var(--font-color-faded);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.customerProgramFactsSecondary {
+  padding: 0;
+  background: transparent;
+
+  dd {
+    font-size: var(--font-size-body1);
+    font-weight: 400;
+  }
+}
+.customerProgramDetails {
+  border-bottom: 1px solid var(--border-subtle);
+
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    color: var(--font-color-faded);
+    list-style: none;
+    font-size: var(--font-size-body2);
+
+    &::-webkit-details-marker {
+      display: none;
     }
+    &::after {
+      content: "›";
+      font-size: 24px;
+    }
+  }
+  &[open] > summary::after {
+    transform: rotate(90deg);
+  }
+  > div {
+    display: grid;
+    gap: $space-3;
+    padding: $space-2 0 $space-4;
+  }
+}
+.customerProgramSettings {
+  display: grid;
+  gap: $space-3;
+  padding-top: $space-2;
+}
+.customerProgramTradeoff {
+  line-height: 1.5;
+}
+@media screen and (max-width: 599px) {
+  .customerProgramHeading h2 {
+    font-size: 22px;
+  }
+  .customerProgramFacts {
+    gap: $space-3;
+  }
+  .customerProgramFact dd {
+    font-size: 18px;
+  }
+  .customerProgramFact[data-wide] dd,
+  .customerProgramFactsSecondary dd {
+    font-size: var(--font-size-body1);
   }
   .programsTitleLong {
     display: none;
@@ -6270,13 +5974,6 @@ $programs_column: 800px;
   .customerProgramsScreen .constructionTitleBar.MuiToolbar-root {
     padding-left: max($space-1, env(safe-area-inset-left));
     padding-right: max($space-1, env(safe-area-inset-right));
-  }
-}
-
-@media screen and (max-width: 359px) {
-  .customerProgramsScreen .constructionTitle {
-    flex-wrap: wrap;
-    gap: 0;
   }
 }
 
@@ -6321,17 +6018,6 @@ $programs_column: 800px;
     padding: 0;
   }
 }
-@media (max-width: 359px) {
-  .MuiDialogActions-root {
-    align-items: stretch;
-  }
-  .MuiDialogActions-root > .MuiButton-root {
-    flex: 1 1 100%;
-  }
-  .facilitySectionLabel {
-    flex-wrap: wrap;
-  }
-}
 
 .base_main #manual .manual-group {
   text-transform: none;
@@ -6341,14 +6027,9 @@ $programs_column: 800px;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
-.facilitySectionMeta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+// The live flow beside each section heading: what the plants generate, what the interties trade.
+.facilitySectionFlow {
   min-width: 0;
-}
-.networkTradingFlow {
-  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 .transmissionLine > .facilityRowHeader > .facilityDisclosure {
@@ -6458,12 +6139,6 @@ $programs_column: 800px;
   .generatorDetails .generatorDetailLabel {
     // Leave enough room for complete cost/unit values beside the help target.
     width: 44%;
-  }
-}
-@media (max-width: 359px) {
-  .generatorDetails .generatorDetailLabel {
-    // Reserve a full numeric/unit column; longer labels wrap at word boundaries.
-    width: 40%;
   }
 }
 @media (pointer: coarse) {
@@ -6613,6 +6288,87 @@ $programs_column: 800px;
   }
 }
 
+// The Scenario tool: the scenario at a glance, then its score, then what it takes to win
+.scenarioDetailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: $space-4;
+}
+
+.scenarioDetailsName {
+  margin-bottom: -12px; // sits with the facts it names
+}
+
+.scenarioFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-3 $space-4;
+  margin: 0;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-body2);
+  }
+
+  dd {
+    margin: $space-1 0 0;
+    font-size: var(--font-size-body2);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+}
+
+// The scenario's score so far and where it is heading: two large figures over the line they
+// summarise, so the answer reads before the chart has to
+.scenarioOutlook {
+  padding: $space-4;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  // The chart sits on the panel rather than in a darker box of its own
+  --chart-surface: var(--bg-raised);
+}
+
+.scenarioOutlookFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2 32px;
+  margin: $space-2 0 $space-3;
+
+  dt {
+    color: $font_color_faded;
+    font-size: var(--font-size-caption);
+  }
+
+  dd {
+    display: flex;
+    align-items: baseline;
+    gap: $space-2;
+    margin: 0;
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// The sign carries the direction on its own; the colour is a second, faster read of it
+.scenarioOutlookChange {
+  font-size: var(--font-size-body2);
+  font-weight: 600;
+  letter-spacing: 0;
+
+  &[data-direction="up"] {
+    color: var(--delta-good);
+  }
+
+  &[data-direction="down"] {
+    color: var(--delta-bad);
+  }
+}
+
 .transmissionUpgrade {
   display: grid;
   gap: 8px;
@@ -6622,87 +6378,6 @@ $programs_column: 800px;
     @media (pointer: coarse) {
       min-height: 44px;
     }
-  }
-}
-
-// Short phones preserve chart space without hiding the rate summary or tutorial controls.
-.insightsShortRateToggle {
-  display: none;
-}
-@media (max-width: 600px) and (max-height: 600px) {
-  .insights .insightsShortRateDisclosure {
-    > .insightsRateMetrics {
-      display: none;
-    }
-    > .insightsShortRateToggle {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      min-height: 44px;
-      border: 0;
-      padding: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
-      > svg {
-        color: var(--interactive-strong);
-      }
-      .insightsRateMetrics {
-        flex: 1;
-      }
-      .insightsRateMetric {
-        padding: 0 4px;
-      }
-      .insightsRateMetric:first-child {
-        padding-left: 0;
-      }
-      .insightsRateMetricLabel {
-        text-transform: none;
-        letter-spacing: 0;
-      }
-      > svg {
-        width: 16px;
-        flex-shrink: 0;
-      }
-      > svg.expanded {
-        transform: rotate(90deg);
-      }
-    }
-    &:not(.insightsShortRateOpen) .budgetSlider {
-      display: none;
-    }
-    &.insightsShortRateOpen .budgetSlider {
-      display: block;
-    }
-  }
-}
-
-.insights .insightsLevers {
-  position: relative;
-  padding-right: 64px;
-
-  // The customer programs button sits over the summary row; the slider below it runs under the
-  // button's column out to the pane's edge instead of stopping short of it
-  .budgetSlider {
-    box-sizing: border-box;
-    width: calc(100% + 52px);
-    margin-right: -52px;
-  }
-}
-// Inset like the Facilities pane's Build button: 4px from the top and 16px from the pane's edge,
-// at the shared control size, which grows to the full 44px target on touch
-.customerProgramsControl {
-  position: absolute;
-  right: 16px;
-  top: 4px;
-
-  .MuiButton-root {
-    min-width: var(--control-size);
-    height: var(--control-size);
-    min-height: var(--control-size);
-    padding: 0 8px;
   }
 }
 
@@ -6745,10 +6420,28 @@ $programs_column: 800px;
 }
 
 // The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
+// No resting rule under the title: a game's menu is one stage, not an app toolbar over a list.
+// Once content scrolls beneath the header, a soft shadow fades in over the first 32px so cards
+// and pinned section labels slide under it rather than being cut by a line. Browsers without
+// scroll-driven animations simply show no edge.
 .screenHeader {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2; // above the sticky section labels it shades
   background: inherit;
-  border-bottom: 1px solid var(--border-subtle);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 16px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--header-scrim), transparent);
+    opacity: 0;
+    animation: screenHeaderScrim linear both;
+    animation-timeline: --screen-scroll;
+    animation-range: 0 32px;
+  }
 
   .screenHeaderBar {
     box-sizing: border-box;
@@ -6760,6 +6453,18 @@ $programs_column: 800px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.flexContainer:has(> .screenHeader) {
+  timeline-scope: --screen-scroll;
+}
+.flexContainer:has(> .screenHeader) > :is(.scrollable, .achievementGallery) {
+  scroll-timeline: --screen-scroll block;
+}
+@keyframes screenHeaderScrim {
+  to {
+    opacity: 1;
   }
 }
 
@@ -6924,8 +6629,13 @@ $programs_column: 800px;
     border-bottom-right-radius: var(--radius-lg);
   }
 
+  // Groups are separated by air rather than rules: the label sits close to the group it
+  // names and well clear of the one above, the way grouped lists read on iOS
+  // Inset by the card's 1px border plus its title's 16px padding, so the label's first letter
+  // sits on the same line as the titles beneath it
   .manual-group {
-    padding: 0 $space-4 + $space-1;
+    margin-top: $space-4;
+    padding: 0 calc(#{$space-4} + 1px);
   }
 }
 
@@ -7017,19 +6727,10 @@ $programs_column: 800px;
       gap: $space-2;
     }
 
-    .gridHealthSeparator {
-      display: none;
-      color: $font_color_faded;
-    }
-
     .gridHealthMetric {
       text-align: left;
       white-space: nowrap;
     }
-  }
-
-  .gameStatusBar .gridHealth.hasActiveEvents {
-    flex: 1 1 100%;
   }
 
   .gameStatusBar .missionSummary {
@@ -7038,12 +6739,8 @@ $programs_column: 800px;
     min-height: 44px;
     padding-block: 0;
     padding-left: $space-2;
+    padding-right: max(16px, env(safe-area-inset-right));
     border: 0;
-  }
-
-  .gameStatusBar .gridHealth.hasActiveEvents + .missionSummary {
-    padding-left: max(16px, env(safe-area-inset-left));
-    border-top: 1px solid var(--border-subtle);
   }
 
   // A stable grid shrinks to a checked bolt so the mission gets the rest of the row. The
@@ -7137,44 +6834,11 @@ $programs_column: 800px;
   }
 }
 
-// Single-panel views keep the control compact beside the rate summary.
-.insightsLevers .customerProgramsControl {
-  .customerProgramsLabel {
-    display: none;
-  }
-  .MuiButton-startIcon {
-    margin: 0;
-  }
-}
-
-// Both multi-pane layouts keep Programs beside the Insights title, like Build.
-.insightsTitle .customerProgramsControl {
-  display: none;
-  .MuiButton-root {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-}
 .insights.pane {
   .insightsTitle {
     display: flex;
     flex-wrap: nowrap;
     gap: 8px;
-  }
-  .insightsTitle .customerProgramsControl {
-    display: block;
-    position: static;
-    margin-left: auto;
-  }
-  .insightsLevers {
-    padding-right: 16px;
-    .customerProgramsControl {
-      display: none;
-    }
-    .budgetSlider {
-      width: 100%;
-      margin-right: 0;
-    }
   }
 }
 

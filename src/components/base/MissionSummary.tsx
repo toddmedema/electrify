@@ -1,7 +1,6 @@
 import { currentTick } from "../../helpers/GameSelectors";
 import * as React from "react";
-import { Button, IconButton, Tooltip } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Button } from "@mui/material";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
@@ -93,7 +92,9 @@ function useMissionRisk(
     readsProjection(last.current?.risk)
       ? last.current?.risk
       : undefined;
-  const risk = defer ? previousRisk : selectMissionRisk(game, upcoming);
+  const risk = defer
+    ? previousRisk
+    : selectMissionRisk(game, upcoming, mission);
   React.useEffect(() => {
     last.current = { risk, scope, month: game.date.monthsElapsed };
     if (defer && now) requestProjection(game, now);
@@ -106,14 +107,12 @@ export default function MissionSummary({
   upcoming = [],
   activeEvents = [],
   onActiveEvents,
-  onDetails,
   onEvidence,
 }: {
   game: GameType;
   upcoming?: UpcomingStoryEventType[];
   activeEvents?: ActiveEventGroupType[];
   onActiveEvents?: () => void;
-  onDetails: () => void;
   onEvidence?: (target: EvidenceTargetType) => void;
 }) {
   const mission = getMissionStatus(game);
@@ -152,7 +151,7 @@ export default function MissionSummary({
       <div className="missionSummaryHeader">
         <div className="missionSummaryCopy">
           {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
-              itself is always one tap away in All requirements. */}
+              itself is always one tap away in the dock's Scenario action. */}
           {shownRisk ? (
             <Button
               className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
@@ -189,21 +188,21 @@ export default function MissionSummary({
           )}
           {/* Leads with the goal or its risk, so a warning icon lines up with the grid readout's. */}
           <span className="missionSummaryMonths">
-            {mission.monthsRemaining === 0
-              ? "Term complete"
-              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+            {/* A crowded single-row bar hides the tail to read "144 mo left"; the full text
+                stays in the DOM, so it reads the same everywhere else. */}
+            {mission.monthsRemaining === 0 ? (
+              "Term complete"
+            ) : (
+              <>
+                {mission.monthsRemaining} mo
+                <span className="missionSummaryMonthsTail">
+                  {mission.monthsRemaining === 1 ? "nth" : "nths"}
+                </span>{" "}
+                left
+              </>
+            )}
           </span>
         </div>
-        <Tooltip title="All requirements">
-          <IconButton
-            className="missionDetailsButton"
-            color="primary"
-            aria-label="All requirements"
-            onClick={onDetails}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
       </div>
       <span className="srOnly" aria-live="polite">
         {announcement}

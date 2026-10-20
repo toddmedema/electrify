@@ -121,9 +121,9 @@ export const waterDashArrays = {
 
 interface ChartPaletteType {
   /** The two operating groups used by the compact Facilities chart. */
-  weatherDriven: string;
+  variable: string;
   onDemand: string;
-  weatherDrivenFill: string;
+  variableFill: string;
   onDemandFill: string;
   powerFlowFill: string;
   powerFlowPattern: string;
@@ -182,15 +182,15 @@ const LOGO_BLUE: { [mode in ThemeModeType]: string } = {
 // in its line and in its fill. Lines 2.2:1 (light) and 1.8:1 (dark) apart; fills 1.3:1 and 1.5:1, kept
 // light enough that the demand line and blackout shading still stand out over dispatchable.
 const PRODUCTION_COLORS = {
-  light: { weatherDriven: "#00897b", onDemand: "#37474f" },
-  dark: { weatherDriven: "#4db6a6", onDemand: "#d5dee5" },
+  light: { variable: "#00897b", onDemand: "#37474f" },
+  dark: { variable: "#4db6a6", onDemand: "#d5dee5" },
 };
 const GRID_STEEL = { light: "#455a64", dark: "#90a4ae" };
 
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     ...PRODUCTION_COLORS.light,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.light.weatherDriven, 0.18),
+    variableFill: withAlpha(PRODUCTION_COLORS.light.variable, 0.18),
     onDemandFill: withAlpha(PRODUCTION_COLORS.light.onDemand, 0.29),
     powerFlowFill: withAlpha(GRID_STEEL.light, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.light, 0.8),
@@ -221,7 +221,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     ...PRODUCTION_COLORS.dark,
-    weatherDrivenFill: withAlpha(PRODUCTION_COLORS.dark.weatherDriven, 0.17),
+    variableFill: withAlpha(PRODUCTION_COLORS.dark.variable, 0.17),
     onDemandFill: withAlpha(PRODUCTION_COLORS.dark.onDemand, 0.25),
     powerFlowFill: withAlpha(GRID_STEEL.dark, 0.08),
     powerFlowPattern: withAlpha(GRID_STEEL.dark, 0.8),
@@ -558,7 +558,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       // Every tooltip here is a plain label. MUI's default keeps a tooltip open while the pointer
       // is over the label itself, so one opened by an incidental hover (a dialog closing under a
       // resting pointer) sat on top of the control beside it and swallowed its clicks -- the
-      // phone Build sheet's close button, under the mission row's "All requirements" label.
+      // phone Build sheet's close button, under a label from the mission row.
       MuiTooltip: {
         defaultProps: { disableInteractive: true },
       },
@@ -599,8 +599,6 @@ export function createAppTheme(mode: ThemeModeType): Theme {
   muiThemes[mode] = built;
   return built;
 }
-
-export default createAppTheme("light");
 
 // In the order the settings screen lists them
 export const THEME_CHOICES: ThemeChoiceType[] = ["system", "light", "dark"];

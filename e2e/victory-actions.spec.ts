@@ -141,13 +141,14 @@ test("retrying a failed scenario keeps its difficulty in the game and mission de
   await page.getByRole("button", { name: "Expert", exact: true }).click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const requirements = page
-    .locator("#appbar:visible")
-    .getByRole("button", { name: "All requirements" })
+    .locator("#navfooter:visible")
+    .getByRole("button", { name: "Scenario", exact: true })
     .first();
-  const details = page.getByRole("dialog", { name: "Rise of Renewables" });
+  const details = page.getByRole("region", { name: "Scenario", exact: true });
   await requirements.click();
   await expect(details.getByText("Expert", { exact: true })).toBeVisible();
-  await details.getByRole("button", { name: "Back to game" }).click();
+  await expect(details).toContainText("Rise of Renewables");
+  await details.getByRole("button", { name: "Close Scenario" }).click();
 
   // Force insolvency at the next month boundary through a real saved game.
   await editSavedGame(page, (save) => {

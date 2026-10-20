@@ -19,27 +19,32 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const insights = page.locator(".insights:visible");
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
     await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
     );
-    const slider = insights.getByRole("slider", {
+    const pricing = programs.getByRole("region", {
+      name: "Electricity pricing",
+    });
+    const slider = pricing.getByRole("slider", {
       name: "The rate you charge for electricity generation",
     });
-    const showRate = insights.getByRole("button", { name: "Show rate slider" });
-    if (await showRate.isVisible()) await showRate.click();
     await slider.focus();
     await slider.press("End");
-    await expect(insights.locator(".insightsRateScore").last()).toHaveClass(
-      /bad/,
-    );
+    await expect(pricing.locator(".insightsRateScore")).toHaveClass(/bad/);
     await expect(slider).toHaveAttribute("aria-valuetext", /rate score [−-]/);
     await slider.press("Home");
-    await expect(insights.locator(".insightsRateScore").last()).toHaveClass(
-      /good/,
-    );
+    await expect(pricing.locator(".insightsRateScore")).toHaveClass(/good/);
     await expect(slider).toHaveAttribute("aria-valuetext", /rate score \+/);
+    expect(
+      await programs
+        .locator(".customerProgramsBody")
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
     // Persist a negative cash fixture so both the clipped chart and its textual alternative
     // can be inspected without relying on a particular scenario's path to insolvency.
     await editSavedGame(page, (save) => {
@@ -47,6 +52,15 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const cashWarning = page.getByRole("dialog", {
+      name: "You're about to run out of cash - raise your rates?",
+      exact: true,
+    });
+    await cashWarning
+      .getByRole("button", { name: "Go bankrupt", exact: true })
+      .click();
+    await expect(cashWarning).toBeHidden();
+    const insights = page.locator(".insights:visible");
     await openPane(
       insights,
       page.getByRole("button", { name: "Insights", exact: true }),
@@ -66,11 +80,7 @@ for (const theme of ["light", "dark"]) {
     // Mouse inspection also exercises the desktop tooltip, on every viewport.
     await plot.hover({ position: { x: box!.width / 2, y: box!.height / 2 } });
     await expect(cash.locator(".chartTooltip")).toContainText("Cash negative");
-    for (const selector of [
-      ".insightsLevers",
-      '[data-layer="cash"]',
-      '[data-layer="profit"]',
-    ]) {
+    for (const selector of ['[data-layer="cash"]', '[data-layer="profit"]']) {
       expect(
         await insights
           .locator(selector)
@@ -78,7 +88,7 @@ for (const theme of ["light", "dark"]) {
       ).toBeLessThanOrEqual(1);
     }
     if (process.env.REVIEW_SCREENSHOT_DIR) {
-      await insights.locator(".insightsLevers").scrollIntoViewIfNeeded();
+      await cash.scrollIntoViewIfNeeded();
       await page.mouse.move(0, 0);
       await page.screenshot({
         path: path.join(

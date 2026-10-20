@@ -5,7 +5,7 @@
 // run at 60 Hz even when the physical display supports 120 Hz. E2E_CPU_RATE is a lab proxy only.
 import { expect, Page, test } from "./fixtures";
 import fs from "fs";
-import { openPane, waitForSettled } from "./layout";
+import { openPane, waitForSettled, openBuild } from "./layout";
 
 interface FrameGap {
   at: number;
@@ -191,9 +191,7 @@ for (const journey of journeys) {
     }
     if (journey.pane === "intertie") {
       const facilities = page.locator(".facilities:visible");
-      await facilities
-        .getByRole("button", { name: "Build", exact: true })
-        .click();
+      await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();
       await page
         .getByRole("button", {

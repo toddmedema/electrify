@@ -43,7 +43,7 @@ continuous screenshot filmstrip during passing tests.
 
 Browser workers cache and install only locked Chromium headless shells. Linux installs the system
 libraries needed by Electron; Windows/Mac avoid repeated Windows Server media-feature setup.
-The browser case union is identical to the original desktop/390 px smoke and desktop/390/320 px
+The browser case union is identical to the original desktop/390 px smoke and desktop/390/360 px
 layout matrix, now split across two workers.
 
 ## Shard maintenance

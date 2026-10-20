@@ -98,7 +98,7 @@ for (const theme of ["light", "dark"] as const) {
     "menu pages share the Game details frame in " + theme,
     async ({ page }, testInfo) => {
       test.skip(
-        !["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+        !["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
           testInfo.project.name,
         ),
       );

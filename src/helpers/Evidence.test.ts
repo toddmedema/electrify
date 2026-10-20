@@ -36,7 +36,7 @@ it("maps semantic destinations and repeats same-card requests without changing s
   expect(store.getState().ui.evidenceRequest!.id).toBe(first.id + 1);
   expect(store.getState().game).toBe(game);
   expect(evidenceCard("finances")).toBe("INSIGHTS");
-  expect(evidenceCard("mission-details")).toBeUndefined();
+  expect(evidenceCard("mission-details")).toBe("SCENARIO");
   expect(evidenceCard({ card: "FACILITIES", view: "BUILD_GENERATORS" })).toBe(
     "BUILD_GENERATORS",
   );

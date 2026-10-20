@@ -46,7 +46,7 @@ it("balances charging, discharging, imports and exports without netting away sto
   ticks[1].supplyW -= 5;
   const stack = supplyDemandStack(ticks, ["Sun", "Coal"]);
   expect(stack.sources).toEqual([
-    "Weather-driven",
+    "Variable",
     "Dispatchable",
     "Storage",
     "Interties",
@@ -82,19 +82,23 @@ it("handles older records without optional flow fields and omits unused source k
   expect(stack.totalDemand).toEqual([40, 40]);
 });
 
-it("reports raw source output and the full demand breakdown", () => {
+it("breaks supply into the four legend groups and keeps the full demand breakdown", () => {
   const stack = supplyDemandStack(timeline, ["Sun", "Coal"]);
   const state = { timeline, ...stack, startingYear: 2020 };
-  expect(formatProductionTooltip(0, state)).toContain(
-    "Interties importing: 30W",
-  );
+  expect(formatProductionTooltip(0, state)).toContain("Interties: 30W");
+  expect(formatProductionTooltip(0, state)).toContain("Storage: 0W");
   expect(formatProductionTooltip(0, state)).toContain("Storage charging: 10W");
-  expect(formatProductionTooltip(1, state)).toContain("Coal: 80W");
-  expect(formatProductionTooltip(1, state)).toContain("Total supply: 130W");
+  expect(formatProductionTooltip(1, state).split("\n").slice(1, 6)).toEqual([
+    "Total supply: 130W",
+    "Variable: 40W",
+    "Dispatchable: 80W",
+    "Storage: 10W",
+    "Interties: 0W",
+  ]);
+  expect(formatProductionTooltip(1, state)).not.toContain("Coal");
+  expect(formatProductionTooltip(1, state)).not.toContain("discharging");
+  expect(formatProductionTooltip(1, state)).not.toContain("importing");
   expect(formatProductionTooltip(1, state)).toContain("Demand: 120W");
-  expect(formatProductionTooltip(1, state)).toContain(
-    "Storage discharging: 10W",
-  );
   expect(formatProductionTooltip(1, state)).toContain(
     "Interties exporting: 20W",
   );
@@ -175,7 +179,7 @@ it("groups every solar and wind variant separately from other generation", () =>
     ],
     ["Hydro", "Sun", "Wind"],
   );
-  expect(stack.sources).toEqual(["Weather-driven", "Dispatchable"]);
+  expect(stack.sources).toEqual(["Variable", "Dispatchable"]);
   expect(stack.bySource).toEqual([[40], [60]]);
   expect(stack.stacked).toEqual([[40], [100]]);
   expect(stack.fuels).toContain("Hydro");
@@ -236,9 +240,9 @@ it("keeps simultaneous inward and outward flows distinct around the customer-dem
     ],
     startingYear: 2020,
   });
-  expect(label).toContain("Storage discharging: 20W");
+  expect(label).toContain("Storage: 20W");
   expect(label).toContain("Storage charging: 15W");
-  expect(label).toContain("Interties importing: 10W");
+  expect(label).toContain("Interties: 10W");
   expect(label).toContain("Interties exporting: 5W");
   expect(label).toContain("Blackout: 10W unmet");
 });

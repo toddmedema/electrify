@@ -1,3 +1,5 @@
+import { matchScenario } from "../multiplayer/World";
+import { validBrowseState } from "../multiplayer/Browse";
 import { tickState } from "../reducers/Game";
 import { TICKS_PER_MONTH } from "../Constants";
 import { TextEncoder } from "util";
@@ -110,4 +112,25 @@ test("mod notifications are committed once and survive save loading", () => {
   expect(
     restored.game.eventLog.filter((event) => event.title === "Review grid"),
   ).toHaveLength(1);
+});
+
+test("mod snapshots cannot enter co-op through custom setup or the wire", () => {
+  const regular = {
+    scenarioId: 999,
+    difficulty: "Manager" as const,
+    customScenario: { ...DEFAULT_CUSTOM_SCENARIO },
+  };
+  expect(matchScenario(regular).scenario.id).toBe(999);
+  const customScenario = modScenario(fixture());
+  expect(() => matchScenario({ ...regular, customScenario })).toThrow();
+  const browse = {
+    session: "test",
+    revision: 0,
+    phase: "browsing",
+    card: "CUSTOM_GAME",
+    difficulty: "Manager",
+    custom: regular.customScenario,
+  };
+  expect(validBrowseState(browse)).toBe(true);
+  expect(validBrowseState({ ...browse, custom: customScenario })).toBe(false);
 });

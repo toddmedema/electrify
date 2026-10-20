@@ -18,7 +18,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
     colorScheme: "light",
     reducedMotion: "no-preference",
   },
-  { width: 320, height: 568, colorScheme: "dark", reducedMotion: "reduce" },
+  { width: 360, height: 640, colorScheme: "dark", reducedMotion: "reduce" },
 ] as const) {
   test(`native entrance hands off at ${width}px in ${colorScheme}`, async () => {
     const profile = await createDesktopProfile();
@@ -43,7 +43,7 @@ for (const { width, height, colorScheme, reducedMotion } of [
         );
       });
       await page.reload();
-      const entrance = page.locator("#desktopStartup");
+      const entrance = page.locator("#appStartup");
       await expect(entrance.getByRole("status")).toHaveText(
         "Reticulating splines...",
       );
@@ -89,7 +89,7 @@ test("startup failure retains branding and keyboard recovery", async () => {
   const profile = await createDesktopProfile();
   const { app, page } = await launchDesktop(profile);
   try {
-    await page.setViewportSize({ width: 320, height: 568 });
+    await page.setViewportSize({ width: 360, height: 640 });
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler("desktop:read-saves");
       ipcMain.handle("desktop:read-saves", () => {
@@ -118,7 +118,7 @@ test("startup failure retains branding and keyboard recovery", async () => {
       }));
     });
     await retry.press("Enter");
-    await expect(page.locator("#desktopStartup")).toHaveCount(0);
+    await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Start playing", exact: true }),
     ).toBeEnabled();

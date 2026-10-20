@@ -90,7 +90,7 @@ export function getMissionStatus(game: GameType) {
             : `${MONTHS[objective.month - 1]} ${objective.year}–${MONTHS[last % 12]} ${lastYear}`;
     requirements.push({
       id: "reliability",
-      label: objective.label,
+      label: objective.goal ?? `Serve demand during the ${objective.label}`,
       compact: `Demand served ≥ ${formatRequiredShare(objective.minimumDemandServed)} (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
@@ -292,6 +292,7 @@ export function cashRunwayMonths(game: GameType): number | undefined {
 export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
+  suppliedStatus?: ReturnType<typeof getMissionStatus>,
 ): MissionRisk | undefined {
   const now = currentTick(game);
   if (
@@ -314,7 +315,7 @@ export function selectMissionRisk(
         target: "finances",
       };
   }
-  const mission = getMissionStatus(game);
+  const mission = suppliedStatus ?? getMissionStatus(game);
   if (
     mission.requirements.some(
       (row) => row.id === "reliability" && row.status === "failed",
@@ -322,7 +323,7 @@ export function selectMissionRisk(
   )
     return {
       id: "reliability",
-      label: "Required reliability window missed · All requirements",
+      label: "Required reliability window missed · Scenario",
       shortLabel: "Reliability missed",
       target: "mission-details",
     };

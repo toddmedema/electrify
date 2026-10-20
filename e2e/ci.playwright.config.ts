@@ -7,15 +7,20 @@ const smoke = [
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
   "tutorial-exit.spec.ts",
+  "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
+  "main-menu.spec.ts",
   "music.spec.ts",
   "achievements.spec.ts",
+  "facilities-production-chart.spec.ts",
+  "intertie-order.spec.ts",
+  "operations-priorities.spec.ts",
 ];
 const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
 const port = process.env.E2E_PORT || "3100";
 
-// Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/320 px.
+// Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.
 // One invocation lets Playwright shard all cases together without starting a dev compiler.
 export default defineConfig({
   ...base,
@@ -23,14 +28,16 @@ export default defineConfig({
   workers: 2,
   projects: base
     .projects!.filter((project) =>
-      ["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+      ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
         project.name!,
       ),
     )
     .map((project) => ({
       ...project,
       testMatch:
-        project.name === "mobile-320px" ? layout : [...smoke, ...layout],
+        project.name === "mobile-360px"
+          ? [...layout, "tutorial-actions.spec.ts", "main-menu.spec.ts"]
+          : [...smoke, ...layout],
     })),
   webServer: {
     command: "node scripts/ci/serve.js",

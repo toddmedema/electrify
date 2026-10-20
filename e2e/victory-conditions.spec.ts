@@ -35,11 +35,15 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       await page
-        .locator("#appbar:visible")
-        .getByRole("button", { name: "All requirements" })
+        .locator("#navfooter:visible")
+        .getByRole("button", { name: "Scenario", exact: true })
         .first()
         .click();
-      const dialog = page.getByRole("dialog", { name: scenario.name });
+      const dialog = page.getByRole("region", {
+        name: "Scenario",
+        exact: true,
+      });
+      await expect(dialog).toContainText(scenario.name);
       await expectDialogToFit(dialog);
       const rules = dialog.locator(".missionRequirements dt");
       const progress = dialog.locator(".missionRequirements dd");
@@ -58,7 +62,7 @@ for (const theme of ["light", "dark"] as const) {
         await expect(progress.first()).toContainText(/0\/\d+ months completed/);
       }
       // Check rendered line boxes; two DOM rows alone would miss wrapping.
-      // At 320px, long date windows may reflow, but must remain fully readable.
+      // At 360px, long date windows may reflow, but must remain fully readable.
       if (testInfo.project.use.viewport!.width >= 390) {
         const wrapped = await dialog
           .locator(".missionRequirements dt, .missionRequirements dd")

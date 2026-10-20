@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openBuild, openPane } from "./layout";
 
 // Heatwave + Drought starts with hydro, storage and a mixed fleet, and a new build adds a row
 // under construction, so every kind of status line the list can show is on screen at once.
@@ -7,7 +7,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
   page,
 }, testInfo) => {
   test.skip(
-    !["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+    !["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
       testInfo.project.name,
     ),
   );
@@ -19,7 +19,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
     pane,
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
-  await pane.getByRole("button", { name: "Build", exact: true }).click();
+  await openBuild(page);
   await page.locator(".button-buildGenerator").click();
   await page
     .getByRole("button", { name: /^Review purchase of / })
