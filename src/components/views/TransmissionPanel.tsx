@@ -893,14 +893,11 @@ export default function TransmissionPanel({
                               >
                                 {reorderDisabled && icon}
                                 <span className="transmissionLineText">
-                                  <span style={constructionStyle}>
-                                    {line.name}
-                                  </span>
+                                  <span>{line.name}</span>
                                   <Typography
                                     component="span"
                                     variant="body2"
                                     color="textSecondary"
-                                    style={constructionStyle}
                                   >
                                     {building ? (
                                       constructionLabel
@@ -936,45 +933,6 @@ export default function TransmissionPanel({
                             </div>
                             {selectedLine === line.id && (
                               <div className="transmissionLineDetails">
-                                {!readOnly && (
-                                  <div className="facilityActions intertieActions">
-                                    {building && onCancel && (
-                                      <Button
-                                        className="facilityCancelConstruction"
-                                        startIcon={<CancelIcon />}
-                                        aria-label={`Cancel construction of ${line.name}`}
-                                        onClick={() => setCancelLine(line)}
-                                      >
-                                        <span className="facilityActionLabel">
-                                          Cancel construction
-                                        </span>
-                                      </Button>
-                                    )}
-                                    {!building && onPause && (
-                                      <Button
-                                        startIcon={
-                                          <ConceptIcon
-                                            concept={
-                                              line.paused ? "play" : "pause"
-                                            }
-                                          />
-                                        }
-                                        aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
-                                        onClick={() =>
-                                          onPause(
-                                            line.id,
-                                            line.name,
-                                            !!line.paused,
-                                          )
-                                        }
-                                      >
-                                        <span className="facilityActionLabel">
-                                          {line.paused ? "Resume" : "Pause"}
-                                        </span>
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
                                 {cancelLine?.id === line.id && (
                                   <ConfirmDialog
                                     open
@@ -1000,16 +958,6 @@ export default function TransmissionPanel({
                                     </Typography>
                                   </ConfirmDialog>
                                 )}
-                                {outlook && (
-                                  <div className="transmissionArchetype">
-                                    <Typography
-                                      variant="body2"
-                                      color="textSecondary"
-                                    >
-                                      {outlook.archetype.summary}
-                                    </Typography>
-                                  </div>
-                                )}
                                 <dl className="transmissionMetrics facilityStats">
                                   <div className="facilityStat">
                                     <dt>Import capacity</dt>
@@ -1029,6 +977,21 @@ export default function TransmissionPanel({
                                       )}
                                     </dd>
                                   </div>
+                                  {building && (
+                                    <div className="facilityStat">
+                                      <dt>Refund if cancelled</dt>
+                                      <dd className="facilityStatValue">
+                                        {formatMoneyConcise(
+                                          line.buildCost - line.loanAmountLeft,
+                                        )}
+                                        {line.loanAmountLeft > 0 && (
+                                          <span className="facilityStatNote">
+                                            After settling the loan
+                                          </span>
+                                        )}
+                                      </dd>
+                                    </div>
+                                  )}
                                   {!building && now && (
                                     <>
                                       <div className="facilityStat">
@@ -1083,6 +1046,16 @@ export default function TransmissionPanel({
                                     </div>
                                   )}
                                 </dl>
+                                {outlook && (
+                                  <div className="transmissionArchetype">
+                                    <Typography
+                                      variant="body2"
+                                      color="textSecondary"
+                                    >
+                                      {outlook.archetype.summary}
+                                    </Typography>
+                                  </div>
+                                )}
                                 {!building && now && (
                                   <Typography
                                     variant="body2"
@@ -1152,6 +1125,49 @@ export default function TransmissionPanel({
                                     />
                                   </>
                                 )}
+                                {!readOnly &&
+                                  ((building && onCancel) ||
+                                    (!building && onPause)) && (
+                                    <div className="facilityActions">
+                                      {building && onCancel && (
+                                        <Button
+                                          className="facilityCancelConstruction"
+                                          variant="outlined"
+                                          startIcon={<CancelIcon />}
+                                          aria-label={`Cancel construction of ${line.name}`}
+                                          onClick={() => setCancelLine(line)}
+                                        >
+                                          <span className="facilityActionLabel">
+                                            Cancel construction
+                                          </span>
+                                        </Button>
+                                      )}
+                                      {!building && onPause && (
+                                        <Button
+                                          variant="outlined"
+                                          startIcon={
+                                            <ConceptIcon
+                                              concept={
+                                                line.paused ? "play" : "pause"
+                                              }
+                                            />
+                                          }
+                                          aria-label={`${line.paused ? "Resume" : "Pause"} ${line.name}`}
+                                          onClick={() =>
+                                            onPause(
+                                              line.id,
+                                              line.name,
+                                              !!line.paused,
+                                            )
+                                          }
+                                        >
+                                          <span className="facilityActionLabel">
+                                            {line.paused ? "Resume" : "Pause"}
+                                          </span>
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
                               </div>
                             )}
                           </div>

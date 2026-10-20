@@ -237,6 +237,7 @@ function FacilityActions(props: {
         // Refunds in full and returns the plant to service at once, so it needs no confirmation
         <Button
           className="facilityCancelConstruction"
+          variant="outlined"
           startIcon={<CancelIcon />}
           aria-label={"Cancel upgrade of " + facility.name}
           onClick={() => onCancelRetrofit(facility.id)}
@@ -246,6 +247,7 @@ function FacilityActions(props: {
       )}
       {!underConstruction && !upgrading && (
         <Button
+          variant="outlined"
           startIcon={
             <ConceptIcon concept={facility.paused ? "play" : "pause"} />
           }
@@ -267,6 +269,7 @@ function FacilityActions(props: {
       )}
       <Button
         className={underConstruction ? "facilityCancelConstruction" : undefined}
+        variant="outlined"
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +
@@ -552,24 +555,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
-              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
-              all under-construction facilities need here. */}
-              <ListItem
-                className="facility"
-                sx={
-                  offlineForWork
-                    ? {
-                        // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemText-primary, & .MuiListItemText-secondary":
-                          {
-                            opacity: (theme) =>
-                              theme.palette.action.disabledOpacity,
-                          },
-                      }
-                    : undefined
-                }
-                component="span"
-              >
+              <ListItem className="facility" component="span">
                 {reorderDisabled && icon}
                 <span className="facilityText">
                   <ListItemText
@@ -677,17 +663,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             </ConfirmDialog>
           )}
           {selected && (
-            <MemoizedFacilityActions
-              facility={facility}
-              readOnly={readOnly}
-              upgrading={upgrading}
-              onPause={onPause}
-              onTogglePause={onTogglePause}
-              onCancelRetrofit={props.onCancelRetrofit}
-              onOpenSell={toggleDialog}
-            />
-          )}
-          {selected && (
             <FacilityDetails
               facility={facility}
               date={game.date}
@@ -696,6 +671,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               game={game}
               readOnly={readOnly}
               onRetrofit={props.onRetrofit}
+            />
+          )}
+          {selected && (
+            <MemoizedFacilityActions
+              facility={facility}
+              readOnly={readOnly}
+              upgrading={upgrading}
+              onPause={onPause}
+              onTogglePause={onTogglePause}
+              onCancelRetrofit={props.onCancelRetrofit}
+              onOpenSell={toggleDialog}
             />
           )}
         </div>
