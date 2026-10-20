@@ -26,28 +26,37 @@ function target(game: GameType) {
 }
 
 describe("public utility rate following its target", () => {
-  it("forecasts target changes at future month boundaries without changing the live rate", () => {
-    const game = createGame({ scenarioId: PUBLIC_ID });
-    const fixed = { ...game, rateFollowsTarget: false };
-    const now = game.timeline[0];
-    const forecast = (state: GameType) =>
-      generateNewTimeline(state, now.cash, now.customers, 13 * 24, 60);
-    const following = forecast(game);
-    const manual = forecast(fixed);
-    expect(following.slice(0, 24)).toEqual(manual.slice(0, 24));
-    const nextYear = following[12 * 24];
-    expect(nextYear.customerBillingRate).toBe(
-      target({
-        ...game,
-        date: getDateFromMinute(nextYear.minute, game.startingYear),
-      }),
-    );
-    expect(nextYear.customerBillingRate).not.toBe(
-      manual[12 * 24].customerBillingRate,
-    );
-    expect(nextYear.cash).not.toBe(manual[12 * 24].cash);
-    expect(game.dollarsPerkWh).toBe(target(game));
-  });
+  it.each([false, true])(
+    "forecasts future target changes without changing the live rate (customer flexibility: %s)",
+    (flexibility) => {
+      const game = createGame({
+        scenarioId: PUBLIC_ID,
+        initialPrograms: flexibility ? { thermal: "On" } : undefined,
+      });
+      const fixed = { ...game, rateFollowsTarget: false };
+      const now = game.timeline[0];
+      const forecast = (state: GameType) =>
+        generateNewTimeline(state, now.cash, now.customers, 13 * 24, 60);
+      const following = forecast(game);
+      const manual = forecast(fixed);
+      expect(following.some((tick) => (tick.thermalShiftedW ?? 0) > 0)).toBe(
+        flexibility,
+      );
+      expect(following.slice(0, 24)).toEqual(manual.slice(0, 24));
+      const nextYear = following[12 * 24];
+      expect(nextYear.customerBillingRate).toBe(
+        target({
+          ...game,
+          date: getDateFromMinute(nextYear.minute, game.startingYear),
+        }),
+      );
+      expect(nextYear.customerBillingRate).not.toBe(
+        manual[12 * 24].customerBillingRate,
+      );
+      expect(nextYear.cash).not.toBe(manual[12 * 24].cash);
+      expect(game.dollarsPerkWh).toBe(target(game));
+    },
+  );
 
   it("invalidates the forecast when following changes at the same price", () => {
     const game = createGame({ scenarioId: PUBLIC_ID });

@@ -22,6 +22,10 @@ const objectFields = {
   renewableCapacityFactors: "dictionary",
   deferredResidential: "queue",
   deferredResidentialStart: "queue",
+  deferredThermal: "queue",
+  deferredThermalStart: "queue",
+  deferredCharging: "queue",
+  deferredChargingStart: "queue",
 } as const satisfies Record<ObjectTickKey, "dictionary" | "queue">;
 type DictionaryKey = {
   [K in ObjectTickKey]: (typeof objectFields)[K] extends "dictionary"

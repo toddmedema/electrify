@@ -15,6 +15,7 @@ import {
 } from "./helpers/RunIdentity";
 import { validInvitation } from "./helpers/Challenge";
 import { validPolicies, validDeferredResidential } from "./helpers/Policies";
+import { validDeferredThermal } from "./helpers/ThermalFlexibility";
 import {
   restoreCommitmentMetadata,
   serializeCommitmentMetadata,
@@ -70,6 +71,28 @@ import { pow } from "./helpers/Pow";
  */
 
 export type { SaveGameType } from "./Types";
+
+function validDeferredCharging(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (
+      entry: {
+        energyWh?: unknown;
+        recoveryStartMinute?: unknown;
+        recoveryEndMinute?: unknown;
+      } | null,
+    ) =>
+      entry &&
+      typeof entry.energyWh === "number" &&
+      Number.isFinite(entry.energyWh) &&
+      entry.energyWh >= 0 &&
+      typeof entry.recoveryStartMinute === "number" &&
+      Number.isSafeInteger(entry.recoveryStartMinute) &&
+      entry.recoveryStartMinute >= 0 &&
+      entry.recoveryEndMinute === entry.recoveryStartMinute + 360,
+  );
+}
 
 function approximatelyEqual(actual: unknown, expected: number): boolean {
   return (
@@ -631,10 +654,25 @@ export function parseSave(raw: unknown): SaveGameType | null {
       (t) =>
         !validDeferredResidential(t.deferredResidential) ||
         !validDeferredResidential(t.deferredResidentialStart) ||
+        !validDeferredThermal(t.deferredThermal) ||
+        !validDeferredThermal(t.deferredThermalStart) ||
+        !validDeferredCharging(t.deferredCharging) ||
+        !validDeferredCharging(t.deferredChargingStart) ||
         [
           t.customerBillingRate,
           t.deferredResidentialWh,
           t.deferredResidentialWhStart,
+          t.thermalShiftedW,
+          t.thermalRecoveredW,
+          t.evShiftedW,
+          t.evRecoveredW,
+          t.customerBatteryWh,
+          t.customerBatteryWhStart,
+          t.customerBatteryChargeW,
+          t.customerBatteryGridChargeW,
+          t.customerBatteryDischargeW,
+          t.customerBatteryLossWh,
+          t.rooftopSurplusW,
           t.shiftedResidentialW,
         ].some(
           (value) =>

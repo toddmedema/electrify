@@ -6,6 +6,9 @@ export const POLICY_IDS: PolicyId[] = [
   "solar",
   "timeOfUse",
   "curtailment",
+  "thermal",
+  "evCharging",
+  "battery",
 ];
 export const POLICY_TIERS: PolicyTier[] = ["Off", "On"];
 // Explicit launch availability: longer scenarios from 2000 on, and custom games. Earlier
@@ -23,6 +26,27 @@ const BUILDOUT_MONTHS = 48;
 const EFFICIENCY_FULL_LIFE_MONTHS = 120;
 const EFFICIENCY_END_LIFE_MONTHS = 240;
 export const POLICIES = {
+  thermal: {
+    name: "Smart heating and hot water",
+    description:
+      "Fund controls over 36 months and pay participating households to move eligible heating and hot-water use out of your four-hour window. Deferred use returns over the following three hours.",
+    tradeoff:
+      "Equipment availability depends on location and installation year. Payments continue while on; comfort limits and recovery demand constrain peak relief. Turning off stops installations and control, but deferred use still returns.",
+  },
+  evCharging: {
+    name: "Managed EV charging",
+    description:
+      "Enroll drivers over 12 months and pay for flexible charging. Eligible vehicles move part of their charging out of your four-hour window and finish during the following six hours.",
+    tradeoff:
+      "Only the local electric-car fleet with compatible charging can participate. Early years have few or no eligible vehicles. Drivers retain overrides, transport energy is conserved, and later charging can create a new peak.",
+  },
+  battery: {
+    name: "Home battery virtual power plant",
+    description:
+      "Fund household batteries over 48 months for customers who join your virtual power plant. Batteries charge from surplus electricity and help homes during your four-hour peak window.",
+    tradeoff:
+      "Availability and installation costs follow the year and location. Batteries start empty, lose energy, age, and keep a household reserve. Rebates and participation payments compete with utility investment.",
+  },
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
@@ -63,9 +87,9 @@ export const POLICIES = {
   solar: {
     name: "Rooftop solar rebates",
     description:
-      "Fund rooftop panels over 48 months to reduce daytime grid demand. Installed panels keep producing without further utility spending; they do not cover evening peaks, and surplus earns no export credit.",
+      "Fund rooftop panels over 48 months to reduce daytime grid demand. Installed panels keep producing without further utility spending; they do not cover evening peaks, and surplus earns no export credit. An enrolled home battery can store surplus for later.",
     tradeoff:
-      "Rebates cost money and reduce sales. Surplus is discarded, with no export payments or utility generation credits.",
+      "Rebates cost money and reduce sales. Surplus beyond enrolled battery charging is discarded, with no export payments or utility generation credits.",
     // Watts per starting customer, scaled with scenario demand, at full adoption. The California
     // Solar Initiative, among the largest rebate programs, funded about 1.9 GW across roughly 12
     // million utility customers - about 160 W each.
