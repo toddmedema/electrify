@@ -11,43 +11,35 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const insights = page.locator(".insights:visible");
-    await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
-    );
-    const entry = insights.getByRole("button", {
-      name: "Customer programs",
+    const entry = page.getByRole("button", {
+      name: "Programs",
       exact: true,
     });
-    await entry.click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("region", { name: "Programs", exact: true });
+    await openPane(dialog, entry);
     for (const offer of ["Time-of-use tariff", "Peak curtailment contracts"]) {
       await dialog
         .getByRole("button", { name: `${offer} · Off`, exact: true })
         .click();
-      await expect(dialog.getByRole("radio")).toHaveCount(2);
+      await expect(dialog.getByRole("radio")).toHaveCount(0);
       await expect(dialog).not.toContainText("Base rate:");
       await expect(dialog).not.toContainText("installed upgrades");
-      const large = dialog.getByRole("radio", { name: "On", exact: true });
-      await expect(dialog.getByLabel("Daily window")).toHaveCount(0);
-      await large.check();
+
       const window = dialog.getByLabel("Daily window", { exact: true });
       await expect(window).toBeVisible();
       await window.selectOption(offer === "Time-of-use tariff" ? "22" : "9");
       await expect(dialog).toContainText(
         offer === "Time-of-use tariff"
           ? "02:00–05:00"
-          : "This use is eliminated",
+          : "Half of demand from factories, mines and data centers drops 20%",
       );
-      await dialog
-        .getByRole("button", { name: "What is Customer programs?" })
-        .click();
-      const manual = page.getByRole("dialog", { name: "Manual help" });
-      await expect(manual).toContainText("Total energy use stays the same");
+      // The workspace header has no contextual help. Its foreground game menu
+      // must consume Escape without losing the program's unsaved daily window.
+      await page.locator(".gameMenuButton").click();
+      await expect(page.getByRole("menu")).toBeVisible();
       await page.keyboard.press("Escape");
-      await expect(manual).toHaveCount(0);
-      await expect(large).toBeChecked();
+      await expect(page.getByRole("menu")).toHaveCount(0);
+      await expect(window).toBeVisible();
       await expect(window).toHaveValue(
         offer === "Time-of-use tariff" ? "22" : "9",
       );
@@ -61,10 +53,10 @@ for (const theme of ["light", "dark"]) {
         await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
       expect((await apply.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-      expect(
-        (await large.locator("..").locator("..").boundingBox())!.height,
-      ).toBeGreaterThanOrEqual(44);
-      await dialog.getByRole("heading", { level: 2 }).scrollIntoViewIfNeeded();
+      expect((await window.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await dialog
+        .getByRole("heading", { name: offer, exact: true })
+        .scrollIntoViewIfNeeded();
       await dialog.locator(".customerProgramsBody").evaluate((el) => {
         el.scrollTop = 0;
       });

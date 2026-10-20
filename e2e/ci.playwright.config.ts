@@ -10,6 +10,7 @@ const smoke = [
   "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
+  "main-menu.spec.ts",
   "music.spec.ts",
   "achievements.spec.ts",
   "facilities-production-chart.spec.ts",
@@ -35,7 +36,7 @@ export default defineConfig({
       ...project,
       testMatch:
         project.name === "mobile-360px"
-          ? [...layout, "tutorial-actions.spec.ts"]
+          ? [...layout, "tutorial-actions.spec.ts", "main-menu.spec.ts"]
           : [...smoke, ...layout],
     })),
   webServer: {

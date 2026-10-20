@@ -1,6 +1,56 @@
 import { expect, test } from "./fixtures";
 import { readSavedGame } from "./save-fixture";
 
+test("loading logo stays centered through its slide into the menu", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.matches("#menuCard .homeLogo")) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      return animation;
+    };
+  });
+  let releaseBundle!: () => void;
+  const bundleReady = new Promise<void>((resolve) => (releaseBundle = resolve));
+  await page.route("**/static/js/*.js", async (route) => {
+    await bundleReady;
+    await route.continue();
+  });
+  await page.goto("/", { waitUntil: "commit" });
+  const loadingLogo = page.locator("#appStartup .homeLogo");
+  await expect(loadingLogo.getByAltText("Electrify")).toBeVisible();
+  const before = (await loadingLogo.boundingBox())!;
+  expect(before.x + before.width / 2).toBeCloseTo(
+    page.viewportSize()!.width / 2,
+    0,
+  );
+  releaseBundle();
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  const menuLogo = page.locator("#menuCard .homeLogo");
+  await expect(menuLogo).toBeVisible();
+  for (const time of [0, 100, 200]) {
+    await menuLogo.evaluate((logo, currentTime) => {
+      for (const animation of logo.getAnimations())
+        animation.currentTime = currentTime;
+    }, time);
+    const bounds = (await menuLogo.boundingBox())!;
+    expect(bounds.width).toBeCloseTo(before.width, 0);
+    expect(bounds.x + bounds.width / 2).toBeCloseTo(
+      page.viewportSize()!.width / 2,
+      0,
+    );
+  }
+  await expect(
+    page.getByRole("button", { name: "Start playing", exact: true }),
+  ).toBeEnabled();
+});
+
 for (const theme of ["light", "dark"]) {
   test(`home install and sound prompts update independently in ${theme}`, async ({
     page,
