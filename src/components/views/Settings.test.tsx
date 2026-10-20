@@ -130,9 +130,9 @@ describe("Settings", () => {
       getState: jest.fn(async () => state),
       onStateChanged: jest.fn(() => () => {}),
     } as unknown as DesktopBridge;
-    const first = renderSettings();
+    const { unmount } = renderSettings();
     expect(screen.queryByText("Manage mods")).toBeNull();
-    first.unmount();
+    unmount();
     window.electrifyDesktop = {
       ...window.electrifyDesktop,
       mods: jest.fn(async () => ({ entries: [{}, {}, {}] })),
