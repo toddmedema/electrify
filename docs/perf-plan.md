@@ -588,8 +588,8 @@ Two small changes remove repeated work without introducing caches or changing si
 - `MissionSummary` passes the status it already computed to `selectMissionRisk`. Other callers
   retain the lazy fallback, after the existing immediate shortage and negative-cash checks.
 - `intertieContextForGame` passes only the four inputs consumed by `accessContextForGame`,
-  avoiding a full game-object spread on every supply calculation, including Immer drafts and
-  forecasts with no operating interties. Scenario defaults, custom games and peer identity stay
+  avoiding a full game-object spread on every supply calculation, including forecasts with no
+  operating interties. Scenario defaults, custom games and peer identity stay
   unchanged.
 
 A profiling agent proposed the changes, a second agent challenged and implemented them, and a
@@ -611,12 +611,17 @@ date and events.
 
 | Paired simulation metric | Median reduction | Pair range |
 | --- | ---: | ---: |
-| Redux/Immer time per simulated year | 3.94% | 2.42–9.98% |
-| Redux/Immer median month rollover | 4.61% | 1.99–10.56% |
+| Headless median ordinary tick | 33.58% | 31.78–44.44% |
+| Draft-wrapped time per simulated year | 3.94% | 2.42–9.98% |
+| Draft-wrapped median month rollover | 4.61% | 1.99–10.56% |
 
 Headless whole-run timing was noisy: a 2.27% median reduction, ranging from a 1.48% regression to a
-24.28% improvement. Headless median rollover did not consistently improve. These results support
-a modest browser-reducer improvement, not a consistent whole-run headless speedup.
+24.28% improvement. Headless median rollover did not consistently improve. The consistent
+whole-run gain is in the draft-wrapped per-tick lab workload, including snapshot/adopt work;
+non-replay draft inputs enter a plain working state inside `tickStatePhases`. Normal foreground
+play batches snapshot/adopt once per frame, so this is not a direct foreground-throughput or
+whole-frame measurement. Plain ordinary-tick medians were 0.0236–0.0297 ms before and
+0.0161–0.0182 ms after. That core-tick gain is a small part of total cost; rollovers dominate here.
 
 The React control used the same fresh game, 100 warmups and 500 updates per sample, with three
 alternating pairs at each width. The forecast was ready before measurement, and an untimed probe
@@ -641,8 +646,8 @@ Temporary paired-control source and legacy copies were removed after measurement
 
 ### Verification
 
-The pre-merge integrated `npm run check:ci` passed all fourteen gates, including unchanged scenario golden
-outputs, tick ratios, both production renderers, the production browser matrix and headless
+The pre-merge integrated `npm run check:ci` passed all fourteen gates, including unchanged
+scenario golden outputs, tick ratios, both production renderers, the production browser matrix and headless
 multiplayer. Independent focused QA passed 114 tests across mission, helper and reducer suites;
 application/e2e types and the retained render benchmark also passed. Each of the three new
 regression guards was shown to fail under a deliberate reversion before restoring the fix.
@@ -654,10 +659,10 @@ reproduction; no assertion or fixture was weakened.
 
 ### Production frame observations
 
-Before and after builds each passed seven frame journeys (390 px at 12x and 1440 px at 24x,
-including month and January boundaries) plus four phone journeys with CDP CPU slowdown set to 4.
-The duplicate desktop Insights case remains intentionally skipped. The final unthrottled sample
-had no long tasks, a 16.8 ms worst gap in every phone journey, and one 33.3 ms desktop hydro gap.
+The pre-merge before and after builds each passed seven frame journeys (390 px at 12x and 1440 px
+at 24x, including month and January boundaries) plus four phone journeys with CDP CPU slowdown
+set to 4. The duplicate desktop Insights case remains intentionally skipped. The final pre-merge
+unthrottled sample had no long tasks, a 16.8 ms worst gap in every phone journey, and one 33.3 ms desktop hydro gap.
 The host's idle callback cadence was about 60 Hz.
 
 The slowed phone samples still expose substantial chart and rollover stalls:
@@ -671,13 +676,24 @@ The slowed phone samples still expose substantial chart and rollover stalls:
 
 These single-build samples differ far more than the paired calculation gains explain; host load
 and scheduling can dominate them. They support no causal whole-frame improvement percentage.
-The final slowed hydro journey still reached a 183.4 ms gap and a 172 ms long task. Viewport and
-CPU emulation do not establish physical-phone performance, and this host cannot verify 120 Hz.
+The final pre-merge slowed hydro journey still reached a 183.4 ms gap and a 172 ms long task.
+Viewport and CPU emulation do not establish physical-phone performance, and this host cannot verify 120 Hz.
 Further chart work needs main-thread attribution and tests preserving viewport/zoom behavior.
 
 The pre-merge `npm run perf:rebaseline` passed with the golden snapshot unchanged. Its ratios
 were 1.493 overall and 1.076 at rollover. The existing 1.632/1.294 ceilings are retained instead of
-accepting the generator's looser 1.866/1.345 suggestions. The web build measures 912.164 kB initial
-JS, 1450.391 kB all JS and 26.630 kB CSS; the existing bundle baseline and 10% tolerance remain
+accepting the generator's looser 1.866/1.345 suggestions. The pre-merge web build measures
+912.164 kB initial JS, 1450.391 kB all JS and 26.630 kB CSS; the existing bundle baseline and 10% tolerance remain
 unchanged and pass. This patch changes no CSS, and the comparison with the October 17 bundle
-baseline includes intervening feature work. No golden, bundle or census ceiling was raised.
+baseline includes intervening feature work. That pre-merge patch raised no golden, bundle or census ceiling.
+
+After merging `20fb39c0` (the two private readonly adoption tables described in the customer
+flexibility audit), all fourteen integrated gates passed again in 736 seconds, including a clean
+production-browser run and headless multiplayer. The retained render benchmark also passed on
+the merged code. The post-merge web rebuild and final `perf:rebaseline` passed with the golden
+snapshot unchanged. Fresh overall/rollover ratios were 1.481/1.067; the existing 1.632/1.294
+ceilings are retained instead of the generated 1.851/1.333 suggestions. The web build measures
+912.169 kB initial JS, 1450.401 kB all JS and 26.630 kB CSS. The upstream bundle baseline
+(912.113/1450.318/26.630 kB) and its 10% tolerance pass and are retained. This PR raises no golden,
+bundle, census or ratio ceiling relative to `20fb39c0`; the paired and frame figures above remain
+explicitly scoped to the earlier source revision.
