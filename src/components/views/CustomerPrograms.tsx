@@ -668,7 +668,7 @@ function WildfireDetails({
   );
 }
 
-/** The catalog of programs, grouped by what kind of commitment each one is. */
+/** The catalog of programs, grouped by the problem each one helps solve. */
 function ProgramList({
   game,
   programs,
@@ -755,18 +755,18 @@ function ProgramList({
     <Box className="customerProgramList">
       {policiesOn &&
         section(
-          "Rebate projects",
+          "Reduce overall demand",
           BUILDOUT_IDS.filter((id) => !finished(id)).map(choice),
         )}
       {policiesOn &&
         section(
-          "Rates and contracts",
-          POLICY_IDS.filter(isOperatingPolicy).map(choice),
+          "Offset peak demand",
+          [...POLICY_IDS.filter(isOperatingPolicy), ...FLEXIBILITY_IDS].map(
+            choice,
+          ),
         )}
-      {policiesOn &&
-        section("Flexible customer equipment", FLEXIBILITY_IDS.map(choice))}
       {preparedness &&
-        section("Hazard readiness", [
+        section("Resilience", [
           row({
             id: "wildfire",
             name: "Wildfire preparedness",

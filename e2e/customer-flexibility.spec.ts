@@ -12,11 +12,13 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await page.getByRole("button", { name: "Programs", exact: true }).click();
     const dialog = page.getByRole("region", { name: "Programs", exact: true });
-    const equipment = dialog.getByRole("region", {
-      name: "Flexible customer equipment",
+    const peakPrograms = dialog.getByRole("region", {
+      name: "Offset peak demand",
     });
-    await expect(equipment.getByRole("button")).toHaveCount(3);
-    await equipment.scrollIntoViewIfNeeded();
+    await expect(peakPrograms.getByRole("button")).toHaveCount(5);
+    await dialog
+      .getByRole("heading", { name: "Reduce overall demand", exact: true })
+      .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: testInfo.outputPath(`flexibility-catalog-${theme}.png`),
     });

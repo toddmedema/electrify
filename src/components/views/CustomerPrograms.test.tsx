@@ -625,7 +625,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   expect(
     screen.queryByText(/Changes start next month/),
   ).not.toBeInTheDocument();
-  const hazards = screen.getByRole("region", { name: "Hazard readiness" });
+  const hazards = screen.getByRole("region", { name: "Resilience" });
   fireEvent.click(
     within(hazards).getByRole("button", {
       name: /^Wildfire preparedness · Off · .*\/yr$/,
