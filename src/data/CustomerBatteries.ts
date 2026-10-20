@@ -16,6 +16,15 @@ export const CUSTOMER_BATTERIES = {
   endLifeMonths: 180,
 } as const;
 
+const ELIGIBLE_HOUSEHOLD_SHARES = [
+  [2013, 0.0001],
+  [2015, 0.0004],
+  [2020, 0.003],
+  [2025, 0.025],
+  [2035, 0.12],
+  [2050, 0.25],
+] as const;
+
 /** Addressable hardware market, not existing battery ownership. The VPP opt-in share further
  * limits the systems this program can fund. Both shares freeze at installation. */
 export function batteryEligibleHouseholdShare(
@@ -23,15 +32,8 @@ export function batteryEligibleHouseholdShare(
   location: Pick<LocationType, "country" | "region">,
 ): number {
   if (year < 2013) return 0;
-  const curve = [
-    [2013, 0.0001],
-    [2015, 0.0004],
-    [2020, 0.003],
-    [2025, 0.025],
-    [2035, 0.12],
-    [2050, 0.25],
-  ];
-  let share = curve[curve.length - 1][1];
+  const curve = ELIGIBLE_HOUSEHOLD_SHARES;
+  let share: number = curve[curve.length - 1][1];
   for (let i = 1; i < curve.length; i++) {
     const [endYear, endShare] = curve[i];
     if (year <= endYear) {

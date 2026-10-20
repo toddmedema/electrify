@@ -2,6 +2,14 @@ import type { LocationType } from "../Types";
 
 type FleetPoint = readonly [year: number, share: number];
 
+const SMART_CHARGING_SHARES: readonly FleetPoint[] = [
+  [2010, 0],
+  [2015, 0.15],
+  [2020, 0.4],
+  [2025, 0.7],
+  [2035, 0.9],
+];
+
 /** Shares of the passenger-car fleet, never shares of new sales. Historical points are
  * rounded calibrations of IEA Global EV Outlook and national vehicle-stock statistics;
  * 2035 onward is a bounded game assumption. See docs/managed-charging-program.md. */
@@ -159,18 +167,7 @@ export function electricVehicleEligibility(
       ? interpolate(fleetProfile(location), year)
       : 0;
   const smartChargingShare =
-    fleetShare > 0
-      ? interpolate(
-          [
-            [2010, 0],
-            [2015, 0.15],
-            [2020, 0.4],
-            [2025, 0.7],
-            [2035, 0.9],
-          ],
-          year,
-        )
-      : 0;
+    fleetShare > 0 ? interpolate(SMART_CHARGING_SHARES, year) : 0;
   const eligibleTransportationShare =
     fleetShare > 0
       ? (MANAGED_CHARGING.maxRoadChargingShare * fleetShare) /

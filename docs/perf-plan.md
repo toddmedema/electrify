@@ -575,6 +575,12 @@ retained rather than accepting the generator's looser 1.782 suggestion; rollover
 intervening feature work, not only this patch (which changes no CSS). The previous bundle gate
 passed before the refresh, and its 10% tolerance is unchanged. Browser census ceilings are unchanged.
 
+## Customer flexibility follow-up
+
+The [customer flexibility audit](customer-flexibility-performance.md) records the
+measured rollout/cohort workload added by PR #576, the two retained table-allocation
+optimizations, the rejected UI experiment, and independent review and validation.
+
 ## October 19 follow-up audit
 
 Two small changes remove repeated work without introducing caches or changing simulation arithmetic:
@@ -595,7 +601,8 @@ coalesces updates into a microtask; fresh context identities alone do not prove 
 
 ### Paired calculation measurements
 
-Windows x64, Node 24.14.0. The simulation control alternated the exact prior and optimized intertie
+Windows x64, Node 24.14.0, based on `9c6188ca` before the later merge of `20fb39c0`.
+The simulation control alternated the exact prior and optimized intertie
 helpers in one process, without spy wrappers. Both variants and both plain/Immer paths received a
 full 240-month warmup, followed by three alternating pairs of the standard scenario 103 workload
 (seed 12345, financed 200 MWh battery at month 36). All sixteen warmup and measured runs completed
@@ -634,7 +641,7 @@ Temporary paired-control source and legacy copies were removed after measurement
 
 ### Verification
 
-The integrated `npm run check:ci` passed all fourteen gates, including unchanged scenario golden
+The pre-merge integrated `npm run check:ci` passed all fourteen gates, including unchanged scenario golden
 outputs, tick ratios, both production renderers, the production browser matrix and headless
 multiplayer. Independent focused QA passed 114 tests across mission, helper and reducer suites;
 application/e2e types and the retained render benchmark also passed. Each of the three new
@@ -668,7 +675,7 @@ The final slowed hydro journey still reached a 183.4 ms gap and a 172 ms long ta
 CPU emulation do not establish physical-phone performance, and this host cannot verify 120 Hz.
 Further chart work needs main-thread attribution and tests preserving viewport/zoom behavior.
 
-`npm run perf:rebaseline` ran last and passed with the golden snapshot unchanged. Its final ratios
+The pre-merge `npm run perf:rebaseline` passed with the golden snapshot unchanged. Its ratios
 were 1.493 overall and 1.076 at rollover. The existing 1.632/1.294 ceilings are retained instead of
 accepting the generator's looser 1.866/1.345 suggestions. The web build measures 912.164 kB initial
 JS, 1450.391 kB all JS and 26.630 kB CSS; the existing bundle baseline and 10% tolerance remain
