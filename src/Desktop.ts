@@ -12,7 +12,6 @@ export interface DesktopDisplay {
   resolutions: { width: number; height: number }[];
 }
 export interface DesktopState {
-  modsAvailable?: boolean;
   display: DesktopDisplay;
   steam: {
     available: boolean;
@@ -72,6 +71,8 @@ export interface DesktopInputFrame {
   >;
 }
 export interface DesktopBridge {
+  // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
+  // apiVersion changes only when an existing method changes incompatibly.
   mods?(
     input: import("./mods/Types").ModRequest,
   ): Promise<import("./mods/Types").ModLibrary>;

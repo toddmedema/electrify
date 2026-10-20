@@ -193,11 +193,11 @@ test("long Workshop uploads can wait beyond ordinary requests without changing t
     dispatcher.callResult(1n, { size: 16, callback: 1104 }),
     /timed out/,
   );
-  const upload = dispatcher.callResult(2n, {
-    size: 16,
-    callback: 3404,
-    timeoutMs: 600000,
-  });
+  const upload = dispatcher.callResult(
+    2n,
+    { size: 16, callback: 3404 },
+    { timeoutMs: 600000 },
+  );
   t.mock.timers.tick(16);
   await ordinary;
   complete(2n, 3404, 16);

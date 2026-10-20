@@ -45,7 +45,8 @@ class SteamDispatcher {
     return () => listeners.delete(listener);
   }
 
-  callResult(handle, layout) {
+  /** Waits for one call result; options.timeoutMs overrides the default for long uploads. */
+  callResult(handle, layout, options = {}) {
     if (this.stopped)
       return Promise.reject(new Error("Steam is shutting down"));
     if (!handle || BigInt(handle) === 0n)
@@ -57,7 +58,7 @@ class SteamDispatcher {
       const timeout = setTimeout(() => {
         this.pending.delete(key);
         reject(new Error("Steam request timed out"));
-      }, layout.timeoutMs ?? this.requestTimeoutMs);
+      }, options.timeoutMs ?? this.requestTimeoutMs);
       this.pending.set(key, { layout, resolve, reject, timeout });
     });
   }
