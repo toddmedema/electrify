@@ -77,6 +77,11 @@ The check's Jest suites use at most four workers; set `ELECTRIFY_CHECK_WORKERS` 
 that limit. This default limits contention on shared machines; it is not a measured speedup.
 The simulation CLI runs its single suite in process. These gates keep their caches inside `.tmp/`.
 
+Before pushing a pull request, run `npm run check:ci` once on the integrated code instead.
+It includes those eight gates plus tick performance, the production web build, bundle-size
+ceilings, the production browser smoke/layout matrix and the desktop renderer's multiplayer
+suite: fourteen gates in total. The packaged Electron UI suite remains CI-only.
+
 Run `npm run check:assets` in a fresh worktree before building or testing. If it reports
 Git LFS pointers, restore cached files with `git lfs checkout`, or fetch them with `git lfs pull`.
 Missing files are reported separately: stage intentional asset deletions or renames before
@@ -86,7 +91,10 @@ The full check runs this preflight automatically before starting any gates.
 After repairing a failed gate, use the printed retry command, for example
 `npm run check -- --steps lint,tests`. This reports a partial check; retain earlier passing
 results only when their inputs have not changed. The runner does not track invalidated results;
-rerun the full check if unsure. Use `npm run check -- --help` for gate IDs. Individually:
+rerun the full check if unsure (`check:ci` when retaining evidence from its extra gates).
+`npm run check:ci -- --steps browser` is also a partial retry; it rebuilds the web renderer
+first. A `multiplayer` retry rebuilds the desktop renderer, since both write to `build/`.
+Use `npm run check -- --help` for gate IDs. Individually:
 
 | Command                | Purpose                                                   |
 | ---------------------- | --------------------------------------------------------- |
@@ -96,12 +104,28 @@ rerun the full check if unsure. Use `npm run check -- --help` for gate IDs. Indi
 | `npm run format:check` | Report unformatted app or script files                    |
 | `npm run test:ci`      | Run Jest once with the same coverage checks used by CI    |
 | `npm run test:sim`     | Run the long simulation suites (`*.sim.test.tsx`)         |
-| `npm run test:e2e`     | Run browser UI tests in headless Chromium                |
+| `npm run test:e2e`     | Run browser UI tests in headless Chromium                 |
 | `npm run sim -- --all` | Run every scenario through the headless invariant checker |
 
 Local checks run without opening application windows. The Electron UI suite requires an
 explicit `npm run test:desktop -- --headed` because it opens native windows and takes keyboard
 focus. CI runs that suite on dedicated runners; see [desktop testing](docs/desktop-steam.md).
+
+For changed UI flows or layouts, run the affected specs even when they are outside CI's list:
+
+```sh
+npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px
+```
+
+Add `--project=mobile-360px` for minimum-width layout changes. Reuse the navigation helpers
+in `e2e/layout.ts` and make sure the run reaches the changed assertions. `test:e2e:ci` only
+selects the smoke/layout specs in `e2e/ci.playwright.config.ts`, even when passed another spec.
+To run an arbitrary spec against production, use `test:e2e` with `E2E_BASE_URL` pointing to
+your hosted web build. Rebuild web first if `check:ci` last wrote the desktop renderer.
+
+Use an unused task-specific `E2E_PORT` for browser checks and keep it in the same shell
+through the final check: `$env:E2E_PORT = "3189"` in PowerShell or `export E2E_PORT=3189`
+in Bash. If occupied, choose another port without stopping another task's server.
 
 `npm run test:ci` reports coverage and skips the `*.sim.test.tsx` suites, which CI runs without
 coverage through `npm run test:sim`. `src/helpers` and `src/reducers` have floors set in

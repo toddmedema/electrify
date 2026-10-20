@@ -11,14 +11,15 @@ files are large, so broad rewrites create expensive review diffs.
 - In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
   Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
   For missing files, stage intentional deletions or renames; otherwise restore the files.
-- Run `npm run check` once on the integrated code before handing work off. Allow several minutes,
-  depending on machine load. It runs types (including `e2e/`), lint, formatting, the covered Jest
+- Use `npm run check` for an eight-gate check during iteration. It runs types (including `e2e/`),
+  lint, formatting, native unit tests, CI tooling, the covered Jest
   suite, the long simulation suites (`npm run test:sim`, which includes every scenario through
   the headless simulation), and a short run of the simulation CLI. CI also runs the Firestore
   rules tests (`npm run test:rules`, which needs Java 21); run them yourself when you change
   `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
   and continues after gate failures.
-- Before pushing a pull request, run `npm run check:ci` instead. It adds the CI gates that most
+- Before pushing a pull request, run `npm run check:ci` once on the integrated code; there is no
+  need to run `check` immediately beforehand. Its fourteen gates add the CI checks that most
   often fail pull requests: tick performance, the production web build and bundle-size
   ceilings, the headless production browser suites at 1280, 390 and 360 px, and the multiplayer
   suite against the desktop renderer. Only the packaged Electron suite stays CI-only, because
@@ -28,6 +29,8 @@ files are large, so broad rewrites create expensive review diffs.
   remain unchanged. A test-query lint fix does not require repeating successful simulations;
   changes to simulation inputs do. The runner does not track invalidation; rerun the full check
   if unsure. A partial check is never evidence that all gates ran.
+  `npm run check:ci -- --steps browser` also works; selecting `browser` or `multiplayer`
+  rebuilds the renderer it tests because web and desktop builds share `build/`.
 - For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
   and simulations are unnecessary. Changes to scripts, configuration or executable examples
   need the relevant checks. Do not run the full game suite just to save a proposal.
@@ -50,10 +53,19 @@ files are large, so broad rewrites create expensive review diffs.
   build; `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output. Rebaseline all of
   them with `npm run perf:rebaseline`, last, and explain the move in the PR. Append `?perf=1`
   to a dev URL for the frame-budget overlay.
-- Build with `npm run build`. Browser-level checks live under `e2e/`. While iterating, run one
-  spec with `npm run test:e2e -- <spec> --project=desktop-chromium`, or against a production
-  build, as CI does, with `npm run test:e2e:ci -- <spec> --project=mobile-390px`.
-  `e2e/ci.playwright.config.ts` lists the specs CI runs on every pull request.
+- Build with `npm run build`. For UI flow or layout changes, search affected `e2e/` specs for
+  the old controls and reuse the navigation helpers in `e2e/layout.ts`. Run changed specs with
+  `npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`; include
+  `--project=mobile-360px` when minimum-width layout changes. New assertions must be reached,
+  even when an earlier failure also occurs on the base branch.
+- `check:ci` runs only the smoke/layout specs listed in `e2e/ci.playwright.config.ts`.
+  `test:e2e:ci -- <spec>` cannot select a spec outside that list. To test an arbitrary spec
+  against production, use `test:e2e` with `E2E_BASE_URL` pointing to your hosted web build.
+  The final `check:ci` leaves a desktop build in `build/`; rebuild web before hosting it.
+- Choose an unused task-specific `E2E_PORT` before starting browser checks; keep it set in
+  the same shell for iteration and the final check. In PowerShell: `$env:E2E_PORT = "3189"`;
+  in Bash: `export E2E_PORT=3189`. If occupied, choose another port; leave other tasks' servers
+  alone. An already-running dev server may serve another checkout.
 - Keep local validation windowless: use `npm run check` and headless Chromium through
   `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
   leave it to CI unless the user explicitly requests a local native-window test. It requires
@@ -81,19 +93,18 @@ is missing. See `docs/run-compatibility.md` for why the hash is intentionally br
 
 This file is the only agent guide; do not add a `CLAUDE.md`. `.claude/settings.json` allows the
 npm scripts above without a prompt and formats each file Claude edits with Prettier, so formatting
-failures should be rare; agents without that hook should format the files they changed before
-`check` (for example, `npx prettier --write <files>`).
+failures should be rare. Generated `.codex/` hook copies are local and may be stale; keep them
+untracked. Agents without a verified hook should format the files they changed before `check`
+(for example, `npx prettier --write <files>`).
 
 ## Pull requests
 
-- You own a pull request until its CI passes. Once `npm run check:ci` passes, create or update
-  the PR. Then watch the run to completion (`gh pr checks --watch`, or the app's CI monitor or
-  Auto-fix when it is available) before reporting the work as done. Do not hand off a PR with
-  CI pending or red.
+- After required local checks pass, create or update the PR and report remote CI's current
+  status. Monitor it to completion only when asked to monitor, merge, or deliver green CI.
 - When CI fails, run `npm run ci:failures` (or `npm run ci:failures -- <pr>`). It lists the failed
   jobs, gates, tests and assertion excerpts, plus the local command that reproduces each
-  failure. Reproduce the failure, fix the cause, rerun the matching local gate, push, and watch
-  again. Never weaken a test, raise a ceiling or rebaseline just to get green; when a change
+  failure. Reproduce the failure, fix the cause, rerun the matching local gate, push, and report
+  the current status. Never weaken a test, raise a ceiling or rebaseline just to get green; when a change
   intentionally moves a ceiling, explain the move in the PR.
 - If a failure is unrelated to your change (it also fails on `master`, or it is a known flake that
   passes on retry), rerun only the failed jobs once with `gh run rerun <run-id> --failed`. If it
@@ -101,6 +112,8 @@ failures should be rare; agents without that hook should format the files they c
   your diagnosis instead of retrying further.
 - Merge the base again when needed for conflicts or relevant changes, rather than restarting
   validation for every unrelated base commit. Stop temporary preview servers when finished.
+- Stage explicit task files and inspect `git diff --cached` before committing; leave unrelated
+  edits, generated hook configuration, scratch tests, and review artifacts out of the PR.
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.

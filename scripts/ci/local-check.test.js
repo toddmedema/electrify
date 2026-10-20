@@ -30,6 +30,10 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     selectSteps(["--steps", "lint,tests,lint"]).map((step) => step.id),
     ["lint", "tests"],
   );
+  assert.deepEqual(
+    selectSteps(["--ci", "--steps", "multiplayer,browser"]),
+    selectSteps(["--steps", "multiplayer,browser"]),
+  );
   // --ci adds the gates that need a production build or browser, in CI's dependency order.
   assert.deepEqual(
     selectSteps(["--ci"])
@@ -58,7 +62,9 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     ["--steps", "lint;echo bad"],
     ["--steps"],
     ["--skip", "tests"],
-    ["--ci", "--steps", "lint"],
+    ["--ci", "--steps", ""],
+    ["--ci", "--steps", "lnti"],
+    ["--ci", "--ci"],
   ])
     assert.throws(() => selectSteps(args));
   assert.equal(workerCount({}, 20), 4);
@@ -216,22 +222,30 @@ test("the CLI returns failure, finishes other selected gates, and prints an exac
       },
     }),
   );
-  const result = spawnSync(
-    process.execPath,
-    [path.resolve("scripts/check.js"), "--steps", "lint,formatting"],
-    {
-      cwd: root,
-      encoding: "utf8",
-      windowsHide: true,
-    },
-  );
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /ok\s+Formatting/);
-  assert.match(result.stderr, /Failed 1\/2 gates/);
-  assert.match(result.stderr, /Partial check only/);
-  assert.match(
-    result.stderr,
-    /Also rerun any passing gates whose inputs changed/,
-  );
-  assert.match(result.stderr, /rerun: npm run check -- --steps lint\s*$/);
+  for (const prefix of [[], ["--ci"]]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.resolve("scripts/check.js"),
+        ...prefix,
+        "--steps",
+        "lint,formatting",
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        windowsHide: true,
+      },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /ok\s+Formatting/);
+    assert.match(result.stderr, /Failed 1\/2 gates/);
+    assert.match(result.stderr, /Partial check only/);
+    assert.match(
+      result.stderr,
+      /Also rerun any passing gates whose inputs changed/,
+    );
+    assert.match(result.stderr, /rerun: npm run check -- --steps lint\s*$/);
+    assert.doesNotMatch(result.stderr, /Starting (Types|Production)/);
+  }
 });
