@@ -20,8 +20,9 @@ if (productionRoot) {
     );
   }
 }
-// Headless desktop renderer with an in-memory replacement for the native Steam bridge.
-// The real gameplay, input navigation, host worker and checkpoint protocol still run.
+// Desktop-renderer specs that replace the native bridge with an in-memory one: Steam
+// multiplayer, Steam Input and mod management (Workshop and local packages). The name is
+// historical. The real gameplay, input navigation, host worker and checkpoint protocol still run.
 // CI reuses its verified production desktop artifact; local dev remains available by default.
 export default defineConfig({
   testDir: ".",
