@@ -115,12 +115,38 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   const investorOwned = activeScenarioOrDefault(game).ownership === "Investor";
   const [, refresh] = React.useReducer((value: number) => value + 1, 0);
   React.useEffect(() => subscribeProjection(refresh), []);
-  const forecast =
+  // Keep the last supply estimate during background refreshes. Reprice it with the current
+  // rate below, so a monthly rollover never blanks the score or delays slider feedback.
+  const estimate = React.useRef<{ game: GameType; supplyWh: number }>();
+  const previous = estimate.current?.game;
+  if (
+    previous &&
+    (investorOwned ||
+      !now ||
+      previous.scenarioId !== game.scenarioId ||
+      previous.seed !== game.seed ||
+      previous.startingYear !== game.startingYear ||
+      (previous.runIdentity ?? previous.location ?? previous.monthlyHistory) !==
+        (game.runIdentity ?? game.location ?? game.monthlyHistory) ||
+      game.date.minute < previous.date.minute ||
+      game.date.monthsElapsed < previous.date.monthsElapsed)
+  ) {
+    estimate.current = undefined;
+  }
+  if (
     !investorOwned &&
     now &&
     (projectionReady(game) || typeof Worker === "undefined")
-      ? readProjection(game, now)
-      : undefined;
+  ) {
+    estimate.current = {
+      game,
+      supplyWh: readProjection(game, now)
+        .financeProjected.slice(0, 12)
+        .reduce((sum, month) => sum + month.supplyWh, 0),
+    };
+  } else if (estimate.current) {
+    estimate.current.game = game;
+  }
   React.useEffect(() => {
     if (!investorOwned && now && !projectionReady(game))
       requestProjection(game, now);
@@ -185,19 +211,18 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   // year, even near the end of a run, so the figure means the same thing every time. The
   // sign is the sign of target minus rate: a rate above target reads as a loss every year it
   // is in force, no matter what the lifetime average did last period.
-  const projection = forecast;
-  const upcoming = projection?.financeProjected.slice(0, 12) || [];
   const pastTotals = summarizeHistory(game.monthlyHistory);
-  const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
+  const nextSupplyWh = estimate.current?.supplyWh;
+  const hasEstimate = nextSupplyWh !== undefined;
   const rateScore = (rate: number) =>
     publicRateYearContribution(
       scenario.dollarsPerkWh,
       pastTotals,
-      { supplyWh: nextSupplyWh },
+      { supplyWh: nextSupplyWh ?? 0 },
       rate,
       inflationIndex,
     );
-  const formattedRateScore = projection
+  const formattedRateScore = hasEstimate
     ? formatRateScore(rateScore(game.dollarsPerkWh))
     : "Calculating…";
   const marks = investor
@@ -245,7 +270,7 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
   );
   const rateSummary = investor
     ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "following the target each month; " : ""}${projection ? `rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
+    : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; ${following ? "following the target each month; " : ""}${hasEstimate ? `estimated rate score ${formattedRateScore} over the next year at this rate` : "calculating the rate score"}. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
   const rateScoreClass = `insightsRateScore ${
     rateScore(game.dollarsPerkWh) > 0
       ? "good"
@@ -348,12 +373,12 @@ export default function RateControls({ game, onDelta }: RateControlsProps) {
           aria-label="The rate you charge for electricity generation"
           valueLabelDisplay="auto"
           valueLabelFormat={(rate) =>
-            investor
+            investor || !hasEstimate
               ? `${formatRateAxis(rate)}/kWh`
               : `${formatRateAxis(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
           }
           getAriaValueText={(rate) =>
-            investor
+            investor || !hasEstimate
               ? `${formatMoneyConcise(rate)} per kilowatt hour`
               : `${formatMoneyConcise(rate)} per kilowatt hour${following && rate === targetRate ? ", matches target" : ""}, rate score ${formatRateScore(rateScore(rate))} over the next year`
           }
