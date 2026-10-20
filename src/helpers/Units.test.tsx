@@ -3,11 +3,9 @@ import {
   formatLargeMassApprox,
   formatMass,
   formatPricePerLargeMass,
-  formatSpeed,
   formatTemperature,
   toDisplayLargeMass,
   toDisplayMass,
-  toDisplaySpeed,
   toDisplayTemperature,
 } from "./Units";
 
@@ -17,23 +15,19 @@ describe("Units", () => {
     // a rounding factor of 1.0000001 here would drift every number in the game
     it("hands metric values back unchanged and labels them", () => {
       expect(toDisplayTemperature(21.5, "metric")).toBe(21.5);
-      expect(toDisplaySpeed(30, "metric")).toBe(30);
       expect(toDisplayMass(450, "metric")).toBe(450);
       expect(toDisplayLargeMass(2500, "metric")).toBe(2.5);
       expect(formatTemperature(21.5, "metric")).toBe("22°C");
-      expect(formatSpeed(30, "metric")).toBe("30 km/h");
       expect(formatMass(450, "metric")).toBe("450kg");
       expect(formatLargeMass(2500000, "metric")).toBe("2,500 tonnes");
     });
   });
 
   describe("imperial", () => {
-    it("converts and labels temperature, speed, and mass", () => {
+    it("converts and labels temperature and mass", () => {
       expect(formatTemperature(0, "imperial")).toBe("32°F");
       expect(formatTemperature(100, "imperial")).toBe("212°F");
       expect(formatTemperature(-40, "imperial")).toBe("-40°F");
-      expect(toDisplaySpeed(160.9344, "imperial")).toBeCloseTo(100, 6);
-      expect(formatSpeed(50, "imperial")).toBe("31 mph");
       expect(toDisplayMass(0.45359237, "imperial")).toBeCloseTo(1, 9);
       expect(formatMass(450, "imperial")).toBe("992lb");
       // Short tons, not tonnes: 10% apart, which is why the metric one is spelled "tonnes"

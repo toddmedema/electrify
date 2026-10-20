@@ -1,4 +1,5 @@
 import path from "path";
+import { openSavedGames } from "./layout";
 import { expect, test, Page } from "./fixtures";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType } from "../src/Types";
@@ -11,16 +12,6 @@ async function startGame(page: Page) {
   await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
 }
 
-async function openSaves(page: Page) {
-  await page.getByRole("button", { name: "menu", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Saved games", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Saved games", exact: true }),
-  ).toBeVisible();
-}
-
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("audioEnabled", "false"));
 });
@@ -29,7 +20,7 @@ test("an independent local copy preserves compact save data and resumes paused",
   page,
 }) => {
   await startGame(page);
-  await openSaves(page);
+  await openSavedGames(page);
   const original = (await readSaveRecords(page))[0];
   const originalId = original.metadata.id;
   const wire = original.save as {
@@ -65,7 +56,7 @@ for (const theme of ["light", "dark"]) {
       theme,
     );
     await startGame(page);
-    await openSaves(page);
+    await openSavedGames(page);
     const original = (await readSaveRecords(page))[0];
     const originalRow = page.locator(
       `[data-save-id="${original.metadata.id}"]`,
@@ -104,7 +95,7 @@ for (const theme of ["light", "dark"]) {
     ).toBeFocused();
     expect(await readSavedGame(page, original.metadata.id)).toEqual(liveGame);
     expect(await readSaveRecords(page)).toHaveLength(1);
-    await openSaves(page);
+    await openSavedGames(page);
     await originalRow.getByRole("button", { name: /^Actions for/ }).click();
     await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
     const rename = page.getByRole("dialog", { name: "Rename saved game" });

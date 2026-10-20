@@ -2,7 +2,7 @@ import path from "path";
 import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
-test("public insights show the rate score and an absolute customer objective", async ({
+test("public pricing shows the rate score and an absolute customer objective", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -21,14 +21,15 @@ test("public insights show the rate score and an absolute customer objective", a
   });
   await page.goto("/?scenario=106");
   await page.getByRole("button", { name: "Start game" }).click();
-  const insights = page.locator(".insights");
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
   await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
+    programs,
+    page.getByRole("button", { name: "Programs", exact: true }),
   );
-  // A public utility's rate moves its score, not its customers, so that is what the levers show
-  await expect(page.locator(".insightsLevers")).toContainText(/rate score/i);
-  await expect(page.locator(".insightsLevers")).not.toContainText(/market/i);
+  const pricing = programs.getByRole("region", { name: "Electricity pricing" });
+  // A public utility's pricing feedback shows its rate score and target.
+  await expect(pricing).toContainText(/rate score/i);
+  await expect(pricing).not.toContainText(/market/i);
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "fast speed" })
@@ -44,28 +45,22 @@ test("public insights show the rate score and an absolute customer objective", a
     .first()
     .click();
   expect(
-    await page
-      .locator(".insightsLevers")
-      .evaluate((el) => el.scrollWidth - el.clientWidth),
+    await pricing.evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(1);
   if (testInfo.project.name === "mobile-390px") {
-    // The rate metrics render in both the wide and compact layouts; measure the shown set
-    const metrics = await page.locator(".insightsRateMetric:visible").all();
+    const metrics = await pricing.locator(".insightsRateMetric:visible").all();
     const boxes = await Promise.all(
       metrics.map((metric) => metric.boundingBox()),
     );
     expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
     await expect(
-      page.locator(".insightsRateMetric:visible").last(),
+      pricing.locator(".insightsRateMetric:visible").last(),
     ).toContainText("Points / yr");
   }
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
   if (reviewDir) {
     await page.screenshot({
-      path: path.join(
-        reviewDir,
-        `public-insights-${testInfo.project.name}.png`,
-      ),
+      path: path.join(reviewDir, `public-pricing-${testInfo.project.name}.png`),
       fullPage: true,
     });
   }

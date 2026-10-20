@@ -1271,7 +1271,7 @@ describe("Insights layers", () => {
 
 function labelledButton(label: string | RegExp): HTMLElement {
   const button = screen.getByLabelText(label, {
-    selector: "button:not(.insightsShortRateToggle)",
+    selector: "button",
   });
   expect(button).toBeVisible();
   expect(isInaccessible(button)).toBe(false);

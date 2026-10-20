@@ -1,8 +1,4 @@
-import {
-  makeMapStateToProps,
-  navigationForStoryTarget,
-  selectOngoing,
-} from "./EventLogContainer";
+import { makeMapStateToProps, selectOngoing } from "./EventLogContainer";
 import { createNextState as produce } from "@reduxjs/toolkit";
 import { initialUI } from "../../reducers/UI";
 import { TICK_MINUTES } from "../../Constants";
@@ -36,35 +32,6 @@ test("FAST presents a bounded rail snapshot while evidence and incidents update 
     });
   });
   expect(select(incident).events).toHaveLength(first.events.length + 1);
-});
-
-describe("story action targets", () => {
-  it("routes a generator target to the quote screen and preserves its fuel", () => {
-    const target = {
-      card: "FACILITIES" as const,
-      view: "BUILD_GENERATORS" as const,
-      fuel: "Natural Gas" as const,
-    };
-    expect(navigationForStoryTarget(target)).toEqual({
-      name: "BUILD_GENERATORS",
-      storyTarget: target,
-    });
-  });
-
-  it("routes insight and event targets to their panes", () => {
-    const insights = {
-      card: "INSIGHTS" as const,
-      layer: "FUEL_PRICES" as const,
-    };
-    expect(navigationForStoryTarget(insights)).toEqual({
-      name: "INSIGHTS",
-      storyTarget: insights,
-    });
-    expect(navigationForStoryTarget({ card: "EVENTS" })).toEqual({
-      name: "EVENTS",
-      storyTarget: { card: "EVENTS" },
-    });
-  });
 });
 
 describe("ongoing story events", () => {

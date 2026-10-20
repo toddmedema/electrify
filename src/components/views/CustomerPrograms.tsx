@@ -133,10 +133,22 @@ const WILDFIRE_SUMMARY =
 
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
-const BUILDOUT_SHORT_NAME: Record<BuildoutPolicyId, string> = {
-  efficiency: "Efficiency",
-  solar: "Rooftop solar",
-};
+function CustomerProgramFacts({ facts }: { facts: [string, string][] }) {
+  return (
+    <Box component="dl" className="customerProgramFacts">
+      {facts.map(([term, value]) => (
+        <React.Fragment key={term}>
+          <Typography component="dt" variant="body2">
+            {term}
+          </Typography>
+          <Typography component="dd" variant="body2">
+            {value}
+          </Typography>
+        </React.Fragment>
+      ))}
+    </Box>
+  );
+}
 
 function FlexibilitySummary({
   game,
@@ -219,18 +231,7 @@ function FlexibilitySummary({
             : `This location has no eligible equipment in ${year}. Availability follows the game year.`}
         </Alert>
       )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
+      <CustomerProgramFacts facts={facts} />
       <Typography variant="body2" color="text.secondary">
         {POLICIES[id].tradeoff}
       </Typography>
@@ -357,18 +358,7 @@ function BuildoutSummary({
           <Typography variant="body2">{progress}</Typography>
         </Box>
       )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
+      <CustomerProgramFacts facts={facts} />
       {solar && (
         <Typography variant="body2" color="text.secondary">
           Rooftops produce less per MW because of shading and orientation, but
@@ -526,18 +516,7 @@ function WildfireDetails({
           it reduces disconnections and generator losses for that incident.
         </Typography>
       )}
-      <Box component="dl" className="customerProgramFacts">
-        {facts.map(([term, value]) => (
-          <React.Fragment key={term}>
-            <Typography component="dt" variant="body2">
-              {term}
-            </Typography>
-            <Typography component="dd" variant="body2">
-              {value}
-            </Typography>
-          </React.Fragment>
-        ))}
-      </Box>
+      <CustomerProgramFacts facts={facts} />
       {!importedFire && month === undefined && (
         <Typography variant="body2" color="textSecondary">
           The next wildfire season starts after this run ends. The program can
@@ -1339,71 +1318,5 @@ export function ProgramsScreen({
     >
       {content}
     </Dialog>
-  );
-}
-
-export default function CustomerPrograms({ game }: { game: GameType }) {
-  const [open, setOpen] = React.useState(false);
-  const policiesOn = policyAvailable(game);
-  const preparedness = wildfirePreparedness(game);
-  if ((!policiesOn && !preparedness) || game.replayPlayback) return null;
-  const programs = game.policies?.programs ?? emptyPolicies().programs;
-  // A finished build-out costs nothing more, so it is neither active nor in the rebate total.
-  const building = policiesOn
-    ? BUILDOUT_IDS.filter(
-        (id) =>
-          programs[id].tier === "On" &&
-          !buildoutComplete(programs[id].adoption),
-      )
-    : [];
-  const active =
-    (policiesOn
-      ? POLICY_IDS.filter(
-          (id) =>
-            (isOperatingPolicy(id) || isFlexibilityPolicy(id)) &&
-            programs[id].tier !== "Off",
-        ).length
-      : 0) +
-    building.length +
-    (preparedness?.active ? 1 : 0);
-  const pending = POLICY_IDS.some((id) => programs[id].pending);
-  const budget = building.reduce(
-    (sum, id) => sum + policyBudget(game, id, "On", game.date.monthsElapsed),
-    0,
-  );
-  const progress = building.map(
-    (id) =>
-      ` · ${BUILDOUT_SHORT_NAME[id]} build-out · month ${buildoutMonthsDone(id, programs[id].adoption)} of ${buildoutMonths(id)}`,
-  );
-  const flexibilityBudget = FLEXIBILITY_IDS.reduce(
-    (sum, id) =>
-      sum +
-      (programs[id].tier === "On"
-        ? flexibilityMonthlyCost(game, id, game.date.monthsElapsed) +
-          (buildoutComplete(programs[id].adoption)
-            ? 0
-            : flexibilityCapitalCost(game, id, game.date.monthsElapsed) /
-              flexibilityMonths(id))
-        : 0),
-    0,
-  );
-  return (
-    <Box className="customerProgramsControl">
-      <Button
-        aria-label="Customer programs"
-        title={
-          pending
-            ? `Customer programs: change starts ${labelMonth(game, game.date.monthsElapsed + 1)}`
-            : `Customer programs: ${active} active${progress.join("")}${budget > 0 ? ` · ${formatMoneyConcise(budget)}/month in rebates` : ""}${flexibilityBudget > 0 ? ` · ${formatMoneyConcise(flexibilityBudget)}/month in flexibility programs` : ""}${preparedness?.active ? ` · wildfire preparedness ${formatMoneyConcise(preparedness.annualCost)}/yr` : ""}`
-        }
-        color="primary"
-        variant="contained"
-        startIcon={<GroupsIcon />}
-        onClick={() => setOpen(true)}
-      >
-        <span className="customerProgramsLabel">Programs</span>
-      </Button>
-      {open && <ProgramsScreen onClose={() => setOpen(false)} />}
-    </Box>
   );
 }

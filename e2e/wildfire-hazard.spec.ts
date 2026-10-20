@@ -78,10 +78,10 @@ async function setFastSpeed(page: Page): Promise<void> {
     .click();
 }
 
-async function openInsightsPane(page: Page): Promise<void> {
+async function openProgramsPane(page: Page): Promise<void> {
   await openPane(
-    page.locator(".insights:visible"),
-    page.getByRole("button", { name: "Insights", exact: true }),
+    page.getByRole("region", { name: "Programs", exact: true }),
+    page.getByRole("button", { name: "Programs", exact: true }),
   );
 }
 
@@ -92,7 +92,7 @@ async function openEventsPane(page: Page): Promise<void> {
   );
 }
 
-/** The status rows whose height an active event must not change. */
+/** Track the toolbar and status-bar heights before an incident arrives. */
 async function statusBarHeights(page: Page): Promise<number[]> {
   return page.evaluate(() =>
     ["#topbar", ".gameStatusBar"].map(
@@ -149,24 +149,31 @@ for (const theme of ["light", "dark"] as const) {
       /(Mar|Apr|May|Jun) 2020/,
       { timeout: 60_000 },
     );
-    await openInsightsPane(page);
-    // Opening the programs screen pauses the clock, like the build screen.
     await page
-      .locator(".insights:visible")
-      .getByRole("button", { name: "Customer programs", exact: true })
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
       .click();
-    const programs = page.getByRole("dialog");
+    // Keep spring fixed while moving between the docked overview and program details.
+    await openProgramsPane(page);
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
     await expect(
-      programs.getByRole("button", { name: "Close customer programs" }),
+      programs.getByRole("button", { name: "Close Programs", exact: true }),
     ).toBeVisible();
-    await expect(
-      programs.getByRole("button", { name: "pause" }),
-    ).toHaveAttribute("aria-pressed", "true");
     await programs
       .getByRole("button", {
         name: /^Wildfire preparedness · Off · .*\/yr$/,
       })
       .click();
+    await expect(
+      page
+        .locator("#appbar:visible")
+        .getByRole("button", { name: "pause", exact: true })
+        .first(),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(programs).toContainText("Annual budget");
     await expect(programs).toContainText("no upfront payment");
     await expect(programs).toContainText("Next wildfire season");
@@ -229,7 +236,11 @@ for (const theme of ["light", "dark"] as const) {
       `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
     );
     await programs
-      .getByRole("button", { name: "Close customer programs" })
+      .locator(".customerProgramsActions")
+      .getByRole("button", { name: "Back", exact: true })
+      .click();
+    await programs
+      .getByRole("button", { name: "Close Programs", exact: true })
       .click();
     await expect(programs).toHaveCount(0);
     await openEventsPane(page);
@@ -257,23 +268,28 @@ for (const theme of ["light", "dark"] as const) {
     } else {
       await expect(ongoing).not.toContainText("Prepared crews are in place");
     }
-    // The status bar names the incident beside the grid readout. Desktop keeps its height; on a
-    // phone the grid readout and mission share one 44px row until an event chip needs the room,
-    // then the mission wraps onto its own 44px row by design.
-    const activeEvents = page.locator(".activeEventsChip:visible");
-    await expect(activeEvents).toHaveAccessibleName(
-      /Active events: Wildfire emergency \(critical\), through Sep 2020/,
+    // The mission status names the incident and links to Events. Phones give this action its
+    // own row so the title remains readable; desktop keeps the status bar's height.
+    const activeEvents = page.getByRole("button", {
+      name: /^Active: Wildfire emergency\. Wildfire emergency, through Sep 2020$/,
+    });
+    await expect(activeEvents).toBeVisible();
+    await expect(activeEvents).toHaveClass(/missionRiskEvent/);
+    const eventBounds = (await activeEvents.boundingBox())!;
+    expect(eventBounds.height).toBeGreaterThanOrEqual(
+      testInfo.project.use.hasTouch ? 44 : 40,
     );
-    await expect(activeEvents).toHaveClass(/activeEventsChip-critical/);
+    expect((await statusBarHeights(page))[0]).toBe(heightsBeforeEvents[0]);
     if (testInfo.project.name.startsWith("mobile")) {
-      const heights = await page.evaluate(() =>
-        ["#topbar", ".gridHealth", ".missionSummary"].map(
-          (selector) =>
-            document.querySelector(selector)!.getBoundingClientRect().height,
-        ),
+      const grid = (await page.locator(".gridHealth:visible").boundingBox())!;
+      const mission = (await page
+        .locator(".missionSummary:visible")
+        .boundingBox())!;
+      expect(mission.y).toBeGreaterThanOrEqual(grid.y + grid.height - 1);
+      expect(eventBounds.x).toBeGreaterThanOrEqual(mission.x);
+      expect(eventBounds.x + eventBounds.width).toBeLessThanOrEqual(
+        mission.x + mission.width + 1,
       );
-      // The wrapped mission row adds a 1px hairline above its 44px row
-      expect(heights).toEqual([heightsBeforeEvents[0], 44, 45]);
     } else {
       expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
     }
@@ -292,11 +308,7 @@ for (const theme of ["light", "dark"] as const) {
     );
 
     if (fund) {
-      await openInsightsPane(page);
-      await page
-        .locator(".insights:visible")
-        .getByRole("button", { name: "Customer programs", exact: true })
-        .click();
+      await openProgramsPane(page);
       await programs
         .getByRole("button", { name: /^Wildfire preparedness · On/ })
         .click();
@@ -330,7 +342,11 @@ for (const theme of ["light", "dark"] as const) {
         `wildfire-decay-${theme}-${testInfo.project.name}.png`,
       );
       await programs
-        .getByRole("button", { name: "Close customer programs" })
+        .locator(".customerProgramsActions")
+        .getByRole("button", { name: "Back", exact: true })
+        .click();
+      await programs
+        .getByRole("button", { name: "Close Programs", exact: true })
         .click();
       await openEventsPane(page);
     }
@@ -341,7 +357,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("heading", { name: "Ongoing events" }),
     ).toBeHidden({ timeout: 60_000 });
-    await expect(page.locator(".activeEventsChip:visible")).toHaveCount(0);
+    await expect(activeEvents).toHaveCount(0);
     await expect(
       page.getByText("Wildfire restoration complete", { exact: true }),
     ).toBeVisible();

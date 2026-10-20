@@ -4,25 +4,16 @@ import {
   downloadSave,
   downloadSaveRecovery,
   encodeSaveFile,
-  MAX_SAVE_FILE_BYTES,
-  readSaveFile,
   saveFilename,
 } from "./SaveFile";
-import { serializeSave } from "./SaveGame";
+import { parseSave, serializeSave } from "./SaveGame";
 import {
   fakeSaveFile,
   fakeSaveGame,
   fakeSavedResult,
 } from "./testing/SaveTestHelpers";
-import type { ScenarioType } from "./Types";
-
-function saveFile(contents: unknown): File {
-  return new File(
-    [typeof contents === "string" ? contents : JSON.stringify(contents)],
-    "save.json",
-    { type: "application/json" },
-  );
-}
+import type { SaveFileType, ScenarioType } from "./Types";
+import { validateSaveFileEnvelope } from "./SaveModel";
 
 describe("SaveFile", () => {
   it("uses a sanitized player name for filenames", () => {
@@ -86,28 +77,36 @@ describe("SaveFile", () => {
     });
   });
 
-  describe("readSaveFile", () => {
-    it("round trips the packed current envelope", async () => {
+  describe("save envelopes", () => {
+    function roundTrip(file: SaveFileType): SaveFileType {
+      return validateSaveFileEnvelope(
+        JSON.parse(JSON.stringify(encodeSaveFile(file))),
+        parseSave,
+      );
+    }
+
+    it("rejects unsupported previous envelopes", () => {
+      expect(() =>
+        validateSaveFileEnvelope(fakeSaveFile().save, parseSave),
+      ).toThrow(/unsupported save format/);
+    });
+    it("round trips the packed current envelope", () => {
       const exported = fakeSaveFile();
       expect(encodeSaveFile(exported).save.game.timeline).toHaveProperty(
         "shapes",
       );
-      expect(await readSaveFile(saveFile(encodeSaveFile(exported)))).toEqual({
-        file: exported,
-      });
+      expect(roundTrip(exported)).toEqual(exported);
     });
-    it("round trips completed and terminal results without account metadata", async () => {
+    it("round trips completed and terminal results without account metadata", () => {
       for (const outcome of ["completed", "bankrupt", "fired"] as const) {
         const exported = fakeSaveFile({
           status: outcome,
           result: fakeSavedResult({ outcome }),
         });
-        expect(
-          (await readSaveFile(saveFile(encodeSaveFile(exported)))).file,
-        ).toEqual(exported);
+        expect(roundTrip(exported)).toEqual(exported);
       }
     });
-    it("round trips every custom setup choice", async () => {
+    it("round trips every custom setup choice", () => {
       const customScenario: ScenarioType = {
         ...DEFAULT_CUSTOM_SCENARIO,
         locationId: LOCATIONS.HNL.id,
@@ -137,27 +136,11 @@ describe("SaveFile", () => {
           }),
         ),
       });
-      const { file, error } = await readSaveFile(
-        saveFile(encodeSaveFile(exported)),
-      );
-      expect(error).toBeUndefined();
-      expect(file?.save.game.difficulty).toBe("CEO");
-      expect(file?.save.game.customScenario).toEqual(customScenario);
+      const file = roundTrip(exported);
+      expect(file.save.game.difficulty).toBe("CEO");
+      expect(file.save.game.customScenario).toEqual(customScenario);
     });
-    it("rejects non-JSON, oversized files, and unsupported previous envelopes", async () => {
-      expect((await readSaveFile(saveFile("not json {"))).error).toMatch(
-        /isn't an Electrify save/,
-      );
-      const oversized = saveFile(fakeSaveFile());
-      Object.defineProperty(oversized, "size", {
-        value: MAX_SAVE_FILE_BYTES + 1,
-      });
-      expect((await readSaveFile(oversized)).error).toMatch(/too large/);
-      expect((await readSaveFile(saveFile(fakeSaveFile().save))).error).toMatch(
-        /unsupported save format/,
-      );
-    });
-    it("rejects malformed nested payload, name and status-result relationships", async () => {
+    it("rejects malformed nested payload, name and status-result relationships", () => {
       for (const invalid of [
         { ...fakeSaveFile(), name: "Line\nbreak" },
         { ...fakeSaveFile(), save: {} },
@@ -168,9 +151,7 @@ describe("SaveFile", () => {
           result: fakeSavedResult({ score: Infinity }),
         },
       ]) {
-        const imported = await readSaveFile(saveFile(invalid));
-        expect(imported.file).toBeUndefined();
-        expect(imported.error).toBeDefined();
+        expect(() => validateSaveFileEnvelope(invalid, parseSave)).toThrow();
       }
     });
   });

@@ -600,8 +600,6 @@ export function createAppTheme(mode: ThemeModeType): Theme {
   return built;
 }
 
-export default createAppTheme("light");
-
 // In the order the settings screen lists them
 export const THEME_CHOICES: ThemeChoiceType[] = ["system", "light", "dark"];
 
