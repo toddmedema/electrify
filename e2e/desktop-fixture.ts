@@ -1,4 +1,10 @@
-import { _electron, ElectronApplication, Page, test } from "@playwright/test";
+import {
+  _electron,
+  ElectronApplication,
+  expect,
+  Page,
+  test,
+} from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -51,21 +57,50 @@ export async function launchDesktop(profile: string): Promise<DesktopSession> {
     },
     timeout: 30_000,
   });
-  const page = await app.firstWindow();
-  const errors: string[] = [];
-  const externalRequests: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("request", (request) => {
-    if (/^https?:/i.test(request.url())) externalRequests.push(request.url());
-  });
-  // The native startup awaits loadURL. Navigating after only DOMContentLoaded
-  // can abort that initial load before the BrowserWindow is ready to show.
-  await page.waitForLoadState("load");
-  await page.getByRole("button", { name: "Settings", exact: true }).waitFor();
-  return { app, page, errors, externalRequests };
+  try {
+    const page = await app.firstWindow();
+    const errors: string[] = [];
+    const externalRequests: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("request", (request) => {
+      if (/^https?:/i.test(request.url())) externalRequests.push(request.url());
+    });
+    // The native startup awaits loadURL. Navigating after only DOMContentLoaded
+    // can abort that initial load before the BrowserWindow is ready to show.
+    await page.waitForLoadState("load");
+    await page.getByRole("button", { name: "Settings", exact: true }).waitFor();
+    await expect
+      .poll(() =>
+        app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()[0].isVisible(),
+        ),
+      )
+      .toBe(true);
+    // Renderer readiness precedes macOS's asynchronous native fullscreen entry.
+    // Observe the configured mode; never force it, which could hide a startup bug.
+    const fullscreen = await page.evaluate(async () => {
+      const state = await window.electrifyDesktop!.getState();
+      return state.display.fullscreen;
+    });
+    await app.evaluate(async ({ app, BrowserWindow }, expected) => {
+      const nativeRequire = process
+        .getBuiltinModule("module")
+        .createRequire(`${app.getAppPath()}/package.json`);
+      const { waitForFullscreen } = nativeRequire(
+        `${app.getAppPath()}/electron/display.cjs`,
+      );
+      await waitForFullscreen(BrowserWindow.getAllWindows()[0], expected);
+    }, fullscreen);
+    return { app, page, errors, externalRequests };
+  } catch (error) {
+    // Setup has not transferred ownership to the caller's afterEach yet.
+    await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined);
+    await app.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function displayState(app: ElectronApplication) {

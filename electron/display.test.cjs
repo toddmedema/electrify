@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 const {
+  waitForFullscreen,
   setFullscreen,
   applyNativeDisplay,
   applyConfirmedDisplay,
@@ -17,6 +18,50 @@ function fixture() {
   };
   return window;
 }
+
+test("startup readiness waits for delayed native fullscreen entry without requesting it", async () => {
+  const window = fixture();
+  let completed = false;
+  const ready = waitForFullscreen(window, true).then(() => {
+    completed = true;
+  });
+  // A loaded renderer can be visible while macOS is still entering fullscreen.
+  await Promise.resolve();
+  assert.equal(completed, false);
+  assert.equal(
+    window.requested,
+    undefined,
+    "Observation must not repair startup",
+  );
+  window.fullscreen = true;
+  window.emit("enter-full-screen");
+  await ready;
+  assert.equal(completed, true);
+  assert.equal(window.requested, undefined);
+  assert.equal(window.listenerCount("enter-full-screen"), 0);
+  assert.equal(window.listenerCount("closed"), 0);
+});
+
+test("startup readiness accepts settled fresh and saved modes without waiting for another event", async () => {
+  for (const fullscreen of [true, false]) {
+    const window = fixture();
+    window.fullscreen = fullscreen;
+    await waitForFullscreen(window, fullscreen);
+    assert.equal(window.requested, undefined);
+    assert.equal(window.eventNames().length, 0);
+  }
+});
+
+test("startup readiness rejects a missing native transition and cleans up after close", async () => {
+  const window = fixture();
+  await assert.rejects(waitForFullscreen(window, true, 5), /timed out/);
+  assert.equal(window.requested, undefined);
+  assert.equal(window.eventNames().length, 0);
+  const closing = waitForFullscreen(window, true);
+  window.emit("closed");
+  await closing;
+  assert.equal(window.eventNames().length, 0);
+});
 
 test("macOS fullscreen entry finishes before a subsequent queued exit", async () => {
   const window = fixture();
