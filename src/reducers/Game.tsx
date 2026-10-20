@@ -1,4 +1,5 @@
 import { customEventContext } from "../helpers/CustomScenarioEvents";
+import { modNotificationsDue } from "../helpers/ScenarioMod";
 import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
   gasConversionQuote,
@@ -297,6 +298,7 @@ import {
   ActiveWorldEventType,
   ConstructionEmissions,
   DateType,
+  DifficultyType,
   FacilityOperatingType,
   FacilityShoppingType,
   FuelPricesType,
@@ -396,6 +398,7 @@ const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
   "ACHIEVEMENTS",
   "SAVED_GAMES",
+  "MODS",
   "MANUAL",
   "BUILD_GENERATORS",
   "BUILD_STORAGE",
@@ -3285,6 +3288,22 @@ export function startTutorial(dispatch: AppDispatch, scenarioId: number) {
 }
 
 /**
+ * Ends whatever is running and starts a custom scenario, whether set up on the custom game screen
+ * or resolved from a mod. The scenario has to be on the slice before start(), since the loading
+ * screen resolves it straight back out of there.
+ */
+export function launchCustomScenario(
+  dispatch: AppDispatch,
+  scenario: ScenarioType,
+  difficulty: DifficultyType,
+) {
+  dispatch(quit());
+  dispatch(delta({ difficulty }));
+  dispatch(delta({ scenarioId: CUSTOM_SCENARIO_ID, customScenario: scenario }));
+  dispatch(start(CUSTOM_SCENARIO_ID));
+}
+
+/**
  * The end of a tutorial, which is a different moment from the end of a scenario: there's no score
  * to report and the useful next step is the next tutorial, so this celebrates, says where the
  * player is in the sequence, and offers that next tutorial rather than a scoreboard.
@@ -3556,6 +3575,12 @@ export function* tickStatePhases(
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
+      for (const { notice, key } of modNotificationsDue(state))
+        logGameEvent(state, "WORLD_EVENT", notice.message, {
+          title: notice.title,
+          importance: "NOTABLE",
+          reportedKey: key,
+        });
       const storyPriceFuels = updateWorldEvents(state);
       // The recurring regional hazard resolves on its own path, after the authored story, so a
       // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
@@ -3638,7 +3663,10 @@ export function* tickStatePhases(
       // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
       // and rules the player gave themselves - would be scored against each other as if they
       // were the same scenario. Replays likewise belong to the original player, not the viewer.
+      // Mods always run as the custom scenario, so this is also their single exclusion point
+      // from scores, official replays and completion records.
       const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
+      const modded = !!state.customScenario?.mod;
 
       /**
        * All non-tutorial endings use one scoring path. In particular, bankruptcy and firing used
@@ -3748,6 +3776,7 @@ export function* tickStatePhases(
                   ? endMessage()
                   : endMessage,
               ranked,
+              modded,
               previousBest,
               outcome: recorded?.outcome ?? outcome,
               debrief,
