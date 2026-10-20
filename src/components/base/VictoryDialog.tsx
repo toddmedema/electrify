@@ -177,6 +177,15 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Typography>
         )}
         {victory.debrief && <RunDebrief debrief={victory.debrief} />}
+        {victory.modded && (
+          <Typography
+            className="victoryStanding"
+            variant="body2"
+            color="textSecondary"
+          >
+            Modded run · not ranked and no achievements.
+          </Typography>
+        )}
         {ranked && loggedIn && (
           <Typography
             className="victoryStanding"

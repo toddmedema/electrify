@@ -57,6 +57,14 @@ beforeEach(() => {
 });
 
 describe("VictoryDialog", () => {
+  it("says a modded run is unranked instead of showing standings", () => {
+    renderDialog({ victory: aVictory({ ranked: false, modded: true }) });
+    expect(
+      screen.getByText("Modded run · not ranked and no achievements."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/personal best/i)).toBeNull();
+  });
+
   it("renders nothing until a run has ended", () => {
     renderDialog({ victory: null });
     expect(screen.queryByText(/final score/)).not.toBeInTheDocument();

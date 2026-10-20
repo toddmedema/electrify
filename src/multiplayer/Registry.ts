@@ -29,6 +29,7 @@ const BLOCKING = new Set([
   "MANUAL",
   "SETTINGS",
   "SAVED_GAMES",
+  "MODS",
   "ACHIEVEMENTS",
 ]);
 export const multiplayerMiddleware: Middleware<object, AppStateType> =

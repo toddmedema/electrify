@@ -552,6 +552,16 @@ export function GameAppBar(props: Props) {
         />
       )}
       {!singleRow && statusRow}
+      {game.customScenario?.mod && (
+        <Typography
+          className="modRunStatus"
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 0.5 }}
+        >
+          Modded · Unranked
+        </Typography>
+      )}
       {game.challenge && (
         <Typography
           variant="caption"

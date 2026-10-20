@@ -26,7 +26,8 @@ export function desktopActivity(state: RootState): DesktopActivity {
       ? "menu"
       : game.replayPlayback
         ? "replay"
-        : game.speed === "PAUSED" || ["SETTINGS", "MANUAL"].includes(card.name)
+        : game.speed === "PAUSED" ||
+            ["SETTINGS", "MANUAL", "MODS"].includes(card.name)
           ? "paused"
           : "playing";
   if (phase === "menu") return { phase, timelineEnabled };

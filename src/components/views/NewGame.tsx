@@ -25,6 +25,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import SortIcon from "@mui/icons-material/Sort";
+import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
 import NavigableCardRow from "../base/NavigableCardRow";
 import ScreenPage from "../base/ScreenPage";
 import { getScenarioPlayCounts } from "../../LocalStorage";
@@ -52,6 +53,8 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onCustomGame: () => void;
+  /** Desktop builds with mod support: open the installed community scenarios. */
+  onCommunityScenarios?: () => void;
   onDetails: (delta: Partial<GameType>) => void;
   onManual: () => void;
   onTutorial: (scenarioId: number) => void;
@@ -491,6 +494,29 @@ export default function NewGame(props: Props): React.JSX.Element {
             readOnly={guest}
           />
         </div>
+        {props.onCommunityScenarios && !props.coop && (
+          <>
+            <MissionSectionHeader>Community scenarios</MissionSectionHeader>
+            <div className="groupedList">
+              <NavigableCardRow
+                testId="community-scenarios"
+                onOpen={props.onCommunityScenarios}
+                ariaLabel="Open community scenarios"
+                avatar={
+                  <Avatar aria-hidden>
+                    <ExtensionOutlinedIcon />
+                  </Avatar>
+                }
+                title={<span>Mods</span>}
+                description={
+                  <span>
+                    Scenarios from files and Steam Workshop. Unranked.
+                  </span>
+                }
+              />
+            </div>
+          </>
+        )}
       </List>
     </ScreenPage>
   );
