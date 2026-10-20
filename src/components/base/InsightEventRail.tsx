@@ -46,9 +46,6 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
         }
       }}
     >
-      <span className="insightEventRailLabel" aria-hidden="true">
-        Upcoming
-      </span>
       <span className="srOnly">
         {events.length} {events.length === 1 ? "event" : "events"} in this
         range. Select an event to show details.
@@ -85,8 +82,9 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                 <span className="insightEventNumber" aria-hidden="true">
                   {index + 1}
                 </span>
-                <span className="insightEventDate" aria-hidden="true">
-                  {conciseDate}
+                <span className="insightEventCopy" aria-hidden="true">
+                  <span className="insightEventTitle">{title}</span>
+                  <span className="insightEventDate">{conciseDate}</span>
                 </span>
               </button>
             </li>

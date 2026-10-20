@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test, type Page } from "./fixtures";
+import { expect, test } from "./fixtures";
 import { openPane } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([
@@ -9,13 +9,6 @@ const REVIEW_VIEWPORTS = new Set([
   "desktop-chromium",
 ]);
 
-const dismissTutorial = async (page: Page) => {
-  const exit = page.getByRole("button", { name: "Exit", exact: true });
-  await expect(exit).toBeVisible();
-  await exit.click();
-  await expect(exit).not.toBeVisible();
-};
-
 test("upcoming scenario events stay usable across insight viewports", async ({
   page,
 }, testInfo) => {
@@ -24,10 +17,12 @@ test("upcoming scenario events stay usable across insight viewports", async ({
       testInfo.project.name,
     ),
   );
-  await page.addInitScript(() => {
+  const theme = testInfo.project.name.startsWith("mobile-") ? "dark" : "light";
+  await page.addInitScript((mode) => {
     window.localStorage.clear();
-  });
-  await page.goto("/?scenario=100");
+    window.localStorage.setItem("theme", mode);
+  }, theme);
+  await page.goto("/?scenario=103");
   await page.getByRole("button", { name: "Start game" }).click();
 
   const insights = page.locator(".insights:visible");
@@ -40,18 +35,50 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
   });
-  await insights.getByRole("button", { name: "Fit full timeline" }).click();
-  await expect(eventRail).toContainText("Upcoming");
-  await expect(eventRail).not.toContainText("Pollution fees will rise");
+  await expect(
+    insights.getByRole("button", { name: "Fit full timeline" }),
+  ).toBeDisabled();
+  await expect(eventRail.getByRole("button")).toHaveCount(4);
+  await expect(eventRail).toContainText("Gas prices will fall");
   const eventButton = eventRail.getByRole("button", {
-    name: /Pollution fees will rise/,
+    name: /Gas prices will fall/,
   });
   await expect(eventButton).toBeVisible();
+  await expect(eventButton.locator(".insightEventTitle")).toBeVisible();
+  await expect(eventButton.locator(".insightEventDate")).toBeVisible();
+  const [titleBox, dateBox] = await Promise.all([
+    eventButton.locator(".insightEventTitle").boundingBox(),
+    eventButton.locator(".insightEventDate").boundingBox(),
+  ]);
+  expect(titleBox).not.toBeNull();
+  expect(dateBox).not.toBeNull();
+  expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(dateBox!.y);
+  expect(
+    await eventButton
+      .locator(".insightEventTitle")
+      .evaluate((element) =>
+        Math.max(0, element.scrollWidth - element.clientWidth),
+      ),
+  ).toBeLessThanOrEqual(1);
   await expect(eventButton).toHaveAttribute("aria-expanded", "false");
+
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir) {
+    await eventRail.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: path.join(
+        reviewDir,
+        `upcoming-events-${testInfo.project.name}-${theme}.png`,
+      ),
+      animations: "disabled",
+      fullPage: true,
+    });
+  }
+
   await eventButton.click();
   await expect(eventButton).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("dialog")).toContainText(
-    "Coal and gas will cost more to run.",
+    "A regional shale glut will make local gas cheaper.",
   );
   await eventButton.click();
   await expect(eventButton).toHaveAttribute("aria-expanded", "false");
@@ -149,19 +176,6 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     expect(railBox).not.toBeNull();
     expect(railBox!.height).toBeLessThanOrEqual(52);
   }
-
-  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-  if (reviewDir) {
-    await eventButton.click();
-    await viewportToolbar.scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: path.join(
-        reviewDir,
-        `upcoming-events-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
-  }
 });
 
 test("insights header controls stay aligned in one compact row", async ({
@@ -201,11 +215,8 @@ test("insights header controls stay aligned in one compact row", async ({
       ]),
     );
   });
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
-  await dismissTutorial(page);
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
 
   const insights = page.locator(".insights");
   await openPane(
@@ -346,13 +357,13 @@ test("insights header controls stay aligned in one compact row", async ({
     const dateRange = page.getByLabel(/Displayed date range:/);
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: Jan 2019",
+      "Displayed date range: 2020–31",
     );
     await expect(dateRange).toHaveCSS("font-size", "14px");
     await page.getByRole("button", { name: "Fit full timeline" }).click();
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: 2019–38",
+      "Displayed date range: 2020–39",
     );
     expect(
       await dateRange.evaluate(
@@ -386,11 +397,8 @@ test("the compact dock's Build action stays touch-sized and clear of the chart",
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile-"));
   await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: "Start playing", exact: true })
-    .click();
-  await dismissTutorial(page);
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
 
   const facilities = page.locator(".facilities");
   await openPane(

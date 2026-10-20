@@ -1,7 +1,46 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import InsightEventRail from "./InsightEventRail";
+
+it("identifies each event and its date before opening details", () => {
+  render(
+    <InsightEventRail
+      events={[
+        {
+          key: "data-centers",
+          title: "Data Centers will connect",
+          label: "Expected Jan 2026",
+          message: "Demand will rise as new load comes online.",
+        },
+        {
+          key: "fee",
+          title: "Pollution fees will rise",
+          label: "Expected Jan 2027",
+          message: "Coal and gas will cost more to run.",
+        },
+      ]}
+      onActiveChange={jest.fn()}
+      onZoom={jest.fn()}
+    />,
+  );
+
+  const events = screen.getByRole("region", {
+    name: "Upcoming scenario events",
+  });
+  for (const [title, date] of [
+    ["Data Centers will connect", "Jan 2026"],
+    ["Pollution fees will rise", "Jan 2027"],
+  ]) {
+    const chip = within(events).getByRole("button", {
+      name: `Expected ${date}: ${title}`,
+    });
+    expect(within(chip).getByText(title)).toBeVisible();
+    expect(within(chip).getByText(date)).toBeVisible();
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+  }
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
 
 it("restores the details anchor when a selected event returns to the viewport", () => {
   const event = {

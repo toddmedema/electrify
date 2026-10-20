@@ -1,5 +1,6 @@
 import { ScenarioType } from "../Types";
 import { HYDRO_SITES } from "../data/HydroSites";
+import { getStartingFacilityAge } from "../data/StartingFacilityAges";
 import {
   forecastCustomGameTimeline,
   summarizeYearOneOutlook,
@@ -114,6 +115,12 @@ export function calibrateDataCenterScenario({
         fuel: "Natural Gas",
         peakW: Math.ceil(outlook.worstShortfallW),
         label: DATA_CENTER_RESERVE_LABEL,
+        initialAgeYears: getStartingFacilityAge(
+          location,
+          "Natural Gas",
+          startingYear,
+          "Natural Gas CC",
+        ).ageYears,
       });
       low = 0;
     }
