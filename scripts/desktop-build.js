@@ -34,7 +34,6 @@ function desktopBuild() {
   }
   verifyEditionBundle("build", "desktop");
   writeBuildVersion(version);
-  fs.copyFileSync("src/data/RunCompatibility.json", "build/mod-rules.json");
   const assets = verifyBuild("build", "public");
   fs.writeFileSync(
     path.join("build", "desktop-assets.json"),

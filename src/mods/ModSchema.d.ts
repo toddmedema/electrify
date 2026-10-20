@@ -1,0 +1,54 @@
+// Types for ModSchema.js. ModSchema.test.ts checks every key list below against these types and
+// the facility catalog, so the JavaScript validator and the TypeScript model cannot drift apart.
+import type {
+  FacilityModifierType,
+  ModFacilityNameType,
+  ScenarioModType,
+  ScenarioNoticeType,
+  ScenarioType,
+} from "../Types";
+
+export type ModScenarioOverrides = Partial<
+  Pick<
+    ScenarioType,
+    | "cash"
+    | "startingYear"
+    | "startingCustomers"
+    | "startingDemandScale"
+    | "dollarsPerkWh"
+    | "durationMonths"
+    | "feePerKgCO2e"
+    | "eventScenarioIds"
+    | "ownership"
+    | "endTitle"
+    | "endMessage"
+  >
+>;
+export type ModProgramId = keyof NonNullable<ScenarioModType["programs"]>;
+
+/** The authoring and sharing format. Runs keep only ScenarioModType, never this package. */
+export interface ModPackage {
+  schemaVersion: 1;
+  gameApi: number;
+  id: string;
+  title: string;
+  creator: string;
+  version: string;
+  seed: number;
+  baseScenarioId: number;
+  scenario?: ModScenarioOverrides;
+  facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
+  programs?: Partial<Record<ModProgramId, number>>;
+  notifications?: ScenarioNoticeType[];
+}
+
+export class ModValidationError extends Error {}
+export const MOD_API_VERSION: number;
+export const MAX_MOD_BYTES: number;
+export const MOD_SCENARIO_IDS: readonly number[];
+export const FACILITY_NAMES: readonly ModFacilityNameType[];
+export const SCENARIO_OVERRIDE_KEYS: readonly (keyof ModScenarioOverrides)[];
+export const FACILITY_MODIFIER_KEYS: readonly (keyof FacilityModifierType)[];
+export const PROGRAM_KEYS: readonly ModProgramId[];
+export function parseMod(input: string): ModPackage;
+export function validateMod(value: unknown): ModPackage;

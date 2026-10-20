@@ -12,6 +12,7 @@ import { hasFuelPrices } from "./FuelPrices";
 import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
+import { facilityModifier } from "../helpers/ScenarioMod";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -793,7 +794,7 @@ export function GENERATORS(
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
-    const mod = state.customScenario?.modPackage?.facilities?.[g.name];
+    const mod = facilityModifier(state, g.name);
     g.buildCost *= mod?.buildCost ?? 1;
     g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
     g.yearsToBuild *= mod?.yearsToBuild ?? 1;
@@ -921,7 +922,7 @@ export function STORAGE(state: GameType, peakWh: number) {
   const difficulty = DIFFICULTIES[state.difficulty];
   const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
-    const mod = state.customScenario?.modPackage?.facilities?.[g.name];
+    const mod = facilityModifier(state, g.name);
     g.buildCost *= mod?.buildCost ?? 1;
     g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
     g.yearsToBuild *= mod?.yearsToBuild ?? 1;

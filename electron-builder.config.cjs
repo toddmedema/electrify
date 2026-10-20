@@ -16,7 +16,7 @@ module.exports = {
   files: [
     "build/**/*",
     "electron/**/*.cjs",
-    "src/data/ModSchema.js",
+    "src/mods/ModSchema.js",
     "!electron/*.test.cjs",
     "desktop-config.json",
     "package.json",

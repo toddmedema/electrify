@@ -22,7 +22,7 @@ function filesUnder(directory) {
 
 const sourceFiles = ["src/data", "src/helpers", "src/reducers"]
   .flatMap(filesUnder)
-  .filter((file) => /\.(tsx?|js|json)$/.test(file))
+  .filter((file) => /\.(tsx?|json)$/.test(file))
   .filter((file) => !/\.(test|spec)\./.test(file) && file !== output);
 const dataFiles = filesUnder("public/data").filter((file) =>
   /\.(bin|csv|json)$/.test(file),
@@ -31,7 +31,6 @@ const inputs = [
   "src/Constants.tsx",
   "src/Types.tsx",
   "package-lock.json",
-  "src/mods/Packages.ts",
   ...sourceFiles,
   ...dataFiles,
 ].sort();

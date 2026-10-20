@@ -155,7 +155,7 @@ export function serializeReplay(
   game: GameType,
   result?: ReplayResultType,
 ): ReplayType | undefined {
-  if (!game.replayLog || game.customScenario?.modPackage) {
+  if (!game.replayLog) {
     return undefined;
   }
   return {

@@ -206,6 +206,7 @@ export type CardNameType =
   | "SETTINGS"
   | "ACHIEVEMENTS"
   | "SAVED_GAMES"
+  | "MODS"
   | "CUSTOM_GAME"
   | "DATA_CENTER_SETUP"
   | "CHALLENGE";
@@ -888,9 +889,59 @@ export interface ScenarioBriefingType {
   threat: string;
 }
 
+/** Facility catalog names a data-only scenario mod may adjust. */
+export type ModFacilityNameType =
+  | "Coal"
+  | "Nuclear"
+  | "Natural Gas Peaker"
+  | "Natural Gas CC"
+  | "Oil"
+  | "Biomass"
+  | "Wind"
+  | "Offshore Wind"
+  | "Airborne Wind"
+  | "Solar"
+  | "Hydro"
+  | "Geothermal"
+  | "Enhanced Geothermal"
+  | "Battery"
+  | "Pumped Hydro";
+
+/** Multipliers on a facility's normal catalog calculation. */
+export interface FacilityModifierType {
+  buildCost?: number;
+  annualOperatingCost?: number;
+  yearsToBuild?: number;
+}
+
+export interface ScenarioNoticeType {
+  /** Months from the start of the run. */
+  month: number;
+  title: string;
+  message: string;
+}
+
+/**
+ * A data-only mod's run-local effects, frozen into the run when it starts. Saves keep this small
+ * runtime shape rather than the authoring package, so later schema, catalog or scenario changes
+ * cannot make a modded save unreadable: unknown facility names simply match nothing.
+ */
+export interface ScenarioModType {
+  source: {
+    id: string;
+    title: string;
+    creator: string;
+    version: string;
+    workshopId?: string;
+  };
+  facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
+  programs?: Partial<Record<Extract<PolicyId, "efficiency" | "solar">, number>>;
+  notifications?: ScenarioNoticeType[];
+}
+
 export interface ScenarioType {
-  /** Immutable data-only mod snapshot; installed updates never mutate a running game. */
-  modPackage?: import("./data/ModSchema").ModPackage;
+  /** Immutable mod effects; installed updates never mutate a running game. */
+  mod?: ScenarioModType;
   /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
   eventScenarioIds?: number[];
   hydroInventoryKey?: string;
@@ -1456,6 +1507,8 @@ export interface VictoryType {
   // Whether the run counts for the leaderboard. A custom game (every one shares an id) or a
   // replay of someone else's run gets the breakdown without a rank or a personal best
   ranked: boolean;
+  // A community mod run, which is never ranked and never earns achievements
+  modded?: boolean;
   // The player's best on this scenario BEFORE this run, read at the moment the scenario ended so
   // that "was 640" reports the run before this one rather than the one just finished
   previousBest?: number;
