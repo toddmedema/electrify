@@ -195,18 +195,18 @@ const STABLE_TOOLTIP_MS = 2500;
 
 /**
  * A stable grid on a phone: a checked bolt whose tooltip carries the full readout. Hover and
- * keyboard focus open it as usual; a tap opens it too, until a tap elsewhere or a few seconds.
+ * keyboard focus open it as usual; a tap toggles it, until a tap elsewhere or a few seconds.
  * Unmounted whenever the grid leaves the stable state, so it never reopens on its own.
  */
 function CompactStableStatus({ summary }: { summary: string }) {
   const [open, setOpen] = React.useState(false);
   // A tap pins the tooltip: the browser follows a touch with a synthetic mouseleave, which
   // would otherwise close it the moment the finger lifts.
-  const [pinned, setPinned] = React.useState(0);
+  const [pinned, setPinned] = React.useState(false);
   React.useEffect(() => {
     if (!pinned) return;
     const timer = setTimeout(() => {
-      setPinned(0);
+      setPinned(false);
       setOpen(false);
     }, STABLE_TOOLTIP_MS);
     return () => clearTimeout(timer);
@@ -215,7 +215,7 @@ function CompactStableStatus({ summary }: { summary: string }) {
     <div className="gridHealth gridHealth-stable gridHealth-compact">
       <ClickAwayListener
         onClickAway={() => {
-          setPinned(0);
+          setPinned(false);
           setOpen(false);
         }}
       >
@@ -240,8 +240,8 @@ function CompactStableStatus({ summary }: { summary: string }) {
             className="gridHealthStableButton"
             aria-label={`Current grid status: ${summary}`}
             onClick={() => {
-              setOpen(true);
-              setPinned((count) => count + 1);
+              setOpen(!pinned);
+              setPinned(!pinned);
             }}
           >
             <span className="gridHealthStableIcon" aria-hidden="true">

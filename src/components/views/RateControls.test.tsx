@@ -1,9 +1,11 @@
 import * as React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { EMPTY_HISTORY } from "../../helpers/DateTime";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
+import { currentTick } from "../../helpers/GameSelectors";
+import * as DeferredProjection from "../base/DeferredProjection";
 import RateControls from "./RateControls";
 
 function renderRates(scenarioId = 100, game = createGame({ scenarioId })) {
@@ -107,6 +109,104 @@ it("marks a public utility rate above its target as losing points", () => {
   });
   expect(points.textContent).toMatch(/^−\d+ pts$/);
   expect(points).toHaveClass("bad");
+});
+
+describe("background rate estimates", () => {
+  const originalWorker = global.Worker;
+  let game: GameType;
+  let ready: jest.SpyInstance;
+  let publish: () => void;
+
+  beforeEach(() => {
+    game = createGame({ scenarioId: 107 });
+    game = { ...game, dollarsPerkWh: game.dollarsPerkWh - 0.02 };
+    const projection = DeferredProjection.readProjection(
+      game,
+      currentTick(game)!,
+    );
+    global.Worker = jest.fn() as unknown as typeof Worker;
+    ready = jest
+      .spyOn(DeferredProjection, "projectionReady")
+      .mockReturnValue(false);
+    jest
+      .spyOn(DeferredProjection, "readProjection")
+      .mockReturnValue(projection);
+    jest
+      .spyOn(DeferredProjection, "requestProjection")
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(DeferredProjection, "subscribeProjection")
+      .mockImplementation((listener) => {
+        publish = listener;
+        return () => undefined;
+      });
+  });
+
+  afterEach(() => {
+    global.Worker = originalWorker;
+    jest.restoreAllMocks();
+  });
+
+  it("keeps points through monthly refreshes and reprices immediately while pending", () => {
+    const view = renderRates(107, game);
+    const pricing = screen.getByRole("region", { name: "Electricity pricing" });
+    expect(within(pricing).getByText("Calculating…")).toBeVisible();
+    expect(screen.getByRole("slider")).not.toHaveAttribute(
+      "aria-valuetext",
+      expect.stringContaining("rate score"),
+    );
+    ready.mockReturnValue(true);
+    act(() => publish());
+    const points = within(pricing).getByText(/^\+\d+ pts$/);
+    const previous = points.textContent;
+    ready.mockReturnValue(false);
+    const next = {
+      ...game,
+      date: { ...game.date, monthsElapsed: game.date.monthsElapsed + 1 },
+      monthlyHistory: [...game.monthlyHistory],
+    };
+    view.rerender(<RateControls game={next} onDelta={() => undefined} />);
+    expect(points).toHaveTextContent(previous!);
+    expect(pricing).not.toHaveTextContent("Calculating");
+    expect(pricing).toHaveAccessibleDescription(
+      /estimated rate score \+\d+ pts/,
+    );
+    view.rerender(
+      <RateControls
+        game={{ ...next, dollarsPerkWh: game.dollarsPerkWh + 0.03 }}
+        onDelta={() => undefined}
+      />,
+    );
+    expect(points).toHaveTextContent(/^−\d+ pts$/);
+    expect(points).toHaveClass("bad");
+    jest.mocked(DeferredProjection.readProjection).mockReturnValue({
+      ...DeferredProjection.readProjection(game, currentTick(game)!),
+      financeProjected: [],
+    });
+    ready.mockReturnValue(true);
+    act(() => publish());
+    expect(points).toHaveTextContent("±0 pts");
+  });
+
+  it.each(["run", "seed", "year", "rewind", "ownership"])(
+    "clears the previous estimate after changing %s",
+    (change) => {
+      ready.mockReturnValue(true);
+      const view = renderRates(107, game);
+      ready.mockReturnValue(false);
+      const next = { ...game };
+      if (change === "run") next.runIdentity = { ...game.runIdentity! };
+      if (change === "seed") next.seed += 1;
+      if (change === "year") next.startingYear += 1;
+      if (change === "rewind")
+        next.date = { ...game.date, minute: game.date.minute - 1 };
+      if (change === "ownership") next.scenarioId = 100;
+      view.rerender(<RateControls game={next} onDelta={() => undefined} />);
+      // Returning while a new forecast is pending must not resurrect an old run's estimate.
+      view.rerender(<RateControls game={game} onDelta={() => undefined} />);
+      expect(screen.getByText("Calculating…")).toBeVisible();
+    },
+  );
 });
 
 it("shows a year's rate moving a long record's score less", () => {
