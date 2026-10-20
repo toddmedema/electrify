@@ -1365,6 +1365,11 @@ export default class Insights extends React.Component<Props, State> {
     minSpan: number,
   ) {
     const full = rangesEqual(bounds, range);
+    const scenarioRange = clampChartViewport(
+      bounds,
+      [0, scenarioEndMinute(this.props.game) ?? 20 * 12 * MINUTES_PER_MONTH],
+      minSpan,
+    );
     const span = range[1] - range[0];
     const rangeLabel = viewportLabel(range, this.props.game.startingYear);
     const setRange = (next: ChartViewportRange) =>
@@ -1416,15 +1421,11 @@ export default class Insights extends React.Component<Props, State> {
                 ),
               ),
           )}
-          {iconButton("Zoom out", <ZoomOutIcon />, full, () =>
-            setRange(
-              zoomChartViewport(
-                bounds,
-                range,
-                minSpan,
-                1 / VIEWPORT_ZOOM_FACTOR,
-              ),
-            ),
+          {iconButton(
+            "Zoom out",
+            <ZoomOutIcon />,
+            rangesEqual(scenarioRange, range),
+            () => setRange(scenarioRange),
           )}
           {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>
             setRange(bounds),
@@ -1585,17 +1586,6 @@ export default class Insights extends React.Component<Props, State> {
                   currentMinute={projection.forecast[0]?.minute}
                   syncKey={SYNC_KEY}
                 />
-              )}
-              {projection.domain.x[1] - projection.domain.x[0] >
-                24 * MINUTES_PER_MONTH && (
-                <Typography
-                  className="insightsChartExplanation"
-                  variant="caption"
-                  color="textSecondary"
-                >
-                  Monthly forecast ranges show lows and peaks. Recorded months
-                  show averages. Red marks forecast shortfalls.
-                </Typography>
               )}
               {projection.shortfall && (
                 <Typography

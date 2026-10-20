@@ -326,6 +326,7 @@ const runwayGame = (
 ) =>
   createNextState(createGame({ scenarioId: 111, seed: 7 }), (g) => {
     g.dollarsPerkWh = rate;
+    g.rateFollowsTarget = false;
     g.monthlyHistory = history;
     // A flat current tick: a zero reserve is not a shortage, so no other risk outranks the
     // runway in the assertions below

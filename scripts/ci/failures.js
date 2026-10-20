@@ -124,7 +124,7 @@ function reproduce(tests) {
       commands.add("npm run check -- --steps multiplayer");
     else
       commands.add(
-        `npm run build && npm run test:e2e:ci -- ${spec}:${line} --project=${project}`,
+        `npm run test:e2e -- ${spec}:${line}${project ? ` --project=${project}` : ""}`,
       );
   }
   return [...commands];

@@ -418,6 +418,7 @@ export function customerBillingRate(
     | "shiftedResidentialW"
     | "customerBatteryDischargeW"
   >,
+  baseRate = game.dollarsPerkWh,
 ) {
   const p = game.policies?.programs;
   const enrolledTariff = participation(p?.timeOfUse?.tier ?? "Off");
@@ -457,7 +458,7 @@ export function customerBillingRate(
     0,
   );
   return (
-    game.dollarsPerkWh *
+    baseRate *
     (total > 0
       ? 1 +
         (enrolledResidentialW * tariffDelta -

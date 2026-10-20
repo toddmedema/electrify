@@ -41,6 +41,30 @@ describe("SaveGame", () => {
     },
   );
 
+  it.each(["false", 0, 1, null, {}])(
+    "rejects an invalid saved rate-follow setting %p",
+    (rateFollowsTarget) => {
+      expect(
+        parseSave({
+          ...serializeSave(game),
+          game: { ...game, rateFollowsTarget },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([true, false, undefined])(
+    "accepts a saved rate-follow setting %p",
+    (rateFollowsTarget) => {
+      expect(
+        parseSave({
+          ...serializeSave(game),
+          game: { ...game, rateFollowsTarget },
+        })?.game.rateFollowsTarget,
+      ).toBe(rateFollowsTarget);
+    },
+  );
+
   it("rejects a non-boolean marginal-load flag", () => {
     const save = serializeSave(game);
     expect(
