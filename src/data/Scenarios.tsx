@@ -32,9 +32,8 @@ const MISSION_ONE_FIRST_LOOK: TutorialUiIdType[] = [
   "speed",
 ];
 
-// Missions 2 and 3 hand over building, the clock and the menu, but still keep the player on the
-// fleet: navigation and the Insights and Events panes arrive with the Finances mission.
-const EARLY_MISSION_HIDDEN: TutorialUiIdType[] = ["nav", "sidePanes"];
+// Build now lives inside the dock. Keep its button available while later tools stay unrevealed.
+const EARLY_MISSION_HIDDEN: TutorialUiIdType[] = ["sidePanes"];
 
 const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
@@ -237,10 +236,11 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: ".button-buildFacility",
+        revealActions: ["BUILD_GENERATORS"],
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
         action: "Tap Build",
         content: (
-          <TutorialPrompt text="Your grid needs more power. New plants come from the generator shop." />
+          <TutorialPrompt text="Add generation to cover demand. Tap Build again to return to your fleet." />
         ),
       },
       {
@@ -456,6 +456,7 @@ export const SCENARIOS: ScenarioType[] = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
+        revealActions: ["INSIGHTS"],
         advanceOn: onInsights,
         action: "Tap Insights",
         content: (
@@ -479,6 +480,25 @@ export const SCENARIOS: ScenarioType[] = [
         action: "Tap Layers, or choose a preset question",
         content: (
           <TutorialPrompt text="Layers let you compare the information you care about." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#programsNav",
+        revealActions: ["PROGRAMS"],
+        advanceOn: (s: AppStateType) => s.card.name === "PROGRAMS",
+        action: "Tap Programs",
+        content: (
+          <TutorialPrompt text="Programs contains your electricity rate. Raise revenue by charging more per kWh." />
+        ),
+      },
+      {
+        card: "PROGRAMS",
+        target: "#rateSlider",
+        advanceOn: (s: AppStateType) => s.game.dollarsPerkWh > 0.03,
+        action: "Raise the electricity rate",
+        content: (
+          <TutorialPrompt text="Drag the rate slider right, then compare revenue with expenses in Insights." />
         ),
       },
       {
@@ -539,7 +559,7 @@ export const SCENARIOS: ScenarioType[] = [
           s.card.name === "PROGRAMS" || s.game.dollarsPerkWh < 0.07,
         action: "Tap Programs",
         content: (
-          <TutorialPrompt text="Your electricity rate lives in Programs, alongside ways to manage demand." />
+          <TutorialPrompt text="Set your electricity rate in Programs. In scenarios, it also offers ways to manage demand." />
         ),
       },
       {
@@ -658,6 +678,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         // No card: the player makes the switch, and the step is done when they are on Events
         target: "#eventsNav",
+        revealActions: ["EVENTS"],
         advanceOn: onEvents,
         action: "Tap Events",
         content: (
@@ -671,12 +692,6 @@ export const SCENARIOS: ScenarioType[] = [
         content: (
           <TutorialPrompt text="Each dated event explains what changed." />
         ),
-        desktop: {
-          target: "#eventsPane",
-          content: (
-            <TutorialPrompt text="Each dated event explains what changed." />
-          ),
-        },
       },
       {
         card: "FACILITIES",

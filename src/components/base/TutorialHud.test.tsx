@@ -284,6 +284,57 @@ describe("TutorialHud", () => {
     jest.useRealTimers();
   });
 
+  it.each([
+    [true, true],
+    [false, true],
+    [true, false],
+  ])(
+    "reveals overlapping targets (%s) above a floating dock only inside the stage (%s)",
+    (overlaps, inStage) => {
+      jest.useFakeTimers();
+      const scroller = document.createElement("div");
+      scroller.className = inStage ? "gameStage" : "";
+      scroller.style.overflowY = "auto";
+      Object.defineProperties(scroller, {
+        scrollHeight: { value: 1600 },
+        clientHeight: { value: 600 },
+      });
+      stubRect(scroller, 0, 100, 500, 700);
+      const target = document.createElement("div");
+      target.id = "tutorial-target";
+      target.getBoundingClientRect = () =>
+        ({
+          left: 0,
+          right: 500,
+          top: 550 - scroller.scrollTop,
+          bottom: 650 - scroller.scrollTop,
+          width: 500,
+          height: 100,
+        }) as DOMRect;
+      scroller.appendChild(target);
+      const dock = document.createElement("nav");
+      dock.id = "navfooter";
+      dock.className = "gameActionDock";
+      stubRect(dock, overlaps ? 200 : 600, 600, overlaps ? 300 : 700, 680);
+      document.body.append(scroller, dock);
+      const { unmount } = render(<TutorialHud {...props()} />);
+      try {
+        act(() => jest.advanceTimersByTime(500));
+        expect(scroller.scrollTop).toBe(overlaps && inStage ? 50 : 0);
+        const ring = screen.getByTestId("tutorial-target-ring");
+        expect(
+          Number.parseFloat(ring.style.top) +
+            Number.parseFloat(ring.style.height),
+        ).toBe(overlaps && inStage ? 600 : 650);
+      } finally {
+        unmount();
+        scroller.remove();
+        dock.remove();
+        jest.useRealTimers();
+      }
+    },
+  );
+
   it("gives the ring a small gap when the control is not flush with a clipping edge", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";

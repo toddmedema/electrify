@@ -39,13 +39,9 @@ test("closing a walkthrough offers a working way to the missions", async ({
     .click();
 
   await expect(page.locator(".tutorialHud")).toBeHidden();
-  for (const action of ["Build", "Programs", "Insights", "Events"]) {
-    await expect(
-      page
-        .locator("#navfooter")
-        .getByRole("button", { name: action, exact: true }),
-    ).toBeVisible();
-  }
+  // Free practice keeps this mission's taught controls; later tools and score stay for later.
+  await expect(page.locator("#navfooter")).toHaveCount(0);
+  await expect(page.locator("#scenarioNav")).toHaveCount(0);
 
   const snackbar = page.locator(".snackbarContent");
   await expect(snackbar).toContainText("Walkthrough closed");

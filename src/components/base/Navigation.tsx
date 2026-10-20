@@ -4,19 +4,19 @@ import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { useAppSelector, useAppDispatch } from "../../Store";
-import { CardNameType, CardType } from "../../Types";
+import { CardNameType, CardType, GameToolType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import { getScenario } from "../../data/Scenarios";
 import ConceptIcon from "./ConceptIcon";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
+import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export interface StateProps {
   card: CardType;
 }
 export interface Props extends StateProps {}
-export type GameTool =
-  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
+export type GameTool = GameToolType;
 export const GAME_TOOLS: {
   id: GameTool;
   label: string;
@@ -81,7 +81,15 @@ export default function Navigation({
         ?.tutorialSteps,
   );
   const opened = openTools ?? [gameToolForCard(cardName)];
+  const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
+  const tools = GAME_TOOLS.filter(
+    (tool) =>
+      (!readOnly || tool.id !== "BUILD_GENERATORS") &&
+      (hasScenarioDetails || tool.id !== "SCENARIO") &&
+      (!tutorialActions || tutorialActions.includes(tool.id)),
+  );
+  if (!tools.length) return null;
   return (
     <nav
       id="navfooter"
@@ -89,11 +97,7 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
-      {GAME_TOOLS.filter(
-        (tool) =>
-          (!readOnly || tool.id !== "BUILD_GENERATORS") &&
-          (hasScenarioDetails || tool.id !== "SCENARIO"),
-      ).map((tool) => {
+      {tools.map((tool) => {
         const open = opened.includes(tool.id);
         return (
           <Tooltip
