@@ -4,11 +4,11 @@
     "node": "v24.14.0",
     "platform": "win32-x64",
     "runs": 3,
-    "date": "2026-10-17"
+    "date": "2026-10-20"
   },
   "measured": {
-    "immerOverheadRatio": 1.425,
-    "rolloverImmerRatio": 1.036
+    "immerOverheadRatio": 1.493,
+    "rolloverImmerRatio": 1.076
   },
   "ceilings": {
     "immerOverheadRatio": 1.632,

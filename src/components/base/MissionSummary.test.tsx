@@ -7,16 +7,14 @@ import MissionSummary from "./MissionSummary";
 const mockSelectProjection = jest.fn();
 const mockSelectMissionRisk = jest.fn();
 const mockRequirements: { id: string; status: string }[] = [];
+const mockGetMissionStatus = jest.fn();
 jest.mock("../../helpers/Projection", () => ({
   projectionSignature: (game: GameType) => `month ${game.date.monthsElapsed}`,
   selectProjection: (...args: unknown[]) => mockSelectProjection(...args),
   cacheProjection: () => undefined,
 }));
 jest.mock("../../helpers/MissionStatus", () => ({
-  getMissionStatus: () => ({
-    monthsRemaining: 12,
-    requirements: mockRequirements,
-  }),
+  getMissionStatus: () => mockGetMissionStatus(),
   selectMissionRisk: (...args: unknown[]) => mockSelectMissionRisk(...args),
 }));
 
@@ -53,9 +51,28 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockSelectProjection.mockReset();
   mockSelectMissionRisk.mockReset();
+  mockGetMissionStatus.mockImplementation(() => ({
+    monthsRemaining: 12,
+    requirements: mockRequirements,
+  }));
   mockRequirements.length = 0;
 });
 afterEach(() => jest.useRealTimers());
+
+it("shares the displayed mission status with the risk check on each render", () => {
+  const view = render(summary(makeGame(1)));
+  expect(mockSelectMissionRisk.mock.calls.at(-1)?.[2]).toBe(
+    mockGetMissionStatus.mock.results.at(-1)?.value,
+  );
+
+  mockSelectMissionRisk.mockClear();
+  mockRequirements.push({ id: "reliability", status: "failed" });
+  view.rerender(summary(makeGame(2)));
+  expect(mockSelectMissionRisk).toHaveBeenCalledTimes(1);
+  expect(mockSelectMissionRisk.mock.calls[0][2]).toBe(
+    mockGetMissionStatus.mock.results.at(-1)?.value,
+  );
+});
 
 it("does not synchronously simulate or show a runway warning while its first worker forecast is pending", () => {
   const originalWorker = global.Worker;

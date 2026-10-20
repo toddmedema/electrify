@@ -1,4 +1,10 @@
-import { DAYS_PER_MONTH, DAYS_PER_YEAR, DIFFICULTIES } from "../Constants";
+import {
+  DAYS_PER_MONTH,
+  DAYS_PER_YEAR,
+  DIFFICULTIES,
+  LOCATIONS,
+} from "../Constants";
+import { SCENARIOS } from "../data/Scenarios";
 import {
   ADJACENT_MARKETS,
   TRANSMISSION_CORRIDORS,
@@ -149,6 +155,7 @@ describe("intertie context", () => {
     });
     expect(north).toMatchObject({
       seed: 7,
+      scenarioId: -1,
       southernHemisphere: false,
       peakSharingImportLoss: DIFFICULTIES.Intern.peakSharingImportLoss,
     });
@@ -156,6 +163,68 @@ describe("intertie context", () => {
     expect(south.peakSharingImportLoss).toBe(
       DIFFICULTIES.CEO.peakSharingImportLoss,
     );
+  });
+
+  it("reads access metadata without enumerating unrelated simulation state", () => {
+    const peers = [
+      {
+        id: "peer",
+        name: "Neighbour",
+        locationId: "SF",
+        corridor: TRANSMISSION_CORRIDORS[0],
+      },
+    ];
+    const game = {
+      seed: 7,
+      scenarioId: 100,
+      location: LOCATIONS.SF,
+      difficulty: "CEO" as const,
+      startingYear: 2020,
+      tutorialIntertieStress: {
+        active: true,
+        startsMinute: 0,
+        suppliedTicks: 0,
+        completed: false,
+      },
+      multiplayer: { seat: "host", peers },
+      get timeline(): never {
+        throw new Error(
+          "Intertie context does not need the simulation timeline",
+        );
+      },
+    };
+    const result = intertieContextForGame(game);
+    expect(result).toEqual({
+      startingYear: 2020,
+      peers,
+      scenarioId: 100,
+      locationId: "SF",
+      tutorialSupplyLimitW: 150e6,
+      seed: 7,
+      southernHemisphere: false,
+      peakSharingImportLoss: DIFFICULTIES.CEO.peakSharingImportLoss,
+    });
+    expect(result.peers).toBe(peers);
+  });
+
+  it("keeps custom games outside the authored scenario's access allocation", () => {
+    const result = intertieContextForGame({
+      seed: 7,
+      scenarioId: 100,
+      location: LOCATIONS.SF,
+      difficulty: "CEO",
+      customScenario: SCENARIOS[0],
+    });
+    expect(result).toEqual({
+      startingYear: undefined,
+      peers: undefined,
+      scenarioId: undefined,
+      locationId: "SF",
+      tutorialSupplyLimitW: undefined,
+      seed: 7,
+      southernHemisphere: false,
+      peakSharingImportLoss: DIFFICULTIES.CEO.peakSharingImportLoss,
+    });
   });
 
   it("makes the peak-sharing loss harsher with every difficulty step", () => {

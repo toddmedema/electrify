@@ -142,7 +142,12 @@ export function intertieContextForGame(
 ): IntertieContext {
   return {
     startingYear: game.startingYear,
-    ...accessContextForGame({ ...game, scenarioId: game.scenarioId ?? -1 }),
+    ...accessContextForGame({
+      scenarioId: game.scenarioId ?? -1,
+      location: game.location,
+      customScenario: game.customScenario,
+      multiplayer: game.multiplayer,
+    }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6
       : undefined,

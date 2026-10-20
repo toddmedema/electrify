@@ -92,7 +92,9 @@ function useMissionRisk(
     readsProjection(last.current?.risk)
       ? last.current?.risk
       : undefined;
-  const risk = defer ? previousRisk : selectMissionRisk(game, upcoming);
+  const risk = defer
+    ? previousRisk
+    : selectMissionRisk(game, upcoming, mission);
   React.useEffect(() => {
     last.current = { risk, scope, month: game.date.monthsElapsed };
     if (defer && now) requestProjection(game, now);

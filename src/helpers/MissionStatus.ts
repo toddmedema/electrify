@@ -292,6 +292,7 @@ export function cashRunwayMonths(game: GameType): number | undefined {
 export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
+  suppliedStatus?: ReturnType<typeof getMissionStatus>,
 ): MissionRisk | undefined {
   const now = currentTick(game);
   if (
@@ -314,7 +315,7 @@ export function selectMissionRisk(
         target: "finances",
       };
   }
-  const mission = getMissionStatus(game);
+  const mission = suppliedStatus ?? getMissionStatus(game);
   if (
     mission.requirements.some(
       (row) => row.id === "reliability" && row.status === "failed",
