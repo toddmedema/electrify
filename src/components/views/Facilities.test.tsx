@@ -382,6 +382,37 @@ describe("the fleet list", () => {
 
     expect(onSell).toHaveBeenCalledWith(facility.id);
   });
+
+  it.each([0, 150e6])(
+    "shows capacity and the cash refund before cancelling a build with a %s loan",
+    async (loanAmountLeft) => {
+      const game = createGame({ scenarioId: 100 });
+      const facility = game.facilities[0];
+      facility.peakW = 320e6;
+      facility.yearsToBuildLeft = 2;
+      facility.buildCost = 200e6;
+      facility.loanAmountLeft = loanAmountLeft;
+      const { onSell } = renderFacilities(game, facility.id);
+      const construction = screen.getByRole("region", { name: "Construction" });
+      expect(construction).toHaveTextContent("Nameplate capacity320MW");
+      const refund = formatMoneyConcise(200e6 - loanAmountLeft);
+      expect(construction).toHaveTextContent(`Refund if cancelled${refund}`);
+      expect(
+        within(construction).queryByText("After settling the loan") !== null,
+      ).toBe(loanAmountLeft > 0);
+      await user.click(
+        screen.getByRole("button", {
+          name: `Cancel construction of ${facility.name}`,
+        }),
+      );
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveTextContent(`You will receive ${refund}`);
+      await user.click(
+        within(dialog).getByRole("button", { name: "Cancel construction" }),
+      );
+      expect(onSell).toHaveBeenCalledWith(facility.id);
+    },
+  );
 });
 
 function renderProjects(game: GameType, onBuild = jest.fn()) {
@@ -873,6 +904,10 @@ describe("unified connections", () => {
     expect(building).not.toHaveTextContent("Line capacity");
     expect(building).toHaveTextContent("Import capacity180MW");
     expect(building).toHaveTextContent("Export capacity150MW");
+    expect(building).toHaveTextContent(
+      `Refund if cancelled${formatMoneyConcise(game.transmission!.lines[1].buildCost - 1000)}`,
+    );
+    expect(building).toHaveTextContent("After settling the loan");
     expect(building).toHaveTextContent("Emissions");
     expect(building).not.toHaveTextContent("Import available now");
     expect(building).toHaveTextContent("Typical price");
