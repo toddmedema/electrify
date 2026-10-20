@@ -55,10 +55,12 @@ async function expectTargetVisible(page: Page, selector: string) {
           const hudBottom = document
             .querySelector(".tutorialHud")!
             .getBoundingClientRect().bottom;
-          const footer = document.querySelector("#navfooter");
+          const footer = document
+            .querySelector("#navfooter")
+            ?.getBoundingClientRect();
           const bottom =
-            footer && footer.getBoundingClientRect().height
-              ? footer.getBoundingClientRect().top
+            footer?.height && box.left < footer.right && box.right > footer.left
+              ? footer.top
               : innerHeight;
           return (
             box.top >= hudBottom && box.bottom <= bottom + 1 && box.height > 0
@@ -90,13 +92,22 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   }
   await page.setViewportSize(originalViewport);
   await expectTargetVisible(page, "#chartInsightsCustomers");
-  await page.locator("#programsNav").click();
+  await openPane(
+    page.getByRole("region", { name: "Programs", exact: true }),
+    page.locator("#programsNav"),
+  );
   await expect(rate).toHaveValue("0.069");
-  await page.locator("#insightsNav").click();
+  await openPane(
+    page.getByRole("region", { name: "Insights", exact: true }),
+    page.locator("#insightsNav"),
+  );
   await next(page);
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
   await expect(page.locator(".tutorialHud")).toContainText("Grow customers 5%");
-  await page.locator("#programsNav").click();
+  await openPane(
+    page.getByRole("region", { name: "Programs", exact: true }),
+    page.locator("#programsNav"),
+  );
   await expect(rate).toHaveValue("0.069");
   await expect(
     page.getByRole("button", { name: "slow speed", exact: true }),
@@ -179,6 +190,7 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   await expect(page.locator(".tutorialHud")).toContainText(
     "Read the blackout event",
   );
+  await expectTargetVisible(page, ".eventLogItem");
   await next(page);
   await expect(
     page.getByRole("button", { name: "Resume Coal", exact: true }),

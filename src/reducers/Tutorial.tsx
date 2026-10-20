@@ -1,10 +1,12 @@
 import type { Middleware } from "@reduxjs/toolkit";
+import { createSelector } from "@reduxjs/toolkit";
 import { recordScenarioPlayed } from "../LocalStorage";
-import { getNextTutorial, getScenario } from "../data/Scenarios";
+import { getNextTutorial, getScenario, TUTORIALS } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
   GameType,
+  GameToolType,
   TutorialStepChangeType,
   TutorialStepType,
   TutorialUiIdType,
@@ -15,6 +17,32 @@ import { delta, quit, setSpeed, start, tutorialCompleteDialog } from "./Game";
 import { dialogOpen } from "./UI";
 
 const NOTHING_HIDDEN: TutorialUiIdType[] = [];
+
+/** Authored order, rather than play history, also supports jumping directly into a lesson. */
+export const selectTutorialActions = createSelector(
+  [
+    (state: AppStateType) =>
+      getScenario(state.game.scenarioId, state.game.customScenario),
+    (state: AppStateType) => state.game.tutorialStep,
+  ],
+  (scenario, stepIndex): GameToolType[] | undefined => {
+    if (!scenario?.tutorialSteps) return undefined;
+    const previous = TUTORIALS.slice(
+      0,
+      Math.max(
+        0,
+        TUTORIALS.findIndex((item) => item.id === scenario.id),
+      ),
+    );
+    const steps = [
+      ...previous.flatMap((item) => item.tutorialSteps || []),
+      ...scenario.tutorialSteps.slice(0, stepIndex + 1),
+    ];
+    return Array.from(
+      new Set(steps.flatMap((step) => step.revealActions || [])),
+    );
+  },
+);
 
 /** The game chrome the current tutorial step keeps out of the way; empty outside a walkthrough. */
 export function selectTutorialHiddenUi(

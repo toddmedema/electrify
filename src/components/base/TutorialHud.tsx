@@ -29,6 +29,24 @@ const RING_GAP_PX = 3;
 
 type Bounds = { left: number; top: number; right: number; bottom: number };
 
+/** The floating dock covers only the columns it crosses, and never its own tutorial target. */
+function overlappingDock(element: Element): DOMRect | undefined {
+  // Dialogs and popovers are portaled above the dock, so only stage content needs clearance.
+  if (!element.closest(".gameStage")) return;
+  const dock = document.querySelector("#navfooter.gameActionDock");
+  if (!dock || dock.contains(element)) return;
+  const bar = dock.getBoundingClientRect();
+  const target = element.getBoundingClientRect();
+  if (
+    bar.width > 0 &&
+    bar.height > 0 &&
+    target.left < bar.right &&
+    target.right > bar.left
+  ) {
+    return bar;
+  }
+}
+
 /**
  * Two rectangles around the control. `visible` is the viewport narrowed by every ancestor whose
  * overflow clips and by any sticky bar lying across the control: whatever the control has
@@ -48,6 +66,11 @@ function targetBounds(element: Element): { visible: Bounds; room: Bounds } {
   const visible = { ...viewport };
   const room = { ...viewport };
   const target = element.getBoundingClientRect();
+  const dock = overlappingDock(element);
+  if (dock && dock.bottom > target.top) {
+    visible.bottom = Math.min(visible.bottom, dock.top);
+    room.bottom = Math.min(room.bottom, dock.top);
+  }
   for (
     let ancestor = element.parentElement;
     ancestor && visible.left < visible.right && visible.top < visible.bottom;
@@ -255,6 +278,8 @@ function revealTarget(element: Element) {
         top = Math.max(top, bar.bottom);
     }
     const target = element.getBoundingClientRect();
+    const dock = overlappingDock(element);
+    if (dock && dock.top > top) bottom = Math.min(bottom, dock.top);
     // Instant scrolling also respects reduced motion and does not race card transitions.
     if (target.top < top || target.height > bottom - top) {
       parent.scrollTop += target.top - top;

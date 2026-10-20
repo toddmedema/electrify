@@ -56,6 +56,12 @@ test("production browser shards run the complete PR matrix exactly once", () => 
       ...projects,
       "--project=mobile-360px",
     ]),
+    ...list([
+      "--config=e2e/playwright.config.ts",
+      "tutorial-actions.spec.ts",
+      ...projects,
+      "--project=mobile-360px",
+    ]),
   ].sort();
   const actual = [1, 2]
     .flatMap((shard) =>

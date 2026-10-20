@@ -758,7 +758,13 @@ interface SharedShoppingType {
   spinMinutes: number; // 1 for renewables, avoiding repeated fallback coercion in the tick loop
 }
 
+export type GameToolType =
+  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
+
 export interface TutorialStepType {
+  // Introduced here and retained through this and every later mission in authored order.
+  // The scenario objective/score belongs to real scenarios, never tutorials.
+  revealActions?: Exclude<GameToolType, "SCENARIO">[];
   skipBeacon?: boolean;
   // The card this step's target lives on. Every step change navigates here, in both
   // directions, so stepping backwards over a step that navigated forwards still lands on
@@ -819,10 +825,8 @@ export interface TutorialStepType {
     successMessage: string;
     failureMessage: string;
   };
-  // Above the desktop breakpoint the bottom nav is hidden and Facilities / Insights render
-  // side by side, so a step whose target lives in that nav - or whose
-  // selector matches more than one pane - needs a different target there, and usually
-  // different wording too, since there are no tabs left to switch between
+  // Optional wording or target for a genuinely different desktop control. The action dock
+  // itself is shared across widths, so navigation lessons use the same target everywhere.
   desktop?: {
     target: string;
     action?: string;

@@ -7,6 +7,7 @@ const smoke = [
   "escape-close.spec.ts",
   "game-workspace.spec.ts",
   "tutorial-exit.spec.ts",
+  "tutorial-actions.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
   "music.spec.ts",
@@ -33,7 +34,9 @@ export default defineConfig({
     .map((project) => ({
       ...project,
       testMatch:
-        project.name === "mobile-360px" ? layout : [...smoke, ...layout],
+        project.name === "mobile-360px"
+          ? [...layout, "tutorial-actions.spec.ts"]
+          : [...smoke, ...layout],
     })),
   webServer: {
     command: "node scripts/ci/serve.js",
