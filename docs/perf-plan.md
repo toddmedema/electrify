@@ -574,3 +574,9 @@ retained rather than accepting the generator's looser 1.782 suggestion; rollover
 25.038 kB CSS, versus the October 14 baseline's 896.904/1424.972/23.947 kB. That comparison includes
 intervening feature work, not only this patch (which changes no CSS). The previous bundle gate
 passed before the refresh, and its 10% tolerance is unchanged. Browser census ceilings are unchanged.
+
+## Customer flexibility follow-up
+
+The [customer flexibility audit](customer-flexibility-performance.md) records the
+measured rollout/cohort workload added by PR #576, the two retained table-allocation
+optimizations, the rejected UI experiment, and independent review and validation.
