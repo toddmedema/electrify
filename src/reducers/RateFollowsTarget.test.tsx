@@ -4,7 +4,13 @@ import { getScenario } from "../data/Scenarios";
 import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { GameType } from "../Types";
-import gameReducer, { delta } from "./Game";
+import gameReducer, {
+  delta,
+  forecastMonthClosingCashAtCustomerRate,
+  generateNewTimeline,
+} from "./Game";
+import { getDateFromMinute } from "../helpers/DateTime";
+import { projectionSignature } from "../helpers/Projection";
 
 // Hurricane Season is a public utility; Investor Owned Utility is not.
 const PUBLIC_ID = 104;
@@ -20,6 +26,48 @@ function target(game: GameType) {
 }
 
 describe("public utility rate following its target", () => {
+  it("forecasts target changes at future month boundaries without changing the live rate", () => {
+    const game = createGame({ scenarioId: PUBLIC_ID });
+    const fixed = { ...game, rateFollowsTarget: false };
+    const now = game.timeline[0];
+    const forecast = (state: GameType) =>
+      generateNewTimeline(state, now.cash, now.customers, 13 * 24, 60);
+    const following = forecast(game);
+    const manual = forecast(fixed);
+    expect(following.slice(0, 24)).toEqual(manual.slice(0, 24));
+    const nextYear = following[12 * 24];
+    expect(nextYear.customerBillingRate).toBe(
+      target({
+        ...game,
+        date: getDateFromMinute(nextYear.minute, game.startingYear),
+      }),
+    );
+    expect(nextYear.customerBillingRate).not.toBe(
+      manual[12 * 24].customerBillingRate,
+    );
+    expect(nextYear.cash).not.toBe(manual[12 * 24].cash);
+    expect(game.dollarsPerkWh).toBe(target(game));
+  });
+
+  it("invalidates the forecast when following changes at the same price", () => {
+    const game = createGame({ scenarioId: PUBLIC_ID });
+    const fixed = gameReducer(game, delta({ rateFollowsTarget: false }));
+    expect(fixed.dollarsPerkWh).toBe(game.dollarsPerkWh);
+    expect(projectionSignature(fixed)).not.toBe(projectionSignature(game));
+  });
+
+  it("probes a manual rate without following the target or editing the live game", () => {
+    const game = createGame({ scenarioId: PUBLIC_ID });
+    const fixed = { ...game, rateFollowsTarget: false };
+    const cash = forecastMonthClosingCashAtCustomerRate(game, 0.04);
+    expect(cash).toBe(forecastMonthClosingCashAtCustomerRate(fixed, 0.04));
+    expect(cash).toBeLessThan(
+      forecastMonthClosingCashAtCustomerRate(game, 0.12),
+    );
+    expect(game.rateFollowsTarget).toBe(true);
+    expect(game.dollarsPerkWh).toBe(target(game));
+  });
+
   it("starts new public games following and leaves investor rates alone", () => {
     expect(createGame({ scenarioId: PUBLIC_ID }).rateFollowsTarget).toBe(true);
     expect(createGame({ scenarioId: INVESTOR_ID }).rateFollowsTarget).toBe(

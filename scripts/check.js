@@ -54,7 +54,13 @@ const steps = [
     assets: true,
     env: { DISABLE_ESLINT_PLUGIN: "true" },
   },
-  { id: "bundle", name: "Bundle size", script: "perf:bundle", ci: true },
+  {
+    id: "bundle",
+    name: "Bundle size",
+    script: "perf:bundle",
+    ci: true,
+    needs: "build",
+  },
   {
     id: "browser",
     name: "Production browser",
