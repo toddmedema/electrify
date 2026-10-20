@@ -4961,6 +4961,8 @@ $homeSmokeCycle: 5.6s;
 
   .appStartupLogo {
     flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100%;
     padding: 32px 24px 0;
   }
 
@@ -6209,28 +6211,122 @@ $programs_column: 800px;
     margin-right: auto;
   }
 }
-.customerProgramFacts {
+.customerProgramDetail {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: $space-4;
-  row-gap: $space-1;
-  margin: 0;
+  gap: $space-4;
+}
+.customerProgramHeading {
+  display: grid;
+  gap: $space-2;
 
-  dt {
-    color: var(--font-color-faded);
-  }
-
-  dd {
-    margin: 0;
+  h2 {
+    font-size: 24px;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 600;
   }
 }
-@media screen and (max-width: 599px) {
-  .customerProgramFacts {
-    grid-template-columns: minmax(0, 1fr);
+.customerProgramState {
+  color: var(--font-color-faded);
+}
+.customerProgramFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-4;
+  margin: 0;
+  padding: $space-4;
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+.customerProgramFact {
+  min-width: 0;
 
-    dd + dt {
-      margin-top: $space-2;
+  &[data-wide] {
+    grid-column: 1 / -1;
+  }
+  dt {
+    color: var(--font-color-faded);
+    margin-bottom: $space-1;
+  }
+  dd {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  &[data-wide] dd {
+    font-size: var(--font-size-body1);
+    font-weight: 500;
+  }
+}
+.customerProgramFactDetail.MuiTypography-root {
+  display: block;
+  margin-top: $space-1;
+  color: var(--font-color-faded);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.customerProgramFactsSecondary {
+  padding: 0;
+  background: transparent;
+
+  dd {
+    font-size: var(--font-size-body1);
+    font-weight: 400;
+  }
+}
+.customerProgramDetails {
+  border-bottom: 1px solid var(--border-subtle);
+
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    color: var(--font-color-faded);
+    list-style: none;
+    font-size: var(--font-size-body2);
+
+    &::-webkit-details-marker {
+      display: none;
     }
+    &::after {
+      content: "›";
+      font-size: 24px;
+    }
+  }
+  &[open] > summary::after {
+    transform: rotate(90deg);
+  }
+  > div {
+    display: grid;
+    gap: $space-3;
+    padding: $space-2 0 $space-4;
+  }
+}
+.customerProgramSettings {
+  display: grid;
+  gap: $space-3;
+  padding-top: $space-2;
+}
+.customerProgramTradeoff {
+  line-height: 1.5;
+}
+@media screen and (max-width: 599px) {
+  .customerProgramHeading h2 {
+    font-size: 22px;
+  }
+  .customerProgramFacts {
+    gap: $space-3;
+  }
+  .customerProgramFact dd {
+    font-size: 18px;
+  }
+  .customerProgramFact[data-wide] dd,
+  .customerProgramFactsSecondary dd {
+    font-size: var(--font-size-body1);
   }
   .programsTitleLong {
     display: none;

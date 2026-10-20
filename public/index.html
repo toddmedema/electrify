@@ -59,9 +59,26 @@
       html[data-theme="dark"] #appStartup {
         color: #9aa9ba;
       }
+      #appStartup .appStartupLogo {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 32px 24px 0;
+      }
+      #appStartup .homeLogo {
+        position: relative;
+        max-width: 680px;
+        margin: 0 auto;
+      }
       #appStartup img {
-        max-width: calc(100vw - 48px);
+        display: block;
+        width: 100%;
         height: auto;
+      }
+      #appStartup .homeEnergyTrace {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
       }
       .app-loading {
         max-width: 36rem;

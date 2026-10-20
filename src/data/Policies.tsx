@@ -29,48 +29,48 @@ export const POLICIES = {
   thermal: {
     name: "Smart heating and hot water",
     description:
-      "Fund controls over 36 months and pay participating households to move eligible heating and hot-water use out of your four-hour window. Deferred use returns over the following three hours.",
+      "Move eligible heating and hot-water use out of your peak window. Deferred use returns over the next three hours.",
     tradeoff:
-      "Equipment availability depends on location and installation year. Payments continue while on; comfort limits and recovery demand constrain peak relief. Turning off stops installations and control, but deferred use still returns.",
+      "Comfort limits constrain peak relief. Switching off stops installations and control, but deferred use still returns.",
   },
   evCharging: {
     name: "Managed EV charging",
     description:
-      "Enroll drivers over 12 months and pay for flexible charging. Eligible vehicles move part of their charging out of your four-hour window and finish during the following six hours.",
+      "Move some EV charging out of your peak window and into the next six hours.",
     tradeoff:
-      "Only the local electric-car fleet with compatible charging can participate. Early years have few or no eligible vehicles. Drivers retain overrides, transport energy is conserved, and later charging can create a new peak.",
+      "Drivers can override controls. Delayed charging can create a later peak.",
   },
   battery: {
     name: "Home battery virtual power plant",
     description:
-      "Fund household batteries over 48 months for customers who join your virtual power plant. Batteries charge from surplus electricity and help homes during your four-hour peak window.",
+      "Store surplus electricity in household batteries for your peak window.",
     tradeoff:
-      "Availability and installation costs follow the year and location. Batteries start empty, lose energy, age, and keep a household reserve. Rebates and participation payments compete with utility investment.",
+      "Batteries start empty, lose energy and age. A household reserve limits how much they can supply.",
   },
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Half of homes shift 20% of peak-window use into the following three hours. Participants pay 30% more during your four-hour window and 10% less afterward; total energy use stays unchanged.",
+      "Half of homes shift 20% of peak-window use into the next three hours.",
     tradeoff:
-      "Rates apply only to enrolled residential consumption actually supplied. Higher bills can affect customer retention. Compare the forecast: shifted consumption can create a later peak.",
+      "Participants pay 30% more during the peak window and 10% less for the next three hours. Higher bills can drive customers away; shifted demand can create a later peak.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Half of industrial and Data Centers load cuts consumption 20% during your chosen four-hour window, easing grid demand. Participants receive a 10% credit on electricity supplied throughout the day, even without shortages.",
+      "Half of demand from factories, mines and data centers drops 20% during your peak window.",
     tradeoff:
-      "Credits reduce sales revenue, including outside the curtailment window. Curtailment is agreed service, not a blackout. Contracts do not affect homes, businesses or transport, and do nothing without eligible industrial or data-center load.",
+      "Participants receive a 10% bill credit all day, even without shortages.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   efficiency: {
     name: "Efficiency rebates",
     description:
-      "Fund home and business upgrades over 48 months to reduce demand, especially heating and cooling. Savings grow with installations, then fade between each upgrade’s tenth and twentieth years.",
+      "Reduce home and business demand, especially heating and cooling.",
     tradeoff:
-      "Upgrades cost money and reduce sales, but can lower generation costs and improve reliability.",
+      "Upgrades reduce sales as well as generation needs. Savings fade between each upgrade’s tenth and twentieth years.",
     // At full adoption: lighting and appliance upgrades cut all home and business use, while
     // insulation, sealing and efficient heat pumps cut the weather-driven part of it much more.
     // DOE's Weatherization Assistance Program evaluations report heating and cooling savings of
@@ -87,9 +87,9 @@ export const POLICIES = {
   solar: {
     name: "Rooftop solar rebates",
     description:
-      "Fund rooftop panels over 48 months to reduce daytime grid demand. Installed panels keep producing without further utility spending; they do not cover evening peaks, and surplus earns no export credit. An enrolled home battery can store surplus for later.",
+      "Reduce daytime demand with rooftop panels. Home batteries can store surplus for later.",
     tradeoff:
-      "Rebates cost money and reduce sales. Surplus beyond enrolled battery charging is discarded, with no export payments or utility generation credits.",
+      "Panels keep producing without further spending, but do not cover evening peaks alone. Surplus beyond enrolled battery charging is discarded.",
     // Watts per starting customer, scaled with scenario demand, at full adoption. The California
     // Solar Initiative, among the largest rebate programs, funded about 1.9 GW across roughly 12
     // million utility customers - about 160 W each.
