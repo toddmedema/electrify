@@ -9,6 +9,7 @@ import {
   ListItemAvatar,
   ListItemText,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ConfirmDialog from "../base/ConfirmDialog";
@@ -33,6 +34,7 @@ import {
   currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
+import { SIDE_LAYOUT_MEDIA } from "../../Globals";
 import {
   FacilityOperatingType,
   isStorage,
@@ -717,6 +719,7 @@ function FacilitySupplyChart({
   anchor: React.RefObject<HTMLDivElement>;
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
+  const sideLayout = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   return (
     <div
       ref={anchor}
@@ -733,7 +736,9 @@ function FacilitySupplyChart({
         legend
         startingYear={game.startingYear}
       />
-      <ProductionMixBar tick={currentTick(game)} fuelOrder={fuelOrder} />
+      {sideLayout && (
+        <ProductionMixBar tick={currentTick(game)} fuelOrder={fuelOrder} />
+      )}
     </div>
   );
 }

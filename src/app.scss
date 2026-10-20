@@ -5495,13 +5495,18 @@ $homeSmokeCycle: 5.6s;
   flex: 0 0 auto;
 }
 .productionMix {
-  padding: 0 16px;
+  position: relative;
+  height: 4px;
+  flex: 0 0 auto;
 }
 .productionMixTarget {
   appearance: none;
+  // Borrow the chart's static axis footer for the hit area, leaving the plot and fleet clear.
+  position: absolute;
+  inset: auto 16px 0;
+  z-index: 1;
   display: flex;
-  align-items: center;
-  width: 100%;
+  align-items: flex-end;
   min-height: 40px;
   padding: 0;
   border: 0;
