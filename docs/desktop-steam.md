@@ -213,8 +213,13 @@ stats callbacks through the existing sole manual dispatcher. SetAchievement and 
 run in Steam Offline Mode, using Steam's offline cache. Pending intents remain on disk until a
 successful, matching UserStatsStored callback acknowledges that submitted batch. Boolean API
 returns, unrelated callbacks, failed writes and later awards cannot acknowledge it. Already
-cached achievements are not set again; retries never reset achievements or completed flags.
-Steam outages leave local play available.
+cached achievements are imported as earned and are not set again; a cache read alone cannot
+confirm storage. Retries never reset achievements or completed flags. Native-interface failures
+leave local earning usable. Failed journal writes retry synchronization later; cache imports
+and receipts update the in-memory journal only after an atomic write succeeds. Missing receipts
+retry the same frozen batch at most once a minute. Because StoreStats receipts have no request
+ID, confirmation counts conservatively account for every older accepted request; late receipts
+cannot acknowledge a newer batch. Fully received requests reset that accounting.
 
 Automated tests cover threshold boundaries, all scenario/difficulty completions, save/resume,
 forecast/replay exclusion, offline earning/reconnect/relaunch, callback packing for all supported

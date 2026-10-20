@@ -308,3 +308,214 @@ test("shutdown ignores late callbacks and never calls native stats again", (t) =
   assert.equal(f.calls.length, count);
   assert.equal(f.listeners.size, 0);
 });
+
+for (const platform of ["win32", "linux", "darwin"]) {
+  test(`${platform} cached offline awards need a storage receipt across reconnect and relaunch`, (t) => {
+    const f = fixture(t, platform);
+    // Steam may have cached the unlock on an earlier launch or another device.
+    f.cache.achievements.add("LIGHTS_ON");
+    let service = f.make();
+    service.refresh();
+    f.received();
+    assert.deepEqual(service.data.earned, ["LIGHTS_ON"]);
+    assert.deepEqual(
+      service.data.confirmed,
+      [],
+      "A cache read is not a storage receipt",
+    );
+    assert.equal(service.pending(), true);
+    assert.equal(f.calls.filter(([kind]) => kind === "award").length, 0);
+    assert.equal(f.calls.filter(([kind]) => kind === "store").length, 1);
+    f.stored(3); // NoConnection: leave the cached award pending while offline.
+    service.dispose();
+    service = f.make();
+    service.refresh();
+    f.received(); // Reconnect using the same Steam cache and durable journal.
+    f.stored();
+    assert.equal(service.pending(), false);
+    service.dispose();
+    service = f.make();
+    service.refresh();
+    f.received();
+    service.add({ earned: ["LIGHTS_ON"] });
+    assert.deepEqual(service.data.confirmed, ["LIGHTS_ON"]);
+    assert.equal(f.calls.filter(([kind]) => kind === "award").length, 0);
+    assert.equal(f.calls.filter(([kind]) => kind === "store").length, 2);
+    service.dispose();
+  });
+}
+
+test("an unavailable Steam stats interface leaves local earning usable and retries later", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1000000 });
+  const f = fixture(t);
+  const stats = f.api.stats;
+  const reads = t.mock.method(f.api, "getStat");
+  f.api.stats = () => {
+    throw new Error("Steam client unavailable");
+  };
+  let service;
+  assert.doesNotThrow(() => {
+    service = f.make();
+  });
+  service.add({ earned: ["LIGHTS_ON"] });
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.filename)).earned, [
+    "LIGHTS_ON",
+  ]);
+  assert.equal(service.pending(), true);
+  assert.equal(f.calls.length, 0);
+  f.received(); // An unsolicited callback must not use an unavailable native pointer.
+  assert.equal(reads.mock.callCount(), 0);
+  f.api.stats = () => null;
+  t.mock.timers.tick(120000);
+  service.refresh();
+  assert.equal(f.calls.length, 0);
+  f.api.stats = stats;
+  t.mock.timers.tick(120000);
+  service.refresh();
+  f.received();
+  f.stored();
+  assert.equal(service.pending(), false);
+  service.dispose();
+});
+
+test("failed journal writes during cache import and storage receipts stay pending and recover", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1000000 });
+  const f = fixture(t);
+  const service = f.make();
+  service.add({ earned: ["LIGHTS_ON"] });
+  const persist = service.persist;
+  service.persist = () => {
+    throw new Error("Disk unavailable");
+  };
+  f.cache.achievements.add("GOOD_NEIGHBOR");
+  f.cache.stats.set("ELECTRIFY_TUTORIAL_0", 1);
+  assert.doesNotThrow(() => f.received());
+  assert.deepEqual(service.data.earned, ["LIGHTS_ON"]);
+  assert.deepEqual(service.data.tutorials, []);
+  assert.equal(f.calls.filter(([kind]) => kind === "store").length, 0);
+  service.persist = persist;
+  t.mock.timers.tick(120000);
+  service.refresh();
+  f.received();
+  assert(service.data.earned.includes("GOOD_NEIGHBOR"));
+  assert.deepEqual(service.data.tutorials, [0]);
+  service.persist = () => {
+    throw new Error("Disk unavailable");
+  };
+  assert.doesNotThrow(() => f.stored());
+  assert.equal(service.pending(), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.filename)).confirmed, []);
+  service.persist = persist;
+  t.mock.timers.tick(120000);
+  service.refresh();
+  f.stored();
+  assert.equal(service.pending(), false);
+  service.dispose();
+});
+
+test("offline earning reconnects in the same session and stays confirmed after relaunch", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1000000 });
+  const f = fixture(t);
+  let service = f.make();
+  service.refresh();
+  f.received();
+  service.add({
+    earned: ["FIRST_SPARK"],
+    completion: { scenarioId: 0, difficulty: "Intern" },
+  });
+  f.stored(3); // NoConnection: SetAchievement and SetStat remain in Steam's offline cache.
+  service.add({ earned: ["LIGHTS_ON"] });
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.filename)).confirmed, []);
+  assert.equal(service.pending(), true);
+  t.mock.timers.tick(120000);
+  service.refresh();
+  f.received(); // Stats become available again after reconnect.
+  f.stored();
+  assert.equal(service.pending(), false);
+  assert.deepEqual(service.data.confirmed, ["FIRST_SPARK", "LIGHTS_ON"]);
+  assert.deepEqual(service.data.storedTutorials, [0]);
+  assert.deepEqual(
+    f.calls.filter(([kind]) => kind === "award"),
+    [
+      ["award", "FIRST_SPARK"],
+      ["award", "LIGHTS_ON"],
+    ],
+  );
+  service.dispose();
+  service = f.make();
+  service.refresh();
+  f.received();
+  service.add({
+    earned: ["FIRST_SPARK", "LIGHTS_ON"],
+    completion: { scenarioId: 0, difficulty: "Intern" },
+  });
+  assert.equal(service.pending(), false);
+  assert.equal(f.calls.filter(([kind]) => kind === "award").length, 2);
+  assert.equal(f.calls.filter(([kind]) => kind === "store").length, 2);
+  service.dispose();
+});
+
+for (const lateResult of [1, 2]) {
+  test(`missing storage receipts retry a frozen batch safely after a late result ${lateResult}`, (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: 1000000 });
+    const f = fixture(t);
+    let service = f.make();
+    service.add({ earned: ["LIGHTS_ON"] });
+    f.received(); // First StoreStats request is accepted, but its receipt is delayed.
+    service.add({ earned: ["GOOD_NEIGHBOR"] });
+    service.refresh();
+    assert.equal(f.calls.filter(([kind]) => kind === "store").length, 1);
+    t.mock.timers.tick(120000);
+    service.refresh(); // Retry only LIGHTS_ON, using Steam's existing cached unlock.
+    assert.equal(f.calls.filter(([kind]) => kind === "store").length, 2);
+    assert.deepEqual(
+      f.calls.filter(([kind]) => kind === "award"),
+      [["award", "LIGHTS_ON"]],
+    );
+    f.stored(); // Retry confirms LIGHTS_ON; the original receipt remains outstanding.
+    assert.deepEqual(service.data.confirmed, ["LIGHTS_ON"]);
+    t.mock.timers.tick(120000);
+    service.refresh(); // First request containing GOOD_NEIGHBOR.
+    f.stored(lateResult); // Late original receipt cannot confirm GOOD_NEIGHBOR.
+    assert.deepEqual(service.data.confirmed, ["LIGHTS_ON"]);
+    assert.equal(service.pending(), true);
+    f.stored(); // Enough successful receipts now prove a request containing GOOD_NEIGHBOR succeeded.
+    if (lateResult !== 1) {
+      // All old requests have replied; a fresh store can now confirm the newer batch.
+      assert.equal(service.pending(), true);
+      t.mock.timers.tick(120000);
+      service.refresh();
+      f.received();
+      f.stored();
+    }
+    assert.equal(service.pending(), false);
+    assert.deepEqual(service.data.confirmed, ["LIGHTS_ON", "GOOD_NEIGHBOR"]);
+    assert.equal(f.calls.filter(([kind]) => kind === "award").length, 2);
+    service.dispose();
+    service = f.make();
+    assert.equal(service.pending(), false);
+    service.dispose();
+  });
+}
+
+test("a permanently lost receipt does not prevent later awards from reaching Steam", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1000000 });
+  const f = fixture(t);
+  const service = f.make();
+  service.add({ earned: ["LIGHTS_ON"] });
+  f.received(); // This receipt never arrives, even after reconnect.
+  service.add({ earned: ["GOOD_NEIGHBOR"] });
+  t.mock.timers.tick(120000);
+  f.received(); // Reconnect retries the frozen first batch.
+  f.stored();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    t.mock.timers.tick(120000);
+    service.refresh();
+    f.stored();
+  }
+  assert.equal(service.pending(), false);
+  assert.deepEqual(service.data.confirmed, ["LIGHTS_ON", "GOOD_NEIGHBOR"]);
+  assert.equal(f.calls.filter(([kind]) => kind === "award").length, 2);
+  assert.equal(f.calls.filter(([kind]) => kind === "store").length, 4);
+  service.dispose();
+});
