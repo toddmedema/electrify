@@ -566,10 +566,3 @@ export function scheduledLoadAdditionWAt(
     loadFactor + (1 - loadFactor) * Math.cos((2 * Math.PI * monthOfCycle) / 12);
   return Math.max(0, addition.peakW) * multiplier;
 }
-
-/** Nameplate/load-factor arithmetic, independent of the game's representative-day calendar. */
-export function annualLoadAdditionWh(
-  addition: ScenarioLoadAdditionType,
-): number {
-  return addition.peakW * addition.loadFactor * 8760;
-}

@@ -266,30 +266,6 @@ function lifetimeRate(
 }
 
 /**
- * How much a public utility's rate score moves over a stretch of play. The score is judged on the
- * lifetime average rate, so a period's effect depends on how much has already been sold: the
- * same rate moves a young run's score further than an old one's.
- */
-export function publicRateScoreChange(
-  targetRate: number,
-  past: Pick<MonthlyHistoryType, "revenue" | "supplyWh">,
-  next: Pick<MonthlyHistoryType, "revenue" | "supplyWh">,
-): number {
-  const before = publicRateScore(targetRate, lifetimeRate(past, targetRate));
-  const after = publicRateScore(
-    targetRate,
-    lifetimeRate(
-      {
-        revenue: past.revenue + next.revenue,
-        supplyWh: past.supplyWh + next.supplyWh,
-      },
-      targetRate,
-    ),
-  );
-  return after - before;
-}
-
-/**
  * The points a year of sales at `rate` contributes to a public utility's lifetime rate score.
  *
  * The final score decomposes exactly as a supply-weighted sum over the years played, and this is
@@ -298,7 +274,7 @@ export function publicRateScoreChange(
  *
  * - The sign is always the sign of `target - rate`. A rate above target reads as a loss every
  *   year it is in force, no matter what the lifetime average did last period, which is what the
- *   change-based figure below got wrong.
+ *   former change-based estimate got wrong.
  * - The magnitude shrinks as the record lengthens: a year of sales still matters, but less, the
  *   more has already been sold.
  *

@@ -1,4 +1,5 @@
 import path from "path";
+import { openSavedGames } from "./layout";
 import { expect, Page, test, TestInfo } from "./fixtures";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
 
@@ -13,16 +14,6 @@ async function startGame(page: Page) {
   await page.goto("/?scenario=101");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
-}
-
-async function openSaves(page: Page) {
-  await page.getByRole("button", { name: "menu", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Saved games", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Saved games", exact: true }),
-  ).toBeVisible();
 }
 
 async function checkDialogLayout(page: Page, name: string, info: TestInfo) {
@@ -125,7 +116,7 @@ test("a save from an earlier deploy upgrades silently and keeps its run", async 
   expect(upgraded.date).toEqual(original.date);
   expect(upgraded.facilities).toEqual(original.facilities);
   expect(upgraded.monthlyHistory).toEqual(original.monthlyHistory);
-  await openSaves(page);
+  await openSavedGames(page);
   const row = page.locator(`[data-save-id="${id}"]`);
   await expect(
     row.getByRole("button", { name: "Load", exact: true }),
@@ -144,7 +135,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
     }, theme);
     await startGame(page);
-    await openSaves(page);
+    await openSavedGames(page);
     const touch = !!info.project.use.hasTouch;
     const title = page.getByRole("heading", {
       name: "Saved games",
@@ -234,7 +225,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
     }, theme);
     await startGame(page);
-    await openSaves(page);
+    await openSavedGames(page);
     const before = (await readSaveRecords(page)).map(
       (entry) => entry.metadata.id,
     );
@@ -335,7 +326,7 @@ for (const theme of ["light", "dark"]) {
       await screenshot(page, info, "main-menu-mobile-dark.png");
     }
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openSaves(page);
+    await openSavedGames(page);
     await expect(
       page.getByText(
         "Saves stay on this device. Sign in for cloud backup and access on other devices.",
@@ -371,7 +362,7 @@ for (const theme of ["light", "dark"]) {
       localStorage.setItem("electrify-cloud-save-prompt-seen", "true");
     }, theme);
     await startGame(page);
-    await openSaves(page);
+    await openSavedGames(page);
     const records = await readSaveRecords(page);
     await page
       .locator("article.saveEntry")

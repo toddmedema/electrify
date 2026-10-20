@@ -1,7 +1,6 @@
 import {
   getStartingCustomers,
   hasGeothermalResource,
-  hasHydroResource,
 } from "./LocationProfiles";
 import { LocationType } from "../Types";
 
@@ -28,10 +27,9 @@ describe("location profiles", () => {
     ).toBeGreaterThan(getStartingCustomers(location("Kenya", "Africa")));
   });
 
-  it("recognises regional geothermal and hydro resources", () => {
+  it("recognises regional geothermal resources", () => {
     const iceland = location("Iceland", "Europe");
     expect(hasGeothermalResource(iceland)).toBe(true);
-    expect(hasHydroResource(iceland)).toBe(true);
     expect(hasGeothermalResource(location("France", "Europe"))).toBe(false);
   });
 
@@ -41,7 +39,6 @@ describe("location profiles", () => {
       hydro: false,
     });
     expect(hasGeothermalResource(dry)).toBe(false);
-    expect(hasHydroResource(dry)).toBe(false);
   });
 
   it("profiles US resources by state instead of treating the whole country alike", () => {
@@ -52,9 +49,7 @@ describe("location profiles", () => {
       "CA",
     );
     const ohio = location("United States", "North America", undefined, "OH");
-    expect(hasHydroResource(california)).toBe(true);
     expect(hasGeothermalResource(california)).toBe(true);
-    expect(hasHydroResource(ohio)).toBe(false);
     expect(hasGeothermalResource(ohio)).toBe(false);
   });
 
@@ -66,6 +61,5 @@ describe("location profiles", () => {
       "NY",
     );
     expect(hasGeothermalResource(local)).toBe(true);
-    expect(hasHydroResource(local)).toBe(false);
   });
 });

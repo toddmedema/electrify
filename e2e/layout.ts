@@ -97,3 +97,14 @@ export async function openPane(
   await expect(visiblePane.first()).toBeVisible();
   return true;
 }
+
+/** Open the saved-game library from the menu and wait for its screen. */
+export async function openSavedGames(page: Page) {
+  await page.getByRole("button", { name: "menu", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Saved games", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Saved games", exact: true }),
+  ).toBeVisible();
+}

@@ -27,22 +27,6 @@ function equipmentAt(location: LocationType, year: number) {
   };
 }
 
-/** Eligible share with a full new rollout using this year's technology. Actual dispatch uses
- * thermalFleet instead so previously installed cohorts keep their historical capabilities. */
-export function thermalEligibility(
-  location: LocationType,
-  year: number,
-  weatherShare = 0,
-  temperatureC = 0,
-): number {
-  const equipment = equipmentAt(location, year);
-  const weather = boundedShare(weatherShare);
-  return boundedShare(
-    (1 - weather) * equipment.hotWaterLoadShare +
-      (temperatureC < 18 ? weather * equipment.weatherControlShare : 0),
-  );
-}
-
 /** Cohorts retain the equipment available at installation. A relay installed in 1980 never
  * acquires a connected thermostat merely because the game reaches 2025. Monthly rewards cover
  * maintaining the installed controls; they do not upgrade the technology in old cohorts. */

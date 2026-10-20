@@ -8,7 +8,6 @@ import {
   facilityLifetime,
   facilityOutputFactor,
   estimatedAnnualOperatingCost,
-  getCompanyInterestRate,
   getCreditInputs,
   getCreditPremium,
   getMonthlyPayment,
@@ -344,15 +343,6 @@ describe("getCreditPremium", () => {
       aCleanCompany({ profitMargin: 0, cashRatio: 0.05 }),
     );
     expect(premium).toBeCloseTo(1.75, 10);
-    expect(
-      getCompanyInterestRate(
-        0.05,
-        aCleanCompany({
-          profitMargin: 0,
-          cashRatio: 0.05,
-        }),
-      ),
-    ).toBeCloseTo(0.0875, 10);
   });
 
   it("keeps charging a company whose losses keep growing", () => {

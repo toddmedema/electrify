@@ -160,13 +160,6 @@ export function getCreditPremium(c: CreditInputsType): number {
   return 1 + PREMIUM_PER_POINT * Math.min(points, MAX_CREDIT_POINTS);
 }
 
-export function getCompanyInterestRate(
-  primeRate: number,
-  c: CreditInputsType,
-): number {
-  return primeRate * getCreditPremium(c);
-}
-
 // A lender looks at a year, not a month. One bad month of weather is not a credit event, and
 // pricing off it would have the rate flapping around every rollover.
 const TRAILING_MONTHS = 12;

@@ -7,7 +7,6 @@ import { MINUTES_PER_MONTH } from "./DateTime";
 import {
   shiftThermalDemand,
   thermalCapitalCostPerCustomer,
-  thermalEligibility,
   thermalFleet,
   thermalMonthlyRewardPerCustomer,
   validDeferredThermal,
@@ -89,8 +88,22 @@ test("space heating controls never shift cooling, and reduced native demand limi
     residentialW: 600,
   });
   expect(efficient.shiftedW).toBeCloseTo(heating.shiftedW * 0.6);
-  expect(thermalEligibility(location, 1980, 1, 5)).toBe(0);
-  expect(thermalEligibility(location, 2025, 1, 30)).toBe(0);
+  expect(
+    shiftThermalDemand({
+      ...input,
+      minute: 17 * 60,
+      startingYear: 1980,
+      weatherShare: 1,
+    }).shiftedW,
+  ).toBe(0);
+  expect(
+    shiftThermalDemand({
+      ...input,
+      minute: 17 * 60,
+      temperatureC: 30,
+      weatherShare: 1,
+    }).shiftedW,
+  ).toBe(0);
 });
 
 function simulate(stepMinutes: number, startHour = 17) {

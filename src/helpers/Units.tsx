@@ -19,7 +19,6 @@ export const UNIT_SYSTEM_LABELS: { [system in UnitSystemType]: string } = {
 };
 
 // Exact definitions rather than the rounded constants they're usually quoted as
-const KM_PER_MILE = 1.609344;
 const KG_PER_POUND = 0.45359237;
 const KG_PER_SHORT_TON = 907.18474;
 const KG_PER_TONNE = 1000;
@@ -47,18 +46,6 @@ export function formatTemperature(
   units: UnitSystemType,
 ): string {
   return `${Math.round(toDisplayTemperature(celsius, units))}${temperatureUnit(units)}`;
-}
-
-export function speedUnit(units: UnitSystemType): string {
-  return isImperial(units) ? "mph" : "km/h";
-}
-
-export function toDisplaySpeed(kph: number, units: UnitSystemType): number {
-  return isImperial(units) ? kph / KM_PER_MILE : kph;
-}
-
-export function formatSpeed(kph: number, units: UnitSystemType): string {
-  return `${Math.round(toDisplaySpeed(kph, units))} ${speedUnit(units)}`;
 }
 
 /** The unit a generator's emissions per MWh are quoted in - small enough to read in whole units */

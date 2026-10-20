@@ -8,6 +8,7 @@ import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getScenarioLocation } from "../../helpers/Locations";
+import { waitForLoad } from "../../helpers/WaitForLoad";
 import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
@@ -132,15 +133,6 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return;
       }
 
-      const callbackLoad = (
-        start: (done: (failure?: string) => void) => void,
-      ) =>
-        new Promise<void>((resolve, reject) => {
-          start((failure?: string) =>
-            failure ? reject(new Error(failure)) : resolve(),
-          );
-        });
-
       reportProgress("Loading weather and market data…");
       try {
         const task = dataLoading
@@ -148,9 +140,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           .then(async () => {
             if (!isCurrentLoadingGeneration(request)) return;
             await Promise.all([
-              callbackLoad((done) => initWeather(location, done)),
-              callbackLoad(initFuelPrices),
-              callbackLoad(initEconomy),
+              waitForLoad((done) => initWeather(location, done)),
+              waitForLoad(initFuelPrices),
+              waitForLoad(initEconomy),
             ]);
           });
         dataLoading = task;
