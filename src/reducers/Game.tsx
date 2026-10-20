@@ -3137,7 +3137,10 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
  * The rate a public utility following its target charges now, or undefined where there is no
  * target to follow: investor-owned and multiplayer companies, and tutorials.
  */
-function followedTargetRate(state: GameType): number | undefined {
+function followedTargetRate(
+  state: GameType,
+  date: DateType = state.date,
+): number | undefined {
   const scenario = getScenario(state.scenarioId, state.customScenario);
   if (
     !scenario ||
@@ -3148,9 +3151,18 @@ function followedTargetRate(state: GameType): number | undefined {
     return undefined;
   return publicTargetRate(
     scenario.dollarsPerkWh,
-    state.date,
+    date,
     state.startingYear,
     state.seed,
+  );
+}
+
+/** Current-month edits stay in force; future months apply the same target as live rollover. */
+function customerBaseRateAt(state: GameType, date: DateType): number {
+  return (
+    (state.rateFollowsTarget && date.monthsElapsed > state.date.monthsElapsed
+      ? followedTargetRate(state, date)
+      : undefined) ?? state.dollarsPerkWh
   );
 }
 
@@ -3944,7 +3956,11 @@ function getDemandW(
     prev.deferredResidential,
     TICK_MINUTES * tickScale,
   );
-  now.customerBillingRate = customerBillingRate(game, now);
+  now.customerBillingRate = customerBillingRate(
+    game,
+    now,
+    customerBaseRateAt(game, date),
+  );
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
     0,
@@ -4838,7 +4854,11 @@ function* supplyFacilitiesFinancesPhases(
   const demandWh = (now.demandW / ticksPerHour) * GAME_TO_REAL_YEARS;
   // Re-read the base rate for live slider edits; demand forecasts may have been
   // generated before that edit. Forecast passes advance their own policy copy.
-  now.customerBillingRate = customerBillingRate(state, now);
+  now.customerBillingRate = customerBillingRate(
+    state,
+    now,
+    customerBaseRateAt(state, tickDate),
+  );
   const customerRevenue =
     (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
@@ -5280,6 +5300,7 @@ export function forecastMonthClosingCashAtCustomerRate(
 ): number {
   const forecast = cloneDeep(state);
   forecast.dollarsPerkWh = dollarsPerkWh;
+  forecast.rateFollowsTarget = false;
   forecast.timeline = reforecastSupply(forecast, true);
   const closesMinute = (state.date.monthsElapsed + 1) * MINUTES_PER_MONTH;
   for (

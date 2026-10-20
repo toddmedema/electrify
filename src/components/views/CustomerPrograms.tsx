@@ -893,8 +893,9 @@ export function ProgramsScreen({
         else onClose();
       }
     };
-    document.addEventListener("keydown", closeOnEscape, true);
-    return () => document.removeEventListener("keydown", closeOnEscape, true);
+    // Foreground menus and dialogs consume Escape before it reaches the decision behind them.
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
   }, [onClose, manualOpen, embedded, selected, activeCard, setSelected]);
   // A docked overview may stay open while playing. Freeze time only while reviewing an
   // individual decision; the standalone screen retains its existing pause behavior.

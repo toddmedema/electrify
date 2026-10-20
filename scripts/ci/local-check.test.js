@@ -56,6 +56,10 @@ test("full checks retain every gate; partial checks reject unknown or injected n
     selectSteps(["--steps", "multiplayer,browser"]).map((step) => step.id),
     ["build", "browser", "desktop-build", "multiplayer"],
   );
+  assert.deepEqual(
+    selectSteps(["--steps", "bundle"]).map((step) => step.id),
+    ["build", "bundle"],
+  );
   for (const args of [
     ["--steps", ""],
     ["--steps", "lnti"],
@@ -107,7 +111,7 @@ test("full and partial checks finish all gates after failures and never overlap 
 test("a failed build skips the suites that test it and still runs later gates", async () => {
   const visited = [];
   const results = await execute(
-    selectSteps(["--steps", "browser,multiplayer"]),
+    selectSteps(["--steps", "bundle,browser,multiplayer"]),
     async (step) => {
       visited.push(step.id);
       return { ...step, ok: step.id !== "build" };
@@ -115,6 +119,7 @@ test("a failed build skips the suites that test it and still runs later gates", 
   );
   assert.deepEqual(visited, ["build", "desktop-build", "multiplayer"]);
   assert.equal(results.find((result) => result.id === "browser").ok, false);
+  assert.equal(results.find((result) => result.id === "bundle").ok, false);
 });
 
 test("asset preflight rejects pointers and missing tracked files, ignoring untracked files", (t) => {

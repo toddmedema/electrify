@@ -28,6 +28,35 @@ async function settleSheets(page: Page) {
   });
 }
 
+test("Escape closes the game menu before an unsaved program decision", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  await page.locator("#programsNav").click();
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await programs.getByRole("button", { name: /^Time-of-use tariff ·/ }).click();
+  await programs.getByRole("radio", { name: "On", exact: true }).check();
+  await programs.getByLabel("Daily window").selectOption("22");
+  await page.locator(".gameMenuButton").click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(
+    programs.getByRole("region", { name: "Program details" }),
+  ).toBeVisible();
+  await expect(
+    programs.getByRole("radio", { name: "On", exact: true }),
+  ).toBeChecked();
+  await expect(programs.getByLabel("Daily window")).toHaveValue("22");
+  await programs
+    .getByRole("heading", { name: "Time-of-use tariff", exact: true })
+    .focus();
+  await page.keyboard.press("Escape");
+  await expect(
+    programs.getByRole("region", { name: "Electricity pricing" }),
+  ).toBeVisible();
+});
+
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
   page,
 }) => {

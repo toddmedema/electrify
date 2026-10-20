@@ -74,9 +74,22 @@ test("reproduction commands use the matching local gate for each Playwright proj
       "Math › pow rounds",
     ]),
     [
-      "npm run build && npm run test:e2e:ci -- e2e/game-workspace.spec.ts:124 --project=mobile-390px",
+      "npm run test:e2e -- e2e/game-workspace.spec.ts:124 --project=mobile-390px",
       "npm run check -- --steps multiplayer",
       "e2e/desktop.spec.ts:180 runs only in CI (native windows); read its trace in the diagnostics artifact",
+    ],
+  );
+});
+
+test("reproduction supports specs outside the CI allowlist and unnamed projects", () => {
+  assert.deepEqual(
+    reproduce([
+      "[desktop-1440px] › e2e/scenario-details.spec.ts:12:5 › shows score",
+      "e2e/scenario-details.spec.ts:20:5 › shows goals",
+    ]),
+    [
+      "npm run test:e2e -- e2e/scenario-details.spec.ts:12 --project=desktop-1440px",
+      "npm run test:e2e -- e2e/scenario-details.spec.ts:20",
     ],
   );
 });
