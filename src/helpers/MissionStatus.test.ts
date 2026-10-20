@@ -288,10 +288,16 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
     g.timeline[0].cash = -1;
   });
   expect(selectMissionRisk(cash, [event])?.id).toBe("cash");
+  expect(selectMissionRisk(cash, [event], getMissionStatus(cash))?.id).toBe(
+    "cash",
+  );
   const shortage = createNextState(cash, (g) => {
     g.timeline[0].supplyW = 99;
   });
   expect(selectMissionRisk(shortage, [event])?.id).toBe("shortage");
+  expect(
+    selectMissionRisk(shortage, [event], getMissionStatus(shortage))?.id,
+  ).toBe("shortage");
   const failed = createNextState(fixture(38), (g) => {
     g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
     g.timeline.push(
@@ -314,6 +320,24 @@ test("risk precedence distinguishes actual shortage, cash, required failure and 
     ])?.target,
   ).toEqual({ card: "INSIGHTS", eventKey: "b" });
   expect(selectMissionRisk(fixture())).toBeUndefined(); // zero reserve is not shortage
+});
+
+test("reuses the current mission status without reading completed history again", () => {
+  const game = createNextState(fixture(38), (g) => {
+    g.monthlyHistory = [monthRow(2025, 2, 99), monthRow(2025, 1)];
+  });
+  const mission = getMissionStatus(game);
+  const expected = selectMissionRisk(game);
+  expect(expected?.id).toBe("reliability");
+  const alreadySummarized = {
+    ...game,
+    get monthlyHistory(): MonthlyHistoryType[] {
+      throw new Error(
+        "Completed history was already summarized for this render",
+      );
+    },
+  };
+  expect(selectMissionRisk(alreadySummarized, [], mission)).toEqual(expected);
 });
 
 // The runway reads the forward projection, not the average of recent months. Scenario 111's

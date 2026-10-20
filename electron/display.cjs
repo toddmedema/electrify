@@ -1,5 +1,4 @@
-/** Wait for the native fullscreen transition before another queued display change. */
-function setFullscreen(window, fullscreen, timeoutMs = 5000) {
+function confirmFullscreen(window, fullscreen, request, timeoutMs) {
   if (window.isDestroyed() || window.isFullScreen() === fullscreen)
     return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -20,12 +19,27 @@ function setFullscreen(window, fullscreen, timeoutMs = 5000) {
     window.once(event, done);
     window.once("closed", done);
     try {
-      window.setFullScreen(fullscreen);
+      request();
     } catch (error) {
       cleanup();
       reject(error);
     }
   });
+}
+
+/** Observe native completion without changing the window's requested display mode. */
+function waitForFullscreen(window, fullscreen, timeoutMs = 5000) {
+  return confirmFullscreen(window, fullscreen, () => {}, timeoutMs);
+}
+
+/** Wait for the native fullscreen transition before another queued display change. */
+function setFullscreen(window, fullscreen, timeoutMs = 5000) {
+  return confirmFullscreen(
+    window,
+    fullscreen,
+    () => window.setFullScreen(fullscreen),
+    timeoutMs,
+  );
 }
 
 async function applyNativeDisplay(
@@ -130,6 +144,7 @@ function createDisplayQueue(update) {
 }
 
 module.exports = {
+  waitForFullscreen,
   setFullscreen,
   applyNativeDisplay,
   applyConfirmedDisplay,
