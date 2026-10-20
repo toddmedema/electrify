@@ -142,6 +142,14 @@ function publishState() {
 }
 
 function publishGameFocus() {
+  steam.setInputEnabled(
+    !!window &&
+      !window.isDestroyed() &&
+      window.isFocused() &&
+      !steam.overlayActive &&
+      !quitRequested &&
+      rendererReady,
+  );
   if (window && !window.isDestroyed())
     window.webContents.send(
       "desktop:focus-changed",
@@ -235,6 +243,7 @@ async function quitFailure() {
   if (response === (crashed ? 1 : 2)) return finishQuit();
   quitRequested = false;
   displayChanges.resume();
+  publishGameFocus();
   if (!window || window.isDestroyed()) return finishQuit();
   // The renderer can also die while the ordinary save warning is already open.
   // Both Retry and Return then recover the game instead of pretending to save it.
@@ -247,6 +256,7 @@ function requestQuit() {
   if (!window || window.isDestroyed() || (!rendererReady && !rendererCrashed))
     return finishQuit();
   quitRequested = true;
+  steam.setInputEnabled(false);
   displayChanges.pause();
   if (rendererCrashed) return quitFailure();
   window.webContents.send("desktop:before-quit");
@@ -266,6 +276,7 @@ function handle(channel, callback) {
 handle("desktop:state", () => {
   rendererReady = true;
   rendererCrashed = false;
+  publishGameFocus();
   void steam.flushScores();
   return state();
 });
@@ -295,6 +306,7 @@ handle("desktop:friends", () => {
 });
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
+handle("desktop:input-context", (context) => steam.setInputContext(context));
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
 function multiplayerRequest(input) {
@@ -499,10 +511,22 @@ async function createWindow() {
     // A crashed renderer can't answer the save handshake; don't make Quit wait for it.
     rendererReady = false;
     rendererCrashed = true;
+    steam.setInputEnabled(false);
     if (quitRequested && !finalizingQuit) void quitFailure();
   });
   window.on("blur", publishGameFocus);
   window.on("focus", publishGameFocus);
+  window.webContents.on("did-start-loading", () => {
+    rendererReady = false;
+    steam.setInputEnabled(false);
+  });
+  const inputManifest = app.isPackaged
+    ? path.join(process.resourcesPath, "steam-input", "actions.vdf")
+    : path.join(app.getAppPath(), "steamworks", "input", "actions.vdf");
+  steam.configureInput(inputManifest, (frame) => {
+    if (window && !window.isDestroyed() && rendererReady)
+      window.webContents.send("desktop:input-event", frame);
+  });
   window.on("leave-full-screen", () => {
     if (displayUpdating) return;
     preferences.fullscreen = false;
@@ -564,6 +588,7 @@ async function createWindow() {
   }, 5000);
   steamTimer.unref();
   window.once("closed", () => {
+    steam.input?.dispose();
     clearInterval(steamTimer);
     clearTimeout(resizeTimer);
   });

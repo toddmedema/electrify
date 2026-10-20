@@ -12,6 +12,7 @@ module.exports = {
     "node_modules/@koromix/koffi-*/**/*",
   ],
   npmRebuild: false,
+  extraResources: [{ from: "steamworks/input", to: "steam-input" }],
   files: [
     "build/**/*",
     "electron/**/*.cjs",

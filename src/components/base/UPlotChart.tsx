@@ -649,7 +649,11 @@ export default function UPlotChart<S>(
                   End: data[0].length - 1,
                   Enter: current,
                 };
-                if (event.key === "Escape") {
+                if (
+                  event.key === "Escape" &&
+                  (selectedPoint !== null ||
+                    (plotRef.current?.cursor.left ?? -1) >= 0)
+                ) {
                   event.preventDefault();
                   closeDetails();
                 } else if (event.key in points) {

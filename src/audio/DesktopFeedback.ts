@@ -115,9 +115,10 @@ function snapshot(store: AppStore): SoundEventSnapshot {
   };
 }
 
-export function startDesktopFeedback(store: AppStore): () => void {
+export function startDesktopFeedback(store: AppStore) {
   const desktop = getDesktop();
-  if (!desktop) return () => {};
+  if (!desktop)
+    return Object.assign(() => {}, { controllerCue: (_cue: MenuCue) => {} });
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
   let nativeFocused = true;
   let windowFocused = document.hasFocus();
@@ -145,11 +146,12 @@ export function startDesktopFeedback(store: AppStore): () => void {
     audio.stop();
     haptics.stop();
   };
+  const controllerCue = (cue: MenuCue) => {
+    void audio.play(cue);
+    if (cue === "confirm") haptics.play("confirm");
+  };
   const stopInput = bindDesktopMenuInput(
-    (cue) => {
-      void audio.play(cue);
-      if (cue === "confirm") haptics.play("confirm");
-    },
+    controllerCue,
     () => store.getState().card.name === "SETTINGS",
     foreground,
   );
@@ -212,17 +214,20 @@ export function startDesktopFeedback(store: AppStore): () => void {
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("gamepaddisconnected", stop);
   reduced.addEventListener("change", onReducedMotion);
-  return () => {
-    disposed = true;
-    stop();
-    stopInput();
-    stopStore();
-    stopNative();
-    stopQuit();
-    window.removeEventListener("blur", onBlur);
-    window.removeEventListener("focus", onFocus);
-    document.removeEventListener("visibilitychange", onVisibility);
-    window.removeEventListener("gamepaddisconnected", stop);
-    reduced.removeEventListener("change", onReducedMotion);
-  };
+  return Object.assign(
+    () => {
+      disposed = true;
+      stop();
+      stopInput();
+      stopStore();
+      stopNative();
+      stopQuit();
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("gamepaddisconnected", stop);
+      reduced.removeEventListener("change", onReducedMotion);
+    },
+    { controllerCue },
+  );
 }
