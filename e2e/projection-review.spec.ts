@@ -52,6 +52,14 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    const cashWarning = page.getByRole("dialog", {
+      name: "You're about to run out of cash - raise your rates?",
+      exact: true,
+    });
+    await cashWarning
+      .getByRole("button", { name: "Go bankrupt", exact: true })
+      .click();
+    await expect(cashWarning).toBeHidden();
     const insights = page.locator(".insights:visible");
     await openPane(
       insights,
