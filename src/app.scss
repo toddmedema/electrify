@@ -5494,6 +5494,86 @@ $homeSmokeCycle: 5.6s;
 .facilitySupplyChart {
   flex: 0 0 auto;
 }
+.productionMix {
+  padding: 0 16px;
+}
+.productionMixTarget {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: var(--radius-sm);
+}
+.productionMixTrack {
+  display: flex;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--border-subtle);
+}
+.productionMixSegment {
+  height: 100%;
+  flex: 0 0 auto;
+  + .productionMixSegment {
+    box-shadow: inset 1px 0 var(--bg-primary);
+  }
+}
+.productionMixTooltip.MuiTooltip-tooltip {
+  box-sizing: border-box;
+  width: 256px;
+  max-width: calc(100vw - 32px);
+  max-height: min(300px, calc(100dvh - 32px));
+  overflow-y: auto;
+  margin: 4px 0 !important;
+  padding: 12px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: var(--radius-md);
+  background: var(--tooltip-bg);
+  box-shadow: 0 8px 24px var(--tooltip-shadow);
+  color: var(--font-color-primary);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.productionMixDetails {
+  display: grid;
+  gap: 8px;
+}
+.productionMixSources {
+  display: grid;
+  gap: 4px;
+}
+.productionMixSource {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.productionMixSwatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.productionMixTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+@media (pointer: coarse) {
+  .productionMixTarget {
+    min-height: 44px;
+  }
+}
 .dailyProductionChart .chartLegend {
   padding: 8px 12px 0;
   gap: 4px 8px;

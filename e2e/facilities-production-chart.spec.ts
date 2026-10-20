@@ -4,6 +4,141 @@ import { openPane, openBuild } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
+  test(`current production mix stays a thin bar with inspectable details in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await page.mouse.move(0, 0);
+    const bar = pane.getByRole("button", {
+      name: "Inspect current production mix",
+    });
+    await expect(bar).toBeVisible();
+    await expect(bar).toHaveText("");
+    const chartBounds = (await pane
+      .locator("#chartSupplyDemand")
+      .boundingBox())!;
+    const barBounds = (await bar.boundingBox())!;
+    expect(barBounds.y).toBeGreaterThanOrEqual(
+      chartBounds.y + chartBounds.height,
+    );
+    expect(barBounds.height).toBeGreaterThanOrEqual(
+      info.project.use.hasTouch ? 44 : 40,
+    );
+    expect(
+      (await bar.locator(".productionMixTrack").boundingBox())!.height,
+    ).toBe(4);
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await page.evaluate(() => document.fonts.ready);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `mix-${info.project.name}-${theme}-rest.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    if (info.project.use.hasTouch) await bar.tap();
+    else await bar.hover();
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toContainText("Supply now");
+    await expect(tooltip).toContainText("Total supply");
+    await expect(tooltip.locator(".productionMixSource")).not.toHaveCount(0);
+    const tipBounds = (await tooltip.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(tipBounds.x).toBeGreaterThanOrEqual(0);
+    expect(tipBounds.y).toBeGreaterThanOrEqual(0);
+    expect(tipBounds.x + tipBounds.width).toBeLessThanOrEqual(viewport.width);
+    expect(tipBounds.y + tipBounds.height).toBeLessThanOrEqual(viewport.height);
+    if (!info.project.use.hasTouch) {
+      await tooltip.hover();
+      await expect(tooltip).toBeVisible();
+    }
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `mix-${info.project.name}-${theme}-open.png`,
+        ),
+        animations: "disabled",
+      });
+    }
+    if (info.project.use.hasTouch) {
+      await bar.tap();
+      await expect(tooltip).toBeHidden();
+      await bar.tap();
+      await expect(tooltip).toBeVisible();
+    }
+    await page.getByRole("heading", { level: 6 }).first().click();
+    await expect(tooltip).toBeHidden();
+    await bar.focus();
+    await bar.press("Enter");
+    await expect(tooltip).toBeVisible();
+    await bar.press("Escape");
+    await expect(tooltip).toBeHidden();
+
+    // A saved reading distinct from its forecast proves this is the current mix.
+    await editSavedGame(page, (save) => {
+      save.game.timeline.forEach((tick) => {
+        tick.supplyByFuel =
+          tick.minute === save.game.date.minute
+            ? { Wind: 25e6, Uranium: 75e6, Sun: 0 }
+            : { Coal: 900e6 };
+        tick.storageDischargeW = 0;
+        tick.importedW = 0;
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await bar.click();
+    await expect(tooltip).toContainText("25MW");
+    await expect(tooltip).toContainText("75MW");
+    await expect(tooltip).toContainText("100MW");
+    await expect(tooltip).not.toContainText("900MW");
+    const segments = bar.locator(".productionMixSegment");
+    await expect(segments).toHaveCount(2);
+    const shares = await segments.evaluateAll((elements) =>
+      elements.map((el) => (el as HTMLElement).style.width).sort(),
+    );
+    expect(shares).toEqual(["25%", "75%"]);
+
+    // The same inspectable target remains when the entire fleet is idle.
+    await editSavedGame(page, (save) => {
+      save.game.timeline.forEach((tick) => {
+        tick.supplyByFuel = { Sun: 0 };
+        tick.storageDischargeW = 0;
+        tick.importedW = 0;
+      });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await bar.click();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText("No production now");
+    await expect(segments).toHaveCount(0);
+  });
+}
+
+for (const theme of ["light", "dark"]) {
   test(`storage and complete demand remain compact and inspectable in ${theme}`, async ({
     page,
   }, info) => {
@@ -484,6 +619,44 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await chart.screenshot({
     path: info.outputPath("concurrent-flow-fixture.png"),
   });
+  const mix = pane.getByRole("button", {
+    name: "Inspect current production mix",
+  });
+  await mix.click();
+  const mixDetails = page.getByRole("tooltip");
+  await expect(mixDetails).toBeVisible();
+  await expect(mixDetails.locator(".productionMixSource")).toHaveCount(13);
+  await expect(mixDetails).toContainText("Storage discharge");
+  await expect(mixDetails).toContainText("Imports");
+  const mixBounds = (await mixDetails.boundingBox())!;
+  expect(mixBounds.y).toBeGreaterThanOrEqual(0);
+  expect(mixBounds.y + mixBounds.height).toBeLessThanOrEqual(
+    page.viewportSize()!.height,
+  );
+  expect(
+    await mixDetails.evaluate((el) => el.scrollWidth - el.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  await mix.press("End");
+  expect(
+    await mixDetails
+      .locator(".productionMixTooltip")
+      .evaluate((el) => el.scrollTop),
+  ).toBeGreaterThan(0);
+  await expect(mixDetails.getByText("Total supply")).toBeVisible();
+  await mix.press("Home");
+  expect(
+    await mixDetails
+      .locator(".productionMixTooltip")
+      .evaluate((el) => el.scrollTop),
+  ).toBe(0);
+  await mix.press("ArrowDown");
+  expect(
+    await mixDetails
+      .locator(".productionMixTooltip")
+      .evaluate((el) => el.scrollTop),
+  ).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(mixDetails).toBeHidden();
   if (process.env.REVIEW_SCREENSHOT_DIR) {
     await chart.screenshot({
       path: path.join(

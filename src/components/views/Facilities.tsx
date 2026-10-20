@@ -30,6 +30,7 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
+  currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
@@ -49,6 +50,7 @@ import {
   formatFacilitySize,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import ProductionMixBar from "../base/ProductionMixBar";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
@@ -714,6 +716,7 @@ function FacilitySupplyChart({
   game: GameType;
   anchor: React.RefObject<HTMLDivElement>;
 }) {
+  const fuelOrder = getDispatchOrderedFuels(game.facilities);
   return (
     <div
       ref={anchor}
@@ -724,12 +727,13 @@ function FacilitySupplyChart({
       <ChartSupplyDemand
         height={180}
         timeline={game.timeline}
-        fuelOrder={getDispatchOrderedFuels(game.facilities)}
+        fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         location={game.location}
         legend
         startingYear={game.startingYear}
       />
+      <ProductionMixBar tick={currentTick(game)} fuelOrder={fuelOrder} />
     </div>
   );
 }
