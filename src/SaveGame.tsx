@@ -1,3 +1,4 @@
+import { validScenarioMod } from "./helpers/ScenarioMod";
 import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
 import { maxLoanAmount } from "./helpers/Financials";
 import {
@@ -611,6 +612,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!validCustomEventScenario(game.customScenario)) return null;
+  if (
+    game.customScenario?.mod !== undefined &&
+    (!validScenarioMod(game.customScenario.mod) ||
+      game.scenarioId !== 999 ||
+      game.customScenario.id !== 999)
+  )
+    return null;
   const transmissionEnabled = !!(
     scenario && intertiesEnabledForScenario(scenario, game.location)
   );

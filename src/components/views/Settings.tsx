@@ -52,6 +52,7 @@ export interface DispatchProps {
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onManageSaves: () => void;
+  onManageMods: () => void;
   onBack: () => void;
 }
 
@@ -188,6 +189,20 @@ export default function Settings(props: Props): React.JSX.Element {
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
+  // Feature-detected: only a desktop bridge with mod support offers the screen.
+  const modsBridge =
+    process.env.REACT_APP_DESKTOP === "true" ? getDesktop()?.mods : undefined;
+  const [modCount, setModCount] = React.useState<number>();
+  React.useEffect(() => {
+    if (!modsBridge) return;
+    let live = true;
+    void modsBridge({ kind: "list" })
+      .then((library) => live && setModCount(library.entries.length))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [modsBridge]);
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -426,6 +441,26 @@ export default function Settings(props: Props): React.JSX.Element {
             )}
           </SettingsGroup>
 
+          {desktopApp && modsBridge && (
+            <SettingsGroup id="mods-settings" title="Mods">
+              <SettingRow
+                label="Community scenarios"
+                description={
+                  modCount
+                    ? `${modCount} installed`
+                    : "Play scenarios from files or Steam Workshop."
+                }
+              >
+                <Button
+                  data-mods-trigger
+                  variant="outlined"
+                  onClick={props.onManageMods}
+                >
+                  Manage mods
+                </Button>
+              </SettingRow>
+            </SettingsGroup>
+          )}
           <SettingsGroup id="saved-game-settings" title="Game data">
             <SettingRow
               label="Saved games"

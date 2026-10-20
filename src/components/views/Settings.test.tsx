@@ -36,6 +36,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onManageSaves: () => undefined,
+    onManageMods: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -119,6 +120,30 @@ describe("Settings", () => {
     expect(localStorage.getItem("steamTimelineEnabled")).toBe("true");
     expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
   });
+  it("offers mod management only when the desktop bridge supports it", async () => {
+    const state = {
+      display: { fullscreen: true, width: 1, height: 1, resolutions: [] },
+      steam: { available: false, online: false, cloudEnabled: false },
+    };
+    window.electrifyDesktop = {
+      apiVersion: 1,
+      getState: jest.fn(async () => state),
+      onStateChanged: jest.fn(() => () => {}),
+    } as unknown as DesktopBridge;
+    const { unmount } = renderSettings();
+    expect(screen.queryByText("Manage mods")).toBeNull();
+    unmount();
+    window.electrifyDesktop = {
+      ...window.electrifyDesktop,
+      mods: jest.fn(async () => ({ entries: [{}, {}, {}] })),
+    } as unknown as DesktopBridge;
+    const onManageMods = jest.fn();
+    renderSettings({ onManageMods });
+    expect(await screen.findByText("3 installed")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Manage mods"));
+    expect(onManageMods).toHaveBeenCalledTimes(1);
+  });
+
   it("changes appearance and units with direct choices", async () => {
     const onThemeChange = jest.fn();
     const onUnitsChange = jest.fn();

@@ -1,4 +1,5 @@
 import { getLocalStorage } from "./Globals";
+import { withoutMod } from "./helpers/ScenarioMod";
 import { LocalStoragePlayedType, ScenarioType } from "./Types";
 
 // Force specifying a default, since just doing (|| fallback) would bork on stored falsey values
@@ -143,9 +144,10 @@ const CUSTOM_GAME_KEY = "customGame";
 // rather than back at the defaults. Unlike a save, this is only the setup, never a game in
 // progress - see SaveGame for the latter
 export function getCustomScenario(fallback: ScenarioType): ScenarioType {
-  return getStorageJson<ScenarioType>(CUSTOM_GAME_KEY, fallback);
+  // A mod run never becomes the remembered custom setup, even from an older build.
+  return withoutMod(getStorageJson<ScenarioType>(CUSTOM_GAME_KEY, fallback));
 }
 
 export function recordCustomScenario(scenario: ScenarioType) {
-  setStorageKeyValue(CUSTOM_GAME_KEY, scenario);
+  setStorageKeyValue(CUSTOM_GAME_KEY, withoutMod(scenario));
 }

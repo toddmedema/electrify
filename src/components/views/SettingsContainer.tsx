@@ -48,6 +48,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onManageSaves: () => {
       dispatch(navigate("SAVED_GAMES"));
     },
+    onManageMods: () => {
+      dispatch(navigate("MODS"));
+    },
     // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu
     onBack: () => {

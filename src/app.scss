@@ -7334,8 +7334,9 @@ $programs_column: 800px;
     transition: none !important;
   }
 }
-// Save management follows the same quiet grouped surfaces as Settings.
-.savedGames {
+// Save and mod management follow the same quiet grouped surfaces as Settings.
+.savedGames,
+.modsScreen {
   .MuiButton-root,
   .MuiIconButton-root {
     min-height: 40px;
@@ -7345,7 +7346,8 @@ $programs_column: 800px;
     min-width: 40px;
   }
 
-  .saveEntry {
+  .saveEntry,
+  .modEntry {
     padding: 16px;
   }
 }
@@ -7365,6 +7367,8 @@ $programs_column: 800px;
   .savedGames .MuiButton-root,
   .savedGames .MuiIconButton-root,
   .savedGames .MuiInputBase-root,
+  .modsScreen .MuiButton-root,
+  .modsScreen .MuiInputBase-root,
   .saveStatusAction {
     min-height: 44px;
   }

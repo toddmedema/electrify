@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
+import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
@@ -66,6 +67,25 @@ describe("GameAppBar", () => {
       screen.getByRole("button", { name: "Save failed · Manage saves" }),
     );
     expect(onSavedGames).toHaveBeenCalledTimes(1);
+  });
+  it("labels a modded run as unranked in words for the whole run", () => {
+    const game = createGame({ scenarioId: 101 });
+    const { unmount } = renderAppBar();
+    expect(screen.queryByText("Modded · Unranked")).toBeNull();
+    unmount();
+    renderAppBar({
+      game: {
+        ...game,
+        inGame: true,
+        customScenario: {
+          ...DEFAULT_CUSTOM_SCENARIO,
+          mod: {
+            source: { id: "grid", title: "Grid", creator: "A", version: "1" },
+          },
+        },
+      },
+    });
+    expect(screen.getByText("Modded · Unranked")).toBeInTheDocument();
   });
   afterEach(() => {
     mockDesktop = false;

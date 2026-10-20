@@ -73,6 +73,12 @@ const AchievementGallery = React.lazy(() =>
   ).then(({ AchievementGallery }) => ({ default: AchievementGallery })),
 );
 
+// Desktop-only: web builds drop the screen and its mod parser entirely.
+const Mods =
+  process.env.REACT_APP_DESKTOP === "true"
+    ? React.lazy(() => import("./views/Mods"))
+    : () => null;
+
 const GAME_WORKSPACE_KEY = "GAME_WORKSPACE";
 
 // How many facilities the number row can reach. Nine because that is how many number keys
@@ -521,6 +527,12 @@ export default class Compositor extends React.Component<Props, {}> {
         );
       case "SAVED_GAMES":
         return <SavedGames />;
+      case "MODS":
+        return (
+          <React.Suspense fallback={<p role="status">Loading mods…</p>}>
+            <Mods />
+          </React.Suspense>
+        );
       case "MAIN_MENU":
         return <MainMenuContainer />;
       case "MANUAL":

@@ -24,6 +24,8 @@ const {
 const { atomicWrite, readJson, DesktopSaveStore } = require("./storage.cjs");
 const { SteamService } = require("./steam.cjs");
 const { SteamMultiplayer, lobbyFromArgs } = require("./steam-multiplayer.cjs");
+const { ModStore } = require("./mods.cjs");
+const { SteamWorkshop } = require("./steam-workshop.cjs");
 const { applyConfirmedDisplay, createDisplayQueue } = require("./display.cjs");
 
 protocol.registerSchemesAsPrivileged([
@@ -69,6 +71,9 @@ if (
 // the running game's rich presence, or clear it again while it exits.
 const primaryInstance = app.requestSingleInstanceLock();
 const steam = new SteamService();
+let modStore;
+let workshop;
+
 if (primaryInstance)
   steam.initialize(
     app,
@@ -309,6 +314,13 @@ handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:input-context", (context) => steam.setInputContext(context));
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
+// Like the multiplayer bridge, mod requests resolve with player-facing errors rather than
+// rejecting, so the renderer never shows Electron's IPC wrapper text.
+handle("desktop:mods", (input) =>
+  modStore
+    ? modStore.request(input)
+    : { entries: [], error: "Mod management is still starting. Try again." },
+);
 function multiplayerRequest(input) {
   if (!steam.multiplayer && (!steam.state().online || !steam.dispatcher)) {
     if (input?.kind === "state")
@@ -372,6 +384,18 @@ function openExternal(url) {
   }
 }
 
+/** Opens a Steam Community page in the overlay, or the browser when Steam isn't running. */
+function openSteamPage(url) {
+  if (steam.state().online && steam.client)
+    try {
+      steam.client.overlay.activateToWebPage(url);
+      return;
+    } catch (error) {
+      console.warn(`Steam overlay unavailable: ${error.message}`);
+    }
+  openExternal(url);
+}
+
 async function createWindow() {
   if (!fs.existsSync(path.join(root, "index.html")))
     throw new Error("Run npm run desktop:build before opening Electrify");
@@ -382,6 +406,33 @@ async function createWindow() {
     preferences = normalizeDisplay(null, display);
   }
   saves = new DesktopSaveStore(app.getPath("userData"), steam);
+  modStore = new ModStore(app.getPath("userData"), {
+    appId: config.appId,
+    workshop: () => {
+      if (!steam.state().online || !steam.dispatcher) return null;
+      workshop ??= new SteamWorkshop(steam, config.appId);
+      return workshop;
+    },
+    chooseFile: async () => {
+      const result = await dialog.showOpenDialog(window, {
+        title: "Import data-only scenario mod",
+        properties: ["openFile"],
+        filters: [{ name: "Scenario package", extensions: ["json"] }],
+      });
+      return result.canceled ? undefined : result.filePaths[0];
+    },
+    chooseSave: async () => {
+      const result = await dialog.showSaveDialog(window, {
+        title: "Save scenario mod template",
+        defaultPath: "scenario.json",
+        filters: [{ name: "Scenario package", extensions: ["json"] }],
+      });
+      return result.canceled ? undefined : result.filePath;
+    },
+    openUrl: openSteamPage,
+  });
+  // Upload stages from an earlier session; a failure is logged and never blocks launch.
+  void modStore.cleanupStages();
   steam.configureScoreQueue(saves.directory);
   steam.configureAchievements(saves.directory, config.appId);
   if (steam.state().online) {
