@@ -22,6 +22,12 @@ const expectInsightSpacing = async (insights: Locator) => {
     const panelTitle = element
       .closest(".gameToolPanel")!
       .querySelector(".gameToolHeader h2")!;
+    const layers = element.querySelector(".insightsLayerControls")!;
+    const layerLabel = document.createRange();
+    layerLabel.selectNodeContents(layers.firstChild!);
+    const panLaterIcon = element.querySelector(
+      '.insightsViewportButtons [aria-label="Pan later"] path',
+    )!;
     const paneLeft = element.getBoundingClientRect().left;
     const insets = (row: Element, content: Element) => {
       const rowBox = row.getBoundingClientRect();
@@ -52,6 +58,10 @@ const expectInsightSpacing = async (insights: Locator) => {
       chartHeadingClearance:
         chartTitle.getBoundingClientRect().top -
         rail.getBoundingClientRect().bottom,
+      trailingControlAlignment: Math.abs(
+        layerLabel.getBoundingClientRect().right -
+          panLaterIcon.getBoundingClientRect().right,
+      ),
     };
   });
   for (const [name, inset] of Object.entries(spacing.left)) {
@@ -72,6 +82,10 @@ const expectInsightSpacing = async (insights: Locator) => {
     spacing.chartHeadingClearance,
     "chart title clears the rail divider",
   ).toBeGreaterThanOrEqual(8);
+  expect(
+    spacing.trailingControlAlignment,
+    "Pan later visually aligns with Layers",
+  ).toBeLessThanOrEqual(4);
 };
 
 for (const theme of ["light", "dark"] as const) {

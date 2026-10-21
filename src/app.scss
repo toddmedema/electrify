@@ -1678,7 +1678,8 @@ $pane_header_height: 48px;
   align-items: center;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 4px 16px;
+  // The trailing icon's own inset completes its alignment with the Layers label.
+  padding: 4px 8px 4px 16px;
   margin: 0 auto;
   overflow: hidden;
   border-bottom: $border_accent;
@@ -6766,7 +6767,7 @@ $programs_column: 800px;
     min-height: 44px;
     flex-wrap: nowrap;
     gap: 4px;
-    padding: 0 16px;
+    padding: 0 8px 0 16px;
   }
 
   .insights .insightsViewportButtons {
