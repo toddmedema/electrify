@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { resolve } from "path";
 
-// The manual's figures ship as WebP compressed from the originals in design/manual/ by
+// The manual's figures ship as WebP compressed from the originals in docs/manual-images/ by
 // `node scripts/compress-manual-images.js`. These tests keep the two in step.
 const root = process.cwd();
-const sourceDir = resolve(root, "design/manual");
+const sourceDir = resolve(root, "docs/manual-images");
 const imagesDir = resolve(root, "public/images");
 
 type Size = { width: number; height: number };

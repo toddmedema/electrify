@@ -21,8 +21,7 @@ process.stdin.on("end", () => {
       /^src\/.*\.(tsx?|jsx?|s?css|json)$/.test(relative) ||
       /^scripts\/.*\.js$/.test(relative) ||
       /^e2e\/.*\.ts$/.test(relative) ||
-      /^electron\/.*\.cjs$/.test(relative) ||
-      relative === "electron-builder.config.cjs";
+      /^electron\/.*\.cjs$/.test(relative);
     if (!formatted) return;
     execFileSync(
       process.execPath,

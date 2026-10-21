@@ -18,6 +18,7 @@ module.exports = {
     "electron/**/*.cjs",
     "src/mods/ModSchema.js",
     "!electron/*.test.cjs",
+    "!electron/electron-builder.config.cjs",
     "desktop-config.json",
     "package.json",
     "!node_modules/**/*",

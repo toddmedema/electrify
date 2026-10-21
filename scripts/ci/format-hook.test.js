@@ -31,7 +31,7 @@ test("the edit hook formats supported files with local Prettier, including paths
     path.join("e2e", "example.ts"),
     path.join("scripts", "example.js"),
     path.join("electron", "example.cjs"),
-    "electron-builder.config.cjs",
+    path.join("electron", "electron-builder.config.cjs"),
   ]) {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });

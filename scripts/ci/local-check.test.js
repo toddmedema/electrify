@@ -180,6 +180,38 @@ test("asset preflight rejects pointers and missing tracked files, ignoring untra
   checkAssets(root);
 });
 
+test("asset preflight checks manual originals under docs/manual-images", (t) => {
+  const parent = path.resolve(".tmp", "asset-preflight-tests");
+  fs.mkdirSync(parent, { recursive: true });
+  const root = fs.mkdtempSync(path.join(parent, "manual-"));
+  t.after(() => {
+    assert(root.startsWith(parent + path.sep));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: root, stdio: "pipe", windowsHide: true });
+  git("init", "--quiet");
+  const relative = "docs/manual-images/figure.png";
+  const asset = path.join(root, relative);
+  fs.mkdirSync(path.dirname(asset), { recursive: true });
+  fs.writeFileSync(
+    asset,
+    "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12\n",
+  );
+  git("-c", "core.autocrlf=false", "add", relative);
+  assert.throws(
+    () => checkAssets(root),
+    /Git LFS pointers[\s\S]*docs\/manual-images\/figure\.png/,
+  );
+  fs.writeFileSync(asset, "real manual artwork");
+  checkAssets(root);
+  fs.unlinkSync(asset);
+  assert.throws(
+    () => checkAssets(root),
+    /Missing tracked files[\s\S]*docs\/manual-images\/figure\.png/,
+  );
+});
+
 test("the simulation CLI uses an in-process Jest run and a worktree-local cache", () => {
   // Ask the CLI's actual Jest invocation for its resolved config, without running a simulation.
   const result = spawnSync(
