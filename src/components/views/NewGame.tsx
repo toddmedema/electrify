@@ -339,7 +339,7 @@ export default function NewGame(props: Props): React.JSX.Element {
         </IconButton>
       }
     >
-      <CoopBrowseBar coop={props.coop} />
+      <CoopBrowseBar coop={props.coop} offerSaves />
       <List
         dense
         className="scrollable cardList missionList"

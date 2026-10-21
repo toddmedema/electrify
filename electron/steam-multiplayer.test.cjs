@@ -121,6 +121,32 @@ function fixture(directory = "unused-test-path") {
   mp.hostId = service.identity.steamId;
   return { mp, api, calls, events };
 }
+test("campaign management exposes deletion but no rename, import or export requests", async () => {
+  const { mp } = fixture();
+  try {
+    let deleted;
+    mp.saves = {
+      remove: async (id) => {
+        deleted = id;
+      },
+      list: async () => ({ slots: [] }),
+    };
+    for (const kind of ["rename-save", "import-save", "export-save"])
+      await assert.rejects(
+        mp.request({ kind, id: "campaign", name: "Renamed" }),
+        /Unknown multiplayer request/,
+      );
+    assert.deepEqual(
+      await mp.request({ kind: "delete-save", id: "campaign" }),
+      {
+        slots: [],
+      },
+    );
+    assert.equal(deleted, "campaign");
+  } finally {
+    mp.dispose();
+  }
+});
 test("incoming connections use authenticated Steam identity and locked membership", () => {
   const { mp, api, calls } = fixture();
   try {
@@ -350,6 +376,7 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
   const guest = { id: "76561198000000002", connected: true, queue: [] };
   const world = {
     schema: 2,
+    matchId: "campaign-one",
     revision: 1,
     seats: [{ id: mp.service.identity.steamId }, { id: guest.id }],
   };
@@ -357,7 +384,7 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
     mp.connections.set(100, guest);
     await assert.rejects(
       mp.persist({ ...world, schema: 1 }),
-      /Invalid shared save/,
+      /Invalid multiplayer save/,
     );
     await Promise.all([
       mp.checkpoint(world),
@@ -382,15 +409,15 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
 
     // Exercise the actual guest persistence path, including a failed write and retry.
     mp.hostId = guest.id;
-    const savedFilename = mp.filename;
-    mp.filename = directory; // Writing a file over this directory must fail.
+    const savedFilename = mp.saves.filename;
+    mp.saves.filename = directory; // Writing a library over this directory must fail.
     await assert.rejects(mp.receive(guest.id, messages[1]));
     assert.equal(
       guest.queue.length,
       0,
       "failed persistence is never acknowledged",
     );
-    mp.filename = savedFilename;
+    mp.saves.filename = savedFilename;
     await mp.receive(guest.id, messages[1]);
     assert.equal(
       fs.readFileSync(mp.filename, "utf8"),
@@ -405,6 +432,35 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+test("healthy named campaigns checkpoint while a corrupt or newer legacy file stays untouched", async () => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const directory = fs.mkdtempSync(
+    path.join(temporaryRoot, "legacy-protection-"),
+  );
+  const { mp } = fixture(directory);
+  const world = {
+    schema: 3,
+    gameSchema: 3,
+    matchId: "current",
+    seats: [{ id: mp.service.identity.steamId }, { id: "76561198000000002" }],
+  };
+  try {
+    await mp.persist(world);
+    const future = stringify({ ...world, gameSchema: 99 });
+    fs.writeFileSync(mp.filename, future);
+    await mp.persist({ ...world, matchId: "another" });
+    assert.equal(fs.readFileSync(mp.filename, "utf8"), future);
+    fs.writeFileSync(mp.filename, "damaged legacy JSON");
+    await mp.persist({ ...world, revision: 2 });
+    assert.equal(fs.readFileSync(mp.filename, "utf8"), "damaged legacy JSON");
+    assert.equal((await mp.saves.list()).slots.length, 2);
+  } finally {
+    mp.dispose();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("only the host mirrors a bounded scenario selection to its guests", async () => {
   const { mp, events } = fixture();
   const browse = { session: "s", revision: 1, card: "NEW_GAME" };
@@ -427,13 +483,54 @@ test("only the host mirrors a bounded scenario selection to its guests", async (
     mp.dispose();
   }
 });
-test("players may set only their Ready selection, and only the host reopens the lobby", async () => {
+test("only the host mirrors a bounded campaign invitation roster", async () => {
+  const { mp, events } = fixture();
+  const campaign = {
+    id: "界".repeat(64),
+    name: "界".repeat(80),
+    players: Array.from({ length: 4 }, (_, index) => ({
+      id: `${index}${"1".repeat(63)}`,
+      name: "界".repeat(200),
+    })),
+    requiredPlayerIds: Array.from(
+      { length: 4 },
+      (_, index) => `${index}${"1".repeat(63)}`,
+    ),
+  };
+  try {
+    await assert.rejects(
+      mp.receive("76561198000000002", { kind: "campaign", campaign }),
+      /guest message/,
+    );
+    mp.hostId = "76561198000000002";
+    await mp.receive(mp.hostId, { kind: "campaign", campaign });
+    assert.equal(events.at(-1).payload.kind, "campaign");
+    await assert.rejects(
+      mp.receive(mp.hostId, {
+        kind: "campaign",
+        campaign: { ...campaign, padding: "x".repeat(4096) },
+      }),
+      /campaign selection/,
+    );
+  } finally {
+    mp.dispose();
+  }
+});
+test("players may set only their Ready selection and saved company, and only the host reopens the lobby", async () => {
   const { mp, api } = fixture();
   const written = [];
   api.setMemberData = (_self, _lobby, key, value) => written.push([key, value]);
   try {
     await mp.request({ kind: "member", key: "ready", value: "101|Manager|0" });
-    assert.deepEqual(written, [["ready", "101|Manager|0"]]);
+    await mp.request({
+      kind: "member",
+      key: "slot",
+      value: "0123456789abcdef0123456789abcdef:76561198000000002",
+    });
+    assert.deepEqual(written, [
+      ["ready", "101|Manager|0"],
+      ["slot", "0123456789abcdef0123456789abcdef:76561198000000002"],
+    ]);
     await assert.rejects(
       mp.request({ kind: "member", key: "location", value: "SF" }),
       /member data/,

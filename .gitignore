@@ -67,5 +67,9 @@ src/data/RunCompatibility.json
 # and test rebuild it. The service worker downloads the listed icons for offline play.
 public/icons.json
 
+# Generated from the locked installed dependencies by the web/desktop build scripts.
+public/notices.json
+public/notices-chromium.html
+
 # Build-specific Steam App ID/mode generated for the desktop depot, never shipped from source.
 desktop-config.json

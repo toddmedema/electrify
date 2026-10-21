@@ -101,6 +101,9 @@ let displayUpdating = false;
 let manualResize = false;
 const preferenceFile = path.join(app.getPath("userData"), "display.json");
 const root = path.join(app.getAppPath(), "build");
+const runtimeNotices = app.isPackaged
+  ? path.join(process.resourcesPath, "runtime-notices")
+  : path.join(app.getAppPath(), "node_modules/electron/dist");
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -156,13 +159,14 @@ function publishGameFocus() {
       !window.isDestroyed() &&
       window.isFocused() &&
       !steam.overlayActive &&
+      !steam.textInput?.active &&
       !quitRequested &&
       rendererReady,
   );
   if (window && !window.isDestroyed())
     window.webContents.send(
       "desktop:focus-changed",
-      window.isFocused() && !steam.overlayActive,
+      window.isFocused() && !steam.overlayActive && !steam.textInput?.active,
     );
 }
 steam.onOverlayChanged = publishGameFocus;
@@ -322,6 +326,11 @@ handle("desktop:friends", () => {
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:input-context", (context) => steam.setInputContext(context));
+handle("desktop:text-input", (input) => {
+  if (!window?.isFocused() || steam.overlayActive || quitRequested)
+    return { status: "unavailable" };
+  return steam.showTextInput(input);
+});
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
 // Like the multiplayer bridge, mod requests resolve with player-facing errors rather than
@@ -471,7 +480,7 @@ async function createWindow() {
   const policy = contentPolicy();
   await isolatedSession.protocol.handle("electrify", async (request) => {
     try {
-      const filename = resolveAsset(root, request.url);
+      const filename = resolveAsset(root, request.url, runtimeNotices);
       const data = await fs.promises.readFile(filename);
       const headers = {
         "Content-Type":

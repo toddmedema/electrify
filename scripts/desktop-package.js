@@ -9,6 +9,7 @@ const {
   verifySignedMacPackage,
 } = require("./desktop-verify");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
+const { preserveRuntimeNotices } = require("./runtime-notices");
 
 const MAC_ARCHITECTURES = ["arm64", "x64"];
 
@@ -131,6 +132,10 @@ function packageConfiguration(mode, appVersion = "dev") {
   const buildConfig = require("../electron/electron-builder.config.cjs");
   return {
     ...buildConfig,
+    electronVersion: require("../package-lock.json").packages[
+      "node_modules/electron"
+    ].version,
+    afterExtract: preserveRuntimeNotices,
     // Electron requires a semver package version; the game's identity is separate.
     extraMetadata: { ...buildConfig.extraMetadata, appVersion },
     win: {

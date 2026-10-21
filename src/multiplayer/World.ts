@@ -60,6 +60,7 @@ import type {
 import { parseSave, serializeSave, validTransmissionLine } from "../SaveGame";
 import { intertiesEnabledForScenario } from "../data/AdjacentMarkets";
 import { accessContextForGame } from "../data/IntertieAccess";
+import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 
 export const RULES = manifest.multiplayerCompatibilityId;
 export const EDGE_COST_PER_W = MULTIPLAYER_LINK_BUILD_COST_PER_W;
@@ -289,7 +290,8 @@ export function createWorld(
       });
   });
   return {
-    schema: 2,
+    schema: 3,
+    gameSchema: SAVE_SCHEMA_VERSION,
     rules: RULES,
     spec,
     outcomes: {},
@@ -299,12 +301,12 @@ export function createWorld(
     seats,
     grids,
     edges,
-    selectedSpeeds: Object.fromEntries(seats.map((s) => [s.id, "NORMAL"])),
+    selectedSpeeds: Object.fromEntries(seats.map((s) => [s.id, "PAUSED"])),
     activities: {},
     speed: "PAUSED",
     readyRequired: true,
     paused: true,
-    reason: "Everyone ready to begin?",
+    reason: "Paused",
     ready: [],
     sequences: {},
     receipts: {},
@@ -371,7 +373,10 @@ function applyCommandOnce(
     return;
   }
   if (command.kind === "ready") {
-    return markReady(world, sender, allowReady);
+    const error = markReady(world, sender, allowReady);
+    if (!error && world.selectedSpeeds[sender] === "PAUSED")
+      world.selectedSpeeds[sender] = "NORMAL";
+    return error;
   }
   // A retired company can still change its speed or menus, but its grid no longer moves.
   if (!isActive(world, sender)) return "Your company's run has ended";
@@ -655,7 +660,7 @@ export function roomView(world: World, seatId: string): RoomView {
             ? "Choosing a response"
             : undefined) ||
           (world.readyRequired && !world.ready.includes(seat.id)
-            ? "Select a speed to resume"
+            ? "Paused"
             : undefined),
       })),
     },
@@ -681,7 +686,7 @@ export function roomView(world: World, seatId: string): RoomView {
   };
 }
 
-/** First co-op schema: never load partial grids or reinterpret another build's rules. */
+/** All grids and dispatch plans are saved together, at one structural version. */
 export function checkpointWorld(world: World): World {
   return {
     ...world,
@@ -692,15 +697,23 @@ export function checkpointWorld(world: World): World {
 }
 
 const INCOMPLETE_SAVE =
-  "This co-op save is incomplete or needs its original game build";
-const INVALID_GRIDS = "Shared save contains invalid grids or connections";
+  "This co-op save is incomplete or uses an unsupported format. Your original save is preserved.";
+const INVALID_GRIDS = "Multiplayer save contains invalid grids or connections";
 
-/** Schema, build rules, a playable match spec and a two-to-four player roster. */
+/** Current structure, a playable match spec and a two-to-four player roster. */
 function validRoster(world: World) {
   if (
     !world ||
-    world.schema !== 2 ||
-    world.rules !== RULES ||
+    world.schema !== 3 ||
+    typeof world.rules !== "string" ||
+    !world.rules ||
+    typeof world.matchId !== "string" ||
+    !world.matchId ||
+    typeof world.epoch !== "string" ||
+    !world.epoch ||
+    !Number.isFinite(world.pricePerMWh) ||
+    world.pricePerMWh < 0 ||
+    world.gameSchema !== SAVE_SCHEMA_VERSION ||
     !Array.isArray(world.seats) ||
     world.seats.length < 2 ||
     world.seats.length > 4 ||
@@ -770,6 +783,7 @@ function validGridHeaders(world: World) {
       g.startingYear === scenario.startingYear &&
       JSON.stringify(g.location) === JSON.stringify(location) &&
       g.multiplayer.seat === world.seats[i].id &&
+      g.seed === world.grids[0].seed &&
       !!g.timeline?.length &&
       Number.isFinite(g.date?.minute) &&
       (world.outcomes?.[world.seats[i].id]
@@ -842,10 +856,17 @@ function validGrid(world: World, initial: World, i: number) {
         peer.name === expected.name &&
         peer.locationId === expected.locationId &&
         !!peer.corridor &&
+        [
+          peer.corridor.capacityW,
+          peer.corridor.buildCost,
+          peer.corridor.annualOperatingCost,
+        ].every((n) => Number.isFinite(n) && n >= 0) &&
+        peer.corridor.capacityW > 0 &&
         Object.keys(peer.corridor).length ===
           Object.keys(expected.corridor).length &&
         Object.entries(expected.corridor).every(
           ([key, value]) =>
+            ["capacityW", "buildCost", "annualOperatingCost"].includes(key) ||
             peer.corridor[key as keyof typeof peer.corridor] === value,
         )
       );
@@ -857,11 +878,36 @@ function validGrid(world: World, initial: World, i: number) {
 }
 
 /** One link per distinct pair of seats, flowing within its rating. */
-function validEdges(world: World, ids: Set<string>) {
+function validEdges(world: World, ids: Set<string>, initial: World) {
   const pairs = new Set<string>();
   return world.edges.every((edge) => {
     const pair = [edge.a, edge.b].sort().join(":");
+    const expected = initial.edges.find((e) => e.id === edge.id);
+    const endpoints = [edge.a, edge.b].map(
+      (id) => world.grids[world.seats.findIndex((s) => s.id === id)],
+    );
+    const corridors = endpoints.map(
+      (grid) =>
+        grid?.multiplayer?.peers?.find(
+          (peer) => peer.corridor.id === peerCorridorId(edge.id),
+        )?.corridor,
+    );
+    const lines = endpoints.map((grid) =>
+      grid?.transmission?.lines.find(
+        (line) => line.corridorId === peerCorridorId(edge.id),
+      ),
+    );
     if (
+      !expected ||
+      pair !== [expected.a, expected.b].sort().join(":") ||
+      corridors.some((corridor) => !corridor) ||
+      lines.some((line) => !line) ||
+      !(["capacityW", "buildCost", "annualOperatingCost"] as const).every(
+        (key) => corridors[0]?.[key] === corridors[1]?.[key],
+      ) ||
+      edge.capacityW !== Math.min(...lines.map((line) => line!.capacityW)) ||
+      edge.annualOperatingCost !==
+        lines.reduce((sum, line) => sum + line!.annualOperatingCost, 0) ||
       !ids.has(edge.a) ||
       !ids.has(edge.b) ||
       edge.a === edge.b ||
@@ -891,18 +937,69 @@ function restoreCommitments(world: World, result: World) {
     !Array.isArray(world.commitments) ||
     world.commitments.length !== world.grids.length
   )
-    throw new Error("Shared save is missing its dispatch plans");
+    throw new Error("Multiplayer save is missing its dispatch plans");
   world.commitments.forEach((saved, i) => {
     if (saved === null) return;
     if (!validCommitmentMetadata(saved, result.grids[i].timeline.length))
-      throw new Error("Shared save has invalid dispatch plans");
+      throw new Error("Multiplayer save has invalid dispatch plans");
     restoreCommitmentMetadata(result.grids[i].timeline, saved);
   });
   delete result.commitments;
 }
 
-export function restoreWorld(value: unknown, epoch: string): World {
-  const world = value as World;
+/**
+ * Hands each saved company to the player resuming it, in saved order. Every reference to a
+ * seat's id or name moves with it, so the result validates as though it had been saved so.
+ */
+function reassignSeats(world: World, seats: Seat[]) {
+  if (
+    seats.length !== world.seats.length ||
+    new Set(seats.map((s) => s.id)).size !== seats.length ||
+    !seats.every(
+      (s) =>
+        /^[a-zA-Z0-9-]{1,64}$/.test(s?.id) &&
+        typeof s.name === "string" &&
+        s.name.length <= 200,
+    )
+  )
+    throw new Error("Every saved company needs one player");
+  const ids = new Map(world.seats.map((seat, i) => [seat.id, seats[i].id]));
+  const names = new Map(seats.map((seat) => [seat.id, seat.name]));
+  const id = (old: string) => ids.get(old) ?? old;
+  const rekey = <T>(record: Record<string, T>) =>
+    Object.fromEntries(Object.entries(record).map(([k, v]) => [id(k), v]));
+  world.seats = seats.map((seat) => ({ ...seat }));
+  world.outcomes = rekey(world.outcomes);
+  world.selectedSpeeds = rekey(world.selectedSpeeds);
+  world.activities = rekey(world.activities);
+  world.ready = world.ready.map(id);
+  world.edges.forEach((edge) => {
+    edge.a = id(edge.a);
+    edge.b = id(edge.b);
+    if (edge.approval) edge.approval = id(edge.approval);
+  });
+  world.grids.forEach((grid) => {
+    const multiplayer = grid.multiplayer!;
+    multiplayer.seat = id(multiplayer.seat);
+    multiplayer.peers?.forEach((peer) => {
+      const line = grid.transmission?.lines.find(
+        (l) => l.corridorId === peer.corridor.id,
+      );
+      peer.id = id(peer.id);
+      peer.name = names.get(peer.id)!;
+      peer.corridor.adjacentMarketId = peer.id;
+      peer.corridor.name = peer.name;
+      if (line) line.name = peer.name;
+    });
+  });
+}
+
+export function restoreWorld(
+  value: unknown,
+  epoch: string,
+  seats?: Seat[],
+): World {
+  const world = upgradeWorld(value);
   const ids = new Set(world?.seats?.map?.((s) => s?.id));
   if (
     !validRoster(world) ||
@@ -913,9 +1010,11 @@ export function restoreWorld(value: unknown, epoch: string): World {
     throw new Error(INCOMPLETE_SAVE);
   const result = cloneDeep(world);
   if (!validClock(world, ids))
-    throw new Error("Shared save contains invalid player speeds or pauses");
+    throw new Error(
+      "Multiplayer save contains invalid player speeds or pauses",
+    );
   if (!validReceipts(world, ids))
-    throw new Error("Shared save contains invalid command receipts");
+    throw new Error("Multiplayer save contains invalid command receipts");
   const initial = createWorld(
     world.spec,
     world.seats,
@@ -924,15 +1023,78 @@ export function restoreWorld(value: unknown, epoch: string): World {
   );
   if (
     !world.grids.every((_grid, i) => validGrid(world, initial, i)) ||
-    !validEdges(world, ids)
+    !validEdges(world, ids, initial)
   )
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
+  if (seats) reassignSeats(result, seats);
+  result.rules = RULES;
   result.epoch = epoch;
   // A restored renderer starts on the grid view, so prior menus cannot keep it stuck paused.
   result.activities = {};
-  pauseWorld(result, "Restored shared save — everyone ready?");
+  result.selectedSpeeds = Object.fromEntries(
+    result.seats.map((seat) => [seat.id, "PAUSED"]),
+  );
+  pauseWorld(result, "Paused");
   result.sequences = {};
   result.receipts = {};
   return result;
+}
+
+/** Upgrade a whole checkpoint as a copy; no grid reaches play until all pass validation. */
+function upgradeWorld(value: unknown): World {
+  savedMatchSpec(value);
+  if (!value || typeof value !== "object") throw new Error(INCOMPLETE_SAVE);
+  const raw = value as Omit<World, "schema" | "gameSchema"> & {
+    schema: number;
+    gameSchema?: number;
+  };
+  if (![2, 3].includes(raw.schema) || !Array.isArray(raw.grids))
+    throw new Error(INCOMPLETE_SAVE);
+  // Schema 2 predates per-grid versions; its grids used solo structure 2.
+  const gameSchema = raw.schema === 2 ? 2 : raw.gameSchema;
+  if (!Number.isInteger(gameSchema) || gameSchema! < 0)
+    throw new Error(INCOMPLETE_SAVE);
+  const world = cloneDeep(raw) as World;
+  world.schema = 3;
+  world.gameSchema = SAVE_SCHEMA_VERSION;
+  world.grids = world.grids.map((grid) => {
+    if (!grid || typeof grid !== "object") throw new Error(INVALID_GRIDS);
+    const scenario = getScenario(grid.scenarioId, grid.customScenario);
+    if (!scenario || !grid.transmission) throw new Error(INVALID_GRIDS);
+    const parsed = parseSave({
+      ...serializeSave({
+        ...grid,
+        multiplayer: undefined,
+        transmission: intertiesEnabledForScenario(scenario, grid.location)
+          ? { tradingPolicy: grid.transmission.tradingPolicy, lines: [] }
+          : undefined,
+      }),
+      schemaVersion: gameSchema,
+    });
+    if (!parsed) throw new Error(INVALID_GRIDS);
+    // Peer topology is checked against the complete roster after solo migrations.
+    return {
+      ...parsed.game,
+      multiplayer: grid.multiplayer,
+      transmission: grid.transmission,
+    };
+  });
+  return world;
+}
+
+/** Check the envelope before the worker attempts to load another version's scenario data. */
+export function savedMatchSpec(value: unknown): MatchSpec {
+  const raw = value as {
+    schema?: number;
+    gameSchema?: number;
+    spec?: MatchSpec;
+  } | null;
+  if ((raw?.schema ?? 0) > 3 || (raw?.gameSchema ?? 0) > SAVE_SCHEMA_VERSION)
+    throw new Error(
+      "This multiplayer save needs a newer game. Refresh to update. Your original save is preserved.",
+    );
+  if (!raw?.spec || ![2, 3].includes(raw.schema!))
+    throw new Error(INCOMPLETE_SAVE);
+  return raw.spec;
 }

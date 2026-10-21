@@ -395,6 +395,11 @@ a:hover {
   grid-column: 1 / -1;
 }
 
+.panel--credits > p {
+  max-width: 70ch;
+  margin-top: 1.5rem;
+}
+
 .credits-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
@@ -418,8 +423,8 @@ a:hover {
 .panel--contact {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(14rem, 0.72fr) minmax(20rem, 1.28fr);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 2rem;
 }
 
@@ -428,32 +433,15 @@ a:hover {
 }
 
 .panel__intro {
-  position: sticky;
-  top: 5.5rem;
+  max-width: 65ch;
 }
 
 .feedback-privacy {
   font-size: 0.85rem;
 }
 
-.feedback-form {
-  min-width: 0;
-}
-
-.feedback-form iframe {
-  display: block;
-  width: 100%;
-  height: min(48rem, 80vh);
-  min-height: 38rem;
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  background: #ffffff;
-}
-
-.feedback-form__fallback {
-  display: inline-block;
-  margin-top: 0.75rem;
-  font-size: 0.85rem;
+.panel--contact .panel__actions {
+  margin-top: 0;
 }
 
 .panel h2,
@@ -547,6 +535,18 @@ a:hover {
   font-size: clamp(1.3rem, 2.5vw, 1.65rem);
 }
 
+.policy-article h3,
+.summary-card h3 {
+  margin: 1.5rem 0 0;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.summary-card h3 + .summary-list {
+  margin-top: 0.75rem;
+}
+
 .summary-card {
   position: sticky;
   top: 6rem;
@@ -609,12 +609,20 @@ a:hover {
 }
 
 .site-footer p {
+  max-width: 65ch;
   margin: 0;
+  text-wrap: pretty;
 }
 
 .site-footer nav {
   display: flex;
   gap: 1rem;
+}
+
+.site-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
 }
 
 @media (max-width: 48rem) {
@@ -641,15 +649,6 @@ a:hover {
 
   .panel--contact .panel__actions {
     margin-top: 0;
-  }
-
-  .panel__intro {
-    position: static;
-  }
-
-  .feedback-form iframe {
-    height: 46rem;
-    min-height: 0;
   }
 
   .summary-card {

@@ -16,7 +16,7 @@ export const isBrowseCard = (name: string): name is BrowseCard =>
 function viewing(browse?: BrowseState): string | undefined {
   if (!browse) return undefined;
   const difficulty = DIFFICULTY_LABELS[browse.difficulty];
-  if (browse.card === "CUSTOM_GAME") return `a custom game on ${difficulty}`;
+  if (browse.card === "CUSTOM_GAME") return `Custom game on ${difficulty}`;
   const name =
     browse.card === "NEW_GAME_DETAILS" && browse.scenarioId !== undefined
       ? getScenario(browse.scenarioId)?.name
@@ -29,11 +29,12 @@ export function coopSelection(
   session: SessionState,
   custom?: CoopSelectionType["custom"],
 ): CoopSelectionType {
-  const { lobby, browse, view, busy } = session;
+  const { lobby, browse, view, busy, library } = session;
+  const host = lobby.hostId === lobby.selfId;
   const key = browse ? selectionKey(browse) : "";
   const readyFor = (value?: string) => !!key && value === key;
   return {
-    role: lobby.hostId === lobby.selfId ? "host" : "guest",
+    role: host ? "host" : "guest",
     hostName:
       lobby.members.find((member) => member.id === lobby.hostId)?.name ||
       "The host",
@@ -51,6 +52,10 @@ export function coopSelection(
     starting: !view && (busy || browse?.phase === "playing"),
     custom,
     viewing: viewing(browse),
+    ...(host && {
+      lobbyId: lobby.lobbyId,
+      hasSaves: !!library?.slots.length,
+    }),
   };
 }
 

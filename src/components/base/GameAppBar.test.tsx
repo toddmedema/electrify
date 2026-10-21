@@ -432,4 +432,26 @@ describe("GameAppBar", () => {
     target.remove();
     jest.useRealTimers();
   });
+
+  it.each([false, true])(
+    "keeps the solo save library outside a multiplayer game (%s)",
+    (multiplayer) => {
+      const game = createGame({ scenarioId: 101 });
+      const onQuit = jest.fn();
+      renderAppBar({
+        game: {
+          ...game,
+          inGame: true,
+          multiplayer: multiplayer ? { seat: "1" } : undefined,
+        },
+        onQuit,
+      });
+      fireEvent.click(screen.getByRole("button", { name: "menu" }));
+      expect(
+        screen.queryAllByRole("menuitem", { name: "Saved games" }),
+      ).toHaveLength(multiplayer ? 0 : 1);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Save & Quit" }));
+      expect(onQuit).toHaveBeenCalledTimes(1);
+    },
+  );
 });

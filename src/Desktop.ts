@@ -70,6 +70,16 @@ export interface DesktopInputFrame {
     Record<DesktopInputAction, { label: string; image?: string }>
   >;
 }
+export interface DesktopTextInput {
+  description: string;
+  text: string;
+  maxLength: number;
+  multiline: boolean;
+  password: boolean;
+}
+export type DesktopTextInputResult =
+  | { status: "submitted"; text: string }
+  | { status: "cancelled" | "unavailable" };
 export interface DesktopBridge {
   // Optional methods are feature-detected by the renderer, so adding one never bumps apiVersion.
   // apiVersion changes only when an existing method changes incompatibly.
@@ -78,6 +88,7 @@ export interface DesktopBridge {
   ): Promise<import("./mods/Types").ModLibrary>;
   setInputContext?(context: DesktopInputContext): Promise<DesktopInputFrame>;
   onInput?(callback: (frame: DesktopInputFrame) => void): () => void;
+  showTextInput?(input: DesktopTextInput): Promise<DesktopTextInputResult>;
   multiplayerRequest?(
     input: import("./multiplayer/Native").NativeRequest,
   ): Promise<unknown>;

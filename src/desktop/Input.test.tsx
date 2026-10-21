@@ -1,6 +1,11 @@
 import { act, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import type { DesktopBridge, DesktopInputFrame } from "../Desktop";
+import { useState } from "react";
+import type {
+  DesktopBridge,
+  DesktopInputFrame,
+  DesktopTextInputResult,
+} from "../Desktop";
 import { store, useAppSelector } from "../Store";
 import { delta, setSpeed } from "../reducers/Game";
 import { quit } from "../reducers/GameActions";
@@ -69,6 +74,160 @@ function Game() {
     </main>
   );
 }
+
+function TextForm({ readonly = false, disabled = false } = {}) {
+  const [value, setValue] = useState("Campaign one");
+  return (
+    <main className="base_main">
+      <form onSubmit={(event) => event.preventDefault()}>
+        <label>
+          Save name
+          <input
+            value={value}
+            maxLength={80}
+            readOnly={readonly}
+            disabled={disabled}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </label>
+        <output aria-label="Saved name">{value}</output>
+        <button>Rename</button>
+      </form>
+    </main>
+  );
+}
+
+it.each(["submitted", "cancelled", "unavailable"] as const)(
+  "controller text entry handles %s, preserves React state and restores focus",
+  async (status) => {
+    render(<TextForm />);
+    const f = bridge();
+    let complete!: (result: DesktopTextInputResult) => void;
+    const showTextInput = jest.fn(
+      () =>
+        new Promise<DesktopTextInputResult>((resolve) => {
+          complete = resolve;
+        }),
+    );
+    f.desktop.showTextInput = showTextInput;
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const field = screen.getByRole("textbox", { name: "Save name" });
+    field.focus();
+    f.emit({ actions: ["confirm"] });
+    expect(showTextInput).toHaveBeenCalledWith({
+      description: "Save name",
+      text: "Campaign one",
+      maxLength: 80,
+      multiline: false,
+      password: false,
+    });
+    f.emit({ actions: ["down"] });
+    f.emit({ actions: ["confirm"] });
+    expect(field).toHaveFocus();
+    expect(showTextInput).toHaveBeenCalledTimes(1);
+    field.blur();
+    await act(async () => {
+      complete(
+        status === "submitted"
+          ? { status, text: "Électricité ⚡" }
+          : { status },
+      );
+    });
+    expect(field).toHaveFocus();
+    expect(field).toHaveValue(
+      status === "submitted" ? "Électricité ⚡" : "Campaign one",
+    );
+    expect(screen.getByLabelText("Saved name")).toHaveTextContent(
+      status === "submitted" ? "Électricité ⚡" : "Campaign one",
+    );
+    f.emit({ actions: ["down"] });
+    expect(screen.getByRole("button", { name: "Rename" })).toHaveFocus();
+  },
+);
+
+it.each([{ readonly: true }, { disabled: true }])(
+  "does not open text entry on unavailable fields: %j",
+  async (props) => {
+    render(<TextForm {...props} />);
+    const f = bridge();
+    f.desktop.showTextInput = jest.fn();
+    stop = startDesktopInput(store, f.desktop);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    screen.getByRole("textbox", { name: "Save name" }).focus();
+    f.emit({ actions: ["confirm"] });
+    expect(f.desktop.showTextInput).not.toHaveBeenCalled();
+  },
+);
+
+it("does not write a dismissed keyboard into an obsolete surface", async () => {
+  const view = render(<TextForm />);
+  const f = bridge();
+  let complete!: (result: DesktopTextInputResult) => void;
+  f.desktop.showTextInput = () =>
+    new Promise((resolve) => {
+      complete = resolve;
+    });
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const original = screen.getByRole("textbox", { name: "Save name" });
+  original.focus();
+  f.emit({ actions: ["confirm"] });
+  view.rerender(
+    <main className="base_main">
+      <button>New screen</button>
+    </main>,
+  );
+  await act(async () => {
+    complete({ status: "submitted", text: "Obsolete result" });
+  });
+  expect(original).toHaveValue("Campaign one");
+  expect(screen.getByRole("button", { name: "New screen" })).not.toHaveFocus();
+});
+
+it("submits text to the focused autocomplete field that owns a portaled listbox", async () => {
+  const changed = jest.fn();
+  render(
+    <>
+      <main className="base_main">
+        <input
+          role="combobox"
+          aria-label="Search playable cities"
+          aria-controls="city-options"
+          aria-expanded="true"
+          onChange={changed}
+        />
+      </main>
+      <div role="listbox" id="city-options">
+        <div role="option" aria-selected="false">
+          San Francisco
+        </div>
+      </div>
+    </>,
+  );
+  const f = bridge();
+  f.desktop.showTextInput = jest
+    .fn()
+    .mockResolvedValue({ status: "submitted", text: "San Francisco" });
+  stop = startDesktopInput(store, f.desktop);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const field = screen.getByRole("combobox");
+  field.focus();
+  await act(async () => {
+    f.emit({ actions: ["confirm"] });
+  });
+  expect(field).toHaveValue("San Francisco");
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(field).toHaveFocus();
+});
 
 it.each(["pause", "confirm"] as const)(
   "keeps disconnected runs paused until explicitly resumed with %s",

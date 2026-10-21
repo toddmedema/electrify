@@ -8,6 +8,7 @@ import {
   createWorld,
   pauseWorld,
   restoreWorld,
+  RULES,
   roomView,
   stepWorld,
 } from "./World";
@@ -17,6 +18,7 @@ import { parseSave, serializeSave } from "../SaveGame";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { DIFFICULTY_IDS } from "../Constants";
 import { validBrowseState } from "./Browse";
+import { emptyPolicies } from "../helpers/Policies";
 
 beforeAll(() => {
   loadSimData("SF");
@@ -32,6 +34,76 @@ function command(world: World, player: number, action: Command) {
     command: action,
   });
 }
+
+test.each(["new", "restored"])(
+  "%s campaigns start with every player's speed paused",
+  (state) => {
+    let world = create(2);
+    if (state === "restored") {
+      command(world, 0, { kind: "speed", speed: "ULTRA" });
+      command(world, 1, { kind: "speed", speed: "SLOW" });
+      world = restoreWorld(checkpointWorld(world), "resumed");
+    }
+    expect(world.selectedSpeeds).toEqual({ 0: "PAUSED", 1: "PAUSED" });
+    expect(roomView(world, "0").game!.multiplayer!.clock!.selectedSpeed).toBe(
+      "PAUSED",
+    );
+    expect(world.speed).toBe("PAUSED");
+    command(world, 0, { kind: "speed", speed: "NORMAL" });
+    expect(world.speed).toBe("PAUSED");
+    command(world, 1, { kind: "speed", speed: "SLOW" });
+    expect(world.speed).toBe("SLOW");
+  },
+);
+
+test("resuming hands saved companies to the players who claimed them", () => {
+  const world = create(3);
+  world.outcomes["2"] = {
+    outcome: "bankrupt",
+    title: "Bankrupt",
+    month: 3,
+  };
+  world.edges[0].approval = "1";
+  const restored = restoreWorld(checkpointWorld(world), "claimed", [
+    { id: "1", name: "Grace" },
+    { id: "9", name: "Hedy" },
+    { id: "0", name: "Player 2" },
+  ]);
+  expect(restored.seats.map((s) => s.id)).toEqual(["1", "9", "0"]);
+  expect(restored.grids.map((g) => g.multiplayer!.seat)).toEqual([
+    "1",
+    "9",
+    "0",
+  ]);
+  expect(Object.keys(restored.outcomes)).toEqual(["0"]);
+  expect(restored.edges[0]).toMatchObject({ a: "1", b: "9", approval: "9" });
+  const peers = restored.grids[0].multiplayer!.peers!;
+  expect(peers.map((p) => [p.id, p.name, p.corridor.adjacentMarketId])).toEqual(
+    [
+      ["9", "Hedy", "9"],
+      ["0", "Player 2", "0"],
+    ],
+  );
+  expect(restored.grids[0].transmission!.lines.map((l) => l.name)).toEqual([
+    "Hedy",
+    "Player 2",
+  ]);
+  expect(roomView(restored, "9").game!.multiplayer!.clock!.players).toEqual([
+    expect.objectContaining({ id: "1", name: "Grace" }),
+    expect.objectContaining({ id: "9", name: "Hedy" }),
+  ]);
+  // The handed-over roster is a valid save of its own.
+  expect(
+    restoreWorld(checkpointWorld(restored), "again").seats.map((s) => s.name),
+  ).toEqual(["Grace", "Hedy", "Player 2"]);
+  expect(() =>
+    restoreWorld(checkpointWorld(world), "duplicate", [
+      { id: "1", name: "Grace" },
+      { id: "1", name: "Grace" },
+      { id: "2", name: "Player 2" },
+    ]),
+  ).toThrow(/one player/);
+});
 
 test("running speed choices consent to a safety resume atomically, including reselecting the same speed", () => {
   const world = create(3);
@@ -57,12 +129,12 @@ test("running speed choices consent to a safety resume atomically, including res
   expect(world.speed).toBe("SLOW");
 });
 
-test("resume guidance is a clock presentation reason, never a reported local activity", () => {
+test("paused readiness is a clock presentation reason, never a reported local activity", () => {
   const world = create(2);
   let view = roomView(world, "0");
   expect(
     view.game!.multiplayer!.clock!.players.map((p) => p.pauseReason),
-  ).toEqual(["Select a speed to resume", "Select a speed to resume"]);
+  ).toEqual(["Paused", "Paused"]);
   expect(view.grids.map((g) => g.pauseReason)).toEqual([undefined, undefined]);
   expect(world.activities).toEqual({});
   command(world, 0, { kind: "speed", speed: "NORMAL" });
@@ -84,7 +156,7 @@ test("speed readiness cannot bypass a disconnected player or the campaign end", 
   };
   expect(applyCommand(world, "0", envelope, false)).toMatch(/reconnect/);
   expect(world.ready).toEqual([]);
-  expect(world.selectedSpeeds["0"]).toBe("NORMAL");
+  expect(world.selectedSpeeds["0"]).toBe("PAUSED");
   expect(world.speed).toBe("PAUSED");
   world.seats.forEach((seat) => {
     world.outcomes[seat.id] = {
@@ -326,7 +398,7 @@ test("the normal catalog supports storage and host prices override forged client
   ).toMatch(/valid facility options/);
 });
 
-test("shared saves reject changed peer routes and duplicate connections", () => {
+test("multiplayer saves reject changed peer routes and duplicate connections", () => {
   const world = create(3);
   const badRoute = checkpointWorld(world);
   badRoute.grids[0].multiplayer!.peers![0].corridor.buildCost = 0;
@@ -338,6 +410,11 @@ test("shared saves reject changed peer routes and duplicate connections", () => 
     ...duplicate.grids[0].transmission!.lines[0],
   };
   expect(() => restoreWorld(duplicate, "bad")).toThrow(
+    /invalid grids or connections/,
+  );
+  const badEdge = checkpointWorld(create(3));
+  badEdge.edges[0].id = "unrelated-route";
+  expect(() => restoreWorld(badEdge, "bad")).toThrow(
     /invalid grids or connections/,
   );
 });
@@ -373,9 +450,10 @@ test("resume restores the entire match and drops prior-session purchase IDs", ()
   expect(() =>
     restoreWorld({ ...world, grids: world.grids.slice(1) }, "new"),
   ).toThrow(/incomplete/);
-  expect(() => restoreWorld({ ...world, rules: "other-build" }, "new")).toThrow(
-    /original game build/,
-  );
+  expect(
+    restoreWorld({ ...checkpointWorld(world), rules: "other-build" }, "new")
+      .rules,
+  ).toBe(RULES);
   const before = world.grids[0].date.minute;
   world.seats.forEach((_seat, i) => {
     command(world, i, { kind: "ready" });
@@ -389,6 +467,62 @@ test("resume restores the entire match and drops prior-session purchase IDs", ()
   expect(restored.grids.map((g) => currentTick(g)?.cash)).toEqual(
     world.grids.map((g) => currentTick(g)?.cash),
   );
+});
+
+test("schema 2 match migration upgrades every grid, preserves progress and requires common readiness", () => {
+  const world = create(3);
+  const saved = checkpointWorld(world);
+  const legacy = {
+    ...saved,
+    schema: 2,
+    gameSchema: undefined,
+    rules: "previous-release",
+  };
+  for (const grid of legacy.grids) {
+    grid.policies = emptyPolicies();
+    const programs = grid.policies!.programs as Record<string, unknown>;
+    delete programs.thermal;
+    delete programs.evCharging;
+    delete programs.battery;
+  }
+  const original = JSON.stringify(legacy);
+  const restored = restoreWorld(legacy, "common-new-epoch");
+  expect(JSON.stringify(legacy)).toBe(original);
+  expect(restored.schema).toBe(3);
+  expect(restored.rules).toBe(RULES);
+  expect(restored.epoch).toBe("common-new-epoch");
+  expect(restored.ready).toEqual([]);
+  expect(restored.readyRequired).toBe(true);
+  expect(restored.grids.map((g) => g.policies!.programs.thermal.tier)).toEqual([
+    "Off",
+    "Off",
+    "Off",
+  ]);
+  expect(restored.grids.map((g) => g.facilities)).toEqual(
+    world.grids.map((g) => g.facilities),
+  );
+  expect(restored.edges).toEqual(world.edges);
+  command(restored, 0, { kind: "ready" });
+  command(restored, 1, { kind: "ready" });
+  expect(restored.speed).toBe("PAUSED");
+  command(restored, 2, { kind: "ready" });
+  expect(restored.speed).toBe("NORMAL");
+  const bad = { ...legacy, grids: legacy.grids.map((g) => ({ ...g })) };
+  bad.grids[2].customerMarketSize = -1;
+  expect(() => restoreWorld(bad, "rejected")).toThrow(/invalid grids/);
+});
+
+test("future and unsupported shared schemas are rejected without mutating the checkpoint", () => {
+  const saved = checkpointWorld(create(2));
+  for (const bad of [
+    { ...saved, schema: 99 },
+    { ...saved, gameSchema: 99 },
+    { ...saved, schema: 1 },
+  ]) {
+    const original = JSON.stringify(bad);
+    expect(() => restoreWorld(bad, "new")).toThrow(/preserved/);
+    expect(JSON.stringify(bad)).toBe(original);
+  }
 });
 test("rejected commands retain their receipt when the same ID is retried", () => {
   const world = create(2);
@@ -533,23 +667,24 @@ test("invalid speeds and activity payloads cannot corrupt the shared clock", () 
     { kind: "activity", reason: "x".repeat(121) },
   ])
     expect(command(world, 0, action as Command)).toMatch(/valid/i);
-  expect(world.selectedSpeeds["0"]).toBe("NORMAL");
+  expect(world.selectedSpeeds["0"]).toBe("PAUSED");
   expect(world.activities).toEqual({});
 });
 
-test("saved matches preserve individual selections but clear stale menus on restore", () => {
+test("saved matches reset individual speeds and clear stale menus on restore", () => {
   const world = create(2);
   command(world, 0, { kind: "speed", speed: "ULTRA" });
   command(world, 1, { kind: "speed", speed: "SLOW" });
   command(world, 0, { kind: "activity", reason: "Leaving match" });
   const saved = checkpointWorld(world);
   const restored = restoreWorld(saved, "new-epoch");
-  expect(restored.selectedSpeeds).toEqual(world.selectedSpeeds);
+  expect(restored.selectedSpeeds).toEqual({ 0: "PAUSED", 1: "PAUSED" });
+  expect(saved.selectedSpeeds).toEqual({ 0: "ULTRA", 1: "SLOW" });
   expect(restored.activities).toEqual({});
   expect(restored.readyRequired).toBe(true);
   expect(restored.speed).toBe("PAUSED");
   restored.seats.forEach((_s, i) => command(restored, i, { kind: "ready" }));
-  expect(restored.speed).toBe("SLOW");
+  expect(restored.speed).toBe("NORMAL");
   expect(() =>
     restoreWorld(
       { ...saved, selectedSpeeds: { 0: "INVALID", 1: "SLOW" } },

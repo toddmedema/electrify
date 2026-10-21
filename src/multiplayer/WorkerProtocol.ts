@@ -14,7 +14,8 @@ export type WorkerRequest =
       matchId: string;
       epoch: string;
     }
-  | { kind: "restore"; world: unknown; epoch: string }
+  /** seats hands each saved company, in saved order, to the player resuming it. */
+  | { kind: "restore"; world: unknown; epoch: string; seats?: Seat[] }
   | {
       kind: "command";
       sender: string;

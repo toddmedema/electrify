@@ -21,6 +21,7 @@ module.exports = {
     "!electron/electron-builder.config.cjs",
     "desktop-config.json",
     "package.json",
+    "LICENSE.md",
     "!node_modules/**/*",
     "node_modules/steamworks.js/**/*",
     "node_modules/koffi/**/*",

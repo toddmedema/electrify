@@ -302,6 +302,7 @@ export function GameAppBar(props: Props) {
     }
   }, [singleRow]);
   const multiplayer = game.multiplayer;
+  const inMultiplayer = !!multiplayer;
   const clock = multiplayer?.clock;
   const speed = clock?.selectedSpeed ?? game.speed;
   // Watching somebody else's run rather than playing your own. The speed controls stay live --
@@ -390,7 +391,9 @@ export function GameAppBar(props: Props) {
           {!steamAvailable && (
             <MenuItem onClick={props.onAchievements}>Achievements</MenuItem>
           )}
-          <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          {!inMultiplayer && (
+            <MenuItem onClick={props.onSavedGames}>Saved games</MenuItem>
+          )}
           <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
@@ -428,6 +431,7 @@ export function GameAppBar(props: Props) {
       onManual,
       onSettings,
       props.onSavedGames,
+      inMultiplayer,
       props.onAchievements,
       steamAvailable,
       onNextTutorial,

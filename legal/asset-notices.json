@@ -1,0 +1,39 @@
+[
+  {
+    "title": "Electrify contributors and artwork",
+    "text": "Coding: Todd Medema. Art: Chris Gebhart. Music: Nicholas Coronado. Credits are retained from public/about.html. Separate third-party notices below keep their original terms. These credits identify contributors; they do not grant additional rights to reuse their work."
+  },
+  {
+    "title": "Inter font",
+    "text": "Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter). Distributed under the SIL Open Font License 1.1. The complete license is included below.",
+    "file": "public/fonts/inter/LICENSE.txt"
+  },
+  {
+    "title": "Weather: Open-Meteo and ERA5",
+    "text": "Weather data: Open-Meteo (https://open-meteo.com/), ERA5 reanalysis by the Copernicus Climate Change Service / ECMWF. Open-Meteo data is licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Electrify selects locations and historical hours, converts units, quantizes and packs weather records into binary game data, and derives simulated generation and demand. Weather-source overrides are identified in data/weather/index.json. Sources: https://open-meteo.com/en/docs/historical-weather-api and https://open-meteo.com/en/terms. The simulation and its interpretations are Electrify's; no provider endorsement is implied."
+  },
+  {
+    "title": "Weather: NASA POWER",
+    "text": "NASA POWER (https://power.larc.nasa.gov/): monthly meteorological and solar data for the curated watershed records and locations marked NASA POWER in the weather catalogue. Electrify converts monthly means into representative game hours and precipitation totals, converts units, and packs binary records. Acknowledgement: the data were obtained from the NASA Langley Research Center (LaRC) POWER Project funded through the NASA Earth Science/Applied Science Program."
+  },
+  {
+    "title": "World Resources Institute Global Power Plant Database",
+    "text": "World Resources Institute and database contributors, Global Power Plant Database v1.3.0, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Source: https://github.com/wri/global-power-plant-database, revision 7a91cfbb2a4e272597acbc00506d61fc1ec73b3d. Electrify filters and aggregates commissioning ages into capacity-weighted age cohorts, selects conventional hydro sites and rounds game capacity ceilings. Original per-site provenance remains in the game data; these are modeled starting fleets, not current engineering inventories."
+  },
+  {
+    "title": "European hydro corroboration",
+    "text": "Matteo De Felice and contributors, Hydro-power plants database, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Source: https://github.com/energy-modelling-toolkit/hydro-power-database, revision 3e8a8378289679073208b39825a99de5ab8b05f5. Electrify uses selected name, position, technology and capacity records to corroborate conventional hydro sites. This research dataset is not an official European Commission product."
+  },
+  {
+    "title": "Ember electricity data",
+    "text": "Ember, Yearly Electricity Data (https://ember-energy.org/data/yearly-electricity-data/), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Electrify converts capacity from GW to MW, groups fuels, derives historical renewable age estimates and normalizes regional starting capacity shares. Values are combined with separately cited geothermal and US state sources; modeled starting plants and forecasts are not Ember observations."
+  },
+  {
+    "title": "Additional electricity data sources",
+    "text": "US Energy Information Administration, State Electricity Profiles (https://www.eia.gov/electricity/state/), EIA-860 and EIA-860M (https://www.eia.gov/electricity/data/eia860/ and https://www.eia.gov/electricity/data/eia860m/): selected state capacity, plant ages and hydro locations. International Renewable Energy Agency (IRENA), Renewable Capacity Statistics 2025 and 2020 (https://www.irena.org/Publications): selected geothermal capacity observations, converted from MW into modeled starting shares. Detailed original source links and transformation notes are retained in the repository's docs/data-center-power-sources.md, docs/starting-facility-ages.md and docs/hydro-sites.md. These datasets and derived game estimates do not imply provider endorsement."
+  },
+  {
+    "title": "Steam",
+    "text": "Steam and the Steam logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. Steamworks SDK runtime files are distributed with the Steam edition under the developer's Steamworks agreement; the SDK is not licensed under Electrify's game license. steamworks.js has its own included license."
+  }
+]

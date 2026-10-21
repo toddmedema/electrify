@@ -3,6 +3,7 @@ const zlib = require("node:zlib");
 const path = require("node:path");
 const { atomicWriteAsync, readJson } = require("./storage.cjs");
 const { nativeLibraryPath } = require("./steam-native.cjs");
+const { CoopSaveStore } = require("./coop-storage.cjs");
 
 // Valve flat API, the SDK bundled with steamworks.js. No second callback consumer.
 const DECLARATIONS = {
@@ -92,11 +93,13 @@ const MESSAGE_PREFIX_SIZE = 16;
 const MESSAGE_SIZE_OFFSET = 8;
 const MESSAGES_PER_RECEIVE = 16;
 // Lobby member data a player may set: the co-op selection they agreed to, so Ready clears
-// itself whenever the host changes the scenario, difficulty or custom settings.
-const MEMBER_KEYS = new Set(["ready"]);
+// itself whenever the host changes the scenario, difficulty or custom settings, and the saved
+// company they claimed while resuming a multiplayer save.
+const MEMBER_KEYS = new Set(["ready", "slot"]);
 const MEMBER_VALUE = /^[a-zA-Z0-9:|._-]{0,64}$/;
 // The host's mirrored scenario selection; a complete custom game fits well within this.
 const MAX_BROWSE_BYTES = 16 * 1024;
+const MAX_CAMPAIGN_BYTES = 4 * 1024;
 
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_COMPRESSED = 4 * 1024 * 1024;
@@ -233,6 +236,7 @@ class SteamMultiplayer {
     this.koffi = koffi;
     this.emit = emit;
     this.filename = path.join(directory, "co-op.json");
+    this.saves = new CoopSaveStore(directory, service, { stringify, parse });
     this.matchmaking = api.matchmaking();
     this.sockets = api.sockets();
     this.utils = api.utils();
@@ -304,6 +308,13 @@ class SteamMultiplayer {
             this.lobby,
             BigInt(id),
             "ready",
+          ) || undefined,
+        slot:
+          this.api.memberData(
+            this.matchmaking,
+            this.lobby,
+            BigInt(id),
+            "slot",
           ) || undefined,
       };
     });
@@ -489,7 +500,7 @@ class SteamMultiplayer {
     if (
       this.api.owner(this.matchmaking, this.lobby).toString() !== this.hostId
     ) {
-      this.fail("The host left. Resume a shared save in a new lobby.");
+      this.fail("The host left. Resume a multiplayer save in a new lobby.");
       return;
     }
     this.publish();
@@ -497,20 +508,36 @@ class SteamMultiplayer {
   async persist(world) {
     if (
       !world ||
-      world.schema !== 2 ||
+      ![2, 3].includes(world.schema) ||
       !Array.isArray(world.seats) ||
       world.seats.length < 2 ||
       world.seats.length > 4 ||
       !world.seats.some((s) => s.id === this.service.identity.steamId)
     )
-      throw new Error("Invalid shared save");
+      throw new Error("Invalid multiplayer save");
     const json = stringify(world);
     if (Buffer.byteLength(json) > MAX_BYTES)
-      throw new Error("Shared save is too large");
+      throw new Error("Multiplayer save is too large");
     const digest = crypto.createHash("sha256").update(json).digest("hex");
     this.saveQueue = this.saveQueue
       .catch(() => {})
-      .then(() => atomicWriteAsync(this.filename, json));
+      .then(async () => {
+        // Retain the legacy checkpoint for older installations and disaster recovery.
+        // Never replace a future checkpoint with a save from an older game.
+        let previous;
+        try {
+          previous = readJson(this.filename, null);
+        } catch {
+          previous = { schema: Infinity };
+        }
+        await this.saves.save(world);
+        if (
+          !previous ||
+          (previous.schema <= world.schema &&
+            (previous.gameSchema ?? 0) <= (world.gameSchema ?? 0))
+        )
+          await atomicWriteAsync(this.filename, json);
+      });
     await this.saveQueue;
     this.savedAt = Date.now();
     this.publish();
@@ -559,7 +586,7 @@ class SteamMultiplayer {
         throw new Error("Invalid save sender");
       const digest = await this.persist(payload.world);
       if (digest !== payload.digest)
-        throw new Error("Shared save checksum failed");
+        throw new Error("Multiplayer save checksum failed");
       // The host persists before sending; this complete local write establishes two copies.
       this.sharedAt = this.savedAt;
       this.publish();
@@ -606,6 +633,14 @@ class SteamMultiplayer {
         Buffer.byteLength(JSON.stringify(payload.browse)) > MAX_BROWSE_BYTES)
     )
       throw new Error("Invalid scenario selection");
+    if (
+      payload.kind === "campaign" &&
+      payload.campaign !== undefined &&
+      (!payload.campaign ||
+        Buffer.byteLength(JSON.stringify(payload.campaign)) >
+          MAX_CAMPAIGN_BYTES)
+    )
+      throw new Error("Invalid campaign selection");
     if (payload.kind === "command") {
       const envelope = payload.envelope;
       if (
@@ -778,9 +813,13 @@ class SteamMultiplayer {
       case "checkpoint":
         return this.checkpoint(input.world);
       case "read-checkpoint": {
-        const value = readJson(this.filename, null);
-        return value === null ? null : parse(JSON.stringify(value));
+        return this.saves.select(input.id);
       }
+      case "list-saves":
+        return this.saves.list(input.sync === true);
+      case "delete-save":
+        await this.saves.remove(input.id);
+        return this.saves.list();
       default:
         throw new Error("Unknown multiplayer request");
     }

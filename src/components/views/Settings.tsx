@@ -26,6 +26,7 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
+const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -186,6 +187,7 @@ function VolumeSlider(props: {
 }
 
 export default function Settings(props: Props): React.JSX.Element {
+  const [creditsOpen, setCreditsOpen] = React.useState(false);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
@@ -445,6 +447,7 @@ export default function Settings(props: Props): React.JSX.Element {
             <SettingsGroup id="mods-settings" title="Mods">
               <SettingRow
                 label="Community scenarios"
+                stackOnMobile
                 description={
                   modCount
                     ? `${modCount} installed`
@@ -454,6 +457,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 <Button
                   data-mods-trigger
                   variant="outlined"
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
                   onClick={props.onManageMods}
                 >
                   Manage mods
@@ -563,11 +567,29 @@ export default function Settings(props: Props): React.JSX.Element {
               justifyContent: "center",
               flexWrap: "wrap",
               color: "text.secondary",
+              "& .MuiButton-root": {
+                color: "text.secondary",
+                fontSize: "0.8125rem",
+              },
             }}
           >
-            <Typography variant="caption" sx={{ px: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                px: 1,
+                width: { xs: "100%", sm: "auto" },
+                textAlign: "center",
+              }}
+            >
               Electrify v{APP_VERSION}
             </Typography>
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => setCreditsOpen(true)}
+            >
+              Credits and licenses
+            </Button>
             <Button
               component="a"
               href="https://github.com/toddmedema/electrify"
@@ -575,7 +597,6 @@ export default function Settings(props: Props): React.JSX.Element {
               rel="noreferrer"
               variant="text"
               size="small"
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
             >
               GitHub
             </Button>
@@ -584,12 +605,16 @@ export default function Settings(props: Props): React.JSX.Element {
                 variant="text"
                 size="small"
                 onClick={() => void clearAppCache()}
-                sx={{ color: "text.secondary", fontSize: "0.75rem" }}
               >
                 Clear cache
               </Button>
             )}
           </Stack>
+          {creditsOpen && (
+            <React.Suspense fallback={null}>
+              <CreditsDialog onClose={() => setCreditsOpen(false)} />
+            </React.Suspense>
+          )}
         </Stack>
       </Box>
     </ScreenPage>

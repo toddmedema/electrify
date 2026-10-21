@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
+const { verifyRuntimeNotices } = require("./runtime-notices");
 
 function files(root, prefix = "") {
   return fs
@@ -109,6 +110,7 @@ function verifyPackaged(directory) {
   const archive = path.join(resources, "app.asar");
   const count = verifyArchiveAssets(archive);
   verifyInputResources(resources);
+  verifyRuntimeNotices(resources);
   const platform = process.platform;
   const native =
     platform === "win32"
@@ -199,6 +201,7 @@ function verifySignedMacPackage(directory) {
       `The macOS app is not universal: ${lipo.stdout.trim() || "no slices"}`,
     );
   verifyInputResources(path.join(application, "Contents", "Resources"));
+  verifyRuntimeNotices(path.join(application, "Contents", "Resources"));
   return verifyArchiveAssets(
     path.join(application, "Contents", "Resources", "app.asar"),
   );

@@ -1,6 +1,11 @@
-import { MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession } from "./Session";
 import type { DesktopBridge } from "../Desktop";
-import type { NativeEvent, NativeRequest } from "./Native";
+import type {
+  LobbyState,
+  NativeEvent,
+  NativeRequest,
+  PendingCampaign,
+} from "./Native";
 import type { RoomView, World } from "./Types";
 import type { BrowseState } from "./Browse";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
@@ -33,7 +38,10 @@ function fixture(isHost = false, deferLeave = false) {
     terminate: jest.fn(),
     postMessage: (request: WorkerRequest) => {
       posts.push(request);
-      if (request.kind === "create" && !delayStart)
+      if (
+        (request.kind === "create" || request.kind === "restore") &&
+        !delayStart
+      )
         worker.onmessage?.({
           data: { kind: "views", views: { [host]: view() } },
         } as unknown as MessageEvent<WorkerResponse>);
@@ -53,6 +61,9 @@ function fixture(isHost = false, deferLeave = false) {
     failSave = false,
     failLeave = false;
   let releaseLeave = () => {};
+  let checkpoint: World | null = null;
+  let readGate = Promise.resolve();
+  let releaseRead = () => {};
   const bridge = {
     onMultiplayerEvent: (callback: typeof event) => {
       event = callback;
@@ -60,6 +71,19 @@ function fixture(isHost = false, deferLeave = false) {
     },
     multiplayerRequest: async (request: NativeRequest) => {
       requests.push(request);
+      if (request.kind === "read-checkpoint") {
+        await readGate;
+        return checkpoint;
+      }
+      if (request.kind === "create" || request.kind === "join")
+        return {
+          available: true,
+          selfId,
+          hostId: selfId,
+          lobbyId: "new-lobby",
+          members: [{ id: selfId, name: "Host" }],
+          connected: [],
+        };
       if (request.kind === "lock" && failLock) throw new Error("Lock failed");
       if (request.kind === "leave" && deferLeave)
         await new Promise<void>((resolve) => {
@@ -94,6 +118,14 @@ function fixture(isHost = false, deferLeave = false) {
     posts,
     event: (value: NativeEvent) => event(value),
     releaseLeave: () => releaseLeave(),
+    checkpoint: (value: World | null, hold = false) => {
+      checkpoint = value;
+      if (hold)
+        readGate = new Promise<void>((resolve) => {
+          releaseRead = resolve;
+        });
+    },
+    releaseRead: () => releaseRead(),
     fail: () => {
       failSave = true;
     },
@@ -116,6 +148,270 @@ beforeEach(() => {
   });
 });
 afterEach(() => jest.useRealTimers());
+
+const campaign: PendingCampaign = {
+  id: "campaign-id",
+  name: "Friends campaign",
+  players: [
+    { id: host, name: "Host" },
+    { id: guest, name: "Guest" },
+    { id: "retired", name: "Retired" },
+  ],
+  requiredPlayerIds: [host, guest],
+};
+const savedCampaign = () =>
+  ({
+    seats: campaign.players,
+    outcomes: { retired: { outcome: "completed" } },
+  }) as unknown as World;
+
+test("resuming a campaign creates its invitation lobby before starting and waits for its saved players", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.event({
+    kind: "state",
+    state: { available: true, selfId: host, members: [], connected: [] },
+  });
+  f.checkpoint(savedCampaign());
+  await f.session.prepareResume(campaign.id, campaign.name);
+  expect(f.session.getSnapshot().pendingCampaign).toEqual(campaign);
+  expect(f.session.getSnapshot().lobby.lobbyId).toBe("new-lobby");
+  expect(f.requests.some((r) => r.kind === "create")).toBe(true);
+  expect(f.requests.some((r) => r.kind === "lock")).toBe(false);
+  expect(f.posts).toEqual([]);
+  expect(f.session.canResumeCampaign()).toBe(false);
+  const lobby = {
+    ...f.session.getSnapshot().lobby,
+    members: campaign.players.slice(0, 2),
+    connected: [guest],
+  };
+  f.event({ kind: "state", state: lobby });
+  expect(f.session.canResumeCampaign()).toBe(true);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: { kind: "campaign", campaign },
+  });
+  f.event({
+    kind: "state",
+    state: {
+      ...lobby,
+      members: [...lobby.members, { id: "other", name: "Other" }],
+    },
+  });
+  expect(f.session.canResumeCampaign()).toBe(false);
+  await expect(
+    f.session.start({ saved: true, id: campaign.id }),
+  ).rejects.toThrow(/Other must pick a company/);
+  expect(f.session.getSnapshot().pendingCampaign).toEqual(campaign);
+  f.event({ kind: "state", state: lobby });
+  await f.session.start({ saved: true, id: campaign.id });
+  expect(f.requests).toContainEqual({
+    kind: "lock",
+    ids: [host, guest, "retired"],
+  });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "restore",
+    seats: campaign.players,
+  });
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  f.session.dispose();
+});
+
+test("a friend who was not in the save claims an open company and resumes it", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.checkpoint(savedCampaign());
+  await f.session.prepareResume(campaign.id, campaign.name);
+  await f.session.claimSlot(guest);
+  expect(f.requests.at(-1)).toEqual({
+    kind: "member",
+    key: "slot",
+    value: `${campaign.id}:${guest}`,
+  });
+  const lobby = (members: LobbyState["members"], connected: string[]) =>
+    f.event({
+      kind: "state",
+      state: {
+        ...f.session.getSnapshot().lobby,
+        lobbyId: "lobby",
+        hostId: host,
+        selfId: host,
+        members,
+        connected,
+      },
+    });
+  // A newcomer joins before anyone has taken the absent guest's company.
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend" },
+    ],
+    ["friend"],
+  );
+  expect(f.session.resumeBlocker()).toBe("Friend must pick a company");
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend", slot: `${campaign.id}:${guest}` },
+    ],
+    [],
+  );
+  expect(f.session.resumeBlocker()).toBe("Every player must be connected");
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend", slot: `${campaign.id}:${guest}` },
+    ],
+    ["friend"],
+  );
+  expect(f.session.canResumeCampaign()).toBe(true);
+  await f.session.start({ saved: true, id: campaign.id });
+  expect(f.requests).toContainEqual({
+    kind: "lock",
+    ids: [host, "friend", "retired"],
+  });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "restore",
+    seats: [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend" },
+      { id: "retired", name: "Retired" },
+    ],
+  });
+  f.session.dispose();
+});
+
+test("friends leaving before the match begins are routine, and a guest whose host leaves goes home", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.event({ kind: "disconnected", sender: guest });
+  expect(f.session.getSnapshot().error).toBeUndefined();
+  f.session.dispose();
+  const g = fixture();
+  await g.session.initialize();
+  g.event({
+    kind: "state",
+    state: {
+      ...g.session.getSnapshot().lobby,
+      members: [{ id: guest, name: "Guest" }],
+      connected: [],
+    },
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(g.requests.some((r) => r.kind === "leave")).toBe(true);
+  expect(g.session.getSnapshot().lobby.lobbyId).toBeUndefined();
+  expect(g.session.getSnapshot().error).toBe(HOST_LEFT);
+  g.session.dispose();
+});
+
+test("a missing campaign does not create a lobby", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.event({
+    kind: "state",
+    state: { available: true, selfId: host, members: [], connected: [] },
+  });
+  await expect(
+    f.session.prepareResume(campaign.id, campaign.name),
+  ).rejects.toThrow(/could not be found/);
+  expect(f.requests.some((r) => r.kind === "create")).toBe(false);
+  expect(f.session.getSnapshot().busy).toBe(false);
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  f.session.dispose();
+});
+
+test("campaign resume retains legacy names through 200 characters and gives unnamed players an identity label", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const players = [
+    { id: host, name: "界".repeat(200) },
+    { id: guest, name: undefined },
+    { id: "retired", name: " " },
+  ];
+  f.checkpoint({ ...savedCampaign(), seats: players } as unknown as World);
+  await f.session.prepareResume(campaign.id, campaign.name);
+  expect(f.session.getSnapshot().pendingCampaign?.players).toEqual([
+    players[0],
+    { id: guest, name: guest },
+    { id: "retired", name: "retired" },
+  ]);
+  f.checkpoint({
+    ...savedCampaign(),
+    seats: [{ id: host, name: "界".repeat(201) }, campaign.players[1]],
+  });
+  await expect(
+    f.session.prepareResume(campaign.id, campaign.name),
+  ).rejects.toThrow(/could not be read/);
+  expect(f.session.getSnapshot().pendingCampaign?.players[0].name).toBe(
+    players[0].name,
+  );
+  f.session.dispose();
+});
+
+test("deleting the staged campaign clears its invitation for every player while another deletion keeps it", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.checkpoint(savedCampaign());
+  await f.session.prepareResume(campaign.id, campaign.name);
+  await f.session.deleteSharedSave("another-campaign");
+  expect(f.session.getSnapshot().pendingCampaign).toEqual(campaign);
+  await f.session.deleteSharedSave(campaign.id);
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  expect(f.session.canResumeCampaign()).toBe(false);
+  expect(f.requests.at(-1)).toEqual({
+    kind: "send",
+    to: guest,
+    payload: { kind: "campaign", campaign: undefined },
+  });
+  f.session.dispose();
+});
+
+test("leaving while a campaign loads cannot create a late invitation lobby", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.checkpoint(savedCampaign(), true);
+  const preparing = f.session.prepareResume(campaign.id, campaign.name);
+  await f.session.leave({ skipSave: true });
+  f.releaseRead();
+  await preparing;
+  expect(f.requests.some((r) => r.kind === "create")).toBe(false);
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  expect(f.session.getSnapshot().lobby.lobbyId).toBeUndefined();
+  f.session.dispose();
+});
+
+test("a guest accepts only a valid saved-campaign roster from its host and follows later new-game choices", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const send = (sender: string, value: PendingCampaign) =>
+    f.event({
+      kind: "message",
+      sender,
+      payload: { kind: "campaign", campaign: value },
+    });
+  send("stranger", campaign);
+  send(host, { ...campaign, requiredPlayerIds: ["stranger"] });
+  send(host, {
+    ...campaign,
+    players: [campaign.players[0], campaign.players[0]],
+  });
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  send(host, campaign);
+  expect(f.session.getSnapshot().pendingCampaign).toEqual(campaign);
+  expect(f.session.canResumeCampaign()).toBe(false);
+  f.event({ kind: "message", sender: host, payload: { kind: "campaign" } });
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  send(host, campaign);
+  f.event({
+    kind: "message",
+    sender: host,
+    payload: { kind: "browse", browse: browse() },
+  });
+  expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
+  f.session.dispose();
+});
+
 test("late host frames cannot restore a guest game during leave or before rejoining", async () => {
   const f = fixture(false, true);
   await f.session.initialize();

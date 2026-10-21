@@ -148,6 +148,10 @@ Bundled pages, simulation data, fonts, audio, images and worker chunks load from
 protocol. Desktop gameplay does not use Firebase login, Firebase Cloud backup, analytics or a
 web service worker. Native Steam calls run outside the renderer.
 
+**Settings → Credits and licenses** opens the bundled game, asset and dependency notices,
+including desktop privacy information. These remain available offline. The website's privacy
+page also distinguishes Steam services from the browser edition's optional Firebase services.
+
 ## Steamworks configuration and acceptance
 
 ### Achievements
@@ -160,6 +164,8 @@ authoritative list of stable API names, English display names, descriptions and 
 `public/images/`. Define all 35 achievements in Steamworks with those exact API names, Client
 unlocks, and reviewed unlocked/locked raster versions of the listed artwork; publish the
 configuration. Re-upload both rasters whenever a catalog icon changes.
+The [achievement artwork package](../steamworks/achievement-artwork/README.md) contains all 70
+locked/unlocked 256 × 256 PNGs and an upload map. Regenerate it with `npm run achievements:artwork`.
 When Steam is available, its achievement interface and notifications are used. Without Steam,
 the game provides bottom-right unlock notifications and an Achievements page from the main and
 game menus. See [shared achievements](achievements.md) for device storage and Firebase sync.
@@ -298,6 +304,12 @@ X to open Build, Y or Start to pause/resume, bumpers for panes, triggers for cha
 stick's up/down directions for speed. Steam's displayed origins describe the equivalent inputs
 on other controllers and follow player customization.
 
+Confirming an editable text field opens Steam's gamepad text editor. Submitted text follows the
+field's normal validation and React change handling; cancelling preserves the original value.
+Controller actions are suspended while the editor is open and require release before continuing.
+Read-only fields do not open the editor. When Steam's editor is unavailable, physical keyboard
+input remains available.
+
 Windowless browser coverage uses a replacement native bridge while retaining the production
 desktop renderer, real controls, reducers and save repository:
 
@@ -328,6 +340,8 @@ Before release, launch a private Steam build with the real App ID and test:
   leave the game paused until the player resumes it.
 - Reload the saved game and verify its purchases and rate. Repeat offline, where locally
   installed configurations and local saves must remain usable.
+- Enter a lobby code, rename a save and search the manual using the controller text editor.
+  Check Unicode text, cancellation, returning focus and holding Confirm while closing the editor.
 
 ### Partner setup and release acceptance
 
@@ -388,12 +402,14 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
-**Play with friends** on the desktop title screen opens a friends-only Steam lobby. Host a room,
-then invite friends through Steam or share its full numeric lobby code. Once two to four players
-are connected, the host presses **Choose a game together** and picks any authored scenario or a
-custom game in the normal selection screens. Guests follow the host's screen, scenario,
-difficulty and custom settings read-only, and mark **Ready** for exactly what is shown; any change
-by the host clears it. **Start for everyone** launches that scenario for the lobby. Everyone
+**Play with friends** on the desktop title screen offers **Host a game** or joining with an
+invite code. Hosting opens a friends-only Steam lobby and goes straight to the normal selection
+screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
+code** copies the full numeric lobby code. Two to four players can join or leave at any time before
+the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
+scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
+any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
+a friend has joined and everyone is connected. Everyone
 selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
 single-player only. See [co-op scenario selection](multiplayer-scenario-selection.md).
 
@@ -458,8 +474,29 @@ computer's persisted acknowledgement. The bundle includes all grids, canonical e
 commitment metadata and command receipts. Normal host exit joins the existing desktop quit save
 handshake. Local persistence does not wait for an absent player's acknowledgement. Manual resume
 uses one complete bundle, the original roster and a fresh epoch; pending old commands are dropped.
-The first co-op save schema requires the same rules/build. Unsupported bundles remain on disk;
-whole-match version migrations are required before promising cross-update campaign support.
+Co-op checkpoint schema 3 records the solo save schema for its grids. Resume upgrades the entire
+bundle, including supported schema 2 checkpoints, and validates every grid and shared connection
+before publishing a current-rules baseline. Players in the same session must still run matching
+game code and data. Newer or unsupported bundles remain preserved; individual grids never migrate
+independently during play.
+
+When the host has multiplayer saves, the scenario list shows **Load multiplayer save** across the
+top. It lists each save with its players and save time, and its menu offers deletion with
+confirmation. Loading a save gathers the lobby to pick companies: each row is labelled with the
+Steam name that saved it. A returning player takes back their own company by default, and anyone
+in the lobby can take an open one; the host resumes once every company still playing has a
+connected player. A company handed to a new player is saved under that player's Steam ID and name.
+New and resumed games start with every player
+paused, using the same speed controls as ordinary play.
+The account-specific `co-op-library.json` holds up to 32 campaigns and 64 MiB; a checkpoint is
+limited to 16 MiB. The old `co-op.json` is retained and imported as the last multiplayer save. An
+immutable `co-op-original-<digest>.json` preserves a checkpoint before a rules or schema upgrade;
+the rotating `.previous` file also protects interrupted writes.
+
+Steam Cloud uses separate `electrify/co-op-device-<32-hex-device-id>.json` libraries. Different
+checkpoints are retained as separate Cloud copies, with deletion history to suppress a deleted
+copy's return. Budget Cloud quota for both solo and co-op libraries on each computer. Local
+saving remains available while Steam or Cloud is offline.
 
 Run `npm run test:multiplayer` for windowless two- and four-player browser sessions with the real
 worker and an in-memory Steam bridge. CI serves the verified production desktop renderer. To
