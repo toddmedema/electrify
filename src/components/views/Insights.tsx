@@ -125,7 +125,6 @@ import PowerExchangeSummary, {
 import { transmissionAvailable } from "../../data/AdjacentMarkets";
 import ChartSupplyDemandRanges from "../base/ChartSupplyDemandRanges";
 import { ToolScrollMemory } from "../base/GameToolMemory";
-import "./Insights.scss";
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -2257,16 +2256,6 @@ export default class Insights extends React.Component<Props, State> {
             viewportRange,
             minViewportSpan,
           )}
-          <div className="insightsTimelineKey" aria-label="Chart time key">
-            <span>
-              <i aria-hidden="true" />
-              Recorded
-            </span>
-            <span>
-              <i className="forecast" aria-hidden="true" />
-              Forecast
-            </span>
-          </div>
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}

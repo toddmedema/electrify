@@ -1,5 +1,5 @@
 import path from "path";
-import { expect, test } from "./fixtures";
+import { expect, test, type Locator } from "./fixtures";
 import { openPane } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([
@@ -9,174 +9,253 @@ const REVIEW_VIEWPORTS = new Set([
   "desktop-chromium",
 ]);
 
-test("upcoming scenario events stay usable across insight viewports", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
-      testInfo.project.name,
-    ),
-  );
-  const theme = testInfo.project.name.startsWith("mobile-") ? "dark" : "light";
-  await page.addInitScript((mode) => {
-    window.localStorage.clear();
-    window.localStorage.setItem("theme", mode);
-  }, theme);
-  await page.goto("/?scenario=103");
-  await page.getByRole("button", { name: "Start game" }).click();
-
-  const insights = page.locator(".insights:visible");
-  await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
-  );
-  await expect(insights).toBeVisible();
-
-  const eventRail = insights.getByRole("region", {
-    name: "Upcoming scenario events",
+const expectInsightSpacing = async (insights: Locator) => {
+  await expect(insights.locator(".insightsTrack").first()).toBeVisible();
+  const spacing = await insights.evaluate((element) => {
+    const preset = element.querySelector(".insightsPreset")!;
+    const presetRow = element.querySelector(".insightsHeader")!;
+    const date = element.querySelector(".insightsViewportDate")!;
+    const timeRow = element.querySelector(".insightsViewportToolbar")!;
+    const rail = element.querySelector(".insightEventRail")!;
+    const chip = rail.querySelector(".insightEventChip")!;
+    const chartTitle = element.querySelector(".insightsTrackHeader h6")!;
+    const panelTitle = element
+      .closest(".gameToolPanel")!
+      .querySelector(".gameToolHeader h2")!;
+    const paneLeft = element.getBoundingClientRect().left;
+    const insets = (row: Element, content: Element) => {
+      const rowBox = row.getBoundingClientRect();
+      const contentBox = content.getBoundingClientRect();
+      const style = getComputedStyle(row);
+      return {
+        top: contentBox.top - rowBox.top - parseFloat(style.borderTopWidth),
+        bottom:
+          rowBox.bottom -
+          contentBox.bottom -
+          parseFloat(style.borderBottomWidth),
+      };
+    };
+    return {
+      left: Object.fromEntries(
+        Object.entries({ preset, date, chip, chartTitle, panelTitle }).map(
+          ([name, node]) => [
+            name,
+            node.getBoundingClientRect().left - paneLeft,
+          ],
+        ),
+      ),
+      preset: insets(presetRow, preset),
+      chip: insets(rail, chip),
+      timeToEvents:
+        rail.getBoundingClientRect().top -
+        timeRow.getBoundingClientRect().bottom,
+      chartHeadingClearance:
+        chartTitle.getBoundingClientRect().top -
+        rail.getBoundingClientRect().bottom,
+    };
   });
-  await expect(
-    insights.getByRole("button", { name: "Fit full timeline" }),
-  ).toBeDisabled();
-  await expect(eventRail.getByRole("button")).toHaveCount(4);
-  await expect(eventRail).toContainText("Gas prices will fall");
-  const eventButton = eventRail.getByRole("button", {
-    name: /Gas prices will fall/,
-  });
-  await expect(eventButton).toBeVisible();
-  await expect(eventButton.locator(".insightEventTitle")).toBeVisible();
-  await expect(eventButton.locator(".insightEventDate")).toBeVisible();
-  const [titleBox, dateBox] = await Promise.all([
-    eventButton.locator(".insightEventTitle").boundingBox(),
-    eventButton.locator(".insightEventDate").boundingBox(),
-  ]);
-  expect(titleBox).not.toBeNull();
-  expect(dateBox).not.toBeNull();
-  expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(dateBox!.y);
+  for (const [name, inset] of Object.entries(spacing.left)) {
+    expect(inset, `${name} shares the 16px content guide`).toBeCloseTo(16, 0);
+  }
+  for (const [name, { top, bottom }] of Object.entries({
+    preset: spacing.preset,
+    chip: spacing.chip,
+  })) {
+    expect(top, `${name} has 8px above`).toBeCloseTo(8, 0);
+    expect(bottom, `${name} has 8px below`).toBeCloseTo(8, 0);
+  }
+  expect(spacing.timeToEvents, "events follow the time controls").toBeCloseTo(
+    0,
+    0,
+  );
   expect(
-    await eventButton
-      .locator(".insightEventTitle")
-      .evaluate((element) =>
-        Math.max(0, element.scrollWidth - element.clientWidth),
-      ),
-  ).toBeLessThanOrEqual(1);
-  await expect(eventButton).toHaveAttribute("aria-expanded", "false");
+    spacing.chartHeadingClearance,
+    "chart title clears the rail divider",
+  ).toBeGreaterThanOrEqual(8);
+};
 
-  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-  if (reviewDir) {
-    await eventRail.scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: path.join(
-        reviewDir,
-        `upcoming-events-${testInfo.project.name}-${theme}.png`,
+for (const theme of ["light", "dark"] as const) {
+  test(`upcoming scenario events stay usable across insight viewports in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      !new Set(["desktop-chromium", "mobile-390px", "mobile-360px"]).has(
+        testInfo.project.name,
       ),
-      animations: "disabled",
-      fullPage: true,
+    );
+    await page.addInitScript((mode) => {
+      window.localStorage.clear();
+      window.localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=103");
+    await page.getByRole("button", { name: "Start game" }).click();
+
+    const insights = page.locator(".insights:visible");
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    await expect(insights).toBeVisible();
+
+    const eventRail = insights.getByRole("region", {
+      name: "Upcoming scenario events",
     });
-  }
+    await expect(
+      insights.getByRole("button", { name: "Fit full timeline" }),
+    ).toBeDisabled();
+    await expect(eventRail.getByRole("button")).toHaveCount(4);
+    await expect(eventRail).toContainText("Gas prices will fall");
+    const eventButton = eventRail.getByRole("button", {
+      name: /Gas prices will fall/,
+    });
+    await expect(eventButton).toBeVisible();
+    await expect(eventButton.locator(".insightEventTitle")).toBeVisible();
+    await expect(eventButton.locator(".insightEventDate")).toBeVisible();
+    const [titleBox, dateBox] = await Promise.all([
+      eventButton.locator(".insightEventTitle").boundingBox(),
+      eventButton.locator(".insightEventDate").boundingBox(),
+    ]);
+    expect(titleBox).not.toBeNull();
+    expect(dateBox).not.toBeNull();
+    expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(dateBox!.y);
+    expect(
+      await eventButton
+        .locator(".insightEventTitle")
+        .evaluate((element) =>
+          Math.max(0, element.scrollWidth - element.clientWidth),
+        ),
+    ).toBeLessThanOrEqual(1);
+    await expect(eventButton).toHaveAttribute("aria-expanded", "false");
 
-  await eventButton.click();
-  await expect(eventButton).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("dialog")).toContainText(
-    "A regional shale glut will make local gas cheaper.",
-  );
-  await eventButton.click();
-  await expect(eventButton).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await eventButton.click();
+    await expectInsightSpacing(insights);
 
-  const charts = insights.locator(".accessibleChart [role=img]");
-  const fullMin = Number(
-    await charts.first().getAttribute("data-viewport-min"),
-  );
-  const fullMax = Number(
-    await charts.first().getAttribute("data-viewport-max"),
-  );
-  await page.getByRole("button", { name: "Zoom to event" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect
-    .poll(async () => {
-      const min = Number(
-        await charts.first().getAttribute("data-viewport-min"),
+    const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+    if (reviewDir) {
+      await eventRail.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(
+          reviewDir,
+          `upcoming-events-${testInfo.project.name}-${theme}.png`,
+        ),
+        animations: "disabled",
+        fullPage: true,
+      });
+      if (testInfo.project.name === "desktop-chromium") {
+        await page
+          .locator(".gameToolPanel")
+          .filter({ has: insights })
+          .screenshot({
+            path: path.join(
+              reviewDir,
+              `insights-panel-${testInfo.project.name}-${theme}.png`,
+            ),
+            animations: "disabled",
+          });
+      }
+    }
+
+    await eventButton.click();
+    await expect(eventButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("dialog")).toContainText(
+      "A regional shale glut will make local gas cheaper.",
+    );
+    await eventButton.click();
+    await expect(eventButton).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await eventButton.click();
+
+    const charts = insights.locator(".accessibleChart [role=img]");
+    const fullMin = Number(
+      await charts.first().getAttribute("data-viewport-min"),
+    );
+    const fullMax = Number(
+      await charts.first().getAttribute("data-viewport-max"),
+    );
+    await page.getByRole("button", { name: "Zoom to event" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const min = Number(
+          await charts.first().getAttribute("data-viewport-min"),
+        );
+        const max = Number(
+          await charts.first().getAttribute("data-viewport-max"),
+        );
+        return max - min;
+      })
+      .toBeLessThan(fullMax - fullMin);
+    const zoomedMin = Number(
+      await charts.first().getAttribute("data-viewport-min"),
+    );
+    const zoomedMax = Number(
+      await charts.first().getAttribute("data-viewport-max"),
+    );
+    expect(zoomedMax - zoomedMin).toBeLessThan(fullMax - fullMin);
+    const chartRanges = await charts.evaluateAll((elements) =>
+      elements.map((element) => [
+        element.getAttribute("data-viewport-min"),
+        element.getAttribute("data-viewport-max"),
+      ]),
+    );
+    expect(new Set(chartRanges.map((range) => range.join(":"))).size).toBe(1);
+
+    const viewportToolbar = insights.getByRole("region", {
+      name: "Chart time navigation",
+    });
+    await expect(viewportToolbar).toContainText(/20\d{2}/);
+    await expect(
+      viewportToolbar.getByRole("combobox", { name: "Time horizon" }),
+    ).toHaveCount(0);
+    const viewportControls = await viewportToolbar.getByRole("button").all();
+    const viewportControlBoxes = await Promise.all(
+      viewportControls.map((control) => control.boundingBox()),
+    );
+    expect(viewportControlBoxes.every(Boolean)).toBe(true);
+    const viewportControlCenters = viewportControlBoxes.map(
+      (box) => box!.y + box!.height / 2,
+    );
+    expect(
+      Math.max(...viewportControlCenters) - Math.min(...viewportControlCenters),
+    ).toBeLessThanOrEqual(1);
+    const toolbarBox = await viewportToolbar.boundingBox();
+    expect(toolbarBox).not.toBeNull();
+    expect(toolbarBox!.height).toBeLessThanOrEqual(53);
+    const toolbarOverflow = await viewportToolbar.evaluate((element) =>
+      Math.max(0, element.scrollWidth - element.clientWidth),
+    );
+    expect(toolbarOverflow).toBeLessThanOrEqual(1);
+    const viewportButtonBoxes = viewportControlBoxes;
+    expect(
+      viewportButtonBoxes.every((box) =>
+        testInfo.project.name.startsWith("mobile-")
+          ? box!.height >= 44
+          : box!.height >= 40,
+      ),
+    ).toBe(true);
+    if (testInfo.project.name.startsWith("mobile-")) {
+      viewportControlBoxes.forEach((box) =>
+        expect(box!.width).toBeCloseTo(44, 0),
       );
-      const max = Number(
-        await charts.first().getAttribute("data-viewport-max"),
-      );
-      return max - min;
-    })
-    .toBeLessThan(fullMax - fullMin);
-  const zoomedMin = Number(
-    await charts.first().getAttribute("data-viewport-min"),
-  );
-  const zoomedMax = Number(
-    await charts.first().getAttribute("data-viewport-max"),
-  );
-  expect(zoomedMax - zoomedMin).toBeLessThan(fullMax - fullMin);
-  const chartRanges = await charts.evaluateAll((elements) =>
-    elements.map((element) => [
-      element.getAttribute("data-viewport-min"),
-      element.getAttribute("data-viewport-max"),
-    ]),
-  );
-  expect(new Set(chartRanges.map((range) => range.join(":"))).size).toBe(1);
+    }
+    await expect(
+      viewportToolbar.locator(".insightsViewportDate"),
+    ).toBeVisible();
 
-  const viewportToolbar = insights.getByRole("region", {
-    name: "Chart time navigation",
+    const pageOverflow = await insights.evaluate((element) =>
+      Math.max(0, element.scrollWidth - element.clientWidth),
+    );
+    expect(pageOverflow).toBeLessThanOrEqual(1);
+    if (testInfo.project.name.startsWith("mobile-")) {
+      const eventBox = await eventButton.boundingBox();
+      expect(eventBox).not.toBeNull();
+      expect(eventBox!.height).toBeGreaterThanOrEqual(44);
+      await expect(eventRail.locator(".insightEventList")).toHaveCSS(
+        "overflow-x",
+        "auto",
+      );
+    }
   });
-  await expect(viewportToolbar).toContainText(/20\d{2}/);
-  await expect(
-    viewportToolbar.getByRole("combobox", { name: "Time horizon" }),
-  ).toHaveCount(0);
-  const viewportControls = await viewportToolbar.getByRole("button").all();
-  const viewportControlBoxes = await Promise.all(
-    viewportControls.map((control) => control.boundingBox()),
-  );
-  expect(viewportControlBoxes.every(Boolean)).toBe(true);
-  const viewportControlCenters = viewportControlBoxes.map(
-    (box) => box!.y + box!.height / 2,
-  );
-  expect(
-    Math.max(...viewportControlCenters) - Math.min(...viewportControlCenters),
-  ).toBeLessThanOrEqual(1);
-  const toolbarBox = await viewportToolbar.boundingBox();
-  expect(toolbarBox).not.toBeNull();
-  expect(toolbarBox!.height).toBeLessThanOrEqual(53);
-  const toolbarOverflow = await viewportToolbar.evaluate((element) =>
-    Math.max(0, element.scrollWidth - element.clientWidth),
-  );
-  expect(toolbarOverflow).toBeLessThanOrEqual(1);
-  const viewportButtonBoxes = viewportControlBoxes;
-  expect(
-    viewportButtonBoxes.every((box) =>
-      testInfo.project.name.startsWith("mobile-")
-        ? box!.height >= 44
-        : box!.height >= 40,
-    ),
-  ).toBe(true);
-  if (testInfo.project.name.startsWith("mobile-")) {
-    viewportControlBoxes.forEach((box) =>
-      expect(box!.width).toBeCloseTo(44, 0),
-    );
-  }
-  await expect(viewportToolbar.locator(".insightsViewportDate")).toBeVisible();
-
-  const pageOverflow = await insights.evaluate((element) =>
-    Math.max(0, element.scrollWidth - element.clientWidth),
-  );
-  expect(pageOverflow).toBeLessThanOrEqual(1);
-  if (testInfo.project.name.startsWith("mobile-")) {
-    const eventBox = await eventButton.boundingBox();
-    expect(eventBox).not.toBeNull();
-    expect(eventBox!.height).toBeGreaterThanOrEqual(44);
-    await expect(eventRail.locator(".insightEventList")).toHaveCSS(
-      "overflow-x",
-      "auto",
-    );
-    const railBox = await eventRail.boundingBox();
-    expect(railBox).not.toBeNull();
-    expect(railBox!.height).toBeLessThanOrEqual(52);
-  }
-});
+}
 
 test("insights header controls stay aligned in one compact row", async ({
   page,
@@ -313,8 +392,9 @@ test("insights header controls stay aligned in one compact row", async ({
   if (compact) {
     const header = await page.locator(".insightsHeader").boundingBox();
     expect(header).not.toBeNull();
-    expect(header!.height).toBeGreaterThanOrEqual(minimumControlHeight + 8);
-    expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 10);
+    // The controls keep an 8px inset above and below, plus the row's divider.
+    expect(header!.height).toBeGreaterThanOrEqual(minimumControlHeight + 16);
+    expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 18);
 
     // Rate and program levers live in the Programs tool, not under the Insights header.
     if (testInfo.project.name === "mobile-360px") {

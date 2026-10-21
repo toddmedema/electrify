@@ -24,8 +24,7 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
   await expect(
     insights.getByLabel("Displayed date range: 2017–23"),
   ).toBeVisible();
-  await expect(insights.getByLabel("Chart time key")).toContainText("Recorded");
-  await expect(insights.getByLabel("Chart time key")).toContainText("Forecast");
+  await expect(insights.getByLabel("Chart time key")).toHaveCount(0);
   await expect(
     insights.getByRole("button", { name: "Remove Cash" }),
   ).toHaveCount(0);

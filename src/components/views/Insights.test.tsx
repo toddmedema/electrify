@@ -565,9 +565,7 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("button", { name: "Remove Cash" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Chart time key")).toHaveTextContent(
-      "RecordedForecast",
-    );
+    expect(screen.queryByLabelText("Chart time key")).not.toBeInTheDocument();
     await user.click(labelledButton(/Layers/));
     expect(labelledButton("Remove Cash")).toBeEnabled();
     expect(labelledButton("Move Cash up")).toBeEnabled();
