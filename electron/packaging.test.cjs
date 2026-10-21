@@ -100,7 +100,10 @@ test("packaging preserves and verifies each target runtime's original notices be
       path.join(target, "manifest.json"),
       JSON.stringify(manifest),
     );
-    assert.throws(() => verifyRuntimeNotices(resources), /lockfile/);
+    assert.throws(
+      () => verifyRuntimeNotices(resources),
+      /Packaged Electron notice manifest differs from the runtime/,
+    );
     assert.throws(
       () =>
         preserveRuntimeNotices({

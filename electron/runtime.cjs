@@ -1,4 +1,5 @@
 const path = require("node:path");
+const { runtimeNoticeFilename } = require("./runtime-notices.cjs");
 
 const APP_ORIGIN = "electrify://app";
 const APP_URL = `${APP_ORIGIN}/index.html`;
@@ -44,8 +45,8 @@ function resolveAsset(root, value, runtimeNotices) {
     throw new Error("Asset path escapes the bundle");
   // The shared renderer is built on Linux. Only this fixed URL reads the
   // actual packaged platform's original Chromium terms outside that bundle.
-  if (runtimeNotices && relative === "notices-chromium.html")
-    return path.join(runtimeNotices, "LICENSES.chromium.html");
+  const notice = runtimeNoticeFilename(relative);
+  if (runtimeNotices && notice) return path.join(runtimeNotices, notice);
   return filename;
 }
 
