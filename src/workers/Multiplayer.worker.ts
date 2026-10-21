@@ -129,7 +129,7 @@ async function startMatch(
   } else {
     const spec = savedMatchSpec(request.world);
     await data(spec);
-    world = restoreWorld(request.world, request.epoch);
+    world = restoreWorld(request.world, request.epoch, request.seats);
   }
   busy = false;
   requestViews({ force: true });
@@ -218,7 +218,7 @@ worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   }
   if (!world) return refuse("Start a match first");
   if (faulted)
-    return refuse("Resume the last complete shared save in a new lobby");
+    return refuse("Resume the last complete multiplayer save in a new lobby");
   try {
     handle(request, world);
   } catch (error) {

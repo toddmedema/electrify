@@ -75,6 +75,15 @@ test("multiplayer adds only other players' icons along the bottom of the standar
     ),
   ).toBeInTheDocument();
   expect(screen.queryByTestId("speed-peer-ULTRA-1")).not.toBeInTheDocument();
+  // Hovering a speed names who chose it.
+  expect(screen.getByRole("button", { name: "normal speed" })).toHaveAttribute(
+    "title",
+    "3×: Player 2",
+  );
+  expect(screen.getByRole("button", { name: "fast speed" })).toHaveAttribute(
+    "title",
+    "12×: nobody",
+  );
   fireEvent.click(screen.getByRole("button", { name: "ultra speed" }));
   expect(onSpeedChange).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "normal speed" }));
@@ -124,6 +133,10 @@ test("temporary pauses keep chosen speeds and identify the cause without a statu
       "speed-peer-PAUSED-2",
     ),
   ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "pause" })).toHaveAttribute(
+    "title",
+    "Paused: Player 2: Building capacity",
+  );
   expect(
     within(screen.getByRole("button", { name: "normal speed" })).getByTestId(
       "speed-peer-NORMAL-2",

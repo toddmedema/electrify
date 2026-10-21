@@ -7381,9 +7381,25 @@ $programs_column: 800px;
     color: var(--font-color-faded);
   }
 
+  .coopBrowseActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+  }
+
   .MuiButton-root {
     min-height: 40px;
   }
+}
+
+// The host's way back into a multiplayer save, above the new-game choices.
+.coopSavesBar.MuiButton-root {
+  justify-content: flex-start;
+  min-height: 40px;
+  padding: $space-2 $space-4;
+  border-radius: 0;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 // A guest's copy of the host's custom setup: readable, but only the host changes it.
@@ -7431,7 +7447,8 @@ $programs_column: 800px;
 }
 
 @media (pointer: coarse) {
-  .coopBrowseBar .MuiButton-root {
+  .coopBrowseBar .MuiButton-root,
+  .coopSavesBar.MuiButton-root {
     min-height: 44px;
   }
 }

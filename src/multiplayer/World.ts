@@ -698,7 +698,7 @@ export function checkpointWorld(world: World): World {
 
 const INCOMPLETE_SAVE =
   "This co-op save is incomplete or uses an unsupported format. Your original save is preserved.";
-const INVALID_GRIDS = "Shared save contains invalid grids or connections";
+const INVALID_GRIDS = "Multiplayer save contains invalid grids or connections";
 
 /** Current structure, a playable match spec and a two-to-four player roster. */
 function validRoster(world: World) {
@@ -937,17 +937,68 @@ function restoreCommitments(world: World, result: World) {
     !Array.isArray(world.commitments) ||
     world.commitments.length !== world.grids.length
   )
-    throw new Error("Shared save is missing its dispatch plans");
+    throw new Error("Multiplayer save is missing its dispatch plans");
   world.commitments.forEach((saved, i) => {
     if (saved === null) return;
     if (!validCommitmentMetadata(saved, result.grids[i].timeline.length))
-      throw new Error("Shared save has invalid dispatch plans");
+      throw new Error("Multiplayer save has invalid dispatch plans");
     restoreCommitmentMetadata(result.grids[i].timeline, saved);
   });
   delete result.commitments;
 }
 
-export function restoreWorld(value: unknown, epoch: string): World {
+/**
+ * Hands each saved company to the player resuming it, in saved order. Every reference to a
+ * seat's id or name moves with it, so the result validates as though it had been saved so.
+ */
+function reassignSeats(world: World, seats: Seat[]) {
+  if (
+    seats.length !== world.seats.length ||
+    new Set(seats.map((s) => s.id)).size !== seats.length ||
+    !seats.every(
+      (s) =>
+        /^[a-zA-Z0-9-]{1,64}$/.test(s?.id) &&
+        typeof s.name === "string" &&
+        s.name.length <= 200,
+    )
+  )
+    throw new Error("Every saved company needs one player");
+  const ids = new Map(world.seats.map((seat, i) => [seat.id, seats[i].id]));
+  const names = new Map(seats.map((seat) => [seat.id, seat.name]));
+  const id = (old: string) => ids.get(old) ?? old;
+  const rekey = <T>(record: Record<string, T>) =>
+    Object.fromEntries(Object.entries(record).map(([k, v]) => [id(k), v]));
+  world.seats = seats.map((seat) => ({ ...seat }));
+  world.outcomes = rekey(world.outcomes);
+  world.selectedSpeeds = rekey(world.selectedSpeeds);
+  world.activities = rekey(world.activities);
+  world.ready = world.ready.map(id);
+  world.edges.forEach((edge) => {
+    edge.a = id(edge.a);
+    edge.b = id(edge.b);
+    if (edge.approval) edge.approval = id(edge.approval);
+  });
+  world.grids.forEach((grid) => {
+    const multiplayer = grid.multiplayer!;
+    multiplayer.seat = id(multiplayer.seat);
+    multiplayer.peers?.forEach((peer) => {
+      const line = grid.transmission?.lines.find(
+        (l) => l.corridorId === peer.corridor.id,
+      );
+      peer.id = id(peer.id);
+      peer.name = names.get(peer.id)!;
+      peer.corridor.adjacentMarketId = peer.id;
+      peer.corridor.name = peer.name;
+      if (line) line.name = peer.name;
+    });
+  });
+}
+
+export function restoreWorld(
+  value: unknown,
+  epoch: string,
+  seats?: Seat[],
+): World {
   const world = upgradeWorld(value);
   const ids = new Set(world?.seats?.map?.((s) => s?.id));
   if (
@@ -959,9 +1010,11 @@ export function restoreWorld(value: unknown, epoch: string): World {
     throw new Error(INCOMPLETE_SAVE);
   const result = cloneDeep(world);
   if (!validClock(world, ids))
-    throw new Error("Shared save contains invalid player speeds or pauses");
+    throw new Error(
+      "Multiplayer save contains invalid player speeds or pauses",
+    );
   if (!validReceipts(world, ids))
-    throw new Error("Shared save contains invalid command receipts");
+    throw new Error("Multiplayer save contains invalid command receipts");
   const initial = createWorld(
     world.spec,
     world.seats,
@@ -974,6 +1027,7 @@ export function restoreWorld(value: unknown, epoch: string): World {
   )
     throw new Error(INVALID_GRIDS);
   restoreCommitments(world, result);
+  if (seats) reassignSeats(result, seats);
   result.rules = RULES;
   result.epoch = epoch;
   // A restored renderer starts on the grid view, so prior menus cannot keep it stuck paused.
@@ -1038,7 +1092,7 @@ export function savedMatchSpec(value: unknown): MatchSpec {
   } | null;
   if ((raw?.schema ?? 0) > 3 || (raw?.gameSchema ?? 0) > SAVE_SCHEMA_VERSION)
     throw new Error(
-      "This shared save needs a newer game. Refresh to update. Your original save is preserved.",
+      "This multiplayer save needs a newer game. Refresh to update. Your original save is preserved.",
     );
   if (!raw?.spec || ![2, 3].includes(raw.schema!))
     throw new Error(INCOMPLETE_SAVE);

@@ -222,6 +222,11 @@ test("a fresh worker loads the saved match's location before validating and rest
       { id: "guest", name: "Guest" },
     ],
   } as unknown as World;
+  // The players resuming it, who claimed the saved companies.
+  const seats = [
+    { id: "host", name: "Host" },
+    { id: "friend", name: "Friend" },
+  ];
   globalThis.fetch = jest.fn().mockResolvedValue({
     ok: true,
     arrayBuffer: async () => new ArrayBuffer(0),
@@ -237,9 +242,9 @@ test("a fresh worker loads the saved match's location before validating and rest
   try {
     require("./Multiplayer.worker");
     await scope.onmessage!({
-      data: { kind: "restore", world: saved, epoch: "restored" },
+      data: { kind: "restore", world: saved, epoch: "restored", seats },
     } as MessageEvent<WorkerRequest>);
-    expect(restoreWorld).toHaveBeenCalledWith(saved, "restored");
+    expect(restoreWorld).toHaveBeenCalledWith(saved, "restored", seats);
     expect(post).toHaveBeenCalledWith({ kind: "checkpoint", world: saved });
   } finally {
     jest.clearAllTimers();
@@ -366,7 +371,7 @@ test("a command that throws mid-match stops the shared clock for everyone and re
     expect(applyCommand).not.toHaveBeenCalled();
     expect(post).toHaveBeenCalledWith({
       kind: "error",
-      message: "Resume the last complete shared save in a new lobby",
+      message: "Resume the last complete multiplayer save in a new lobby",
     });
   } finally {
     jest.clearAllTimers();

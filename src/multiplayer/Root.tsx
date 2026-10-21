@@ -20,13 +20,14 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
-import { MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession } from "./Session";
 import {
   registerCoopControls,
   registerLobbyOpener,
   registerMultiplayerRuntime,
 } from "./Registry";
 import Lobby from "./Lobby";
+import SavesDialog from "./SavesDialog";
 import CoopResult from "./Result";
 import { runSaveTransition } from "../SaveSession";
 import HostConnectionWarning from "./HostConnectionWarning";
@@ -36,6 +37,7 @@ import { coopSelection, hostSelection, isBrowseCard } from "./Choosing";
 /** Session lifetime follows the app; entering the normal game can unmount the main menu. */
 export default function MultiplayerRoot() {
   const [open, setOpen] = useState(false);
+  const [savesOpen, setSavesOpen] = useState(false);
   // The host has opened the scenario screens for the lobby; guests follow once it publishes.
   const choosing = useRef(false);
   const [watching, setWatching] = useState<string>();
@@ -108,10 +110,59 @@ export default function MultiplayerRoot() {
     (skipSave = false) => {
       choosing.current = false;
       setOpen(false);
+      setSavesOpen(false);
       void session.leave({ skipSave }).catch(() => undefined);
     },
     [session],
   );
+
+  /** The host shows the scenario screens to the lobby, which friends can join meanwhile. */
+  const startChoosing = useCallback(() => {
+    setOpen(false);
+    const card = store.getState().card.name;
+    choosing.current = true;
+    if (!isBrowseCard(card)) store.dispatch(navigate("NEW_GAME"));
+    syncCoop();
+    // The saves bar appears once this computer's multiplayer saves are known, including one
+    // just written by the match that ended.
+    void session.refreshSaves().catch(() => undefined);
+  }, [session, syncCoop]);
+
+  const copyCode = useCallback(() => {
+    const code = session.getSnapshot().lobby.lobbyId;
+    if (!code) return;
+    const shown = () =>
+      store.dispatch(
+        dialogOpen({
+          open: true,
+          title: "Invite code",
+          message: `Friends can enter ${code} in Play with friends to join.`,
+          closeText: "OK",
+        }),
+      );
+    if (!navigator.clipboard) return shown();
+    navigator.clipboard.writeText(code).then(
+      () =>
+        store.dispatch(
+          snackbarOpen({
+            message: "Invite code copied",
+            open: true,
+            timeout: 4000,
+          }),
+        ),
+      shown,
+    );
+  }, [session]);
+
+  const invite = useCallback(() => {
+    void session
+      .invite()
+      .catch((error) =>
+        store.dispatch(
+          snackbarOpen({ message: error.message, open: true, timeout: 6000 }),
+        ),
+      );
+  }, [session]);
 
   useEffect(() => {
     registerLobbyOpener(() => setOpen(true));
@@ -194,23 +245,29 @@ export default function MultiplayerRoot() {
       },
       back: () => {
         const { lobby } = session.getSnapshot();
-        if (lobby.hostId === lobby.selfId) setOpen(true);
-        else
-          store.dispatch(
-            dialogOpen({
-              open: true,
-              title: "Leave the lobby?",
-              message: "You'll stop following the host's game choice.",
-              closeText: "Stay",
-              actionLabel: "Leave lobby",
-              destructive: true,
-              action: () => {
-                store.dispatch(dialogClose());
-                leaveLobby();
-              },
-            }),
-          );
+        const host = lobby.hostId === lobby.selfId;
+        // A host alone in its lobby has nobody to warn.
+        if (host && lobby.members.length < 2) return leaveLobby();
+        store.dispatch(
+          dialogOpen({
+            open: true,
+            title: "Leave the lobby?",
+            message: host
+              ? "Your friends will return to the main menu."
+              : "You'll stop following the host's game choice.",
+            closeText: "Stay",
+            actionLabel: "Leave lobby",
+            destructive: true,
+            action: () => {
+              store.dispatch(dialogClose());
+              leaveLobby();
+            },
+          }),
+        );
       },
+      invite,
+      copyCode,
+      openSaves: () => setSavesOpen(true),
     });
     const stopNative = getDesktop()?.onMultiplayerEvent?.((event) => {
       if (event.kind === "invite" && !session.getSnapshot().view) {
@@ -218,13 +275,17 @@ export default function MultiplayerRoot() {
         void session.join(event.lobbyId).catch(() => undefined);
       }
     });
-    void session.initialize().then(() => {
-      const invite = session.getSnapshot().lobby.inviteLobbyId;
-      if (invite) {
-        setOpen(true);
-        void session.join(invite).catch(() => undefined);
-      }
-    });
+    void session
+      .initialize()
+      .then(() => {
+        const invite = session.getSnapshot().lobby.inviteLobbyId;
+        if (invite) {
+          setOpen(true);
+          void session.join(invite).catch(() => undefined);
+        }
+      })
+      // A desktop build without Steam multiplayer keeps the lobby unavailable.
+      .catch(() => undefined);
     return () => {
       live = false;
       stop();
@@ -236,13 +297,25 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby]);
+  }, [session, syncCoop, leaveLobby, invite, copyCode]);
   useEffect(() => {
     if (!hasView || state.lobby.hostId !== state.lobby.selfId) return;
     return registerShutdownCheckpoint(() => session.save(true));
   }, [session, hasView, state.lobby.hostId, state.lobby.selfId]);
   useEffect(() => {
     const error = state.error || state.lobby.error;
+    if (error === HOST_LEFT && !open) {
+      store.dispatch(
+        dialogOpen({
+          open: true,
+          title: "Multiplayer",
+          message: error,
+          closeText: "OK",
+        }),
+      );
+      session.dismissError();
+      return;
+    }
     if (!error || !(hasView || (coop && !open))) return;
     store.dispatch(
       dialogOpen({
@@ -300,14 +373,12 @@ export default function MultiplayerRoot() {
       {open && !state.view ? (
         <Lobby
           session={session}
-          choosing={choosing.current}
-          onChoose={() => {
-            setOpen(false);
-            const card = store.getState().card.name;
-            choosing.current = true;
-            if (!isBrowseCard(card)) store.dispatch(navigate("NEW_GAME"));
-            syncCoop();
+          onHosted={startChoosing}
+          onChooseNew={() => {
+            session.cancelCampaign();
+            startChoosing();
           }}
+          onCopyCode={copyCode}
           onClose={() => {
             setOpen(false);
             if (!state.lobby.lobbyId) choosing.current = false;
@@ -315,6 +386,9 @@ export default function MultiplayerRoot() {
           onLeave={() => leaveLobby()}
         />
       ) : null}
+      {savesOpen && !open && !state.view && (
+        <SavesDialog session={session} onClose={() => setSavesOpen(false)} />
+      )}
       {showResult && (
         <CoopResult
           ending={ending}
@@ -325,10 +399,7 @@ export default function MultiplayerRoot() {
           onWatch={() => setWatching(endingKey)}
           onBackToLobby={() => {
             choosing.current = true;
-            void session.backToLobby().then(() => {
-              store.dispatch(navigate("NEW_GAME"));
-              syncCoop();
-            });
+            void session.backToLobby().then(startChoosing);
           }}
           onLeave={() => leaveLobby(true)}
         />

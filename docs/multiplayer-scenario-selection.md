@@ -6,8 +6,11 @@ flow and technical design only; no code has changed. Citations are to the PR #54
 
 ## TL;DR
 
-- **Flow:** Gathering (lobby dialog) → host presses **Choose a game together** → everyone is on the
-  real `NEW_GAME` / `NEW_GAME_DETAILS` / `CUSTOM_GAME` cards. The host drives; guests follow
+- **Flow:** **Host a game** goes straight to the real `NEW_GAME` / `NEW_GAME_DETAILS` /
+  `CUSTOM_GAME` cards, with **Invite friends** and **Copy invite code** in the follow bar;
+  friends join with the code and land on the host's card. (The Gathering dialog and **Choose a
+  game together** below were the original design; guests now see the dialog only while
+  joining or picking companies for a multiplayer save.) The host drives; guests follow
   read-only with a "Following Alice" bar and one action, **Ready**. Host presses **Start for
   everyone**, then Loading, the shared game, a co-op result, and **Back to lobby**.
 - **Mirroring:** one host-only `browse` wire message carries the complete selection state

@@ -93,8 +93,9 @@ const MESSAGE_PREFIX_SIZE = 16;
 const MESSAGE_SIZE_OFFSET = 8;
 const MESSAGES_PER_RECEIVE = 16;
 // Lobby member data a player may set: the co-op selection they agreed to, so Ready clears
-// itself whenever the host changes the scenario, difficulty or custom settings.
-const MEMBER_KEYS = new Set(["ready"]);
+// itself whenever the host changes the scenario, difficulty or custom settings, and the saved
+// company they claimed while resuming a multiplayer save.
+const MEMBER_KEYS = new Set(["ready", "slot"]);
 const MEMBER_VALUE = /^[a-zA-Z0-9:|._-]{0,64}$/;
 // The host's mirrored scenario selection; a complete custom game fits well within this.
 const MAX_BROWSE_BYTES = 16 * 1024;
@@ -308,6 +309,13 @@ class SteamMultiplayer {
             BigInt(id),
             "ready",
           ) || undefined,
+        slot:
+          this.api.memberData(
+            this.matchmaking,
+            this.lobby,
+            BigInt(id),
+            "slot",
+          ) || undefined,
       };
     });
   }
@@ -492,7 +500,7 @@ class SteamMultiplayer {
     if (
       this.api.owner(this.matchmaking, this.lobby).toString() !== this.hostId
     ) {
-      this.fail("The host left. Resume a shared save in a new lobby.");
+      this.fail("The host left. Resume a multiplayer save in a new lobby.");
       return;
     }
     this.publish();
@@ -506,10 +514,10 @@ class SteamMultiplayer {
       world.seats.length > 4 ||
       !world.seats.some((s) => s.id === this.service.identity.steamId)
     )
-      throw new Error("Invalid shared save");
+      throw new Error("Invalid multiplayer save");
     const json = stringify(world);
     if (Buffer.byteLength(json) > MAX_BYTES)
-      throw new Error("Shared save is too large");
+      throw new Error("Multiplayer save is too large");
     const digest = crypto.createHash("sha256").update(json).digest("hex");
     this.saveQueue = this.saveQueue
       .catch(() => {})
@@ -578,7 +586,7 @@ class SteamMultiplayer {
         throw new Error("Invalid save sender");
       const digest = await this.persist(payload.world);
       if (digest !== payload.digest)
-        throw new Error("Shared save checksum failed");
+        throw new Error("Multiplayer save checksum failed");
       // The host persists before sending; this complete local write establishes two copies.
       this.sharedAt = this.savedAt;
       this.publish();

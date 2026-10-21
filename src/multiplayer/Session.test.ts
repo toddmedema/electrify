@@ -1,6 +1,11 @@
-import { MultiplayerSession } from "./Session";
+import { HOST_LEFT, MultiplayerSession } from "./Session";
 import type { DesktopBridge } from "../Desktop";
-import type { NativeEvent, NativeRequest, PendingCampaign } from "./Native";
+import type {
+  LobbyState,
+  NativeEvent,
+  NativeRequest,
+  PendingCampaign,
+} from "./Native";
 import type { RoomView, World } from "./Types";
 import type { BrowseState } from "./Browse";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
@@ -197,7 +202,7 @@ test("resuming a campaign creates its invitation lobby before starting and waits
   expect(f.session.canResumeCampaign()).toBe(false);
   await expect(
     f.session.start({ saved: true, id: campaign.id }),
-  ).rejects.toThrow(/only the saved match's players/);
+  ).rejects.toThrow(/Other must pick a company/);
   expect(f.session.getSnapshot().pendingCampaign).toEqual(campaign);
   f.event({ kind: "state", state: lobby });
   await f.session.start({ saved: true, id: campaign.id });
@@ -205,12 +210,102 @@ test("resuming a campaign creates its invitation lobby before starting and waits
     kind: "lock",
     ids: [host, guest, "retired"],
   });
-  expect(f.posts.at(-1)).toMatchObject({ kind: "restore" });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "restore",
+    seats: campaign.players,
+  });
   expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();
   f.session.dispose();
 });
 
-test("a missing or foreign campaign does not create a lobby", async () => {
+test("a friend who was not in the save claims an open company and resumes it", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.checkpoint(savedCampaign());
+  await f.session.prepareResume(campaign.id, campaign.name);
+  await f.session.claimSlot(guest);
+  expect(f.requests.at(-1)).toEqual({
+    kind: "member",
+    key: "slot",
+    value: `${campaign.id}:${guest}`,
+  });
+  const lobby = (members: LobbyState["members"], connected: string[]) =>
+    f.event({
+      kind: "state",
+      state: {
+        ...f.session.getSnapshot().lobby,
+        lobbyId: "lobby",
+        hostId: host,
+        selfId: host,
+        members,
+        connected,
+      },
+    });
+  // A newcomer joins before anyone has taken the absent guest's company.
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend" },
+    ],
+    ["friend"],
+  );
+  expect(f.session.resumeBlocker()).toBe("Friend must pick a company");
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend", slot: `${campaign.id}:${guest}` },
+    ],
+    [],
+  );
+  expect(f.session.resumeBlocker()).toBe("Every player must be connected");
+  lobby(
+    [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend", slot: `${campaign.id}:${guest}` },
+    ],
+    ["friend"],
+  );
+  expect(f.session.canResumeCampaign()).toBe(true);
+  await f.session.start({ saved: true, id: campaign.id });
+  expect(f.requests).toContainEqual({
+    kind: "lock",
+    ids: [host, "friend", "retired"],
+  });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "restore",
+    seats: [
+      { id: host, name: "Host" },
+      { id: "friend", name: "Friend" },
+      { id: "retired", name: "Retired" },
+    ],
+  });
+  f.session.dispose();
+});
+
+test("friends leaving before the match begins are routine, and a guest whose host leaves goes home", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  f.event({ kind: "disconnected", sender: guest });
+  expect(f.session.getSnapshot().error).toBeUndefined();
+  f.session.dispose();
+  const g = fixture();
+  await g.session.initialize();
+  g.event({
+    kind: "state",
+    state: {
+      ...g.session.getSnapshot().lobby,
+      members: [{ id: guest, name: "Guest" }],
+      connected: [],
+    },
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(g.requests.some((r) => r.kind === "leave")).toBe(true);
+  expect(g.session.getSnapshot().lobby.lobbyId).toBeUndefined();
+  expect(g.session.getSnapshot().error).toBe(HOST_LEFT);
+  g.session.dispose();
+});
+
+test("a missing campaign does not create a lobby", async () => {
   const f = fixture(true);
   await f.session.initialize();
   f.event({
@@ -220,10 +315,6 @@ test("a missing or foreign campaign does not create a lobby", async () => {
   await expect(
     f.session.prepareResume(campaign.id, campaign.name),
   ).rejects.toThrow(/could not be found/);
-  f.checkpoint({ ...savedCampaign(), seats: campaign.players.slice(1) });
-  await expect(
-    f.session.prepareResume(campaign.id, campaign.name),
-  ).rejects.toThrow(/different players/);
   expect(f.requests.some((r) => r.kind === "create")).toBe(false);
   expect(f.session.getSnapshot().busy).toBe(false);
   expect(f.session.getSnapshot().pendingCampaign).toBeUndefined();

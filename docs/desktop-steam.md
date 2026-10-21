@@ -402,12 +402,14 @@ through Valve's normal review process.
 
 ## Realtime Steam co-op
 
-**Play with friends** on the desktop title screen opens a friends-only Steam lobby. Host a room,
-then invite friends through Steam or share its full numeric lobby code. Once two to four players
-are connected, the host presses **Choose a game together** and picks any authored scenario or a
-custom game in the normal selection screens. Guests follow the host's screen, scenario,
-difficulty and custom settings read-only, and mark **Ready** for exactly what is shown; any change
-by the host clears it. **Start for everyone** launches that scenario for the lobby. Everyone
+**Play with friends** on the desktop title screen offers **Host a game** or joining with an
+invite code. Hosting opens a friends-only Steam lobby and goes straight to the normal selection
+screens, where the top bar's **Invite friends** opens Steam's invitation overlay and **Copy invite
+code** copies the full numeric lobby code. Two to four players can join or leave at any time before
+the start. The host picks any authored scenario or a custom game. Guests follow the host's screen,
+scenario, difficulty and custom settings read-only, and mark **Ready** for exactly what is shown;
+any change by the host clears it. **Start for everyone** launches that scenario for the lobby once
+a friend has joined and everyone is connected. Everyone
 selects a running speed to begin. Tutorials, challenge links, replays and Data Center setup are
 single-player only. See [co-op scenario selection](multiplayer-scenario-selection.md).
 
@@ -478,12 +480,16 @@ before publishing a current-rules baseline. Players in the same session must sti
 game code and data. Newer or unsupported bundles remain preserved; individual grids never migrate
 independently during play.
 
-**Play with friends → Shared campaigns** lists saved campaigns with their players and save times.
-Resume opens a lobby for that campaign; invite the missing players, then resume together. The
-campaign menu offers deletion with confirmation. New and resumed games start with every player
+When the host has multiplayer saves, the scenario list shows **Load multiplayer save** across the
+top. It lists each save with its players and save time, and its menu offers deletion with
+confirmation. Loading a save gathers the lobby to pick companies: each row is labelled with the
+Steam name that saved it. A returning player takes back their own company by default, and anyone
+in the lobby can take an open one; the host resumes once every company still playing has a
+connected player. A company handed to a new player is saved under that player's Steam ID and name.
+New and resumed games start with every player
 paused, using the same speed controls as ordinary play.
 The account-specific `co-op-library.json` holds up to 32 campaigns and 64 MiB; a checkpoint is
-limited to 16 MiB. The old `co-op.json` is retained and imported as the last shared save. An
+limited to 16 MiB. The old `co-op.json` is retained and imported as the last multiplayer save. An
 immutable `co-op-original-<digest>.json` preserves a checkpoint before a rules or schema upgrade;
 the rotating `.previous` file also protects interrupted writes.
 

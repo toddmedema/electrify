@@ -257,5 +257,8 @@ test("a damaged legacy checkpoint cannot block a healthy library or new campaign
         }),
       ),
     );
-    await assert.rejects(store.importFile(malformed), /Invalid shared save/);
+    await assert.rejects(
+      store.importFile(malformed),
+      /Invalid multiplayer save/,
+    );
   }));

@@ -3,6 +3,8 @@ import type { CommandEnvelope, RoomView, Seat, World } from "./Types";
 /** A lobby member, with the selection they last marked Ready for (see selectionKey). */
 export interface LobbyMember extends Seat {
   ready?: string;
+  /** The saved company this member claimed while resuming (see slotClaim). */
+  slot?: string;
 }
 export interface LobbyState {
   inviteLobbyId?: string;
@@ -52,7 +54,7 @@ export type NativeRequest =
   | { kind: "delete-save"; id: string }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
-  | { kind: "member"; key: "ready"; value: string }
+  | { kind: "member"; key: "ready" | "slot"; value: string }
   | { kind: "lock"; ids: string[] }
   | { kind: "send"; to: string; payload: WireMessage }
   | { kind: "checkpoint"; world: World };

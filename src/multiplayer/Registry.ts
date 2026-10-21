@@ -7,7 +7,7 @@ interface Runtime {
   command: (command: Command) => void;
   submit: (command: Command) => Promise<void>;
   activity: (reason: string | null) => void;
-  /** Leaves the match; skipSave uses the last shared save instead of a fresh checkpoint. */
+  /** Leaves the match; skipSave uses the last multiplayer save instead of a fresh checkpoint. */
   leave: (options?: { skipSave?: boolean }) => Promise<void>;
 }
 let runtime: Runtime | undefined;
@@ -95,8 +95,14 @@ interface CoopControls {
   start: (spec: import("./Types").MatchSpec) => void;
   /** Guest: mark Ready for the selection on screen, or clear it. */
   ready: (ready: boolean) => void;
-  /** Host: back to the lobby dialog. Guest: leave the lobby. */
+  /** Leave the lobby, after confirming. */
   back: () => void;
+  /** Host: open Steam's invitation overlay. */
+  invite: () => void;
+  /** Host: copy the lobby code for friends to enter. */
+  copyCode: () => void;
+  /** Host: choose a multiplayer save to resume instead. */
+  openSaves: () => void;
 }
 let coop: CoopControls | undefined;
 export const coopControls = () => coop;

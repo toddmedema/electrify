@@ -56,6 +56,55 @@ test.each(["new", "restored"])(
   },
 );
 
+test("resuming hands saved companies to the players who claimed them", () => {
+  const world = create(3);
+  world.outcomes["2"] = {
+    outcome: "bankrupt",
+    title: "Bankrupt",
+    month: 3,
+  };
+  world.edges[0].approval = "1";
+  const restored = restoreWorld(checkpointWorld(world), "claimed", [
+    { id: "1", name: "Grace" },
+    { id: "9", name: "Hedy" },
+    { id: "0", name: "Player 2" },
+  ]);
+  expect(restored.seats.map((s) => s.id)).toEqual(["1", "9", "0"]);
+  expect(restored.grids.map((g) => g.multiplayer!.seat)).toEqual([
+    "1",
+    "9",
+    "0",
+  ]);
+  expect(Object.keys(restored.outcomes)).toEqual(["0"]);
+  expect(restored.edges[0]).toMatchObject({ a: "1", b: "9", approval: "9" });
+  const peers = restored.grids[0].multiplayer!.peers!;
+  expect(peers.map((p) => [p.id, p.name, p.corridor.adjacentMarketId])).toEqual(
+    [
+      ["9", "Hedy", "9"],
+      ["0", "Player 2", "0"],
+    ],
+  );
+  expect(restored.grids[0].transmission!.lines.map((l) => l.name)).toEqual([
+    "Hedy",
+    "Player 2",
+  ]);
+  expect(roomView(restored, "9").game!.multiplayer!.clock!.players).toEqual([
+    expect.objectContaining({ id: "1", name: "Grace" }),
+    expect.objectContaining({ id: "9", name: "Hedy" }),
+  ]);
+  // The handed-over roster is a valid save of its own.
+  expect(
+    restoreWorld(checkpointWorld(restored), "again").seats.map((s) => s.name),
+  ).toEqual(["Grace", "Hedy", "Player 2"]);
+  expect(() =>
+    restoreWorld(checkpointWorld(world), "duplicate", [
+      { id: "1", name: "Grace" },
+      { id: "1", name: "Grace" },
+      { id: "2", name: "Player 2" },
+    ]),
+  ).toThrow(/one player/);
+});
+
 test("running speed choices consent to a safety resume atomically, including reselecting the same speed", () => {
   const world = create(3);
   expect(command(world, 0, { kind: "speed", speed: "NORMAL" })).toBeUndefined();
@@ -349,7 +398,7 @@ test("the normal catalog supports storage and host prices override forged client
   ).toMatch(/valid facility options/);
 });
 
-test("shared saves reject changed peer routes and duplicate connections", () => {
+test("multiplayer saves reject changed peer routes and duplicate connections", () => {
   const world = create(3);
   const badRoute = checkpointWorld(world);
   badRoute.grids[0].multiplayer!.peers![0].corridor.buildCost = 0;

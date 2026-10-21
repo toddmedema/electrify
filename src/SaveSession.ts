@@ -664,7 +664,7 @@ export async function runSaveTransition(
           message: getSaveErrorMessage(error),
           retry: again,
           lossMessage:
-            "Progress since the last shared save will be lost. The shared save will remain.",
+            "Progress since the last multiplayer save will be lost. The multiplayer save will remain.",
           // A host that has gone cannot save. Leaving the match ends it locally even if Steam
           // could not leave the lobby cleanly, so the transition can always continue.
           leaveWithoutSaving: () => {

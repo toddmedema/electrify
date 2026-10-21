@@ -29,11 +29,12 @@ export function coopSelection(
   session: SessionState,
   custom?: CoopSelectionType["custom"],
 ): CoopSelectionType {
-  const { lobby, browse, view, busy } = session;
+  const { lobby, browse, view, busy, library } = session;
+  const host = lobby.hostId === lobby.selfId;
   const key = browse ? selectionKey(browse) : "";
   const readyFor = (value?: string) => !!key && value === key;
   return {
-    role: lobby.hostId === lobby.selfId ? "host" : "guest",
+    role: host ? "host" : "guest",
     hostName:
       lobby.members.find((member) => member.id === lobby.hostId)?.name ||
       "The host",
@@ -51,6 +52,10 @@ export function coopSelection(
     starting: !view && (busy || browse?.phase === "playing"),
     custom,
     viewing: viewing(browse),
+    ...(host && {
+      lobbyId: lobby.lobbyId,
+      hasSaves: !!library?.slots.length,
+    }),
   };
 }
 

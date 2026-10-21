@@ -17,7 +17,14 @@ const coop = (update: Partial<CoopSelectionType> = {}): CoopSelectionType => ({
   starting: false,
   ...update,
 });
-const controls = { start: jest.fn(), ready: jest.fn(), back: jest.fn() };
+const controls = {
+  start: jest.fn(),
+  ready: jest.fn(),
+  back: jest.fn(),
+  invite: jest.fn(),
+  copyCode: jest.fn(),
+  openSaves: jest.fn(),
+};
 beforeEach(() => {
   jest.clearAllMocks();
   registerCoopControls(controls);
@@ -30,14 +37,52 @@ test("guests see who they follow and every player's state in words", () => {
   const roster = screen.getByLabelText("Players");
   expect(within(roster).getByText("Host")).toBeInTheDocument();
   expect(within(roster).getByText("Ready")).toBeInTheDocument();
-  expect(within(roster).getByText("Reconnecting")).toBeInTheDocument();
+  expect(within(roster).getByText("Connecting")).toBeInTheDocument();
+  expect(screen.queryByText("Invite friends")).not.toBeInTheDocument();
   fireEvent.click(screen.getByText("Leave"));
   expect(controls.back).toHaveBeenCalled();
 });
 
+test("a host alone invites friends first, can copy the code and cannot start yet", () => {
+  const host = coop({
+    role: "host",
+    lobbyId: "109775242999999999",
+    hasSaves: true,
+    players: [coop().players[0]],
+  });
+  render(
+    <>
+      <CoopBrowseBar coop={host} offerSaves />
+      <CoopStartButton coop={host} onStart={jest.fn()} />
+    </>,
+  );
+  expect(screen.getByText("Invite friends to play")).toBeInTheDocument();
+  const invite = screen.getByRole("button", { name: "Invite friends" });
+  expect(invite).toHaveClass("MuiButton-contained");
+  fireEvent.click(invite);
+  expect(controls.invite).toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Copy invite code" }));
+  expect(controls.copyCode).toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Load multiplayer save" }),
+  );
+  expect(controls.openSaves).toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Invite a friend to start" }),
+  ).toBeDisabled();
+});
+
+test("saves are offered only where the host chooses a new game", () => {
+  render(<CoopBrowseBar coop={coop({ role: "host", hasSaves: true })} />);
+  expect(screen.queryByText("Load multiplayer save")).not.toBeInTheDocument();
+});
+
 test("the host sees how many guests are ready and starts for everyone", () => {
   const onStart = jest.fn();
-  const host = coop({ role: "host" });
+  const host = coop({
+    role: "host",
+    players: coop().players.map((p) => ({ ...p, connected: true })),
+  });
   render(
     <>
       <CoopBrowseBar coop={host} />
@@ -46,6 +91,9 @@ test("the host sees how many guests are ready and starts for everyone", () => {
   );
   expect(screen.getByText("You're choosing for 3 players")).toBeInTheDocument();
   expect(screen.getByText("1 of 2 ready")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Invite friends" })).toHaveClass(
+    "MuiButton-outlined",
+  );
   fireEvent.click(screen.getByText("Start for everyone"));
   expect(onStart).toHaveBeenCalled();
 });

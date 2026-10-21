@@ -38,11 +38,11 @@ class CoopSaveStore {
   }
   decode(json) {
     if (Buffer.byteLength(json) > MAX_LIBRARY_BYTES)
-      throw new Error("Shared save library is too large");
+      throw new Error("Multiplayer save library is too large");
     const library = this.codec.parse(json);
     if (library?.schema > 1)
       throw new Error(
-        "This shared save library needs a newer game. Your files are preserved.",
+        "This multiplayer save library needs a newer game. Your files are preserved.",
       );
     if (
       library?.schema !== 1 ||
@@ -51,7 +51,7 @@ class CoopSaveStore {
       !Array.isArray(library.deleted)
     )
       throw new Error(
-        "This shared save library cannot be read. Your files are preserved.",
+        "This multiplayer save library cannot be read. Your files are preserved.",
       );
     const ids = new Set();
     for (const slot of library.slots) {
@@ -64,11 +64,11 @@ class CoopSaveStore {
         !Number.isFinite(slot.updatedAt)
       )
         throw new Error(
-          "Invalid shared save library. Your files are preserved.",
+          "Invalid multiplayer save library. Your files are preserved.",
         );
       this.worldJson(slot.world);
       if (hash(this.codec.stringify(slot.world)) !== slot.digest)
-        throw new Error("Shared save checksum failed");
+        throw new Error("Multiplayer save checksum failed");
       ids.add(slot.id);
     }
     library.seen ??= [];
@@ -79,7 +79,7 @@ class CoopSaveStore {
       library.seen.length > 4096 ||
       library.seen.some((key) => !validKey(key))
     )
-      throw new Error("Invalid shared save deletion history");
+      throw new Error("Invalid multiplayer save deletion history");
     return library;
   }
   worldJson(world) {
@@ -106,11 +106,11 @@ class CoopSaveStore {
       !world.seats.some((s) => s?.id === this.steam.identity.steamId)
     )
       throw new Error(
-        "Invalid shared save or this account is not one of its players",
+        "Invalid multiplayer save or this account is not one of its players",
       );
     const json = this.codec.stringify(world);
     if (Buffer.byteLength(json) > MAX_WORLD_BYTES)
-      throw new Error("Shared save is too large");
+      throw new Error("Multiplayer save is too large");
     return json;
   }
   read() {
@@ -129,7 +129,7 @@ class CoopSaveStore {
           return recovered;
         } catch {
           throw new Error(
-            "The local shared save backup could not be read. Your files are preserved.",
+            "The local multiplayer save backup could not be read. Your files are preserved.",
           );
         }
       }
@@ -137,12 +137,12 @@ class CoopSaveStore {
       if (fs.existsSync(this.legacy)) {
         try {
           const world = this.codec.parse(fs.readFileSync(this.legacy, "utf8"));
-          const slot = this.add(library, world, "Last shared save");
+          const slot = this.add(library, world, "Last multiplayer save");
           slot.id = hash(this.codec.stringify(world)).slice(0, 32);
           slot.source = `${this.device}:${slot.id}`;
         } catch {
           this.warning =
-            "The old shared checkpoint could not be read. Its file is preserved; other campaigns are available.";
+            "The old multiplayer save could not be read. Its file is preserved; other saves are available.";
         }
       }
     }
@@ -153,7 +153,7 @@ class CoopSaveStore {
     const digest = hash(json);
     if (library.slots.length >= MAX_SLOTS)
       throw new Error(
-        "Your shared save library is full. Delete a campaign first.",
+        "Your multiplayer save library is full. Delete a save first.",
       );
     const id = crypto.randomBytes(16).toString("hex");
     const slot = {
@@ -180,7 +180,7 @@ class CoopSaveStore {
         this.decode(json);
         if (Buffer.byteLength(json) > MAX_LIBRARY_BYTES)
           throw new Error(
-            "Shared save library is too large. Delete a campaign first.",
+            "Multiplayer save library is too large. Delete a save first.",
           );
         await atomicWriteAsync(
           this.deviceFile,
@@ -328,14 +328,14 @@ class CoopSaveStore {
       throw new Error("Use a campaign name of 1–80 characters");
     return this.transact((library) => {
       const slot = library.slots.find((s) => s.id === id);
-      if (!slot) throw new Error("Shared save no longer exists");
+      if (!slot) throw new Error("Multiplayer save no longer exists");
       slot.name = name.trim();
     });
   }
   remove(id) {
     return this.transact((library) => {
       const slot = library.slots.find((s) => s.id === id);
-      if (!slot) throw new Error("Shared save no longer exists");
+      if (!slot) throw new Error("Multiplayer save no longer exists");
       library.deleted.push(`${slot.source}:${slot.digest}`);
       library.slots = library.slots.filter((s) => s.id !== id);
       if (this.activeId === id) this.activeId = undefined;
@@ -343,7 +343,7 @@ class CoopSaveStore {
   }
   async importFile(filename) {
     if ((await fs.promises.stat(filename)).size > MAX_WORLD_BYTES)
-      throw new Error("Shared save is too large");
+      throw new Error("Multiplayer save is too large");
     const json = await fs.promises.readFile(filename, "utf8");
     const world = this.codec.parse(json);
     this.worldJson(world);
@@ -356,7 +356,7 @@ class CoopSaveStore {
   async exportFile(id, filename) {
     await this.queue.catch(() => {});
     const slot = this.read().slots.find((s) => s.id === id);
-    if (!slot) throw new Error("Shared save no longer exists");
+    if (!slot) throw new Error("Multiplayer save no longer exists");
     await atomicWriteAsync(filename, this.codec.stringify(slot.world));
   }
 }

@@ -17,6 +17,7 @@ import type {
 } from "./Native";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { validBrowseState, type BrowseState } from "./Browse";
+import { resumeBlocker, resumeSeats, slotClaim } from "./Slots";
 import {
   BROWSE_RESEND_MS,
   COMMAND_RESEND_MS,
@@ -61,6 +62,9 @@ function validPendingCampaign(value: unknown): value is PendingCampaign {
   );
 }
 
+/** A guest's lobby closed before the match began, because its host left. */
+export const HOST_LEFT = "The host closed the lobby.";
+
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -71,6 +75,9 @@ export interface SessionState {
   /** The scenario selection the lobby is browsing; the host authors it, guests follow it. */
   browse?: BrowseState;
   pendingCampaign?: PendingCampaign;
+  /** The host's multiplayer saves, loaded when it opens a lobby. */
+  library?: SharedSaveLibrary;
+  loadingSaves: boolean;
 }
 export class MultiplayerSession {
   private state: SessionState = {
@@ -78,7 +85,9 @@ export class MultiplayerSession {
     pending: false,
     busy: false,
     waitingForHost: false,
+    loadingSaves: false,
   };
+  private libraryRequest = 0;
   private listeners = new Set<() => void>();
   private worker?: Worker;
   private stopEvents?: () => void;
@@ -185,6 +194,21 @@ export class MultiplayerSession {
   }
   private event(event: NativeEvent) {
     if (event.kind === "state") {
+      const { hostId, lobbyId, members } = event.state;
+      // Before a match, a lobby without its host has nobody left to choose or start a game.
+      if (
+        lobbyId &&
+        hostId &&
+        hostId !== event.state.selfId &&
+        !this.state.view &&
+        !this.closing &&
+        members.length > 0 &&
+        !members.some((member) => member.id === hostId)
+      ) {
+        this.update({ lobby: event.state });
+        void this.hostLeft();
+        return;
+      }
       this.update({ lobby: event.state });
       if (this.isHost()) {
         // A friend who just joined lands on the page the host is showing, straight away.
@@ -208,10 +232,14 @@ export class MultiplayerSession {
       }
     } else if (event.kind === "disconnected") {
       if (this.worker) this.post({ kind: "disconnect", sender: event.sender });
+      // A friend leaving before the match begins is routine; only a guest loses its game.
+      else if (this.isHost() || event.sender !== this.state.lobby.hostId)
+        return;
+      else if (!this.state.view) void this.hostLeft();
       else
         this.update({
           error:
-            "Connection lost. Reconnect to continue, or resume the shared save in a new lobby.",
+            "Connection lost. Reconnect to continue, or resume the multiplayer save in a new lobby.",
         });
     } else if (event.kind === "message") {
       if (this.worker && event.payload.kind === "save-request") {
@@ -508,17 +536,32 @@ export class MultiplayerSession {
       error: undefined,
     });
   }
-  async sharedSaves(sync = false) {
-    return (await this.request({
-      kind: "list-saves",
-      sync,
-    })) as SharedSaveLibrary;
+  /** Reloads the multiplayer saves; only the newest request may replace the list. */
+  async refreshSaves(sync = true) {
+    return this.loadLibrary(
+      () =>
+        this.request({
+          kind: "list-saves",
+          sync,
+        }) as Promise<SharedSaveLibrary>,
+    );
+  }
+  private async loadLibrary(read: () => Promise<SharedSaveLibrary>) {
+    const request = ++this.libraryRequest;
+    this.update({ loadingSaves: true });
+    try {
+      const library = await read();
+      if (request === this.libraryRequest) this.update({ library });
+      return library;
+    } finally {
+      if (request === this.libraryRequest) this.update({ loadingSaves: false });
+    }
   }
   async deleteSharedSave(id: string) {
-    const library = (await this.request({
-      kind: "delete-save",
-      id,
-    })) as SharedSaveLibrary;
+    const library = await this.loadLibrary(
+      () =>
+        this.request({ kind: "delete-save", id }) as Promise<SharedSaveLibrary>,
+    );
     if (this.state.pendingCampaign?.id === id) {
       this.campaignGeneration++;
       this.update({ pendingCampaign: undefined });
@@ -539,9 +582,9 @@ export class MultiplayerSession {
         id,
       })) as World | null;
       if (!current()) return;
-      if (!world) throw new Error("This shared campaign could not be found");
+      if (!world) throw new Error("This multiplayer save could not be found");
       if (!Array.isArray(world.seats))
-        throw new Error("This shared campaign could not be read");
+        throw new Error("This multiplayer save could not be read");
       const players = world.seats.map((seat) => ({
         ...seat,
         name:
@@ -561,11 +604,9 @@ export class MultiplayerSession {
           .map((seat) => seat.id),
       };
       if (!validPendingCampaign(campaign))
-        throw new Error("This shared campaign could not be read");
-      if (!campaign.players.some((p) => p.id === this.state.lobby.selfId))
-        throw new Error("This campaign belongs to different players");
+        throw new Error("This multiplayer save could not be read");
       if (this.state.lobby.lobbyId && !this.isHost())
-        throw new Error("Only the host can choose a campaign");
+        throw new Error("Only the host can choose a save");
       if (!this.state.lobby.lobbyId) {
         const lobby = (await this.request({
           kind: "create",
@@ -583,21 +624,42 @@ export class MultiplayerSession {
       if (current()) this.update({ busy: false });
     }
   }
-  canResumeCampaign() {
+  /** The host sets the saved campaign aside to choose a new game instead. */
+  cancelCampaign() {
+    if (!this.isHost() || !this.state.pendingCampaign) return;
+    this.campaignGeneration++;
+    this.update({ pendingCampaign: undefined });
+    this.sendCampaign(undefined, true);
+  }
+  /** Takes one saved company for this player; Steam shares the claim with the lobby. */
+  async claimSlot(seatId: string) {
     const campaign = this.state.pendingCampaign;
-    return (
-      this.isHost() &&
-      !!campaign &&
-      !this.rosterError(
-        campaign.players,
-        campaign.players.filter((p) =>
-          campaign.requiredPlayerIds.includes(p.id),
-        ),
-      )
+    if (!campaign) return;
+    this.update({
+      lobby: (await this.request({
+        kind: "member",
+        key: "slot",
+        value: slotClaim(campaign.id, seatId),
+      })) as LobbyState,
+    });
+  }
+  /** Why the lobby cannot resume its saved campaign yet. */
+  resumeBlocker() {
+    const campaign = this.state.pendingCampaign;
+    if (!campaign) return "Choose a multiplayer save";
+    const { members, connected, selfId } = this.state.lobby;
+    return resumeBlocker(
+      campaign,
+      members,
+      (id) => id === selfId || connected.includes(id),
     );
+  }
+  canResumeCampaign() {
+    return this.isHost() && !this.resumeBlocker();
   }
   private rosterError(seats: Seat[], required: Seat[]) {
     const { members, connected, selfId } = this.state.lobby;
+    if (seats.length < 2) return "Invite a friend to play together";
     if (required.some((s) => s.id !== selfId && !connected.includes(s.id)))
       return "Every player in this match must be connected";
     const ids = new Set(seats.map((s) => s.id));
@@ -607,7 +669,7 @@ export class MultiplayerSession {
     )
       return "The lobby must contain only the saved match's players";
   }
-  /** Starts the host's chosen scenario for the lobby, or resumes the last shared save. */
+  /** Starts the host's chosen scenario for the lobby, or resumes the last multiplayer save. */
   async start(choice: { spec: MatchSpec } | { saved: true; id?: string }) {
     const generation = ++this.startGeneration;
     const lifecycle = this.lifecycle;
@@ -648,13 +710,21 @@ export class MultiplayerSession {
             })) as World | null)
           : null;
       if ("saved" in choice && !world)
-        throw new Error("No shared save on this computer yet");
+        throw new Error("No multiplayer save on this computer yet");
       const { members } = this.state.lobby;
-      const seats =
-        world?.seats || members.map(({ id, name }) => ({ id, name }));
-      // A resumed match needs every company still playing; retired ones may stay away.
-      const required = seats.filter((s) => !world?.outcomes?.[s.id]);
-      const rosterError = this.rosterError(seats, required);
+      const campaign = this.state.pendingCampaign;
+      if (
+        world &&
+        (!campaign || !("saved" in choice) || campaign.id !== choice.id)
+      )
+        throw new Error("Choose the multiplayer save again");
+      // A resumed match hands each saved company to whoever claimed it; retired ones may stay away.
+      const seats = world
+        ? resumeSeats(campaign!, members)
+        : members.map(({ id, name }) => ({ id, name }));
+      const rosterError = world
+        ? this.resumeBlocker()
+        : this.rosterError(seats, seats);
       if (rosterError) throw new Error(rosterError);
       await this.request({ kind: "lock", ids: seats.map((s) => s.id) });
       locked = true;
@@ -685,7 +755,7 @@ export class MultiplayerSession {
               this.request({ kind: "checkpoint", world: data.world }),
             );
           void this.saving.catch((error) =>
-            this.update({ error: `Shared save failed: ${error.message}` }),
+            this.update({ error: `Multiplayer save failed: ${error.message}` }),
           );
           if (data.requestId) {
             const request = this.saveRequests.get(data.requestId);
@@ -728,14 +798,14 @@ export class MultiplayerSession {
       this.worker.onerror = () => {
         if (!current() || this.worker !== worker) return;
         const error =
-          "The simulation worker stopped. Resume the shared save to continue.";
+          "The simulation worker stopped. Resume the multiplayer save to continue.";
         if (!receivedView) rollback(error);
         else this.update({ busy: false, error });
       };
       const epoch = crypto.randomUUID();
       this.post(
         world
-          ? { kind: "restore", world, epoch }
+          ? { kind: "restore", world, epoch, seats }
           : {
               kind: "create",
               spec: (choice as { spec: MatchSpec }).spec,
@@ -795,7 +865,7 @@ export class MultiplayerSession {
   }
   /**
    * Saves, then leaves the match: the host checkpoints its world and a guest waits for the
-   * host's save. skipSave keeps the last shared save instead, so a player can always leave a
+   * host's save. skipSave keeps the last multiplayer save instead, so a player can always leave a
    * match whose host is gone.
    */
   async leave({ skipSave = false }: { skipSave?: boolean } = {}) {
@@ -830,9 +900,12 @@ export class MultiplayerSession {
       this.browseSession = undefined;
       this.publishedSelection = undefined;
       this.browsePeers = new Set();
+      ++this.libraryRequest;
       this.update({
         browse: undefined,
         pendingCampaign: undefined,
+        library: undefined,
+        loadingSaves: false,
         lobby: {
           ...this.state.lobby,
           lobbyId: undefined,
@@ -847,6 +920,11 @@ export class MultiplayerSession {
       });
       this.closing = false;
     }
+  }
+  /** The guest returns to the title screen, where the host's departure is explained. */
+  private async hostLeft() {
+    await this.leave({ skipSave: true }).catch(() => undefined);
+    this.update({ error: HOST_LEFT });
   }
   private isHost() {
     const { lobbyId, hostId, selfId } = this.state.lobby;
@@ -934,7 +1012,7 @@ export class MultiplayerSession {
     if (!this.isHost()) return;
     this.closing = true;
     try {
-      // Keep the finished match's final state as the shared save; a failed write isn't fatal.
+      // Keep the finished match's final state as the multiplayer save; a failed write isn't fatal.
       if (this.worker) await this.save(true).catch(() => undefined);
       this.endLocalMatch();
       await this.request({ kind: "unlock" }).catch(() => undefined);

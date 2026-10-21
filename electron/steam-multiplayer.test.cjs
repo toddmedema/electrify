@@ -384,7 +384,7 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
     mp.connections.set(100, guest);
     await assert.rejects(
       mp.persist({ ...world, schema: 1 }),
-      /Invalid shared save/,
+      /Invalid multiplayer save/,
     );
     await Promise.all([
       mp.checkpoint(world),
@@ -516,13 +516,21 @@ test("only the host mirrors a bounded campaign invitation roster", async () => {
     mp.dispose();
   }
 });
-test("players may set only their Ready selection, and only the host reopens the lobby", async () => {
+test("players may set only their Ready selection and saved company, and only the host reopens the lobby", async () => {
   const { mp, api } = fixture();
   const written = [];
   api.setMemberData = (_self, _lobby, key, value) => written.push([key, value]);
   try {
     await mp.request({ kind: "member", key: "ready", value: "101|Manager|0" });
-    assert.deepEqual(written, [["ready", "101|Manager|0"]]);
+    await mp.request({
+      kind: "member",
+      key: "slot",
+      value: "0123456789abcdef0123456789abcdef:76561198000000002",
+    });
+    assert.deepEqual(written, [
+      ["ready", "101|Manager|0"],
+      ["slot", "0123456789abcdef0123456789abcdef:76561198000000002"],
+    ]);
     await assert.rejects(
       mp.request({ kind: "member", key: "location", value: "SF" }),
       /member data/,
