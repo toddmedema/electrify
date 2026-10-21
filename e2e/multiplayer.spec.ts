@@ -166,6 +166,8 @@ class SteamRoom {
   >();
   members: LobbyState["members"] = [];
   checkpoint?: World;
+  campaignName = "Friends campaign";
+  exportedCampaign?: string;
   views = new Map<string, RoomView>();
   pendingViews = new Map<string, NativeEvent>();
   deliveringViews = new Set<string>();
@@ -292,6 +294,32 @@ class SteamRoom {
       return this.state(id);
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
+    if (input.kind === "rename-save") this.campaignName = input.name;
+    if (input.kind === "delete-save") this.checkpoint = undefined;
+    if (input.kind === "export-save") {
+      this.exportedCampaign = input.id;
+      return;
+    }
+    if (
+      input.kind === "list-saves" ||
+      input.kind === "rename-save" ||
+      input.kind === "delete-save"
+    )
+      return {
+        cloudState: "ready",
+        slots: this.checkpoint
+          ? [
+              {
+                id: "saved-campaign",
+                name: this.campaignName,
+                updatedAt: Date.now(),
+                matchId: this.checkpoint.matchId,
+                schema: this.checkpoint.schema,
+                players: this.checkpoint.seats.map((s) => s.name),
+              },
+            ]
+          : [],
+      };
     if (input.kind === "reconnect") {
       this.dropped.delete(id);
       await this.publish();
@@ -402,6 +430,64 @@ class SteamRoom {
         .click();
     return page;
   }
+}
+
+for (const mobile of [false, true]) {
+  test(`shared campaign library manages named saves on ${mobile ? "mobile" : "desktop"}`, async ({
+    browser,
+  }) => {
+    const room = new SteamRoom();
+    room.checkpoint = {
+      schema: 3,
+      matchId: "library-campaign",
+      seats: [
+        { id: room.host, name: "Player 1" },
+        { id: "76561198000000002", name: "Player 2" },
+      ],
+    } as World;
+    const page = await room.player(browser, 0, mobile);
+    await page
+      .getByRole("button", { name: "Shared campaigns", exact: true })
+      .click();
+    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+      "Friends campaign",
+    );
+    await expect(
+      page.getByRole("button", { name: "Resume campaign", exact: true }),
+    ).toBeDisabled();
+    await page
+      .getByLabel("Campaign name", { exact: true })
+      .fill("Launch friends");
+    await page.getByRole("button", { name: "Rename", exact: true }).click();
+    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+      "Launch friends",
+    );
+    await page
+      .getByRole("button", { name: "Export campaign", exact: true })
+      .click();
+    await expect.poll(() => room.exportedCampaign).toBe("saved-campaign");
+    await page.screenshot({
+      path: `.tmp/shared-campaigns-${mobile ? "mobile" : "desktop"}.png`,
+    });
+    await page
+      .getByRole("button", { name: "Delete campaign", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Keep campaign", exact: true })
+      .click();
+    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+      "Launch friends",
+    );
+    await page
+      .getByRole("button", { name: "Delete campaign", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm delete", exact: true })
+      .click();
+    await expect(
+      page.getByText("No shared campaigns saved yet.", { exact: true }),
+    ).toBeVisible();
+  });
 }
 
 test("mock Steam publishes only to players with an initialized transport", async ({
@@ -1169,7 +1255,22 @@ for (const count of [2, 4]) {
         if (i === 0) await deliverOldView();
       }
       await pages[0]
-        .getByRole("button", { name: "Resume last shared save", exact: true })
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        pages[0].getByLabel("Campaign", { exact: true }),
+      ).toContainText("Friends campaign");
+      await pages[0]
+        .getByLabel("Campaign name", { exact: true })
+        .fill("Launch friends");
+      await pages[0]
+        .getByRole("button", { name: "Rename", exact: true })
+        .click();
+      await expect(
+        pages[0].getByLabel("Campaign", { exact: true }),
+      ).toContainText("Launch friends");
+      await pages[0]
+        .getByRole("button", { name: "Resume campaign", exact: true })
         .click();
       for (const page of pages)
         await expect(page.locator(".facilities:visible")).toBeVisible();

@@ -15,6 +15,12 @@ import {
   moveInputFocus,
   visibleControls,
 } from "./InputNavigation";
+import {
+  applyTextInput,
+  availableTextControl,
+  focusedTextControl,
+  textInputRequest,
+} from "./InputText";
 
 interface InputPresentation {
   active: boolean;
@@ -84,6 +90,7 @@ export function startDesktopInput(
   let runningSpeed = "NORMAL";
   let previousState = store.getState();
   let chartFrame: number | undefined;
+  let editingText = false;
   const gameplay = () =>
     !!document.querySelector(".base_main:not([inert]) .gameWorkspace");
   const controls = () => visibleControls(inputScope());
@@ -240,6 +247,37 @@ export function startDesktopInput(
       moveInputFocus(action as "up" | "down" | "left" | "right");
       feedback("select");
     } else if (action === "confirm") {
+      const textControl = focusedTextControl();
+      if (textControl && desktop.showTextInput) {
+        editingText = true;
+        const request = textInputRequest(textControl);
+        void desktop
+          .showTextInput(request)
+          .then((result) => {
+            if (
+              !live ||
+              !textControl.isConnected ||
+              !availableTextControl(textControl)
+            )
+              return;
+            if (result.status === "submitted")
+              applyTextInput(textControl, result.text);
+          })
+          .catch(() => {
+            // Steam/Big Picture may be unavailable. Physical text entry still works.
+          })
+          .finally(() => {
+            editingText = false;
+            if (
+              live &&
+              textControl.isConnected &&
+              availableTextControl(textControl)
+            )
+              textControl.focus({ preventScroll: true });
+          });
+        feedback("confirm");
+        return;
+      }
       const target = document.activeElement as HTMLElement | null;
       if (target && speedButtons().includes(target)) releasePause();
       confirmInput();
@@ -278,6 +316,7 @@ export function startDesktopInput(
     sync();
     if (
       !ready ||
+      editingText ||
       !foreground ||
       document.visibilityState === "hidden" ||
       store.getState().saves.transitioning ||

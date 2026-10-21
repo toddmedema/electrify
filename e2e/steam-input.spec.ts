@@ -147,8 +147,76 @@ test.beforeEach(async ({ page }) => {
         window.addEventListener("mockSteamInput", handler);
         return () => window.removeEventListener("mockSteamInput", handler);
       },
+      showTextInput: (request) => {
+        document.documentElement.dataset.mockTextInput =
+          JSON.stringify(request);
+        return new Promise((resolve) => {
+          window.addEventListener(
+            "mockSteamTextResult",
+            (event: Event) => {
+              resolve((event as CustomEvent).detail);
+            },
+            { once: true },
+          );
+        });
+      },
     };
   }, glyphs);
+});
+
+test("controller text entry searches the manual, cancels and restores field focus", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  const manual = page.getByRole("button", { name: "Manual", exact: true });
+  await select(page, manual);
+  await input(page, "confirm");
+  const search = page.getByRole("textbox", { name: "Search the manual" });
+  await select(page, search);
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-text-input",
+    /Search the manual/,
+  );
+  // Direction and Back belong to the Steam keyboard until it dismisses.
+  await input(page, "down");
+  await input(page, "back");
+  await expect(search).toBeFocused();
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new CustomEvent("mockSteamTextResult", {
+        detail: { status: "submitted", text: "blackouts" },
+      }),
+    );
+  });
+  await expect(search).toHaveValue("blackouts");
+  await expect(search).toBeFocused();
+  // Filtered results prove the React state received the native edit.
+  await expect(page.locator("#manual-blackouts-header")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-text-input",
+    /"text":"blackouts"/,
+  );
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    window.dispatchEvent(
+      new CustomEvent("mockSteamTextResult", {
+        detail: { status: "cancelled" },
+      }),
+    );
+  });
+  await expect(search).toHaveValue("blackouts");
+  await expect(search).toBeFocused();
+  await input(page, "down");
+  await expect(search).not.toBeFocused();
 });
 
 test("semantic actions play, build, adjust pricing, inspect charts and save without a mouse", async ({

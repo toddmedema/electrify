@@ -156,13 +156,14 @@ function publishGameFocus() {
       !window.isDestroyed() &&
       window.isFocused() &&
       !steam.overlayActive &&
+      !steam.textInput?.active &&
       !quitRequested &&
       rendererReady,
   );
   if (window && !window.isDestroyed())
     window.webContents.send(
       "desktop:focus-changed",
-      window.isFocused() && !steam.overlayActive,
+      window.isFocused() && !steam.overlayActive && !steam.textInput?.active,
     );
 }
 steam.onOverlayChanged = publishGameFocus;
@@ -322,6 +323,11 @@ handle("desktop:friends", () => {
 handle("desktop:activity", (activity) => steam.setActivity(activity));
 handle("desktop:timeline-event", (event) => steam.addTimelineEvent(event));
 handle("desktop:input-context", (context) => steam.setInputContext(context));
+handle("desktop:text-input", (input) => {
+  if (!window?.isFocused() || steam.overlayActive || quitRequested)
+    return { status: "unavailable" };
+  return steam.showTextInput(input);
+});
 handle("desktop:achievements", (intent) => steam.submitAchievements(intent));
 handle("desktop:readAchievements", () => steam.readAchievements());
 // Like the multiplayer bridge, mod requests resolve with player-facing errors rather than
@@ -355,6 +361,26 @@ function multiplayerRequest(input) {
         }
         window.webContents.send("desktop:multiplayer-event", event);
       }
+    },
+    undefined,
+    undefined,
+    {
+      chooseImport: async () => {
+        const result = await dialog.showOpenDialog(window, {
+          title: "Import shared campaign",
+          properties: ["openFile"],
+          filters: [{ name: "Shared campaign", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePaths[0];
+      },
+      chooseExport: async () => {
+        const result = await dialog.showSaveDialog(window, {
+          title: "Export shared campaign",
+          defaultPath: "shared-campaign.json",
+          filters: [{ name: "Shared campaign", extensions: ["json"] }],
+        });
+        return result.canceled ? undefined : result.filePath;
+      },
     },
   );
   return steam.multiplayer.request(input);

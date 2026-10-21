@@ -7,11 +7,13 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  MenuItem,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import type { MultiplayerSession } from "./Session";
+import type { SharedSaveLibrary } from "./Native";
 
 /**
  * Gathering friends. Once everyone is here the host chooses a game in the normal scenario
@@ -37,6 +39,24 @@ export default function Lobby({
   );
   const [code, setCode] = useState("");
   const [failure, setFailure] = useState<string>();
+  const [library, setLibrary] = useState<SharedSaveLibrary>();
+  const [selected, setSelected] = useState("");
+  const [name, setName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [loadingSaves, setLoadingSaves] = useState(false);
+  const loadSaves = async (action = () => session.sharedSaves(true)) => {
+    setLoadingSaves(true);
+    try {
+      const next = await action();
+      setLibrary(next);
+      const slot = next.slots.find((s) => s.id === selected) || next.slots[0];
+      setSelected(slot?.id || "");
+      setName(slot?.name || "");
+      setConfirmDelete(false);
+    } finally {
+      setLoadingSaves(false);
+    }
+  };
   const host = lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
@@ -166,6 +186,165 @@ export default function Lobby({
                 <Typography role="status">
                   {hostName} will choose a game.
                 </Typography>
+              )}
+            </>
+          )}
+          {(!lobby.lobbyId || host) && (
+            <>
+              <Button
+                disabled={busy || loadingSaves}
+                onClick={() => run(() => loadSaves())}
+              >
+                Shared campaigns
+              </Button>
+              {library && (
+                <Stack spacing={2} aria-label="Shared campaigns">
+                  <Divider>Saved campaigns</Divider>
+                  {library.warning && (
+                    <Alert severity="warning">{library.warning}</Alert>
+                  )}
+                  {library.cloudState === "failed" && (
+                    <Alert severity="warning">
+                      Steam Cloud could not sync. Local campaigns are available.
+                    </Alert>
+                  )}
+                  {library.cloudState === "offline" && (
+                    <Typography variant="body2">
+                      Steam Cloud is offline. Campaigns are saved on this
+                      computer.
+                    </Typography>
+                  )}
+                  {library.slots.length ? (
+                    <>
+                      <TextField
+                        select
+                        label="Campaign"
+                        value={selected}
+                        onChange={(event) => {
+                          setSelected(event.target.value);
+                          setName(
+                            library.slots.find(
+                              (s) => s.id === event.target.value,
+                            )?.name || "",
+                          );
+                          setConfirmDelete(false);
+                        }}
+                      >
+                        {library.slots.map((slot) => (
+                          <MenuItem key={slot.id} value={slot.id}>
+                            {slot.name} ·{" "}
+                            {new Date(slot.updatedAt).toLocaleString()}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      <Typography variant="body2">
+                        {library.slots
+                          .find((s) => s.id === selected)
+                          ?.players.join(", ")}
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        disabled={
+                          busy || loadingSaves || !host || !everyoneHere
+                        }
+                        onClick={() =>
+                          run(() =>
+                            session.start({ saved: true, id: selected }),
+                          )
+                        }
+                      >
+                        Resume campaign
+                      </Button>
+                      {!lobby.lobbyId && (
+                        <Typography variant="body2">
+                          Host a lobby and invite this campaign’s players to
+                          resume.
+                        </Typography>
+                      )}
+                      <TextField
+                        label="Campaign name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        slotProps={{ htmlInput: { maxLength: 80 } }}
+                      />
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        useFlexGap
+                        sx={{ flexWrap: "wrap" }}
+                      >
+                        <Button
+                          disabled={busy || loadingSaves || !name.trim()}
+                          onClick={() =>
+                            run(() =>
+                              loadSaves(() =>
+                                session.renameSharedSave(selected, name),
+                              ),
+                            )
+                          }
+                        >
+                          Rename
+                        </Button>
+                        <Button
+                          disabled={busy || loadingSaves}
+                          onClick={() =>
+                            run(() => session.exportSharedSave(selected))
+                          }
+                        >
+                          Export campaign
+                        </Button>
+                        <Button
+                          color="error"
+                          disabled={busy || loadingSaves}
+                          onClick={() => setConfirmDelete(true)}
+                        >
+                          Delete campaign
+                        </Button>
+                      </Stack>
+                      {confirmDelete && (
+                        <Alert severity="warning">
+                          Delete “
+                          {library.slots.find((s) => s.id === selected)?.name}”
+                          from your library? Export it first to keep a portable
+                          backup.
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              color="error"
+                              disabled={loadingSaves}
+                              onClick={() =>
+                                run(() =>
+                                  loadSaves(() =>
+                                    session.deleteSharedSave(selected),
+                                  ),
+                                )
+                              }
+                            >
+                              Confirm delete
+                            </Button>
+                            <Button onClick={() => setConfirmDelete(false)}>
+                              Keep campaign
+                            </Button>
+                          </Stack>
+                        </Alert>
+                      )}
+                    </>
+                  ) : (
+                    <Typography>No shared campaigns saved yet.</Typography>
+                  )}
+                  <Button
+                    disabled={busy || loadingSaves}
+                    onClick={() =>
+                      run(() => loadSaves(() => session.importSharedSave()))
+                    }
+                  >
+                    Import campaign
+                  </Button>
+                  <Typography variant="body2">
+                    Differing Steam Cloud checkpoints appear as separate copies.
+                    Every player must select a speed before a restored match
+                    continues.
+                  </Typography>
+                </Stack>
               )}
             </>
           )}

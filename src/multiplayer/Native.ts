@@ -16,6 +16,18 @@ export interface LobbyState {
   sharedAt?: number | null;
   error?: string;
 }
+export interface SharedSaveLibrary {
+  warning?: string;
+  slots: {
+    id: string;
+    name: string;
+    updatedAt: number;
+    matchId: string;
+    schema: number;
+    players: string[];
+  }[];
+  cloudState: "disabled" | "offline" | "ready" | "failed";
+}
 export type WireMessage =
   | { kind: "heartbeat" }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }
@@ -26,14 +38,14 @@ export type WireMessage =
   | { kind: "browse"; browse: BrowseState };
 export type NativeRequest =
   | {
-      kind:
-        | "state"
-        | "leave"
-        | "reconnect"
-        | "invite"
-        | "read-checkpoint"
-        | "unlock";
+      kind: "state" | "leave" | "reconnect" | "invite" | "unlock";
     }
+  | { kind: "read-checkpoint"; id?: string }
+  | { kind: "list-saves"; sync?: boolean }
+  | { kind: "rename-save"; id: string; name: string }
+  | { kind: "delete-save"; id: string }
+  | { kind: "export-save"; id: string }
+  | { kind: "import-save" }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready"; value: string }

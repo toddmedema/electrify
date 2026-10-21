@@ -14,11 +14,14 @@ function desktopBuild() {
     "scripts/generate-icon-manifest.js",
     "scripts/generate-steam-localization.js",
     "scripts/generate-achievements.js",
+    "scripts/generate-notices.js",
     "node_modules/react-scripts/bin/react-scripts.js",
   ]) {
     const arguments_ = script.includes("react-scripts")
       ? [script, "build"]
-      : [script];
+      : script === "scripts/generate-notices.js"
+        ? [script, "--desktop"]
+        : [script];
     const result = spawnSync(process.execPath, arguments_, {
       stdio: "inherit",
       env: {

@@ -10,6 +10,7 @@ import {
   matchScenario,
   pauseWorld,
   restoreWorld,
+  savedMatchSpec,
   stepWorld,
 } from "../multiplayer/World";
 import { ViewPublication } from "../multiplayer/ViewPublication";
@@ -126,9 +127,7 @@ async function startMatch(
       request.epoch,
     );
   } else {
-    const spec = (request.world as Partial<World> | null)?.spec;
-    if (!spec)
-      throw new Error("This shared save needs its original game build");
+    const spec = savedMatchSpec(request.world);
     await data(spec);
     world = restoreWorld(request.world, request.epoch);
   }

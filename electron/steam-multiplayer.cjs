@@ -3,6 +3,7 @@ const zlib = require("node:zlib");
 const path = require("node:path");
 const { atomicWriteAsync, readJson } = require("./storage.cjs");
 const { nativeLibraryPath } = require("./steam-native.cjs");
+const { CoopSaveStore } = require("./coop-storage.cjs");
 
 // Valve flat API, the SDK bundled with steamworks.js. No second callback consumer.
 const DECLARATIONS = {
@@ -226,6 +227,7 @@ class SteamMultiplayer {
     emit,
     api = loadMultiplayerFunctions(),
     koffi = require("koffi"),
+    dialogs = {},
   ) {
     this.service = service;
     this.dispatcher = dispatcher;
@@ -233,6 +235,8 @@ class SteamMultiplayer {
     this.koffi = koffi;
     this.emit = emit;
     this.filename = path.join(directory, "co-op.json");
+    this.saves = new CoopSaveStore(directory, service, { stringify, parse });
+    this.dialogs = dialogs;
     this.matchmaking = api.matchmaking();
     this.sockets = api.sockets();
     this.utils = api.utils();
@@ -497,7 +501,7 @@ class SteamMultiplayer {
   async persist(world) {
     if (
       !world ||
-      world.schema !== 2 ||
+      ![2, 3].includes(world.schema) ||
       !Array.isArray(world.seats) ||
       world.seats.length < 2 ||
       world.seats.length > 4 ||
@@ -510,7 +514,23 @@ class SteamMultiplayer {
     const digest = crypto.createHash("sha256").update(json).digest("hex");
     this.saveQueue = this.saveQueue
       .catch(() => {})
-      .then(() => atomicWriteAsync(this.filename, json));
+      .then(async () => {
+        // Retain the legacy checkpoint for older installations and disaster recovery.
+        // Never replace a future checkpoint with a save from an older game.
+        let previous;
+        try {
+          previous = readJson(this.filename, null);
+        } catch {
+          previous = { schema: Infinity };
+        }
+        await this.saves.save(world);
+        if (
+          !previous ||
+          (previous.schema <= world.schema &&
+            (previous.gameSchema ?? 0) <= (world.gameSchema ?? 0))
+        )
+          await atomicWriteAsync(this.filename, json);
+      });
     await this.saveQueue;
     this.savedAt = Date.now();
     this.publish();
@@ -778,8 +798,25 @@ class SteamMultiplayer {
       case "checkpoint":
         return this.checkpoint(input.world);
       case "read-checkpoint": {
-        const value = readJson(this.filename, null);
-        return value === null ? null : parse(JSON.stringify(value));
+        return this.saves.select(input.id);
+      }
+      case "list-saves":
+        return this.saves.list(input.sync === true);
+      case "rename-save":
+        await this.saves.rename(input.id, input.name);
+        return this.saves.list();
+      case "delete-save":
+        await this.saves.remove(input.id);
+        return this.saves.list();
+      case "import-save": {
+        const filename = await this.dialogs.chooseImport?.();
+        if (filename) await this.saves.importFile(filename);
+        return this.saves.list();
+      }
+      case "export-save": {
+        const filename = await this.dialogs.chooseExport?.();
+        if (filename) await this.saves.exportFile(input.id, filename);
+        return;
       }
       default:
         throw new Error("Unknown multiplayer request");

@@ -1,6 +1,7 @@
 const { spawnSync } = require("node:child_process");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
+require("./generate-notices").generateNotices();
 
 const version = buildVersion();
 const result = spawnSync(

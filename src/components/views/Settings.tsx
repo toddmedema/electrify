@@ -26,6 +26,7 @@ import { clearAppCache } from "../../helpers/Cache";
 import { getDesktop, isDesktopApp } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useMenuKeys } from "../base/useMenuKeys";
+const CreditsDialog = React.lazy(() => import("../base/CreditsDialog"));
 const DesktopDisplaySettings =
   process.env.REACT_APP_DESKTOP === "true"
     ? React.lazy(() => import("../base/DesktopDisplaySettings"))
@@ -186,6 +187,7 @@ function VolumeSlider(props: {
 }
 
 export default function Settings(props: Props): React.JSX.Element {
+  const [creditsOpen, setCreditsOpen] = React.useState(false);
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
@@ -569,6 +571,14 @@ export default function Settings(props: Props): React.JSX.Element {
               Electrify v{APP_VERSION}
             </Typography>
             <Button
+              variant="text"
+              size="small"
+              onClick={() => setCreditsOpen(true)}
+              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
+            >
+              Credits and licenses
+            </Button>
+            <Button
               component="a"
               href="https://github.com/toddmedema/electrify"
               target="_blank"
@@ -590,6 +600,11 @@ export default function Settings(props: Props): React.JSX.Element {
               </Button>
             )}
           </Stack>
+          {creditsOpen && (
+            <React.Suspense fallback={null}>
+              <CreditsDialog onClose={() => setCreditsOpen(false)} />
+            </React.Suspense>
+          )}
         </Stack>
       </Box>
     </ScreenPage>

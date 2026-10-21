@@ -46,7 +46,9 @@ export interface World {
   commitments?: (
     import("../helpers/Commitment").SavedCommitmentMetadata[] | null
   )[];
-  schema: 2;
+  schema: 3;
+  /** Solo-save structural version used by every grid in this atomic checkpoint. */
+  gameSchema: number;
   rules: string;
   spec: MatchSpec;
   /** Companies whose run has ended, by seat. A failed company retires; the rest play on. */

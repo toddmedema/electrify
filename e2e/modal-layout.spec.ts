@@ -212,5 +212,39 @@ for (const theme of ["light", "dark"]) {
       });
       await dialog.getByRole("button", { name: "Got it", exact: true }).click();
     });
+
+    test("bundled credits and expanded license text fit and return focus to Settings", async ({
+      page,
+    }, info) => {
+      await page.goto("/");
+      await page.getByRole("button", { name: "Settings", exact: true }).click();
+      const credits = page.getByRole("button", {
+        name: "Credits and licenses",
+        exact: true,
+      });
+      await credits.click();
+      const dialog = page.getByRole("dialog", { name: "Credits and licenses" });
+      const gameLicense = dialog
+        .locator("summary")
+        .filter({ hasText: "Electrify — MIT License with Commons Clause" });
+      await expect(gameLicense).toBeVisible();
+      await gameLicense.click();
+      await expect(
+        gameLicense
+          .locator("..")
+          .getByText("THE SOFTWARE IS PROVIDED", { exact: false }),
+      ).toBeVisible();
+      await expectDialogToFit(dialog);
+      await page.screenshot({
+        path: info.outputPath("credits-and-licenses.png"),
+        animations: "disabled",
+      });
+      await dialog.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(credits).toBeFocused();
+      await expect(
+        page.getByRole("heading", { name: "Settings", exact: true }),
+      ).toBeVisible();
+    });
   });
 }

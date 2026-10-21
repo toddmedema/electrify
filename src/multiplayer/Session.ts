@@ -7,7 +7,12 @@ import type {
   RoomView,
   World,
 } from "./Types";
-import type { LobbyState, NativeEvent, NativeRequest } from "./Native";
+import type {
+  LobbyState,
+  NativeEvent,
+  NativeRequest,
+  SharedSaveLibrary,
+} from "./Native";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
 import { validBrowseState, type BrowseState } from "./Browse";
 import {
@@ -438,8 +443,33 @@ export class MultiplayerSession {
       error: undefined,
     });
   }
+  async sharedSaves(sync = false) {
+    return (await this.request({
+      kind: "list-saves",
+      sync,
+    })) as SharedSaveLibrary;
+  }
+  async renameSharedSave(id: string, name: string) {
+    return (await this.request({
+      kind: "rename-save",
+      id,
+      name,
+    })) as SharedSaveLibrary;
+  }
+  async deleteSharedSave(id: string) {
+    return (await this.request({
+      kind: "delete-save",
+      id,
+    })) as SharedSaveLibrary;
+  }
+  async importSharedSave() {
+    return (await this.request({ kind: "import-save" })) as SharedSaveLibrary;
+  }
+  async exportSharedSave(id: string) {
+    await this.request({ kind: "export-save", id });
+  }
   /** Starts the host's chosen scenario for the lobby, or resumes the last shared save. */
-  async start(choice: { spec: MatchSpec } | { saved: true }) {
+  async start(choice: { spec: MatchSpec } | { saved: true; id?: string }) {
     const generation = ++this.startGeneration;
     const lifecycle = this.lifecycle;
     const current = () =>
@@ -473,7 +503,10 @@ export class MultiplayerSession {
       if (!current()) return;
       const world =
         "saved" in choice
-          ? ((await this.request({ kind: "read-checkpoint" })) as World | null)
+          ? ((await this.request({
+              kind: "read-checkpoint",
+              ...(choice.id && { id: choice.id }),
+            })) as World | null)
           : null;
       if ("saved" in choice && !world)
         throw new Error("No shared save on this computer yet");

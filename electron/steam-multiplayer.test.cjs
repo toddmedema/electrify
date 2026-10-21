@@ -350,6 +350,7 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
   const guest = { id: "76561198000000002", connected: true, queue: [] };
   const world = {
     schema: 2,
+    matchId: "campaign-one",
     revision: 1,
     seats: [{ id: mp.service.identity.steamId }, { id: guest.id }],
   };
@@ -382,15 +383,15 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
 
     // Exercise the actual guest persistence path, including a failed write and retry.
     mp.hostId = guest.id;
-    const savedFilename = mp.filename;
-    mp.filename = directory; // Writing a file over this directory must fail.
+    const savedFilename = mp.saves.filename;
+    mp.saves.filename = directory; // Writing a library over this directory must fail.
     await assert.rejects(mp.receive(guest.id, messages[1]));
     assert.equal(
       guest.queue.length,
       0,
       "failed persistence is never acknowledged",
     );
-    mp.filename = savedFilename;
+    mp.saves.filename = savedFilename;
     await mp.receive(guest.id, messages[1]);
     assert.equal(
       fs.readFileSync(mp.filename, "utf8"),
@@ -405,6 +406,35 @@ test("schema 2 checkpoints persist real files, including overlapping host saves 
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+test("healthy named campaigns checkpoint while a corrupt or newer legacy file stays untouched", async () => {
+  const temporaryRoot = path.resolve(".tmp", "native-tests");
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  const directory = fs.mkdtempSync(
+    path.join(temporaryRoot, "legacy-protection-"),
+  );
+  const { mp } = fixture(directory);
+  const world = {
+    schema: 3,
+    gameSchema: 3,
+    matchId: "current",
+    seats: [{ id: mp.service.identity.steamId }, { id: "76561198000000002" }],
+  };
+  try {
+    await mp.persist(world);
+    const future = stringify({ ...world, gameSchema: 99 });
+    fs.writeFileSync(mp.filename, future);
+    await mp.persist({ ...world, matchId: "another" });
+    assert.equal(fs.readFileSync(mp.filename, "utf8"), future);
+    fs.writeFileSync(mp.filename, "damaged legacy JSON");
+    await mp.persist({ ...world, revision: 2 });
+    assert.equal(fs.readFileSync(mp.filename, "utf8"), "damaged legacy JSON");
+    assert.equal((await mp.saves.list()).slots.length, 2);
+  } finally {
+    mp.dispose();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("only the host mirrors a bounded scenario selection to its guests", async () => {
   const { mp, events } = fixture();
   const browse = { session: "s", revision: 1, card: "NEW_GAME" };

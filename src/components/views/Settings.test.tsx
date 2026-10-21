@@ -238,6 +238,45 @@ describe("Settings", () => {
     expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
   });
 
+  it("opens bundled credits and restores the Settings footer after closing", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            notices: [
+              {
+                title: "Game redistribution license",
+                text: "MIT with Commons Clause",
+              },
+            ],
+            chromium: false,
+          }),
+        }) as Response,
+    );
+    try {
+      renderSettings();
+      const button = screen.getByRole("button", {
+        name: "Credits and licenses",
+      });
+      await userEvent.click(button);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Credits and licenses",
+      });
+      expect(
+        await within(dialog).findByText("Game redistribution license"),
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: "Close" }),
+      );
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(button).toHaveFocus();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it("returns focus to the control that opened Settings", () => {
     jest.useFakeTimers();
     const trigger = document.createElement("button");
