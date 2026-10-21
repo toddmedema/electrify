@@ -3,10 +3,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   createDesktopProfile,
+  closeDesktop,
+  desktopDeadline,
   DesktopSession,
   launchDesktop,
   removeDesktopProfile,
 } from "./desktop-fixture";
+import { restoreFocusBeforeClosingProbe } from "./desktop-focus";
 import {
   auditFeedbackAudio,
   feedbackAudio,
@@ -175,10 +178,12 @@ test.beforeEach(async () => {
 test.afterEach(async ({}, testInfo) => {
   try {
     if (desktop && testInfo.status !== testInfo.expectedStatus) {
-      const diagnostics = await Promise.allSettled([
-        feedbackAudio(desktop.page),
-        desktop.page.evaluate(() => window.feedbackControllerAudit),
-      ]);
+      const diagnostics = await desktopDeadline("Feedback diagnostics", () =>
+        Promise.allSettled([
+          feedbackAudio(desktop.page),
+          desktop.page.evaluate(() => window.feedbackControllerAudit),
+        ]),
+      ).catch((reason) => [{ status: "rejected" as const, reason }]);
       const observed = diagnostics.map((result) =>
         result.status === "fulfilled"
           ? result.value
@@ -191,17 +196,18 @@ test.afterEach(async ({}, testInfo) => {
             controller: observed[1],
             errors: desktop.errors,
             externalRequests: desktop.externalRequests,
+            nativeLog: desktop.nativeLog,
           }),
           contentType: "application/json",
         })
         .catch(() => undefined);
-      await desktop.app
-        .evaluate(({ app }) => app.exit(0))
-        .catch(() => undefined);
     }
   } finally {
     try {
-      if (desktop) await desktop.app.close().catch(() => undefined);
+      if (desktop)
+        await closeDesktop(desktop.app, {
+          force: testInfo.status !== testInfo.expectedStatus,
+        });
     } finally {
       try {
         await recoveredBrowser?.close().catch(() => undefined);
@@ -841,10 +847,11 @@ test("mocked controller feedback is optional, bounded, independent of mute, and 
       .poll(() => page.evaluate(() => window.feedbackControllerAudit.resets))
       .toBeGreaterThan(beforeBlur);
   } finally {
-    await app.evaluate(({ BrowserWindow }, ids) => {
-      BrowserWindow.fromId(ids.probe)?.destroy();
-      BrowserWindow.fromId(ids.game)?.focus();
-    }, windows);
+    await desktopDeadline(
+      "Native focus handoff",
+      () => app.evaluate(restoreFocusBeforeClosingProbe, windows),
+      10_000,
+    );
   }
   await focusGame();
   await confirm();

@@ -4,11 +4,14 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import {
   createDesktopProfile,
+  closeDesktop,
+  desktopDeadline,
   DesktopSession,
   displayState,
   launchDesktop,
   removeDesktopProfile,
 } from "./desktop-fixture";
+import { restoreFocusBeforeClosingProbe } from "./desktop-focus";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 import type { DesktopState } from "../src/Desktop";
 import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
@@ -138,43 +141,60 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async ({}, testInfo) => {
-  if (desktop) {
+  try {
+    if (!desktop) return;
     if (
       testInfo.status !== testInfo.expectedStatus &&
       !desktop.page.isClosed()
     ) {
+      const diagnostic = await desktopDeadline(
+        "Desktop diagnostics",
+        async () => ({
+          display: await displayState(desktop.app),
+          renderer: await desktop.page.evaluate(() => ({
+            visible: document.visibilityState,
+            focused: document.hasFocus(),
+            worker: (window as unknown as { desktopWorkerAudit?: unknown })
+              .desktopWorkerAudit,
+            appbar: document.querySelector("#appbar")?.textContent,
+          })),
+        }),
+      ).catch((error: Error) => ({ unavailable: error.message }));
       await testInfo
         .attach("desktop-runtime-diagnostics.json", {
           body: JSON.stringify({
-            display: await displayState(desktop.app),
-            renderer: await desktop.page.evaluate(() => ({
-              visible: document.visibilityState,
-              focused: document.hasFocus(),
-              worker: (window as unknown as { desktopWorkerAudit?: unknown })
-                .desktopWorkerAudit,
-              appbar: document.querySelector("#appbar")?.textContent,
-            })),
+            ...diagnostic,
             errors: desktop.errors,
             externalRequests: desktop.externalRequests,
+            nativeLog: desktop.nativeLog,
+            process: {
+              pid: desktop.app.process().pid,
+              exitCode: desktop.app.process().exitCode,
+              signalCode: desktop.app.process().signalCode,
+            },
           }),
           contentType: "application/json",
         })
         .catch(() => undefined);
-      await testInfo
-        .attach("electron-failure.png", {
-          body: await desktop.page.screenshot({ timeout: 5000 }),
+      const screenshot = await desktopDeadline("Desktop screenshot", () =>
+        desktop.page.screenshot({ timeout: 5000 }),
+      ).catch(() => undefined);
+      if (screenshot)
+        await testInfo.attach("electron-failure.png", {
+          body: screenshot,
           contentType: "image/png",
-        })
-        .catch(() => undefined);
-      // An intentionally failed save must not leave a native quit warning or
-      // locked temporary Chromium profile behind after a test assertion fails.
-      await desktop.app
-        .evaluate(({ app }) => app.exit(0))
-        .catch(() => undefined);
+        });
     }
-    await desktop.app.close().catch(() => undefined);
+  } finally {
+    try {
+      if (desktop)
+        await closeDesktop(desktop.app, {
+          force: testInfo.status !== testInfo.expectedStatus,
+        });
+    } finally {
+      if (profile) await removeDesktopProfile(profile);
+    }
   }
-  if (profile) await removeDesktopProfile(profile);
 });
 
 test("a fresh offline install launches fullscreen with every bundled file and a sandboxed renderer", async ({}, testInfo) => {
@@ -768,10 +788,11 @@ test("production projection workers finish offline and native focus pauses and r
       page.getByRole("button", { name: "pause", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
   } finally {
-    await desktop.app.evaluate(({ BrowserWindow }, ids) => {
-      BrowserWindow.fromId(ids.probe)?.destroy();
-      BrowserWindow.fromId(ids.game)?.focus();
-    }, focusWindows);
+    await desktopDeadline(
+      "Native focus handoff",
+      () => desktop.app.evaluate(restoreFocusBeforeClosingProbe, focusWindows),
+      10_000,
+    );
   }
   await expect(
     page.getByRole("button", { name: "fast speed", exact: true }),

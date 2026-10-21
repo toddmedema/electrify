@@ -5,6 +5,25 @@ const { summarize, reproduce } = require("./failures");
 const line = (job, text) =>
   `${job}\tUNKNOWN STEP\t2026-10-17T18:53:11.6775880Z ${text}`;
 
+test("native test timeouts retain the original failure before secondary teardown errors", () => {
+  const job = "macOS universal tests";
+  const errors = summarize(
+    [
+      line(job, "Test timeout of 120000ms exceeded."),
+      line(
+        job,
+        'Test timeout of 120000ms exceeded while running "afterEach" hook.',
+      ),
+      line(job, "##[error]Worker teardown timeout of 120000ms exceeded."),
+    ].join("\n"),
+  ).get(job).errors;
+  assert.deepEqual(errors, [
+    "Test timeout of 120000ms exceeded.",
+    'Test timeout of 120000ms exceeded while running "afterEach" hook.',
+    "Worker teardown timeout of 120000ms exceeded.",
+  ]);
+});
+
 test("summaries list failed gates, tests, flakes and assertion excerpts per job", () => {
   const mac = "macOS universal tests";
   const log = [

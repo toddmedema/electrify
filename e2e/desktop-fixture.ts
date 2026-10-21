@@ -11,12 +11,25 @@ import path from "node:path";
 const workspace = path.resolve(__dirname, "..");
 const profileRoot = path.join(workspace, ".tmp", "desktop-qa");
 const requireHeadedDesktop = require("../scripts/desktop-test-setup.js");
+export const { desktopDeadline, closeDesktop } =
+  require("../scripts/ci/desktop-process.js") as {
+    desktopDeadline: <T>(
+      label: string,
+      operation: () => Promise<T>,
+      timeoutMs?: number,
+    ) => Promise<T>;
+    closeDesktop: (
+      app: ElectronApplication,
+      options?: { force?: boolean; timeoutMs?: number },
+    ) => Promise<void>;
+  };
 
 export interface DesktopSession {
   app: ElectronApplication;
   page: Page;
   errors: string[];
   externalRequests: string[];
+  nativeLog: string[];
 }
 
 export async function createDesktopProfile(): Promise<string> {
@@ -57,6 +70,12 @@ export async function launchDesktop(profile: string): Promise<DesktopSession> {
     },
     timeout: 30_000,
   });
+  const nativeLog: string[] = [];
+  for (const stream of [app.process().stdout, app.process().stderr])
+    stream?.on("data", (data: Buffer) => {
+      nativeLog.push(data.toString());
+      if (nativeLog.length > 100) nativeLog.shift();
+    });
   try {
     const page = await app.firstWindow();
     const errors: string[] = [];
@@ -94,11 +113,10 @@ export async function launchDesktop(profile: string): Promise<DesktopSession> {
       );
       await waitForFullscreen(BrowserWindow.getAllWindows()[0], expected);
     }, fullscreen);
-    return { app, page, errors, externalRequests };
+    return { app, page, errors, externalRequests, nativeLog };
   } catch (error) {
     // Setup has not transferred ownership to the caller's afterEach yet.
-    await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined);
-    await app.close().catch(() => undefined);
+    await closeDesktop(app, { force: true });
     throw error;
   }
 }
