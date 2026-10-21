@@ -85,8 +85,13 @@ async function stalledDesktop(t) {
       child.kill("SIGKILL");
   });
   return {
-    process: () => child,
-    close: () => new Promise(() => {}),
+    nativeProcess: child,
+    isClosed: () => false,
+    app: {
+      process: () =>
+        assert.fail("Process ownership must be captured at launch"),
+      close: () => new Promise(() => {}),
+    },
   };
 }
 
@@ -106,7 +111,7 @@ test(
       await closeDesktop(app, { force: true, timeoutMs: 100 });
     }
     assert.match(diagnostic.unavailable, /Native diagnostics did not finish/);
-    assert.equal(app.process().signalCode, "SIGKILL");
+    assert.equal(app.nativeProcess.signalCode, "SIGKILL");
   },
 );
 
@@ -119,7 +124,7 @@ test(
       closeDesktop(app, { timeoutMs: 100 }),
       /Closing Electron did not finish/,
     );
-    assert.equal(app.process().signalCode, "SIGKILL");
+    assert.equal(app.nativeProcess.signalCode, "SIGKILL");
   },
 );
 
@@ -133,7 +138,36 @@ test("deadline preserves the original rejection", async () => {
 
 test("cleanup is harmless after a test has already quit the application", async () => {
   await closeDesktop({
-    process: () => ({ exitCode: 0, signalCode: null }),
-    close: () => assert.fail("An exited application needs no second quit RPC"),
+    nativeProcess: { exitCode: 0, signalCode: null },
+    isClosed: () => true,
+    app: {
+      process: () => {
+        throw new TypeError(
+          "Cannot read properties of undefined (reading '_object')",
+        );
+      },
+      close: () =>
+        assert.fail("An exited application needs no second quit RPC"),
+    },
   });
+});
+
+test("a disposed app can finish exiting without another Playwright RPC", async () => {
+  const child = Object.assign(new EventEmitter(), {
+    exitCode: null,
+    signalCode: null,
+  });
+  setImmediate(() => {
+    child.exitCode = 0;
+    child.emit("exit", 0);
+  });
+  await closeDesktop({
+    nativeProcess: child,
+    isClosed: () => true,
+    app: {
+      process: () => assert.fail("The app proxy is disposed"),
+      close: () => assert.fail("The app proxy is disposed"),
+    },
+  });
+  assert.equal(child.exitCode, 0);
 });

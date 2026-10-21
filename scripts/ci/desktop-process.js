@@ -18,10 +18,9 @@ async function desktopDeadline(label, operation, timeoutMs = 5000) {
 }
 
 async function closeDesktop(
-  app,
+  { app, nativeProcess: child, isClosed },
   { force = false, timeoutMs = force ? 5000 : 30_000 } = {},
 ) {
-  const child = app.process();
   const running = () => child.exitCode === null && child.signalCode === null;
   if (!running()) return;
   const exited = new Promise((resolve) => child.once("exit", resolve));
@@ -30,7 +29,7 @@ async function closeDesktop(
     await desktopDeadline(
       "Closing Electron",
       async () => {
-        await app.close();
+        if (!isClosed()) await app.close();
         await exited;
       },
       timeoutMs,

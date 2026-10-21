@@ -205,7 +205,7 @@ test.afterEach(async ({}, testInfo) => {
   } finally {
     try {
       if (desktop)
-        await closeDesktop(desktop.app, {
+        await closeDesktop(desktop, {
           force: testInfo.status !== testInfo.expectedStatus,
         });
     } finally {

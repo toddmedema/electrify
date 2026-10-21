@@ -19,13 +19,15 @@ export const { desktopDeadline, closeDesktop } =
       timeoutMs?: number,
     ) => Promise<T>;
     closeDesktop: (
-      app: ElectronApplication,
+      session: Pick<DesktopSession, "app" | "nativeProcess" | "isClosed">,
       options?: { force?: boolean; timeoutMs?: number },
     ) => Promise<void>;
   };
 
 export interface DesktopSession {
   app: ElectronApplication;
+  nativeProcess: ReturnType<ElectronApplication["process"]>;
+  isClosed: () => boolean;
   page: Page;
   errors: string[];
   externalRequests: string[];
@@ -70,8 +72,16 @@ export async function launchDesktop(profile: string): Promise<DesktopSession> {
     },
     timeout: 30_000,
   });
+  // Playwright disposes its app proxy after a normal in-game quit. Keep process
+  // ownership outside that proxy so teardown also works after the close event.
+  const nativeProcess = app.process();
+  let closed = false;
+  app.once("close", () => {
+    closed = true;
+  });
+  const isClosed = () => closed;
   const nativeLog: string[] = [];
-  for (const stream of [app.process().stdout, app.process().stderr])
+  for (const stream of [nativeProcess.stdout, nativeProcess.stderr])
     stream?.on("data", (data: Buffer) => {
       nativeLog.push(data.toString());
       if (nativeLog.length > 100) nativeLog.shift();
@@ -113,10 +123,18 @@ export async function launchDesktop(profile: string): Promise<DesktopSession> {
       );
       await waitForFullscreen(BrowserWindow.getAllWindows()[0], expected);
     }, fullscreen);
-    return { app, page, errors, externalRequests, nativeLog };
+    return {
+      app,
+      nativeProcess,
+      isClosed,
+      page,
+      errors,
+      externalRequests,
+      nativeLog,
+    };
   } catch (error) {
     // Setup has not transferred ownership to the caller's afterEach yet.
-    await closeDesktop(app, { force: true });
+    await closeDesktop({ app, nativeProcess, isClosed }, { force: true });
     throw error;
   }
 }

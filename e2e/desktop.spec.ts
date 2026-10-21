@@ -168,9 +168,9 @@ test.afterEach(async ({}, testInfo) => {
             externalRequests: desktop.externalRequests,
             nativeLog: desktop.nativeLog,
             process: {
-              pid: desktop.app.process().pid,
-              exitCode: desktop.app.process().exitCode,
-              signalCode: desktop.app.process().signalCode,
+              pid: desktop.nativeProcess.pid,
+              exitCode: desktop.nativeProcess.exitCode,
+              signalCode: desktop.nativeProcess.signalCode,
             },
           }),
           contentType: "application/json",
@@ -188,7 +188,7 @@ test.afterEach(async ({}, testInfo) => {
   } finally {
     try {
       if (desktop)
-        await closeDesktop(desktop.app, {
+        await closeDesktop(desktop, {
           force: testInfo.status !== testInfo.expectedStatus,
         });
     } finally {
