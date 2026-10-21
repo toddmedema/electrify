@@ -336,7 +336,29 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("60% available");
     expect(operation).toHaveTextContent("4 days to repair");
     expect(operation).toHaveTextContent("Current maximum output");
-    expect(operation).toHaveTextContent("Limited to 60% (hail)");
+    expect(operation).toHaveTextContent("60% of nameplate");
+  });
+
+  it("includes an active event in the maximum output shown for an aging plant", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.peakW = 300e6;
+    solar.annualOutputDegradation = 0.005;
+    solar.minuteOperational = game.date.minute - 0.7 * 12 * MINUTES_PER_MONTH;
+    game.worldEvents.active.push({
+      key: "wildfire:active",
+      definitionId: "wildfire-incident",
+      startsMinute: game.date.minute,
+      endsMinute: game.date.minute + MINUTES_PER_MONTH,
+      attributes: {},
+      effects: { facilityOutputMultipliersByFuel: { Sun: 0.54 } },
+    });
+
+    showDetails(game, solar);
+
+    const operation = screen.getByRole("region", { name: "Operation" });
+    expect(operation).toHaveTextContent("161MW");
+    expect(operation).toHaveTextContent("54% of nameplate");
   });
 
   it("reports an extreme-cold outage until month end", () => {
@@ -349,20 +371,84 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("Extreme cold");
     expect(operation).toHaveTextContent("55% available");
     expect(operation).toHaveTextContent("Until month end");
-    expect(operation).toHaveTextContent("Limited to 55% (cold)");
+    expect(operation).toHaveTextContent("55% of nameplate");
   });
 
   it("combines age wear with hail damage in the maximum output", () => {
     const game = carbonFee();
     const solar = withSolar(game);
     // Two per cent a year for about ten years leaves about 82%; 60% of that is about 49%
+    solar.peakW = 100e6;
     solar.annualOutputDegradation = 0.02;
     solar.minuteOperational = game.date.minute - 10 * 12 * MINUTES_PER_MONTH;
     outage(game, solar, true, 0.6);
     showDetails(game, solar);
-    expect(screen.getByRole("region", { name: "Operation" })).toHaveTextContent(
-      /Limited to 4\d% \(age, hail\)/,
+    const operation = screen.getByRole("region", { name: "Operation" });
+    expect(operation).toHaveTextContent("49MW");
+    expect(operation).toHaveTextContent("49% of nameplate");
+  });
+
+  it("combines event limits by fuel and facility, including a complete outage", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.peakW = 300e6;
+    solar.annualOutputDegradation = 0;
+    const event = {
+      key: "wildfire:active",
+      definitionId: "wildfire-incident",
+      startsMinute: game.date.minute,
+      endsMinute: game.date.minute + MINUTES_PER_MONTH,
+      attributes: {},
+      effects: {
+        facilityOutputMultipliersByFuel: { Sun: 0.5 },
+        facilityOutputMultipliersById: { [String(solar.id)]: 0.6 },
+      },
+    };
+    game.worldEvents.active.push(event);
+    const { rerender } = showDetails(game, solar);
+    const operation = () => screen.getByRole("region", { name: "Operation" });
+    expect(operation()).toHaveTextContent("90MW");
+    expect(operation()).toHaveTextContent("30% of nameplate");
+
+    const outageGame = cloneDeep(game);
+    outageGame.worldEvents.active.find(
+      (active) => active.key === event.key,
+    )!.effects.facilityOutputMultipliersById = {
+      [String(solar.id)]: 0,
+    };
+    rerender(outageGame);
+    expect(operation()).toHaveTextContent("0W");
+    expect(operation()).toHaveTextContent("0% of nameplate");
+  });
+
+  it("leaves future and expired event limits out of the maximum output", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.annualOutputDegradation = 0;
+    game.worldEvents.active.push(
+      ...[-1, 1].map((offset) => ({
+        key: `wildfire:${offset}`,
+        definitionId: "wildfire-incident",
+        startsMinute: game.date.minute + offset * MINUTES_PER_MONTH,
+        endsMinute: game.date.minute + (offset + 1) * MINUTES_PER_MONTH,
+        attributes: {},
+        effects: { facilityOutputMultipliersByFuel: { Sun: 0.54 } },
+      })),
     );
+    showDetails(game, solar);
+    expect(screen.queryByText("Current maximum output")).toBeNull();
+  });
+
+  it("does not round small age wear up to an unrestricted 100%", () => {
+    const game = carbonFee();
+    const solar = withSolar(game);
+    solar.peakW = 300e6;
+    solar.annualOutputDegradation = 0.005;
+    solar.minuteOperational = game.date.minute - 0.7 * 12 * MINUTES_PER_MONTH;
+    showDetails(game, solar);
+    const operation = screen.getByRole("region", { name: "Operation" });
+    expect(operation).toHaveTextContent("299MW");
+    expect(operation).toHaveTextContent("<100% of nameplate");
   });
 
   it("hides the purchase in a replay", () => {

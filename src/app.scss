@@ -5694,11 +5694,8 @@ $homeSmokeCycle: 5.6s;
 }
 .customerProgramTitle {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  column-gap: 12px;
-  row-gap: 0;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .customerProgramStatus {
   font-size: var(--font-size-body2);
