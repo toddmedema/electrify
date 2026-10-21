@@ -11,39 +11,64 @@ import {
 } from "@mui/material";
 import steamPrivacy from "../../legal/SteamPrivacy.json";
 import { isDesktopApp } from "../../Desktop";
+import { ChevronDownGlyph } from "./Glyphs";
 
 interface Notice {
   title: string;
   text: string;
 }
 
+const disclosureStyles = {
+  borderTop: 1,
+  borderColor: "divider",
+  "& > summary": {
+    boxSizing: "border-box",
+    cursor: "pointer",
+    minHeight: 48,
+    py: 1.5,
+    display: "flex",
+    alignItems: "center",
+    gap: 1.5,
+    listStyle: "none",
+    overflowWrap: "anywhere",
+    "&::-webkit-details-marker": { display: "none" },
+    "&:hover": { color: "primary.main" },
+    "&:focus-visible": {
+      outline: "2px solid",
+      outlineColor: "primary.main",
+      outlineOffset: 2,
+      borderRadius: 1,
+    },
+  },
+  "& > summary .creditsDisclosureIcon": {
+    flexShrink: 0,
+    color: "text.secondary",
+    transform: "rotate(-90deg)",
+  },
+  "&[open] > summary .creditsDisclosureIcon": { transform: "none" },
+};
+
 function NoticeDetails({ notice }: { notice: Notice }) {
   return (
-    <Box
-      component="details"
-      sx={{ borderTop: 1, borderColor: "divider", py: 1 }}
-    >
-      <Box
-        component="summary"
-        sx={{
-          cursor: "pointer",
-          minHeight: 44,
-          display: "list-item",
-          alignContent: "center",
-          overflowWrap: "anywhere",
-        }}
-      >
-        {notice.title}
+    <Box component="details" sx={disclosureStyles}>
+      <Box component="summary">
+        <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
+          {notice.title}
+        </Box>
+        <ChevronDownGlyph className="creditsDisclosureIcon" fontSize="small" />
       </Box>
       <Typography
         component="pre"
         variant="body2"
         sx={{
           m: 0,
-          py: 1,
+          pt: 0.5,
+          pb: 2,
           whiteSpace: "pre-wrap",
           overflowWrap: "anywhere",
           fontFamily: "inherit",
+          lineHeight: 1.65,
+          color: "text.secondary",
         }}
       >
         {notice.text}
@@ -83,16 +108,12 @@ function ChromiumNotices() {
       .catch(() => setFailed(true));
   };
   return (
-    <Box
-      component="details"
-      sx={{ borderTop: 1, borderColor: "divider", py: 1 }}
-    >
-      <Box
-        component="summary"
-        onClick={load}
-        sx={{ cursor: "pointer", minHeight: 44, alignContent: "center" }}
-      >
-        Chromium third-party licenses
+    <Box component="details" sx={disclosureStyles}>
+      <Box component="summary" onClick={load}>
+        <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
+          Chromium third-party licenses
+        </Box>
+        <ChevronDownGlyph className="creditsDisclosureIcon" fontSize="small" />
       </Box>
       {!notices && !failed && (
         <Typography role="status">Loading bundled notices…</Typography>
@@ -137,36 +158,95 @@ export default function CreditsDialog({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       fullWidth
-      maxWidth="md"
+      maxWidth="sm"
       aria-labelledby="credits-title"
     >
       <DialogTitle id="credits-title">Credits and licenses</DialogTitle>
-      <DialogContent dividers>
-        <Typography component="p" sx={{ mb: 2 }}>
-          Coding: Todd Medema. Art: Chris Gebhart. Music: Nicholas Coronado.
-        </Typography>
-        <Typography component="p" sx={{ mb: 2 }}>
+      <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: 2.5 }}>
+        <Box
+          component="dl"
+          aria-label="Contributors"
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+            gap: { xs: 1.5, sm: 2 },
+            m: 0,
+            mb: 3,
+          }}
+        >
+          {[
+            ["Coding", "Todd Medema"],
+            ["Art", "Chris Gebhart"],
+            ["Music", "Nicholas Coronado"],
+          ].map(([role, name]) => (
+            <Box
+              key={role}
+              sx={{
+                display: { xs: "grid", sm: "block" },
+                gridTemplateColumns: "64px minmax(0, 1fr)",
+                alignItems: "baseline",
+                gap: 1,
+              }}
+            >
+              <Typography component="dt" variant="body2" color="text.secondary">
+                {role}
+              </Typography>
+              <Typography component="dd" sx={{ m: 0, fontWeight: 600 }}>
+                {name}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <Typography
+          component="p"
+          variant="body2"
+          color="text.secondary"
+          sx={{ mb: 3, lineHeight: 1.6 }}
+        >
           Electrify is source available under the MIT License with Commons
           Clause. Third-party components and assets retain their own terms
           below.
         </Typography>
         {process.env.REACT_APP_DESKTOP === "true" && isDesktopApp() && (
-          <Box component="section" sx={{ mb: 3 }}>
-            <Typography component="h2" variant="h6">
-              Desktop privacy
-            </Typography>
-            {steamPrivacy.map((paragraph) => (
-              <Typography
-                key={paragraph}
-                component="p"
-                sx={{ mb: 2 }}
-                variant="body2"
-              >
-                {paragraph}
+          <Box
+            component="details"
+            sx={{
+              ...disclosureStyles,
+              mb: 3,
+              borderBottom: 1,
+              borderBottomColor: "divider",
+            }}
+          >
+            <Box component="summary">
+              <Typography component="h2" variant="subtitle2" sx={{ flex: 1 }}>
+                Desktop privacy
               </Typography>
-            ))}
+              <ChevronDownGlyph
+                className="creditsDisclosureIcon"
+                fontSize="small"
+              />
+            </Box>
+            <Box sx={{ pb: 1 }}>
+              {steamPrivacy.map((paragraph) => (
+                <Typography
+                  key={paragraph}
+                  component="p"
+                  sx={{ mb: 2, lineHeight: 1.65, overflowWrap: "anywhere" }}
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {paragraph}
+                </Typography>
+              ))}
+            </Box>
           </Box>
         )}
+        <Typography component="h2" variant="subtitle2" sx={{ mb: 0.5 }}>
+          Bundled licenses
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Expand an entry to read its full terms.
+        </Typography>
         {!notices && !failed && (
           <Typography role="status">Loading bundled notices…</Typography>
         )}
@@ -182,7 +262,9 @@ export default function CreditsDialog({ onClose }: { onClose: () => void }) {
         {chromium && <ChromiumNotices />}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose} variant="contained" sx={{ minWidth: 88 }}>
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );

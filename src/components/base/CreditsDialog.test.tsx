@@ -43,6 +43,10 @@ it("reads bundled notices without external navigation and displays desktop priva
     screen.getByRole("heading", { name: "Desktop privacy" }),
   ).toBeInTheDocument();
   expect(
+    screen.queryByText(/no Google sign-in or Firebase analytics/),
+  ).not.toBeVisible();
+  await userEvent.click(screen.getByText("Desktop privacy"));
+  expect(
     screen.getByText(/no Google sign-in or Firebase analytics/),
   ).toBeVisible();
   await userEvent.click(summary);

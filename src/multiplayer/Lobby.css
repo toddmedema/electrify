@@ -1,0 +1,43 @@
+.coopLobby .MuiDialogTitle-root {
+  padding-bottom: 12px;
+}
+
+.coopLobby .MuiDialogContent-root {
+  scroll-padding: 16px;
+}
+
+.coopLobby .MuiAlert-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coopLobby .MuiSelect-select {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.coopCampaignDetails {
+  overflow-wrap: anywhere;
+}
+
+.coopCampaignActions > .MuiButton-root {
+  flex: 1;
+  min-width: 0;
+}
+
+.coopCampaignDeleteActions .MuiButton-root {
+  flex: 1;
+}
+
+.coopCampaignEmpty {
+  padding: 24px 0;
+}
+
+.coopLobbyRoster li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coopLobbyRoster li > span:last-child {
+  flex-shrink: 0;
+}

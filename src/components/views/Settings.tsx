@@ -447,6 +447,7 @@ export default function Settings(props: Props): React.JSX.Element {
             <SettingsGroup id="mods-settings" title="Mods">
               <SettingRow
                 label="Community scenarios"
+                stackOnMobile
                 description={
                   modCount
                     ? `${modCount} installed`
@@ -456,6 +457,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 <Button
                   data-mods-trigger
                   variant="outlined"
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
                   onClick={props.onManageMods}
                 >
                   Manage mods
@@ -565,16 +567,26 @@ export default function Settings(props: Props): React.JSX.Element {
               justifyContent: "center",
               flexWrap: "wrap",
               color: "text.secondary",
+              "& .MuiButton-root": {
+                color: "text.secondary",
+                fontSize: "0.8125rem",
+              },
             }}
           >
-            <Typography variant="caption" sx={{ px: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                px: 1,
+                width: { xs: "100%", sm: "auto" },
+                textAlign: "center",
+              }}
+            >
               Electrify v{APP_VERSION}
             </Typography>
             <Button
               variant="text"
               size="small"
               onClick={() => setCreditsOpen(true)}
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
             >
               Credits and licenses
             </Button>
@@ -585,7 +597,6 @@ export default function Settings(props: Props): React.JSX.Element {
               rel="noreferrer"
               variant="text"
               size="small"
-              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
             >
               GitHub
             </Button>
@@ -594,7 +605,6 @@ export default function Settings(props: Props): React.JSX.Element {
                 variant="text"
                 size="small"
                 onClick={() => void clearAppCache()}
-                sx={{ color: "text.secondary", fontSize: "0.75rem" }}
               >
                 Clear cache
               </Button>

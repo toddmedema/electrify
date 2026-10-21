@@ -4,6 +4,7 @@ import type {
   LobbyState,
   NativeEvent,
   NativeRequest,
+  SharedSaveLibrary,
 } from "../src/multiplayer/Native";
 import type { RoomView, World } from "../src/multiplayer/Types";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -14,6 +15,7 @@ type SteamTestWindow = typeof window & {
   releaseMockSteamDelivery?: () => void;
   receivedMockSteamEvent?: unknown;
   mockSteamGeneration?: number;
+  mockSharedSaveRequests?: number;
 };
 
 test.afterEach(async ({ browser }) => {
@@ -167,6 +169,10 @@ class SteamRoom {
   members: LobbyState["members"] = [];
   checkpoint?: World;
   campaignName = "Friends campaign";
+  campaignCloudState: SharedSaveLibrary["cloudState"] = "ready";
+  campaignWarning?: string;
+  campaignError?: string;
+  campaignListHold?: Promise<void>;
   exportedCampaign?: string;
   views = new Map<string, RoomView>();
   pendingViews = new Map<string, NativeEvent>();
@@ -304,9 +310,12 @@ class SteamRoom {
       input.kind === "list-saves" ||
       input.kind === "rename-save" ||
       input.kind === "delete-save"
-    )
+    ) {
+      if (input.kind === "list-saves") await this.campaignListHold;
+      if (this.campaignError) throw new Error(this.campaignError);
       return {
-        cloudState: "ready",
+        cloudState: this.campaignCloudState,
+        warning: this.campaignWarning,
         slots: this.checkpoint
           ? [
               {
@@ -320,6 +329,7 @@ class SteamRoom {
             ]
           : [],
       };
+    }
     if (input.kind === "reconnect") {
       this.dropped.delete(id);
       await this.publish();
@@ -407,12 +417,21 @@ class SteamRoom {
           openFriends: async () => {},
           setActivity: async () => {},
           addTimelineEvent: async () => {},
-          multiplayerRequest: (input) =>
-            (
-              window as unknown as {
-                mockSteamRequest: (input: NativeRequest) => Promise<unknown>;
+          multiplayerRequest: async (input) => {
+            try {
+              return await (
+                window as unknown as {
+                  mockSteamRequest: (input: NativeRequest) => Promise<unknown>;
+                }
+              ).mockSteamRequest(input);
+            } finally {
+              if (input.kind === "list-saves") {
+                const target = window as SteamTestWindow;
+                target.mockSharedSaveRequests =
+                  (target.mockSharedSaveRequests || 0) + 1;
               }
-            ).mockSteamRequest(input),
+            }
+          },
           onMultiplayerEvent: (callback) => {
             const handler = (event: Event) =>
               callback((event as CustomEvent<NativeEvent>).detail);
@@ -432,62 +451,278 @@ class SteamRoom {
   }
 }
 
-for (const mobile of [false, true]) {
-  test(`shared campaign library manages named saves on ${mobile ? "mobile" : "desktop"}`, async ({
-    browser,
-  }) => {
-    const room = new SteamRoom();
-    room.checkpoint = {
-      schema: 3,
-      matchId: "library-campaign",
-      seats: [
-        { id: room.host, name: "Player 1" },
-        { id: "76561198000000002", name: "Player 2" },
-      ],
-    } as World;
-    const page = await room.player(browser, 0, mobile);
-    await page
-      .getByRole("button", { name: "Shared campaigns", exact: true })
-      .click();
-    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-      "Friends campaign",
-    );
-    await expect(
-      page.getByRole("button", { name: "Resume campaign", exact: true }),
-    ).toBeDisabled();
-    await page
-      .getByLabel("Campaign name", { exact: true })
-      .fill("Launch friends");
-    await page.getByRole("button", { name: "Rename", exact: true }).click();
-    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-      "Launch friends",
-    );
-    await page
-      .getByRole("button", { name: "Export campaign", exact: true })
-      .click();
-    await expect.poll(() => room.exportedCampaign).toBe("saved-campaign");
-    await page.screenshot({
-      path: `.tmp/shared-campaigns-${mobile ? "mobile" : "desktop"}.png`,
+for (const width of [1280, 390, 360]) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`shared campaign library manages named saves at ${width}px in ${theme}`, async ({
+      browser,
+    }) => {
+      const room = new SteamRoom();
+      room.checkpoint = {
+        schema: 3,
+        matchId: "library-campaign",
+        seats: [
+          { id: room.host, name: "Player 1" },
+          { id: "76561198000000002", name: "Player 2" },
+        ],
+      } as World;
+      const mobile = width < 600;
+      const page = await room.player(browser, 0, mobile);
+      await page.setViewportSize({
+        width,
+        height: width === 360 ? 640 : mobile ? 844 : 900,
+      });
+      await page.emulateMedia({ colorScheme: theme });
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      const capture = async (state: string) => {
+        if (process.env.CAMPAIGN_DESIGN_SCREENSHOTS) {
+          await page.mouse.move(0, 0);
+          await page
+            .getByRole("heading")
+            .first()
+            .evaluate((element) =>
+              (element as HTMLElement).focus({ preventScroll: true }),
+            );
+          await page.screenshot({
+            path: `${process.env.CAMPAIGN_DESIGN_SCREENSHOTS}/${width}-${theme}-${state}.png`,
+            animations: "disabled",
+            style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+          });
+        }
+      };
+      const bounded = async () => {
+        const dialog = page.getByRole("dialog");
+        expect(
+          await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
+        ).toBeLessThanOrEqual(1);
+        const bounds = await dialog.boundingBox();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+        const buttons = await dialog.getByRole("button").evaluateAll((els) =>
+          els
+            .filter((el) => el.getBoundingClientRect().height > 0)
+            .map((el) => ({
+              label: el.getAttribute("aria-label") || el.textContent,
+              height: el.getBoundingClientRect().height,
+            })),
+        );
+        for (const button of buttons)
+          expect(
+            button.height,
+            `${button.label} touch target`,
+          ).toBeGreaterThanOrEqual(mobile ? 44 : 40);
+      };
+      await bounded();
+      await capture("lobby");
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
+      ).toBeFocused();
+      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveCount(
+        0,
+      );
+      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+        "Friends campaign",
+      );
+      await expect(
+        page.getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeDisabled();
+      await capture("saved");
+      await bounded();
+      await page.getByRole("button", { name: "Rename", exact: true }).click();
+      await expect(
+        page.getByLabel("Campaign name", { exact: true }),
+      ).toBeFocused();
+      await capture("rename");
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(
+        page.getByRole("button", { name: "Rename", exact: true }),
+      ).toBeFocused();
+      await page.getByRole("button", { name: "Rename", exact: true }).click();
+      await page
+        .getByLabel("Campaign name", { exact: true })
+        .fill("Launch friends");
+      await page
+        .getByRole("button", { name: "Save name", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Rename", exact: true }),
+      ).toBeFocused();
+      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+        "Launch friends",
+      );
+      await page
+        .getByRole("button", { name: "Export campaign", exact: true })
+        .click();
+      await expect.poll(() => room.exportedCampaign).toBe("saved-campaign");
+      await page.screenshot({
+        path: `.tmp/shared-campaigns-${mobile ? "mobile" : "desktop"}.png`,
+      });
+      await page.getByRole("button", { name: "Rename", exact: true }).click();
+      await page
+        .getByLabel("Campaign name", { exact: true })
+        .fill("A".repeat(80));
+      await page
+        .getByRole("button", { name: "Save name", exact: true })
+        .click();
+      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+        "A".repeat(80),
+      );
+      await bounded();
+      await capture("long-name");
+      await page.getByLabel("Campaign", { exact: true }).click();
+      const option = page.getByRole("option", {
+        name: "A".repeat(80),
+        exact: true,
+      });
+      const optionBounds = await option.boundingBox();
+      expect(optionBounds!.x).toBeGreaterThanOrEqual(0);
+      expect(optionBounds!.x + optionBounds!.width).toBeLessThanOrEqual(width);
+      await option.click();
+      await page
+        .getByRole("button", { name: "Delete campaign", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Keep campaign", exact: true }),
+      ).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: "Keep campaign", exact: true }),
+      ).toBeInViewport();
+      await expect(
+        page.getByRole("button", { name: "Confirm delete", exact: true }),
+      ).toBeInViewport();
+      await capture("delete");
+      await bounded();
+      await page
+        .getByRole("button", { name: "Keep campaign", exact: true })
+        .click();
+      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
+        "A".repeat(80),
+      );
+      await page
+        .getByRole("button", { name: "Delete campaign", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Confirm delete", exact: true })
+        .click();
+      await expect(
+        page.getByText("No shared campaigns saved yet.", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
+      ).toBeFocused();
+      await capture("empty");
+      await page
+        .getByRole("button", { name: "Back to lobby", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Shared campaigns", exact: true }),
+      ).toBeFocused();
+      room.campaignCloudState = "offline";
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        page.getByText(
+          "Steam Cloud is offline. Campaigns are saved on this computer.",
+        ),
+      ).toBeVisible();
+      await capture("offline");
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("button", { name: "Shared campaigns", exact: true }),
+      ).toBeFocused();
+      room.campaignCloudState = "failed";
+      room.campaignWarning =
+        "Your local campaigns are safe. A Cloud copy will be available when space is free.";
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        page.getByText(
+          "Steam Cloud could not sync. Local campaigns are available.",
+        ),
+      ).toBeVisible();
+      await bounded();
+      await capture("cloud-warning");
+      await page.keyboard.press("Escape");
+      room.campaignError =
+        "Campaign files could not be read. Your existing files have been kept.";
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(page.getByRole("alert")).toContainText(room.campaignError);
+      await capture("error");
+      await page
+        .getByRole("alert")
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
+      room.campaignError = undefined;
+      await page
+        .getByRole("button", { name: "Host a Steam lobby", exact: true })
+        .click();
+      await expect(
+        page.getByText("Waiting for a friend to join…", { exact: true }),
+      ).toBeVisible();
+      await bounded();
+      await capture("waiting");
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveValue(
+        room.lobbyId,
+      );
+      const guest = await room.player(browser, 1, mobile);
+      await guest.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
+      await guest
+        .getByRole("button", { name: "Join lobby", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", {
+          name: "Choose a game together",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      await capture("ready");
+      let release!: () => void;
+      const completed = await page.evaluate(
+        () => (window as SteamTestWindow).mockSharedSaveRequests || 0,
+      );
+      room.campaignListHold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await page
+        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Shared campaigns", exact: true }),
+      ).toBeDisabled();
+      await page.keyboard.press("Escape");
+      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveValue(
+        room.lobbyId,
+      );
+      release();
+      room.campaignListHold = undefined;
+      await page.waitForFunction(
+        (before) =>
+          ((window as SteamTestWindow).mockSharedSaveRequests || 0) > before,
+        completed,
+      );
+      await expect(
+        page.getByRole("button", { name: "Shared campaigns", exact: true }),
+      ).toBeEnabled();
+      // The delayed result must not reopen a dismissed library or leave the hosted lobby.
+      await expect(
+        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
+      ).toHaveCount(0);
+      expect(room.members).toHaveLength(2);
     });
-    await page
-      .getByRole("button", { name: "Delete campaign", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Keep campaign", exact: true })
-      .click();
-    await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-      "Launch friends",
-    );
-    await page
-      .getByRole("button", { name: "Delete campaign", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Confirm delete", exact: true })
-      .click();
-    await expect(
-      page.getByText("No shared campaigns saved yet.", { exact: true }),
-    ).toBeVisible();
-  });
+  }
 }
 
 test("mock Steam publishes only to players with an initialized transport", async ({
@@ -1261,10 +1496,13 @@ for (const count of [2, 4]) {
         pages[0].getByLabel("Campaign", { exact: true }),
       ).toContainText("Friends campaign");
       await pages[0]
+        .getByRole("button", { name: "Rename", exact: true })
+        .click();
+      await pages[0]
         .getByLabel("Campaign name", { exact: true })
         .fill("Launch friends");
       await pages[0]
-        .getByRole("button", { name: "Rename", exact: true })
+        .getByRole("button", { name: "Save name", exact: true })
         .click();
       await expect(
         pages[0].getByLabel("Campaign", { exact: true }),

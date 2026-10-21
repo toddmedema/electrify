@@ -224,11 +224,29 @@ for (const theme of ["light", "dark"]) {
       });
       await credits.click();
       const dialog = page.getByRole("dialog", { name: "Credits and licenses" });
+      await expect(
+        dialog.getByRole("heading", { name: "Bundled licenses" }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByText("Todd Medema", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByText("Chris Gebhart", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        dialog.getByText("Nicholas Coronado", { exact: true }),
+      ).toBeVisible();
+      await expectDialogToFit(dialog);
       const gameLicense = dialog
         .locator("summary")
         .filter({ hasText: "Electrify — MIT License with Commons Clause" });
       await expect(gameLicense).toBeVisible();
-      await gameLicense.click();
+      expect((await gameLicense.boundingBox())!.height).toBeGreaterThanOrEqual(
+        44,
+      );
+      await gameLicense.focus();
+      await page.keyboard.press("Enter");
+      await expect(gameLicense.locator("..")).toHaveAttribute("open", "");
       await expect(
         gameLicense
           .locator("..")
