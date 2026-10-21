@@ -13,7 +13,7 @@ import Tabs from "@mui/material/Tabs";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import ScreenHeader from "../components/base/ScreenHeader";
+import ScreenPage from "../components/base/ScreenPage";
 import { useAppDispatch, useAppSelector } from "../Store";
 import { navigate, navigateBack } from "../reducers/Card";
 import { firebaseAppAuth, login } from "../Globals";
@@ -68,6 +68,13 @@ export function AchievementGallery(): React.JSX.Element {
       filter === "all" ||
       state.progress.earned.includes(id) === (filter === "unlocked"),
   );
+  if (filter === "all") {
+    entries.sort(
+      (a, b) =>
+        Number(state.progress.earned.includes(b.id)) -
+        Number(state.progress.earned.includes(a.id)),
+    );
+  }
   const account = !!state.uid && !!firebaseAppAuth;
   const status =
     !state.storageAvailable && account && state.sync === "synced"
@@ -97,9 +104,13 @@ export function AchievementGallery(): React.JSX.Element {
     }
   };
   return (
-    <div className="achievementCard flexContainer keyboardMenu" {...menuKeys}>
-      <ScreenHeader title="Achievements" onBack={onBack} />
-      <main className="achievementGallery">
+    <ScreenPage
+      title="Achievements"
+      onBack={onBack}
+      className="achievementCard keyboardMenu"
+      {...menuKeys}
+    >
+      <main className="achievementGallery scrollable">
         <div className="achievementSummary">
           <Typography variant="h5" component="h2">
             {count} of {catalog.length} unlocked
@@ -229,7 +240,7 @@ export function AchievementGallery(): React.JSX.Element {
           )}
         </div>
       </main>
-    </div>
+    </ScreenPage>
   );
 }
 

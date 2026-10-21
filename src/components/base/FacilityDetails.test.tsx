@@ -335,8 +335,8 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("Hail damage");
     expect(operation).toHaveTextContent("60% available");
     expect(operation).toHaveTextContent("4 days to repair");
-    expect(operation).toHaveTextContent("Current maximum output");
-    expect(operation).toHaveTextContent("60% of nameplate");
+    expect(operation).toHaveTextContent("Current max output");
+    expect(operation).toHaveTextContent("(60%)");
   });
 
   it("includes an active event in the maximum output shown for an aging plant", () => {
@@ -357,8 +357,12 @@ describe("weather resilience details", () => {
     showDetails(game, solar);
 
     const operation = screen.getByRole("region", { name: "Operation" });
-    expect(operation).toHaveTextContent("161MW");
-    expect(operation).toHaveTextContent("54% of nameplate");
+    const stats = within(operation).getAllByRole("term");
+    expect(stats[0]).toHaveTextContent("Nameplate capacity");
+    expect(stats[1]).toHaveTextContent("Current max output");
+    expect(within(operation).getAllByRole("definition")[1]).toHaveTextContent(
+      "161MW (54%)",
+    );
   });
 
   it("reports an extreme-cold outage until month end", () => {
@@ -371,7 +375,7 @@ describe("weather resilience details", () => {
     expect(operation).toHaveTextContent("Extreme cold");
     expect(operation).toHaveTextContent("55% available");
     expect(operation).toHaveTextContent("Until month end");
-    expect(operation).toHaveTextContent("55% of nameplate");
+    expect(operation).toHaveTextContent("(55%)");
   });
 
   it("combines age wear with hail damage in the maximum output", () => {
@@ -385,7 +389,7 @@ describe("weather resilience details", () => {
     showDetails(game, solar);
     const operation = screen.getByRole("region", { name: "Operation" });
     expect(operation).toHaveTextContent("49MW");
-    expect(operation).toHaveTextContent("49% of nameplate");
+    expect(operation).toHaveTextContent("(49%)");
   });
 
   it("combines event limits by fuel and facility, including a complete outage", () => {
@@ -408,7 +412,7 @@ describe("weather resilience details", () => {
     const { rerender } = showDetails(game, solar);
     const operation = () => screen.getByRole("region", { name: "Operation" });
     expect(operation()).toHaveTextContent("90MW");
-    expect(operation()).toHaveTextContent("30% of nameplate");
+    expect(operation()).toHaveTextContent("(30%)");
 
     const outageGame = cloneDeep(game);
     outageGame.worldEvents.active.find(
@@ -418,7 +422,7 @@ describe("weather resilience details", () => {
     };
     rerender(outageGame);
     expect(operation()).toHaveTextContent("0W");
-    expect(operation()).toHaveTextContent("0% of nameplate");
+    expect(operation()).toHaveTextContent("(0%)");
   });
 
   it("leaves future and expired event limits out of the maximum output", () => {
@@ -436,7 +440,7 @@ describe("weather resilience details", () => {
       })),
     );
     showDetails(game, solar);
-    expect(screen.queryByText("Current maximum output")).toBeNull();
+    expect(screen.queryByText("Current max output")).toBeNull();
   });
 
   it("does not round small age wear up to an unrestricted 100%", () => {
@@ -448,7 +452,7 @@ describe("weather resilience details", () => {
     showDetails(game, solar);
     const operation = screen.getByRole("region", { name: "Operation" });
     expect(operation).toHaveTextContent("299MW");
-    expect(operation).toHaveTextContent("<100% of nameplate");
+    expect(operation).toHaveTextContent("(<100%)");
   });
 
   it("hides the purchase in a replay", () => {

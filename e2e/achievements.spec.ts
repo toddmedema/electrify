@@ -4,6 +4,9 @@ import { expect, Page, test, TestInfo } from "./fixtures";
 const STORAGE_KEY = "electrify-achievements-v1";
 async function screenshot(page: Page, info: TestInfo, name: string) {
   if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+  if (name.startsWith("gallery"))
+    await page.locator(".screenHeaderTitle").click();
+  await page.mouse.move(0, 0);
   await page.screenshot({
     path: path.join(
       process.env.REVIEW_SCREENSHOT_DIR,
@@ -66,7 +69,13 @@ test("gallery lists all requirements, filters earned awards, restores keyboard f
   await expect(page.locator(".achievementRow").first()).toContainText(
     "Unlocked",
   );
-  await expect(page.locator(".achievementRow").nth(1)).toContainText("Locked");
+  await expect(page.locator(".achievementRow").nth(1)).toContainText(
+    "Out of Juice",
+  );
+  await expect(page.locator(".achievementRow").nth(1)).toContainText(
+    "Unlocked",
+  );
+  await expect(page.locator(".achievementRow").nth(2)).toContainText("Locked");
   await expect(
     page.getByText("Saved on this device.", { exact: true }),
   ).toBeVisible();

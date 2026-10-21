@@ -4,7 +4,7 @@ import ScreenHeader from "./ScreenHeader";
 type Props = React.ComponentProps<typeof ScreenHeader> &
   Omit<React.HTMLAttributes<HTMLDivElement>, "title">;
 
-/** Shared header and body insets within the compositor's single menu width container. */
+/** Shared reading column inside a full-width header and scrollable body. */
 export default React.forwardRef<HTMLDivElement, Props>(function ScreenPage(
   {
     title,

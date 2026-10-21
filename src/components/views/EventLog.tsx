@@ -279,7 +279,7 @@ export default function EventLog(props: Props): React.JSX.Element {
               >
                 <Button
                   id="eventHistoryFilterButton"
-                  className={`eventHistoryFilterButton${allSelected ? "" : " active"}`}
+                  className="eventHistoryFilterButton"
                   size="small"
                   onClick={(event) => setFilterAnchor(event.currentTarget)}
                   aria-label={`Filter event history, ${filterLabel}`}

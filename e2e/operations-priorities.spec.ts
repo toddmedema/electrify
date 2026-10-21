@@ -24,9 +24,7 @@ for (const layout of [
       .getByRole("button", { name: "Events", exact: true })
       .click();
     if (layout.pane) {
-      await expect(
-        page.getByRole("heading", { name: "Pinned goals" }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Goals" })).toBeVisible();
       await expect(
         page.locator(".operationsGoals > .eventLogItem"),
       ).toHaveCount(2);
@@ -85,7 +83,7 @@ for (const layout of [
       await expect(page.getByText(/^Calculating forecast/)).toHaveCount(0, {
         timeout: 45000,
       });
-      await page.getByRole("heading", { name: "Pinned goals" }).click();
+      await page.getByRole("heading", { name: "Goals" }).click();
       await page.screenshot({
         path: testInfo.outputPath(
           `operations-${layout.width}-${layout.theme}.png`,
