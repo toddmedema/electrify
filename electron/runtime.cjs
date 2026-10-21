@@ -30,7 +30,7 @@ function isAppUrl(value) {
   }
 }
 
-function resolveAsset(root, value) {
+function resolveAsset(root, value, runtimeNotices) {
   if (!isAppUrl(value)) throw new Error("Untrusted asset origin");
   const pathname = decodeURIComponent(new URL(value).pathname);
   if (pathname.includes("\\") || pathname.includes("\0"))
@@ -42,6 +42,10 @@ function resolveAsset(root, value) {
   const relative = path.relative(root, filename);
   if (relative.startsWith("..") || path.isAbsolute(relative))
     throw new Error("Asset path escapes the bundle");
+  // The shared renderer is built on Linux. Only this fixed URL reads the
+  // actual packaged platform's original Chromium terms outside that bundle.
+  if (runtimeNotices && relative === "notices-chromium.html")
+    return path.join(runtimeNotices, "LICENSES.chromium.html");
   return filename;
 }
 

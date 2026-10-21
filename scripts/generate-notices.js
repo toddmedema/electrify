@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { prepareElectronRuntime } = require("./prepare-electron-runtime");
 
 const NOTICE_NAME = /^(?:licen[cs]e|copying|copyright|notice)(?:[._-].*)?$/i;
 
@@ -132,8 +133,11 @@ function generateNotices(
   const notices = collectNotices(root);
   const publicRoot = path.join(root, "public");
   if (desktop) {
-    const runtime = path.join(root, "node_modules/electron/dist");
-    notices.push({ title: "Electron runtime", text: readNotices(runtime) });
+    const { directory: runtime, version } = prepareElectronRuntime(root);
+    notices.push({
+      title: `Electron runtime ${version}`,
+      text: readNotices(runtime),
+    });
     fs.copyFileSync(
       path.join(runtime, "LICENSES.chromium.html"),
       path.join(publicRoot, "notices-chromium.html"),

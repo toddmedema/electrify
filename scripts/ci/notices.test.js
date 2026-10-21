@@ -42,6 +42,49 @@ function fixture(t) {
   return { root, write, packages };
 }
 
+function electronFixture(t) {
+  const value = fixture(t);
+  const { write, packages } = value;
+  packages["node_modules/electron"] = { version: "44.7.1", dev: true };
+  write("package-lock.json", JSON.stringify({ packages }));
+  write(
+    "node_modules/electron/package.json",
+    JSON.stringify({ name: "electron", version: "44.7.1" }),
+  );
+  // npm ci installs the package, not its runtime. Use the actual child-process
+  // boundary without downloading or launching Electron in a tooling test.
+  write(
+    "node_modules/electron/install.js",
+    `const fs = require('node:fs');
+     const path = require('node:path');
+     const platformPath = process.platform === 'win32' ? 'electron.exe'
+       : process.platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron'
+       : 'electron';
+     // Electron's real installer checks version, executable and path.txt. It
+     // does not check licenses before taking its already-installed fast path.
+     try {
+       if (fs.readFileSync(path.join(__dirname, 'dist/version'), 'utf8') === '44.7.1'
+         && fs.readFileSync(path.join(__dirname, 'path.txt'), 'utf8') === platformPath
+         && fs.existsSync(path.join(__dirname, 'dist', platformPath))) process.exit(0);
+     } catch {}
+     const files = ${JSON.stringify({
+       "dist/version": "44.7.1",
+       "dist/LICENSE": "Electron MIT notice",
+       "dist/LICENSES.chromium.html":
+         "<html>Chromium third-party original</html>",
+     })};
+     files['dist/' + platformPath] = 'runtime binary fixture';
+     files['path.txt'] = platformPath;
+     for (const [name, contents] of Object.entries(files)) {
+       const target = path.join(__dirname, name);
+       fs.mkdirSync(path.dirname(target), { recursive: true });
+       fs.writeFileSync(target, contents);
+     }
+     fs.appendFileSync(path.join(__dirname, 'install-calls'), 'install\\n');`,
+  );
+  return value;
+}
+
 test("ships game, asset, runtime and nested vendor notices using locked installed versions", (t) => {
   const { root } = fixture(t);
   const notices = generateNotices(root);
@@ -78,12 +121,11 @@ test("refuses a stale dependency install and a missing nonoptional runtime", (t)
   assert.throws(() => collectNotices(root), /Install the lockfile/);
 });
 
-test("desktop output preserves the runtime license and exact original Chromium notice bytes", (t) => {
-  const { root, write } = fixture(t);
-  write("node_modules/electron/dist/LICENSE", "Electron MIT notice");
-  write(
-    "node_modules/electron/dist/LICENSES.chromium.html",
-    "<html>Chromium third-party original</html>",
+test("desktop output installs a cold runtime and preserves its exact original notices", (t) => {
+  const { root } = electronFixture(t);
+  assert.equal(
+    fs.existsSync(path.join(root, "node_modules/electron/dist")),
+    false,
   );
   const notices = generateNotices(root, true);
   assert.match(notices.at(-1).text, /Electron MIT notice/);
@@ -96,9 +138,108 @@ test("desktop output preserves the runtime license and exact original Chromium n
       .chromium,
     true,
   );
+  generateNotices(root, true);
+  assert.equal(
+    fs.readFileSync(
+      path.join(root, "node_modules/electron/install-calls"),
+      "utf8",
+    ),
+    "install\n",
+    "A valid cached runtime must not need a network/install step",
+  );
   generateNotices(root, false);
   assert.equal(
     fs.existsSync(path.join(root, "public/notices-chromium.html")),
+    false,
+  );
+});
+
+test("desktop generation rechecks cached runtime versions and both nonempty notices", (t) => {
+  for (const [name, contents] of [
+    ["version", "43.9.0"],
+    ["version", "not a runtime version"],
+    ["LICENSE", null],
+    ["LICENSE", " \n"],
+    ["LICENSES.chromium.html", null],
+    ["LICENSES.chromium.html", ""],
+  ]) {
+    const { root, write } = electronFixture(t);
+    generateNotices(root, true);
+    const relative = `node_modules/electron/dist/${name}`;
+    if (contents === null) fs.rmSync(path.join(root, relative));
+    else write(relative, contents);
+
+    const notices = generateNotices(root, true);
+    assert.match(notices.at(-1).text, /Electron MIT notice/);
+    assert.equal(
+      fs.readFileSync(path.join(root, "public/notices-chromium.html"), "utf8"),
+      "<html>Chromium third-party original</html>",
+    );
+    assert.equal(
+      fs.readFileSync(
+        path.join(root, "node_modules/electron/install-calls"),
+        "utf8",
+      ),
+      "install\ninstall\n",
+      `Invalid cached ${name} must request the locked runtime again`,
+    );
+  }
+});
+
+test("desktop generation refuses an installed Electron version different from the lockfile", (t) => {
+  const { root, write } = electronFixture(t);
+  write(
+    "node_modules/electron/package.json",
+    JSON.stringify({ name: "electron", version: "44.7.0" }),
+  );
+  assert.throws(() => generateNotices(root, true), /lockfile/);
+  assert.equal(
+    fs.existsSync(path.join(root, "node_modules/electron/install-calls")),
+    false,
+    "Do not download from a stale package install",
+  );
+  assert.equal(fs.existsSync(path.join(root, "public/notices.json")), false);
+});
+
+test("failed or incomplete runtime preparation cannot replace existing generated notices", (t) => {
+  for (const installer of ["process.exit(7);", "// exits without a runtime"])
+    for (const name of ["version", "LICENSE", "LICENSES.chromium.html"]) {
+      const { root, write } = electronFixture(t);
+      generateNotices(root, true);
+      const original = ["notices.json", "notices-chromium.html"].map((file) =>
+        fs.readFileSync(path.join(root, "public", file)),
+      );
+      fs.rmSync(path.join(root, "node_modules/electron/dist", name));
+      write("node_modules/electron/install.js", installer);
+
+      assert.throws(() => generateNotices(root, true), /Electron/i);
+      for (const [index, file] of [
+        "notices.json",
+        "notices-chromium.html",
+      ].entries())
+        assert.deepEqual(
+          fs.readFileSync(path.join(root, "public", file)),
+          original[index],
+          "Failed preparation must not publish incomplete legal output",
+        );
+    }
+});
+
+test("web notices never install or require the desktop runtime", (t) => {
+  const { root, write } = electronFixture(t);
+  write("node_modules/electron/install.js", "process.exit(7);");
+  generateNotices(root, false);
+  assert.equal(
+    fs.existsSync(path.join(root, "node_modules/electron/dist")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(root, "node_modules/electron/install-calls")),
+    false,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(root, "public/notices.json")))
+      .chromium,
     false,
   );
 });

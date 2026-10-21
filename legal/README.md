@@ -7,10 +7,18 @@ that private contributor agreements or third-party permissions have been obtaine
 It produces the ignored `public/notices.json`, consumed by Settings → Credits and
 licenses. The desktop build also copies Electron's original
 `LICENSES.chromium.html`; the dialog extracts its attribution as inert local text
-when requested. Electron's original runtime notices and webpack's generated
-JavaScript license notices remain in their normal packaged locations.
-`LICENSE.md` is also explicitly included in the packaged app. Notices do not make
-network requests and remain readable in the installed desktop game offline.
+when requested. Desktop notice generation prepares the exact locked Electron
+runtime through its checksum-verified installer when the runtime is missing or
+incomplete; it also accepts a complete local cache without a download. A clean
+`npm ci` needs no additional manual setup command.
+
+Packaging preserves the target runtime's original LICENSE and Chromium notices
+in `resources/runtime-notices` (inside `Contents/Resources` on macOS), before
+branding can remove the originals. Their version and hashes are checked again
+after packaging. The dialog's fixed local notice URL reads these platform-specific
+bytes, including when the shared renderer was built on Linux. Webpack's generated
+JavaScript license notices and the game's `LICENSE.md` are also included.
+Installed notices make no network requests and remain readable offline.
 
 ## Software
 
