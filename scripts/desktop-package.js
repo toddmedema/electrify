@@ -128,7 +128,7 @@ async function withOfflineMacSigning(
 }
 
 function packageConfiguration(mode, appVersion = "dev") {
-  const buildConfig = require("../electron-builder.config.cjs");
+  const buildConfig = require("../electron/electron-builder.config.cjs");
   return {
     ...buildConfig,
     // Electron requires a semver package version; the game's identity is separate.

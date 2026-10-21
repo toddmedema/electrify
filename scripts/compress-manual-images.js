@@ -1,4 +1,4 @@
-// Regenerates the manual's figures in public/images/ from the originals in design/manual/.
+// Regenerates the manual's figures in public/images/ from the originals in docs/manual-images/.
 //
 // Every player's service worker downloads these in the background (see
 // scripts/generate-icon-manifest.js), so they ship as WebP instead of the originals: charts that
@@ -12,7 +12,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
-const sourceDir = path.join(root, "design", "manual");
+const sourceDir = path.join(root, "docs", "manual-images");
 const outputDir = path.join(root, "public", "images");
 
 // Chosen by SSIM against the original and side-by-side review at 3x zoom (see README). q88 with

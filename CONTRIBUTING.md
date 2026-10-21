@@ -28,7 +28,7 @@ in the pull request description.
 
 ## Style guide
 
-All code submissions should be formatted with prettier, configured in `.prettierrc`. Run
+All code submissions should be formatted with prettier, configured in `package.json`. Run
 `npm run format` before committing, or use VSCode with the Prettier extension
 (esbenp.prettier-vscode) set to format on save. CI fails on unformatted files.
 
