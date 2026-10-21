@@ -268,21 +268,20 @@ describe("The Shale Boom pilot arc", () => {
     ]);
     expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
       {
-        title: "Gas prices will fall",
-        message: "A regional shale glut will make local gas cheaper.",
+        title: "Gas prices falling",
+        message: "Regional shale glut lowering local gas prices.",
       },
       {
-        title: "Winter freeze will hit",
-        message: "Gas costs will spike and gas plants will produce less.",
+        title: "Winter freeze approaching",
+        message: "Gas costs spiking and gas plants producing less.",
       },
       {
-        title: "Gas output will recover",
-        message:
-          "Plant limits will lift and lower boom-era prices will resume.",
+        title: "Gas output recovering",
+        message: "Plant limits lifting and lower boom-era prices returning.",
       },
       {
-        title: "Gas boom will end",
-        message: "Natural gas prices will return to normal.",
+        title: "Gas boom ending",
+        message: "Natural gas prices returning to normal.",
       },
     ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
@@ -404,8 +403,8 @@ describe("authored upcoming-event previews", () => {
     const start = { ...context(0, 113), difficulty: "Employee" as const };
     const forecasts = upcomingStoryPhases(start);
     expect(forecasts.map((event) => event.message)).toEqual([
-      "Coal output will decrease.",
-      ...Array(3).fill("Coal output will decrease further."),
+      "Coal output decreasing.",
+      ...Array(3).fill("Coal output decreasing further."),
     ]);
     const arc = STORY_ARC_DEFINITIONS.find(
       (story) => story.scenarioId === 113,
@@ -443,7 +442,7 @@ describe("authored upcoming-event previews", () => {
     });
     expect(upcoming).toHaveLength(1);
     expect(upcoming[0].message).toBe(
-      "Safety shutoffs may disrupt supply; prepared crews will reduce generation losses.",
+      "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses.",
     );
   });
 });

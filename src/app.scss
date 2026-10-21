@@ -1633,7 +1633,8 @@ $pane_header_height: 48px;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Chart controls share the page surface, including this expanded layer picker.
+  background: var(--bg-primary);
 }
 
 .insightsLayerGroup {
@@ -1677,11 +1678,13 @@ $pane_header_height: 48px;
   align-items: center;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 4px 16px;
+  // The trailing icon's own inset completes its alignment with the Layers label.
+  padding: 4px 8px 4px 16px;
   margin: 0 auto;
   overflow: hidden;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Presets, timeline controls, upcoming events and charts share one page surface.
+  background: var(--bg-primary);
 }
 
 .insightsViewportDate {
@@ -6761,7 +6764,7 @@ $programs_column: 800px;
     min-height: 44px;
     flex-wrap: nowrap;
     gap: 4px;
-    padding: 0 16px;
+    padding: 0 8px 0 16px;
   }
 
   .insights .insightsViewportButtons {

@@ -86,12 +86,12 @@ function summarize(log) {
     // Playwright repeats each failed title as "1) [project] › ..." above its error.
     if (/^\d+\) (\[|e2e)/.test(trimmed)) continue;
     if (
-      /^(Error(?! Context)|TypeError|AssertionError)\b|Timeout \d+ms exceeded/.test(
+      /^(Error(?! Context)|TypeError|AssertionError)\b|(?:Test|Worker teardown) timeout|Timeout \d+ms exceeded/.test(
         trimmed,
       )
     )
       excerpt = 6;
-    if (excerpt > 0 && trimmed) {
+    if (excerpt > 0 && trimmed && !trimmed.startsWith("##[error]")) {
       add(found.errors, trimmed);
       excerpt--;
     }
