@@ -9,6 +9,7 @@ import {
 } from "../Types";
 import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
 import { HYDRO_SITES, resolveHydroInventory } from "../data/HydroSites";
+import { getStartingFacilityAge } from "../data/StartingFacilityAges";
 
 export const DATA_CENTER_SEED = 1062026;
 export const DATA_CENTER_DIFFICULTY = "CEO" as const;
@@ -113,6 +114,16 @@ export function createDataCenterScenario(
       );
     } else {
       facilities.push({ fuel: fuel as FuelNameType, peakW });
+    }
+  });
+  facilities.forEach((facility) => {
+    if (facility.fuel) {
+      facility.initialAgeYears = getStartingFacilityAge(
+        location,
+        facility.fuel,
+        startingYear,
+        facility.name,
+      ).ageYears;
     }
   });
   const scenario: ScenarioType = {

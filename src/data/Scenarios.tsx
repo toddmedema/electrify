@@ -1295,10 +1295,17 @@ export const SCENARIOS: ScenarioType[] = [
     facilities: [
       // Sand Hill's combined cycle, Decker's steam units and both sites' peakers, grouped as the
       // combined cycle that carries the portfolio's mid-merit gas role
-      { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 1497000000 },
-      { fuel: "Coal", peakW: 700000000 },
-      { fuel: "Uranium", peakW: 430000000 },
-      { fuel: "Wind", peakW: 1200000000 },
+      // Capacity-weighted commissioning cohorts, rounded for these aggregates;
+      // see docs/starting-facility-ages.md for the utility's plant/PPA sources.
+      {
+        name: "Natural Gas CC",
+        fuel: "Natural Gas",
+        peakW: 1497000000,
+        initialAgeYears: 30,
+      },
+      { fuel: "Coal", peakW: 700000000, initialAgeYears: 33 },
+      { fuel: "Uranium", peakW: 430000000, initialAgeYears: 29 },
+      { fuel: "Wind", peakW: 1200000000, initialAgeYears: 4 },
     ],
     endTitle: "After the thaw",
     endMessage:
@@ -1800,6 +1807,12 @@ export const DEFAULT_CUSTOM_SCENARIO: ScenarioType = {
   feePerKgCO2e: 0,
   // A peaker because a custom game can start before combined cycles were built
   facilities: [
-    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 500000000 },
+    // Representative California peaker age at the default 2020 opening (EIA-860).
+    {
+      name: "Natural Gas Peaker",
+      fuel: "Natural Gas",
+      peakW: 500000000,
+      initialAgeYears: 17,
+    },
   ],
 };

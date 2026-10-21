@@ -1513,6 +1513,11 @@ $pane_header_height: 48px;
   gap: 8px;
 }
 
+.base_main .MuiToolbar-root.insightsHeader {
+  min-height: calc(var(--insights-control-size) + 16px) !important;
+  padding: 8px 16px;
+}
+
 .insightsHeaderControls {
   display: flex;
   justify-content: flex-end;
@@ -1718,43 +1723,46 @@ $pane_header_height: 48px;
   box-sizing: border-box;
   width: 100%;
   max-width: 960px;
-  min-height: 40px;
+  min-height: 60px;
   align-items: center;
   gap: 12px;
-  padding: 4px 16px;
+  padding: 8px 0 8px 16px;
   margin: 0 auto;
   border-bottom: $border_accent;
 }
 
-.insightEventRailLabel {
-  flex: 0 0 auto;
-  color: $font_color_faded;
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-}
-
 .insightEventList {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   gap: 4px;
-  padding: 0;
+  padding: 0 16px 0 0;
   margin: 0;
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  scroll-padding-inline: 16px;
+  scroll-snap-type: x proximity;
+
+  > li {
+    display: flex;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
 }
 
 .insightEventChip {
   display: inline-flex;
   min-width: 0;
-  min-height: var(--control-size);
+  min-height: 44px;
+  max-width: calc(100cqw - 32px);
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px 4px 4px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: transparent;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
   color: inherit;
   font: inherit;
   white-space: nowrap;
@@ -1785,6 +1793,23 @@ $pane_header_height: 48px;
 .insightEventDate {
   color: $font_color_faded;
   font-size: var(--font-size-caption-sm);
+  line-height: 16px;
+}
+
+.insightEventCopy {
+  display: flex;
+  min-width: 0;
+  max-width: 256px;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.insightEventTitle {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-emphasis);
+  line-height: 16px;
+  white-space: normal;
 }
 
 .insightEventDetails {
@@ -1863,12 +1888,6 @@ $pane_header_height: 48px;
     display: none;
   }
 
-  .MuiToolbar-root.insightsHeader {
-    // Match the shared touch target size without adding an empty band around the controls.
-    min-height: calc(var(--insights-control-size) + 8px) !important;
-    padding: 4px 8px !important;
-  }
-
   .insightsHeaderControls {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 64px;
@@ -1917,75 +1936,6 @@ $pane_header_height: 48px;
 
     .MuiButton-root {
       min-height: 44px;
-    }
-  }
-
-  .insightEventRail {
-    min-height: 52px;
-    gap: 8px;
-    padding: 4px 0 4px 16px;
-  }
-
-  .insightsViewportToolbar {
-    height: auto;
-    min-height: 52px;
-    flex-wrap: wrap;
-    gap: 4px;
-    // The date lines up with the chart titles below; the icon buttons carry their own inset.
-    padding: 4px 4px 4px 16px;
-  }
-
-  .insightsViewportDate {
-    flex: 1 1 auto;
-    font-size: var(--font-size-body2);
-    white-space: nowrap;
-  }
-
-  .insightsViewportButtons {
-    flex-basis: 220px;
-    gap: 0;
-
-    .insightsViewportButton,
-    .MuiIconButton-root {
-      width: 44px;
-      height: 44px;
-      flex-basis: 44px;
-    }
-  }
-
-  .insightEventList {
-    padding-right: 16px;
-    scroll-padding-inline: 16px;
-    scroll-snap-type: x proximity;
-
-    > li {
-      flex: 0 0 auto;
-      scroll-snap-align: start;
-    }
-  }
-
-  .insightEventChip {
-    min-height: 44px;
-    padding-right: 8px;
-  }
-
-  @container insights (max-width: 359px) {
-    .insightsViewportDate {
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-    .MuiToolbar-root.insightsTrackHeader {
-      flex-flow: row nowrap !important;
-      padding-right: 8px;
-      padding-left: 8px;
-
-      > h6 {
-        min-width: 0;
-        overflow: hidden;
-        font-size: var(--font-size-title);
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
     }
   }
 }
@@ -6519,8 +6469,7 @@ $programs_column: 800px;
 .sectionLabel,
 .base_main #manual .manual-group,
 .missionList .missionSectionHeader h2,
-.customerProgramSection > h3,
-.insightEventRailLabel {
+.customerProgramSection > h3 {
   display: block;
   color: $font_color_faded;
   font-size: var(--font-size-caption);
@@ -6804,17 +6753,48 @@ $programs_column: 800px;
   }
 }
 
-// Phone Insights: the time navigation and the upcoming-events rail are single-purpose strips,
-// so they take the 44px touch height and no more, and share one hairline between them.
-.insightsCompact {
-  .insightEventRail {
-    min-height: 44px;
-    padding-block: 0;
+// Size navigation before the pane observer runs, so reopening preserves its scroll position.
+@container insights (max-width: 700px) {
+  .insights .insightsViewportDate {
+    font-size: var(--font-size-body2);
   }
 
-  .insightsViewportToolbar {
+  .insights .insightsViewportToolbar {
+    height: auto;
     min-height: 44px;
-    padding-block: 0;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 0 16px;
+  }
+
+  .insights .insightsViewportButtons {
+    flex-basis: 220px;
+    gap: 0;
+
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: 44px;
+      height: 44px;
+      flex-basis: 44px;
+    }
+  }
+}
+
+@container insights (max-width: 359px) {
+  .insights .insightsViewportDate {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .insights .MuiToolbar-root.insightsTrackHeader {
+    flex-flow: row nowrap !important;
+
+    > h6 {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 }
 

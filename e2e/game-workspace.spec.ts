@@ -522,7 +522,9 @@ test("Programs keeps points visible through monthly forecast refreshes", async (
     animations: "disabled",
   });
   await page.locator("#insightsNav").click();
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Zoom out", exact: true }),
+  ).toBeDisabled();
   await expect(
     page.getByLabel("Displayed date range: 2017–23", { exact: true }),
   ).toBeVisible();

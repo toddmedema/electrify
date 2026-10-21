@@ -244,16 +244,19 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
 }));
 jest.mock("../base/ChartSupplyDemandRanges", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => (
-    <div
-      role="img"
-      data-testid="supply-demand-chart"
-      data-forecast-start={currentMinute}
-      data-sync-key={syncKey}
-      data-points={timeline?.length}
-      data-domain={domainValue(domain)}
-    />
-  ),
+  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
+    mockSupplyDemandPaints++;
+    return (
+      <div
+        role="img"
+        data-testid="supply-demand-chart"
+        data-forecast-start={currentMinute}
+        data-sync-key={syncKey}
+        data-points={timeline?.length}
+        data-domain={domainValue(domain)}
+      />
+    );
+  },
 }));
 jest.mock("../base/ChartForecastStorage", () => ({
   __esModule: true,
@@ -562,9 +565,7 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("button", { name: "Remove Cash" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Chart time key")).toHaveTextContent(
-      "RecordedForecast",
-    );
+    expect(screen.queryByLabelText("Chart time key")).not.toBeInTheDocument();
     await user.click(labelledButton(/Layers/));
     expect(labelledButton("Remove Cash")).toBeEnabled();
     expect(labelledButton("Move Cash up")).toBeEnabled();
@@ -617,9 +618,9 @@ describe("Insights layers", () => {
       },
       {
         key: "later-event",
-        startsMinute: 18 * MINUTES_PER_MONTH,
-        endsMinute: 19 * MINUTES_PER_MONTH,
-        label: "Expected Jul 2024",
+        startsMinute: 180 * MINUTES_PER_MONTH,
+        endsMinute: 181 * MINUTES_PER_MONTH,
+        label: "Expected Jan 2035",
         title: "Outside range",
         message: "This should not be shown.",
       },
@@ -628,9 +629,8 @@ describe("Insights layers", () => {
     const region = screen.getByRole("region", {
       name: "Upcoming scenario events",
     });
-    expect(region).toHaveTextContent("Upcoming");
     expect(region).toHaveTextContent("Jul 2023");
-    expect(region).not.toHaveTextContent("Higher pollution fee begins");
+    expect(region).toHaveTextContent("Higher pollution fee begins");
     const event = within(region).getByRole("button", {
       name: "Expected Jul 2023: Higher pollution fee begins",
     });
@@ -682,14 +682,14 @@ describe("Insights layers", () => {
     const initial = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(initial));
     expect(labelledButton("Pan earlier")).toBeDisabled();
-    expect(labelledButton("Zoom out")).toBeEnabled();
+    expect(labelledButton("Zoom out")).toBeDisabled();
 
     await user.click(labelledButton("Zoom in"));
     const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
-      screen.getByLabelText("Displayed date range: Apr–Sep 2020"),
+      screen.getByLabelText("Displayed date range: 2023–28"),
     ).toBeVisible();
     expect(labelledButton("Pan earlier")).toBeEnabled();
     expect(labelledButton("Pan later")).toBeEnabled();
@@ -714,10 +714,10 @@ describe("Insights layers", () => {
     ).toBeVisible();
   });
 
-  it.each([60, 0])(
-    "zooms out to the scenario span, with a 20-year fallback for duration %s",
-    async (durationMonths) => {
-      const game = gameWithHistory();
+  it.each([1, 12, 60, 192, 0])(
+    "opens on the scenario span, with a 20-year fallback for duration %s",
+    (durationMonths) => {
+      const game = createGame({ scenarioId: 100 });
       const months = durationMonths || 20 * 12;
       renderInsights(100, {
         ...game,
@@ -728,7 +728,6 @@ describe("Insights layers", () => {
           durationMonths,
         },
       });
-      await user.click(labelledButton("Zoom out"));
       expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
         "data-domain",
         JSON.stringify([0, months * MINUTES_PER_MONTH]),
@@ -737,13 +736,13 @@ describe("Insights layers", () => {
     },
   );
 
-  it("opens on the operating year and follows it as the game advances", () => {
+  it("opens on the full scenario and keeps its endpoints as the game advances", () => {
     const game = createGame({ scenarioId: 100 });
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
     );
 
     const nextGame = {
@@ -764,7 +763,7 @@ describe("Insights layers", () => {
 
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([MINUTES_PER_MONTH, 13 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, getScenario(100)!.durationMonths * MINUTES_PER_MONTH]),
     );
   });
 
@@ -773,17 +772,15 @@ describe("Insights layers", () => {
     game.facilities = [];
     renderInsights(100, game);
     const note = screen.getByRole("note", {
-      name: /^Forecast shortfall for Jan–Dec 2020:/,
+      name: /^Forecast shortfall for 2020–31:/,
     });
-    expect(note).toHaveTextContent(
-      /^Shortfall, Jan–Dec 2020:\s*~.+ unmet · peak ~/,
-    );
+    expect(note).toHaveTextContent(/^Shortfall, 2020–31:\s*~.+ unmet · peak ~/);
     const wholeScenario = note.textContent;
 
     await user.click(labelledButton("Zoom in"));
     expect(
       screen.getByRole("note", {
-        name: /^Forecast shortfall for Apr–Sep 2020:/,
+        name: /^Forecast shortfall for 2023–28:/,
       }),
     ).not.toHaveTextContent(wholeScenario!);
   });

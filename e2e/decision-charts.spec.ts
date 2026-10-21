@@ -22,10 +22,9 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
   );
   await expect(insights.locator(".insightsTrack")).toHaveCount(3);
   await expect(
-    insights.getByLabel("Displayed date range: Jan–Dec 2017"),
+    insights.getByLabel("Displayed date range: 2017–23"),
   ).toBeVisible();
-  await expect(insights.getByLabel("Chart time key")).toContainText("Recorded");
-  await expect(insights.getByLabel("Chart time key")).toContainText("Forecast");
+  await expect(insights.getByLabel("Chart time key")).toHaveCount(0);
   await expect(
     insights.getByRole("button", { name: "Remove Cash" }),
   ).toHaveCount(0);
@@ -34,7 +33,7 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
     insights.getByRole("slider", {
       name: "The rate you charge for electricity generation",
     }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   expect(
     await insights.evaluate(
       (element) => element.scrollWidth - element.clientWidth,
@@ -79,9 +78,11 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
       name: /^Monthly ranges of estimated electricity supply and demand/,
     }),
   ).toBeVisible();
-  await expect(insights.locator(".insightsChartExplanation")).toContainText(
-    "lows and peaks",
-  );
+  await expect(
+    insights.getByRole("img", {
+      name: /^Monthly ranges of estimated electricity supply and demand/,
+    }),
+  ).toHaveAccessibleName(/Forecast supply low:.*Forecast supply high:/);
   await page.mouse.move(0, 0);
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   if (
