@@ -8,6 +8,7 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import ConfirmDialog from "./ConfirmDialog";
 import {
   facilityAgeYears,
+  facilityCashBack,
   facilityEquivalentCycles,
   facilityLifetime,
   facilityOutputFactor,
@@ -350,12 +351,45 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
         </Typography>
       )}
+      {underConstruction && (
+        <section className="facilityDetailSection" aria-label="Construction">
+          <dl className="facilityStats">
+            <Stat
+              label="Nameplate capacity"
+              value={formatWatts(facility.peakW)}
+            />
+            {storage && (
+              <Stat
+                label="Energy capacity"
+                value={formatWattHours(storage.peakWh)}
+              />
+            )}
+            <Stat
+              label="Refund if cancelled"
+              value={
+                <>
+                  {formatMoneyConcise(facilityCashBack(facility, date.minute))}
+                  {facility.loanAmountLeft > 0 && (
+                    <span className="facilityStatNote">
+                      After settling the loan
+                    </span>
+                  )}
+                </>
+              }
+            />
+          </dl>
+        </section>
+      )}
       {!underConstruction && (
         <section className="facilityDetailSection" aria-label="Operation">
           <Typography component="h3" className="facilityDetailHeading">
             Operation
           </Typography>
           <dl className="facilityStats">
+            <Stat
+              label="Nameplate capacity"
+              value={formatWatts(facility.peakW)}
+            />
             <Stat
               label="Age"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}

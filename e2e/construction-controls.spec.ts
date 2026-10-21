@@ -1,7 +1,141 @@
-import { expect, test } from "./fixtures";
+import { expect, test, Locator } from "./fixtures";
 import { openPane, openBuild } from "./layout";
 
+async function expectExpandedActions(row: Locator, touch: boolean) {
+  const actions = row.locator(".facilityActions");
+  const facts = row.locator(".facilityStats").last();
+  const factsBounds = (await facts.boundingBox())!;
+  const actionsBounds = (await actions.boundingBox())!;
+  expect(actionsBounds.y).toBeGreaterThanOrEqual(
+    factsBounds.y + factsBounds.height,
+  );
+  for (const button of await actions.getByRole("button").all()) {
+    const bounds = (await button.boundingBox())!;
+    expect(bounds.height).toBeGreaterThanOrEqual(touch ? 44 : 40);
+    expect(bounds.x).toBeGreaterThanOrEqual(actionsBounds.x);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      actionsBounds.x + actionsBounds.width + 1,
+    );
+  }
+  expect(
+    await row.evaluate((el) => el.scrollWidth - el.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  // Native scrolling respects the fleet's reserved dock clearance. Playwright's
+  // scrollIntoViewIfNeeded only considers the viewport, including the area behind the dock.
+  await actions.evaluate((el) =>
+    el.scrollIntoView({ block: "end", behavior: "instant" }),
+  );
+  const dock = (await row.page().locator("#navfooter").boundingBox())!;
+  const visibleActions = (await actions.boundingBox())!;
+  expect(visibleActions.y + visibleActions.height).toBeLessThanOrEqual(dock.y);
+  for (const button of await actions.getByRole("button").all()) {
+    await expect
+      .poll(() =>
+        button.evaluate((el) => {
+          const bounds = el.getBoundingClientRect();
+          return el.contains(
+            document.elementFromPoint(
+              bounds.x + bounds.width / 2,
+              bounds.y + bounds.height / 2,
+            ),
+          );
+        }),
+      )
+      .toBe(true);
+  }
+}
+
 for (const theme of ["light", "dark"] as const) {
+  test(`facility construction details and actions reflow in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const operating = pane.locator(".facilityRow").first();
+    await operating.locator(".facilityDisclosure").click();
+    await expect(operating).toContainText("Nameplate capacity");
+    await expectExpandedActions(operating, !!testInfo.project.use.hasTouch);
+    await page.screenshot({
+      path: testInfo.outputPath("facility-operating.png"),
+    });
+
+    for (const [category, name, payment] of [
+      ["Generators", "Solar", "Pay cash"],
+      ["Storage", "Battery", "Take loan"],
+    ]) {
+      await openBuild(page);
+      await page.getByRole("tab", { name: category, exact: true }).click();
+      if (name === "Battery") {
+        await page
+          .getByRole("button", { name: "Use max size", exact: true })
+          .click();
+      }
+      await page
+        .getByRole("button", {
+          name: `Review purchase of ${name}`,
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: payment })
+        .click();
+      const row = pane.locator(".facilityRow").filter({
+        has: page.locator(".facilityName", {
+          hasText: new RegExp(`^${name}$`),
+        }),
+      });
+      await row.locator(".facilityDisclosure").click();
+      const construction = row.getByRole("region", { name: "Construction" });
+      await expect(construction).toContainText("Nameplate capacity");
+      await expect(construction).toContainText("Refund if cancelled");
+      if (name === "Battery") {
+        await expect(construction).toContainText("Energy capacity");
+        await expect(construction).toContainText("After settling the loan");
+      }
+      await expectExpandedActions(row, !!testInfo.project.use.hasTouch);
+      const refund = (
+        await construction
+          .locator(".facilityStat")
+          .filter({
+            has: page.locator("dt", { hasText: "Refund if cancelled" }),
+          })
+          .locator("dd")
+          .innerText()
+      ).split("\n")[0];
+      await page.mouse.move(0, 0);
+      await expect(page.locator(".snackbarContent")).toBeHidden();
+      await page.screenshot({
+        path: testInfo.outputPath(`${name}-construction.png`),
+      });
+      await row
+        .getByRole("button", { name: `Cancel construction of ${name}` })
+        .click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toContainText(`You will receive ${refund}`);
+      if (name === "Solar") {
+        await page.screenshot({
+          path: testInfo.outputPath("cancel-confirmation.png"),
+          animations: "disabled",
+        });
+      }
+      await dialog
+        .getByRole("button", { name: "Cancel construction", exact: true })
+        .click();
+      await expect(row).toHaveCount(0);
+    }
+  });
+
   test(`intertie construction controls and motion in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -36,7 +170,20 @@ for (const theme of ["light", "dark"] as const) {
     await line.locator(".facilityDisclosure").click();
     const cancel = line.getByRole("button", { name: /Cancel construction of/ });
     await expect(cancel).toBeVisible();
+    await expect(line).toContainText("Refund if cancelled");
+    await expect(line).toContainText("After settling the loan");
+    await expectExpandedActions(line, !!testInfo.project.use.hasTouch);
+    const refund = (
+      await line
+        .locator(".facilityStat")
+        .filter({ has: page.locator("dt", { hasText: "Refund if cancelled" }) })
+        .locator("dd")
+        .innerText()
+    ).split("\n")[0];
     await cancel.click();
+    await expect(page.getByRole("dialog")).toContainText(
+      `Receive ${refund} back`,
+    );
     await expect(page.getByRole("dialog")).toContainText(
       "after settling the outstanding loan",
     );
@@ -61,7 +208,7 @@ for (const theme of ["light", "dark"] as const) {
       .toBe("paused");
     await page.mouse.move(0, 0);
     await expect(page.locator(".snackbarContent")).toBeHidden();
-    await line.scrollIntoViewIfNeeded();
+    await expectExpandedActions(line, !!testInfo.project.use.hasTouch);
     await page.screenshot({
       path: testInfo.outputPath("intertie-construction.png"),
     });
@@ -100,7 +247,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await page.mouse.move(0, 0);
     await expect(page.locator(".snackbarContent")).toBeHidden();
-    await line.scrollIntoViewIfNeeded();
+    await expectExpandedActions(line, !!testInfo.project.use.hasTouch);
     await page.screenshot({ path: testInfo.outputPath("intertie-paused.png") });
     const metrics = line.locator(".transmissionMetrics");
     await expect(metrics.locator("dt")).toHaveText([
@@ -165,7 +312,7 @@ for (const theme of ["light", "dark"] as const) {
           ),
         )
         .toBeGreaterThanOrEqual(4);
-      await line.scrollIntoViewIfNeeded();
+      await expectExpandedActions(line, !!testInfo.project.use.hasTouch);
       await page.screenshot({
         path: testInfo.outputPath("intertie-metrics-wide.png"),
       });

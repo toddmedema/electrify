@@ -5446,26 +5446,25 @@ $homeSmokeCycle: 5.6s;
     display: none;
   }
 }
-.base_main .facilityRow {
+.base_main .facilityRow,
+.base_main .transmissionLine {
   container: facility-row / inline-size;
 }
 
 .base_main .facilityActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 8px;
-  padding: 0 16px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 16px;
+  padding: 12px 0 16px;
+  border-top: 1px solid var(--border-subtle);
 
   .MuiButton-root {
     min-width: 0;
     min-height: 40px;
-    padding: 8px;
+    padding: 8px 12px;
     line-height: 20px;
     text-transform: none;
-  }
-
-  .facilityCancelConstruction {
-    grid-column: 1 / -1;
   }
 }
 
@@ -5475,10 +5474,9 @@ $homeSmokeCycle: 5.6s;
   }
 }
 
-// Row queries include the two 16px insets; detail queries use its content box directly.
-@container facility-row (max-width: 271px) {
-  .base_main .facilityActions {
-    grid-template-columns: minmax(0, 1fr);
+@container facility-row (max-width: 459px) {
+  .base_main .facilityActions .MuiButton-root {
+    flex: 1 1 auto;
   }
 }
 
@@ -5582,6 +5580,15 @@ $homeSmokeCycle: 5.6s;
 }
 .transmissionLine .transmissionLineDetails {
   padding: 0 16px 16px;
+  gap: 16px;
+}
+.base_main .transmissionLineDetails .facilityActions {
+  margin: 0;
+  padding-bottom: 0;
+}
+.transmissionMetrics {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
 }
 .transmissionPanel {
   padding: 0;
@@ -6904,10 +6911,6 @@ $programs_column: 800px;
     animation: none;
     display: none;
   }
-}
-
-.base_main .intertieActions {
-  padding: 0 0 12px;
 }
 
 .screenDataCenterSetup {
