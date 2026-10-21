@@ -54,7 +54,9 @@ when measured load drifts. Coverage validates every discovered unit suite actual
 once and retains zero-hit files. Raw counters are merged; percentages are never averaged.
 
 Local `npm run check`, `test:ci` and `test:sim` still run complete suites. On a shared workstation,
-set `ELECTRIFY_CHECK_WORKERS=8` to bound workers without omitting tests. CI generates manifests
+set `ELECTRIFY_CHECK_WORKERS=8` to bound workers without omitting tests. The local production
+browser gate uses up to six Chromium workers, bounded to half the cores; GitHub Actions keeps two.
+CI generates manifests
 before concurrent work and suppresses duplicate generation pre-hooks in those test branches.
 The CLI/ratio benchmark runs before concurrent work on its Linux runner.
 
