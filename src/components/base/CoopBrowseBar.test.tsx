@@ -31,13 +31,18 @@ beforeEach(() => {
 });
 afterAll(() => registerCoopControls(undefined));
 
-test("guests see who they follow and every player's state in words", () => {
+test("guests see who they follow and every player's state as a named icon", () => {
   render(<CoopBrowseBar coop={coop()} />);
   expect(screen.getByText("Following Alice")).toBeInTheDocument();
   const roster = screen.getByLabelText("Players");
-  expect(within(roster).getByText("Host")).toBeInTheDocument();
-  expect(within(roster).getByText("Ready")).toBeInTheDocument();
-  expect(within(roster).getByText("Connecting")).toBeInTheDocument();
+  // States are icons that name themselves, not words beside each name.
+  expect(within(roster).getByRole("img", { name: "Host" })).toBeInTheDocument();
+  expect(
+    within(roster).getByRole("img", { name: "Ready" }),
+  ).toBeInTheDocument();
+  expect(
+    within(roster).getByRole("img", { name: "Connecting" }),
+  ).toBeInTheDocument();
   expect(screen.queryByText("Invite friends")).not.toBeInTheDocument();
   fireEvent.click(screen.getByText("Leave"));
   expect(controls.back).toHaveBeenCalled();
@@ -56,7 +61,7 @@ test("a host alone invites friends first, can copy the code and cannot start yet
       <CoopStartButton coop={host} onStart={jest.fn()} />
     </>,
   );
-  expect(screen.getByText("Invite friends to play")).toBeInTheDocument();
+  expect(screen.queryByText(/Invite friends to play|can join/)).toBeNull();
   const invite = screen.getByRole("button", { name: "Invite friends" });
   expect(invite).toHaveClass("MuiButton-contained");
   fireEvent.click(invite);
@@ -89,8 +94,10 @@ test("the host sees how many guests are ready and starts for everyone", () => {
       <CoopStartButton coop={host} onStart={onStart} />
     </>,
   );
-  expect(screen.getByText("You're choosing for 3 players")).toBeInTheDocument();
-  expect(screen.getByText("1 of 2 ready")).toBeInTheDocument();
+  expect(screen.queryByText(/choosing for/)).toBeNull();
+  // The count stays for screen readers only; sighted hosts read the roster's icons.
+  expect(screen.getByText("1 of 2 ready")).toHaveClass("srOnly");
+  expect(screen.getAllByRole("img", { name: "Reviewing" })).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Invite friends" })).toHaveClass(
     "MuiButton-outlined",
   );

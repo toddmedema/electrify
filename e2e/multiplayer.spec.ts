@@ -471,7 +471,9 @@ async function loadSave(page: Page, name: string) {
     .getByRole("article", { name, exact: true })
     .getByRole("button", { name: "Load save", exact: true })
     .click();
-  await expect(page.getByRole("dialog", { name, exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Pick your company", exact: true }),
+  ).toBeVisible();
 }
 const company = (page: Page, name: string) =>
   page.getByRole("listitem", { name: `${name}'s company`, exact: true });
@@ -540,18 +542,34 @@ for (const width of [1280, 390, 360]) {
         name: "Play with friends",
         exact: true,
       });
+      // Back is the header's arrow, as on every screen; there are no bottom actions.
       await expect(entry.getByRole("button")).toHaveText([
+        "",
         "Host a game",
         "Join",
-        "Back",
       ]);
+      await expect(entry.getByRole("button").first()).toHaveAccessibleName(
+        "Back",
+      );
+      const [field, join] = await Promise.all([
+        entry.getByLabel("Invite code", { exact: true }).boundingBox(),
+        entry.getByRole("button", { name: "Join", exact: true }).boundingBox(),
+      ]);
+      // The code and Join share one row.
+      expect(Math.abs(field!.y - join!.y)).toBeLessThan(12);
+      expect(join!.x).toBeGreaterThan(field!.x + field!.width);
       await bounded();
       await capture("entry");
       await hostGame(page);
       const bar = page
         .getByRole("region", { name: "Playing together", exact: true })
         .last();
-      await expect(bar.getByText("Invite friends to play")).toBeVisible();
+      await expect(
+        bar.getByRole("img", { name: "Host", exact: true }),
+      ).toBeVisible();
+      await expect(
+        bar.getByText(/Invite friends to play|can join/),
+      ).toHaveCount(0);
       await expect(
         bar.getByRole("button", { name: "Invite friends", exact: true }),
       ).toHaveClass(/MuiButton-contained/);
@@ -686,7 +704,7 @@ for (const width of [1280, 390, 360]) {
         .click();
       for (const peer of [page, guest])
         await expect(
-          peer.getByRole("dialog", { name: room.campaignName, exact: true }),
+          peer.getByRole("dialog", { name: "Pick your company", exact: true }),
         ).toBeVisible();
       await expect(
         page.getByRole("button", { name: "Resume game", exact: true }),
@@ -769,9 +787,10 @@ test("friends join and leave freely before the start, and claim saved companies 
   const hydro = await room.player(browser, 2);
   await joinGame(hydro, room);
   await expect(hydro.getByText("Following SolarSam").last()).toBeVisible();
-  await expect(
-    host.getByText("You're choosing for 2 players").last(),
-  ).toBeVisible();
+  const roster = host
+    .getByRole("list", { name: "Players", exact: true })
+    .last();
+  await expect(roster.getByText("HydroHal", { exact: true })).toBeVisible();
   await hydro
     .getByRole("button", { name: "Leave", exact: true })
     .last()
@@ -780,7 +799,7 @@ test("friends join and leave freely before the start, and claim saved companies 
   await expect(
     hydro.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
-  await expect(host.getByText("Invite friends to play").last()).toBeVisible();
+  await expect(roster.getByText("HydroHal", { exact: true })).toHaveCount(0);
   await expect(host.getByRole("dialog")).toHaveCount(0);
   await hydro
     .getByRole("button", { name: "Play with friends", exact: true })
@@ -1038,8 +1057,11 @@ async function startSharedGame(browser: Browser, count: number) {
     ).toHaveAttribute("aria-pressed", "true");
   }
   await expect(
-    pages[0].getByText(`${count - 1} of ${count - 1} ready`).last(),
-  ).toBeVisible();
+    pages[0]
+      .getByRole("list", { name: "Players", exact: true })
+      .last()
+      .getByRole("img", { name: "Ready", exact: true }),
+  ).toHaveCount(count - 1);
   await pages[0]
     .getByRole("button", { name: "Start for everyone", exact: true })
     .click();
@@ -1399,8 +1421,9 @@ for (const width of [1280, 390]) {
     await guest.getByLabel("Invite code", { exact: true }).blur();
     await capture("03-join-with-code", guest);
     await guest.getByRole("button", { name: "Join", exact: true }).click();
+    const roster = host.getByRole("list", { name: "Players", exact: true });
     await expect(
-      host.getByText("You're choosing for 2 players").last(),
+      roster.last().getByRole("img", { name: "Reviewing", exact: true }),
     ).toBeVisible();
     await capture("04-friend-joined");
     await host.getByTestId("mission-row-999").click();
@@ -1414,7 +1437,9 @@ for (const width of [1280, 390]) {
     ).toBeVisible();
     await capture("06-friend-ready", guest, "I'm ready");
     await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
-    await expect(host.getByText("1 of 1 ready").last()).toBeVisible();
+    await expect(
+      roster.last().getByRole("img", { name: "Ready", exact: true }),
+    ).toBeVisible();
     await capture("07-ready-to-start", host, "Start for everyone");
     await host
       .getByRole("button", { name: "Start for everyone", exact: true })

@@ -1,16 +1,45 @@
 import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import HourglassIcon from "@mui/icons-material/HourglassEmpty";
+import StarIcon from "@mui/icons-material/StarBorder";
+import SyncIcon from "@mui/icons-material/Sync";
 import FolderOpenIcon from "@mui/icons-material/FolderOpenOutlined";
 import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import { coopControls } from "../../multiplayer/Registry";
 import type { CoopSelectionType } from "../../Types";
 
+/** Each player's state beside their name, as an icon that names itself to hover and AT. */
+function PlayerState({
+  player,
+}: {
+  player: CoopSelectionType["players"][number];
+}): React.JSX.Element {
+  if (player.host)
+    return <StarIcon className="coopBrowseState" titleAccess="Host" />;
+  if (!player.connected)
+    return (
+      <SyncIcon
+        className="coopBrowseState coopBrowseConnecting"
+        titleAccess="Connecting"
+      />
+    );
+  return player.ready ? (
+    <CheckCircleIcon
+      className="coopBrowseState coopBrowseReady"
+      titleAccess="Ready"
+    />
+  ) : (
+    <HourglassIcon className="coopBrowseState" titleAccess="Reviewing" />
+  );
+}
+
 /**
- * Says who is choosing a co-op game and who is ready. Hosts drive the selection screens and
- * invite friends from here; guests follow them read-only, so the bar names the host and keeps
- * every state in words. Friends may join or leave until the host starts.
+ * Who is choosing a co-op game together and who is ready. Hosts drive the selection screens and
+ * invite friends from here; guests follow them read-only, so the bar names the host. Friends
+ * may join or leave until the host starts.
  */
 export default function CoopBrowseBar({
   coop,
@@ -25,82 +54,82 @@ export default function CoopBrowseBar({
   const ready = guests.filter((player) => player.ready).length;
   const host = coop.role === "host";
   const alone = !guests.length;
+  // The host reads the roster's icons; guests need to know whose screen they follow.
   const title = coop.starting
     ? "Starting the game for everyone…"
     : host
-      ? alone
-        ? "Invite friends to play"
-        : `You're choosing for ${coop.players.length} players`
+      ? undefined
       : `Following ${coop.hostName}`;
-  const detail = coop.starting
-    ? undefined
-    : host
-      ? alone
-        ? "Friends can join until you start."
-        : `${ready} of ${guests.length} ready`
-      : coop.viewing
-        ? coop.viewing
-        : "Choosing a game…";
+  const detail =
+    coop.starting || host ? undefined : coop.viewing || "Choosing a game…";
   return (
     <>
       {host && offerSaves && coop.hasSaves && !coop.starting && (
-        <Button
-          className="coopSavesBar"
-          fullWidth
-          startIcon={<FolderOpenIcon />}
-          onClick={() => coopControls()?.openSaves()}
-        >
-          Load multiplayer save
-        </Button>
+        <div className="coopSavesBar">
+          <div className="coopBarColumn">
+            <Button
+              startIcon={<FolderOpenIcon />}
+              onClick={() => coopControls()?.openSaves()}
+            >
+              Load multiplayer save
+            </Button>
+          </div>
+        </div>
       )}
       <section className="coopBrowseBar" aria-label="Playing together">
-        <div className="coopBrowseStatus" role="status" aria-live="polite">
-          <Typography component="p" variant="subtitle2">
-            {title}
-          </Typography>
-          {detail && (
-            <Typography component="p" variant="body2" color="textSecondary">
-              {detail}
-            </Typography>
+        <div className="coopBarColumn">
+          <div className="coopBrowseStatus" role="status" aria-live="polite">
+            {title && (
+              <Typography component="p" variant="subtitle2">
+                {title}
+              </Typography>
+            )}
+            {detail && (
+              <Typography component="p" variant="body2" color="textSecondary">
+                {detail}
+              </Typography>
+            )}
+            {host && !coop.starting && !alone && (
+              <span className="srOnly">
+                {ready} of {guests.length} ready
+              </span>
+            )}
+          </div>
+          <ul className="coopBrowseRoster" aria-label="Players">
+            {coop.players.map((player) => (
+              <li key={player.id}>
+                <span className="coopBrowseName">{player.name}</span>
+                <PlayerState player={player} />
+              </li>
+            ))}
+          </ul>
+          {!coop.starting && (
+            <div className="coopBrowseActions">
+              {host && (
+                <>
+                  <Button
+                    variant={alone ? "contained" : "outlined"}
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => coopControls()?.invite()}
+                  >
+                    Invite friends
+                  </Button>
+                  {coop.lobbyId && (
+                    <Button
+                      aria-label="Copy invite code"
+                      onClick={() => coopControls()?.copyCode()}
+                    >
+                      {/* Phones drop "invite" so the host's three actions share one row. */}
+                      Copy <span className="coopWideOnly">invite&nbsp;</span>
+                      code
+                    </Button>
+                  )}
+                </>
+              )}
+              <Button onClick={() => coopControls()?.back()}>Leave</Button>
+            </div>
           )}
         </div>
-        <ul className="coopBrowseRoster" aria-label="Players">
-          {coop.players.map((player) => (
-            <li key={player.id}>
-              <span className="coopBrowseName">{player.name}</span>
-              <span className="coopBrowseState">
-                {player.host
-                  ? "Host"
-                  : !player.connected
-                    ? "Connecting"
-                    : player.ready
-                      ? "Ready"
-                      : "Reviewing"}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {!coop.starting && (
-          <div className="coopBrowseActions">
-            {host && (
-              <>
-                <Button
-                  variant={alone ? "contained" : "outlined"}
-                  startIcon={<PersonAddIcon />}
-                  onClick={() => coopControls()?.invite()}
-                >
-                  Invite friends
-                </Button>
-                {coop.lobbyId && (
-                  <Button onClick={() => coopControls()?.copyCode()}>
-                    Copy invite code
-                  </Button>
-                )}
-              </>
-            )}
-            <Button onClick={() => coopControls()?.back()}>Leave</Button>
-          </div>
-        )}
       </section>
     </>
   );

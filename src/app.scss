@@ -7340,19 +7340,37 @@ $programs_column: 800px;
 }
 
 // Choosing a co-op game together. A quiet neutral bar above the scenario screens names who is
-// choosing and who is ready, always in words; the screen's own action stays the dominant one.
-.coopBrowseBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $space-2 $space-3;
+// choosing and who is ready; the screen's own action stays the dominant one. Its content keeps
+// the screen header's centered column.
+.coopBarColumn {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
   padding: $space-2 $space-4;
+}
+
+.coopBrowseBar {
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border-subtle);
 
+  .coopBarColumn {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-2 $space-3;
+  }
+
+  // An empty status (the host's) takes no room, so the roster starts under the header's title.
   .coopBrowseStatus {
-    flex: 1 1 220px;
+    flex: 0 1 auto;
     min-width: 0;
+
+    // Keeps its live-region role; the negative margin cancels the row gap it would leave.
+    &:not(:has(p)) {
+      flex: 0 0 0;
+      margin-right: -$space-3;
+    }
 
     p {
       margin: 0;
@@ -7360,6 +7378,7 @@ $programs_column: 800px;
   }
 
   .coopBrowseRoster {
+    flex: 1 1 auto;
     display: flex;
     flex-wrap: wrap;
     gap: $space-1 $space-2;
@@ -7369,6 +7388,7 @@ $programs_column: 800px;
 
     li {
       display: inline-flex;
+      align-items: center;
       gap: $space-1;
       padding: $space-1 $space-2;
       border: 1px solid var(--border-tile);
@@ -7378,7 +7398,16 @@ $programs_column: 800px;
   }
 
   .coopBrowseState {
+    font-size: 16px;
     color: var(--font-color-faded);
+  }
+
+  .coopBrowseReady {
+    color: var(--delta-good);
+  }
+
+  .coopBrowseConnecting {
+    color: var(--warning-icon);
   }
 
   .coopBrowseActions {
@@ -7392,14 +7421,26 @@ $programs_column: 800px;
   }
 }
 
+@media screen and (max-width: 599px) {
+  .coopBrowseBar .coopWideOnly {
+    display: none;
+  }
+}
+
 // The host's way back into a multiplayer save, above the new-game choices.
-.coopSavesBar.MuiButton-root {
-  justify-content: flex-start;
-  min-height: 40px;
-  padding: $space-2 $space-4;
-  border-radius: 0;
+.coopSavesBar {
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border-subtle);
+
+  .coopBarColumn {
+    display: flex;
+    justify-content: flex-end;
+    padding-block: $space-1;
+  }
+
+  .MuiButton-root {
+    min-height: 40px;
+  }
 }
 
 // A guest's copy of the host's custom setup: readable, but only the host changes it.
@@ -7448,7 +7489,7 @@ $programs_column: 800px;
 
 @media (pointer: coarse) {
   .coopBrowseBar .MuiButton-root,
-  .coopSavesBar.MuiButton-root {
+  .coopSavesBar .MuiButton-root {
     min-height: 44px;
   }
 }

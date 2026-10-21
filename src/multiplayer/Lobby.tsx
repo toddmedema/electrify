@@ -8,10 +8,12 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import PersonAddIcon from "@mui/icons-material/PersonAddAlt1";
 import type { MultiplayerSession } from "./Session";
 import { seatAssignments } from "./Slots";
@@ -85,12 +87,32 @@ export default function Lobby({
       }}
     >
       <DialogTitle
-        id="multiplayer-lobby-title"
-        ref={title}
-        tabIndex={-1}
-        sx={{ outline: "none", overflowWrap: "anywhere" }}
+        component="div"
+        // Only the heading inside names the dialog, not the Back button beside it.
+        id="multiplayer-lobby-header"
+        className={mode === "entry" ? "coopLobbyHeader" : undefined}
       >
-        {pendingCampaign?.name || "Play with friends"}
+        {mode === "entry" && (
+          <IconButton
+            aria-label="Back"
+            edge="start"
+            color="primary"
+            disabled={busy}
+            onClick={onClose}
+          >
+            <ChevronLeftIcon />
+          </IconButton>
+        )}
+        <Typography
+          component="h2"
+          variant="h6"
+          id="multiplayer-lobby-title"
+          ref={title}
+          tabIndex={-1}
+          sx={{ outline: "none", overflowWrap: "anywhere", minWidth: 0 }}
+        >
+          {pendingCampaign ? "Pick your company" : "Play with friends"}
+        </Typography>
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -121,23 +143,25 @@ export default function Lobby({
                 Host a game
               </Button>
               <Divider>or join a friend</Divider>
-              <TextField
-                label="Invite code"
-                value={code}
-                onChange={(event) => setCode(event.target.value.trim())}
-                slotProps={{
-                  htmlInput: { inputMode: "numeric", maxLength: 20 },
-                }}
-              />
-              <Button
-                variant="outlined"
-                disabled={
-                  !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
-                }
-                onClick={() => run(() => session.join(code))}
-              >
-                Join
-              </Button>
+              <div className="coopJoinRow">
+                <TextField
+                  label="Invite code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.trim())}
+                  slotProps={{
+                    htmlInput: { inputMode: "numeric", maxLength: 20 },
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  disabled={
+                    !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
+                  }
+                  onClick={() => run(() => session.join(code))}
+                >
+                  Join
+                </Button>
+              </div>
             </>
           )}
           {mode === "waiting" && (
@@ -171,23 +195,18 @@ export default function Lobby({
           )}
         </Stack>
       </DialogContent>
-      <DialogActions>
-        {mode === "entry" && (
-          <Button disabled={busy} onClick={onClose}>
-            Back
-          </Button>
-        )}
-        {mode === "campaign" && host && (
-          <Button disabled={busy} onClick={onChooseNew}>
-            Choose a new game
-          </Button>
-        )}
-        {mode !== "entry" && (
+      {mode !== "entry" && (
+        <DialogActions>
+          {mode === "campaign" && host && (
+            <Button disabled={busy} onClick={onChooseNew}>
+              Choose a new game
+            </Button>
+          )}
           <Button disabled={busy} onClick={onLeave}>
             Leave lobby
           </Button>
-        )}
-      </DialogActions>
+        </DialogActions>
+      )}
     </Dialog>
   );
 }
@@ -226,9 +245,6 @@ function CampaignSlots({
   };
   return (
     <>
-      <Typography color="text.secondary">
-        Pick the company you'll play.
-      </Typography>
       <ul className="coopLobbyRoster coopSlots" aria-label="Companies">
         {campaign.players.map((player) => {
           const retired = !campaign.requiredPlayerIds.includes(player.id);

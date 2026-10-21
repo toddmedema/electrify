@@ -70,3 +70,26 @@
 .coopSlotName {
   display: grid;
 }
+
+/* The app's one back glyph sits before the title, as on every screen header. */
+.coopLobbyHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The code fills the row; Join takes about a fifth of it. */
+.coopJoinRow {
+  display: flex;
+  gap: 8px;
+}
+
+.coopJoinRow .MuiTextField-root {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.coopJoinRow .MuiButton-root {
+  flex: 0 0 20%;
+  min-width: 72px;
+}
