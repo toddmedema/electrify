@@ -98,8 +98,8 @@ test("custom story forecasts appear without scheduled load additions", () => {
   expect(upcoming).toEqual([
     expect.objectContaining({
       key: "story:100:carbon-fee-ratchet:ratchet-onset",
-      title: "Pollution fees will rise",
-      message: "Coal and gas will cost more to run.",
+      title: "Pollution fees rising",
+      message: "Coal and gas costing more to run.",
       label: `Expected Jan ${game.startingYear + 4}`,
     }),
   ]);

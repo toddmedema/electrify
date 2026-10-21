@@ -1633,7 +1633,8 @@ $pane_header_height: 48px;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Chart controls share the page surface, including this expanded layer picker.
+  background: var(--bg-primary);
 }
 
 .insightsLayerGroup {
@@ -1681,7 +1682,8 @@ $pane_header_height: 48px;
   margin: 0 auto;
   overflow: hidden;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Presets, timeline controls, upcoming events and charts share one page surface.
+  background: var(--bg-primary);
 }
 
 .insightsViewportDate {

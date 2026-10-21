@@ -75,6 +75,58 @@ const expectInsightSpacing = async (insights: Locator) => {
 };
 
 for (const theme of ["light", "dark"] as const) {
+  test(`insights controls share the chart surface in ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      window.localStorage.clear();
+      window.localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=103");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.getByRole("button", { name: "Start game" }).click();
+
+    const insights = page.locator(".insights:visible");
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    const chart = insights.locator(".uplot").first();
+    await expect(chart).toBeVisible();
+    const chartSurface = await chart.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+
+    for (const selector of [
+      ".insightsHeader",
+      ".insightsViewportToolbar",
+      ".insightEventRail",
+    ]) {
+      const surface = await insights.locator(selector).evaluate((element) => {
+        let painted: Element | null = element;
+        while (
+          painted &&
+          /^rgba\(.*,\s*0\)$|^transparent$/.test(
+            getComputedStyle(painted).backgroundColor,
+          )
+        ) {
+          painted = painted.parentElement;
+        }
+        return getComputedStyle(painted ?? document.body).backgroundColor;
+      });
+      expect(surface, `${selector} stays flush with the charts`).toBe(
+        chartSurface,
+      );
+    }
+
+    await insights.getByRole("button", { name: /^Layers \(/ }).click();
+    await expect(insights.locator(".insightsLayerPanel")).toBeVisible();
+    await expect(insights.locator(".insightsLayerPanel")).toHaveCSS(
+      "background-color",
+      chartSurface,
+    );
+  });
+
   test(`upcoming scenario events stay usable across insight viewports in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -104,9 +156,9 @@ for (const theme of ["light", "dark"] as const) {
       insights.getByRole("button", { name: "Fit full timeline" }),
     ).toBeDisabled();
     await expect(eventRail.getByRole("button")).toHaveCount(4);
-    await expect(eventRail).toContainText("Gas prices will fall");
+    await expect(eventRail).toContainText("Gas prices falling");
     const eventButton = eventRail.getByRole("button", {
-      name: /Gas prices will fall/,
+      name: /Gas prices falling/,
     });
     await expect(eventButton).toBeVisible();
     await expect(eventButton.locator(".insightEventTitle")).toBeVisible();
@@ -157,7 +209,7 @@ for (const theme of ["light", "dark"] as const) {
     await eventButton.click();
     await expect(eventButton).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("dialog")).toContainText(
-      "A regional shale glut will make local gas cheaper.",
+      "Regional shale glut lowering local gas prices.",
     );
     await eventButton.click();
     await expect(eventButton).toHaveAttribute("aria-expanded", "false");
