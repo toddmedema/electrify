@@ -365,26 +365,6 @@ function multiplayerRequest(input) {
         window.webContents.send("desktop:multiplayer-event", event);
       }
     },
-    undefined,
-    undefined,
-    {
-      chooseImport: async () => {
-        const result = await dialog.showOpenDialog(window, {
-          title: "Import shared campaign",
-          properties: ["openFile"],
-          filters: [{ name: "Shared campaign", extensions: ["json"] }],
-        });
-        return result.canceled ? undefined : result.filePaths[0];
-      },
-      chooseExport: async () => {
-        const result = await dialog.showSaveDialog(window, {
-          title: "Export shared campaign",
-          defaultPath: "shared-campaign.json",
-          filters: [{ name: "Shared campaign", extensions: ["json"] }],
-        });
-        return result.canceled ? undefined : result.filePath;
-      },
-    },
   );
   return steam.multiplayer.request(input);
 }

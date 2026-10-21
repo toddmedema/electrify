@@ -28,6 +28,12 @@ export interface SharedSaveLibrary {
   }[];
   cloudState: "disabled" | "offline" | "ready" | "failed";
 }
+export interface PendingCampaign {
+  id: string;
+  name: string;
+  players: Seat[];
+  requiredPlayerIds: string[];
+}
 export type WireMessage =
   | { kind: "heartbeat" }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }
@@ -35,17 +41,15 @@ export type WireMessage =
   | { kind: "save-request"; requestId: string }
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }
-  | { kind: "browse"; browse: BrowseState };
+  | { kind: "browse"; browse: BrowseState }
+  | { kind: "campaign"; campaign?: PendingCampaign };
 export type NativeRequest =
   | {
       kind: "state" | "leave" | "reconnect" | "invite" | "unlock";
     }
   | { kind: "read-checkpoint"; id?: string }
   | { kind: "list-saves"; sync?: boolean }
-  | { kind: "rename-save"; id: string; name: string }
   | { kind: "delete-save"; id: string }
-  | { kind: "export-save"; id: string }
-  | { kind: "import-save" }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready"; value: string }

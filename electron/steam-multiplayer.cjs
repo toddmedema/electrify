@@ -98,6 +98,7 @@ const MEMBER_KEYS = new Set(["ready"]);
 const MEMBER_VALUE = /^[a-zA-Z0-9:|._-]{0,64}$/;
 // The host's mirrored scenario selection; a complete custom game fits well within this.
 const MAX_BROWSE_BYTES = 16 * 1024;
+const MAX_CAMPAIGN_BYTES = 4 * 1024;
 
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_COMPRESSED = 4 * 1024 * 1024;
@@ -227,7 +228,6 @@ class SteamMultiplayer {
     emit,
     api = loadMultiplayerFunctions(),
     koffi = require("koffi"),
-    dialogs = {},
   ) {
     this.service = service;
     this.dispatcher = dispatcher;
@@ -236,7 +236,6 @@ class SteamMultiplayer {
     this.emit = emit;
     this.filename = path.join(directory, "co-op.json");
     this.saves = new CoopSaveStore(directory, service, { stringify, parse });
-    this.dialogs = dialogs;
     this.matchmaking = api.matchmaking();
     this.sockets = api.sockets();
     this.utils = api.utils();
@@ -626,6 +625,14 @@ class SteamMultiplayer {
         Buffer.byteLength(JSON.stringify(payload.browse)) > MAX_BROWSE_BYTES)
     )
       throw new Error("Invalid scenario selection");
+    if (
+      payload.kind === "campaign" &&
+      payload.campaign !== undefined &&
+      (!payload.campaign ||
+        Buffer.byteLength(JSON.stringify(payload.campaign)) >
+          MAX_CAMPAIGN_BYTES)
+    )
+      throw new Error("Invalid campaign selection");
     if (payload.kind === "command") {
       const envelope = payload.envelope;
       if (
@@ -802,22 +809,9 @@ class SteamMultiplayer {
       }
       case "list-saves":
         return this.saves.list(input.sync === true);
-      case "rename-save":
-        await this.saves.rename(input.id, input.name);
-        return this.saves.list();
       case "delete-save":
         await this.saves.remove(input.id);
         return this.saves.list();
-      case "import-save": {
-        const filename = await this.dialogs.chooseImport?.();
-        if (filename) await this.saves.importFile(filename);
-        return this.saves.list();
-      }
-      case "export-save": {
-        const filename = await this.dialogs.chooseExport?.();
-        if (filename) await this.saves.exportFile(input.id, filename);
-        return;
-      }
       default:
         throw new Error("Unknown multiplayer request");
     }

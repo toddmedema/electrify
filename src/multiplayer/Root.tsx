@@ -47,6 +47,8 @@ export default function MultiplayerRoot() {
   );
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const hasView = !!state.view;
+  const lobbyId = state.lobby.lobbyId;
+  const pendingCampaignId = state.pendingCampaign?.id;
   const coop = useAppSelector((app) => app.ui.coop);
   const reconnect = useCallback(() => {
     void session.reconnect();
@@ -56,7 +58,9 @@ export default function MultiplayerRoot() {
   const syncCoop = useCallback(() => {
     const current = session.getSnapshot();
     const app = store.getState();
-    const { lobby, browse, view } = current;
+    const { lobby, browse, view, pendingCampaign } = current;
+    // A saved campaign replaces scenario selection; the previous screen must not republish it.
+    if (pendingCampaign && !view) choosing.current = false;
     const host = !!lobby.lobbyId && lobby.hostId === lobby.selfId;
     const active =
       !!lobby.lobbyId && (host ? choosing.current : !!browse || !!view);
@@ -94,6 +98,11 @@ export default function MultiplayerRoot() {
         );
     }
   }, [session]);
+
+  useEffect(() => {
+    // Friends already following the scenario picker return to the campaign's invitation lobby.
+    if (pendingCampaignId && lobbyId && !hasView) setOpen(true);
+  }, [pendingCampaignId, lobbyId, hasView]);
 
   const leaveLobby = useCallback(
     (skipSave = false) => {

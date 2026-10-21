@@ -153,7 +153,7 @@ class CoopSaveStore {
     const digest = hash(json);
     if (library.slots.length >= MAX_SLOTS)
       throw new Error(
-        "Your shared save library is full. Export or delete a campaign first.",
+        "Your shared save library is full. Delete a campaign first.",
       );
     const id = crypto.randomBytes(16).toString("hex");
     const slot = {
@@ -180,7 +180,7 @@ class CoopSaveStore {
         this.decode(json);
         if (Buffer.byteLength(json) > MAX_LIBRARY_BYTES)
           throw new Error(
-            "Shared save library is too large. Export or delete a campaign first.",
+            "Shared save library is too large. Delete a campaign first.",
           );
         await atomicWriteAsync(
           this.deviceFile,

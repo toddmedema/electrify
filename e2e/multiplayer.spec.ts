@@ -173,7 +173,7 @@ class SteamRoom {
   campaignWarning?: string;
   campaignError?: string;
   campaignListHold?: Promise<void>;
-  exportedCampaign?: string;
+  invites: string[] = [];
   views = new Map<string, RoomView>();
   pendingViews = new Map<string, NativeEvent>();
   deliveringViews = new Set<string>();
@@ -300,17 +300,12 @@ class SteamRoom {
       return this.state(id);
     }
     if (input.kind === "read-checkpoint") return this.checkpoint;
-    if (input.kind === "rename-save") this.campaignName = input.name;
     if (input.kind === "delete-save") this.checkpoint = undefined;
-    if (input.kind === "export-save") {
-      this.exportedCampaign = input.id;
+    if (input.kind === "invite") {
+      this.invites.push(id);
       return;
     }
-    if (
-      input.kind === "list-saves" ||
-      input.kind === "rename-save" ||
-      input.kind === "delete-save"
-    ) {
+    if (input.kind === "list-saves" || input.kind === "delete-save") {
       if (input.kind === "list-saves") await this.campaignListHold;
       if (this.campaignError) throw new Error(this.campaignError);
       return {
@@ -453,7 +448,7 @@ class SteamRoom {
 
 for (const width of [1280, 390, 360]) {
   for (const theme of ["light", "dark"] as const) {
-    test(`shared campaign library manages named saves at ${width}px in ${theme}`, async ({
+    test(`shared campaign library offers direct resume and safe deletion at ${width}px in ${theme}`, async ({
       browser,
     }) => {
       const room = new SteamRoom();
@@ -465,6 +460,7 @@ for (const width of [1280, 390, 360]) {
           { id: "76561198000000002", name: "Player 2" },
         ],
       } as World;
+      const checkpoint = room.checkpoint;
       const mobile = width < 600;
       const page = await room.player(browser, 0, mobile);
       await page.setViewportSize({
@@ -474,183 +470,158 @@ for (const width of [1280, 390, 360]) {
       await page.emulateMedia({ colorScheme: theme });
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       const capture = async (state: string) => {
-        if (process.env.CAMPAIGN_DESIGN_SCREENSHOTS) {
-          await page.mouse.move(0, 0);
-          await page
-            .getByRole("heading")
-            .first()
-            .evaluate((element) =>
-              (element as HTMLElement).focus({ preventScroll: true }),
-            );
-          await page.screenshot({
-            path: `${process.env.CAMPAIGN_DESIGN_SCREENSHOTS}/${width}-${theme}-${state}.png`,
-            animations: "disabled",
-            style: ".MuiTouchRipple-root { visibility: hidden !important; }",
-          });
-        }
+        if (!process.env.CAMPAIGN_DESIGN_SCREENSHOTS) return;
+        await page.mouse.move(0, 0);
+        await page.screenshot({
+          path: `${process.env.CAMPAIGN_DESIGN_SCREENSHOTS}/${width}-${theme}-${state}.png`,
+          animations: "disabled",
+          style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+        });
       };
       const bounded = async () => {
-        const dialog = page.getByRole("dialog");
+        const dialog = page.getByRole("dialog").last();
         expect(
           await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
         const bounds = await dialog.boundingBox();
         expect(bounds!.x).toBeGreaterThanOrEqual(0);
         expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
-        const buttons = await dialog.getByRole("button").evaluateAll((els) =>
-          els
-            .filter((el) => el.getBoundingClientRect().height > 0)
-            .map((el) => ({
-              label: el.getAttribute("aria-label") || el.textContent,
-              height: el.getBoundingClientRect().height,
-            })),
-        );
-        for (const button of buttons)
+        for (const button of await dialog
+          .getByRole("button")
+          .evaluateAll((els) =>
+            els
+              .filter((el) => el.getBoundingClientRect().height > 0)
+              .map((el) => ({
+                label: el.getAttribute("aria-label") || el.textContent,
+                height: el.getBoundingClientRect().height,
+              })),
+          )) {
           expect(
             button.height,
             `${button.label} touch target`,
           ).toBeGreaterThanOrEqual(mobile ? 44 : 40);
+        }
       };
-      await bounded();
-      await capture("lobby");
-      await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
-        .click();
+      const openLibrary = async () => {
+        await page
+          .getByRole("button", { name: /^(Shared campaigns|Change campaign)$/ })
+          .click();
+        await expect(
+          page.getByRole("heading", { name: "Shared campaigns", exact: true }),
+        ).toBeFocused();
+      };
+      await openLibrary();
       await expect(
-        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
-      ).toBeFocused();
-      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveCount(
-        0,
+        page.getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeEnabled();
+      const campaign = page.getByRole("article", {
+        name: room.campaignName,
+        exact: true,
+      });
+      await expect(campaign).toBeVisible();
+      await expect(
+        campaign.getByText("Player 1, Player 2", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        campaign.getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeEnabled();
+      await expect(
+        page.getByRole("button", { name: /rename|export|import/i }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(
+          /Saved on this computer|Differing Steam Cloud|Host a lobby and invite/,
+        ),
+      ).toHaveCount(0);
+      await bounded();
+      await capture("saved");
+      await campaign
+        .getByRole("button", { name: "Resume campaign", exact: true })
+        .click();
+      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveValue(
+        room.lobbyId,
       );
-      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-        "Friends campaign",
-      );
+      await expect(page.getByText("Player 2", { exact: true })).toBeVisible();
+      await expect(page.getByText("Not joined", { exact: true })).toBeVisible();
       await expect(
         page.getByRole("button", { name: "Resume campaign", exact: true }),
       ).toBeDisabled();
-      await capture("saved");
+      await page
+        .getByRole("button", { name: "Invite Steam friends", exact: true })
+        .click();
+      await expect.poll(() => room.invites).toEqual([room.host]);
       await bounded();
-      await page.getByRole("button", { name: "Rename", exact: true }).click();
-      await expect(
-        page.getByLabel("Campaign name", { exact: true }),
-      ).toBeFocused();
-      await capture("rename");
-      await page.getByRole("button", { name: "Cancel", exact: true }).click();
-      await expect(
-        page.getByRole("button", { name: "Rename", exact: true }),
-      ).toBeFocused();
-      await page.getByRole("button", { name: "Rename", exact: true }).click();
-      await page
-        .getByLabel("Campaign name", { exact: true })
-        .fill("Launch friends");
-      await page
-        .getByRole("button", { name: "Save name", exact: true })
+      await capture("resume-invite");
+      const guest = await room.player(browser, 1, mobile);
+      await guest.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
+      await guest
+        .getByRole("button", { name: "Join lobby", exact: true })
         .click();
       await expect(
-        page.getByRole("button", { name: "Rename", exact: true }),
-      ).toBeFocused();
-      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-        "Launch friends",
-      );
-      await page
-        .getByRole("button", { name: "Export campaign", exact: true })
-        .click();
-      await expect.poll(() => room.exportedCampaign).toBe("saved-campaign");
-      await page.screenshot({
-        path: `.tmp/shared-campaigns-${mobile ? "mobile" : "desktop"}.png`,
-      });
-      await page.getByRole("button", { name: "Rename", exact: true }).click();
-      await page
-        .getByLabel("Campaign name", { exact: true })
-        .fill("A".repeat(80));
-      await page
-        .getByRole("button", { name: "Save name", exact: true })
-        .click();
-      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-        "A".repeat(80),
-      );
-      await bounded();
-      await capture("long-name");
-      await page.getByLabel("Campaign", { exact: true }).click();
-      const option = page.getByRole("option", {
-        name: "A".repeat(80),
+        page.getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeEnabled();
+      await capture("resume-ready");
+      room.campaignName = "A".repeat(80);
+      await openLibrary();
+      const longCampaign = page.getByRole("article", {
+        name: room.campaignName,
         exact: true,
       });
-      const optionBounds = await option.boundingBox();
-      expect(optionBounds!.x).toBeGreaterThanOrEqual(0);
-      expect(optionBounds!.x + optionBounds!.width).toBeLessThanOrEqual(width);
-      await option.click();
-      await page
-        .getByRole("button", { name: "Delete campaign", exact: true })
-        .click();
-      await expect(
-        page.getByRole("button", { name: "Keep campaign", exact: true }),
-      ).toBeFocused();
-      await expect(
-        page.getByRole("button", { name: "Keep campaign", exact: true }),
-      ).toBeInViewport();
-      await expect(
-        page.getByRole("button", { name: "Confirm delete", exact: true }),
-      ).toBeInViewport();
-      await capture("delete");
+      await expect(longCampaign).toBeVisible();
       await bounded();
-      await page
-        .getByRole("button", { name: "Keep campaign", exact: true })
+      await capture("long-name");
+      const openDelete = async () => {
+        await longCampaign
+          .getByRole("button", {
+            name: `Actions for ${room.campaignName}`,
+            exact: true,
+          })
+          .click();
+        await expect(page.getByRole("menuitem")).toHaveCount(1);
+        await page
+          .getByRole("menuitem", { name: "Delete", exact: true })
+          .click();
+        const confirmation = page.getByRole("dialog", {
+          name: "Delete shared campaign?",
+          exact: true,
+        });
+        await expect(
+          confirmation.getByRole("button", { name: "Cancel", exact: true }),
+        ).toBeFocused();
+        await expect(
+          confirmation.getByRole("button", { name: "Delete", exact: true }),
+        ).toBeInViewport();
+        return confirmation;
+      };
+      let confirmation = await openDelete();
+      await bounded();
+      await capture("delete");
+      await confirmation
+        .getByRole("button", { name: "Cancel", exact: true })
         .click();
-      await expect(page.getByLabel("Campaign", { exact: true })).toContainText(
-        "A".repeat(80),
-      );
-      await page
-        .getByRole("button", { name: "Delete campaign", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Confirm delete", exact: true })
+      await expect(longCampaign).toBeVisible();
+      confirmation = await openDelete();
+      await confirmation
+        .getByRole("button", { name: "Delete", exact: true })
         .click();
       await expect(
-        page.getByText("No shared campaigns saved yet.", { exact: true }),
+        page.getByText("No shared campaigns yet", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("heading", { name: "Shared campaigns", exact: true }),
       ).toBeFocused();
       await capture("empty");
-      await page
-        .getByRole("button", { name: "Back to lobby", exact: true })
-        .click();
-      await expect(
-        page.getByRole("button", { name: "Shared campaigns", exact: true }),
-      ).toBeFocused();
-      room.campaignCloudState = "offline";
-      await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
-        .click();
-      await expect(
-        page.getByText(
-          "Steam Cloud is offline. Campaigns are saved on this computer.",
-        ),
-      ).toBeVisible();
-      await capture("offline");
       await page.keyboard.press("Escape");
+      room.campaignCloudState = "offline";
+      await openLibrary();
       await expect(
-        page.getByRole("button", { name: "Shared campaigns", exact: true }),
-      ).toBeFocused();
-      room.campaignCloudState = "failed";
-      room.campaignWarning =
-        "Your local campaigns are safe. A Cloud copy will be available when space is free.";
-      await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
-        .click();
-      await expect(
-        page.getByText(
-          "Steam Cloud could not sync. Local campaigns are available.",
-        ),
-      ).toBeVisible();
-      await bounded();
-      await capture("cloud-warning");
+        page.getByText(/Saved on this computer|Steam Cloud is offline/),
+      ).toHaveCount(0);
       await page.keyboard.press("Escape");
       room.campaignError =
         "Campaign files could not be read. Your existing files have been kept.";
       await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .getByRole("button", { name: /^(Shared campaigns|Change campaign)$/ })
         .click();
       await expect(page.getByRole("alert")).toContainText(room.campaignError);
       await capture("error");
@@ -659,36 +630,6 @@ for (const width of [1280, 390, 360]) {
         .getByRole("button", { name: "Close", exact: true })
         .click();
       room.campaignError = undefined;
-      await page
-        .getByRole("button", { name: "Host a Steam lobby", exact: true })
-        .click();
-      await expect(
-        page.getByText("Waiting for a friend to join…", { exact: true }),
-      ).toBeVisible();
-      await bounded();
-      await capture("waiting");
-      await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
-        .click();
-      await expect(
-        page.getByRole("heading", { name: "Shared campaigns", exact: true }),
-      ).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveValue(
-        room.lobbyId,
-      );
-      const guest = await room.player(browser, 1, mobile);
-      await guest.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
-      await guest
-        .getByRole("button", { name: "Join lobby", exact: true })
-        .click();
-      await expect(
-        page.getByRole("button", {
-          name: "Choose a game together",
-          exact: true,
-        }),
-      ).toBeEnabled();
-      await capture("ready");
       let release!: () => void;
       const completed = await page.evaluate(
         () => (window as SteamTestWindow).mockSharedSaveRequests || 0,
@@ -697,15 +638,12 @@ for (const width of [1280, 390, 360]) {
         release = resolve;
       });
       await page
-        .getByRole("button", { name: "Shared campaigns", exact: true })
+        .getByRole("button", { name: /^(Shared campaigns|Change campaign)$/ })
         .click();
-      await expect(
-        page.getByRole("button", { name: "Shared campaigns", exact: true }),
-      ).toBeDisabled();
-      await page.keyboard.press("Escape");
-      await expect(page.getByLabel("Lobby code", { exact: true })).toHaveValue(
-        room.lobbyId,
+      await expect(page.getByRole("status")).toContainText(
+        "Loading shared campaigns…",
       );
+      await page.keyboard.press("Escape");
       release();
       room.campaignListHold = undefined;
       await page.waitForFunction(
@@ -714,17 +652,44 @@ for (const width of [1280, 390, 360]) {
         completed,
       );
       await expect(
-        page.getByRole("button", { name: "Shared campaigns", exact: true }),
+        page.getByRole("button", {
+          name: /^(Shared campaigns|Change campaign)$/,
+        }),
       ).toBeEnabled();
-      // The delayed result must not reopen a dismissed library or leave the hosted lobby.
       await expect(
         page.getByRole("heading", { name: "Shared campaigns", exact: true }),
       ).toHaveCount(0);
       expect(room.members).toHaveLength(2);
+      // A campaign selection must replace an in-progress scenario choice for both peers.
+      room.checkpoint = checkpoint;
+      room.campaignName = "Friends campaign";
+      await page
+        .getByRole("button", { name: "Choose a game together", exact: true })
+        .click();
+      await page.getByTestId("mission-row-999").click();
+      await expect(
+        guest.getByText("Custom setup", { exact: true }).last(),
+      ).toBeVisible();
+      await page
+        .getByRole("button", { name: "Lobby", exact: true })
+        .last()
+        .click();
+      await openLibrary();
+      await page
+        .getByRole("button", { name: "Resume campaign", exact: true })
+        .click();
+      for (const peer of [page, guest]) {
+        await expect(
+          peer.getByRole("dialog", { name: "Friends campaign", exact: true }),
+        ).toBeVisible();
+      }
+      await expect(
+        page.getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeEnabled();
+      expect(room.transportErrors).toEqual([]);
     });
   }
 }
-
 test("mock Steam publishes only to players with an initialized transport", async ({
   browser,
 }) => {
@@ -1253,6 +1218,168 @@ async function saveAndQuit(page: Page) {
     page.getByRole("button", { name: "Play with friends", exact: true }),
   ).toBeVisible();
 }
+
+for (const width of [1280, 390]) {
+  test(`shared campaign creation and resume walkthrough at ${width}px`, async ({
+    browser,
+  }) => {
+    const room = new SteamRoom();
+    room.campaignName = "Campaign 1";
+    const mobile = width < 600;
+    const host = await room.player(browser, 0, mobile);
+    const guest = await room.player(browser, 1, mobile);
+    await guest.emulateMedia({ colorScheme: "light" });
+    const errors: string[] = [];
+    for (const page of [host, guest])
+      page.on("pageerror", (error) => errors.push(error.message));
+    const capture = async (step: string, page = host, actionName?: string) => {
+      if (!process.env.CAMPAIGN_WALKTHROUGH_SCREENSHOTS) return;
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await expect(
+        page.getByText("Calculating forecast…", { exact: true }),
+      ).toBeHidden({ timeout: 30000 });
+      await expect(
+        page.getByText("Calculating Year 1 outlook…", { exact: true }).last(),
+      ).toBeHidden({ timeout: 30000 });
+      if (actionName) {
+        const action = page.getByRole("button", {
+          name: actionName,
+          exact: true,
+        });
+        await action.scrollIntoViewIfNeeded();
+        await expect(action).toBeInViewport({ ratio: 1 });
+      }
+      await page.screenshot({
+        path: `${process.env.CAMPAIGN_WALKTHROUGH_SCREENSHOTS}/${width}-${step}.png`,
+        animations: "disabled",
+        style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+      });
+    };
+    await capture("01-play-with-friends");
+    await host
+      .getByRole("button", { name: "Host a Steam lobby", exact: true })
+      .click();
+    await host
+      .getByRole("button", { name: "Invite Steam friends", exact: true })
+      .click();
+    await expect.poll(() => room.invites).toEqual([room.host]);
+    await capture("02-invite-friends");
+    await guest.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
+    await expect(guest.getByLabel("Lobby code", { exact: true })).toHaveValue(
+      room.lobbyId,
+    );
+    await guest.getByLabel("Lobby code", { exact: true }).blur();
+    await capture("03-join-lobby", guest);
+    await guest
+      .getByRole("button", { name: "Join lobby", exact: true })
+      .click();
+    await expect(
+      host.getByRole("button", { name: "Choose a game together", exact: true }),
+    ).toBeEnabled();
+    await capture("04-friends-connected");
+    await host
+      .getByRole("button", { name: "Choose a game together", exact: true })
+      .click();
+    await expect(host.getByTestId("mission-row-999")).toBeVisible();
+    await capture("05-choose-scenario");
+    await host.getByTestId("mission-row-999").click();
+    await expect(
+      host.getByRole("button", { name: "Start for everyone", exact: true }),
+    ).toBeEnabled();
+    await capture("06-configure-game");
+    await expect(guest.getByText("Following Player 1").last()).toBeVisible();
+    await expect(
+      guest.getByText("Custom setup", { exact: true }).last(),
+    ).toBeVisible();
+    await capture("07-friend-ready", guest, "I'm ready");
+    await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
+    await expect(
+      host.getByRole("button", { name: "Start for everyone", exact: true }),
+    ).toBeEnabled();
+    await capture("08-ready-to-start", host, "Start for everyone");
+    await host
+      .getByRole("button", { name: "Start for everyone", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expectClockMeaning(page, "pause", "pause");
+    }
+    await capture("09-game-paused");
+    // A shared save persists actual running progress, not merely a freshly created world.
+    const initialDate = { ...room.views.get("76561198000000002")!.game!.date };
+    for (const page of [host, guest]) await ready(page);
+    await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.date)
+      .not.toEqual(initialDate);
+    await host.getByRole("button", { name: "pause", exact: true }).click();
+    await host.getByRole("button", { name: /^menu/ }).click();
+    await expect(
+      host.getByRole("menuitem", { name: "Saved games", exact: true }),
+    ).toHaveCount(0);
+    await capture("10-save-and-quit");
+    await host.keyboard.press("Escape");
+    await saveAndQuit(guest);
+    await saveAndQuit(host);
+    const savedDates = room.checkpoint!.grids.map((grid) => ({ ...grid.date }));
+    const savedFacilities = room.checkpoint!.grids.map(
+      (grid) => grid.facilities.length,
+    );
+    await capture("11-saved");
+    await host
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await host
+      .getByRole("button", { name: /^(Shared campaigns|Change campaign)$/ })
+      .click();
+    await expect(
+      host.getByRole("article", { name: "Campaign 1", exact: true }),
+    ).toBeVisible();
+    await capture("12-shared-campaigns");
+    await host
+      .getByRole("button", { name: "Resume campaign", exact: true })
+      .click();
+    await expect(host.getByText("Not joined", { exact: true })).toBeVisible();
+    await expect(
+      host.getByRole("button", { name: "Resume campaign", exact: true }),
+    ).toBeDisabled();
+    await host
+      .getByRole("button", { name: "Invite Steam friends", exact: true })
+      .click();
+    await expect.poll(() => room.invites).toEqual([room.host, room.host]);
+    await capture("13-resume-invite");
+    await guest
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await guest.getByLabel("Lobby code", { exact: true }).fill(room.lobbyId);
+    await guest
+      .getByRole("button", { name: "Join lobby", exact: true })
+      .click();
+    await expect(
+      host.getByRole("button", { name: "Resume campaign", exact: true }),
+    ).toBeEnabled();
+    await capture("14-resume-ready");
+    await host
+      .getByRole("button", { name: "Resume campaign", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expectClockMeaning(page, "pause", "pause");
+    }
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.date)
+      .toEqual(savedDates[1]);
+    await expect
+      .poll(() => room.views.get("76561198000000002")?.game?.facilities.length)
+      .toBe(savedFacilities[1]);
+    await capture("15-restored-paused");
+    await capture("16-friend-restored-paused", guest);
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  });
+}
+
 for (const count of [2, 4]) {
   test(
     count +
@@ -1471,42 +1598,41 @@ for (const count of [2, 4]) {
       ).toBe(true);
       for (let i = 1; i < count - 1; i++) await saveAndQuit(pages[i]);
       await saveAndQuit(pages[0]);
-      for (let i = 0; i < count; i++) {
+      await pages[0]
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .click();
+      await pages[0]
+        .getByRole("button", { name: /^(Shared campaigns|Change campaign)$/ })
+        .click();
+      await expect(
+        pages[0].getByRole("article", {
+          name: "Friends campaign",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await pages[0]
+        .getByRole("button", { name: "Resume campaign", exact: true })
+        .click();
+      await room.deliver(buyerId, {
+        kind: "message",
+        sender: room.host,
+        payload: { kind: "view", view: oldView },
+      });
+      await expect(buyer.locator(".facilities:visible")).toHaveCount(0);
+      await expect(
+        pages[0].getByRole("button", { name: "Resume campaign", exact: true }),
+      ).toBeDisabled();
+      for (let i = 1; i < count; i++) {
         await pages[i]
           .getByRole("button", { name: "Play with friends", exact: true })
           .click();
-        if (i === 0)
-          await pages[i]
-            .getByRole("button", { name: "Host a Steam lobby", exact: true })
-            .click();
-        else {
-          await pages[i]
-            .getByLabel("Lobby code", { exact: true })
-            .fill(room.lobbyId);
-          await pages[i]
-            .getByRole("button", { name: "Join lobby", exact: true })
-            .click();
-        }
-        if (i === 0) await deliverOldView();
+        await pages[i]
+          .getByLabel("Lobby code", { exact: true })
+          .fill(room.lobbyId);
+        await pages[i]
+          .getByRole("button", { name: "Join lobby", exact: true })
+          .click();
       }
-      await pages[0]
-        .getByRole("button", { name: "Shared campaigns", exact: true })
-        .click();
-      await expect(
-        pages[0].getByLabel("Campaign", { exact: true }),
-      ).toContainText("Friends campaign");
-      await pages[0]
-        .getByRole("button", { name: "Rename", exact: true })
-        .click();
-      await pages[0]
-        .getByLabel("Campaign name", { exact: true })
-        .fill("Launch friends");
-      await pages[0]
-        .getByRole("button", { name: "Save name", exact: true })
-        .click();
-      await expect(
-        pages[0].getByLabel("Campaign", { exact: true }),
-      ).toContainText("Launch friends");
       await pages[0]
         .getByRole("button", { name: "Resume campaign", exact: true })
         .click();

@@ -301,12 +301,12 @@ export function createWorld(
     seats,
     grids,
     edges,
-    selectedSpeeds: Object.fromEntries(seats.map((s) => [s.id, "NORMAL"])),
+    selectedSpeeds: Object.fromEntries(seats.map((s) => [s.id, "PAUSED"])),
     activities: {},
     speed: "PAUSED",
     readyRequired: true,
     paused: true,
-    reason: "Everyone ready to begin?",
+    reason: "Paused",
     ready: [],
     sequences: {},
     receipts: {},
@@ -373,7 +373,10 @@ function applyCommandOnce(
     return;
   }
   if (command.kind === "ready") {
-    return markReady(world, sender, allowReady);
+    const error = markReady(world, sender, allowReady);
+    if (!error && world.selectedSpeeds[sender] === "PAUSED")
+      world.selectedSpeeds[sender] = "NORMAL";
+    return error;
   }
   // A retired company can still change its speed or menus, but its grid no longer moves.
   if (!isActive(world, sender)) return "Your company's run has ended";
@@ -657,7 +660,7 @@ export function roomView(world: World, seatId: string): RoomView {
             ? "Choosing a response"
             : undefined) ||
           (world.readyRequired && !world.ready.includes(seat.id)
-            ? "Select a speed to resume"
+            ? "Paused"
             : undefined),
       })),
     },
@@ -975,7 +978,10 @@ export function restoreWorld(value: unknown, epoch: string): World {
   result.epoch = epoch;
   // A restored renderer starts on the grid view, so prior menus cannot keep it stuck paused.
   result.activities = {};
-  pauseWorld(result, "Restored shared save — everyone ready?");
+  result.selectedSpeeds = Object.fromEntries(
+    result.seats.map((seat) => [seat.id, "PAUSED"]),
+  );
+  pauseWorld(result, "Paused");
   result.sequences = {};
   result.receipts = {};
   return result;

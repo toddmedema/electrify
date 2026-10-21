@@ -121,6 +121,32 @@ function fixture(directory = "unused-test-path") {
   mp.hostId = service.identity.steamId;
   return { mp, api, calls, events };
 }
+test("campaign management exposes deletion but no rename, import or export requests", async () => {
+  const { mp } = fixture();
+  try {
+    let deleted;
+    mp.saves = {
+      remove: async (id) => {
+        deleted = id;
+      },
+      list: async () => ({ slots: [] }),
+    };
+    for (const kind of ["rename-save", "import-save", "export-save"])
+      await assert.rejects(
+        mp.request({ kind, id: "campaign", name: "Renamed" }),
+        /Unknown multiplayer request/,
+      );
+    assert.deepEqual(
+      await mp.request({ kind: "delete-save", id: "campaign" }),
+      {
+        slots: [],
+      },
+    );
+    assert.equal(deleted, "campaign");
+  } finally {
+    mp.dispose();
+  }
+});
 test("incoming connections use authenticated Steam identity and locked membership", () => {
   const { mp, api, calls } = fixture();
   try {
@@ -452,6 +478,39 @@ test("only the host mirrors a bounded scenario selection to its guests", async (
         browse: { ...browse, padding: "x".repeat(17 * 1024) },
       }),
       /scenario selection/,
+    );
+  } finally {
+    mp.dispose();
+  }
+});
+test("only the host mirrors a bounded campaign invitation roster", async () => {
+  const { mp, events } = fixture();
+  const campaign = {
+    id: "界".repeat(64),
+    name: "界".repeat(80),
+    players: Array.from({ length: 4 }, (_, index) => ({
+      id: `${index}${"1".repeat(63)}`,
+      name: "界".repeat(200),
+    })),
+    requiredPlayerIds: Array.from(
+      { length: 4 },
+      (_, index) => `${index}${"1".repeat(63)}`,
+    ),
+  };
+  try {
+    await assert.rejects(
+      mp.receive("76561198000000002", { kind: "campaign", campaign }),
+      /guest message/,
+    );
+    mp.hostId = "76561198000000002";
+    await mp.receive(mp.hostId, { kind: "campaign", campaign });
+    assert.equal(events.at(-1).payload.kind, "campaign");
+    await assert.rejects(
+      mp.receive(mp.hostId, {
+        kind: "campaign",
+        campaign: { ...campaign, padding: "x".repeat(4096) },
+      }),
+      /campaign selection/,
     );
   } finally {
     mp.dispose();

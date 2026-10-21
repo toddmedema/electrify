@@ -1,25 +1,28 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Alert,
+  Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
+  Menu,
   MenuItem,
+  Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import type { MultiplayerSession } from "./Session";
 import type { SharedSaveLibrary } from "./Native";
 import "./Lobby.css";
 
-/**
- * Gathering friends. Once everyone is here the host chooses a game in the normal scenario
- * screens, and everyone else follows along there.
- */
+/** Friends gather here before choosing a new game or resuming a shared campaign. */
 export default function Lobby({
   session,
   choosing,
@@ -28,36 +31,34 @@ export default function Lobby({
   onLeave,
 }: {
   session: MultiplayerSession;
-  /** The host has already started choosing; closing returns to the scenario screens. */
   choosing: boolean;
   onChoose: () => void;
   onClose: () => void;
   onLeave: () => void;
 }) {
-  const { lobby, busy, error } = useSyncExternalStore(
+  const { lobby, pendingCampaign, busy, error } = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
   );
   const [code, setCode] = useState("");
   const [failure, setFailure] = useState<string>();
   const [library, setLibrary] = useState<SharedSaveLibrary>();
-  const [selected, setSelected] = useState("");
-  const [name, setName] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editingName, setEditingName] = useState(false);
+  const [search, setSearch] = useState("");
   const [loadingSaves, setLoadingSaves] = useState(false);
+  const [menu, setMenu] = useState<{
+    anchor: HTMLElement;
+    id: string;
+    name: string;
+  }>();
+  const [deleting, setDeleting] = useState<{ id: string; name: string }>();
   const title = useRef<HTMLHeadingElement>(null);
-  const renameButton = useRef<HTMLButtonElement>(null);
-  const deleteButton = useRef<HTMLButtonElement>(null);
-  const keepButton = useRef<HTMLButtonElement>(null);
-  const deleteConfirmation = useRef<HTMLDivElement>(null);
+  const cancelDelete = useRef<HTMLButtonElement>(null);
+  const deleteReturn = useRef<HTMLElement>();
+  const deleted = useRef(false);
   const libraryButton = useRef<HTMLButtonElement>(null);
   const previouslyShowingLibrary = useRef(false);
-  const pendingFocus = useRef<"rename" | "title" | "library" | undefined>(
-    undefined,
-  );
   const libraryRequest = useRef(0);
-  const showingLibrary = !!library;
+  const showingLibrary = !!library || loadingSaves;
   useEffect(() => {
     (!showingLibrary && previouslyShowingLibrary.current
       ? libraryButton
@@ -65,38 +66,12 @@ export default function Lobby({
     ).current?.focus();
     previouslyShowingLibrary.current = showingLibrary;
   }, [showingLibrary]);
-  useEffect(() => {
-    if (loadingSaves && !showingLibrary) title.current?.focus();
-  }, [loadingSaves, showingLibrary]);
-  useEffect(() => {
-    if (!loadingSaves && pendingFocus.current) {
-      (pendingFocus.current === "rename"
-        ? renameButton
-        : pendingFocus.current === "library"
-          ? libraryButton
-          : title
-      ).current?.focus();
-      pendingFocus.current = undefined;
-    }
-  }, [editingName, loadingSaves]);
-  useEffect(() => {
-    if (confirmDelete) {
-      keepButton.current?.focus({ preventScroll: true });
-      deleteConfirmation.current?.scrollIntoView({ block: "nearest" });
-    }
-  }, [confirmDelete]);
   const loadSaves = async (action = () => session.sharedSaves(true)) => {
     const request = ++libraryRequest.current;
     setLoadingSaves(true);
     try {
       const next = await action();
-      if (request !== libraryRequest.current) return;
-      setLibrary(next);
-      const slot = next.slots.find((s) => s.id === selected) || next.slots[0];
-      setSelected(slot?.id || "");
-      setName(slot?.name || "");
-      setConfirmDelete(false);
-      setEditingName(false);
+      if (request === libraryRequest.current) setLibrary(next);
     } catch (error) {
       if (request === libraryRequest.current) throw error;
     } finally {
@@ -112,430 +87,429 @@ export default function Lobby({
   const everyoneHere =
     lobby.members.length >= 2 &&
     lobby.members.every((member) => connected(member.id));
+  const canBegin = pendingCampaign ? session.canResumeCampaign() : everyoneHere;
+  const roster = [
+    ...lobby.members,
+    ...(pendingCampaign?.players.filter(
+      (player) =>
+        pendingCampaign.requiredPlayerIds.includes(player.id) &&
+        !lobby.members.some((member) => member.id === player.id),
+    ) || []),
+  ];
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
-    void action().catch((e) => setFailure(e.message));
-  };
-  const campaign = library?.slots.find((slot) => slot.id === selected);
-  const closeRename = () => {
-    pendingFocus.current = "rename";
-    setEditingName(false);
+    void action().catch((error) =>
+      setFailure(error instanceof Error ? error.message : "Please try again."),
+    );
   };
   const closeLibrary = () => {
-    pendingFocus.current = "library";
     ++libraryRequest.current;
     setLoadingSaves(false);
     setLibrary(undefined);
-    setEditingName(false);
-    setConfirmDelete(false);
+    setSearch("");
+    setMenu(undefined);
+    setDeleting(undefined);
   };
+  const resume = (id: string, name: string) =>
+    run(async () => {
+      await session.prepareResume(id, name);
+      closeLibrary();
+      window.setTimeout(() => title.current?.focus(), 0);
+    });
+  const showSearch = (library?.slots.length || 0) > 3;
+  const query = showSearch ? search.trim().toLocaleLowerCase() : "";
+  const campaigns = library?.slots.filter((slot) =>
+    `${slot.name} ${slot.players.join(" ")}`
+      .toLocaleLowerCase()
+      .includes(query),
+  );
   return (
-    <Dialog
-      className="coopLobby"
-      open
-      fullWidth
-      maxWidth="sm"
-      onClose={
-        library || loadingSaves
-          ? closeLibrary
-          : choosing || !lobby.lobbyId
-            ? onClose
-            : onLeave
-      }
-      aria-labelledby="multiplayer-lobby-title"
-    >
-      <DialogTitle
-        id="multiplayer-lobby-title"
-        ref={title}
-        tabIndex={-1}
-        sx={{ outline: "none" }}
+    <>
+      <Dialog
+        className="coopLobby"
+        open
+        fullWidth
+        maxWidth="sm"
+        onClose={
+          busy
+            ? undefined
+            : showingLibrary
+              ? closeLibrary
+              : choosing || !lobby.lobbyId
+                ? onClose
+                : onLeave
+        }
+        aria-labelledby="multiplayer-lobby-title"
       >
-        {library ? "Shared campaigns" : "Play with friends"}
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ pt: 1 }}>
-          {(failure || error || lobby.error) && (
-            <Alert
-              severity="warning"
-              onClose={() => {
-                setFailure(undefined);
-                session.dismissError();
-              }}
-            >
-              {failure || error || lobby.error}
-            </Alert>
-          )}
-          {!library && (
-            <>
-              <Typography color="textSecondary">
-                Run neighboring electricity companies in any scenario or custom
-                game. Each company starts with a tier 1 intertie to every other
-                player.
-              </Typography>
-              {!lobby.lobbyId ? (
-                <>
-                  <Button
-                    variant="contained"
-                    disabled={!lobby.available || busy}
-                    onClick={() => run(() => session.create())}
-                  >
-                    Host a Steam lobby
-                  </Button>
-                  <Divider>or join friends</Divider>
-                  <TextField
-                    label="Lobby code"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.trim())}
-                    slotProps={{
-                      htmlInput: { inputMode: "numeric", maxLength: 20 },
-                    }}
-                  />
-                  <Button
-                    variant="outlined"
-                    disabled={
-                      !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
-                    }
-                    onClick={() => run(() => session.join(code))}
-                  >
-                    Join lobby
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <TextField
-                    label="Lobby code"
-                    value={lobby.lobbyId}
-                    slotProps={{ input: { readOnly: true } }}
-                  />
-                  {/* Until a friend arrives, inviting is the host's next step. */}
-                  <Button
-                    variant={host && !everyoneHere ? "contained" : "text"}
-                    onClick={() => run(() => session.invite())}
-                  >
-                    Invite Steam friends
-                  </Button>
-                  <ul className="coopLobbyRoster" aria-label="Players">
-                    {lobby.members.map((member) => (
-                      <li key={member.id}>
-                        <span>
-                          {member.name}
-                          {member.id === lobby.selfId ? " (you)" : ""}
-                        </span>
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color="textSecondary"
-                        >
-                          {member.id === lobby.hostId
-                            ? "Host"
-                            : connected(member.id)
-                              ? "Connected"
-                              : "Connecting…"}
-                        </Typography>
-                      </li>
-                    ))}
-                  </ul>
-                  {host ? (
-                    <>
+        <DialogTitle
+          id="multiplayer-lobby-title"
+          ref={title}
+          tabIndex={-1}
+          sx={{ outline: "none", overflowWrap: "anywhere" }}
+        >
+          {showingLibrary
+            ? "Shared campaigns"
+            : pendingCampaign?.name || "Play with friends"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {(failure || error || lobby.error) && !deleting && (
+              <Alert
+                severity="warning"
+                onClose={() => {
+                  setFailure(undefined);
+                  session.dismissError();
+                }}
+              >
+                {failure || error || lobby.error}
+              </Alert>
+            )}
+            {!showingLibrary && (
+              <>
+                {!lobby.lobbyId ? (
+                  <>
+                    <Button
+                      variant="contained"
+                      disabled={!lobby.available || busy}
+                      onClick={() => run(() => session.create())}
+                    >
+                      Host a Steam lobby
+                    </Button>
+                    <Divider>or join friends</Divider>
+                    <TextField
+                      label="Lobby code"
+                      value={code}
+                      onChange={(event) => setCode(event.target.value.trim())}
+                      slotProps={{
+                        htmlInput: { inputMode: "numeric", maxLength: 20 },
+                      }}
+                    />
+                    <Button
+                      variant="outlined"
+                      disabled={
+                        !lobby.available || busy || !/^[0-9]{17,20}$/.test(code)
+                      }
+                      onClick={() => run(() => session.join(code))}
+                    >
+                      Join lobby
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant={host && !canBegin ? "contained" : "outlined"}
+                      disabled={busy}
+                      onClick={() => run(() => session.invite())}
+                    >
+                      Invite Steam friends
+                    </Button>
+                    <ul className="coopLobbyRoster" aria-label="Players">
+                      {roster.map((member) => {
+                        const expected =
+                          !pendingCampaign ||
+                          pendingCampaign.players.some(
+                            (player) => player.id === member.id,
+                          );
+                        return (
+                          <li key={member.id}>
+                            <span>
+                              {member.name}
+                              {member.id === lobby.selfId ? " (you)" : ""}
+                            </span>
+                            <Typography
+                              component="span"
+                              variant="body2"
+                              color={
+                                expected ? "text.secondary" : "warning.main"
+                              }
+                            >
+                              {!expected
+                                ? "Not in this campaign"
+                                : !lobby.members.some(
+                                      (present) => present.id === member.id,
+                                    )
+                                  ? "Not joined"
+                                  : member.id === lobby.hostId
+                                    ? "Host"
+                                    : connected(member.id)
+                                      ? "Connected"
+                                      : "Connecting…"}
+                            </Typography>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <TextField
+                      label="Lobby code"
+                      value={lobby.lobbyId}
+                      size="small"
+                      slotProps={{ input: { readOnly: true } }}
+                    />
+                    {host ? (
                       <Button
-                        variant="contained"
+                        variant={canBegin ? "contained" : "outlined"}
                         size="large"
-                        disabled={busy || !everyoneHere}
-                        onClick={onChoose}
-                      >
-                        {choosing
-                          ? "Back to choosing"
-                          : "Choose a game together"}
-                      </Button>
-                      {!everyoneHere && (
-                        <Typography role="status" variant="body2">
-                          Waiting for a friend to join…
-                        </Typography>
-                      )}
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          run(() => session.start({ saved: true }))
+                        disabled={busy || !canBegin}
+                        onClick={
+                          pendingCampaign
+                            ? () =>
+                                run(() =>
+                                  session.start({
+                                    saved: true,
+                                    id: pendingCampaign.id,
+                                  }),
+                                )
+                            : onChoose
                         }
                       >
-                        Resume last shared save
+                        {pendingCampaign
+                          ? "Resume campaign"
+                          : choosing
+                            ? "Back to choosing"
+                            : "Choose a game together"}
                       </Button>
-                    </>
-                  ) : (
-                    <Typography role="status">
-                      {hostName} will choose a game.
+                    ) : (
+                      <Typography role="status" color="text.secondary">
+                        Waiting for {hostName}…
+                      </Typography>
+                    )}
+                  </>
+                )}
+                {(!lobby.lobbyId || host) && (
+                  <Button
+                    ref={libraryButton}
+                    disabled={busy || loadingSaves}
+                    onClick={() => run(() => loadSaves())}
+                  >
+                    {pendingCampaign ? "Change campaign" : "Shared campaigns"}
+                  </Button>
+                )}
+              </>
+            )}
+            {showingLibrary && (
+              <Stack spacing={2} className="savedGames coopCampaigns">
+                {library?.warning && (
+                  <Alert severity="warning">{library.warning}</Alert>
+                )}
+                {library?.cloudState === "failed" && (
+                  <Alert severity="warning">
+                    Steam Cloud could not sync. Local campaigns are available.
+                  </Alert>
+                )}
+                {showSearch && (
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search campaigns"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                )}
+                {loadingSaves && !library && (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    role="status"
+                    sx={{ alignItems: "center" }}
+                  >
+                    <CircularProgress size={20} />
+                    <Typography>Loading shared campaigns…</Typography>
+                  </Stack>
+                )}
+                {library && !library.slots.length && (
+                  <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+                    <Typography component="h2" variant="h6">
+                      No shared campaigns yet
                     </Typography>
-                  )}
-                </>
+                    {!lobby.lobbyId && (
+                      <Button
+                        variant="contained"
+                        disabled={!lobby.available || busy}
+                        sx={{ mt: 2 }}
+                        onClick={() =>
+                          run(async () => {
+                            await session.create();
+                            closeLibrary();
+                          })
+                        }
+                      >
+                        Host a Steam lobby
+                      </Button>
+                    )}
+                  </Paper>
+                )}
+                {!!library?.slots.length && !campaigns?.length && (
+                  <Typography role="status">
+                    No campaigns match “{search}”.
+                  </Typography>
+                )}
+                {campaigns?.map((campaign) => {
+                  const savedAt = new Date(campaign.updatedAt);
+                  const timestamp = savedAt.toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  });
+                  return (
+                    <Paper
+                      key={campaign.id}
+                      variant="outlined"
+                      component="article"
+                      className="saveEntry"
+                      aria-label={campaign.name}
+                    >
+                      <Box className="coopCampaignHeading">
+                        <Typography component="h2" variant="h6">
+                          {campaign.name}
+                        </Typography>
+                        <IconButton
+                          aria-label={`Actions for ${campaign.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={menu?.id === campaign.id || undefined}
+                          disabled={busy || loadingSaves}
+                          onClick={(event) => {
+                            deleteReturn.current = event.currentTarget;
+                            deleted.current = false;
+                            setMenu({
+                              anchor: event.currentTarget,
+                              id: campaign.id,
+                              name: campaign.name,
+                            });
+                          }}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        {campaign.players.join(", ")}
+                      </Typography>
+                      <Typography
+                        component="div"
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5 }}
+                      >
+                        <time
+                          dateTime={savedAt.toISOString()}
+                          title={timestamp}
+                          aria-label={`Saved ${timestamp}`}
+                        >
+                          Saved {timestamp}
+                        </time>
+                      </Typography>
+                      <Box className="coopCampaignResume">
+                        <Button
+                          variant="contained"
+                          disabled={busy || loadingSaves}
+                          onClick={() => resume(campaign.id, campaign.name)}
+                        >
+                          Resume campaign
+                        </Button>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+            {busy && !loadingSaves && (
+              <CircularProgress size={20} aria-label="Loading multiplayer" />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          {showingLibrary ? (
+            <Button disabled={busy} onClick={closeLibrary}>
+              {lobby.lobbyId ? "Back to lobby" : "Back"}
+            </Button>
+          ) : (
+            <>
+              {lobby.lobbyId && (
+                <Button disabled={busy} onClick={onLeave}>
+                  Leave lobby
+                </Button>
               )}
-              {(!lobby.lobbyId || host) && (
-                <Button
-                  ref={libraryButton}
-                  variant="outlined"
-                  disabled={busy || loadingSaves}
-                  onClick={() => run(() => loadSaves())}
-                >
-                  Shared campaigns
+              {(choosing || !lobby.lobbyId) && (
+                <Button disabled={busy} onClick={onClose}>
+                  {choosing ? "Close" : "Back"}
                 </Button>
               )}
             </>
           )}
-          {library && (
-            <Stack spacing={2} aria-label="Shared campaigns">
-              {library.warning && (
-                <Alert severity="warning">{library.warning}</Alert>
-              )}
-              {library.cloudState === "failed" && (
-                <Alert severity="warning">
-                  Steam Cloud could not sync. Local campaigns are available.
-                </Alert>
-              )}
-              {library.cloudState === "offline" && (
-                <Typography variant="body2" color="textSecondary">
-                  Steam Cloud is offline. Campaigns are saved on this computer.
-                </Typography>
-              )}
-              {library.cloudState === "ready" && (
-                <Typography variant="body2" color="textSecondary">
-                  Saved on this computer and synced with Steam Cloud.
-                </Typography>
-              )}
-              {library.cloudState === "disabled" && (
-                <Typography variant="body2" color="textSecondary">
-                  Saved on this computer. Steam Cloud is turned off.
-                </Typography>
-              )}
-              {library.slots.length ? (
-                <>
-                  <TextField
-                    select
-                    label="Campaign"
-                    value={selected}
-                    onChange={(event) => {
-                      setSelected(event.target.value);
-                      setName(
-                        library.slots.find((s) => s.id === event.target.value)
-                          ?.name || "",
-                      );
-                      setConfirmDelete(false);
-                      setEditingName(false);
-                    }}
-                    slotProps={{
-                      select: {
-                        MenuProps: {
-                          slotProps: {
-                            paper: { sx: { maxWidth: "calc(100vw - 32px)" } },
-                          },
-                        },
-                      },
-                    }}
-                  >
-                    {library.slots.map((slot) => (
-                      <MenuItem
-                        key={slot.id}
-                        value={slot.id}
-                        sx={{ whiteSpace: "normal", overflowWrap: "anywhere" }}
-                      >
-                        {slot.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <Stack spacing={0.5} className="coopCampaignDetails">
-                    <Typography variant="body2">
-                      {campaign?.players.join(", ")}
-                    </Typography>
-                    {campaign && (
-                      <Typography variant="body2" color="textSecondary">
-                        Saved{" "}
-                        {new Date(campaign.updatedAt).toLocaleString(
-                          undefined,
-                          { dateStyle: "medium", timeStyle: "short" },
-                        )}
-                      </Typography>
-                    )}
-                  </Stack>
-                  <Button
-                    variant="contained"
-                    disabled={busy || loadingSaves || !host || !everyoneHere}
-                    onClick={() =>
-                      run(() => session.start({ saved: true, id: selected }))
-                    }
-                  >
-                    Resume campaign
-                  </Button>
-                  {!lobby.lobbyId && (
-                    <Typography variant="body2" color="textSecondary">
-                      Host a lobby and invite this campaign’s players to resume.
-                    </Typography>
-                  )}
-                  <Divider />
-                  {editingName && (
-                    <Stack spacing={1}>
-                      <TextField
-                        autoFocus
-                        label="Campaign name"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        slotProps={{ htmlInput: { maxLength: 80 } }}
-                      />
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{ justifyContent: "flex-end" }}
-                      >
-                        <Button onClick={closeRename}>Cancel</Button>
-                        <Button
-                          variant="contained"
-                          disabled={
-                            busy ||
-                            loadingSaves ||
-                            !name.trim() ||
-                            name.trim() === campaign?.name
-                          }
-                          onClick={() =>
-                            run(async () => {
-                              pendingFocus.current = "rename";
-                              await loadSaves(() =>
-                                session.renameSharedSave(selected, name),
-                              );
-                            })
-                          }
-                        >
-                          Save name
-                        </Button>
-                      </Stack>
-                    </Stack>
-                  )}
-                  {!editingName && (
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      useFlexGap
-                      className="coopCampaignActions"
-                    >
-                      <Button
-                        ref={renameButton}
-                        disabled={busy || loadingSaves}
-                        onClick={() => {
-                          setName(campaign?.name || "");
-                          setEditingName(true);
-                          setConfirmDelete(false);
-                        }}
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        aria-label="Export campaign"
-                        disabled={busy || loadingSaves}
-                        onClick={() =>
-                          run(() => session.exportSharedSave(selected))
-                        }
-                      >
-                        Export
-                      </Button>
-                      <Button
-                        ref={deleteButton}
-                        aria-label="Delete campaign"
-                        color="error"
-                        disabled={busy || loadingSaves}
-                        onClick={() => {
-                          setConfirmDelete(true);
-                          setEditingName(false);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  )}
-                  {confirmDelete && (
-                    <Alert severity="warning" ref={deleteConfirmation}>
-                      Delete “
-                      {library.slots.find((s) => s.id === selected)?.name}” from
-                      your library? Export it first to keep a portable backup.
-                      <Stack
-                        className="coopCampaignDeleteActions"
-                        direction={{ xs: "column-reverse", sm: "row" }}
-                        spacing={1}
-                        sx={{ mt: 1 }}
-                      >
-                        <Button
-                          ref={keepButton}
-                          variant="outlined"
-                          color="inherit"
-                          onClick={() => {
-                            setConfirmDelete(false);
-                            deleteButton.current?.focus();
-                          }}
-                        >
-                          Keep campaign
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          disabled={loadingSaves}
-                          onClick={() =>
-                            run(() => {
-                              pendingFocus.current = "title";
-                              return loadSaves(() =>
-                                session.deleteSharedSave(selected),
-                              );
-                            })
-                          }
-                        >
-                          Confirm delete
-                        </Button>
-                      </Stack>
-                    </Alert>
-                  )}
-                </>
-              ) : (
-                <Stack spacing={1} className="coopCampaignEmpty">
-                  <Typography
-                    component="h3"
-                    variant="subtitle1"
-                    sx={{ fontWeight: 600 }}
-                  >
-                    No shared campaigns saved yet.
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Your campaigns appear here when you save a game with
-                    friends. You can also import a campaign from a file.
-                  </Typography>
-                </Stack>
-              )}
-              <Button
-                variant="outlined"
-                disabled={busy || loadingSaves}
-                onClick={() =>
-                  run(() => loadSaves(() => session.importSharedSave()))
-                }
-              >
-                Import campaign
-              </Button>
-              <Typography variant="body2" color="textSecondary">
-                Differing Steam Cloud checkpoints appear as separate copies.
-                Every player must select a speed before a restored match
-                continues.
-              </Typography>
-            </Stack>
+        </DialogActions>
+      </Dialog>
+      <Menu
+        anchorEl={menu?.anchor}
+        open={!!menu}
+        onClose={() => setMenu(undefined)}
+        disableRestoreFocus={!!deleting}
+      >
+        <MenuItem
+          sx={{ color: "error.main" }}
+          onClick={() => {
+            if (menu) setDeleting({ id: menu.id, name: menu.name });
+            setFailure(undefined);
+            setMenu(undefined);
+          }}
+        >
+          Delete
+        </MenuItem>
+      </Menu>
+      <Dialog
+        open={!!deleting}
+        fullWidth
+        maxWidth="xs"
+        onClose={loadingSaves ? undefined : () => setDeleting(undefined)}
+        aria-labelledby="delete-campaign-title"
+        aria-describedby="delete-campaign-message"
+        slotProps={{
+          transition: {
+            onEntered: () => cancelDelete.current?.focus(),
+            onExited: () =>
+              (deleted.current ? title.current : deleteReturn.current)?.focus(),
+          },
+        }}
+      >
+        <DialogTitle id="delete-campaign-title">
+          Delete shared campaign?
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            id="delete-campaign-message"
+            sx={{ overflowWrap: "anywhere" }}
+          >
+            “{deleting?.name}” will be permanently deleted.
+          </Typography>
+          {failure && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {failure}
+            </Alert>
           )}
-          {busy && (
-            <Typography role="status">Preparing the shared grids…</Typography>
-          )}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        {library ? (
-          <Button onClick={closeLibrary}>Back to lobby</Button>
-        ) : (
-          <>
-            {lobby.lobbyId && <Button onClick={onLeave}>Leave lobby</Button>}
-            {(choosing || !lobby.lobbyId) && (
-              <Button onClick={onClose}>{choosing ? "Close" : "Back"}</Button>
-            )}
-          </>
-        )}
-      </DialogActions>
-    </Dialog>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            autoFocus
+            ref={cancelDelete}
+            disabled={loadingSaves}
+            onClick={() => setDeleting(undefined)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={loadingSaves}
+            onClick={() => {
+              if (deleting)
+                run(async () => {
+                  await loadSaves(() => session.deleteSharedSave(deleting.id));
+                  deleted.current = true;
+                  setDeleting(undefined);
+                });
+            }}
+          >
+            {loadingSaves ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

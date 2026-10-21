@@ -28,8 +28,8 @@ export default function CoopBrowseBar({
     : host
       ? `${ready} of ${guests.length} ready`
       : coop.viewing
-        ? `${coop.hostName} is looking at ${coop.viewing}. Mark Ready when you're happy with it.`
-        : `${coop.hostName} is browsing games.`;
+        ? coop.viewing
+        : "Choosing a game…";
   return (
     <section className="coopBrowseBar" aria-label="Playing together">
       <div className="coopBrowseStatus" role="status" aria-live="polite">

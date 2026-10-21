@@ -16,7 +16,7 @@ export const isBrowseCard = (name: string): name is BrowseCard =>
 function viewing(browse?: BrowseState): string | undefined {
   if (!browse) return undefined;
   const difficulty = DIFFICULTY_LABELS[browse.difficulty];
-  if (browse.card === "CUSTOM_GAME") return `a custom game on ${difficulty}`;
+  if (browse.card === "CUSTOM_GAME") return `Custom game on ${difficulty}`;
   const name =
     browse.card === "NEW_GAME_DETAILS" && browse.scenarioId !== undefined
       ? getScenario(browse.scenarioId)?.name

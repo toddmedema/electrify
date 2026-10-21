@@ -35,6 +35,27 @@ function command(world: World, player: number, action: Command) {
   });
 }
 
+test.each(["new", "restored"])(
+  "%s campaigns start with every player's speed paused",
+  (state) => {
+    let world = create(2);
+    if (state === "restored") {
+      command(world, 0, { kind: "speed", speed: "ULTRA" });
+      command(world, 1, { kind: "speed", speed: "SLOW" });
+      world = restoreWorld(checkpointWorld(world), "resumed");
+    }
+    expect(world.selectedSpeeds).toEqual({ 0: "PAUSED", 1: "PAUSED" });
+    expect(roomView(world, "0").game!.multiplayer!.clock!.selectedSpeed).toBe(
+      "PAUSED",
+    );
+    expect(world.speed).toBe("PAUSED");
+    command(world, 0, { kind: "speed", speed: "NORMAL" });
+    expect(world.speed).toBe("PAUSED");
+    command(world, 1, { kind: "speed", speed: "SLOW" });
+    expect(world.speed).toBe("SLOW");
+  },
+);
+
 test("running speed choices consent to a safety resume atomically, including reselecting the same speed", () => {
   const world = create(3);
   expect(command(world, 0, { kind: "speed", speed: "NORMAL" })).toBeUndefined();
@@ -59,12 +80,12 @@ test("running speed choices consent to a safety resume atomically, including res
   expect(world.speed).toBe("SLOW");
 });
 
-test("resume guidance is a clock presentation reason, never a reported local activity", () => {
+test("paused readiness is a clock presentation reason, never a reported local activity", () => {
   const world = create(2);
   let view = roomView(world, "0");
   expect(
     view.game!.multiplayer!.clock!.players.map((p) => p.pauseReason),
-  ).toEqual(["Select a speed to resume", "Select a speed to resume"]);
+  ).toEqual(["Paused", "Paused"]);
   expect(view.grids.map((g) => g.pauseReason)).toEqual([undefined, undefined]);
   expect(world.activities).toEqual({});
   command(world, 0, { kind: "speed", speed: "NORMAL" });
@@ -86,7 +107,7 @@ test("speed readiness cannot bypass a disconnected player or the campaign end", 
   };
   expect(applyCommand(world, "0", envelope, false)).toMatch(/reconnect/);
   expect(world.ready).toEqual([]);
-  expect(world.selectedSpeeds["0"]).toBe("NORMAL");
+  expect(world.selectedSpeeds["0"]).toBe("PAUSED");
   expect(world.speed).toBe("PAUSED");
   world.seats.forEach((seat) => {
     world.outcomes[seat.id] = {
@@ -597,23 +618,24 @@ test("invalid speeds and activity payloads cannot corrupt the shared clock", () 
     { kind: "activity", reason: "x".repeat(121) },
   ])
     expect(command(world, 0, action as Command)).toMatch(/valid/i);
-  expect(world.selectedSpeeds["0"]).toBe("NORMAL");
+  expect(world.selectedSpeeds["0"]).toBe("PAUSED");
   expect(world.activities).toEqual({});
 });
 
-test("saved matches preserve individual selections but clear stale menus on restore", () => {
+test("saved matches reset individual speeds and clear stale menus on restore", () => {
   const world = create(2);
   command(world, 0, { kind: "speed", speed: "ULTRA" });
   command(world, 1, { kind: "speed", speed: "SLOW" });
   command(world, 0, { kind: "activity", reason: "Leaving match" });
   const saved = checkpointWorld(world);
   const restored = restoreWorld(saved, "new-epoch");
-  expect(restored.selectedSpeeds).toEqual(world.selectedSpeeds);
+  expect(restored.selectedSpeeds).toEqual({ 0: "PAUSED", 1: "PAUSED" });
+  expect(saved.selectedSpeeds).toEqual({ 0: "ULTRA", 1: "SLOW" });
   expect(restored.activities).toEqual({});
   expect(restored.readyRequired).toBe(true);
   expect(restored.speed).toBe("PAUSED");
   restored.seats.forEach((_s, i) => command(restored, i, { kind: "ready" }));
-  expect(restored.speed).toBe("SLOW");
+  expect(restored.speed).toBe("NORMAL");
   expect(() =>
     restoreWorld(
       { ...saved, selectedSpeeds: { 0: "INVALID", 1: "SLOW" } },

@@ -95,9 +95,10 @@ test("choosing together drops the lessons and the personal recommendations", () 
 test("guests hear what the host has open as it changes", () => {
   const { rerender } = render(<CoopBrowseBar coop={coop()} />);
   const status = screen.getByRole("status");
-  expect(status).toHaveTextContent("Alice is browsing games.");
+  expect(status).toHaveTextContent("Choosing a game…");
   rerender(<CoopBrowseBar coop={coop({ viewing: "Deep Freeze on Hard" })} />);
-  expect(status).toHaveTextContent("Alice is looking at Deep Freeze on Hard.");
+  expect(status).toHaveTextContent("Following Alice");
+  expect(status).toHaveTextContent("Deep Freeze on Hard");
 });
 
 test("a setup that can't be played can't be started or marked ready", () => {

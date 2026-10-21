@@ -11,26 +11,31 @@
   overflow-wrap: anywhere;
 }
 
-.coopLobby .MuiSelect-select {
-  white-space: normal;
-  overflow-wrap: anywhere;
+.coopLobby .MuiButton-root,
+.coopLobby .MuiIconButton-root {
+  min-height: 40px;
 }
 
-.coopCampaignDetails {
-  overflow-wrap: anywhere;
-}
-
-.coopCampaignActions > .MuiButton-root {
-  flex: 1;
+.coopCampaigns {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.coopCampaignDeleteActions .MuiButton-root {
-  flex: 1;
+.coopCampaignHeading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
 }
 
-.coopCampaignEmpty {
-  padding: 24px 0;
+.coopCampaignHeading h2 {
+  font-weight: 600;
+}
+
+.coopCampaignResume {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 .coopLobbyRoster li > span:first-child {
@@ -40,4 +45,17 @@
 
 .coopLobbyRoster li > span:last-child {
   flex-shrink: 0;
+}
+
+@media (max-width: 599px) {
+  .coopCampaignResume .MuiButton-root {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .coopLobby .MuiButton-root,
+  .coopLobby .MuiIconButton-root {
+    min-height: 44px;
+  }
 }

@@ -478,8 +478,10 @@ before publishing a current-rules baseline. Players in the same session must sti
 game code and data. Newer or unsupported bundles remain preserved; individual grids never migrate
 independently during play.
 
-**Play with friends → Shared campaigns** lists named campaigns, with rename, delete, import and
-export actions. Host a lobby with the saved campaign's players to resume a selected campaign.
+**Play with friends → Shared campaigns** lists saved campaigns with their players and save times.
+Resume opens a lobby for that campaign; invite the missing players, then resume together. The
+campaign menu offers deletion with confirmation. New and resumed games start with every player
+paused, using the same speed controls as ordinary play.
 The account-specific `co-op-library.json` holds up to 32 campaigns and 64 MiB; a checkpoint is
 limited to 16 MiB. The old `co-op.json` is retained and imported as the last shared save. An
 immutable `co-op-original-<digest>.json` preserves a checkpoint before a rules or schema upgrade;
@@ -488,7 +490,7 @@ the rotating `.previous` file also protects interrupted writes.
 Steam Cloud uses separate `electrify/co-op-device-<32-hex-device-id>.json` libraries. Different
 checkpoints are retained as separate Cloud copies, with deletion history to suppress a deleted
 copy's return. Budget Cloud quota for both solo and co-op libraries on each computer. Local
-saving remains available while Steam or Cloud is offline; JSON export provides a portable backup.
+saving remains available while Steam or Cloud is offline.
 
 Run `npm run test:multiplayer` for windowless two- and four-player browser sessions with the real
 worker and an in-memory Steam bridge. CI serves the verified production desktop renderer. To
