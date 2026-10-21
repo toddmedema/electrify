@@ -72,13 +72,13 @@ export function finishStartup(): void {
           },
           { transform: "none" },
         ],
-        { duration: 200, easing: "ease-out" },
+        { duration: 300, easing: "ease-out" },
       );
     }
     menu
       ?.querySelector("#centeredMenu")
       ?.animate([{ opacity: 0.65 }, { opacity: 1 }], {
-        duration: 160,
+        duration: 240,
         easing: "ease-out",
       });
   }

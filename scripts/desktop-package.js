@@ -129,7 +129,7 @@ async function withOfflineMacSigning(
 }
 
 function packageConfiguration(mode, appVersion = "dev") {
-  const buildConfig = require("../electron-builder.config.cjs");
+  const buildConfig = require("../electron/electron-builder.config.cjs");
   return {
     ...buildConfig,
     electronVersion: require("../package-lock.json").packages[

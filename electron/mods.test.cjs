@@ -476,7 +476,7 @@ test("unfinished uploads have a bounded disk footprint before any new Steam item
 });
 
 test("packaged builds include every repository file the main process loads outside electron/", () => {
-  const { files } = require("../electron-builder.config.cjs");
+  const { files } = require("./electron-builder.config.cjs");
   for (const file of fs
     .readdirSync(__dirname)
     .filter((f) => f.endsWith(".cjs") && !f.endsWith(".test.cjs")))

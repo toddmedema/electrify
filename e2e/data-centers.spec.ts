@@ -135,11 +135,11 @@ test("the landing page opens a prepared current-year grid and supports browser h
       .locator(".dataCenterSetupContent")
       .boundingBox())!;
     const header = (await page.locator(".screenHeaderBar").boundingBox())!;
-    const frame = (await page.locator(".screenPage").boundingBox())!;
-    expect(header.x).toBeCloseTo(frame.x, 0);
-    expect(header.width).toBeCloseTo(frame.width, 0);
-    expect(content.x).toBeCloseTo(frame.x + 16, 0);
-    expect(content.width).toBeCloseTo(frame.width - 32, 0);
+    const viewport = page.viewportSize()!;
+    expect(header.width).toBeCloseTo(Math.min(viewport.width, 1040), 0);
+    expect(header.x).toBeCloseTo((viewport.width - header.width) / 2, 0);
+    expect(content.x).toBeCloseTo(header.x + 16, 0);
+    expect(content.width).toBeCloseTo(header.width - 32, 0);
     const summary = (await page
       .locator(".dataCenterSetupSummary")
       .boundingBox())!;

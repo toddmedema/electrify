@@ -14,7 +14,14 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const upcoming = page.getByRole("button", { name: /^Upcoming:/ });
+    await openPane(
+      page.locator(".insights:visible"),
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
+    const upcoming = page
+      .getByRole("region", { name: "Upcoming scenario events" })
+      .getByRole("button")
+      .first();
     await expect(upcoming).toBeVisible();
     await upcoming.click();
     await expect(page.locator(".insightEventChip.active")).toBeVisible();
@@ -41,11 +48,16 @@ for (const theme of ["light", "dark"] as const) {
       page.getByRole("menuitemcheckbox", { name: "Blackouts" }),
     ).not.toBeChecked();
     await page.getByRole("menuitem", { name: "Done" }).click();
-    await expect(
-      page.getByRole("button", {
-        name: "Filter event history, World events, Projects",
-      }),
-    ).toBeVisible();
+    const filterButton = page.getByRole("button", {
+      name: "Filter event history, World events, Projects",
+    });
+    await expect(filterButton).toBeVisible();
+    await page.mouse.move(0, 0);
+    await filterButton.blur();
+    await expect(filterButton).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
     await openPane(
       page.locator(".facilities"),
       page.getByRole("button", { name: "Facilities", exact: true }),

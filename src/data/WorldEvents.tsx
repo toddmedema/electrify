@@ -69,7 +69,7 @@ export interface StoryPhaseDefinitionType {
   /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
   scheduleAddress?: string;
   scheduleOffsetMonths?: number | ((context: StoryContextType) => number);
-  /** Short future-tense copy shared by all upcoming views; live logs use `describe`.
+  /** Short anticipatory copy shared by all upcoming views; live logs use `describe`.
    * Return null to keep warning-only or surprise phases out of those views.
    */
   preview: (
@@ -194,8 +194,8 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 48 },
       durationMonths: 74,
       preview: () => ({
-        title: "Gas prices will fall",
-        message: "A regional shale glut will make local gas cheaper.",
+        title: "Gas prices falling",
+        message: "Regional shale glut lowering local gas prices.",
       }),
       describe: ({ difficulty }) => {
         const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
@@ -234,8 +234,8 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 96 },
       durationMonths: 3,
       preview: () => ({
-        title: "Winter freeze will hit",
-        message: "Gas costs will spike and gas plants will produce less.",
+        title: "Winter freeze approaching",
+        message: "Gas costs spiking and gas plants producing less.",
       }),
       describe: ({ difficulty }) => {
         const balance = SHALE_BOOM_BALANCE[difficulty];
@@ -268,8 +268,8 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "normalization",
       schedule: { atMonth: 122 },
       preview: () => ({
-        title: "Gas boom will end",
-        message: "Natural gas prices will return to normal.",
+        title: "Gas boom ending",
+        message: "Natural gas prices returning to normal.",
       }),
       describe: ({ snapshot }) => {
         const gasShare = share(
@@ -299,9 +299,8 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "freeze-recovery",
       schedule: { atMonth: 99 },
       preview: () => ({
-        title: "Gas output will recover",
-        message:
-          "Plant limits will lift and lower boom-era prices will resume.",
+        title: "Gas output recovering",
+        message: "Plant limits lifting and lower boom-era prices returning.",
       }),
       describe: ({ difficulty }) => ({
         title: "Winter freeze ends",
@@ -484,8 +483,8 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 48 },
       durationMonths: 96,
       preview: () => ({
-        title: "Pollution fees will rise",
-        message: "Coal and gas will cost more to run.",
+        title: "Pollution fees rising",
+        message: "Coal and gas costing more to run.",
       }),
       describe: ({ difficulty }) => {
         const feePerTon = CARBON_FEE_BALANCE[difficulty];
@@ -515,7 +514,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Visitor surge forecast",
-        message: `Visitors are expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
+        message: `Visitors expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
         concept: "customers",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -527,8 +526,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 28 },
       durationMonths: 18,
       preview: () => ({
-        title: "Visitor demand will rise",
-        message: "More visitors will increase electricity use.",
+        title: "Visitor demand rising",
+        message: "More visitors increasing electricity use.",
       }),
       describe: ({ difficulty }) => {
         const demandMultiplier = PARADISE_BALANCE[difficulty].visitorDemand;
@@ -561,8 +560,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       id: "visitor-recovery",
       schedule: { atMonth: 46 },
       preview: () => ({
-        title: "Visitor demand will ease",
-        message: "Visitor electricity use will return to normal.",
+        title: "Visitor demand easing",
+        message: "Visitor electricity use returning to normal.",
       }),
       describe: () => ({
         title: "Visitor surge ends",
@@ -578,8 +577,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 116 },
       durationMonths: 3,
       preview: () => ({
-        title: "Fuel deliveries may be delayed",
-        message: "A delayed shipment will raise oil prices.",
+        title: "Possible fuel delivery delays",
+        message: "Delayed fuel shipment raising oil prices.",
       }),
       describe: ({ difficulty }) => {
         const oilMultiplier = PARADISE_BALANCE[difficulty].oilShock;
@@ -600,9 +599,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       id: "local-energy-review",
       schedule: { atMonth: 120 },
       preview: () => ({
-        title: "Island power will be reviewed",
-        message:
-          "A check-in will assess local generation and grid reliability.",
+        title: "Island power review ahead",
+        message: "Assessing local generation and grid reliability.",
       }),
       describe: ({ snapshot }) => {
         const shipped = deliveredFrom(snapshot, [
@@ -636,8 +634,8 @@ const PARADISE_ARC: StoryArcDefinitionType = {
       id: "cargo-restored",
       schedule: { atMonth: 119 },
       preview: () => ({
-        title: "Fuel deliveries will resume",
-        message: "Oil deliveries and prices will return to normal.",
+        title: "Fuel deliveries resuming",
+        message: "Oil deliveries and prices returning to normal.",
       }),
       describe: () => ({
         title: "Fuel delivery restored",
@@ -660,8 +658,8 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 0 },
       durationMonths: 144,
       preview: () => ({
-        title: "Gas plants will be discounted",
-        message: "New gas plants will become cheaper to build.",
+        title: "Gas plant discounts coming",
+        message: "New gas plants becoming cheaper to build.",
       }),
       describe: ({ difficulty }) => {
         const balance = RENEWABLES_BALANCE[difficulty];
@@ -691,7 +689,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
           title: "Cheaper solar and wind forecast",
-          message: `From January 2009, new solar projects will cost ${Math.round((1 - balance.solarBuildCost) * 100)}% less and wind ${Math.round((1 - balance.windBuildCost) * 100)}% less. Existing projects keep their price.`,
+          message: `New solar projects costing ${Math.round((1 - balance.solarBuildCost) * 100)}% less and wind ${Math.round((1 - balance.windBuildCost) * 100)}% less from January 2009. Existing projects keep their price.`,
           concept: "build",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -704,9 +702,8 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 84 },
       durationMonths: 60,
       preview: () => ({
-        title: "Solar and wind costs will fall",
-        message:
-          "New solar plants and wind farms will become cheaper to build.",
+        title: "Solar and wind costs falling",
+        message: "New solar plants and wind farms becoming cheaper to build.",
       }),
       describe: ({ difficulty }) => {
         const balance = RENEWABLES_BALANCE[difficulty];
@@ -737,7 +734,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Factory growth forecast",
-        message: `New factories are expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
+        message: `New factories expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
         concept: "customers",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -749,8 +746,8 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 120 },
       durationMonths: 24,
       preview: () => ({
-        title: "New factories will open",
-        message: "Factory growth will increase electricity use.",
+        title: "New factories opening",
+        message: "Factory growth increasing electricity use.",
       }),
       describe: ({ difficulty }) => {
         const demandMultiplier = RENEWABLES_BALANCE[difficulty].demandLoad;
@@ -770,9 +767,8 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
       id: "integration-review",
       schedule: { atMonth: 132 },
       preview: () => ({
-        title: "Clean power will be reviewed",
-        message:
-          "A check-in will assess renewable generation and backup capacity.",
+        title: "Clean power review ahead",
+        message: "Assessing renewable generation and backup capacity.",
       }),
       describe: ({ snapshot }) => {
         const variable = deliveredFrom(snapshot, [
@@ -911,8 +907,8 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
       scheduleOffsetMonths: ({ difficulty }) =>
         HURRICANE_BALANCE[difficulty].durationMonths,
       preview: () => ({
-        title: "Storm repairs will finish",
-        message: "Plant output and oil prices will return to normal.",
+        title: "Storm repairs finishing",
+        message: "Plant output and oil prices returning to normal.",
       }),
       describe: (context) => {
         const balance = HURRICANE_BALANCE[context.difficulty];
@@ -954,7 +950,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
         );
         return {
           title: "Aging coal warning",
-          message: `From January 1986, ${selected.length} aging coal ${selected.length === 1 ? "plant will" : "plants will"} drop to ${percent(END_OF_ERA_BALANCE[difficulty].oldCoalOutput)} output for two years.`,
+          message: `${selected.length} aging coal ${selected.length === 1 ? "plant" : "plants"} dropping to ${percent(END_OF_ERA_BALANCE[difficulty].oldCoalOutput)} output for two years from January 1986.`,
           concept: "generator",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -971,8 +967,8 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 72 },
       durationMonths: 24,
       preview: () => ({
-        title: "Older coal output will fall",
-        message: "Aging coal plants will produce less power.",
+        title: "Older coal output falling",
+        message: "Aging coal plants producing less power.",
       }),
       describe: ({ snapshot, difficulty }) => {
         const outputMultiplier = END_OF_ERA_BALANCE[difficulty].oldCoalOutput;
@@ -1010,7 +1006,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "New coal rules announced",
-        message: `Coal running costs will rise ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
+        message: `Coal running costs rising ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
         concept: "danger",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1021,8 +1017,8 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       id: "aging-restoration",
       schedule: { atMonth: 96 },
       preview: () => ({
-        title: "Older coal output will recover",
-        message: "The temporary limits on older coal plants will lift.",
+        title: "Older coal output recovering",
+        message: "Temporary limits on older coal plants lifting.",
       }),
       describe: () => ({
         title: "Aging slowdown ends",
@@ -1038,8 +1034,8 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 180 },
       durationMonths: 60,
       preview: () => ({
-        title: "Coal rules will tighten",
-        message: "Coal plants will cost more to run and produce less power.",
+        title: "Coal rules tightening",
+        message: "Coal plants costing more to run and producing less power.",
       }),
       describe: ({ difficulty }) => {
         const { coalOM, complianceCoalOutput } = END_OF_ERA_BALANCE[difficulty];
@@ -1065,8 +1061,8 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       id: "successor-review",
       schedule: { atMonth: 216 },
       preview: () => ({
-        title: "The transition will be reviewed",
-        message: "A check-in will assess the move away from coal.",
+        title: "Transition review ahead",
+        message: "Assessing the move away from coal.",
       }),
       describe: ({ snapshot }) => {
         const coalShare = share(
@@ -1170,9 +1166,8 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 49 },
       durationMonths: 1,
       preview: () => ({
-        title: "A deep freeze will strain supply",
-        message:
-          "Demand will rise while plant output falls and gas prices climb.",
+        title: "Deep freeze straining supply",
+        message: "Demand rising as plant output falls and gas prices climb.",
       }),
       describe: ({ difficulty, occurrences }) => {
         const winterized = deepFreezeWinterized(occurrences);
@@ -1207,9 +1202,9 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       id: "thaw",
       schedule: { atMonth: 50 },
       preview: () => ({
-        title: "The freeze will end",
+        title: "Freeze ending",
         message:
-          "Normal plant output and gas prices will return as the cold eases.",
+          "Normal plant output and gas prices returning as the cold eases.",
       }),
       describe: ({ periodSnapshots, occurrences }) => {
         const event = periodSnapshots?.[1];
@@ -1290,7 +1285,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
       preview: () => null,
       describe: ({ difficulty }) => ({
         title: "A hot, dry summer ahead",
-        message: `June–August 2026 heat will raise demand while drought cuts hydro and nuclear output. Build generation and storage. ${buildLeadTimeHint(difficulty)}`,
+        message: `June–August 2026 heat raising demand as drought cuts hydro and nuclear output. Build generation and storage. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1303,16 +1298,16 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
       durationMonths: 1,
       preview: () => ({
         title: [
-          "Heat will build",
-          "Rivers will fall further",
-          "Heat and drought will peak",
+          "Heat building",
+          "Rivers falling further",
+          "Heat and drought peaking",
         ][index],
         message:
           index === 0
-            ? "Heat will raise demand while drought limits hydro and nuclear output."
+            ? "Heat raising demand as drought limits hydro and nuclear output."
             : index === 1
-              ? "Drought will tighten hydro and nuclear limits as demand rises further."
-              : "Demand will climb further while hydro and nuclear output reach seasonal lows.",
+              ? "Drought tightening hydro and nuclear limits as demand rises further."
+              : "Demand climbing further as hydro and nuclear output reach seasonal lows.",
       }),
       describe: ({ difficulty }: StoryContextType) => {
         const balance = HEATWAVE_DROUGHT_BALANCE[difficulty];
@@ -1350,9 +1345,9 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
       id: "cooler-weather",
       schedule: { atMonth: 32 },
       preview: () => ({
-        title: "The heat will break",
+        title: "Heat easing",
         message:
-          "Cooler weather will lower demand; reservoirs will recover more slowly.",
+          "Cooler weather lowering demand, with slower reservoir recovery.",
       }),
       describe: () => ({
         title: "The heat breaks",
@@ -1446,7 +1441,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "Extreme Santa Ana winds are forecast for January. Fund preparedness or keep cash; choose to resume.",
+          "Extreme Santa Ana winds forecast for January. Fund preparedness or keep cash; choose to resume.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "CRITICAL",
@@ -1460,7 +1455,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       preview: (context) => ({
         title: "Wildfires may disrupt power",
         message: wildfirePrepared(context.occurrences)
-          ? "Safety shutoffs may disrupt supply; prepared crews will reduce generation losses."
+          ? "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses."
           : "Extreme fire weather may force safety shutoffs and limit generation.",
       }),
       describe: (context, random) => {
@@ -1672,7 +1667,7 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "The maintenance backlog is growing",
         message:
-          "Coal output will fall each year. Build replacement capacity before shortages begin.",
+          "Coal output falling each year. Build replacement capacity before shortages begin.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
@@ -1685,15 +1680,15 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
       durationMonths: 12,
       preview: () => ({
         title: [
-          "Breakdowns will outpace repairs",
-          "Another station will be derated",
-          "Fleet reliability will decline further",
-          "Coal availability will reach a low",
+          "Breakdowns outpacing repairs",
+          "Another station facing output limits",
+          "Fleet reliability declining further",
+          "Coal availability reaching a low",
         ][index],
         message:
           index === 0
-            ? "Coal output will decrease."
-            : "Coal output will decrease further.",
+            ? "Coal output decreasing."
+            : "Coal output decreasing further.",
       }),
       describe: ({ difficulty }: StoryContextType) => {
         const balance = LOAD_SHEDDING_BALANCE[difficulty];
@@ -1770,7 +1765,7 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 8 },
       preview: () => null,
       describe: () => ({
-        title: "A weak rainy season is forecast",
+        title: "Weak rainy season forecast",
         message:
           "El Niño may reduce reservoir inflow in 2015–2016. Nearly all your power depends on this water.",
         concept: "forecast",
@@ -1788,17 +1783,17 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
       durationMonths: index >= 2 ? 12 : 6,
       preview: () => ({
         title: [
-          "The rains will fall short",
-          "The lake will keep dropping",
-          "Kariba will approach its minimum",
-          "The rains will return",
+          "Rains falling short",
+          "Lake levels dropping further",
+          "Kariba approaching its minimum",
+          "Rains returning",
         ][index],
         message:
           index === 3
-            ? "Better rains will increase inflow and help hydro output recover."
+            ? "Better rains increasing inflow and helping hydro output recover."
             : index === 0
-              ? "Poor rains will reduce reservoir inflow and hydro output."
-              : "Reservoir inflow and hydro output will decrease further.",
+              ? "Poor rains reducing reservoir inflow and hydro output."
+              : "Reservoir inflow and hydro output decreasing further.",
       }),
       describe: ({ difficulty }: StoryContextType) => {
         const balance = KARIBA_DROUGHT_BALANCE[difficulty];
@@ -1898,15 +1893,15 @@ const DELHI_SUMMER_ARC: StoryArcDefinitionType = {
       durationMonths: 3,
       preview: () => ({
         title: [
-          "Summer heat will raise demand",
-          "A hotter summer will strain supply",
-          "Summer demand will climb further",
+          "Summer heat raising demand",
+          "Hotter summer straining supply",
+          "Summer demand climbing further",
           "Summer demand may reach a record",
         ][index],
         message:
           index === 0
-            ? "Heat will raise demand and reduce coal and gas output."
-            : "Summer demand will rise further as heat tightens coal and gas output limits.",
+            ? "Heat raising demand and reducing coal and gas output."
+            : "Summer demand rising further as heat tightens coal and gas output limits.",
       }),
       describe: ({ difficulty }: StoryContextType) => {
         const balance = DELHI_SUMMER_BALANCE[difficulty];

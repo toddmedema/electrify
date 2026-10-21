@@ -1,5 +1,8 @@
 import { expect, test } from "./fixtures";
 import { openPane, openBuild } from "./layout";
+import path from "node:path";
+import { editSavedGame } from "./save-fixture";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 
 // Exercise pane width rather than assuming a viewport implies a column count.
 // Only one project runs this explicit matrix to avoid duplicating it per project.
@@ -41,12 +44,15 @@ for (const colorScheme of ["light", "dark"] as const) {
         const geometry = await details.evaluate((element) => {
           const innerWidth = element.clientWidth - 32;
           const groups = Array.from(element.querySelectorAll(".facilityStats"));
+          const sections = Array.from(
+            element.querySelectorAll(".facilityDetailSection"),
+          );
           return {
             innerWidth,
             counts: groups.map((group) => group.children.length),
             aligned: groups.every((group) => {
               const cells = Array.from(
-                group.querySelectorAll(".facilityStat:not(.facilityFuelTrend)"),
+                group.querySelectorAll(".facilityStat"),
               ).map((cell) => cell.getBoundingClientRect());
               const firstRow = cells.filter(
                 (cell) => Math.abs(cell.top - cells[0].top) < 1,
@@ -76,6 +82,16 @@ for (const colorScheme of ["light", "dark"] as const) {
               const value = stat.querySelector("dd")!.getBoundingClientRect();
               return Math.abs(value.top - label.bottom - 4) < 1;
             }),
+            sectionGaps: sections.slice(1).map((section, index) => {
+              const heading =
+                section.firstElementChild!.getBoundingClientRect();
+              const previous =
+                sections[index].lastElementChild!.getBoundingClientRect();
+              return heading.top - previous.bottom;
+            }),
+            initialGap:
+              sections[0].firstElementChild!.getBoundingClientRect().top -
+              sections[0].getBoundingClientRect().top,
           };
         });
         const expectedColumns = Math.max(
@@ -88,6 +104,8 @@ for (const colorScheme of ["light", "dark"] as const) {
         expect(geometry.overflow).toBe(false);
         expect(geometry.aligned).toBe(true);
         expect(geometry.grouped).toBe(true);
+        for (const gap of geometry.sectionGaps)
+          expect(gap).toBeCloseTo(geometry.initialGap, 0);
         const labels = row.locator(".facilityActionLabel");
         for (const label of await labels.all())
           await expect(label).toBeVisible();
@@ -101,6 +119,68 @@ for (const colorScheme of ["light", "dark"] as const) {
     });
   }
 }
+
+test("reduced output stays inline beside capacity and fuel history shares the grid", async ({
+  page,
+}, info) => {
+  if (info.project.name === "desktop-chromium")
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("theme", "dark");
+  });
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await editSavedGame(page, ({ game }) => {
+    game.date = getDateFromMinute(8 * MINUTES_PER_MONTH, game.startingYear);
+    const gas = game.facilities.find(
+      (facility) => facility.name === "Natural Gas CC",
+    )!;
+    gas.annualOutputDegradation = 0.005;
+    gas.minuteOperational = game.date.minute - 0.7 * 12 * MINUTES_PER_MONTH;
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const row = page.locator(
+    '.facilities:visible .facilityRow[data-facility="Natural Gas CC"]',
+  );
+  await row.locator(".facilityDisclosure").click();
+  const operation = row.getByRole("region", { name: "Operation" });
+  await expect(operation.getByRole("term").nth(1)).toHaveText(
+    "Current max output",
+  );
+  const output = operation.getByRole("definition").nth(1);
+  await expect(output).toHaveText("259MW (<100%)");
+  expect(
+    await output.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getClientRects().length;
+    }),
+  ).toBe(1);
+  const economics = row.getByRole("region", { name: "Economics" });
+  await expect(economics.locator(".facilityFuelTrend")).toBeVisible();
+  if (info.project.name === "desktop-chromium") {
+    const positions = await economics
+      .locator(".facilityStat")
+      .evaluateAll((stats) =>
+        stats.map((stat) => stat.getBoundingClientRect().top),
+      );
+    expect(positions).toHaveLength(7);
+    expect(new Set(positions).size).toBe(1);
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await row.scrollIntoViewIfNeeded();
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "pr-facility-desktop.png",
+        ),
+        animations: "disabled",
+      });
+    }
+  }
+});
 
 test("expanded details reflow in a resized window and at 200% magnification", async ({
   page,

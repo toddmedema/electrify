@@ -8,7 +8,7 @@ function checkAssets(root = process.cwd()) {
   // old worktrees and local screenshots without depending on git-lfs being installed.
   const files = execFileSync(
     "git",
-    ["ls-files", "-z", "--", "public", "design"],
+    ["ls-files", "-z", "--", "public", "docs/manual-images"],
     {
       cwd: root,
       encoding: "utf8",

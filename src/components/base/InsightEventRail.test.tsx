@@ -9,15 +9,15 @@ it("identifies each event and its date before opening details", () => {
       events={[
         {
           key: "data-centers",
-          title: "Data Centers will connect",
+          title: "Data Centers coming online",
           label: "Expected Jan 2026",
-          message: "Demand will rise as new load comes online.",
+          message: "Demand rising as new load connects.",
         },
         {
           key: "fee",
-          title: "Pollution fees will rise",
+          title: "Pollution fees rising",
           label: "Expected Jan 2027",
-          message: "Coal and gas will cost more to run.",
+          message: "Coal and gas costing more to run.",
         },
       ]}
       onActiveChange={jest.fn()}
@@ -29,8 +29,8 @@ it("identifies each event and its date before opening details", () => {
     name: "Upcoming scenario events",
   });
   for (const [title, date] of [
-    ["Data Centers will connect", "Jan 2026"],
-    ["Pollution fees will rise", "Jan 2027"],
+    ["Data Centers coming online", "Jan 2026"],
+    ["Pollution fees rising", "Jan 2027"],
   ]) {
     const chip = within(events).getByRole("button", {
       name: `Expected ${date}: ${title}`,

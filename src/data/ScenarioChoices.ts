@@ -65,7 +65,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     scenarioId: 107,
     atMonth: 36,
     title: "Prepare for the deep freeze",
-    message: "February demand and gas prices will spike as plant output falls.",
+    message: "February demand and gas prices spiking as plant output falls.",
     options: [
       {
         id: "winterize",

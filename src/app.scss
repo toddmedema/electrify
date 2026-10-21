@@ -98,8 +98,6 @@
   --tooltip-border: rgba(0, 0, 0, 0.2);
   --tooltip-bg: #ffffff;
   --tooltip-shadow: rgba(15, 23, 42, 0.16);
-  // The soft edge a screen header gains once content scrolls beneath it
-  --header-scrim: rgba(15, 23, 42, 0.12);
   --cursor-line: #757575; /* grey600 */
   // Charts sit flush on the page in both themes: no panel, no edge
   --chart-surface: var(--bg-primary);
@@ -152,7 +150,6 @@
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
-  --header-scrim: rgba(0, 0, 0, 0.5);
   --cursor-line: rgba(98, 155, 225, 0.55);
   --chart-surface: var(--bg-primary);
 }
@@ -388,9 +385,13 @@ button,
   margin-inline: auto;
 }
 
-// Every menu screen, including Home and Game details, shares this one width container.
+// Menu pages scroll at the viewport edge; their headers and body insets cap the reading width.
 .app_container.menu-layout {
+  max-width: none;
+}
+.menu-layout #menuCard {
   max-width: 1040px;
+  margin-inline: auto;
 }
 
 #noscript {
@@ -458,11 +459,6 @@ button,
   min-height: 0;
   padding: 24px 16px 32px;
   box-sizing: border-box;
-  > * {
-    max-width: 864px;
-    margin-left: auto;
-    margin-right: auto;
-  }
 }
 .achievementSummary {
   h2 {
@@ -915,6 +911,10 @@ $topbar_height: 56px;
 // In a game the offline notice shrinks to a dot on the menu button, explained inside the menu
 .gameMenuButton {
   position: relative;
+}
+
+#gameCardMenu .MuiMenuItem-root:not(.Mui-disabled) {
+  color: var(--font-color-primary);
 }
 
 .offlineDot {
@@ -1633,7 +1633,8 @@ $pane_header_height: 48px;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Chart controls share the page surface, including this expanded layer picker.
+  background: var(--bg-primary);
 }
 
 .insightsLayerGroup {
@@ -1677,11 +1678,13 @@ $pane_header_height: 48px;
   align-items: center;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 4px 16px;
+  // The trailing icon's own inset completes its alignment with the Layers label.
+  padding: 4px 8px 4px 16px;
   margin: 0 auto;
   overflow: hidden;
   border-bottom: $border_accent;
-  background: var(--bg-raised);
+  // Presets, timeline controls, upcoming events and charts share one page surface.
+  background: var(--bg-primary);
 }
 
 .insightsViewportDate {
@@ -3360,8 +3363,12 @@ $pane_header_height: 48px;
   }
 
   .facilityDetailSection {
-    padding: 16px 0;
+    padding: 8px 0;
     border-top: 1px solid var(--border-subtle);
+
+    &:first-of-type {
+      padding-top: 16px;
+    }
 
     &:last-child {
       padding-bottom: 0;
@@ -3425,10 +3432,6 @@ $pane_header_height: 48px;
     font-size: var(--font-size-caption-sm);
     line-height: 16px;
     font-weight: 400;
-  }
-
-  .facilityFuelTrend {
-    grid-column: 1 / -1;
   }
 
   .facilityDetailDescription {
@@ -3681,11 +3684,6 @@ $pane_header_height: 48px;
     padding-inline: 8px;
     margin: -5px -8px -5px 0;
     color: var(--interactive-strong);
-
-    &.active {
-      background: var(--interactive-tint);
-      color: $interactive_blue;
-    }
   }
 
   .eventHistoryFilterCheck {
@@ -5694,11 +5692,8 @@ $homeSmokeCycle: 5.6s;
 }
 .customerProgramTitle {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  column-gap: 12px;
-  row-gap: 0;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .customerProgramStatus {
   font-size: var(--font-size-body2);
@@ -6360,8 +6355,7 @@ $programs_column: 800px;
 // they settle the older per-screen rules above them.
 // ===============================================
 
-// ScreenPage fills the shared menu width container. The header and scrollable body use
-// identical horizontal insets; content must not introduce another page width cap.
+// Keep the scroll owner full width and align its content with the centered header column.
 .screenPage {
   width: 100%;
   min-width: 0;
@@ -6371,38 +6365,34 @@ $programs_column: 800px;
   > .scrollable {
     box-sizing: border-box;
     width: 100%;
-    padding-left: max($space-4, env(safe-area-inset-left));
-    padding-right: max($space-4, env(safe-area-inset-right));
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+    padding-left: max(
+      $space-4,
+      calc((100% - 1040px) / 2 + #{$space-4}),
+      env(safe-area-inset-left)
+    );
+    padding-right: max(
+      $space-4,
+      calc((100% - 1040px) / 2 + #{$space-4}),
+      env(safe-area-inset-right)
+    );
   }
 }
 
-// The toolbar keeps the #topbar safe-area insets and a left-aligned title at every width.
-// No resting rule under the title: a game's menu is one stage, not an app toolbar over a list.
-// Once content scrolls beneath the header, a soft shadow fades in over the first 32px so cards
-// and pinned section labels slide under it rather than being cut by a line. Browsers without
-// scroll-driven animations simply show no edge.
+// A quiet edge separates scrolling content without shading the page below the title.
 .screenHeader {
   flex: 0 0 auto;
   position: relative;
-  z-index: 2; // above the sticky section labels it shades
+  z-index: 2;
   background: inherit;
-
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 100% 0 auto;
-    height: 16px;
-    pointer-events: none;
-    background: linear-gradient(to bottom, var(--header-scrim), transparent);
-    opacity: 0;
-    animation: screenHeaderScrim linear both;
-    animation-timeline: --screen-scroll;
-    animation-range: 0 32px;
-  }
+  border-bottom: 1px solid var(--border-subtle);
 
   .screenHeaderBar {
     box-sizing: border-box;
     width: 100%;
+    max-width: 1040px;
+    margin-inline: auto;
   }
 
   .screenHeaderTitle {
@@ -6410,18 +6400,6 @@ $programs_column: 800px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-}
-
-.flexContainer:has(> .screenHeader) {
-  timeline-scope: --screen-scroll;
-}
-.flexContainer:has(> .screenHeader) > :is(.scrollable, .achievementGallery) {
-  scroll-timeline: --screen-scroll block;
-}
-@keyframes screenHeaderScrim {
-  to {
-    opacity: 1;
   }
 }
 
@@ -6764,7 +6742,7 @@ $programs_column: 800px;
     min-height: 44px;
     flex-wrap: nowrap;
     gap: 4px;
-    padding: 0 16px;
+    padding: 0 8px 0 16px;
   }
 
   .insights .insightsViewportButtons {

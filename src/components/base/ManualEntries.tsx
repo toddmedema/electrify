@@ -123,7 +123,7 @@ export interface ManualEntryType {
 // The source line for an image, shown to the player rather than hidden in the alt attribute:
 // on an educational game a citation is worth reading, and alt text is for describing the
 // picture to someone who can't see it. A diagram drawn for the game (its source is in
-// design/manual/) has nothing to cite, so it leaves the source out.
+// docs/manual-images/) has nothing to cite, so it leaves the source out.
 interface FigureProps {
   src: string;
   alt: string;

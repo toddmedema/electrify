@@ -1399,7 +1399,7 @@ export const SCENARIOS: ScenarioType[] = [
       resources: { hydro: false },
     },
     summary:
-      "Your biggest reactor will shut down without warning. Have a backup ready.",
+      "Your biggest reactor shuts down without warning. Have backup ready.",
     themes: ["Energy transition"],
     briefing: {
       tone: "legacy",
@@ -1407,7 +1407,7 @@ export const SCENARIOS: ScenarioType[] = [
       objective:
         "Have enough generation and storage ready to cover the main reactor's shutdown.",
       threat:
-        "You won't know the shutdown date in advance, and the reactor will stay offline for the rest of the mission.",
+        "The shutdown date is hidden. The reactor stays offline for the rest of the mission.",
     },
     ownership: "Public",
     startingYear: 2023,

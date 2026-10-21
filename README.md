@@ -206,7 +206,7 @@ players don't download them.
 ### Manual figures
 
 Every player downloads the manual's figures, so they ship as WebP. The originals live in
-`design/manual/`, which is not deployed. To add or change a figure, put the original there,
+`docs/manual-images/`, which is not deployed. To add or change a figure, put the original there,
 run `node scripts/compress-manual-images.js` (requires `cwebp`: `brew install webp`), and
 reference the `.webp` from `src/components/base/ManualEntries.tsx` with its real `width` and
 `height`. JPEG charts are re-encoded at WebP quality 88 (about 60-70% smaller, SSIM ≥ 0.993 and

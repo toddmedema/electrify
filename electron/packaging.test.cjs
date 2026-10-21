@@ -30,7 +30,7 @@ test("packaged app metadata uses the renderer artifact's build version", () => {
     assert.equal(config.extraMetadata.main, "electron/main.cjs");
   }
   assert.equal(
-    require("../electron-builder.config.cjs").extraMetadata.version,
+    require("./electron-builder.config.cjs").extraMetadata.version,
     undefined,
   );
 });
