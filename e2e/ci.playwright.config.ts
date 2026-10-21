@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import os from "node:os";
 import path from "node:path";
 import base from "./playwright.config";
 
@@ -19,13 +20,18 @@ const smoke = [
 ];
 const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
 const port = process.env.E2E_PORT || "3100";
+// GitHub's runners have few cores, so they keep two workers. Local checks set CI=true too, so
+// only GITHUB_ACTIONS identifies a runner; workstations use up to six, leaving half the cores.
+const workers = process.env.GITHUB_ACTIONS
+  ? 2
+  : Math.max(2, Math.min(6, Math.floor(os.availableParallelism() / 2)));
 
 // Run the PR smoke matrix at 1280/390 px and layout checks at 1280/390/360 px.
 // One invocation lets Playwright shard all cases together without starting a dev compiler.
 export default defineConfig({
   ...base,
   outputDir: path.resolve(__dirname, "../test-results/browser"),
-  workers: 2,
+  workers,
   projects: base
     .projects!.filter((project) =>
       ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
