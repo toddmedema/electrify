@@ -69,7 +69,11 @@ function setup(width = 390) {
   const store = configureStore({
     reducer: {
       card: cardReducer,
-      game: () => ({ eventLog: [], eventLogReadThroughId: 0 }),
+      game: () => ({
+        eventLog: [],
+        eventLogReadThroughId: 0,
+        worldEvents: { active: [] },
+      }),
     },
     preloadedState: {
       card: { ...initialCard, name: "FACILITIES" as const },

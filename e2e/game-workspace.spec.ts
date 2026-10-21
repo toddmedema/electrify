@@ -1,4 +1,5 @@
 import { expect, Page, test } from "./fixtures";
+import path from "node:path";
 
 test.setTimeout(90_000);
 
@@ -29,6 +30,96 @@ async function settleSheets(page: Page) {
         panel.getAnimations().map((animation) => animation.finished),
       ),
     );
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`program statuses always sit below their names in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await startGame(page, theme, 111);
+    await page.locator("#programsNav").click();
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await settleSheets(page);
+    await expect(programs.locator(".customerProgramTitle")).toHaveCount(7);
+    for (const title of await programs.locator(".customerProgramTitle").all()) {
+      const name = await title.locator(":scope > span").first().boundingBox();
+      const status = await title
+        .locator(".customerProgramStatus")
+        .boundingBox();
+      expect(name).not.toBeNull();
+      expect(status).not.toBeNull();
+      expect(status!.y).toBeGreaterThanOrEqual(name!.y + name!.height - 1);
+      expect(Math.abs(status!.x - name!.x)).toBeLessThanOrEqual(1);
+    }
+    expect(
+      await programs.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    if (
+      process.env.REVIEW_SCREENSHOT_DIR &&
+      theme === "light" &&
+      testInfo.project.name === "mobile-390px"
+    ) {
+      await programs.locator(".customerProgramsBody").evaluate((body) => {
+        body.scrollTop = body.scrollHeight;
+      });
+      await settleSheets(page);
+      await programs.locator(".customerProgramList").screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          "programs-mobile-light.png",
+        ),
+        animations: "disabled",
+      });
+    }
+  });
+
+  test(`touch closes dock tools without a lingering highlight in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(!testInfo.project.use.hasTouch);
+    await startGame(page, theme);
+    const insights = page.locator("#insightsNav");
+    const build = page.locator("#buildNav");
+    const insightsPane = page.getByRole("region", {
+      name: "Insights",
+      exact: true,
+    });
+    await insights.tap();
+    await expect(insightsPane).toBeVisible();
+    await expect(insights).toHaveAttribute("aria-expanded", "true");
+    await insights.tap();
+    await expect(insightsPane).toHaveCount(0);
+    await expect(insights).toHaveAttribute("aria-expanded", "false");
+    // Some phone browsers retain :hover after a tap. Exercise that state explicitly.
+    const session = await page.context().newCDPSession(page);
+    await session.send("DOM.enable");
+    await session.send("CSS.enable");
+    const { root } = await session.send("DOM.getDocument");
+    const { nodeId } = await session.send("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#insightsNav",
+    });
+    await session.send("CSS.forcePseudoState", {
+      nodeId,
+      forcedPseudoClasses: ["hover"],
+    });
+    await expect(insights).toHaveCSS(
+      "background-color",
+      await build.evaluate((el) => getComputedStyle(el).backgroundColor),
+    );
+    await session.detach();
+    await expect(insights).not.toHaveClass(/Mui-focusVisible/);
+    // A physical keyboard on the same touch device still receives visible focus when closing.
+    await page.keyboard.press("e");
+    await expect(insightsPane).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(insights).toBeFocused();
+    await expect(insights).toHaveCSS("outline-style", "solid");
+    await expect(insights).toHaveCSS("outline-width", "2px");
   });
 }
 

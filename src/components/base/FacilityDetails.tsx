@@ -2,6 +2,7 @@ import GasConversion from "./GasConversion";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
 import { HYDRO_SITES } from "../../data/HydroSites";
+import { combineStoryEffects } from "../../data/WorldEvents";
 import * as React from "react";
 import { DialogContentText, Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
@@ -41,6 +42,7 @@ import {
   resilienceName,
 } from "./WeatherResilienceText";
 import { RETROFIT_COST_MULTIPLIER } from "../../data/Hazards";
+import { storyOutputMultiplier } from "../../helpers/Story";
 import {
   DateType,
   FacilityOperatingType,
@@ -313,12 +315,20 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
     props.game && !underConstruction
       ? facilityHazardStatus(props.game, facility)
       : undefined;
-  // Age wear and an active weather outage both cap output, and the simulation multiplies them
-  const maxOutputFactor = outputFactor * (hazard?.availableFraction ?? 1);
-  const maxOutputCauses = [
-    outputFactor < 1 ? "age" : "",
-    hazard ? (hazard.hazard === "HAIL" ? "hail" : "cold") : "",
-  ].filter(Boolean);
+  // Use the simulation's event composition, including weather outages exactly once, so this
+  // maximum accounts for the same temporary limits as the fleet row's limit chip.
+  const activeEffects = combineStoryEffects(
+    (props.game?.worldEvents?.active ?? []).filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    ),
+  );
+  const maxOutputFactor =
+    outputFactor * storyOutputMultiplier(facility, activeEffects);
+  const maxOutputPercent =
+    maxOutputFactor < 1 && Math.round(maxOutputFactor * 100) === 100
+      ? "<100%"
+      : formatPercent(maxOutputFactor);
 
   // Price history only changes at a month boundary. Selected-facility lifetime totals still
   // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
@@ -457,7 +467,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                   <>
                     {formatWatts(facility.peakW * maxOutputFactor)}
                     <span className="facilityStatNote">
-                      {`Limited to ${formatPercent(maxOutputFactor)} (${maxOutputCauses.join(", ")})`}
+                      {`${maxOutputPercent} of nameplate`}
                     </span>
                   </>
                 }
