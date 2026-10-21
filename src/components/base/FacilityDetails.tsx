@@ -400,6 +400,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               label="Nameplate capacity"
               value={formatWatts(facility.peakW)}
             />
+            {!storage && maxOutputFactor < 1 && (
+              <Stat
+                label="Current max output"
+                value={`${formatWatts(facility.peakW * maxOutputFactor)} (${maxOutputPercent})`}
+              />
+            )}
             <Stat
               label="Age"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
@@ -457,19 +463,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
                         : "Until month end"}
                     </span>
                   </span>
-                }
-              />
-            )}
-            {!storage && maxOutputFactor < 1 && (
-              <Stat
-                label="Current maximum output"
-                value={
-                  <>
-                    {formatWatts(facility.peakW * maxOutputFactor)}
-                    <span className="facilityStatNote">
-                      {`${maxOutputPercent} of nameplate`}
-                    </span>
-                  </>
                 }
               />
             )}

@@ -29,7 +29,7 @@ test("a current shortage never replaces the two pinned requirements or repeats t
     draft.timeline[0].demandW = 2;
   });
   render(<OperationsPriorities {...props(game)} />);
-  expect(screen.getByRole("heading", { name: "Pinned goals" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Goals" })).toBeVisible();
   expect(
     screen.getByRole("button", { name: /Keep the utility solvent/ }),
   ).toBeVisible();

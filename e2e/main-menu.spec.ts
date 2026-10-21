@@ -34,7 +34,12 @@ test("loading logo stays centered through its slide into the menu", async ({
   await expect(page.locator("#appStartup")).toHaveCount(0);
   const menuLogo = page.locator("#menuCard .homeLogo");
   await expect(menuLogo).toBeVisible();
-  for (const time of [0, 100, 200]) {
+  expect(
+    await menuLogo.evaluate(
+      (logo) => logo.getAnimations()[0].effect!.getTiming().duration,
+    ),
+  ).toBe(300);
+  for (const time of [0, 150, 300]) {
     await menuLogo.evaluate((logo, currentTime) => {
       for (const animation of logo.getAnimations())
         animation.currentTime = currentTime;

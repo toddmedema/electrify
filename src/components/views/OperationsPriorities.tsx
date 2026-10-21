@@ -75,7 +75,7 @@ export default function OperationsPriorities({
         className="operationsSection"
       >
         <header className="operationsSectionHeader">
-          <h3 id="operationsGoalsTitle">Pinned goals</h3>
+          <h3 id="operationsGoalsTitle">Goals</h3>
           <IconButton
             size="small"
             onClick={(event) => setGoalAnchor(event.currentTarget)}
