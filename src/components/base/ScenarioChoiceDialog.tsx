@@ -89,7 +89,10 @@ export default function ScenarioChoiceDialog() {
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
         {company && (
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          <Typography
+            variant="subtitle2"
+            sx={{ mb: 1, overflowWrap: "anywhere" }}
+          >
             Your company: {company}
           </Typography>
         )}
@@ -98,7 +101,7 @@ export default function ScenarioChoiceDialog() {
             role="status"
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 2 }}
+            sx={{ mb: 2, overflowWrap: "anywhere" }}
           >
             Still deciding: {deciding.join(", ")}. Each company chooses for its
             own grid.

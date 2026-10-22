@@ -1,7 +1,7 @@
 import { DIFFICULTY_IDS } from "../Constants";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import type { LocationType, ScenarioType } from "../Types";
-import type { ScenarioStartingPeakResponse } from "../helpers/ScenarioStartingPeak";
+import type { ScenarioStartingPeakResponse } from "../helpers/ScenarioStartingPeakCalculation";
 
 const mockEconomy = jest.fn();
 const mockFuelPrices = jest.fn();
@@ -17,8 +17,8 @@ jest.mock("../data/Weather", () => ({
   initWeather: (location: LocationType, done: (error?: string) => void) =>
     mockWeather(location, done),
 }));
-jest.mock("../helpers/ScenarioStartingPeak", () => ({
-  resolvedScenarioStartingPeak: (...args: unknown[]) => mockPeak(...args),
+jest.mock("../helpers/ScenarioStartingPeakCalculation", () => ({
+  calculateScenarioStartingPeak: (...args: unknown[]) => mockPeak(...args),
 }));
 
 const worker = globalThis as unknown as Worker;

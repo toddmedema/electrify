@@ -52,9 +52,13 @@ is the valid upper boundary `10`; static `5.01` with timed `2` is rejected.
 | `operatingExpenseDollarsPerMonth`        | `0–1e12` starting-year dollars per active month; `1000` adds $1,000/month.                                                                                                                                                                                                      |
 | `transactions`                           | One-time `grant` or `charge`, `0–1e12` starting-year dollars. `10000` grants $10,000 once at onset.                                                                                                                                                                             |
 | `carbonFeeDollarsPerTonneCO2e`           | Absolute `0–100000` dollars/tonne CO₂e. `25` replaces the initial fee with $25/tonne while active; `0` explicitly waives it. Co-reachable overlapping overrides are rejected.                                                                                                   |
-| `outputMultipliersBySelector`            | Bind original generators at onset, then apply `0–1` output. `0` disables output; `1` leaves it unchanged. A sold original never transfers its target identity to a replacement.                                                                                                 |
+| `outputMultipliersBySelector`            | Bind original facilities at onset, then apply `0–1` output. `0` disables output; `1` leaves it unchanged. A sold original never transfers its target identity to a replacement.                                                                                                 |
 | `transmissionCapacityLimitsMWByCorridor` | Map registered corridor IDs to absolute `0–1e6` MW caps. `{"california-north":4}` limits the northern route to 4 MW, including upgrades, before weather derating. `0` closes it in both directions. Overlapping caps take the smallest value; independent routes are unchanged. |
 | Permanent `loads`                        | `peakMW: 100` means 100 MW, converted once to watts. Alternatively, `peakShareOfStartingPeak: 0.2` means 100 MW on a 500 MW baseline. Choose exactly one sizing field. Load factor is `0.01–1`.                                                                                 |
+
+Operating selectors consider generators. `startingAsset` can also reference an
+original storage asset: its multiplier limits discharge and responsive output,
+while charging keeps its usual power limit.
 
 Months are one-based: month `1` opens before the first tick. The six-month recipe
 uses an event starting at month `2` for `2` months, active in months `2–3` and expired

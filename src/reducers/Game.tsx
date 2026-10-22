@@ -4968,7 +4968,11 @@ function* supplyFacilitiesFinancesPhases(
         const targetW = Math.max(0, now.demandW - (supply - charge));
         if (g.currentWh > 0 && targetW > 0) {
           // If there's a need and we have charge, discharge
-          g.currentW = Math.min(g.peakW, targetW, g.currentWh * ticksPerHour);
+          g.currentW = Math.min(
+            availablePeakW,
+            targetW,
+            g.currentWh * ticksPerHour,
+          );
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
           dischargedW += g.currentW;
@@ -5002,7 +5006,10 @@ function* supplyFacilitiesFinancesPhases(
       // Keep this response window fixed even when long forecasts integrate hourly samples.
       // Ramping, weather/event derates and remaining water/charge constrain that headroom.
       if (isStorage(g)) {
-        const dischargeW = Math.min(g.peakW, g.currentWh * TICKS_PER_HOUR);
+        const dischargeW = Math.min(
+          availablePeakW,
+          g.currentWh * TICKS_PER_HOUR,
+        );
         const currentGridW =
           g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
         reachableHeadroomW += Math.max(0, dischargeW - currentGridW);

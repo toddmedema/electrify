@@ -207,7 +207,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 1, overflowWrap: "anywhere" }}
                 >
                   Events for {companyName}.
                 </Typography>
@@ -242,7 +242,7 @@ export default function EventLog(props: Props): React.JSX.Element {
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 1, overflowWrap: "anywhere" }}
                 >
                   Events for {companyName}.
                 </Typography>
@@ -373,7 +373,11 @@ export default function EventLog(props: Props): React.JSX.Element {
               </Typography>
             )}
             {props.game?.multiplayer && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1, overflowWrap: "anywhere" }}
+              >
                 Events for {companyName}.
               </Typography>
             )}

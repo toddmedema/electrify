@@ -176,12 +176,12 @@ async function createSteamTransport(page: Page) {
 
 /** Steam persona names, by player index, so the game shows names rather than seat numbers. */
 const STEAM_NAMES = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
-const steamName = (id: string) => STEAM_NAMES[Number(id.slice(-1)) - 1];
 
 class SteamRoom {
   constructor(
     private readonly createTransport = createSteamTransport,
     private readonly installedMods: InstalledMod[][] = [],
+    private readonly personaNames: readonly string[] = STEAM_NAMES,
   ) {}
   modEntries = new Map<string, InstalledMod[]>();
   modRequests = new Map<string, ModRequest[]>();
@@ -319,7 +319,10 @@ class SteamRoom {
       if (input.kind === "join" && input.lobbyId !== this.lobbyId)
         throw new Error("Invalid lobby code");
       if (!this.members.some((m) => m.id === id))
-        this.members.push({ id, name: steamName(id) });
+        this.members.push({
+          id,
+          name: this.personaNames[Number(id.slice(-1)) - 1],
+        });
       await this.publish();
       return this.state(id);
     }
@@ -1964,6 +1967,9 @@ for (const width of [1280, 390, 360]) {
   test(`a shared mod needs no guest setup and survives library removal at ${width}px`, async ({
     browser,
   }) => {
+    // Valid Steam names can be a single long word. Test the company identity inside
+    // each scrollable surface: the dialog's outer box can fit while its text clips.
+    const companyNames = ["W".repeat(32), "M".repeat(32)];
     const hostEntry = cooperativeMod(width !== 390);
     const guestEntry: InstalledMod = {
       ...cooperativeMod(true),
@@ -1983,10 +1989,11 @@ for (const width of [1280, 390, 360]) {
       enabled: false,
       pack: { ...hostEntry.pack, id: "disabled-grid", title: "Disabled Grid" },
     };
-    const room = new SteamRoom(createSteamTransport, [
-      [hostEntry, disabledEntry],
-      [guestEntry],
-    ]);
+    const room = new SteamRoom(
+      createSteamTransport,
+      [[hostEntry, disabledEntry], [guestEntry]],
+      [...companyNames, ...STEAM_NAMES.slice(2)],
+    );
     const hostId = room.host;
     const guestId = "76561198000000002";
     const host = await room.player(browser, 0, width < 600);
@@ -2139,12 +2146,14 @@ for (const width of [1280, 390, 360]) {
     const hostChoice = host.getByRole("dialog", { name: /Grid funding/ });
     const guestChoice = guest.getByRole("dialog", { name: /Grid funding/ });
     for (const [page, dialog, companyName] of [
-      [host, hostChoice, "SolarSam"],
-      [guest, guestChoice, "WindyWren"],
+      [host, hostChoice, companyNames[0]],
+      [guest, guestChoice, companyNames[1]],
     ] as const) {
       await expect(dialog).toBeVisible();
       await expect(dialog).toContainText(`Your company: ${companyName}`);
-      await expect(dialog).toContainText("Still deciding: SolarSam, WindyWren");
+      await expect(dialog).toContainText(
+        `Still deciding: ${companyNames.join(", ")}`,
+      );
       await expect(dialog).toContainText("One-time grant: $1M");
       const bounds = await dialog.boundingBox();
       expect(bounds!.x).toBeGreaterThanOrEqual(0);
@@ -2154,8 +2163,27 @@ for (const width of [1280, 390, 360]) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
+      expect(
+        await dialog
+          .locator(".MuiDialogContent-root")
+          .evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(1);
       for (const button of await dialog.getByRole("button").all())
         expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      const primary = dialog.getByRole("button", {
+        name: "Accept funding",
+        exact: true,
+      });
+      const secondary = dialog.getByRole("button", {
+        name: "Keep the current plan",
+        exact: true,
+      });
+      await expect(primary).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(secondary).toBeFocused();
+      await expect(secondary).toBeInViewport();
+      await page.keyboard.press("Shift+Tab");
+      await expect(primary).toBeFocused();
       await capture(page === host ? "choice-light" : "choice-dark", page);
     }
     await expect(
@@ -2163,7 +2191,9 @@ for (const width of [1280, 390, 360]) {
     ).toBeFocused();
     await host.keyboard.press("Enter");
     await expect(hostChoice).toBeHidden();
-    await expect(guestChoice).toContainText("Still deciding: WindyWren");
+    await expect(guestChoice).toContainText(
+      `Still deciding: ${companyNames[1]}`,
+    );
     await ready(host);
     await expect
       .poll(
@@ -2196,6 +2226,28 @@ for (const width of [1280, 390, 360]) {
     await clock(host)
       .getByRole("button", { name: "pause", exact: true })
       .click();
+    for (const [page, companyName, outcome] of [
+      [host, companyNames[0], "Your company accepted funding."],
+      [guest, companyNames[1], "Your company kept its current plan."],
+    ] as const) {
+      const events = page.locator(".eventLog");
+      await openPane(
+        events,
+        page.getByRole("button", { name: "Events", exact: true }),
+      );
+      await expect(events).toContainText(`Events for ${companyName}.`);
+      await expect(events).toContainText(outcome);
+      expect(
+        await events
+          .locator(".scrollable")
+          .evaluate((element) => element.scrollWidth - element.clientWidth),
+      ).toBeLessThanOrEqual(1);
+      await capture(page === host ? "events-light" : "events-dark", page);
+      await page
+        .getByRole("button", { name: "Close Events", exact: true })
+        .click();
+      await expect(events).toBeHidden();
+    }
     const scenarioPanel = guest.getByRole("region", {
       name: "Scenario",
       exact: true,

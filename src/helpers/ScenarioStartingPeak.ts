@@ -1,34 +1,17 @@
 import { DIFFICULTY_IDS } from "../Constants";
-import { hasEconomy } from "../data/Economy";
-import { hasFuelPrices } from "../data/FuelPrices";
-import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
-import { hasWeather, selectWeatherLocation } from "../data/Weather";
 import type { DifficultyType, ScenarioType } from "../Types";
-import { forecastCustomGameTimeline } from "./CustomGameForecast";
 import { getScenarioLocation } from "./Locations";
-
-export type ScenarioStartingPeakResponse =
-  { peaks: Record<DifficultyType, number> } | { error: string };
+import {
+  baselineScenario,
+  calculateScenarioStartingPeak,
+  dataReady,
+} from "./ScenarioStartingPeakCalculation";
+import type { ScenarioStartingPeakResponse } from "./ScenarioStartingPeakCalculation";
+export type { ScenarioStartingPeakResponse } from "./ScenarioStartingPeakCalculation";
 
 const peaks = new Map<string, number>();
 const preparing = new Map<string, Promise<void>>();
 let preparation = Promise.resolve();
-
-/** Baseline grid only: future rules and permanent additions must not size themselves. */
-function baselineScenario(scenario: ScenarioType): ScenarioType {
-  const baseline: ScenarioType = JSON.parse(JSON.stringify(scenario));
-  baseline.id = CUSTOM_SCENARIO_ID;
-  delete baseline.mod;
-  delete baseline.rules;
-  delete baseline.eventScenarioIds;
-  baseline.loadAdditions = baseline.loadAdditions?.filter(
-    (load) =>
-      load.startsYear < baseline.startingYear ||
-      (load.startsYear === baseline.startingYear &&
-        (load.startsMonth ?? 1) === 1),
-  );
-  return baseline;
-}
 
 function cacheKey(
   baseline: ScenarioType,
@@ -36,11 +19,6 @@ function cacheKey(
   seed: number,
 ): string {
   return JSON.stringify([baseline, difficulty, seed]);
-}
-
-function dataReady(scenario: ScenarioType): boolean {
-  const location = getScenarioLocation(scenario);
-  return !!location && hasWeather(location) && hasEconomy() && hasFuelPrices();
 }
 
 /** Cached first-year peaks remain valid after another location replaces loaded weather. */
@@ -67,14 +45,8 @@ export function resolvedScenarioStartingPeak(
   const key = cacheKey(baseline, difficulty, seed);
   const cached = peaks.get(key);
   if (cached !== undefined) return cached;
-  if (!dataReady(baseline)) return undefined;
-  selectWeatherLocation(getScenarioLocation(baseline)!.id);
-  const timeline = forecastCustomGameTimeline(baseline, difficulty, seed);
-  const peakW = timeline.reduce(
-    (peak, tick) => Math.max(peak, tick.demandW),
-    0,
-  );
-  if (!Number.isFinite(peakW) || peakW <= 0) return undefined;
+  const peakW = calculateScenarioStartingPeak(baseline, difficulty, seed);
+  if (peakW === undefined) return undefined;
   peaks.set(key, peakW);
   return peakW;
 }

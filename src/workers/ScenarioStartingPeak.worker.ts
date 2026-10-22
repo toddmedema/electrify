@@ -4,9 +4,9 @@ import { initFuelPrices } from "../data/FuelPrices";
 import { initWeather } from "../data/Weather";
 import { getScenarioLocation } from "../helpers/Locations";
 import {
-  resolvedScenarioStartingPeak,
+  calculateScenarioStartingPeak,
   ScenarioStartingPeakResponse,
-} from "../helpers/ScenarioStartingPeak";
+} from "../helpers/ScenarioStartingPeakCalculation";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import type { DifficultyType, ScenarioType } from "../Types";
 
@@ -26,7 +26,7 @@ worker.onmessage = async ({
     if (failure?.status === "rejected") throw failure.reason;
     const peaks = {} as Record<DifficultyType, number>;
     for (const difficulty of DIFFICULTY_IDS) {
-      const peak = resolvedScenarioStartingPeak(
+      const peak = calculateScenarioStartingPeak(
         data.scenario,
         difficulty,
         data.scenario.seed ?? 0,
