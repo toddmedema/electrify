@@ -37,7 +37,9 @@ test("facility rows keep readings untruncated when narrow details reflow", async
   const rows = pane.locator(".facilityRow");
   await expect(rows.getByText(/^Building \d+%/)).toBeVisible();
   await expect(
-    rows.getByText(/^(reservoir )?\d+%$/).filter({ visible: true }),
+    rows
+      .getByText(/^(filling|draining|steady|spilling)$/)
+      .filter({ visible: true }),
   ).toBeVisible();
   await expect(
     rows.getByText(/Wh · (charging|discharging|idle)/),
@@ -99,6 +101,8 @@ for (const theme of ["light", "dark"]) {
     const hydro = pane.locator('.facilityRow[data-fuel="Hydro"]');
     const subtitle = hydro.locator(".MuiListItemText-secondary");
     await expect(subtitle).not.toContainText("running");
+    await expect(subtitle).toContainText(/filling|draining|steady|spilling/);
+    await expect(subtitle).not.toContainText(/\d+%/);
     await expect(hydro.locator(".capacityProgressBar")).toBeVisible();
     const layout = await subtitle.evaluate((el) => ({
       height: el.getBoundingClientRect().height,

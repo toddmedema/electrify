@@ -581,7 +581,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 textAlign: "center",
               }}
             >
-              Electrify v{APP_VERSION}
+              {APP_VERSION}
             </Typography>
             <Button
               variant="text"

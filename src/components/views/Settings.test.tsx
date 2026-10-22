@@ -226,7 +226,7 @@ describe("Settings", () => {
   it("offers a subtle cache reset at the bottom", async () => {
     renderSettings();
 
-    expect(screen.getByText("Electrify v26sept26-1507")).toBeInTheDocument();
+    expect(screen.getByText("26sept26-1507")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Clear cache" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {

@@ -1718,7 +1718,7 @@ export const gameSlice = createSlice({
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
-      // repriced against its own results at the first month rollover, and every one after.
+      // repriced when it borrows and against its results at each month rollover.
       state.creditPremium = getCreditPremium(
         getCreditInputs([], startingCash, startingCash, []),
       );
@@ -2367,6 +2367,29 @@ function matchesFacilitySearch(
   );
 }
 
+function refreshInterestRate(
+  state: GameType,
+  cash: number,
+  netWorth = getNetWorth(
+    state.facilities,
+    cash,
+    state.date.minute,
+    state.transmission?.lines,
+  ),
+) {
+  state.creditPremium = getCreditPremium(
+    getCreditInputs(
+      state.monthlyHistory,
+      cash,
+      netWorth,
+      state.facilities,
+      state.transmission?.lines,
+    ),
+  );
+  state.interestRate =
+    getPrimeRate(state.date, state.seed) * state.creditPremium;
+}
+
 function applyBuildFacility(
   state: GameType,
   payload: BuildFacilityAction,
@@ -2415,6 +2438,8 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
+  // Book this loan at the quoted rate, then price the next one against the new debt and cash.
+  if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
     recordMeaningfulDecision(state, {
       lever: `asset-build:${added.id}`,
@@ -2632,6 +2657,7 @@ function applyBuildTransmissionLine(
     constructionKgco2eTotal: corridor.constructionKgco2eTotal,
   };
   state.transmission.lines.push(line);
+  if (financed) refreshInterestRate(state, now.cash);
   recordMeaningfulDecision(state, {
     lever: `intertie:${line.id}`,
     label: `Build ${line.name}`,
@@ -2742,6 +2768,7 @@ function applyUpgradeTransmissionLine(
     constructionKgco2eTotal: quote.constructionKgco2eTotal,
     constructionKgco2eEmitted: 0,
   };
+  if (financed) refreshInterestRate(state, now.cash);
   recordMeaningfulDecision(state, {
     lever: `intertie-upgrade:${line.id}`,
     label: `Upgrade ${line.name}`,
@@ -3562,19 +3589,8 @@ export function* tickStatePhases(
           month: history.length,
         });
       // Reprice the company's credit off the year that just closed, before the forecast is built
-      // against it. Once a month, not once a tick: a lender looks at a year of results, and a
-      // rate that moved every tick would be unplannable.
-      state.creditPremium = getCreditPremium(
-        getCreditInputs(
-          history,
-          cash,
-          now.netWorth,
-          state.facilities,
-          state.transmission?.lines,
-        ),
-      );
-      state.interestRate =
-        getPrimeRate(state.date, state.seed) * state.creditPremium;
+      // against it. Operating results reprice monthly; new borrowing reprices immediately.
+      refreshInterestRate(state, cash, now.netWorth);
       for (const { notice, key } of modNotificationsDue(state))
         logGameEvent(state, "WORLD_EVENT", notice.message, {
           title: notice.title,
