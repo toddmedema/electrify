@@ -1,3 +1,6 @@
+import { getScenario } from "./Scenarios";
+import { officialScenarioRules } from "../helpers/ScenarioRules";
+import { LOAD_SHEDDING_BALANCE } from "./OfficialScenarioRules";
 import {
   ActiveWorldEventType,
   ConceptNameType,
@@ -31,6 +34,7 @@ import {
   resolveScenarioRuleEvents,
   upcomingScenarioRuleEvents,
 } from "../helpers/ScenarioRuleRuntime";
+export { LOAD_SHEDDING_BALANCE } from "./OfficialScenarioRules";
 export {
   DEEP_FREEZE_DECISION_KEY,
   WILDFIRE_DECISION_KEY,
@@ -1615,115 +1619,6 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   ],
 };
 
-export interface LoadSheddingBalanceType {
-  /** Share of nominal coal output still available, year by year from 2019 to 2022. */
-  coalOutputMultipliers: [number, number, number, number];
-  /** Coal operating cost, which rises with the breakdowns and the running repairs. */
-  coalOperatingMultipliers: [number, number, number, number];
-  /** Diesel is what covers the gap, and it is bought at short notice. */
-  dieselPriceMultipliers: [number, number, number, number];
-}
-
-// Eskom's energy availability factor fell from 78% in 2018 to about 58% in 2022, with unplanned
-// outages roughly doubling over the same period. These multiply nameplate output, so Employee is
-// set to the published EAF itself - 67, 65, 62 and 58 percent - and the other difficulties sit
-// either side of the record. Anything shallower leaves the fleet able to carry the load on its
-// own, which is the one thing the years these steps describe were not.
-// https://www.eskom.co.za/dataportal/supply-side/eaf-weekly-data/
-export const LOAD_SHEDDING_BALANCE: Record<
-  DifficultyType,
-  LoadSheddingBalanceType
-> = {
-  Intern: {
-    coalOutputMultipliers: [0.74, 0.72, 0.7, 0.68],
-    coalOperatingMultipliers: [1.05, 1.1, 1.15, 1.2],
-    dieselPriceMultipliers: [1.05, 1.1, 1.15, 1.2],
-  },
-  Employee: {
-    coalOutputMultipliers: [0.67, 0.65, 0.62, 0.58],
-    coalOperatingMultipliers: [1.08, 1.16, 1.24, 1.32],
-    dieselPriceMultipliers: [1.1, 1.2, 1.3, 1.4],
-  },
-  Manager: {
-    coalOutputMultipliers: [0.64, 0.61, 0.57, 0.53],
-    coalOperatingMultipliers: [1.1, 1.2, 1.3, 1.45],
-    dieselPriceMultipliers: [1.15, 1.3, 1.45, 1.6],
-  },
-  VP: {
-    coalOutputMultipliers: [0.61, 0.57, 0.52, 0.47],
-    coalOperatingMultipliers: [1.12, 1.26, 1.4, 1.55],
-    dieselPriceMultipliers: [1.2, 1.4, 1.6, 1.8],
-  },
-  CEO: {
-    coalOutputMultipliers: [0.58, 0.53, 0.47, 0.42],
-    coalOperatingMultipliers: [1.15, 1.32, 1.5, 1.7],
-    dieselPriceMultipliers: [1.25, 1.5, 1.75, 2],
-  },
-};
-
-const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
-  id: "load-shedding",
-  scenarioId: 113,
-  phases: [
-    {
-      id: "maintenance-backlog",
-      schedule: { atMonth: 6 },
-      preview: () => null,
-      describe: () => ({
-        title: "The maintenance backlog is growing",
-        message:
-          "Coal output falling each year. Build replacement capacity before shortages begin.",
-        concept: "forecast",
-        kind: "WORLD_EVENT",
-        importance: "NOTABLE",
-        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
-      }),
-    },
-    ...([12, 24, 36, 48] as const).map((atMonth, index) => ({
-      id: `availability-step-${index + 1}`,
-      schedule: { atMonth },
-      durationMonths: 12,
-      preview: () => ({
-        title: [
-          "Breakdowns outpacing repairs",
-          "Another station facing output limits",
-          "Fleet reliability declining further",
-          "Coal availability reaching a low",
-        ][index],
-        message:
-          index === 0
-            ? "Coal output decreasing."
-            : "Coal output decreasing further.",
-      }),
-      describe: ({ difficulty }: StoryContextType) => {
-        const balance = LOAD_SHEDDING_BALANCE[difficulty];
-        const output = balance.coalOutputMultipliers[index];
-        const operating = balance.coalOperatingMultipliers[index];
-        const diesel = balance.dieselPriceMultipliers[index];
-        return {
-          title: [
-            "Breakdowns outpace repairs",
-            "Another station derated",
-            "The fleet is running on borrowed time",
-            "Availability at its lowest",
-          ][index],
-          message: `Coal output is down to ${Math.round(output * 100)}%.`,
-          concept: "fuel" as const,
-          kind: "WORLD_EVENT" as const,
-          importance: index >= 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
-          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
-          effects: {
-            facilityOutputMultipliersByFuel: { Coal: output },
-            operatingCostMultipliersByFuel: { Coal: operating },
-            fuelPriceMultipliers: { Oil: diesel },
-          },
-          turningPointPriority: 100 + index,
-        };
-      },
-    })),
-  ],
-};
-
 export interface KaribaDroughtBalanceType {
   /** Inflow to the reservoir across the four steps of the drought. */
   hydroRunoffMultipliers: [number, number, number, number];
@@ -1951,7 +1846,6 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   HEATWAVE_DROUGHT_ARC,
   NUCLEAR_TRIP_ARC,
   CALIFORNIA_WILDFIRE_ARC,
-  LOAD_SHEDDING_ARC,
   KARIBA_DROUGHT_ARC,
   DELHI_SUMMER_ARC,
 ];
@@ -2449,6 +2343,42 @@ function resolvePhaseTiming(
   return { scheduledMonth, durationMonths };
 }
 
+/** Direct resolver probes and legacy custom-game imports share the migrated catalog data too. */
+function declarativeStoryRules(
+  context: StoryContextType,
+): CompiledScenarioRules[] {
+  const ids =
+    context.scenarioId === 999
+      ? (context.customEvents?.map((event) => event.scenarioId) ?? [])
+      : [context.scenarioId];
+  return ids.flatMap((id) => {
+    const source = getScenario(id);
+    if (!source) return [];
+    const rules = officialScenarioRules(source, context, {
+      startingYear:
+        context.date.year - Math.floor(context.date.monthsElapsed / 12),
+    });
+    if (!rules) return [];
+    if (context.scenarioId !== 999) return [rules];
+    return [
+      {
+        ...rules,
+        events: rules.events.map((event) => ({
+          ...event,
+          message: `${context.location.name}: ${scenarioEffectsSummary(event.effects).length ? scenarioEffectsSummary(event.effects).join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`,
+          source: {
+            ...event.source!,
+            actionTarget: {
+              card: "FACILITIES" as const,
+              view: "FLEET" as const,
+            },
+          },
+        })),
+      },
+    ];
+  });
+}
+
 /**
  * Pure story resolver used at both live monthly rollover and every date in a forecast. It never
  * mutates checked keys, occurrences, logs, snackbars, recovery state, facilities, or speed.
@@ -2504,6 +2434,17 @@ export function resolveStoryAtDate(
         active.push(resolved);
       }
     });
+  if (definitions === STORY_ARC_DEFINITIONS) {
+    for (const rules of declarativeStoryRules(context)) {
+      const shared = resolveScenarioRuleEvents({ ...context, rules });
+      occurrences.push(...shared.occurrences);
+      active.push(...shared.active);
+    }
+    const order = (a: ActiveWorldEventType, b: ActiveWorldEventType) =>
+      a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    occurrences.sort(order);
+    active.sort(order);
+  }
   return { occurrences, active, effects: combineStoryEffects(active) };
 }
 
@@ -2513,7 +2454,7 @@ export function upcomingStoryPhases(
   definitions: StoryArcDefinitionType[] = STORY_ARC_DEFINITIONS,
 ): Array<ActiveWorldEventType & StoryPhaseDescriptionType> {
   if (context.rules) return upcomingScenarioRuleEvents(context);
-  return definitions
+  const legacy = definitions
     .filter(
       (arc) =>
         arc.scenarioId === context.scenarioId ||
@@ -2553,4 +2494,14 @@ export function upcomingStoryPhases(
     .sort(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
+  return [
+    ...legacy,
+    ...(definitions === STORY_ARC_DEFINITIONS
+      ? declarativeStoryRules(context).flatMap((rules) =>
+          upcomingScenarioRuleEvents({ ...context, rules }),
+        )
+      : []),
+  ].sort(
+    (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
+  );
 }

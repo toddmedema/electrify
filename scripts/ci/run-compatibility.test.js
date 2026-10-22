@@ -32,6 +32,7 @@ function fixture(t) {
     "electron/mods.cjs",
     "electron/steam-workshop.cjs",
     "electron/steam-multiplayer.cjs",
+    "electron/coop-codec.cjs",
     "package-lock.json",
     "public/data/input.csv",
   ])
@@ -95,18 +96,19 @@ for (const file of [
   });
 }
 
-test("transport changes move only multiplayer compatibility", (t) => {
-  const f = fixture(t);
-  const before = f.manifest();
-  f.write("src/multiplayer/World.ts", "changed co-op transport\n");
-  const after = f.manifest();
-  assert.equal(after.compatibilityId, before.compatibilityId);
-  assert.equal(after.modRuntimeId, before.modRuntimeId);
-  assert.notEqual(
-    after.multiplayerCompatibilityId,
-    before.multiplayerCompatibilityId,
-  );
-});
+for (const file of ["src/multiplayer/World.ts", "electron/coop-codec.cjs"])
+  test(`transport changes in ${file} move only multiplayer compatibility`, (t) => {
+    const f = fixture(t);
+    const before = f.manifest();
+    f.write(file, "changed co-op transport\n");
+    const after = f.manifest();
+    assert.equal(after.compatibilityId, before.compatibilityId);
+    assert.equal(after.modRuntimeId, before.modRuntimeId);
+    assert.notEqual(
+      after.multiplayerCompatibilityId,
+      before.multiplayerCompatibilityId,
+    );
+  });
 
 test("UI and test files cannot churn runtime identities", (t) => {
   const f = fixture(t);

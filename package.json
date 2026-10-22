@@ -60,6 +60,8 @@
     "pretest:e2e:ci": "npm run compatibility:generate",
     "test:rules": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-electrify-achievements \"node --test firebase/achievements.test.cjs\"",
     "sim": "node scripts/sim.js",
+    "mods:arcs": "node scripts/mods-arcs.js",
+    "premods:arcs": "npm run compatibility:generate",
     "perf:bench": "node scripts/perf/bench.js",
     "perf:bundle": "node scripts/perf/bundle-size.js",
     "perf:rebaseline": "node scripts/perf/rebaseline.js",

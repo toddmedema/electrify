@@ -10,7 +10,6 @@ import {
   PARADISE_BALANCE,
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
-  resolveStoryPhase,
   resolveStoryScheduleMonth,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
@@ -406,14 +405,10 @@ describe("authored upcoming-event previews", () => {
       "Coal output decreasing.",
       ...Array(3).fill("Coal output decreasing further."),
     ]);
-    const arc = STORY_ARC_DEFINITIONS.find(
-      (story) => story.scenarioId === 113,
-    )!;
-    const phase = arc.phases[1];
-    const live = resolveStoryPhase(arc, phase, {
+    const live = resolveStoryAtDate({
       ...start,
       date: context(12, 113).date,
-    });
+    }).occurrences[0];
     expect(live.title).toBe("Breakdowns outpace repairs");
     expect(live.message).toBe("Coal output is down to 67%.");
     expect(live.effects).toMatchObject({

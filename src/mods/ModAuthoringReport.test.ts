@@ -24,6 +24,10 @@ test("the common author report has all difficulty values, actual peak and additi
     [...DIFFICULTY_IDS].sort(),
   );
   for (const facts of Object.values(report.difficulties)) {
+    expect(
+      facts!.sections.find((section) => section.id === "modifiers")!.rows[0]
+        .value,
+    ).toContain("applies to starting facilities and future purchases");
     const peak = facts!.sections
       .find((s) => s.id === "setup")!
       .rows.find((r) => r.label === "Starting peak demand")!.value;

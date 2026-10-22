@@ -1,3 +1,4 @@
+import { OFFICIAL_SCENARIO_RULES } from "../data/OfficialScenarioRules";
 import {
   compileOfficialArcEvents,
   officialArcLoadScale,
@@ -67,7 +68,11 @@ test("all fourteen importable challenges compile detached JSON and data-center k
   expect(challenges).toHaveLength(14);
   const events = compile(challenges.map((scenario) => scenario.id));
   expect(events).toHaveLength(
-    STORY_ARC_DEFINITIONS.reduce((total, arc) => total + arc.phases.length, 0),
+    STORY_ARC_DEFINITIONS.reduce((total, arc) => total + arc.phases.length, 0) +
+      OFFICIAL_SCENARIO_RULES.reduce(
+        (total, arc) => total + (arc.definitions.events?.length ?? 0),
+        0,
+      ),
   );
   expect(compile([106])).toEqual([]);
   expect(JSON.parse(JSON.stringify(events))).toEqual(events);
@@ -89,6 +94,35 @@ test("all fourteen importable challenges compile detached JSON and data-center k
   } finally {
     arc.phases[0].describe = original;
   }
+});
+
+test("trusted pilot forecast titles survive transfer while hostile metadata is rejected", () => {
+  const event = compile([113]).find((item) => item.source.previewTitle)!;
+  expect(validOfficialArcMetadata(JSON.parse(JSON.stringify(event)))).toBe(
+    true,
+  );
+  for (const previewTitle of [
+    "",
+    " ",
+    "x".repeat(121),
+    "<script>bad</script>",
+    "https://example.com",
+    "hidden\u202etitle",
+    "bad\nline",
+  ]) {
+    expect(
+      validOfficialArcMetadata({
+        ...event,
+        source: { ...event.source, previewTitle },
+      }),
+    ).toBe(false);
+  }
+  expect(validOfficialArcMetadata(event)).toBe(true);
+  const originalTitle = event.source.previewTitle;
+  event.source.previewTitle = "Changed imported forecast";
+  expect(
+    compile([113]).find((item) => item.id === event.id)!.source.previewTitle,
+  ).toBe(originalTitle);
 });
 
 test.each(DIFFICULTY_IDS)(

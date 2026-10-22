@@ -1,0 +1,78 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "retire-coal-without-bill-shock",
+  "title": "Retire coal without a bill shock",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Replace the inherited coal fleet before month 25. Keep electricity affordable, contain financed debt and serve customers reliably after retirement.",
+  "seed": 12345,
+  "baseScenarioId": 102,
+  "scenario": {
+    "durationMonths": 36,
+    "startingYear": 2020,
+    "dollarsPerkWh": 0.1
+  },
+  "officialArcs": [],
+  "facilities": {
+    "Natural Gas CC": {
+      "buildCost": 0.8,
+      "yearsToBuild": 0.5
+    },
+    "Solar": {
+      "buildCost": 0.8
+    }
+  },
+  "objectives": {
+    "mode": "replace",
+    "items": [
+      {
+        "id": "retire-coal",
+        "label": "Own no coal from month 25 onward",
+        "metric": "fuelRetirement",
+        "fuel": "Coal",
+        "deadlineMonth": 25
+      },
+      {
+        "id": "no-bill-shock",
+        "label": "Keep billed electricity at or below 11 cents",
+        "metric": "monthlyBilledRate",
+        "fromMonth": 1,
+        "throughMonth": 36,
+        "maxDollarsPerKWh": 0.11
+      },
+      {
+        "id": "debt-ceiling",
+        "label": "Keep outstanding principal at or below 300 million dollars",
+        "metric": "monthEndDebt",
+        "fromMonth": 1,
+        "throughMonth": 36,
+        "maxDebtDollars": 300000000
+      },
+      {
+        "id": "replacement-reliability",
+        "label": "Supply customers after coal retirement",
+        "metric": "monthlyReliability",
+        "fromMonth": 25,
+        "throughMonth": 36,
+        "minDemandServedShare": 0.995
+      }
+    ]
+  },
+  "debriefReports": [
+    {
+      "id": "transition-review",
+      "kind": "fuelMix",
+      "fromMonth": 25,
+      "throughMonth": 36,
+      "fuels": ["Natural Gas", "Sun", "Wind"]
+    },
+    {
+      "id": "transition-finance",
+      "kind": "profitLoss",
+      "fromMonth": 25,
+      "throughMonth": 36
+    }
+  ]
+}

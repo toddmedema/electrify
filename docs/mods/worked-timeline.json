@@ -1,0 +1,98 @@
+{
+  "$schema": "./scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "worked-timeline",
+  "title": "A year after the decision",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Choose your company's grid plan before a year of higher demand, then keep the declared year reliable.",
+  "seed": 42,
+  "baseScenarioId": 100,
+  "officialArcs": [],
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 25,
+    "startingCustomers": 10000,
+    "cash": 1000000000
+  },
+  "choices": [
+    {
+      "id": "grid-plan",
+      "title": "Choose your grid plan",
+      "prompt": "Keep the current demand, fund an upgrade, or accept support for new demand.",
+      "dueMonth": 13,
+      "options": [
+        {
+          "id": "maintain",
+          "label": "Maintain the current plan",
+          "description": "Keep demand unchanged without a transfer.",
+          "message": "Your current demand plan is unchanged.",
+          "costDollars": 0
+        },
+        {
+          "id": "upgrade",
+          "label": "Fund the upgrade",
+          "description": "Pay $1,000 to enable the 10% higher-demand plan.",
+          "message": "Your company funded the upgrade and enabled higher demand.",
+          "costDollars": 1000
+        },
+        {
+          "id": "subsidize",
+          "label": "Accept support",
+          "description": "Receive $10,000 and enable the 10% higher-demand plan.",
+          "message": "Your company received support and enabled higher demand.",
+          "grantDollars": 10000
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "maintenance-expense",
+      "title": "Scheduled maintenance",
+      "message": "Maintenance costs your company $1,000 this month.",
+      "preview": "Maintenance will cost your company $1,000 in month 12.",
+      "visibility": "forecast",
+      "startMonth": 12,
+      "durationMonths": 1,
+      "effects": { "operatingExpenseDollarsPerMonth": 1000 }
+    },
+    {
+      "id": "new-demand",
+      "title": "The selected demand plan begins",
+      "message": "Your company's demand is 10% higher through the end of the run.",
+      "preview": "Upgrading or accepting support will raise your company's demand by 10%.",
+      "visibility": "forecast",
+      "startMonth": 13,
+      "durationMonths": "untilEnd",
+      "requiresChoice": {
+        "choiceId": "grid-plan",
+        "optionIds": ["upgrade", "subsidize"]
+      },
+      "effects": { "demandMultiplier": 1.1 }
+    }
+  ],
+  "objectives": {
+    "mode": "replace",
+    "items": [
+      {
+        "id": "reliable-year",
+        "label": "Keep the declared year reliable",
+        "metric": "monthlyReliability",
+        "fromMonth": 13,
+        "throughMonth": 24,
+        "minDemandServedShare": 0.99
+      }
+    ]
+  },
+  "debriefReports": [
+    {
+      "id": "year-review",
+      "kind": "reliability",
+      "fromMonth": 13,
+      "throughMonth": 24,
+      "minDemandServedShare": 0.99
+    }
+  ]
+}

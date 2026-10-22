@@ -352,7 +352,7 @@ function facts(
       ...Object.entries(mod.facilities ?? {}).flatMap(([name, values]) =>
         Object.entries(values).map(([field, value]) => ({
           label: `${name} ${{ buildCost: "construction cost", annualOperatingCost: "annual operating cost", yearsToBuild: "construction time" }[field] ?? field}`,
-          value: `×${number(value)} · applies to new facilities; existing assets retain their values`,
+          value: `×${number(value)} · applies to starting facilities and future purchases; timed construction changes leave committed purchases unchanged`,
         })),
       ),
       ...Object.entries(mod.programs ?? {}).map(([name, value]) => ({

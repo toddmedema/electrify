@@ -20,6 +20,7 @@ import {
 import { validCompiledScenarioRules } from "./ScenarioRules";
 import { canonicalRuleJson, ruleDigest, utf8Bytes } from "./RuleIdentity";
 import { getScenarioLocation, isValidLocation } from "./Locations";
+import { validHydroInventorySource } from "../data/HydroSites";
 
 export function facilityModifier(
   game: Pick<GameType, "customScenario">,
@@ -105,14 +106,23 @@ function validModSetup(scenario: ScenarioType): boolean {
     ])
   )
     return false;
+  const location = getScenarioLocation(scenario);
   if (
     !number(scenario.cash, 0, 1e12) ||
     !number(scenario.dollarsPerkWh, 0, 100) ||
     !number(scenario.feePerKgCO2e, 0, 100) ||
     !["Investor", "Public"].includes(scenario.ownership) ||
-    !isValidLocation(getScenarioLocation(scenario)) ||
+    !isValidLocation(location) ||
     !safeText(scenario.icon, 100) ||
     !/^[a-z0-9 +_-]+$/i.test(scenario.icon)
+  )
+    return false;
+  if (
+    !validHydroInventorySource({
+      location,
+      scenarioId: scenario.id,
+      customScenario: scenario,
+    })
   )
     return false;
   for (const key of ["summary", "endTitle", "endMessage"] as const)

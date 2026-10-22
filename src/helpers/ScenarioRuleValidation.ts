@@ -3,6 +3,7 @@ import { scenarioRules } from "./ScenarioRules";
 import { getScenario } from "../data/Scenarios";
 import {
   ruleConditionMet,
+  officialRuleOccurrence,
   ruleEvents,
   scenarioRuleProtectionFactor,
   scenarioRuleTargetOperations,
@@ -73,11 +74,20 @@ export function validRuleTargetBindings(value: unknown): boolean {
 export function validScenarioRuleState(game: GameType): boolean {
   const rules = scenarioRules(
     getScenario(game.scenarioId, game.customScenario),
+    game,
   );
   const occurrences = game.worldEvents.occurrences;
-  const ruleOccurrences = occurrences.filter(
-    (event) => event.attributes.ruleEvent === true,
-  );
+  const belongsToRules = (
+    event: GameType["worldEvents"]["occurrences"][number],
+  ) =>
+    event.attributes.ruleEvent === true ||
+    (rules?.namespace.kind === "official" &&
+      event.key.startsWith(
+        `story:${rules.namespace.scenarioId}:${rules.namespace.arcId}:`,
+      ) &&
+      event.attributes.scenarioChoice !== true &&
+      event.attributes.ruleObservation !== true);
+  const ruleOccurrences = occurrences.filter(belongsToRules);
   if (!rules)
     return (
       ruleOccurrences.length === 0 &&
@@ -157,6 +167,17 @@ export function validScenarioRuleState(game: GameType): boolean {
     const definition = definitions.find(
       (definition) => definition.key === event.key,
     );
+    if (definition) {
+      const official = officialRuleOccurrence(definition, rules);
+      if (official) {
+        if (
+          event.startsMinute > game.date.minute ||
+          canonicalRuleJson(official) !== canonicalRuleJson(event)
+        )
+          return false;
+        continue;
+      }
+    }
     if (
       !definition ||
       !validRuleTargetBindings(event.attributes.ruleTargets) ||
@@ -238,9 +259,10 @@ export function validScenarioRuleState(game: GameType): boolean {
     )
       return false;
   }
-  for (const active of game.worldEvents.active.filter(
-    (event) => event.attributes.ruleEvent === true,
-  )) {
+  const activeKeys = new Set<string>();
+  for (const active of game.worldEvents.active.filter(belongsToRules)) {
+    if (activeKeys.has(active.key)) return false;
+    activeKeys.add(active.key);
     const recorded = ruleOccurrences.find((event) => event.key === active.key);
     if (!recorded || canonicalRuleJson(recorded) !== canonicalRuleJson(active))
       return false;

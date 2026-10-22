@@ -22,7 +22,7 @@ export function scenarioEffectsSummary(
     );
   if (effects.operatingExpensePerMonth)
     changes.push(
-      `Restoration: $${rounded(effects.operatingExpensePerMonth).toLocaleString("en-US")}/month`,
+      `${exact ? "Operating expense" : "Restoration"}: $${rounded(effects.operatingExpensePerMonth).toLocaleString("en-US", exact ? { maximumSignificantDigits: 12 } : undefined)}/month`,
     );
   for (const [label, values] of [
     ["fuel price", effects.fuelPriceMultipliers],

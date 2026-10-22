@@ -297,7 +297,10 @@ export function GENERATORS(
     state.date.minute,
   );
   const storyContext = {
-    rules: scenarioRules(getScenario(state.scenarioId, state.customScenario)),
+    rules: scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ),
     seed: state.seed,
     scenarioId: state.scenarioId,
     customEvents: customEventContext(state.customScenario),

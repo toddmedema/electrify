@@ -20,7 +20,7 @@ export function scenarioChoicesForGame(game: GameType): {
   rules?: CompiledScenarioRules;
 } {
   const scenario = getScenario(game.scenarioId, game.customScenario);
-  const rules = scenarioRules(scenario);
+  const rules = scenarioRules(scenario, game);
   if (rules) return { choices: ruleChoices(rules), rules };
   if (
     !scenario ||

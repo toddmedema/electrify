@@ -1,0 +1,32 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "prepare-before-freeze",
+  "title": "Prepare before the freeze",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Choose winterization or a larger construction budget before the Texas freeze. Gas prices and demand still surge; protect every customer through the exact February window.",
+  "seed": 268107,
+  "baseScenarioId": 107,
+  "scenario": {
+    "durationMonths": 60
+  },
+  "officialArcs": [
+    {
+      "scenarioId": 107,
+      "includeChoices": true
+    }
+  ],
+  "objectives": {
+    "mode": "inherit"
+  },
+  "debriefReports": [
+    {
+      "id": "freeze-review",
+      "kind": "deepFreeze",
+      "fromMonth": 49,
+      "throughMonth": 51
+    }
+  ]
+}

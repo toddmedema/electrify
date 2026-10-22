@@ -1,7 +1,9 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { packageDigest } from "../src/mods/ModSchema";
+import { packageDigest, validateMod } from "../src/mods/ModSchema";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
+import type { GameType } from "../src/Types";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -14,6 +16,11 @@ declare global {
       requests: ModRequest[];
       scores: number;
       finishUpload?: () => void;
+      forecasts?: {
+        loads: GameType["loadAdditions"];
+        responses: { key: string; optionId?: string }[];
+      }[];
+      forecastReplies?: number;
     };
   }
 }
@@ -212,6 +219,374 @@ async function scrollEvidenceIntoView(label: Locator) {
 
 const noHorizontalScroll = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+
+// Advance the actual animation-frame clock in bounded catch-up steps. All simulation
+// state still comes from the live reducer; this is functional QA, not a speed benchmark.
+async function advanceExampleTo(page: Page, reached: Locator) {
+  for (let step = 0; step < 220; step++) {
+    if (await reached.isVisible()) return;
+    await page.clock.fastForward(1000);
+  }
+  await expect(
+    reached,
+    "the real example reaches its next boundary",
+  ).toBeVisible();
+}
+
+async function observeExampleForecasts(page: Page) {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.addEventListener("message", (event) => {
+          if (event.data.transport)
+            window.__mods.forecastReplies =
+              (window.__mods.forecastReplies ?? 0) + 1;
+        });
+      }
+      postMessage(
+        message: unknown,
+        options?: Transferable[] | StructuredSerializeOptions,
+      ) {
+        if (
+          message &&
+          typeof message === "object" &&
+          "game" in message &&
+          "now" in message
+        ) {
+          const game = message.game as GameType;
+          (window.__mods.forecasts ??= []).push({
+            loads: game.loadAdditions.map((load) => ({ ...load })),
+            responses: game.worldEvents.occurrences
+              .filter((event) => typeof event.attributes.choice === "string")
+              .map((event) => ({
+                key: event.key,
+                optionId: String(event.attributes.choice),
+              })),
+          });
+        }
+        // Observe the public worker boundary without intercepting or editing the request.
+        if (Array.isArray(options)) super.postMessage(message, options);
+        else super.postMessage(message, options);
+      }
+    };
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  for (const winning of [true, false]) {
+    test(`finished connection example reaches ${winning ? "success" : "failure"} in ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(180000);
+      page.setDefaultTimeout(20000);
+      const example = validateMod(
+        JSON.parse(
+          await fs.readFile(
+            path.resolve("docs/mods/examples/funded-or-phased-connection.json"),
+            "utf8",
+          ),
+        ),
+      );
+      const entry: InstalledMod = {
+        key: `local:${example.id}`,
+        source: "local",
+        enabled: true,
+        pack: example,
+      };
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await mockDesktop(page, false, theme, [entry]);
+      await observeExampleForecasts(page);
+      await page.clock.install();
+      await page.goto("/");
+      await page.getByRole("button", { name: "Mods", exact: true }).click();
+      const play = page.getByRole("button", {
+        name: `Play ${example.title}`,
+        exact: true,
+      });
+      await expect(play).toBeEnabled({ timeout: 60000 });
+      await play.focus();
+      await page.keyboard.press("Enter");
+      const launch = page.getByRole("dialog");
+      const easy = launch.getByRole("button", { name: "Easy", exact: true });
+      await easy.focus();
+      await page.keyboard.press("Enter");
+      await expect(easy).toHaveAttribute("aria-pressed", "true");
+      await expect(launch).toContainText("Serve the connected city");
+      await expect(launch).toContainText("Retain your starting customers");
+      await expect(launch).toContainText(
+        "Modded run · unranked · no achievements",
+      );
+      expect(await noHorizontalScroll(page)).toBe(true);
+      await launch.getByRole("button", { name: "Start", exact: true }).focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("button", { name: "Build", exact: true }),
+      ).toBeVisible({ timeout: 60000 });
+      const appbar = page.locator("#appbar:visible");
+      await appbar.getByRole("button", { name: "pause", exact: true }).click();
+      await openPane(
+        page.getByRole("region", { name: "Programs", exact: true }),
+        page.getByRole("button", { name: "Programs", exact: true }),
+      );
+      const rate = page.getByRole("slider", {
+        name: "The rate you charge for electricity generation",
+        exact: true,
+      });
+      await rate.focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+      await expect(rate).toHaveAttribute("aria-valuenow", "0.12");
+      await page.keyboard.press("Escape");
+      if (winning) {
+        await openPane(
+          page.locator(".facilities"),
+          page.getByRole("button", { name: "Facilities", exact: true }),
+        );
+        await page.locator(".button-buildFacility").click();
+        await page.locator(".button-buildGenerator").click();
+        const capacity = page.getByRole("slider", { name: /^Capacity/ });
+        await capacity.focus();
+        await page.keyboard.press("Home");
+        for (let tick = 0; tick < wToSliderTick(50e6); tick++)
+          await page.keyboard.press("ArrowRight");
+        await expect(page.locator("#construction-capacity")).toContainText(
+          /50\s?MW/,
+        );
+        await page
+          .getByRole("button", {
+            name: "Review purchase of Natural Gas Peaker",
+            exact: true,
+          })
+          .click();
+        await page
+          .getByRole("dialog")
+          .getByRole("button", { name: "Take loan", exact: true })
+          .click();
+        // Committing the purchase returns to the fleet at every viewport.
+        await expect(
+          page.getByRole("region", { name: "Build", exact: true }),
+        ).toHaveCount(0);
+        const opening = (await readSavedGame(page))!;
+        expect(opening.facilities).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: "Natural Gas Peaker",
+              peakW: 50e6,
+            }),
+          ]),
+        );
+        expect(opening.dollarsPerkWh).toBe(0.12);
+      }
+      await appbar
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+      const choice = page.getByRole("dialog", {
+        name: /Negotiate the data-center connection/,
+      });
+      await advanceExampleTo(page, choice);
+      const pending = (await readSavedGame(page))!;
+      expect(pending.date.monthsElapsed).toBe(48);
+      expect(pending.speed).toBe("PAUSED");
+      await page.keyboard.press("Escape");
+      await expect(choice).toBeVisible();
+      const response = choice.getByRole("button", {
+        name: winning
+          ? "Require phased connections"
+          : "Accept funded connection",
+        exact: true,
+      });
+      for (const button of await choice.getByRole("button").all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.height).toBeGreaterThanOrEqual(44);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(
+          page.viewportSize()!.width,
+        );
+      }
+      const repliesBefore = await page.evaluate(
+        () => window.__mods.forecastReplies ?? 0,
+      );
+      await response.focus();
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(await noHorizontalScroll(page)).toBe(true);
+      if (winning && theme === "dark" && page.viewportSize()!.width === 360)
+        await screenshot(page, "finished-connection-choice-360-dark.png");
+      await page.keyboard.press("Enter");
+      await expect(choice).toHaveCount(0);
+      const key = `mod:${example.id}:arc:106:choice:connection`;
+      const committed = (await readSavedGame(page))!;
+      expect(
+        committed.worldEvents.occurrences.filter((event) => event.key === key),
+      ).toEqual([
+        expect.objectContaining({
+          attributes: expect.objectContaining({
+            choice: winning ? "phased" : "fast-track",
+          }),
+        }),
+      ]);
+      expect(
+        committed.loadAdditions.map((load) => ({
+          peakW: load.peakW,
+          year: load.startsYear,
+        })),
+      ).toEqual(
+        winning
+          ? [
+              { peakW: 50e6, year: 2026 },
+              { peakW: 50e6, year: 2028 },
+            ]
+          : [{ peakW: 100e6, year: 2026 }],
+      );
+      await openPane(
+        page.locator(".insights"),
+        page.getByRole("button", { name: "Insights", exact: true }),
+      );
+      await expect
+        .poll(async () =>
+          page.evaluate(
+            (key) =>
+              window.__mods.forecasts?.some((forecast) =>
+                forecast.responses.some((response) => response.key === key),
+              ),
+            key,
+          ),
+        )
+        .toBe(true);
+      await expect
+        .poll(
+          async () => page.evaluate(() => window.__mods.forecastReplies ?? 0),
+          { timeout: 60000 },
+        )
+        .toBeGreaterThan(repliesBefore);
+      const request = await page.evaluate(
+        (key) =>
+          window.__mods.forecasts!.findLast((forecast) =>
+            forecast.responses.some((response) => response.key === key),
+          ),
+        key,
+      );
+      expect(request!.loads).toEqual(committed.loadAdditions);
+      const chart = page
+        .locator(".insights:visible")
+        .getByRole("img", { name: /^(Chart of|Monthly ranges of)/ })
+        .first();
+      await expect(chart).toBeVisible({ timeout: 60000 });
+      await expect(chart).toHaveAttribute("aria-label", /demand|supply/i);
+      await page.keyboard.press("Escape");
+      await appbar
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+      if (winning) {
+        await advanceExampleTo(
+          page,
+          appbar.getByRole("heading").filter({ hasText: "Feb 2026" }),
+        );
+        await appbar
+          .getByRole("button", { name: "pause", exact: true })
+          .click();
+        const scenario = page.getByRole("region", {
+          name: "Scenario",
+          exact: true,
+        });
+        await openPane(
+          scenario,
+          page.getByRole("button", { name: "Scenario", exact: true }),
+        );
+        await expect(
+          scenario.getByRole("region", { name: "Victory conditions" }),
+        ).toContainText("1/36 months completed");
+        expect(
+          (await readSavedGame(page))!.objectiveProgress?.completedMonths,
+        ).toBe(73);
+        await page.keyboard.press("Escape");
+        await appbar
+          .getByRole("button", { name: "fast speed", exact: true })
+          .click();
+      }
+      const result = page.getByRole("dialog", {
+        name: winning
+          ? "A bigger city, a bigger grid"
+          : "Mission objective missed",
+        exact: true,
+      });
+      await advanceExampleTo(page, result);
+      const evidence = result.getByRole("region", {
+        name: "Objective results",
+      });
+      await expect(evidence).toContainText(
+        `Serve the connected city · Required · ${winning ? "Met" : "Failed"}`,
+      );
+      await expect(evidence).toContainText("Months 73–108");
+      await expect(evidence).toContainText(
+        winning ? "36/36 months completed" : "1/36 months completed",
+      );
+      if (!winning)
+        await expect(evidence).toContainText(
+          "At least one completed month supplied less than the required share of customer demand.",
+        );
+      await expect(result).toContainText(
+        "Modded run · not ranked and no achievements.",
+      );
+      expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(await noHorizontalScroll(page)).toBe(true);
+      const goal = evidence
+        .getByText("Serve the connected city", { exact: false })
+        .first();
+      await scrollEvidenceIntoView(goal);
+      await expect(goal).toBeInViewport({ ratio: 1 });
+      // The evidence scrolls inside the dialog while its action footer stays usable.
+      const nextGame = result.getByRole("button", {
+        name: "New game",
+        exact: true,
+      });
+      await expect(nextGame).toBeInViewport({ ratio: 1 });
+      const footerBounds = (await nextGame.boundingBox())!;
+      expect(footerBounds.height).toBeGreaterThanOrEqual(
+        page.viewportSize()!.width < 600 ? 44 : 40,
+      );
+      expect(footerBounds.x).toBeGreaterThanOrEqual(0);
+      expect(footerBounds.x + footerBounds.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width,
+      );
+      // Let ordinary shortage notices finish after the stopped outcome, so they
+      // cannot cover the debrief or its footer in a review capture.
+      const toast = page.locator(".snackbarContent");
+      for (let notice = 0; notice < 3 && (await toast.isVisible()); notice++)
+        await page.clock.fastForward(10000);
+      await expect(toast).toBeHidden();
+      // Failed runs retain results instead of a resumable game payload; observe
+      // the stopped live clock and canonical completed-month evidence above.
+      await expect(
+        appbar.locator('button[aria-label="pause"]'),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(appbar).toContainText(winning ? "Jan 2029" : "Feb 2026");
+      if (winning && page.viewportSize()!.width === 1280) {
+        // The flow above is checked at 1280×800. A taller normal desktop capture
+        // fits the complete intro and results without a clipped scroll seam.
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await result.locator(".MuiDialogContent-root").evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await expect(goal).toBeInViewport({ ratio: 1 });
+        await expect(nextGame).toBeInViewport({ ratio: 1 });
+      }
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      await screenshot(
+        page,
+        `finished-connection-${winning ? "success" : "failure"}-${page.viewportSize()!.width}-${theme}.png`,
+      );
+    });
+  }
+}
 
 test("desktop menu keyboard navigation includes Mods between Manual and Settings", async ({
   page,

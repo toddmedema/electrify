@@ -239,11 +239,54 @@ function reportDescription(
   });
 }
 
+/** Effect-only trusted catalog phases keep their established public receipt shape. */
+export function officialRuleOccurrence(
+  event: CompiledRuleEvent,
+  rules: CompiledScenarioRules,
+  preview = false,
+): Occurrence | undefined {
+  if (
+    rules.namespace.kind !== "official" ||
+    !event.source ||
+    event.targets.length ||
+    event.transactions.length ||
+    event.protection ||
+    event.report ||
+    event.endReport ||
+    event.reports?.length
+  )
+    return undefined;
+  return {
+    key: event.key,
+    definitionId: `${event.source.arcId}:${event.source.phaseId}`,
+    startsMinute: event.startMonth * MINUTES_PER_MONTH,
+    endsMinute:
+      Math.min(rules.durationMonths, event.startMonth + event.durationMonths) *
+      MINUTES_PER_MONTH,
+    forecastable: event.visibility === "surprise" ? false : undefined,
+    kind: event.source.kind ?? "WORLD_EVENT",
+    title: preview ? (event.source.previewTitle ?? event.title) : event.title,
+    message: preview ? (event.preview ?? event.message) : event.message,
+    ...(event.source.concept ? { concept: event.source.concept } : {}),
+    ...(event.source.importance ? { importance: event.source.importance } : {}),
+    ...(event.source.actionTarget
+      ? { actionTarget: event.source.actionTarget }
+      : {}),
+    ...(event.source.turningPointPriority === undefined
+      ? {}
+      : { turningPointPriority: event.source.turningPointPriority }),
+    attributes: { scheduledMonth: event.startMonth },
+    effects: event.effects,
+  };
+}
+
 function resolveEvent(
   event: CompiledRuleEvent,
   context: StoryContextType,
   preview = false,
 ): Occurrence {
+  const official = officialRuleOccurrence(event, context.rules!, preview);
+  if (official) return official;
   const prior = context.occurrences?.find((o) => o.key === event.key);
   if (prior && !preview)
     return {
@@ -323,7 +366,7 @@ function resolveEvent(
       ) * MINUTES_PER_MONTH,
     forecastable: event.visibility !== "surprise",
     kind: event.source?.kind ?? "WORLD_EVENT",
-    title: event.title,
+    title: preview ? (event.source?.previewTitle ?? event.title) : event.title,
     message: preview
       ? (event.preview ?? event.message)
       : [
@@ -477,7 +520,9 @@ export function captureRuleReportObservation(
   ];
   if (
     !reports.some(
-      (report) => "throughMonth" in report && report.throughMonth === month,
+      (report) =>
+        (report.kind === "firmCoverage" || report.kind === "storageCoverage") &&
+        report.throughMonth === month,
     )
   )
     return;

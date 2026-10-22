@@ -98,6 +98,7 @@ for (const file of [
   ...filesUnder("src/multiplayer").filter(productionSource),
   "src/workers/Multiplayer.worker.ts",
   "electron/steam-multiplayer.cjs",
+  "electron/coop-codec.cjs",
 ].sort()) {
   multiplayerDigest.update(`${file}\0${readInput(file).inputDigest}\n`);
 }

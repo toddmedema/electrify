@@ -197,7 +197,7 @@ inventories["scenario:114"] = {
   locationId: "Lusaka",
   siteIds: [...inventories.Lusaka.siteIds, "victoria-falls-zmb"],
   researchDisposition:
-    "Authored Zambia national-grid exception: scenario 114 explicitly models Kariba, Kafue Gorge and Victoria Falls. Victoria Falls is outside the ordinary 250 km radius; ZESCO generation catalogue corroborates its 108 MW ceiling. This exception never widens custom Lusaka games.",
+    "Authored Zambia national-grid exception: scenario 114 explicitly models Kariba, Kafue Gorge and Victoria Falls. Victoria Falls is outside the ordinary 250 km radius; ZESCO generation catalogue corroborates its 108 MW ceiling. Validated mods based on scenario 114 inherit this inventory; ordinary custom Lusaka games retain their local inventory.",
 };
 const used = new Set(Object.values(inventories).flatMap((i) => i.siteIds));
 const output = {

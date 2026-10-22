@@ -16,7 +16,10 @@ import {
 } from "../../helpers/Wildfire";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
-import { scenarioRules } from "../../helpers/ScenarioRules";
+import {
+  scenarioRules,
+  scenarioRulesIdentity,
+} from "../../helpers/ScenarioRules";
 import { getScenario } from "../../data/Scenarios";
 import { scenarioChoicesForGame } from "../../helpers/ScenarioChoices";
 import {
@@ -47,6 +50,7 @@ export function selectUpcomingStoryEvents(
   const game = state.game;
   const rules = scenarioRules(
     getScenario(game.scenarioId, game.customScenario),
+    game,
   );
   const customEvents = customEventContext(game.customScenario);
   if (
@@ -98,8 +102,8 @@ export function selectUpcomingStoryEvents(
   const key = [
     game.seed,
     game.customScenario?.mod?.runtimeDigest ??
-      JSON.stringify(
-        scenarioRules(getScenario(game.scenarioId, game.customScenario)),
+      scenarioRulesIdentity(
+        scenarioRules(getScenario(game.scenarioId, game.customScenario), game),
       ),
     game.scenarioId,
     game.difficulty,
@@ -125,7 +129,10 @@ export function selectUpcomingStoryEvents(
     return upcomingCache.events;
   }
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
-    rules: scenarioRules(getScenario(game.scenarioId, game.customScenario)),
+    rules: scenarioRules(
+      getScenario(game.scenarioId, game.customScenario),
+      game,
+    ),
     seed: game.seed,
     scenarioId: game.scenarioId,
     customEvents,

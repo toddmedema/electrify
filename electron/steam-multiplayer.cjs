@@ -4,6 +4,7 @@ const path = require("node:path");
 const { atomicWriteAsync, readJson } = require("./storage.cjs");
 const { nativeLibraryPath } = require("./steam-native.cjs");
 const { CoopSaveStore } = require("./coop-storage.cjs");
+const { stringify, parse } = require("./coop-codec.cjs");
 const {
   isRuleJson,
   RULE_LIMITS,
@@ -139,21 +140,6 @@ function lobbyFromArgs(args) {
     : undefined;
 }
 const RULES = /^[a-zA-Z0-9:._-]{1,128}$/;
-const stringify = (value) =>
-  JSON.stringify(value, (_key, item) =>
-    typeof item === "number" && !Number.isFinite(item)
-      ? { $electrifyNumber: String(item) }
-      : item,
-  );
-const parse = (value) =>
-  JSON.parse(value, (_key, item) =>
-    item &&
-    typeof item === "object" &&
-    Object.keys(item).length === 1 &&
-    ["Infinity", "-Infinity", "NaN"].includes(item.$electrifyNumber)
-      ? Number(item.$electrifyNumber)
-      : item,
-  );
 function loadMultiplayerFunctions(
   library = require("koffi").load(nativeLibraryPath()),
 ) {

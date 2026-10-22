@@ -47,6 +47,8 @@ test("the packaged mod parser loads, validates and digests without checkout depe
   const probe = `
     const assert = require("node:assert/strict");
     const { ModStore } = require("./electron/mods.cjs");
+    const codec = require("./electron/coop-codec.cjs");
+    assert.deepEqual(codec.parse(codec.stringify({ value: Infinity })), { value: Infinity });
     const { parseMod, packageDigest } = require("./src/mods/ModSchema.js");
     assert.equal(typeof ModStore, "function");
     const pack = {

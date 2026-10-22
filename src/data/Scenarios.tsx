@@ -1,3 +1,4 @@
+import { officialReliabilityMetadata } from "./OfficialScenarioRules";
 import { beginIntertieStress } from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
@@ -1752,16 +1753,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07,
     cash: 140000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: {
-      // The deepest stage of the real shortage. Requiring the whole of 2022 keeps the objective
-      // on the sustained problem rather than on any single bad week.
-      year: 2022,
-      month: 1,
-      durationMonths: 12,
-      minimumDemandServed: 0.995,
-      label: "2022 power shortage",
-      goal: "Keep the lights on through the 2022 shortage",
-    },
+    reliabilityObjective: officialReliabilityMetadata(113, 2016),
     // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
     // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
     // producer programme had delivered by then. https://www.eskom.co.za/dataportal/supply-side/

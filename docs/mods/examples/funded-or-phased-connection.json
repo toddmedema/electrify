@@ -1,0 +1,49 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "funded-or-phased-connection",
+  "title": "Funded or phased connection",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Prepare the Manassas grid for a permanent campus. Each company chooses the contribution or more time to build; keep residents supplied and retain their accounts.",
+  "seed": 12345,
+  "baseScenarioId": 106,
+  "scenario": {
+    "durationMonths": 108
+  },
+  "officialArcs": [
+    {
+      "scenarioId": 106,
+      "includeChoices": true
+    }
+  ],
+  "objectives": {
+    "mode": "replace",
+    "items": [
+      {
+        "id": "connection-reliability",
+        "label": "Serve the connected city",
+        "metric": "monthlyReliability",
+        "fromMonth": 73,
+        "throughMonth": 108,
+        "minDemandServedShare": 0.995
+      },
+      {
+        "id": "resident-retention",
+        "label": "Retain your starting customers",
+        "metric": "customerRetention",
+        "deadlineMonth": 108,
+        "minRetainedShare": 0.9
+      }
+    ]
+  },
+  "debriefReports": [
+    {
+      "id": "connection-review",
+      "kind": "dataCenter",
+      "fromMonth": 73,
+      "throughMonth": 108
+    }
+  ]
+}

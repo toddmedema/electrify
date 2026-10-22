@@ -208,6 +208,7 @@ export interface CompiledRuleEvent {
     scenarioId: number;
     arcId: string;
     phaseId: string;
+    previewTitle?: string;
     drawKey?: string;
     kind?: GameEventKindType;
     concept?: ConceptNameType;

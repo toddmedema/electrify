@@ -54,6 +54,15 @@ import type {
   ScenarioType,
 } from "../Types";
 
+interface ResolvedMod {
+  scenario: ScenarioType;
+  diagnostics: ModDiagnostic[];
+  scenarios: Partial<Record<DifficultyType, ScenarioType>>;
+}
+// All five difficulties share one validated compilation. Public callers receive detached data.
+const compiledMods = new Map<string, ResolvedMod>();
+const detached = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
 export function modIssue(pack: ModPackage): string | undefined {
   const errors = modValidationDiagnostics(pack).filter(
     (d) => d.severity === "error",
@@ -198,13 +207,27 @@ function resolveMod(
   workshopId: string | undefined,
   difficulty: DifficultyType,
   startingPeakW: number,
-): {
-  scenario: ScenarioType;
-  diagnostics: ModDiagnostic[];
-  scenarios: Partial<Record<DifficultyType, ScenarioType>>;
-} {
+): ResolvedMod {
   const { pack, base, arcs, startingYear, durationMonths, resolved } =
     resolveModSetup(input);
+  const startingPeaks = Object.fromEntries(
+    DIFFICULTY_IDS.map((atDifficulty) => [
+      atDifficulty,
+      startingPeakW ||
+        resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed) ||
+        0,
+    ]),
+  ) as Record<DifficultyType, number>;
+  const cacheKey = JSON.stringify([
+    packageDigest(pack),
+    compatibilityManifest.modRuntimeId,
+    modSetupDigest(resolved),
+    workshopId ?? null,
+    startingPeaks,
+  ]);
+  const cached = compiledMods.get(cacheKey);
+  if (cached)
+    return detached({ ...cached, scenario: cached.scenarios[difficulty]! });
   const inherited =
     pack.objectives.mode === "inherit"
       ? inheritedModObjectives(base, startingYear)
@@ -240,10 +263,7 @@ function resolveMod(
   > = {};
   for (const atDifficulty of DIFFICULTY_IDS) {
     try {
-      const peak =
-        startingPeakW ||
-        resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed) ||
-        0;
+      const peak = startingPeaks[atDifficulty];
       const compiled = compileScenarioRules(definitions, {
         ...params,
         startingPeakW: peak,
@@ -374,7 +394,7 @@ function resolveMod(
       message:
         "Compiled mod snapshot exceeds512KiB including metadata, parameters and imported content.",
     });
-  return {
+  const result: ResolvedMod = {
     scenario: resolved,
     scenarios,
     diagnostics: diagnostics.filter(
@@ -385,6 +405,14 @@ function resolveMod(
         ) === i,
     ),
   };
+  if (
+    !result.diagnostics.some((diagnostic) => diagnostic.severity === "error")
+  ) {
+    if (compiledMods.size >= 32)
+      compiledMods.delete(compiledMods.keys().next().value!);
+    compiledMods.set(cacheKey, detached(result));
+  }
+  return result;
 }
 /** Author tools resolve the same setup before loading its data, without inventing another model. */
 export function modResolvedSetup(input: unknown): ScenarioType {

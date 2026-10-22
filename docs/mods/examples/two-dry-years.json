@@ -1,0 +1,162 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "two-dry-years",
+  "title": "Two dry years",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Prepare the Lusaka grid for two dry years. Each company can pay for conservation or accept emergency fuel funding each year, while keeping supply reliable and emissions within budget.",
+  "seed": 42,
+  "baseScenarioId": 114,
+  "scenario": {
+    "durationMonths": 48
+  },
+  "officialArcs": [],
+  "objectives": {
+    "mode": "replace",
+    "items": [
+      {
+        "id": "drought-reliability",
+        "label": "Supply customers through both dry years",
+        "metric": "monthlyReliability",
+        "fromMonth": 13,
+        "throughMonth": 36,
+        "minDemandServedShare": 0.98
+      },
+      {
+        "id": "drought-emissions",
+        "label": "Keep the drought response below one million tonnes",
+        "metric": "emissionsBudget",
+        "fromMonth": 13,
+        "throughMonth": 48,
+        "budgetTonnesCO2e": 1000000
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "first-dry-year",
+      "title": "First dry year",
+      "message": "Hydro inflow is down to 50%.",
+      "preview": "Hydro inflow will fall to 50% for twelve months.",
+      "startMonth": 13,
+      "durationMonths": 12,
+      "visibility": "forecast",
+      "effects": {
+        "hydroInflowMultiplier": 0.5
+      },
+      "endMessage": "The second dry year begins with lower inflow."
+    },
+    {
+      "id": "second-dry-year",
+      "title": "Second dry year",
+      "message": "Hydro inflow is down to 25%.",
+      "preview": "Hydro inflow will fall to 25% for twelve months.",
+      "startMonth": 25,
+      "durationMonths": 12,
+      "visibility": "forecast",
+      "effects": {
+        "hydroInflowMultiplier": 0.25
+      },
+      "endMessage": "The drought inflow limits have ended."
+    },
+    {
+      "id": "first-year-conservation",
+      "title": "First-year conservation",
+      "message": "Your conservation programme reduces demand 10%.",
+      "preview": "Funded conservation will reduce demand 10% for twelve months.",
+      "startMonth": 13,
+      "durationMonths": 12,
+      "visibility": "forecast",
+      "requiresChoice": {
+        "choiceId": "first-year-response",
+        "optionIds": ["conserve"]
+      },
+      "effects": {
+        "demandMultiplier": 0.9,
+        "operatingExpenseDollarsPerMonth": 125000
+      },
+      "endMessage": "This conservation programme has ended."
+    },
+    {
+      "id": "second-year-conservation",
+      "title": "Second-year conservation",
+      "message": "Your conservation programme reduces demand 10%.",
+      "preview": "Funded conservation will reduce demand 10% for twelve months.",
+      "startMonth": 25,
+      "durationMonths": 12,
+      "visibility": "forecast",
+      "requiresChoice": {
+        "choiceId": "second-year-response",
+        "optionIds": ["conserve"]
+      },
+      "effects": {
+        "demandMultiplier": 0.9,
+        "operatingExpenseDollarsPerMonth": 125000
+      },
+      "endMessage": "This conservation programme has ended."
+    }
+  ],
+  "choices": [
+    {
+      "id": "first-year-response",
+      "dueMonth": 12,
+      "title": "Plan the first dry year",
+      "prompt": "Pay for a year of customer conservation or accept emergency fuel funding for your grid.",
+      "options": [
+        {
+          "id": "conserve",
+          "label": "Fund conservation",
+          "description": "Pay 5,000,000 starting-year dollars and 125,000 per month to reduce customer demand 10% for twelve months.",
+          "message": "Your company funded one year of conservation.",
+          "costDollars": 5000000
+        },
+        {
+          "id": "fuel-support",
+          "label": "Accept fuel support",
+          "description": "Receive 5,000,000 starting-year dollars; demand remains unchanged.",
+          "message": "Your company accepted emergency fuel funding.",
+          "grantDollars": 5000000
+        }
+      ]
+    },
+    {
+      "id": "second-year-response",
+      "dueMonth": 25,
+      "title": "Respond to the second dry year",
+      "prompt": "Pay for a year of customer conservation or accept emergency fuel funding for your grid.",
+      "options": [
+        {
+          "id": "conserve",
+          "label": "Fund conservation",
+          "description": "Pay 3,000,000 starting-year dollars and 125,000 per month to reduce customer demand 10% for twelve months.",
+          "message": "Your company funded one year of conservation.",
+          "costDollars": 3000000
+        },
+        {
+          "id": "fuel-support",
+          "label": "Accept fuel support",
+          "description": "Receive 3,000,000 starting-year dollars; demand remains unchanged.",
+          "message": "Your company accepted emergency fuel funding.",
+          "grantDollars": 3000000
+        }
+      ]
+    }
+  ],
+  "debriefReports": [
+    {
+      "id": "drought-service-review",
+      "kind": "reliability",
+      "fromMonth": 13,
+      "throughMonth": 36,
+      "minDemandServedShare": 0.98
+    },
+    {
+      "id": "drought-financial-review",
+      "kind": "profitLoss",
+      "fromMonth": 13,
+      "throughMonth": 48
+    }
+  ]
+}

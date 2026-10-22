@@ -70,90 +70,42 @@ components and assets with separate license notices retain their own licenses.
 
 ## Modding
 
-Mods are community scenarios for the Steam/desktop edition. Open **Mods** above
-**Settings** in the main menu, or choose **Mods** on the Choose a game screen.
-Modded games are single-player, unranked, and do not earn achievements.
+Community scenarios work in solo play and co-op in the Steam/desktop edition.
+Open **Mods** in the main menu or Choose a game, or **Community scenarios** while
+hosting. Local JSON and installed Workshop copies work offline. Guests receive
+the host's validated rules without installing or subscribing to the package.
+Modded companies are unranked and earn no official scores or achievements.
 
-### Install and play
+Choose **Play** to inspect the actual setup, objectives and announced consequences
+before starting. **Author report** shows all rules, including surprises and the
+resolved facts at every difficulty. Its inspection control does not change the
+launch difficulty. Each company answers its own choices and owns its own results.
 
-- Choose **Browse Workshop**, subscribe to a scenario on Steam, then reopen the Mods
-  screen after Steam finishes downloading it. Opening Mods while connected to Steam
-  checks your subscriptions; **Check for updates** refreshes installed Workshop mods.
-- To install a file someone shared with you, choose **Import mod** and select its
-  JSON file. Local mods work offline. The library holds up to 32 mods.
-- Choose **Play** beside an installed mod, pick a difficulty, then choose **Start**.
-  The **Enabled** switch controls whether that mod can be played. **Remove** deletes
-  a local installation; **Unsubscribe** removes a Workshop subscription and requires
-  a Steam connection.
+To author a scenario, choose **Save authoring template** and keep the paired local
+JSON Schema beside the package. Edit JSON, validate all difficulties and simulate
+explicit branches before importing:
 
-Updates apply to new games. Each save keeps the mod version it started with, so
-updating, disabling, removing, or unsubscribing does not change an existing run.
-
-### Create a scenario
-
-1. Under **Create a mod**, choose **Save authoring template**.
-2. Open the saved JSON file in a text editor. Set `id` to a unique name using
-   lowercase letters, digits, and hyphens, and fill in `title`, `creator`, and
-   `version`. Keep the template's `schemaVersion` and `gameApi` values.
-3. Edit the scenario and modifiers, save the file, then choose **Import mod**.
-   Validation errors appear in a toast and identify the field to fix.
-4. Play the imported scenario to check its balance and events. After editing it
-   again, reimport the file with the same `id` to replace the local version, then
-   start a new game to try the changes.
-
-A mod is a UTF-8 JSON file of at most 256 KiB. It contains data only: scripts,
-custom artwork, and extra package files are not supported. This example makes
-solar construction and efficiency rebates 20% cheaper:
-
-```json
-{
-  "schemaVersion": 1,
-  "gameApi": 1,
-  "id": "my-grid",
-  "title": "My Grid",
-  "creator": "Your name",
-  "version": "1.0.0",
-  "seed": 42,
-  "baseScenarioId": 999,
-  "scenario": { "durationMonths": 240, "eventScenarioIds": [100] },
-  "facilities": { "Solar": { "buildCost": 0.8 } },
-  "programs": { "efficiency": 0.8 },
-  "notifications": [
-    {
-      "month": 12,
-      "title": "First year",
-      "message": "Review your grid before the next year."
-    }
-  ]
-}
+```sh
+npm run mods:validate -- path/to/scenario.json --explain
+npm run sim -- --mod path/to/scenario.json --responses responses.json
+npm run sim -- --mod path/to/scenario.json --free-fallback --seeds 1,2 --difficulties Employee,Manager
 ```
 
-| Field                       | What it controls                                                                                                                                                                                                  |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `seed`                      | A whole number from 0 to 4294967295 for repeatable simulation outcomes.                                                                                                                                           |
-| `baseScenarioId`            | `999` starts from the custom-game defaults; a supported challenge ID inherits that challenge's starting grid and objectives. Tutorial IDs are not supported.                                                      |
-| `scenario`                  | Optional overrides for `cash`, `startingYear`, `startingCustomers`, `startingDemandScale`, `dollarsPerkWh`, `durationMonths`, `feePerKgCO2e`, `ownership` (`Investor` or `Public`), `endTitle`, and `endMessage`. |
-| `scenario.eventScenarioIds` | Challenge IDs whose event arcs run in your scenario. Use `[]` for no imported events. If omitted, a challenge base uses its own arc and `999` uses none.                                                          |
-| `facilities`                | Multipliers for each named facility's `buildCost`, `annualOperatingCost`, or `yearsToBuild`. Use `0.8` for 20% less, `1` for unchanged, or `1.5` for 50% more. Allowed multipliers range from `0.1` to `10`.      |
-| `programs`                  | Cost multipliers from `0.1` to `10` for `efficiency` (efficiency rebates) and `solar` (rooftop solar rebates).                                                                                                    |
-| `notifications`             | Up to 100 messages, each with `month`, `title`, and `message`. Months start at 1 and must fall within the scenario's duration. These messages do not change the simulation.                                       |
+Packages are data only, at most 256 KiB, with timed effects, consequential choices,
+explicit measurable goals and optional imported challenge arcs. The compiler
+reports independent errors and warnings; warnings alone do not block publishing.
+Saves and co-op campaigns retain their frozen rules after a package update or
+removal. Importing the same local ID offers Update, Keep both or Cancel.
 
-Use the exact facility names, supported challenge IDs, and field limits in
-[the mod schema](src/mods/ModSchema.js). The
-[scenario catalog](src/data/Scenarios.tsx) maps challenge IDs to names. Omit optional
-fields to keep their defaults. JSON does not allow comments or trailing commas.
-An incompatible mod stays installed with an explanation beside it; ask its creator
-for an update. Ordinary game releases do not require changing `gameApi`.
+Read the [mod contract and worked timeline](docs/mods.md),
+[balanced example packages and viable routes](docs/mods/examples/README.md),
+[offline authoring tools and mechanism recipes](docs/mods/authoring.md), and
+[generated arc reference](docs/mods/arc-reference.md). The schema and production
+compiler own field shapes, units and limits; obsolete `notifications` and
+`scenario.eventScenarioIds` fields are not part of this contract.
 
-### Share on Steam Workshop
-
-Connect to Steam, import your file, then choose **Publish [title]** under
-**Create a mod**. Confirm **Publish publicly** to upload the scenario and your
-creator name. Only publish content you have the right to share. If Steam requires
-you to accept its Workshop agreement, choose **Open on Steam** in the result toast
-and complete that step before others can see the item.
-
-To update your item, edit the file, change its `version`, reimport it with the same
-`id`, then choose **Update [title] on Workshop** and **Upload update**. This updates
-the existing Workshop item. You can also share the JSON file directly for others
-to import without Steam Workshop.
+To share, connect to Steam, import the package, choose **Publish** and confirm.
+Later uploads of the same package update its Workshop item. Each upload appends a
+fresh generated Rules section to the authored description; hidden surprises stay
+private. Steam's full description limit is 7,999 UTF-8 bytes, with actionable
+validation rather than truncation. Complete Steam's agreement when prompted.

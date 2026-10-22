@@ -25,3 +25,23 @@ test("timing benchmarks retain their original sandbox and coverage floors", () =
       ),
   );
 });
+
+test("maximum-rule benchmarks cannot shorten the history or rewrite timing ceilings", () => {
+  for (const args of [
+    ["--mods", "--months", "12"],
+    ["--mods", "--update"],
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      ["scripts/perf/bench.js", ...args],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /fixed maximum workload and no recorded timing ceilings/,
+    );
+  }
+});

@@ -5,7 +5,7 @@ import {
 } from "../helpers/StartingFacilities";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
-import { scenarioRules } from "../helpers/ScenarioRules";
+import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
 import { canonicalRuleJson } from "../helpers/RuleIdentity";
 import { getScenarioLocation } from "../helpers/Locations";
 import { getStartingCustomers } from "../data/LocationProfiles";
@@ -696,6 +696,7 @@ const MAX_WORLD_EVENT_CHECKS = 2400;
 function storyContextAt(state: GameType, date = state.date) {
   const rules = scenarioRules(
     getScenario(state.scenarioId, state.customScenario),
+    state,
   );
   return {
     rules,
@@ -763,6 +764,10 @@ function trimWorldEventOccurrences(state: GameType) {
   const retainedSet = new Set(retained);
   const rules = scenarioRules(
     getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
+  const declaredKeys = new Set(
+    rules ? ruleEvents(rules).map((event) => event.key) : [],
   );
   if (rules) {
     const protectedKeys = new Set(
@@ -783,6 +788,7 @@ function trimWorldEventOccurrences(state: GameType) {
   state.worldEvents.occurrences = occurrences.filter(
     (event) =>
       retainedSet.has(event) ||
+      declaredKeys.has(event.key) ||
       event.attributes.ruleEvent === true ||
       event.attributes.ruleEventEnd === true ||
       event.attributes.ruleObservation === true ||
@@ -807,7 +813,10 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   );
   if (
     state.storyEffectsDisabled ||
-    (!scenarioRules(getScenario(state.scenarioId, state.customScenario)) &&
+    (!scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ) &&
       !state.customScenario?.eventScenarioIds?.length &&
       !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
   ) {
@@ -1449,7 +1458,10 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
-    !!scenarioRules(getScenario(state.scenarioId, state.customScenario)) ||
+    !!scenarioRules(
+      getScenario(state.scenarioId, state.customScenario),
+      state,
+    ) ||
     !!state.customScenario?.eventScenarioIds?.length ||
     state.scenarioId === 104 ||
     state.scenarioId === 111 ||
@@ -1476,8 +1488,11 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   return [
     state.scenarioId,
     state.customScenario?.mod?.runtimeDigest ??
-      JSON.stringify(
-        scenarioRules(getScenario(state.scenarioId, state.customScenario)),
+      scenarioRulesIdentity(
+        scenarioRules(
+          getScenario(state.scenarioId, state.customScenario),
+          state,
+        ),
       ),
     JSON.stringify(customEventContext(state.customScenario)),
     state.difficulty,
@@ -1948,7 +1963,7 @@ export const gameSlice = createSlice({
           const generator = GENERATORS(
             // These are inherited assets, already committed before month-one timed discounts.
             // Static package factors still apply through the retained custom scenario.
-            scenarioRules(scenario)
+            scenarioRules(scenario, state)?.namespace.kind === "mod"
               ? { ...state, storyEffectsDisabled: true }
               : state,
             facilitySearch.peakW || 1000000,
@@ -2044,7 +2059,7 @@ export const gameSlice = createSlice({
       ];
 
       desktopSimulationHooks()?.initialize(state);
-      const rules = scenarioRules(scenario);
+      const rules = scenarioRules(scenario, state);
       if (rules) {
         updateWorldEvents(state);
         const opening = state.timeline[0];
@@ -3211,6 +3226,7 @@ function applyCompiledScenarioResponse(
 ): boolean {
   const sharedStoryRules = !!scenarioRules(
     getScenario(state.scenarioId, state.customScenario),
+    state,
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   if (
@@ -5434,6 +5450,7 @@ function* supplyFacilitiesFinancesPhases(
   // only receives a receipt when updateWorldEvents activates the event at its owning boundary.
   const rules = scenarioRules(
     getScenario(state.scenarioId, state.customScenario),
+    state,
   );
   const futureContext =
     rules &&

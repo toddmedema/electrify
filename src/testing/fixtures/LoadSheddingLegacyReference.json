@@ -1,0 +1,1743 @@
+{
+  "baselineCommit": "2fc5d50e",
+  "originalMaster": "0f392d2c",
+  "significantDigits": 10,
+  "sourceReferenceSha256": "1293ceedaccb92e8688bd929334b14d203b2655150bbce55f7d08a9068679bfa",
+  "note": "Verbatim subset of six old-callback real-reducer active-route observations, captured before the official Load Shedding conversion. Five difficulties at seed12345 and CEO at seed1. All complete all84months and hold every invariant. Options, receipts, objective results and full physical hashes are independent expectations; do not regenerate from converted rules. Canonical hashes include startingAssetId and all recorded fields.",
+  "cases": [
+    {
+      "scenarioId": 113,
+      "difficulty": "Intern",
+      "seed": 12345,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "Intern",
+        "seed": 12345
+      },
+      "monthlyHistoryHash": "e1fc6fc7d852e2dd29e102e1d7a7d1d23121e728fff7c796bed6ac9fcefa7988",
+      "finalFacilitiesHash": "5c4bad2f4bc2834de2cc61ee34daf59eff46330b0b662c72b646c0f937ea9736",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 126218712.2,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 1205258124,
+        "finalDebt": 86919200.67,
+        "finalNetWorth": 1253908507,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.74
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.05
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.05
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 74%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.72
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.1
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.1
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 72%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.7
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.15
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.15
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 70%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.68
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.2
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.2
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 68%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    },
+    {
+      "scenarioId": 113,
+      "difficulty": "Employee",
+      "seed": 12345,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "Employee",
+        "seed": 12345
+      },
+      "monthlyHistoryHash": "894162d6a0b277883e26a8daa30f63ce3d6a1b84582e048d7b751d11b7bb6c9e",
+      "finalFacilitiesHash": "bb519555c4784032825b8b417efd2154d66681ffc1943439b554ae04c7305aa2",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 147255164.2,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 1117257463,
+        "finalDebt": 101108368.7,
+        "finalNetWorth": 1175037098,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.67
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.1
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.08
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 67%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.65
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.2
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.16
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 65%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.62
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.3
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.24
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 62%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.58
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.4
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.32
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 58%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    },
+    {
+      "scenarioId": 113,
+      "difficulty": "Manager",
+      "seed": 12345,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "Manager",
+        "seed": 12345
+      },
+      "monthlyHistoryHash": "ed5af68973d98df229b13b42e379477335346a18f6919d08b7c098e663ca8249",
+      "finalFacilitiesHash": "25b83791878dfad983119e3739b0a9e08526a517c8d1b6542a8edec7a949a616",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 168291616.3,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 1020351284,
+        "finalDebt": 115297536.7,
+        "finalNetWorth": 1088931034,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.64
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.15
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.1
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 64%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.61
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.3
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.2
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 61%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.57
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.45
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.3
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 57%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.53
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.6
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.45
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 53%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    },
+    {
+      "scenarioId": 113,
+      "difficulty": "VP",
+      "seed": 12345,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "VP",
+        "seed": 12345
+      },
+      "monthlyHistoryHash": "16a8598284b66226a3c105fe61466479178a4807a741547592095a4928bcf26f",
+      "finalFacilitiesHash": "23bf11dbf58002101f25816896b37188fad8f6b815bb85df775293b83ef85f7f",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 189328068.3,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 917688167,
+        "finalDebt": 129486704.7,
+        "finalNetWorth": 997717204.7,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.61
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.2
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.12
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 61%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.57
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.4
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.26
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 57%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.52
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.6
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.4
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 52%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.47
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.8
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.55
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 47%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    },
+    {
+      "scenarioId": 113,
+      "difficulty": "CEO",
+      "seed": 12345,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "CEO",
+        "seed": 12345
+      },
+      "monthlyHistoryHash": "a856737afc91207739560ce83dd86012041b315259b06afae23d8a1a6db8c9cf",
+      "finalFacilitiesHash": "ef0b98aaac7b2b1742e7e675ca77edbd8706c5d1de872fbfd09f2eee9681b538",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 210364520.3,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 811128287,
+        "finalDebt": 143675872.7,
+        "finalNetWorth": 904943995.6,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.58
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.25
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.15
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 58%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.53
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.5
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.32
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 53%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.47
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.75
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.5
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 47%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.42
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 2
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.7
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 42%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    },
+    {
+      "scenarioId": 113,
+      "difficulty": "CEO",
+      "seed": 1,
+      "options": {
+        "initialBuild": {
+          "name": "Natural Gas Peaker",
+          "peakW": 300000000,
+          "financed": true
+        },
+        "scheduledActions": [
+          {
+            "month": 0,
+            "type": "rate",
+            "dollarsPerkWh": 0.115
+          },
+          {
+            "month": 7,
+            "type": "intertie",
+            "corridorId": "south-africa-mozambique-upgrade",
+            "financed": true
+          },
+          {
+            "month": 8,
+            "type": "trading",
+            "policy": "RELIABILITY_FIRST"
+          },
+          {
+            "month": 2,
+            "type": "reprioritize",
+            "facilityId": 1
+          },
+          {
+            "month": 3,
+            "type": "reprioritize",
+            "facilityId": 2
+          },
+          {
+            "month": 4,
+            "type": "reprioritize",
+            "facilityId": 3
+          },
+          {
+            "month": 59,
+            "type": "toggle",
+            "facilityId": 1
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "efficiency",
+            "tier": "On"
+          },
+          {
+            "month": 58,
+            "type": "policy",
+            "id": "solar",
+            "tier": "On"
+          }
+        ],
+        "scenarioId": 113,
+        "difficulty": "CEO",
+        "seed": 1
+      },
+      "monthlyHistoryHash": "6c669a8c04655af8ea6b563136d7e4c3bbb013ffb525d1f46c55333cd9596074",
+      "finalFacilitiesHash": "80a770aa1fb6e427a4cba0cee468a107085f735e6f649ba44f76be21f764257e",
+      "summary": {
+        "actionCount": 10,
+        "bankruptAtMonth": null,
+        "builds": [
+          {
+            "buildCost": 210364520.3,
+            "month": 0,
+            "name": "Natural Gas Peaker"
+          }
+        ],
+        "finalCash": 888322500,
+        "finalDebt": 143675872.7,
+        "finalNetWorth": 982138208.6,
+        "finalTransmissionLines": [
+          {
+            "annualOperatingCost": 52000,
+            "buildCost": 2600000,
+            "capacityW": 6500000,
+            "constructionKgco2eEmitted": 287615.1501,
+            "constructionKgco2eTotal": 287615.1501,
+            "corridorId": "south-africa-mozambique-upgrade",
+            "currentFlowW": 0,
+            "financed": true,
+            "id": 1,
+            "interestRate": 0.035,
+            "loanAmountLeft": 1784192.598,
+            "loanMonthlyPayment": 9340.129506,
+            "minuteCreated": 10080,
+            "name": "Mozambique corridor line",
+            "yearsToBuildLeft": 0
+          }
+        ],
+        "firedAtMonth": null,
+        "months": 84,
+        "outcome": "completed",
+        "weatherHazardImpact": {
+          "coldDerates": 0,
+          "coldEvents": 0,
+          "coldRegionalEvents": 0,
+          "hailEvents": 0,
+          "hailFacilityHits": 0,
+          "hailRepairCosts": 0
+        },
+        "wildfireImpact": {
+          "averageSeverity": null,
+          "incidentCount": 0,
+          "totalDisconnectedWh": 0,
+          "totalRestorationCost": 0
+        }
+      },
+      "objectiveResults": [
+        {
+          "definition": "Delivered customer electricity divided by customer demand each completed month.",
+          "id": "reliability",
+          "label": "Keep the lights on through the 2022 shortage",
+          "metric": "monthlyReliability",
+          "objective": {
+            "fromMonth": 72,
+            "id": "reliability",
+            "inherited": true,
+            "label": "Keep the lights on through the 2022 shortage",
+            "metric": "monthlyReliability",
+            "minDemandServedShare": 0.995,
+            "required": true,
+            "throughMonth": 83
+          },
+          "observed": 1,
+          "observedMonths": 12,
+          "required": true,
+          "requiredMonths": 12,
+          "status": "completed",
+          "target": 0.995
+        }
+      ],
+      "storyOccurrences": [
+        {
+          "actionTarget": {
+            "card": "INSIGHTS",
+            "layer": "SUPPLY_DEMAND"
+          },
+          "attributes": {
+            "scheduledMonth": 30
+          },
+          "concept": "forecast",
+          "definitionId": "load-shedding:maintenance-backlog",
+          "effects": {},
+          "endsMinute": 43200,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:maintenance-backlog",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output falling each year. Build replacement capacity before shortages begin.",
+          "startsMinute": 43200,
+          "title": "The maintenance backlog is growing"
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 36
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-1",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.58
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.25
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.15
+            }
+          },
+          "endsMinute": 69120,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-1",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 58%.",
+          "startsMinute": 51840,
+          "title": "Breakdowns outpace repairs",
+          "turningPointPriority": 100
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 48
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-2",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.53
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.5
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.32
+            }
+          },
+          "endsMinute": 86400,
+          "importance": "NOTABLE",
+          "key": "story:113:load-shedding:availability-step-2",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 53%.",
+          "startsMinute": 69120,
+          "title": "Another station derated",
+          "turningPointPriority": 101
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 60
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-3",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.47
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 1.75
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.5
+            }
+          },
+          "endsMinute": 103680,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-3",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 47%.",
+          "startsMinute": 86400,
+          "title": "The fleet is running on borrowed time",
+          "turningPointPriority": 102
+        },
+        {
+          "actionTarget": {
+            "card": "FACILITIES",
+            "view": "FLEET"
+          },
+          "attributes": {
+            "scheduledMonth": 72
+          },
+          "concept": "fuel",
+          "definitionId": "load-shedding:availability-step-4",
+          "effects": {
+            "facilityOutputMultipliersByFuel": {
+              "Coal": 0.42
+            },
+            "fuelPriceMultipliers": {
+              "Oil": 2
+            },
+            "operatingCostMultipliersByFuel": {
+              "Coal": 1.7
+            }
+          },
+          "endsMinute": 120960,
+          "importance": "CRITICAL",
+          "key": "story:113:load-shedding:availability-step-4",
+          "kind": "WORLD_EVENT",
+          "message": "Coal output is down to 42%.",
+          "startsMinute": 103680,
+          "title": "Availability at its lowest",
+          "turningPointPriority": 103
+        }
+      ],
+      "reachedStoryKeys": [
+        "story:113:load-shedding:maintenance-backlog",
+        "story:113:load-shedding:availability-step-1",
+        "story:113:load-shedding:availability-step-2",
+        "story:113:load-shedding:availability-step-3",
+        "story:113:load-shedding:availability-step-4"
+      ]
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import { officialScenarioRules } from "./ScenarioRules";
+import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import type {
   CompiledRuleEvent,
   CompiledScenarioRules,
@@ -29,13 +31,14 @@ import type {
 } from "../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { getScenarioLocation } from "./Locations";
-import { isRuleJson } from "./ScenarioRulesSchema";
+import { isRuleJson, UNSAFE_TEXT, UNSAFE_MARKUP } from "./ScenarioRulesSchema";
 export { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 
 export interface OfficialArcSource {
   scenarioId: number;
   arcId: string;
   phaseId: string;
+  previewTitle?: string;
   /** Catalog-owned RNG address; packages cannot author this field. */
   drawKey?: string;
   kind?: GameEventKindType;
@@ -179,6 +182,53 @@ export function compileOfficialArcEvents(
         severity: "error",
         message: `Official arc ${scenarioId} is not an importable challenge.`,
       });
+      continue;
+    }
+    const shared = officialScenarioRules(source, params, {
+      startingYear: params.startingYear,
+    });
+    if (shared) {
+      for (const compiled of shared.events) {
+        const startMonth = compiled.startMonth;
+        const imported = params.namespace.kind === "mod";
+        const changes = scenarioEffectsSummary(compiled.effects);
+        const event: CompiledOfficialArcEvent = {
+          ...detached(compiled),
+          id: eventId(scenarioId, compiled.source!.phaseId),
+          key: imported
+            ? `mod:${params.namespace.kind === "mod" ? params.namespace.id : ""}:arc:${scenarioId}:${compiled.source!.arcId}:${compiled.source!.phaseId}`
+            : compiled.key,
+          message: imported
+            ? `${getScenarioLocation(params.receivingScenario)!.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`
+            : compiled.message,
+          durationMonths: Math.max(
+            0,
+            Math.min(
+              compiled.durationMonths,
+              params.durationMonths - startMonth,
+            ),
+          ),
+          source: detached(compiled.source!),
+        };
+        if (startMonth >= params.durationMonths)
+          diagnostics.push({
+            code: "outside-term",
+            path: `rules.officialArcs[${scenarioId}].${compiled.source!.phaseId}`,
+            severity: "error",
+            message: `${event.title} can occur in month ${startMonth + 1}, after this run ends in month ${params.durationMonths}. Extend the term or remove this arc.`,
+          });
+        if (
+          startMonth + compiled.durationMonths > params.durationMonths &&
+          compiled.durationMonths > 0
+        )
+          diagnostics.push({
+            code: "duration-truncated",
+            path: `rules.officialArcs[${scenarioId}].${compiled.source!.phaseId}.durationMonths`,
+            severity: "warning",
+            message: `${event.title}'s duration is truncated at the end of the run.`,
+          });
+        results.push(event);
+      }
       continue;
     }
     const imported = params.namespace.kind === "mod";
@@ -472,6 +522,7 @@ export function validOfficialArcMetadata(value: unknown): boolean {
       "scenarioId",
       "arcId",
       "phaseId",
+      "previewTitle",
       "drawKey",
       "kind",
       "concept",
@@ -483,6 +534,12 @@ export function validOfficialArcMetadata(value: unknown): boolean {
     typeof source.scenarioId !== "number" ||
     !identifier(source.arcId) ||
     !identifier(source.phaseId) ||
+    (source.previewTitle !== undefined &&
+      (typeof source.previewTitle !== "string" ||
+        source.previewTitle.trim().length === 0 ||
+        source.previewTitle.length > 120 ||
+        UNSAFE_TEXT.test(source.previewTitle) ||
+        UNSAFE_MARKUP.test(source.previewTitle))) ||
     (source.kind !== undefined && source.kind !== "WORLD_EVENT") ||
     (source.concept !== undefined &&
       ![

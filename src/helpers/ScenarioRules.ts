@@ -12,6 +12,7 @@ import type {
   ScenarioRuleDefinitions,
 } from "../data/ScenarioRules";
 import type {
+  GameType,
   DifficultyType,
   ScenarioType,
   WorldEventEffectsType,
@@ -23,7 +24,9 @@ import {
   RULE_DIFFICULTIES,
   ID_PATTERN,
 } from "./ScenarioRulesSchema";
-import { canonicalRuleJson, utf8Bytes } from "./RuleIdentity";
+import { canonicalRuleJson, utf8Bytes, ruleDigest } from "./RuleIdentity";
+import { officialScenarioRuleDefinition } from "../data/OfficialScenarioRules";
+import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
 import { validOfficialArcMetadata } from "./ScenarioRuleArcs";
@@ -53,15 +56,125 @@ export const ruleNumber = (
   difficulty: DifficultyType,
 ): number =>
   typeof value === "number" ? value : value.byDifficulty[difficulty];
+const officialRulesCache = new WeakMap<
+  ScenarioType,
+  Map<string, CompiledScenarioRules>
+>();
+const identityCache = new WeakMap<CompiledScenarioRules, string>();
+const freezePlain = <T>(value: T): T => {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.values(value).forEach(freezePlain);
+    Object.freeze(value);
+  }
+  return value;
+};
+
+/** Trusted definitions are compiled once per actual run parameters, without community provenance. */
+export function officialScenarioRules(
+  scenario: ScenarioType,
+  parameters: Pick<GameType, "difficulty" | "seed">,
+  setup: Partial<Pick<ScenarioType, "startingYear" | "durationMonths">> = {},
+): CompiledScenarioRules | undefined {
+  const catalog = officialScenarioRuleDefinition(scenario.id);
+  if (!catalog) return undefined;
+  const startingYear = setup.startingYear ?? scenario.startingYear;
+  const durationMonths = setup.durationMonths ?? scenario.durationMonths;
+  const key = `${parameters.difficulty}:${parameters.seed}:${startingYear}:${durationMonths}`;
+  let cache = officialRulesCache.get(scenario);
+  if (!cache) {
+    cache = new Map();
+    officialRulesCache.set(scenario, cache);
+  }
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const definitions: ScenarioRuleDefinitions = {
+    ...catalog.definitions,
+    events: catalog.definitions.events?.map((event) => ({
+      ...event,
+      startMonth:
+        typeof event.startMonth === "number"
+          ? relocateOfficialArcMonth(
+              scenario.id,
+              event.startMonth - 1,
+              "phase",
+            ) + 1
+          : {
+              from:
+                relocateOfficialArcMonth(
+                  scenario.id,
+                  event.startMonth.from - 1,
+                  "phase",
+                ) + 1,
+              to:
+                relocateOfficialArcMonth(
+                  scenario.id,
+                  event.startMonth.to - 1,
+                  "phase",
+                ) + 1,
+            },
+      message:
+        catalog.presentation[event.id]?.messageByDifficulty?.[
+          parameters.difficulty
+        ] ?? event.message,
+    })),
+  };
+  const rules = compileScenarioRules(definitions, {
+    namespace: {
+      kind: "official",
+      scenarioId: scenario.id,
+      arcId: catalog.arcId,
+    },
+    difficulty: parameters.difficulty,
+    seed: parameters.seed,
+    startingYear,
+    durationMonths,
+    startingPeakW: 0,
+    startingAssetIds: scenario.facilities.flatMap((asset) =>
+      asset.assetId ? [asset.assetId] : [],
+    ),
+    inheritedObjectiveIds: definitions.objectives.map((goal) => goal.id),
+  });
+  rules.events = rules.events.map((event) => ({
+    ...event,
+    source: {
+      ...catalog.presentation[event.id]?.source,
+      scenarioId: scenario.id,
+      arcId: catalog.arcId,
+      phaseId: event.id,
+      ...(catalog.presentation[event.id]?.previewTitle
+        ? { previewTitle: catalog.presentation[event.id].previewTitle }
+        : {}),
+    },
+  }));
+  freezePlain(rules);
+  identityCache.set(rules, ruleDigest(rules));
+  if (cache.size >= 32) cache.delete(cache.keys().next().value!);
+  cache.set(key, rules);
+  return rules;
+}
+
+/** Static objective/catalog readers use fixed defaults; every live/forecast reader binds its game. */
 export function scenarioRules(
   scenario?: ScenarioType,
+  parameters?: Pick<GameType, "difficulty" | "seed">,
 ): CompiledScenarioRules | undefined {
   if (!scenario) return undefined;
   if (scenario.id === 999) return scenario.mod?.rules;
-  return scenario.rules?.namespace.kind === "official" &&
+  if (
+    scenario.rules?.namespace.kind === "official" &&
     scenario.rules.namespace.scenarioId === scenario.id
-    ? scenario.rules
-    : undefined;
+  )
+    return scenario.rules;
+  return officialScenarioRules(
+    scenario,
+    parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
+  );
+}
+
+/** Trusted cached rules are immutable; manually supplied mutable objects are hashed afresh. */
+export function scenarioRulesIdentity(rules?: CompiledScenarioRules): string {
+  if (!rules) return "";
+  return identityCache.get(rules) ?? ruleDigest(rules);
 }
 const sorted = <T extends { id: string }>(values: readonly T[]): T[] =>
   [...values].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -863,6 +976,24 @@ export function validCompiledScenarioRules(
         .filter((o) => o.inherited)
         .map((o) => o.id),
     });
+    if (rules.namespace.kind === "official") {
+      for (const event of rules.events) {
+        if (
+          event.source &&
+          (!validOfficialArcMetadata(event) ||
+            event.source.scenarioId !== rules.namespace.scenarioId ||
+            event.source.arcId !== rules.namespace.arcId ||
+            event.source.phaseId !== event.id)
+        )
+          return false;
+      }
+      normalized.events = normalized.events.map((event) => {
+        const source = rules.events.find(
+          (candidate) => candidate.id === event.id,
+        )?.source;
+        return source ? { ...event, source } : event;
+      });
+    }
     if (rules.arcChoices !== undefined) {
       if (!Array.isArray(rules.arcChoices) || rules.arcChoices.length > 200)
         return false;
