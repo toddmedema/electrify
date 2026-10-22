@@ -10,6 +10,7 @@ import { corridorOpenInYear } from "./IntertieTrends";
 export interface IntertieAccessContext {
   peers?: NonNullable<GameType["multiplayer"]>["peers"];
   scenarioId?: number;
+  legacyWildfireIntertieAccess?: boolean;
   locationId?: string;
 }
 export interface ScenarioIntertieAccess {
@@ -172,18 +173,18 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
     scenarioId: 111,
     locationId: "LA",
     corridorId: "california-north",
-    capacityW: 5e6,
-    availableSupplyW: 4e6,
-    importAccessWByTier: [4e6, 4.5e6, 5e6, 5.5e6],
+    capacityW: 40e6,
+    availableSupplyW: 40e6,
+    importAccessWByTier: [40e6, 45e6, 50e6, 55e6],
     availableDemandW: 5e6,
   },
   {
     scenarioId: 111,
     locationId: "LA",
     corridorId: "california-south",
-    capacityW: 7.5e6,
-    availableSupplyW: 5e6,
-    importAccessWByTier: [5e6, 5.5e6, 6e6, 6.5e6],
+    capacityW: 15e6,
+    availableSupplyW: 15e6,
+    importAccessWByTier: [15e6, 17e6, 19e6, 21e6],
     availableDemandW: 7.5e6,
   },
   {
@@ -261,16 +262,40 @@ export const SCENARIO_INTERTIE_ACCESS: readonly ScenarioIntertieAccess[] = [
 ];
 export function accessContextForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer">>,
+    Partial<Pick<GameType, "multiplayer" | "legacyWildfireIntertieAccess">>,
 ): IntertieAccessContext {
   return {
     peers: game.multiplayer?.peers,
+    legacyWildfireIntertieAccess: game.legacyWildfireIntertieAccess,
     scenarioId: game.customScenario ? undefined : game.scenarioId,
     locationId: game.location.id,
   };
 }
+const LEGACY_WILDFIRE_ACCESS: readonly ScenarioIntertieAccess[] = [
+  {
+    scenarioId: 111,
+    locationId: "LA",
+    corridorId: "california-north",
+    capacityW: 5e6,
+    availableSupplyW: 4e6,
+    importAccessWByTier: [4e6, 4.5e6, 5e6, 5.5e6],
+    availableDemandW: 5e6,
+  },
+  {
+    scenarioId: 111,
+    locationId: "LA",
+    corridorId: "california-south",
+    capacityW: 7.5e6,
+    availableSupplyW: 5e6,
+    importAccessWByTier: [5e6, 5.5e6, 6e6, 6.5e6],
+    availableDemandW: 7.5e6,
+  },
+];
 function allocation(corridorId: string, context?: IntertieAccessContext) {
-  return SCENARIO_INTERTIE_ACCESS.find(
+  const allocations = context?.legacyWildfireIntertieAccess
+    ? LEGACY_WILDFIRE_ACCESS
+    : SCENARIO_INTERTIE_ACCESS;
+  return allocations.find(
     (row) =>
       row.scenarioId === context?.scenarioId &&
       row.locationId === context?.locationId &&
@@ -328,7 +353,7 @@ export function effectiveMarket(
 /** Corridors that can be ordered this year: their path exists and has not been cut off. */
 export function corridorsForGame(
   game: Pick<GameType, "scenarioId" | "location" | "customScenario"> &
-    Partial<Pick<GameType, "multiplayer">> & {
+    Partial<Pick<GameType, "multiplayer" | "legacyWildfireIntertieAccess">> & {
       date: Pick<GameType["date"], "year">;
     },
 ) {

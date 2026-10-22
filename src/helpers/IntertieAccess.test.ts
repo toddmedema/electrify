@@ -79,9 +79,9 @@ describe("authored utility transmission access", () => {
 
   it("quotes the player's share without modifying the regional corridor", () => {
     const access = effectiveCorridor("california-north", context(111))!;
-    expect(access.capacityW).toBe(5e6);
-    expect(access.buildCost).toBe(1.8e6);
-    expect(access.annualOperatingCost).toBe(36000);
+    expect(access.capacityW).toBe(40e6);
+    expect(access.buildCost).toBe(14.4e6);
+    expect(access.annualOperatingCost).toBe(288000);
     expect(access.yearsToBuild).toBe(1);
     expect(corridorById(access.id)!.capacityW).toBe(500e6);
     const growingGame = { ...game(111), customers: 1e9 };
@@ -117,8 +117,8 @@ describe("authored utility transmission access", () => {
     const ctx = context(111);
     let line = {
       corridorId: "california-north",
-      capacityW: 5e6,
-      annualOperatingCost: 36000,
+      capacityW: 40e6,
+      annualOperatingCost: 288000,
     };
     const supply = neighborImportSupplyW(line.corridorId, ctx, 0, mild);
     const physical = physicalNeighborImportSupplyW(
@@ -127,16 +127,16 @@ describe("authored utility transmission access", () => {
       0,
       mild,
     );
-    expect(supply).toBeCloseTo(3.2e6);
+    expect(supply).toBeCloseTo(32e6);
     const firstQuote = intertieUpgradeQuote(line, 2024, 1, 1, ctx)!;
-    expect(firstQuote.targetCapacityW).toBe(7.5e6);
-    expect(firstQuote.buildCost).toBe(450000);
+    expect(firstQuote.targetCapacityW).toBe(60e6);
+    expect(firstQuote.buildCost).toBe(3600000);
     for (let step = 0; step < MAX_INTERTIE_UPGRADES; step++) {
       expect(intertieUpgradeCount(line, ctx)).toBe(step);
       const quote = intertieUpgradeQuote(line, 2024, 1, 1, ctx)!;
       expect(quote).toBeDefined();
       expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(
-        (4 + step * 0.5) * 0.8e6,
+        (40 + step * 5) * 0.8e6,
       );
       line = {
         ...line,
@@ -149,7 +149,7 @@ describe("authored utility transmission access", () => {
       );
     }
     expect(intertieUpgradeQuote(line, 2024, 1, 1, ctx)).toBeUndefined();
-    expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(5.5e6 * 0.8);
+    expect(intertieImportLimitW(line, ctx, 0, mild)).toBeCloseTo(55e6 * 0.8);
   });
 
   it("allows a wider wire to relieve a bottleneck without creating supply", () => {

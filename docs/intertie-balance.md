@@ -1,5 +1,9 @@
 # Intertie balance experiment
 
+**Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
+below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
+of its capacity; see [the current mission design](wildfire-intertie.md).
+
 The model separates a utility's purchased transmission access from the regional corridor and separates neighboring spare generation from the wire rating. The per-scenario allocations live only in `src/data/IntertieAccess.ts`. They are calibrated game assumptions, not estimates of actual utility transmission rights.
 
 ## Design rules

@@ -1,12 +1,16 @@
 # Scenario choice cost research
 
+**Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
+below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
+of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
+
 Research date: September 10, 2026. Applies to scenarios 106 (Data Center Boom),
 107 (Deep Freeze), and 111 (California Wildfires) in PR #347.
 
-**Wildfire model update (October 21, 2026):** the current mission uses a finite
-local backup package and observed account-interruption estimates. The historical
-$2M readiness fee, generic plant losses and severity-scaled repairs are retired.
-See the updated wildfire section below.
+**Balance update (September 23, 2026):** scenario wildfire preparedness now costs
+$2M at every difficulty to create a meaningful construction-versus-resilience choice.
+The $200k recommendation below is the historical spending proxy, not the current
+game price; restoration charges and protection effects are unchanged.
 
 ## Findings
 
@@ -15,8 +19,9 @@ $90M**, and reduce **wildfire preparedness from $2M–$7M to $200k**. Use the sa
 price at every difficulty: the offered package has the same scope, while the
 simulation already varies the operating challenge. These are calibrated game
 allowances, not claims that the historical utilities signed these contracts.
-The current wildfire repair envelope is $780k in 2025 dollars, allocated across
-January–March; it no longer scales with an invented disconnection severity.
+The wildfire event's separate restoration estimate also triggered a second
+coder/QA pass: monthly expenses now range from **$350k to $1.7M**, scaled to the
+modeled damage, instead of $1M–$3.5M.
 
 | Decision                  |            Previous amount | Reference in decision-year dollars                                                             | Assessment and revised amount                                                           |
 | ------------------------- | -------------------------: | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -173,77 +178,83 @@ that is consistent with its purpose. Do not inflate its price solely to equalize
 end-game wealth. The exact halving of losses remains a transparent simulation
 abstraction.
 
-## Wildfires: a finite local response package
+## Wildfires: scale the response package, not a whole utility's budget
 
-**October 21, 2026 update:** the former random plant derates, two-month blanket
-customer reductions, difficulty-dependent physical damage and 50% preparedness
-protection have been removed. Historical balance tables using those assumptions
-do not describe the current model.
+This scenario explicitly models **1% of LADWP**, about 16,000 customer accounts.
+The previous $2M–$7M preparation fee would therefore imply $200M–$700M at full
+scale, before the game's separate restoration charges. LADWP's 2024 mitigation
+plan describes about 1.6M accounts and mutual-assistance arrangements. Its broad
+reliability program includes capital and recurring work; it is not a seasonal
+crew-retainer price. [LADWP 2024 plan, pp. 17–18, 24, 35–39](https://www.ladwp.com/sites/default/files/2024-06/2024%20LADWP%20Wildfire%20Mitigation%20Plan.pdf).
 
-The mission represents 1% of LADWP, about 16,000 accounts. The cost comparator
-remains SCE's recorded 2024 spending: $27.233M for PSPS execution O&M plus $36.059M
-for aerial standby. Transferring those broad annual costs at
-16,000 / 5,300,000 accounts gives approximately $191,070 in 2024 dollars. The
-round $200k allowance is a transferred readiness and logistics assumption, not a
-LADWP quotation or the price of buying a generator. Different geography,
-exposure and fixed costs limit linear account scaling.
-[SCE testimony, printed pp. 63–83](https://docs.cpuc.ca.gov/PublishedDocs/SupDoc/A2512002/8780/590427263.pdf),
-[Edison account denominator](https://www.sec.gov/Archives/edgar/data/92103/000082705224000017/eix-20240223xex99d1.htm).
+The best retrieved spending comparator is SCE's sworn cost-recovery testimony,
+filed December 2025 for **recorded 2024 costs**. It reports $27.233M annual PSPS
+execution O&M and $36.059M year-round aerial-suppression standby. Deployment is
+paid separately by counties. These are reported incurred costs, not necessarily
+finally approved regulatory recovery, and the regional aerial program is much
+broader than LADWP alone. [SCE-01, printed pp. 63–83](https://docs.cpuc.ca.gov/PublishedDocs/SupDoc/A2512002/8780/590427263.pdf).
 
-The authored mission offers a one-time $200k deployment package at every
-difficulty. Custom games selecting that historical scenario can instead reserve
-the same package using a $200k annualized budget, prorated monthly while enabled
-and ending after the incident month. Availability is immediate; this is an
-explicit reservation design, not an empirically measured preparation lead time.
-Neither mode promises to recoup its expense through electricity sales.
-The $200k readiness allowance is an explicit fixed game budget. Imported repair
-costs instead retain their sourced 2025 monetary basis and convert to the receiving
-incident year, preserving the mission's lead time before applying grid-size scaling.
+SCE served about 5.3M accounts, so the appropriate transferred scale is
+16,000/5,300,000, **not 1% of SCE**. This implies about $82,213 of execution and
+$108,857 of standby, or **$191,070 in 2024 dollars**. A round $200k is 4.7% above
+that proxy. Linear account scaling is our inference: geography, wildfire
+exposure and fixed commitments need not scale linearly.
+[Edison February 2024 presentation, p. 2](https://www.sec.gov/Archives/edgar/data/92103/000082705224000017/eix-20240223xex99d1.htm).
 
-The finite package reserves one 200 kW mobile diesel, with service limited to
-150 kW and 24 hours of initial fuel: **3.6 MWh total** for eligible local critical
-sites during the January incident. PG&E's July 20–21, 2024 report lists 0.2 MW
-reserve units with a 24-hour estimated runtime at 75% load. Allocating one such
-unit to this mission is a game procurement choice, not a claim LADWP deployed
-that particular unit. Refueling is not assumed. Backup cannot reconnect a
-damaged utility feeder or reduce the fire footprint.
-[PG&E report, Table 14](https://www.pge.com/assets/pge/docs/outages-and-safety/outage-preparedness-and-support/7-20-2024-psps-post-event-report-08-02-2024.pdf).
+This deliberately broad annual comparator is generous for a two-month event.
+Dividing by six would imply unjustified precision because seasonal readiness
+commitments and incidents are uneven. The analyst-selected $100k–$250k sensitivity
+reflects transfer uncertainty, not LADWP bids. Against even its $250k upper point,
+the former Intern/Employee/Manager/VP/CEO fees are respectively **700%, 1,100%,
+1,500%, 2,100%, and 2,700% high**.
 
-### Customer isolation and restoration
+A direct LADWP cross-check strengthens the magnitude finding. Its March 20, 2025
+Council report estimates **$78M for temporary power-system rebuilding**, including
+damage, immediate-response labor and repair/rehabilitation, with 25–40 crews daily
+over two months. At 1% and deflated to 2024, that is approximately **$760k**.
+The former preparation fee alone was 163%–821% above this much broader envelope.
+This is an estimated restoration cost, not a preparation invoice and not a final
+audited total. [LADWP Council report, pp. 1–2](https://cityclerk.lacity.org/onlinedocs/2025/25-0006-S23_rpt_dwp_3-20-25.pdf).
 
-The simulation uses only the observed January 14–28 reporting window. LADWP
-reported 17,962 fire-related interrupted accounts on January 14, approximately
-9,500 on January 20, approximately 8,500 on January 21 and approximately 8,410
-on January 28. Linear interpolation at day precision yields **3,613,704 estimated
-account-hours**. Dividing by the scenario's 1.6M-account reference and the
-engine's 730-hour month gives a **0.3094% monthly grid-service estimate**.
-[January 14](https://ladwpnews.com/8pm-update-january-14-2025-ladwp-windstorm-and-fire-response-continues/),
-[January 20](https://ladwpnews.com/january-20-2025-morning-update-ladwps-windstorm-and-wildfire-response/),
-[January 21](https://ladwpnews.com/january-21-2025-evening-update-ladwps-windstorm-and-wildfire-response/),
-[January 28](https://ladwpnews.com/remarks-by-ladwp-executives-about-wind-and-wildfire-response-january-2025-presented-at-board-of-water-and-power-commission-meeting-jan-28/).
+**Implementation:** charge $200k at every difficulty for advance inspections,
+staged backup equipment, and response resources. No direct LADWP incremental
+readiness invoice was found. Do not describe the price as constructing a hardened
+grid in one month, or assert that reserving crews demonstrably prevents half of
+fire damage. Physical benefits are the game's simplifying assumption.
 
-This assumes an interrupted account carries average system load, solely as a
-service and billing proxy. The sources do not report measured outage energy.
-Earlier snapshots combine windstorm and fire effects; later counts include
-destroyed premises whose continuing demand is unknown. Neither is extrapolated
-into the quantified window. The representative-day engine uses a monthly energy
-equivalent and does not reproduce chronological outage or backup endurance.
+### Restoration: a second correction and QA pass
 
-Repair costs use **$780k in 2025 dollars**, exactly 1% of LADWP's $78M estimate.
-The source includes windstorm, wildfire, rainstorm, immediate response labor and
-repair/rehabilitation, rather than wildfire-only damage. Three equal $260k
-January–March installments are a billing convention, not an observed spending
-curve. There is no severity-to-cost interpolation or difficulty multiplier.
-[LADWP March 20 report](https://cityclerk.lacity.org/onlinedocs/2025/25-0006-S23_rpt_dwp_3-20-25.pdf).
+Restoration charges appear in the subsequent event message, so the research also
+triggered a correction there. Previous totals of $2M–$7M over two months exceeded
+the historical envelope. The same LADWP report identifies 35,800 customers losing
+power, approximately 2.2375% of its 1.6M accounts. We use that as a rough severity
+anchor: `$760k × modeled disconnection share / 2.2375%`, then split the result
+across the two game months. This is our interpolation, not a measured repair-cost
+curve. [LADWP report, p. 1](https://cityclerk.lacity.org/onlinedocs/2025/25-0006-S23_rpt_dwp_3-20-25.pdf).
 
-The April report describes service restored to standing structures by March 21
-while rebuilding continues. It does not claim every damaged asset was repaired
-at that point; temporary rebuilding continued through July.
-[LADWP rebuilding progress](https://webprod.ladwp.com/community/restoration-and-rebuilding-efforts/power-rebuilding).
+| Difficulty | Modeled disconnections before preparation | Previous monthly cost | Inferred monthly reference | Revised monthly cost |
+| ---------- | ----------------------------------------: | --------------------: | -------------------------: | -------------------: |
+| Intern     |                                        2% |                   $1M |                    $0.340M |               $0.35M |
+| Employee   |                                        4% |                 $1.5M |                    $0.679M |               $0.70M |
+| Manager    |                                        6% |                   $2M |                    $1.019M |               $1.00M |
+| VP         |                                        8% |                $2.75M |                    $1.359M |               $1.35M |
+| CEO        |                                       10% |                 $3.5M |                    $1.698M |               $1.70M |
 
-The owning data and mechanism details are in
-[`CaliforniaWildfire.ts`](../data/CaliforniaWildfire.ts) and the
-[wildfire model research](../../docs/wildfire-model-research.md).
+The old prices were approximately 96%–194% above these severity-adjusted
+references. The rounded replacements are within 4%. Unlike the fixed preparation
+package, restoration varies with the scenario's authored damage severity.
+
+Actual damaged equipment, geography and access determine repair costs; safety
+shutoffs need not imply damage, and generation derating is not proportional to
+distribution repairs. The estimate also includes windstorm and rainstorm effects.
+Thus this calibration improves the documented monetary scale without claiming
+historical accuracy for every difficulty. Preparation still leaves ordinary
+restoration costs in place: reconnecting customers with staged resources does not
+erase damaged assets. Permanent reconstruction and liability remain outside scope.
+
+The coder applied this second correction and QA repeated the full matrix before
+accepting the final values. Neither preparation nor restoration is used to force
+equal wealth between the two branches.
 
 ## Validation and update policy
 

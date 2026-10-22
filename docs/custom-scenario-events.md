@@ -18,11 +18,9 @@ resolve against the receiving fleet; a nuclear trip targets its largest operatin
 Future campus additions scale with the same grid-demand ratio. Existing source-city loads
 such as Copperbelt mines are not added to a receiving grid.
 
-Selected wildfire events support the ongoing preparedness program in any location. Its
-normal budget and twelve-month ramp apply; protection is sampled at the incident's onset.
-Full preparedness halves disconnected load and output losses, while restoration costs stay
-unchanged. Selecting wildfire events does not invent a recurring wildfire profile for the
-new location. Places with existing recurring hazards retain those hazards independently.
+Wildfire Emergency depends on its authored starting intertie and is not offered in custom
+event selections. Older custom saves silently remove that retired selection while preserving
+all recorded results. Recurring wildfire smoke and preparedness programs have been removed.
 
 The opening electricity rate is automatic: use an official location's authored tariff when
 available, or the existing custom-game default otherwise, re-quoted through the historical

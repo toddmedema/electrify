@@ -440,10 +440,6 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
-    /** Load isolated from the grid, before finite local emergency backup. Monthly energy equivalent. */
-    disconnectedDemandW?: number;
-    /** Emergency power delivered locally; excluded from grid dispatch and electricity sales. */
-    localBackupW?: number;
     reserveW?: number; // Signed supply margin plus local spare output reachable next tick
     importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity
     // Components sum to demandW; monthly chart averages preserve the breakdown in saves.
@@ -499,6 +495,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
+    /** Resolved route restrictions shared by dispatch and intertie forecasts. */
+    transmissionCapacityLimitsWByCorridor?: Record<string, number>;
     marketPricePerMWh?: number;
     renewableCapacityFactors?: Record<string, number>;
   };
@@ -530,9 +528,6 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
-  /** Isolated customer energy left unserved after local emergency backup. */
-  interruptedWh?: number;
-  localBackupWh?: number;
   // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;
@@ -971,6 +966,8 @@ export interface ScenarioType {
   tutorialSteps?: TutorialStepType[];
   /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
   intertiesEnabled?: boolean;
+  /** Pre-existing, debt-free operational connections using this scenario's access allocation. */
+  startingInterties?: string[];
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -1090,15 +1087,6 @@ export interface GameEventType {
 export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
-/** NOAA heavy-smoke observations and a separately sourced severe-episode solar template. */
-export interface WildfireProfileType {
-  locationId: "LA" | "SF";
-  sourceYears: number[];
-  dailyReferenceAttenuation: number[];
-  localStartHour: number;
-  localEndHour: number;
-}
-
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
 export type ResilienceUpgradeType =
   "hailResistant" | "coldWeatherPackage" | "solarTrackers";
@@ -1151,17 +1139,11 @@ export interface FacilityUpgradeInProgressType {
 }
 
 export interface WorldEventEffectsType {
+  /** Surviving nameplate capacity of each affected corridor, in watts, including upgrades. */
+  transmissionCapacityLimitsWByCorridor?: Record<string, number>;
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
-  /** Share of incident sunlight retained, applied before rooftop and utility PV; [0, 1]. */
-  solarIrradianceMultiplier?: number;
-  /** Additional attenuation only in specified local hours (integer keys 0–23); values [0, 1]. */
-  solarIrradianceMultipliersByHour?: Record<string, number>;
   demandMultiplier?: number;
-  /** Monthly energy-equivalent share isolated by local delivery damage; [0, 1]. */
-  serviceInterruptionFraction?: number;
-  /** Finite emergency energy available locally in each active month, independent of grid supply. */
-  localBackupWhPerMonth?: number;
   /** Multiplies modeled watershed inflow before it reaches a hydro reservoir. */
   hydroRunoffMultiplier?: number;
   // An override rather than a multiplier. Content validation rejects overlapping policy phases.
@@ -1389,8 +1371,6 @@ export interface GameType {
   date: DateType;
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
-  /** A schema upgrade retired obsolete incident effects; rebuild only unplayed ticks after loading. */
-  wildfireForecastRefresh?: boolean;
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   // Newest first, capped at MAX_EVENTS.
   eventLog: GameEventType[];
@@ -1408,9 +1388,12 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
-  // Headless balance harness only: run the identical strategy with the recurring regional wildfire
-  // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
+  // Legacy verification flag: keep earlier unranked runs ineligible for achievements.
   wildfireHazardDisabled?: boolean;
+  /** One-time future forecast refresh after retiring legacy wildfire systems. */
+  wildfireForecastRefresh?: boolean;
+  /** Preserve pre-redesign connection purchases and loans in existing scenario-111 saves. */
+  legacyWildfireIntertieAccess?: boolean;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;

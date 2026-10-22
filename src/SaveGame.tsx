@@ -25,7 +25,10 @@ import {
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
-import { validWorldEvent } from "./helpers/WorldEventValidation";
+import {
+  validWorldEvent,
+  validTransmissionCapacityLimits,
+} from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
@@ -331,11 +334,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (typeof game !== "object" || game === null) {
     return null;
   }
-  if (
-    game.wildfireForecastRefresh !== undefined &&
-    typeof game.wildfireForecastRefresh !== "boolean"
-  )
-    return null;
   // Shared grids are restored only as a validated whole world, never as a solo import.
   if (game.multiplayer) return null;
   if (
@@ -486,6 +484,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.transmissionCapacityLimitsWByCorridor !== undefined &&
+          !validTransmissionCapacityLimits(
+            tick.transmissionCapacityLimitsWByCorridor,
+          )) ||
         typeof tick.reserveW !== "number" ||
         !Number.isFinite(tick.reserveW) ||
         [
@@ -515,27 +517,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
       const record = month as Partial<GameType["monthlyHistory"][number]>;
       const chart = record.chartAverage;
       if (
-        [record.interruptedWh, record.localBackupWh].some(
-          (value) =>
-            value !== undefined &&
-            (typeof value !== "number" || !Number.isFinite(value) || value < 0),
-        )
-      )
-        return true;
-      if (
         chart !== undefined &&
         (typeof chart !== "object" ||
           chart === null ||
           !chart.demandByType ||
           !chart.supplyByFuel ||
           !chart.renewableCapacityFactors ||
-          [chart.disconnectedDemandW, chart.localBackupW].some(
-            (value) =>
-              value !== undefined &&
-              (typeof value !== "number" ||
-                !Number.isFinite(value) ||
-                value < 0),
-          ) ||
           Object.values(chart).some((value) =>
             typeof value === "number"
               ? !Number.isFinite(value)
@@ -577,6 +564,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth) ||
     typeof game.meaningfulDecisionGateWaived !== "boolean"
+  )
+    return null;
+  if (
+    game.wildfireForecastRefresh !== undefined &&
+    typeof game.wildfireForecastRefresh !== "boolean"
+  )
+    return null;
+  if (
+    game.legacyWildfireIntertieAccess !== undefined &&
+    typeof game.legacyWildfireIntertieAccess !== "boolean"
   )
     return null;
   const worldEvents = game.worldEvents as
@@ -690,8 +687,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !validDeferredCharging(t.deferredChargingStart) ||
         [
           t.customerBillingRate,
-          t.disconnectedDemandW,
-          t.localBackupW,
           t.deferredResidentialWh,
           t.deferredResidentialWhStart,
           t.thermalShiftedW,

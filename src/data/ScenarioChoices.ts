@@ -1,10 +1,5 @@
+import { DEEP_FREEZE_DECISION_KEY, winterizationCost } from "./WorldEvents";
 import { ScenarioChoiceType } from "../Types";
-import {
-  WILDFIRE_DECISION_KEY,
-  wildfirePreparationCost,
-  DEEP_FREEZE_DECISION_KEY,
-  winterizationCost,
-} from "./WorldEvents";
 export const DATA_CENTER_DECISION_KEY = "story:106:data-center-boom:connection";
 // The same 100 MW connection earns the same contribution at every difficulty.
 // Demand, operating economics and customer retention already scale the challenge.
@@ -85,35 +80,6 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
           "Save cash for construction and accept February’s full output losses, including a 38% drop at gas plants.",
         message:
           "Construction budget kept. February 2021 output losses apply in full.",
-      },
-    ],
-  },
-  {
-    id: WILDFIRE_DECISION_KEY,
-    scenarioId: 111,
-    atMonth: 11,
-    title: "Wildfire preparedness",
-    message:
-      "Reserve local backup for critical sites during January's fire response, or keep cash.",
-    options: [
-      {
-        id: "prepare",
-        label: "Fund preparedness",
-        cost: wildfirePreparationCost,
-        description:
-          "Reserve one mobile generator: up to 150 kW for 24 hours (3.6 MWh) at eligible local critical sites.",
-        message:
-          "Local critical-load backup reserved: 150 kW for 24 hours (3.6 MWh). Fire isolation and repair costs remain.",
-      },
-      {
-        id: "standard",
-        meaningful: false,
-        label: "Keep cash",
-        cost: () => 0,
-        description:
-          "Keep the deployment budget. Respond to damaged lines and customer interruptions without the reserved local backup.",
-        message:
-          "Cash kept. Standard response applies, with no reserved local critical-load backup.",
       },
     ],
   },

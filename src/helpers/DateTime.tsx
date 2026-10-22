@@ -68,10 +68,6 @@ export function reduceHistories(
   }
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
-  if (t.interruptedWh !== undefined)
-    acc.interruptedWh = (acc.interruptedWh ?? 0) + t.interruptedWh;
-  if (t.localBackupWh !== undefined)
-    acc.localBackupWh = (acc.localBackupWh ?? 0) + t.localBackupWh;
   (
     Object.entries(t.deliveredWhByFuel || {}) as [FuelNameType, number][]
   ).forEach(([fuel, wh]) => {
@@ -224,14 +220,6 @@ function accumulateTick(
     tickScale;
   summary.demandWh +=
     (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * tickScale;
-  if (t.disconnectedDemandW !== undefined) {
-    const hours = (GAME_TO_REAL_YEARS * tickScale) / TICKS_PER_HOUR;
-    summary.interruptedWh =
-      (summary.interruptedWh ?? 0) +
-      Math.max(0, t.disconnectedDemandW - (t.localBackupW ?? 0)) * hours;
-    summary.localBackupWh =
-      (summary.localBackupWh ?? 0) + (t.localBackupW ?? 0) * hours;
-  }
   // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
   // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
   // excess. Storage is deliberately absent because it is not a fuel.

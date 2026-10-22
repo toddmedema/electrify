@@ -2,7 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
-import gameReducer, { generateNewTimeline } from "../../reducers/Game";
+import gameReducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
@@ -12,16 +12,9 @@ import { ProgramsScreen } from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
 import { GENERATORS } from "../../data/Facilities";
 import { POLICIES } from "../../data/Policies";
-import { formatMoneyConcise, formatWattHours } from "../../helpers/Format";
+import { formatMoneyConcise } from "../../helpers/Format";
 import { emptyPolicies, programCustomers } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
-import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { wildfirePreparedness } from "../../helpers/Wildfire";
-import {
-  previewWildfire,
-  wildfirePreviewMonth,
-} from "../../helpers/WildfirePreview";
 
 /** The value beside a build-out fact's label, if the fact is shown. */
 const fact = (label: string) => {
@@ -598,109 +591,6 @@ test("the completion preview is capped at the run's last month", () => {
   );
   expect(fact("Duration")).toBe("48 monthsEnds after this run");
   expect(screen.getByText("Estimated demand · Dec 2035")).toBeInTheDocument();
-  view.unmount();
-});
-
-test("wildfire reservation shows finite support, previews the selected incident, and starts or stops", () => {
-  jest.useFakeTimers();
-  const worker = {
-    onmessage: null as ((event: { data: unknown }) => void) | null,
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
-  };
-  const stub = jest
-    .spyOn(client, "createPolicyPreviewWorker")
-    .mockReturnValue(worker as unknown as Worker);
-  const game = createGame({
-    scenarioId: CUSTOM_SCENARIO_ID,
-    scenario: {
-      ...SCENARIOS.find((scenario) => scenario.id === 111)!,
-      id: CUSTOM_SCENARIO_ID,
-      name: "Custom LA",
-      eventScenarioIds: [111],
-    },
-  });
-  game.date = getDateFromMinute(3 * MINUTES_PER_MONTH, game.startingYear);
-  game.timeline = generateNewTimeline(game, 100000000, 1000000);
-  game.inGame = true;
-  const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
-  });
-  const view = render(
-    <Provider store={store}>
-      <ProgramsScreen onClose={jest.fn()} />
-    </Provider>,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
-  );
-  expect(fact("Annualized reservation budget")).toContain("$200k/yr");
-  expect(fact("Local critical-load backup")).toContain("150 kW for 24 hours");
-  expect(fact("Local critical-load backup")).toContain(
-    "3.6 MWh of initial fuel",
-  );
-  fireEvent.click(screen.getByText("Reservation & incident"));
-  expect(fact("Scenario wildfire")).toBe("Jan 2025");
-  expect(fact("Automatic end")).toContain("Feb 2025");
-  act(() => jest.advanceTimersByTime(250));
-  const month = wildfirePreviewMonth(store.getState().game)!;
-  expect(worker.postMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ month }),
-  );
-  const result = previewWildfire(store.getState().game, month);
-  act(() => worker.onmessage!({ data: { result } }));
-  expect(screen.getByText(/^Estimated customer interruptions ·/)).toBeVisible();
-  expect(screen.getByText(/^Estimated interrupted energy:/)).toHaveTextContent(
-    formatWattHours(result.prepared.interruptedWh || 0),
-  );
-  expect(screen.getByText(/^Local backup supplied:/)).toHaveTextContent(
-    "3.6 MWh maximum",
-  );
-  expect(
-    screen.queryByText(/50% fewer|Generator losses also halved|Cash benefit:/),
-  ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
-  expect(wildfirePreparedness(store.getState().game)!.active).toBe(true);
-  fireEvent.click(
-    screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
-  );
-  expect(fact("Reservation")).toContain("Reserved");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Turn off preparedness" }),
-  );
-  expect(wildfirePreparedness(store.getState().game)!.active).toBe(false);
-  view.unmount();
-  stub.mockRestore();
-  jest.useRealTimers();
-});
-
-test("the historical reservation is available outside smoke regions only when that scenario is selected", () => {
-  const game = createGame({
-    scenarioId: CUSTOM_SCENARIO_ID,
-    scenario: {
-      ...SCENARIOS.find((scenario) => scenario.id === 110)!,
-      id: CUSTOM_SCENARIO_ID,
-      startingYear: 2030,
-      eventScenarioIds: [111],
-    },
-  });
-  const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
-  });
-  const view = render(
-    <Provider store={store}>
-      <ProgramsScreen onClose={jest.fn()} />
-    </Provider>,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
-  );
-  fireEvent.click(screen.getByText("Reservation & incident"));
-  expect(fact("Scenario wildfire")).toBe("Jan 2033");
-  fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
-  expect(wildfirePreparedness(store.getState().game)?.active).toBe(true);
   view.unmount();
 });
 

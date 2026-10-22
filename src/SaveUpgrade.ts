@@ -1,5 +1,4 @@
 import { validWorldEvent } from "./helpers/WorldEventValidation";
-
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -83,6 +82,81 @@ const migrations: ((
         ...game,
         wildfireForecastRefresh: true,
         worldEvents: { ...worldEvents, active },
+      },
+    };
+  },
+  // 4 -> 5: remove retired smoke, service-interruption and backup effects. Keep all
+  // recorded accounts, actions and results; refresh only ticks after the saved instant.
+  (save) => {
+    if (!object(save.game)) return save;
+    const game = save.game;
+    if (!object(game.worldEvents)) return save;
+    const events = game.worldEvents;
+    if (!Array.isArray(events.active) || !Array.isArray(events.occurrences))
+      return save;
+    const retired = (event: unknown) =>
+      object(event) &&
+      (event.definitionId === "recurring-wildfire" ||
+        event.definitionId === "wildfire-smoke" ||
+        (typeof event.definitionId === "string" &&
+          event.definitionId.startsWith("california-wildfire-2025:")) ||
+        (typeof event.key === "string" && event.key.startsWith("wildfire:")));
+    const hadRetired = [...events.active, ...events.occurrences].some(retired);
+    const removedSelection =
+      object(game.customScenario) &&
+      Array.isArray(game.customScenario.eventScenarioIds) &&
+      game.customScenario.eventScenarioIds.includes(111);
+    const legacyLines =
+      game.scenarioId === 111 &&
+      object(game.transmission) &&
+      Array.isArray(game.transmission.lines) &&
+      game.transmission.lines.some(
+        (line) =>
+          object(line) &&
+          ((line.corridorId === "california-north" &&
+            typeof line.capacityW === "number" &&
+            line.capacityW < 40e6) ||
+            (line.corridorId === "california-south" &&
+              [7.5e6, 11.25e6, 16.875e6, 25.3125e6].includes(
+                line.capacityW as number,
+              ))),
+      );
+    const occurrences = events.occurrences.map((event) => {
+      if (!retired(event) || !object(event) || !object(event.effects))
+        return event;
+      const effects = { ...event.effects };
+      for (const key of [
+        "solarIrradianceMultipliersByHour",
+        "serviceInterruptionFraction",
+        "localBackupWhPerMonth",
+      ])
+        delete effects[key];
+      return { ...event, effects };
+    });
+    const customScenario =
+      object(game.customScenario) &&
+      Array.isArray(game.customScenario.eventScenarioIds)
+        ? {
+            ...game.customScenario,
+            eventScenarioIds: game.customScenario.eventScenarioIds.filter(
+              (id) => id !== 111,
+            ),
+          }
+        : game.customScenario;
+    return {
+      ...save,
+      game: {
+        ...game,
+        customScenario,
+        ...(hadRetired || removedSelection || game.scenarioId === 111
+          ? { wildfireForecastRefresh: true }
+          : {}),
+        ...(legacyLines ? { legacyWildfireIntertieAccess: true } : {}),
+        worldEvents: {
+          ...events,
+          active: events.active.filter((event) => !retired(event)),
+          occurrences,
+        },
       },
     };
   },

@@ -180,7 +180,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment wildfire preparedness fire season",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
       <div>
         <p>
@@ -221,22 +221,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           data-center demand participates, cutting use by 20% during a separate
           four-hour window, even when supply is sufficient. They use less energy
           overall. Participants get 10% off electricity delivered all day.
-        </p>
-        <p>
-          <strong>Wildfire preparedness:</strong> Custom games with the selected
-          Wildfire Emergency scenario can reserve one mobile generator for
-          eligible local critical sites. The annualized $200k reservation budget
-          is billed monthly while on, with no upfront payment. Availability is
-          immediate; charges end after the incident month. Turning it off stops
-          future charges.
-        </p>
-        <p>
-          The package supports up to 150 kW for 24 hours, with 3.6 MWh of
-          initial fuel. It cannot reconnect customers through damaged or
-          isolated feeders, prevent smoke or reduce repair costs. The preview
-          estimates interrupted energy and local backup service for the selected
-          incident; it does not simulate consecutive outage hours. Changing the
-          program cannot alter an incident already recorded.
         </p>
       </div>
     ),

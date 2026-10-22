@@ -4,7 +4,6 @@ import { currentTick } from "../helpers/GameSelectors";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { corridorsForGame } from "../data/IntertieAccess";
 import { getScenario, TUTORIALS } from "../data/Scenarios";
-import { WILDFIRE_DECISION_KEY } from "../data/WorldEvents";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import {
   applyCommand,
@@ -67,10 +66,10 @@ test("tutorials, unknown scenarios and mismatched custom specs are refused", () 
 });
 
 test("a scenario choice holds the shared clock until every company answers", () => {
-  loadSimData(getScenario(111)!.locationId!);
-  const world = start({ scenarioId: 111, difficulty: "Employee" }, 2);
-  // Wildfire Emergency asks at month 11 of its term, after 24 preparation months.
-  for (let tick = 0; tick < 37 * 96 && !world.paused; tick++) stepWorld(world);
+  loadSimData(getScenario(106)!.locationId!);
+  const world = start({ scenarioId: 106, difficulty: "Employee" }, 2);
+  // Data Center asks before its first new campus load.
+  for (let tick = 0; tick < 49 * 96 && !world.paused; tick++) stepWorld(world);
   expect(world.grids.every((g) => pendingScenarioChoice(g))).toBe(true);
   expect(world.paused).toBe(true);
   expect(world.reason).toMatch(/Player 0: Choosing a response/);
@@ -80,7 +79,10 @@ test("a scenario choice holds the shared clock until every company answers", () 
   const answer: Command = {
     kind: "action",
     name: "chooseScenarioResponse",
-    payload: { decisionId: WILDFIRE_DECISION_KEY, optionId: "standard" },
+    payload: {
+      decisionId: pendingScenarioChoice(world.grids[0])!.id,
+      optionId: "phased",
+    },
   };
   expect(command(world, 0, answer)).toBeUndefined();
   expect(world.paused).toBe(true);

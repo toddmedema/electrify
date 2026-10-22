@@ -2,7 +2,6 @@ import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
-import { wildfirePreparedness } from "./Wildfire";
 import { SCENARIO_PREPARATION_MONTHS } from "../data/ScenarioPreparation";
 
 /** Keep the price and consequence in one sentence, using the active difficulty's terms. */
@@ -39,12 +38,6 @@ export function pendingScenarioChoice(
           MINUTES_PER_MONTH &&
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );
-}
-/** Choices the player may take up without the clock waiting on them: ongoing wildfire
- * preparedness, started or stopped from Customer programs through the same replayable action. */
-export function optionalScenarioChoice(game: GameType) {
-  if (game.storyEffectsDisabled) return undefined;
-  return wildfirePreparedness(game)?.choice;
 }
 export function validScenarioResponse(
   value: unknown,

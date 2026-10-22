@@ -8,7 +8,6 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
   selectUpcomingStoryEvents,
-  selectWildfireRiskNotice,
   UpcomingStoryEventType,
 } from "./StoryEventSelectors";
 
@@ -72,7 +71,6 @@ export const makeMapStateToProps = () => {
         ),
         ongoing,
         upcoming: selectUpcomingStoryEvents(state),
-        riskNotice: selectWildfireRiskNotice(state),
       };
       throttle.rendered(game.date.minute);
       previous = state;

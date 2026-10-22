@@ -1,13 +1,18 @@
 # Major scenario choice balance QA
 
-**Historical results:** the cash tables below predate the October 21, 2026 wildfire
-model replacement and earlier intertie and fuel-economics changes. Current wildfire
-readiness provides finite local backup; it no longer halves plant or customer
-losses. Current repair charges total $780k across January–March. See the updated
-[cost research](SCENARIO_CHOICE_RESEARCH.md) and
-[wildfire research](../../docs/wildfire-model-research.md). Run
-`SCENARIO_CHOICE_REPORT=1` for current measured outcomes; the historical cash and
-strategy comparisons below must not be read as current calibration evidence.
+**Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
+below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
+of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
+
+**Historical results:** the cash table and Wildfire keep-cash comparison below predate the
+scenario-sized intertie calibration. See the [current intertie balance report](../../docs/intertie-balance.md)
+for measured results and the updated reference plans. Wildfire preparedness now costs $2M at every difficulty (10× the historical $200k proxy),
+so protecting the grid competes meaningfully with construction funds; restoration costs and
+the 50% protection remain unchanged. The historical balances below predate this change, and
+also predate the economics correction that priced fuel at EIA delivered-to-generator cost,
+deflated capital to the starting year and escalated O&M with inflation (see
+`docs/facilities-economics.md`); the winning and losing outcomes still hold, but the cash
+amounts have moved. Run with `SCENARIO_CHOICE_REPORT=1` for current figures.
 
 **Gas split (September 2026):** gas is now two facilities, Natural Gas Peaker and Natural Gas
 CC (`docs/facilities-economics.md`). Every plan below names the one it builds. The Data Center

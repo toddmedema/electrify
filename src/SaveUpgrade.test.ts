@@ -1,3 +1,7 @@
+import reducer, { generateNewTimeline } from "./reducers/Game";
+import { loaded } from "./reducers/GameActions";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
+import { DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
 import { isFutureSave, SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import manifest from "./data/RunCompatibility.json";
@@ -12,14 +16,6 @@ import type { GameType, VictoryType } from "./Types";
 import { achievementHooks } from "./achievements/Achievements";
 import { installSimulationHooks } from "./achievements/SimulationHooks";
 import { emptyPolicies } from "./helpers/Policies";
-import gameReducer, {
-  generateNewTimeline,
-  loaded,
-  resume,
-  tickState,
-} from "./reducers/Game";
-import { MINUTES_PER_MONTH } from "./helpers/DateTime";
-import { serializeCommitmentMetadata } from "./helpers/Commitment";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const OLD_RULES = legacyFile.save.game.runIdentity.compatibilityId;
@@ -39,135 +35,6 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
-  it.each(["recurring-wildfire", "california-wildfire-2025:firestorm"])(
-    "retires schema 3 active %s effects while preserving booked progress and rebuilding only future ticks",
-    (definitionId) => {
-      const game = createGame({
-        scenarioId: 101,
-        seed: 31337,
-        initialBuild: {
-          name: "Natural Gas Peaker",
-          peakW: 500_000_000,
-          financed: true,
-        },
-      });
-      game.facilities = game.facilities.filter(
-        (facility) => facility.fuel === "Natural Gas",
-      );
-      game.facilities[0].yearsToBuildLeft = 0;
-      runMonths(game, 1);
-      game.challenge = {
-        run: projectAuthoredRunReference(game.runIdentity)!,
-        target: 400,
-      };
-      const legacy = {
-        key: `wildfire:${definitionId}:old`,
-        definitionId,
-        startsMinute: MINUTES_PER_MONTH,
-        endsMinute: 3 * MINUTES_PER_MONTH,
-        attributes: {
-          outputMultiplier: 0.25,
-          selectedFacilityIds: [game.facilities[0].id],
-        },
-        effects: {
-          demandMultiplier: 0.9,
-          facilityOutputMultipliersById: { [game.facilities[0].id]: 0.25 },
-          operatingExpensePerMonth: 1_000_000,
-        },
-      };
-      const completed = {
-        ...legacy,
-        key: "wildfire:completed",
-        startsMinute: 0,
-        endsMinute: 1,
-      };
-      game.worldEvents.active = [legacy];
-      game.worldEvents.occurrences = [completed, legacy];
-      const opening = game.timeline[0];
-      game.timeline = generateNewTimeline(
-        game,
-        opening.cash,
-        opening.customers,
-      );
-      for (let index = 0; index < 8; index++) tickState(game);
-      const raw = clone(serializeSave(game));
-      raw.schemaVersion = 3;
-      raw.game.runIdentity!.compatibilityId = OLD_RULES;
-      raw.game.challenge!.run.compatibilityId = OLD_RULES;
-      const source = JSON.stringify(raw);
-      const restored = parseSave(raw)!;
-      expect(restored.schemaVersion).toBe(4);
-      expect(restored.game.worldEvents.active[0].effects).toEqual({});
-      expect(restored.game.worldEvents.occurrences).toEqual(
-        raw.game.worldEvents.occurrences,
-      );
-      expect(restored.game.wildfireForecastRefresh).toBe(true);
-      expect(restored.commitmentForecast).toEqual(raw.commitmentForecast);
-      expect(restored.game.monthlyHistory).toEqual(raw.game.monthlyHistory);
-      expect(restored.game.facilities).toEqual(raw.game.facilities);
-      expect(restored.game.replayLog).toEqual(raw.game.replayLog);
-      expect(restored.game.challenge).toEqual(game.challenge);
-      expect(restored.game.runIdentity).toEqual(game.runIdentity);
-      expect(JSON.stringify(raw)).toBe(source);
-      const committed = raw.game.timeline.filter(
-        (tick) => tick.minute <= game.date.minute,
-      );
-      const committedMetadata = serializeCommitmentMetadata(
-        restored.game.timeline.filter(
-          (tick) => tick.minute <= game.date.minute,
-        ),
-      );
-      const loadedGame = gameReducer(
-        gameReducer(undefined, resume(restored.game)),
-        loaded(),
-      );
-      expect(loadedGame.wildfireForecastRefresh).toBeUndefined();
-      expect(
-        loadedGame.timeline.filter((tick) => tick.minute <= game.date.minute),
-      ).toEqual(committed);
-      expect(
-        serializeCommitmentMetadata(
-          loadedGame.timeline.filter((tick) => tick.minute <= game.date.minute),
-        ),
-      ).toEqual(committedMetadata);
-      expect(loadedGame.monthlyHistory).toEqual(raw.game.monthlyHistory);
-      expect(loadedGame.facilities).toEqual(raw.game.facilities);
-      expect(loadedGame.replayLog).toEqual(raw.game.replayLog);
-      const future = loadedGame.timeline.filter(
-        (tick) => tick.minute > game.date.minute,
-      );
-      expect(future.length).toBeGreaterThan(0);
-      expect(
-        Math.max(
-          ...future.map((tick) => tick.supplyByFuel["Natural Gas"] || 0),
-        ),
-      ).toBeGreaterThan(game.facilities[0].peakW * 0.25);
-      expect(upgradeSave(restored)).toEqual(restored);
-    },
-  );
-
-  it("does not reinterpret completed legacy wildfire records or repair corrupt active effects", () => {
-    const raw = clone(serializeSave(createGame({ scenarioId: 101 })));
-    raw.schemaVersion = 3;
-    const completed = {
-      key: "wildfire:old",
-      definitionId: "recurring-wildfire",
-      startsMinute: 0,
-      endsMinute: 0,
-      attributes: { outputMultiplier: 0.25 },
-      effects: { demandMultiplier: 0.9, operatingExpensePerMonth: 1000 },
-    };
-    raw.game.worldEvents.active = [completed];
-    raw.game.worldEvents.occurrences = [completed];
-    const restored = parseSave(raw)!;
-    expect(restored.game.worldEvents).toEqual(raw.game.worldEvents);
-    expect(restored.game.wildfireForecastRefresh).toBeUndefined();
-    raw.game.worldEvents.active = [
-      { ...completed, endsMinute: 1440, effects: { demandMultiplier: -1 } },
-    ];
-    expect(parseSave(raw)).toBeNull();
-  });
-
   it("upgrades schema 2 programs with new offers Off while preserving existing cohorts and spending", () => {
     const game = createGame({
       scenarioId: 100,
@@ -468,4 +335,108 @@ describe("save upgrades", () => {
     expect(upgradeSave(save)).toEqual(save);
     expect(parseSave(parseSave(save))).toEqual(parseSave(save));
   });
+});
+
+it.each([3, 4])(
+  "retires legacy wildfire systems from schema %i without changing recorded results",
+  (schemaVersion) => {
+    const { save } = challengedSave();
+    runMonths(save.game, 1);
+    const recorded = clone(save.game);
+    const minute = save.game.date.minute;
+    const oldEvent = {
+      key: "wildfire:SF:1",
+      definitionId: "wildfire-smoke",
+      startsMinute: minute,
+      endsMinute: minute + 1440,
+      attributes: { heavySmokeDays: 3 },
+      effects: { solarIrradianceMultipliersByHour: { "10": 0.99 } },
+    };
+    const old = {
+      ...save,
+      schemaVersion,
+      game: {
+        ...save.game,
+        worldEvents: {
+          active: [oldEvent],
+          occurrences: [oldEvent],
+          checkedKeys: [oldEvent.key],
+        },
+      },
+    };
+    const imported = parseSave(clone(old))!;
+    expect(imported).not.toBeNull();
+    expect(imported.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(imported.game.worldEvents.active).toEqual([]);
+    expect(imported.game.worldEvents.occurrences[0]).toMatchObject({
+      key: oldEvent.key,
+      attributes: oldEvent.attributes,
+      effects: {},
+    });
+    expect(imported.game.monthlyHistory).toEqual(recorded.monthlyHistory);
+    expect(imported.game.timeline).toEqual(recorded.timeline);
+    expect(imported.game.facilities).toEqual(recorded.facilities);
+    expect(imported.game.replayLog).toEqual(recorded.replayLog);
+    expect(imported.game.challenge).toMatchObject({ target: 400 });
+    expect(imported.game.wildfireForecastRefresh).toBe(true);
+  },
+);
+
+it("removes the retired custom wildfire selection while keeping the other selected events", () => {
+  const game = createGame({
+    scenarioId: 999,
+    scenario: {
+      ...DEFAULT_CUSTOM_SCENARIO,
+      eventScenarioIds: [108],
+    },
+  });
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  save.game.customScenario!.eventScenarioIds = [108, 111];
+  const restored = parseSave(save)!;
+  expect(restored).not.toBeNull();
+  expect(restored.game.customScenario!.eventScenarioIds).toEqual([108]);
+});
+
+it("preserves a previous wildfire mission's purchased connection, debt and cash", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  const line = save.game.transmission!.lines[0];
+  line.capacityW = 5e6;
+  line.buildCost = 1.8e6;
+  line.annualOperatingCost = 36000;
+  line.financed = true;
+  line.loanAmountLeft = 1e6;
+  line.loanMonthlyPayment = 10000;
+  line.interestRate = 0.06;
+  line.currentFlowW = 1e6;
+  const restored = parseSave(save)!;
+  expect(restored).not.toBeNull();
+  expect(restored.game.legacyWildfireIntertieAccess).toBe(true);
+  expect(restored.game.transmission!.lines).toEqual([line]);
+  expect(restored.game.timeline).toEqual(save.game.timeline);
+});
+
+it("refreshes only future wildfire forecast ticks after migration", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
+  game.timeline = generateNewTimeline(
+    { ...game, storyEffectsDisabled: true },
+    1e9,
+    game.timeline[0].customers,
+    96,
+  );
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  const imported = parseSave(save)!;
+  expect(imported).not.toBeNull();
+  const refreshed = reducer(imported.game, loaded());
+  expect(refreshed.timeline[0]).toEqual(save.game.timeline[0]);
+  expect(refreshed.timeline[1].minute).toBe(game.date.minute + 15);
+  expect(refreshed.timeline[1].transmissionCapacityLimitsWByCorridor).toEqual({
+    "california-north": 4e6,
+  });
+  expect(refreshed.timeline[1].importedW).toBeLessThanOrEqual(4e6);
+  expect(refreshed.wildfireForecastRefresh).toBeUndefined();
 });

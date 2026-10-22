@@ -10,7 +10,6 @@ import * as GameModule from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DATA_CENTER_DECISION_KEY } from "../data/ScenarioChoices";
-import { WILDFIRE_DECISION_KEY } from "../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { cacheProjection, selectProjection } from "./Projection";
 import { cashRunwayMonths } from "./MissionStatus";
@@ -68,10 +67,7 @@ it("rebuilds for another save with identical monthly keys but different balances
   );
 });
 
-it.each([
-  [106, 48, DATA_CENTER_DECISION_KEY, "phased"],
-  [111, 35, WILDFIRE_DECISION_KEY, "prepare"],
-] as const)(
+it.each([[106, 48, DATA_CENTER_DECISION_KEY, "phased"]] as const)(
   "refreshes the forecast after scenario %i's choice",
   (scenarioId, month, decisionId, optionId) => {
     const game = createGame({ scenarioId, difficulty: "Intern", seed: 2468 });

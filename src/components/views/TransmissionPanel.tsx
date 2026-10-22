@@ -765,6 +765,15 @@ export default function TransmissionPanel({
                     const rating =
                       peer?.ratingW ??
                       (now ? transmissionRatingW(line, now) : line.capacityW);
+                    const routeLimitW =
+                      now?.transmissionCapacityLimitsWByCorridor?.[
+                        line.corridorId
+                      ];
+                    const retainedCapacity =
+                      routeLimitW === undefined
+                        ? 1
+                        : Math.min(1, routeLimitW / line.capacityW);
+                    const restricted = retainedCapacity <= 0.9;
                     const building = line.yearsToBuildLeft > 0;
                     // Remaining time plus elapsed simulation time preserves the original build duration.
                     const elapsedYears =
@@ -909,6 +918,15 @@ export default function TransmissionPanel({
                                       </span>
                                     )}
                                   </Typography>
+                                  {restricted && !building && (
+                                    <Typography
+                                      component="span"
+                                      variant="body2"
+                                      color="error"
+                                    >
+                                      Wildfire limit {formatWatts(routeLimitW!)}
+                                    </Typography>
+                                  )}
                                   {building && (
                                     <span
                                       className="constructionProgress"

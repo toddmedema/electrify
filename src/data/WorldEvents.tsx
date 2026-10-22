@@ -17,16 +17,6 @@ import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
-import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
-import {
-  CALIFORNIA_WILDFIRE_ACCOUNT_HOURS,
-  CALIFORNIA_WILDFIRE_BACKUP_HOURS,
-  CALIFORNIA_WILDFIRE_BACKUP_POWER_W,
-  CALIFORNIA_WILDFIRE_BACKUP_WH,
-  CALIFORNIA_WILDFIRE_READINESS_COST,
-  CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
-  CALIFORNIA_WILDFIRE_SERVICE_INTERRUPTION_FRACTION,
-} from "./CaliforniaWildfire";
 
 export interface StoryContextType {
   customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
@@ -1371,143 +1361,69 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   ],
 };
 
-export interface CaliforniaWildfireBalanceType {
-  serviceInterruptionFraction: number;
-  restorationCostPerMonth: number;
-}
-
-// Historical exposure and repairs do not change with difficulty. The scenario's operating
-// economics supply the financial challenge; difficulty must not alter this physical evidence.
-export const CALIFORNIA_WILDFIRE_BALANCE: Record<
-  DifficultyType,
-  CaliforniaWildfireBalanceType
-> = Object.fromEntries(
-  DIFFICULTY_ORDER.map((difficulty) => [
-    difficulty,
-    {
-      serviceInterruptionFraction:
-        CALIFORNIA_WILDFIRE_SERVICE_INTERRUPTION_FRACTION,
-      restorationCostPerMonth: CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
-    },
-  ]),
-) as Record<DifficultyType, CaliforniaWildfireBalanceType>;
-
-export const WILDFIRE_DECISION_KEY =
-  "story:111:california-wildfire-2025:preparedness";
-export function wildfirePrepared(
-  occurrences?: ActiveWorldEventType[],
-): boolean {
-  return (
-    occurrences?.some(
-      (event) =>
-        event.key === WILDFIRE_DECISION_KEY &&
-        event.attributes.choice === "prepare",
-    ) ?? false
-  );
-}
-// Reserve finite local critical-load backup and its deployment resources. Post-fire repairs
-// remain separate; this allowance is a transferred readiness proxy, not a hardware quotation.
-export function wildfirePreparationCost(_difficulty: DifficultyType): number {
-  return CALIFORNIA_WILDFIRE_READINESS_COST;
-}
-
+// The Bootleg fire reduced the Malin intertie from 2,967 MW to 285 MW in July 2021.
+// This authored January-February stress exercise uses a rounded 90% capacity loss, not a
+// reconstruction of the historical outage's duration. See docs/wildfire-intertie.md.
+export const WILDFIRE_INTERTIE_RETAINED_CAPACITY = 0.1;
+export const WILDFIRE_INTERTIE_CAPACITY_LIMIT_W = 4e6;
+export const WILDFIRE_CORRIDOR_ID = "california-north";
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
-  id: "california-wildfire-2025",
+  id: "wildfire-intertie",
   scenarioId: 111,
   phases: [
     {
-      id: "red-flag-warning",
-      schedule: { atMonth: 11 },
+      id: "readiness",
+      schedule: { atMonth: 1 },
+      forecastable: false,
       preview: () => null,
-      describe: () => ({
-        title: "Red-flag warning",
-        message:
-          "Extreme Santa Ana winds forecast for January. Fund preparedness or keep cash; choose to resume.",
+      describe: ({ difficulty }) => ({
+        title: "Prepare for a northern intertie outage",
+        message: `Your existing northern intertie will lose 90% of its capacity in January and February 2025. Prepare local supply, storage, or an independent connection. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
-        importance: "CRITICAL",
-        actionTarget: { card: "EVENTS" },
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
       }),
     },
     {
-      id: "firestorm",
+      id: "outage",
       schedule: { atMonth: 12 },
-      durationMonths: 1,
-      preview: (context) => ({
-        title: "Wildfires may disrupt power",
-        message: wildfirePrepared(context.occurrences)
-          ? "Damaged lines may interrupt customer service. Reserved backup will support local critical loads."
-          : "Damaged lines may interrupt customer service as repair costs mount.",
+      durationMonths: 2,
+      preview: () => ({
+        title: "Northern intertie wildfire outage",
+        message:
+          "The northern intertie will lose 90% of its capacity through February. Prepare replacement supply.",
       }),
-      describe: (context) => {
-        const balance = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
-        const prepared = wildfirePrepared(context.occurrences);
-        return {
-          title: "Wildfire emergency",
-          message: `Fire damage and emergency isolation interrupt customer service. Estimated January 14–28 interruptions equal ${(balance.serviceInterruptionFraction * 100).toFixed(2)}% of monthly demand. ${prepared ? "Reserved local backup provides up to 150 kW for 24 hours (3.6 MWh) at eligible critical sites. " : "Standard response is in place. "}Response and repairs cost $0.26M/month through March.`,
-          concept: "danger",
-          kind: "WORLD_EVENT",
-          importance: "CRITICAL",
-          actionTarget: { card: "EVENTS" },
-          attributes: {
-            prepared,
-            evidenceId: "ladwp-2025-jan14-28",
-            estimatedAccountHours: CALIFORNIA_WILDFIRE_ACCOUNT_HOURS,
-            serviceInterruptionFraction: balance.serviceInterruptionFraction,
-            localBackupPowerW: prepared
-              ? CALIFORNIA_WILDFIRE_BACKUP_POWER_W
-              : 0,
-            localBackupHours: prepared ? CALIFORNIA_WILDFIRE_BACKUP_HOURS : 0,
-            localBackupWh: prepared ? CALIFORNIA_WILDFIRE_BACKUP_WH : 0,
-            restorationCostPerMonth: balance.restorationCostPerMonth,
+      describe: () => ({
+        title: "Northern intertie capacity down 90%",
+        message:
+          "Wildfire has cut the northern intertie to 10% capacity through February. Use local supply or an independent connection to cover the gap.",
+        concept: "danger",
+        kind: "WORLD_EVENT",
+        importance: "CRITICAL",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        attributes: { retainedCapacity: WILDFIRE_INTERTIE_RETAINED_CAPACITY },
+        effects: {
+          transmissionCapacityLimitsWByCorridor: {
+            [WILDFIRE_CORRIDOR_ID]: WILDFIRE_INTERTIE_CAPACITY_LIMIT_W,
           },
-          effects: {
-            serviceInterruptionFraction: balance.serviceInterruptionFraction,
-            localBackupWhPerMonth: prepared ? CALIFORNIA_WILDFIRE_BACKUP_WH : 0,
-            operatingExpensePerMonth: balance.restorationCostPerMonth,
-          },
-          turningPointPriority: 120,
-        };
-      },
+        },
+        turningPointPriority: 120,
+      }),
     },
     {
-      id: "repairs",
-      schedule: { atMonth: 13 },
-      durationMonths: 2,
+      id: "restored",
+      schedule: { atMonth: 14 },
       preview: () => null,
       describe: () => ({
-        title: "Wildfire repairs continue",
-        message:
-          "Crews rebuild damaged distribution equipment. Response and repairs cost $0.26M/month through March.",
+        title: "Northern intertie restored",
+        message: "The northern intertie is back at full capacity.",
         concept: "supply",
         kind: "WORLD_EVENT",
         importance: "NOTABLE",
-        actionTarget: { card: "EVENTS" },
-        effects: {
-          operatingExpensePerMonth: CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
-        },
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        turningPointPriority: 110,
       }),
-    },
-    {
-      id: "restoration-complete",
-      schedule: { atMonth: 15 },
-      preview: () => null,
-      describe: (context) => {
-        const period = context.periodSnapshots?.[3];
-        const demandWh = period?.demandWh || context.snapshot.demandWh12m;
-        const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
-        const reliability = reliabilityOf(demandWh, unservedWh);
-        return {
-          title: "Emergency restoration complete",
-          message: `Service to standing structures was restored by March 21. Rebuilding continues. ${wildfirePrepared(context.occurrences) ? "Your preparedness reserved finite backup for local critical loads. " : ""}The grid met ${percent(reliability)} of connected demand.`,
-          concept: "supply",
-          kind: "WORLD_EVENT",
-          importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
-          actionTarget: SUPPLY_DEMAND_TARGET,
-          attributes: { demandWh, unservedWh, reliability },
-          turningPointPriority: 110,
-        };
-      },
     },
   ],
 };
@@ -2050,20 +1966,6 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
     ),
   );
-  ascending(
-    "California wildfire service interruption",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].serviceInterruptionFraction,
-    ),
-  );
-  ascending(
-    "California wildfire restoration cost",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
-    ),
-  );
   ([0, 1, 2, 3] as const).forEach((step) => {
     descending(
       `Load shedding step ${step + 1} coal output`,
@@ -2197,28 +2099,12 @@ export function combineStoryEffects(
     combined.demandMultiplier =
       (combined.demandMultiplier || 1) * (effects.demandMultiplier || 1);
     if (
-      combined.solarIrradianceMultiplier !== undefined ||
-      effects.solarIrradianceMultiplier !== undefined
-    ) {
-      combined.solarIrradianceMultiplier =
-        (combined.solarIrradianceMultiplier ?? 1) *
-        (effects.solarIrradianceMultiplier ?? 1);
-    }
-    if (
       combined.hydroRunoffMultiplier !== undefined ||
       effects.hydroRunoffMultiplier !== undefined
     ) {
       combined.hydroRunoffMultiplier =
         (combined.hydroRunoffMultiplier ?? 1) *
         (effects.hydroRunoffMultiplier ?? 1);
-    }
-    const solarIrradianceMultipliersByHour = multiplyEffects(
-      combined.solarIrradianceMultipliersByHour,
-      effects.solarIrradianceMultipliersByHour,
-    );
-    if (solarIrradianceMultipliersByHour !== undefined) {
-      combined.solarIrradianceMultipliersByHour =
-        solarIrradianceMultipliersByHour;
     }
     const fuelPriceMultipliers = multiplyEffects(
       combined.fuelPriceMultipliers,
@@ -2241,16 +2127,6 @@ export function combineStoryEffects(
     if (operatingCostMultipliersByFuel !== undefined) {
       combined.operatingCostMultipliersByFuel = operatingCostMultipliersByFuel;
     }
-    if (effects.serviceInterruptionFraction !== undefined) {
-      combined.serviceInterruptionFraction =
-        1 -
-        (1 - (combined.serviceInterruptionFraction ?? 0)) *
-          (1 - effects.serviceInterruptionFraction);
-    }
-    if (effects.localBackupWhPerMonth !== undefined) {
-      combined.localBackupWhPerMonth =
-        (combined.localBackupWhPerMonth ?? 0) + effects.localBackupWhPerMonth;
-    }
     if (
       combined.operatingExpensePerMonth !== undefined ||
       effects.operatingExpensePerMonth !== undefined
@@ -2267,6 +2143,14 @@ export function combineStoryEffects(
       combined.facilityOutputMultipliersByFuel =
         facilityOutputMultipliersByFuel;
     }
+    if (effects.transmissionCapacityLimitsWByCorridor)
+      for (const [id, limitW] of Object.entries(
+        effects.transmissionCapacityLimitsWByCorridor,
+      ))
+        (combined.transmissionCapacityLimitsWByCorridor ??= {})[id] = Math.min(
+          combined.transmissionCapacityLimitsWByCorridor?.[id] ?? Infinity,
+          limitW,
+        );
     const facilityOutputMultipliersById = multiplyEffects(
       combined.facilityOutputMultipliersById,
       effects.facilityOutputMultipliersById,
@@ -2310,24 +2194,6 @@ export function resolveStoryPhase(
     context.customEvents?.find((event) => event.scenarioId === arc.scenarioId);
   if (imported) {
     const effects = { ...description.effects };
-    if (arc.scenarioId === 111 && phase.id === "firestorm") {
-      const effectiveness = wildfirePreparednessEffectiveness(
-        context.occurrences || [],
-        context.location.id,
-        scheduledMonth * MINUTES_PER_MONTH,
-      );
-      effects.localBackupWhPerMonth =
-        CALIFORNIA_WILDFIRE_BACKUP_WH * effectiveness;
-      description.attributes = {
-        ...description.attributes,
-        preparednessEffectiveness: effectiveness,
-        prepared: effectiveness > 0,
-        localBackupPowerW: CALIFORNIA_WILDFIRE_BACKUP_POWER_W * effectiveness,
-        localBackupHours:
-          effectiveness > 0 ? CALIFORNIA_WILDFIRE_BACKUP_HOURS : 0,
-        localBackupWh: effects.localBackupWhPerMonth,
-      };
-    }
     if (effects.operatingExpensePerMonth !== undefined)
       effects.operatingExpensePerMonth *= imported.moneyScale;
     // Prices per unit and percentage shocks retain their meaning in the receiving market.
@@ -2337,13 +2203,10 @@ export function resolveStoryPhase(
       changes.push(
         `Demand: ${Math.round(effects.demandMultiplier * 100)}% of normal`,
       );
-    if (effects.serviceInterruptionFraction !== undefined)
-      changes.push(
-        `Estimated interruptions from the historical January 14–28 window: ${(effects.serviceInterruptionFraction * 100).toFixed(2)}% of monthly demand`,
-      );
-    if (effects.localBackupWhPerMonth)
-      changes.push(
-        `Local critical-load backup: ${(effects.localBackupWhPerMonth / 1e6).toFixed(2)} MWh in total`,
+    if (effects.transmissionCapacityLimitsWByCorridor)
+      Object.values(effects.transmissionCapacityLimitsWByCorridor).forEach(
+        (value) =>
+          changes.push(`Northern intertie limited to ${value / 1e6} MW`),
       );
     if (effects.temperatureOffsetC)
       changes.push(
@@ -2384,9 +2247,6 @@ export function resolveStoryPhase(
       message: `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`,
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     };
-    if (arc.scenarioId === 111 && phase.id === "restoration-complete") {
-      description.message = `${context.location.name}: Response and repair charges have ended. Rebuilding continues. The grid met ${percent(Number(description.attributes?.reliability ?? 1))} of connected demand during the response.`;
-    }
     const eventYear =
       context.date.year -
       Math.floor(context.date.monthsElapsed / 12) +

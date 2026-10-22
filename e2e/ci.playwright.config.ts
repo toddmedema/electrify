@@ -18,7 +18,11 @@ const smoke = [
   "intertie-order.spec.ts",
   "operations-priorities.spec.ts",
 ];
-const layout = ["multiline-text.spec.ts", "modal-layout.spec.ts"];
+const layout = [
+  "multiline-text.spec.ts",
+  "modal-layout.spec.ts",
+  "wildfire-scenario.spec.ts",
+];
 const port = process.env.E2E_PORT || "3100";
 // GitHub's runners have few cores, so they keep two workers. Local checks set CI=true too, so
 // only GITHUB_ACTIONS identifies a runner; workstations use up to six, leaving half the cores.
