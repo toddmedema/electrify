@@ -27,6 +27,7 @@ for (const theme of ["light", "dark"] as const) {
       ),
     ).toHaveCount(0);
     await expect(panel).not.toContainText("(partial month)");
+    await expect(panel).toBeInViewport({ ratio: 1 });
     await expectDialogToFit(panel);
     await expect(
       panel.getByText(/Score appears after your first month/),
@@ -66,6 +67,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       panel.getByRole("region", { name: "Score outlook" }),
     ).toContainText("Projected final");
+    await expect(panel).toBeInViewport({ ratio: 1 });
     await expectDialogToFit(panel);
     await page.keyboard.press("Escape");
     await expect(panel).not.toBeVisible();

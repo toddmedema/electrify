@@ -14,6 +14,8 @@ import { customerSalesRevenue } from "./Scoring";
 import { scenarioRules } from "./ScenarioRules";
 import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
 import type { RuleReportMetric } from "./ScenarioRuleReports";
+import type { ObjectiveResult } from "../data/ScenarioObjectives";
+import cloneDeep from "lodash.clonedeep";
 
 type FleetAssetType = Partial<FacilityShoppingType> & {
   yearsToBuildLeft?: number;
@@ -88,6 +90,7 @@ export function buildVictoryDebrief(
   months: MonthlyHistoryType[] = [],
   endingRate = scenario.dollarsPerkWh,
   occurrences: ActiveWorldEventType[] = [],
+  objectiveResults: ObjectiveResult[] = [],
 ): VictoryDebriefType {
   const unservedWh = Math.max(0, summary.demandWh - summary.supplyWh);
   const reliability =
@@ -105,6 +108,9 @@ export function buildVictoryDebrief(
     unservedWh,
     kgco2e: summary.kgco2e,
     scenarioMetrics: scenarioMetrics(scenario, months, endingRate, occurrences),
+    ...(objectiveResults.length
+      ? { objectiveResults: cloneDeep(objectiveResults) }
+      : {}),
     highlights: debriefHighlights(events),
   };
 }

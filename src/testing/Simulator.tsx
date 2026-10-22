@@ -23,7 +23,6 @@ import gameReducer, {
   delta,
   initGame,
   hasChronicBlackouts,
-  scenarioObjectiveFailure,
   reprioritizeFacility,
   setTradingPolicy,
   start,
@@ -37,11 +36,7 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { customerMarketSizeAt } from "../helpers/Customers";
-import {
-  decidedObjectiveFailure,
-  retentionBaseline,
-} from "../helpers/ObjectiveRules";
+import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
 import { summarizeWildfireImpact } from "../helpers/Wildfire";
@@ -200,6 +195,7 @@ export interface SimResultType {
   violationCountByRule: { [rule: string]: number };
   violationCount: number;
   storyOccurrences: ActiveWorldEventType[];
+  objectiveResults: import("../data/ScenarioObjectives").ObjectiveResult[];
   // Aggregate impact of the recurring regional wildfire hazard over the run (zeroed when it never
   // fired or was disabled), for many-seed balance comparison.
   wildfireImpact: import("../helpers/Wildfire").WildfireImpactSummaryType;
@@ -715,14 +711,9 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       resolved.endOnDecidedObjective &&
       state.date.monthsElapsed < scenario.durationMonths &&
       !scenario.tutorialSteps &&
-      decidedObjectiveFailure(scenario, state.monthlyHistory, {
-        startingCustomers: retentionBaseline(
-          scenario,
-          state.customerMarketSize,
-        ),
-        monthsRemaining: scenario.durationMonths - state.date.monthsElapsed,
-        marketSize: customerMarketSizeAt(state.customerMarketSize, now.minute),
-      })
+      gameObjectiveResults(state).some(
+        (result) => result.required && result.status === "failed",
+      )
     ) {
       firedAtMonth = state.date.monthsElapsed;
       break;
@@ -767,10 +758,10 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     firedAtMonth === null &&
     bankruptAtMonth === null &&
     state.date.monthsElapsed >= scenario.durationMonths &&
-    scenarioObjectiveFailure(
-      scenario,
-      state.monthlyHistory,
-      retentionBaseline(scenario, state.customerMarketSize),
+    gameObjectiveResults(state).some(
+      (result) =>
+        result.required &&
+        (result.status === "failed" || result.status === "unverifiable"),
     )
   ) {
     firedAtMonth = state.date.monthsElapsed;
@@ -819,6 +810,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     violationCountByRule: collector.getCountByRule(),
     violationCount: collector.getTotalCount(),
     storyOccurrences: state.worldEvents.occurrences,
+    objectiveResults: gameObjectiveResults(state),
     wildfireImpact: summarizeWildfireImpact(
       [...state.monthlyHistory].reverse(),
       state.worldEvents.occurrences,

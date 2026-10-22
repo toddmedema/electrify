@@ -29,6 +29,7 @@ import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
 import { validOfficialArcMetadata } from "./ScenarioRuleArcs";
 import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
+import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -299,6 +300,44 @@ export function compileScenarioRules(
       within(o.fromMonth, `objectives[${i}].fromMonth`);
       within(o.throughMonth, `objectives[${i}].throughMonth`);
     }
+  });
+  // Required fuel shares over one aggregate window must admit a normalized fuel mix.
+  // Optional stretch goals may intentionally compete, so only required constraints combine.
+  const shareWindows = new Map<
+    string,
+    Array<{
+      index: number;
+      id: string;
+      fuels: Extract<RuleObjective, { metric: "localFuelShare" }>["fuels"];
+      minShare: number;
+    }>
+  >();
+  definitions.objectives.forEach((objective, index) => {
+    if (objective.metric !== "localFuelShare" || objective.required === false)
+      return;
+    const key = `${objective.fromMonth}:${objective.throughMonth}`;
+    shareWindows.set(key, [
+      ...(shareWindows.get(key) ?? []),
+      {
+        index,
+        id: objective.id,
+        fuels: objective.fuels,
+        minShare: objective.minShare,
+      },
+    ]);
+  });
+  shareWindows.forEach((entries) => {
+    const result = requiredFuelShareFeasibility(entries);
+    if (result.status === "feasible") return;
+    add(
+      result.status === "infeasible"
+        ? "contradictory-objectives"
+        : "objective-analysis-limit",
+      `objectives[${entries[entries.length - 1].index}]`,
+      result.status === "infeasible"
+        ? "Required local fuel-share objectives over the same window cannot all be met by one fuel mix. Reduce a target or make a competing goal optional."
+        : "Fuel-share compatibility could not be verified within the bounded analysis work. Simplify the required goals before launching.",
+    );
   });
   definitions.debriefReports?.forEach((report, i) =>
     checkReport(report, `debriefReports[${i}]`),

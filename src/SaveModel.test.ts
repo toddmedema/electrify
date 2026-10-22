@@ -13,6 +13,10 @@ import { captureRunIdentity } from "./helpers/RunIdentity";
 import { getScenario } from "./data/Scenarios";
 import { encodeSaveFile } from "./SaveFile";
 import type { SaveMetadata, VictoryType } from "./Types";
+import type { ObjectiveResult } from "./data/ScenarioObjectives";
+import { objectiveDefinition } from "./helpers/ScenarioObjectives";
+import { buildVictoryDebrief } from "./helpers/Debrief";
+import { EMPTY_HISTORY } from "./helpers/DateTime";
 
 function summary(
   id: string,
@@ -151,6 +155,71 @@ describe("SaveModel", () => {
     expect(
       parseSavedRunResult({ ...result, debrief: { startingFleet: [] } }),
     ).toBeNull();
+  });
+
+  it("retains detached canonical objective verdicts and rejects malformed result neighbors", () => {
+    const objective: ObjectiveResult["objective"] = {
+      id: "bills",
+      label: "Affordable bills",
+      required: false,
+      metric: "monthlyBilledRate",
+      fromMonth: 0,
+      throughMonth: 1,
+      maxDollarsPerKWh: 0.1,
+    };
+    const verdict: ObjectiveResult = {
+      objective,
+      id: objective.id,
+      metric: objective.metric,
+      label: objective.label,
+      required: false,
+      definition: objectiveDefinition(objective.metric),
+      status: "failed",
+      observed: 0.11,
+      target: 0.1,
+      observedMonths: 1,
+      requiredMonths: 2,
+      reason: "A completed month exceeded the billed rate ceiling.",
+    };
+    const debrief = buildVictoryDebrief(
+      getScenario(101)!,
+      EMPTY_HISTORY,
+      [],
+      [],
+      [],
+      undefined,
+      [],
+      [verdict],
+    );
+    const result = { ...fakeSavedResult(), debrief };
+    const restored = parseSavedRunResult(JSON.parse(JSON.stringify(result)));
+    expect(restored?.debrief?.objectiveResults).toEqual([verdict]);
+    expect(restored?.debrief?.objectiveResults?.[0]).not.toBe(verdict);
+    for (const changed of [
+      { ...verdict, metric: "importsShare" },
+      { ...verdict, target: 100 },
+      { ...verdict, definition: "An author's unsupported claim." },
+      { ...verdict, label: "<script>Unsafe</script>" },
+      { ...verdict, observed: Infinity },
+      { ...verdict, observedMonths: 1201 },
+      { ...verdict, sourceCode: "run()" },
+    ]) {
+      expect(
+        parseSavedRunResult({
+          ...result,
+          debrief: { ...debrief, objectiveResults: [changed] },
+        }),
+      ).toBeNull();
+    }
+    expect(
+      parseSavedRunResult({
+        ...result,
+        debrief: { ...debrief, objectiveResults: [verdict, verdict] },
+      }),
+    ).toBeNull();
+    expect(parseSavedRunResult(result)?.debrief?.objectiveResults).toEqual([
+      verdict,
+    ]);
   });
 
   it("requires the status, result and payload identity to agree", () => {

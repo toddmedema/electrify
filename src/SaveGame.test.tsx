@@ -1,4 +1,3 @@
-import { summarizeTimeline } from "./helpers/DateTime";
 import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
@@ -242,11 +241,8 @@ describe("SaveGame", () => {
   );
 
   it("round trips every monthly chart layer and rejects corrupt chart values", () => {
-    const recorded = {
-      ...game,
-      date: { ...game.date, minute: 1440 },
-      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
-    };
+    const recorded = createGame(OPTIONS);
+    while (recorded.date.monthsElapsed < 1) tickState(recorded);
     const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
     const restored = parseSave(raw);
     expect(restored?.game.monthlyHistory[0].chartAverage).toEqual(
@@ -339,11 +335,11 @@ describe("SaveGame", () => {
     "revenueExports",
     "revenueGrants",
   ])("rejects missing or corrupt current accounting field %s", (field) => {
-    const recorded = {
-      ...game,
-      date: { ...game.date, minute: 1440 },
-      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
-    };
+    const recorded = createGame(OPTIONS);
+    while (recorded.date.monthsElapsed < 1) tickState(recorded);
+    expect(
+      parseSave(JSON.parse(JSON.stringify(serializeSave(recorded)))),
+    ).not.toBeNull();
     for (const collection of ["timeline", "monthlyHistory"]) {
       for (const value of [undefined, null, "0", -1, Infinity]) {
         const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));

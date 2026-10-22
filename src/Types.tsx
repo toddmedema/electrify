@@ -1,4 +1,8 @@
 import type { CompiledScenarioRules } from "./data/ScenarioRules";
+import type {
+  ObjectiveProgress,
+  ObjectiveResult,
+} from "./data/ScenarioObjectives";
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
@@ -1410,6 +1414,8 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
+  /** Completed-month objective facts, retained independently of presentation history. */
+  objectiveProgress?: ObjectiveProgress;
   // Newest first, capped at MAX_EVENTS.
   eventLog: GameEventType[];
   // Keys outlive the capped event log: a once-per-run lesson must not repeat just because its
@@ -1615,6 +1621,7 @@ export interface SaveLease {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  objectiveResults?: ObjectiveResult[];
   demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];
   finalFleet: VictoryFleetCapacityType[];

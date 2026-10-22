@@ -50,7 +50,12 @@ import {
   generatorsAboveDemandFloor,
   mothballAdvice,
 } from "../helpers/Mothball";
-import { runFailure } from "../helpers/ObjectiveRules";
+import {
+  runFailure,
+  initializeGameObjectiveProgress,
+  recordGameObjectiveMonth,
+  gameObjectiveResults,
+} from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
 import {
   validBuildFacility,
@@ -1758,6 +1763,7 @@ export const gameSlice = createSlice({
         policies: _policies,
         policyPause: _policyPause,
         scenarioChoicePause: _scenarioChoicePause,
+        objectiveProgress: _objectiveProgress,
         ...payload
       } = action.payload;
       if (
@@ -1804,6 +1810,7 @@ export const gameSlice = createSlice({
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       delete state.desktopAchievements;
       delete state.lowCashWarningMonth;
+      delete state.objectiveProgress;
       delete state.tutorialIntertieStress;
       delete state.policies;
       delete state.policyPause;
@@ -1894,6 +1901,7 @@ export const gameSlice = createSlice({
       state.rateFollowsTarget =
         !checkpoint && followedTargetRate(state) !== undefined;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
+      initializeGameObjectiveProgress(state);
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.demandShapeExponent = scenario.demandShapeExponent;
       state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
@@ -3732,6 +3740,14 @@ function tickWorkingState(state: GameType): GameType {
 }
 
 /** Isolate each frame just before it is settled, including frames after a batch rolls over. */
+function completedMonthCount(state: GameType): number {
+  const latest = state.monthlyHistory[0];
+  return Math.max(
+    state.objectiveProgress?.completedMonths ?? 0,
+    latest ? (latest.year - state.startingYear) * 12 + latest.month : 0,
+  );
+}
+
 function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
   const minute = state.date.minute + TICK_MINUTES;
   const frame = getTimeFromTimeline(minute, state.timeline);
@@ -3740,7 +3756,7 @@ function tickWorkingStateStep(state: GameType, saveEffects?: RunSaveEffects) {
     copyCommitmentMetadata(frame, copy);
     state.timeline[state.timeline.indexOf(frame)] = copy;
   }
-  if (state.monthlyHistory.length < Math.floor(minute / MINUTES_PER_MONTH)) {
+  if (completedMonthCount(state) < Math.floor(minute / MINUTES_PER_MONTH)) {
     state.monthlyHistory = [...state.monthlyHistory];
     if (state.policies) state.policies = cloneDeep(state.policies);
     state.worldEvents = {
@@ -3893,12 +3909,13 @@ export function* tickStatePhases(
     // One row per completed month is both the rollover signal and the persisted checkpoint. It
     // avoids module-level calendar state leaking between concurrent simulations or a second game,
     // and unlike an empty sentinel it cannot count the opening forecast as completed history.
-    if (history.length < state.date.monthsElapsed) {
+    if (completedMonthCount(state) < state.date.monthsElapsed) {
       const { cash, customers } = now;
       state.customerRate = now.customerRate;
 
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      recordGameObjectiveMonth(state, history[0]);
       if (state.replayPlayback && replayDiverged(state.replayPlayback, history))
         logEvent("replay_diverged", {
           scenarioId: state.scenarioId,
@@ -4047,6 +4064,7 @@ export function* tickStatePhases(
           state.monthlyHistory,
           state.dollarsPerkWh,
           state.worldEvents.occurrences,
+          gameObjectiveResults(state),
         );
 
         if (!isReplay) {

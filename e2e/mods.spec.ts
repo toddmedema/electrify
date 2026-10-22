@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { packageDigest } from "../src/mods/ModSchema";
@@ -179,6 +179,26 @@ async function screenshot(page: Page, name: string) {
   await page.screenshot({
     path: path.join(process.env.REVIEW_SCREENSHOT_DIR, name),
     animations: "disabled",
+  });
+}
+
+/** Keep the evidence clear of a fractional scroll edge without changing its layout. */
+async function scrollEvidenceIntoView(label: Locator) {
+  await label.evaluate((element) => {
+    element.scrollIntoView({ block: "start" });
+    for (
+      let parent = element.parentElement;
+      parent;
+      parent = parent.parentElement
+    ) {
+      if (
+        parent.scrollHeight > parent.clientHeight &&
+        /auto|scroll/.test(getComputedStyle(parent).overflowY)
+      ) {
+        parent.scrollTop -= 8;
+        break;
+      }
+    }
   });
 }
 
@@ -607,6 +627,177 @@ for (const theme of ["light", "dark"] as const) {
     ).toBe(50000);
     expect(resumed.speed).toBe("PAUSED");
   });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  for (const requiredBills of [false, true]) {
+    test(`mod objective evidence ${requiredBills ? "required failure" : "optional failure and success"} in ${theme}`, async ({
+      page,
+    }) => {
+      test.setTimeout(120000);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      const entry: InstalledMod = {
+        key: "local:objective-grid",
+        source: "local",
+        enabled: true,
+        pack: pack({
+          id: "objective-grid",
+          title: "Objective Grid",
+          officialArcs: [],
+          scenario: {
+            durationMonths: 6,
+            cash: 1000000000,
+            startingCustomers: 10000,
+            dollarsPerkWh: 0.2,
+          },
+          objectives: {
+            mode: "replace",
+            items: [
+              {
+                id: "supply",
+                label: "Keep demand supplied",
+                metric: "monthlyReliability",
+                fromMonth: 1,
+                throughMonth: 2,
+                minDemandServedShare: 0,
+              },
+              {
+                id: "bills",
+                label: "Keep bills affordable",
+                metric: "monthlyBilledRate",
+                fromMonth: 1,
+                throughMonth: 2,
+                maxDollarsPerKWh: 0,
+                required: requiredBills,
+              },
+            ],
+          },
+        }),
+      };
+      await mockDesktop(page, false, theme, [entry]);
+      await page.goto("/");
+      await page.getByRole("button", { name: "Mods", exact: true }).click();
+      await playAndCheckRun(page, "Objective Grid");
+      const appbar = page.locator("#appbar:visible").first();
+      await appbar.getByRole("button", { name: "pause", exact: true }).click();
+      const panel = page.getByRole("region", { name: "Scenario", exact: true });
+      const scenarioButton = page.getByRole("button", {
+        name: "Scenario",
+        exact: true,
+      });
+      await openPane(panel, scenarioButton);
+      const rules = panel.getByRole("region", { name: "Victory conditions" });
+      await expect(
+        rules.getByText("Keep bills affordable", { exact: true }),
+      ).toBeVisible();
+      await expect(rules).toContainText(
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
+      );
+      await expect(rules).toContainText(
+        "Bills ≤$0/kWh in starting-year dollars each month · Jan–Feb 2020",
+      );
+      await expect(
+        rules.getByText("0/2 months completed", { exact: true }),
+      ).toHaveCount(2);
+      await expect(rules.getByText("Optional", { exact: true })).toHaveCount(
+        requiredBills ? 0 : 1,
+      );
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(await noHorizontalScroll(page)).toBe(true);
+      await page.keyboard.press("Escape");
+      await expect(scenarioButton).toBeFocused();
+      await appbar
+        .getByRole("button", { name: "fast speed", exact: true })
+        .click();
+      if (!requiredBills) {
+        await expect(appbar).toContainText("Feb 2020", { timeout: 30000 });
+        await appbar
+          .getByRole("button", { name: "pause", exact: true })
+          .click();
+        await openPane(panel, scenarioButton);
+        await expect(rules).toContainText("1/2 months completed");
+        await expect(rules).toContainText(
+          "At least one completed month billed more than the starting-year rate ceiling.",
+        );
+        await expect(
+          rules.getByText("Optional", { exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole("dialog", { name: /Mission objective missed/ }),
+        ).toHaveCount(0);
+        const saved = (await readSavedGame(page))!;
+        expect(saved.date.monthsElapsed).toBe(1);
+        expect(saved.objectiveProgress?.completedMonths).toBe(1);
+        const toast = page.locator(".snackbarContent");
+        if (await toast.isVisible()) await dismissToast(page);
+        const goal = rules.getByText("Keep bills affordable", { exact: true });
+        await scrollEvidenceIntoView(goal);
+        await expect(goal).toBeInViewport({ ratio: 1 });
+        await expect(
+          rules.getByText(
+            "At least one completed month billed more than the starting-year rate ceiling.",
+            { exact: true },
+          ),
+        ).toBeInViewport({ ratio: 1 });
+        await screenshot(
+          page,
+          `mod-objective-progress-${page.viewportSize()!.width}-${theme}.png`,
+        );
+        await page.keyboard.press("Escape");
+        await appbar
+          .getByRole("button", { name: "fast speed", exact: true })
+          .click();
+      }
+      const result = page.getByRole("dialog", {
+        name: requiredBills ? "Mission objective missed" : "Mission complete",
+        exact: true,
+      });
+      await expect(result).toBeVisible({ timeout: 60000 });
+      const evidence = result.getByRole("region", {
+        name: "Objective results",
+      });
+      await expect(evidence).toContainText(
+        `Keep bills affordable · ${requiredBills ? "Required" : "Optional"} · Failed`,
+      );
+      await expect(evidence).toContainText(
+        "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
+      );
+      await expect(evidence).toContainText("Months 1–2");
+      await expect(evidence).toContainText(
+        "At least one completed month billed more than the starting-year rate ceiling.",
+      );
+      await expect(evidence).toContainText(
+        requiredBills ? "1/2 months completed" : "2/2 months completed",
+      );
+      await expect(result).toContainText(
+        "Modded run · not ranked and no achievements.",
+      );
+      expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
+      const toast = page.locator(".snackbarContent");
+      if (await toast.isVisible()) await dismissToast(page);
+      const goal = evidence
+        .getByText("Keep bills affordable", { exact: false })
+        .first();
+      await scrollEvidenceIntoView(goal);
+      await expect(goal).toBeInViewport({ ratio: 1 });
+      await expect(
+        evidence.getByText(
+          "At least one completed month billed more than the starting-year rate ceiling.",
+          { exact: true },
+        ),
+      ).toBeInViewport({ ratio: 1 });
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(await noHorizontalScroll(page)).toBe(true);
+      await screenshot(
+        page,
+        `mod-objective-${requiredBills ? "failure" : "success"}-${page.viewportSize()!.width}-${theme}.png`,
+      );
+    });
+  }
 }
 
 test("desktop mod management, Workshop publishing and a modded run", async ({

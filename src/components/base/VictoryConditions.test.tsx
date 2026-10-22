@@ -1,40 +1,93 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
+import { SCENARIOS } from "../../data/Scenarios";
+import { modScenario } from "../../mods/ModScenario";
+import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 
 it.each(["Public", "Investor"] as const)(
-  "shows required retention and reliability objectives for %s ownership",
+  "shows canonical required retention and reliability objectives for %s ownership",
   (ownership) => {
     render(
       <VictoryConditions
-        ownership={ownership}
-        dollarsPerkWh={0.1}
-        difficulty="Manager"
-        minimumCustomerRetention={0.9}
-        startingCustomers={16500}
-        reliabilityObjective={{
-          year: 2025,
-          month: 1,
-          minimumDemandServed: 0.99,
-          label: "winter emergency",
-          durationMonths: 2,
+        scenario={{
+          ...SCENARIOS.find((scenario) => scenario.id === 100)!,
+          ownership,
+          durationMonths: 72,
+          startingYear: 2020,
+          minimumCustomerRetention: 0.9,
+          startingCustomers: 16500,
+          reliabilityObjective: {
+            year: 2025,
+            month: 1,
+            minimumDemandServed: 0.99,
+            label: "winter emergency",
+            durationMonths: 2,
+          },
         }}
+        difficulty="Manager"
       />,
     );
-    expect(screen.getByText(/Required: retain/)).toHaveTextContent(
-      "90% of starting customers (at least 14,850 customers, from 16,500 at the start)",
+    expect(
+      screen.getByText(/Retain ≥90% of starting customers/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/≥99% of demand monthly/)).toHaveTextContent(
+      "Jan–Feb 2025",
     );
-    expect(screen.getByText(/Required: serve/)).toHaveTextContent(
-      "99% of demand during the winter emergency in every event month",
-    );
+    expect(
+      screen.getByText(objectiveDefinition("monthlyReliability")),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(objectiveDefinition("customerRetention")),
+    ).toBeInTheDocument();
   },
 );
+
+it("labels optional goals and explains their actual units without making them a win gate", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "optional-goals",
+    title: "Optional goals",
+    creator: "Creator",
+    version: "1",
+    description: "Optional planning practice.",
+    seed: 42,
+    baseScenarioId: 999,
+    officialArcs: [],
+    scenario: { durationMonths: 6 },
+    objectives: {
+      mode: "replace",
+      items: [
+        {
+          id: "bills",
+          label: "Affordable practice",
+          metric: "monthlyBilledRate",
+          fromMonth: 1,
+          throughMonth: 2,
+          maxDollarsPerKWh: 0.123456789,
+          required: false,
+        },
+      ],
+    },
+  });
+  render(<VictoryConditions scenario={scenario} difficulty="Manager" />);
+  expect(screen.getByText("Optional: Affordable practice")).toBeInTheDocument();
+  expect(
+    screen.getByText(objectiveDefinition("monthlyBilledRate")),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/Bills ≤\$0.123456789\/kWh in starting-year dollars/),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Stretch goal; does not end or fail the run."),
+  ).toBeInTheDocument();
+});
 
 it("keeps internal decision tracking out of player victory conditions", () => {
   render(
     <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
+      scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
       difficulty="Manager"
     />,
   );
@@ -52,8 +105,7 @@ it("keeps internal decision tracking out of player victory conditions", () => {
 it("explains the stricter Expert blackout limit", () => {
   render(
     <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
+      scenario={SCENARIOS.find((scenario) => scenario.id === 100)!}
       difficulty="CEO"
     />,
   );

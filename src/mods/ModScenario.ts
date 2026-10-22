@@ -429,6 +429,7 @@ function resolvedScenarioDiagnostics(
   }
   const missing = new Map<number, DifficultyType[]>();
   let annualOperatingCost = 0;
+  const startingFuels = new Set<string>();
   for (const difficulty of difficulties) {
     const state = {
       date: getDateFromMinute(0, scenario.startingYear),
@@ -463,7 +464,10 @@ function resolvedScenarioDiagnostics(
       const quote = startingFacilityQuote(state, asset);
       if (!quote)
         missing.set(index, [...(missing.get(index) || []), difficulty]);
-      else cost += quote.annualOperatingCost;
+      else {
+        cost += quote.annualOperatingCost;
+        if (quote.fuel) startingFuels.add(quote.fuel);
+      }
     });
     annualOperatingCost = Math.max(annualOperatingCost, cost);
   }
@@ -474,6 +478,18 @@ function resolvedScenarioDiagnostics(
       `scenario.facilities[${index}]`,
       `Starting asset ${index + 1} (${[asset.label, asset.name || (asset.fuel === "Sun" ? "Solar" : asset.fuel === "Uranium" ? "Nuclear" : asset.fuel)].filter(Boolean).join(" · ") || "facility"}) is unavailable in ${scenario.startingYear} at ${location.name} on ${atDifficulties.join(", ")}. Choose a compatible startingYear or base scenario; assets cannot be removed or substituted.`,
     );
+  });
+  scenario.mod?.rules.objectives.forEach((objective, index) => {
+    if (
+      objective.metric === "fuelRetirement" &&
+      !startingFuels.has(objective.fuel)
+    )
+      add(
+        "trivial-retirement",
+        `objectives[${index}]`,
+        `${objective.label}: no ${objective.fuel} asset is present in the starting fleet. The retirement goal still applies if you buy one later.`,
+        "warning",
+      );
   });
   if (duration < 12)
     add(
