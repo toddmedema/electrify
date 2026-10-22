@@ -38,6 +38,7 @@ function props(overrides: Partial<Props> = {}): Props {
     onContinue: jest.fn(),
     onSavedGames: jest.fn(),
     onSettings: jest.fn(),
+    onMods: jest.fn(),
     onAchievements: jest.fn(),
     onManual: jest.fn(),
     onStart: jest.fn(),
@@ -51,6 +52,32 @@ describe("MainMenu", () => {
   it("keeps the first-run sound prompt in the browser", () => {
     render(<MainMenu {...props({ audioEnabled: undefined })} />);
     expect(screen.getByRole("button", { name: "Turn on sound" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Mods" })).toBeNull();
+  });
+
+  it("opens mods just above Settings when the desktop bridge supports them, including offline", async () => {
+    window.electrifyDesktop = {
+      ...desktopBridge(),
+      mods: async () => ({ entries: [] }),
+    };
+    const onMods = jest.fn();
+    render(<MainMenu {...props({ onMods })} />);
+    const resources = within(
+      screen.getByRole("navigation", { name: "Game resources" }),
+    );
+    const buttons = resources.getAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Manual",
+      "Mods",
+      "Settings",
+      "Achievements",
+      "Quit",
+    ]);
+    expect(resources.getByRole("button", { name: "Mods" })).toHaveClass(
+      "MuiButton-text",
+    );
+    await userEvent.click(resources.getByRole("button", { name: "Mods" }));
+    expect(onMods).toHaveBeenCalledTimes(1);
   });
 
   it.each([undefined, false, true])(

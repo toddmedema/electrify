@@ -19,6 +19,11 @@ export async function openSettingsWithKeyboard(page: Page): Promise<void> {
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("ArrowDown");
+  const mods = page.getByRole("button", { name: "Mods", exact: true });
+  if (await mods.isVisible()) {
+    await expect(mods).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+  }
   const settings = page.getByRole("button", { name: "Settings", exact: true });
   await expect(settings).toBeFocused();
   await page.keyboard.press("Enter");
@@ -75,6 +80,11 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await expect(settings).toBeFocused();
 
   await page.keyboard.press("ArrowUp");
+  const mods = page.getByRole("button", { name: "Mods", exact: true });
+  if (await mods.isVisible()) {
+    await expect(mods).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+  }
   await expect(
     page.getByRole("button", { name: "Manual", exact: true }),
   ).toBeFocused();
