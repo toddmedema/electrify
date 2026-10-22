@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
+import { verifyMenuKeyboard } from "./menu-keyboard";
 
 declare global {
   interface Window {
@@ -66,6 +67,8 @@ async function mockDesktop(
     ({ entries: initial, steamOnline, theme }) => {
       localStorage.clear();
       localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem("musicVolume", "0.5");
+      localStorage.setItem("soundEffectsVolume", "0.5");
       localStorage.setItem("theme", theme);
       // A returning player reaches the New Game catalog instead of Mission 1.
       localStorage.setItem(
@@ -177,6 +180,16 @@ async function screenshot(page: Page, name: string) {
 
 const noHorizontalScroll = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+
+test("desktop menu keyboard navigation includes Mods between Manual and Settings", async ({
+  page,
+}) => {
+  await mockDesktop(page, false, "system");
+  await page.goto("/");
+  // Use the first-time-player journey, just like the packaged desktop fixture.
+  await page.evaluate(() => localStorage.removeItem("plays"));
+  await verifyMenuKeyboard(page);
+});
 
 async function dismissToast(page: Page) {
   const toast = page.locator(".snackbarContent");

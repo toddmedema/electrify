@@ -233,7 +233,7 @@
       "src/**/*.{ts,tsx}",
       "!src/**/*.test.{ts,tsx}",
       "!src/testing/SimulationTestHelpers.ts",
-      "!src/react-app-env.d.ts",
+      "!src/**/*.d.ts",
       "!src/helpers/CustomGameForecastClient.ts",
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
