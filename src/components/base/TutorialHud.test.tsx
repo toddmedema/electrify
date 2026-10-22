@@ -125,7 +125,7 @@ describe("TutorialHud", () => {
   it("exposes the current step, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
     const hudProps = props({ canGoBack: true, stepIndex: 1 });
-    render(<TutorialHud {...hudProps} />);
+    const { rerender } = render(<TutorialHud {...hudProps} />);
 
     expect(
       screen.getByRole("region", { name: "Step 2 of 3" }),
@@ -141,6 +141,8 @@ describe("TutorialHud", () => {
     );
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
+    rerender(<TutorialHud {...hudProps} stepIndex={2} />);
+    expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Exit" }));
     expect(hudProps.onBack).toHaveBeenCalledTimes(1);
     expect(hudProps.onNext).toHaveBeenCalledTimes(1);

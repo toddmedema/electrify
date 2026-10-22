@@ -534,6 +534,12 @@ export default function TutorialHud({
             variant={nextIsPrimary ? "contained" : "text"}
             onClick={onNext}
           >
+            {/* Restart the cue each step while the button keeps keyboard focus. */}
+            <span
+              key={stepIndex}
+              className="tutorialHudNextPulse"
+              aria-hidden
+            />
             {step.nextLabel || "Next"}
           </Button>
         )}

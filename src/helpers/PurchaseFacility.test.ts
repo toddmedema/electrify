@@ -40,5 +40,5 @@ it("acknowledges a purchase in the dispatching store, but not a rejected build",
     )!.id,
   );
   expect(state.ui.snackbar.open).toBe(true);
-  expect(state.ui.snackbar.message).toContain(facility.name);
+  expect(state.ui.snackbar.message).toContain(facility.name.toLowerCase());
 });

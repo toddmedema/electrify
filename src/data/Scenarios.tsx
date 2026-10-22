@@ -3,7 +3,6 @@ import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
 import TutorialPrompt from "../components/base/TutorialPrompt";
-import { selectFacility } from "../reducers/UI";
 import { AppStateType, ScenarioType, TutorialUiIdType } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 
@@ -161,9 +160,6 @@ export const SCENARIOS: ScenarioType[] = [
             s.game.facilities.find(
               (facility) => "fuel" in facility && facility.fuel === "Coal",
             )?.id,
-        // Selection only opens row actions this mission keeps hidden, so let it go rather
-        // than leave a lit row behind that the capstone's first tap would close
-        onNext: () => selectFacility(null),
         action: "Tap your coal plant",
         content: (
           <TutorialPrompt text="These two plants keep San Francisco’s lights on. The bar shows how hard each is working." />
@@ -197,7 +193,6 @@ export const SCENARIOS: ScenarioType[] = [
         content: (
           <TutorialPrompt text="Watch coal output climb slowly as sunlight fades." />
         ),
-        hint: "Pause to inspect the chart, or speed up when you’re ready.",
         capstone: {
           // The step before is tapping 1x, so the player arrives with the clock already running.
           // Rebuilding the scenario here reloaded the game and paused it again under them, and the
@@ -268,6 +263,8 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         hideUi: EARLY_MISSION_HIDDEN,
         target: ".facilityRowHeader:has(.constructionProgress)",
+        continueOnClick:
+          ".facilityRowHeader:has(.constructionProgress) .facilityDisclosure",
         action: "Find the construction progress",
         content: (
           <TutorialPrompt text="Construction started. The generator supplies power only when complete." />
@@ -289,7 +286,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#yearProgressBar",
         action: "Watch the year bar advance",
         content: (
-          <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month. The bar resets in January; construction continues." />
+          <TutorialPrompt text="This bar tracks the year. Each simulated day represents one month." />
         ),
       },
       {
@@ -299,7 +296,6 @@ export const SCENARIOS: ScenarioType[] = [
         content: (
           <TutorialPrompt text="Compare output timing and running costs. Choose a plant that complements your grid." />
         ),
-        hint: "Open Build and order a different type from your first purchase. Your starting coal plant does not count; construction need not finish.",
         capstone: {
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
@@ -379,7 +375,7 @@ export const SCENARIOS: ScenarioType[] = [
           '.facilityRowHeader[data-storage="true"]:has(.capacityProgressBar)',
         action: "Check the storage bar",
         content: (
-          <TutorialPrompt text="The bar shows usable stored energy in MWh. MW tells you how quickly the system can charge or discharge." />
+          <TutorialPrompt text="The vertical bar shows how much energy is stored (MW hours). The horizontal bar shows you how much energy the plant is currently charging or discharging (MW)." />
         ),
       },
       {
@@ -388,7 +384,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: '[aria-label="Reorder Coal"]',
         action: "Check generation comes before storage",
         content: (
-          <TutorialPrompt text="Spare power charges storage only when generation comes first. Storage returns less energy than it takes in." />
+          <TutorialPrompt text="Spare power charges storage only when generation comes first. Charging storage loses some energy." />
         ),
       },
       {

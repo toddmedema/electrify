@@ -4073,6 +4073,28 @@ $pane_header_height: 48px;
   flex: 1 1 auto;
 }
 
+// A brief reminder after six seconds, repeated while the player stays on this step.
+.tutorialHudNextPulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: tutorialNextPulse 6s ease-in-out 6s infinite;
+}
+
+@keyframes tutorialNextPulse {
+  0%,
+  16%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--tutorial-glow);
+  }
+  8% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px var(--tutorial-glow);
+  }
+}
+
 // On a phone the step counter does not earn a row of its own: it joins the button row, just
 // before Back/Next, where it reads like pager controls. It stays there on gated steps, which
 // have no Next button to carry it. The header keeps its place first in the DOM, so the region
@@ -4385,7 +4407,8 @@ $pane_header_height: 48px;
 
 @media (prefers-reduced-motion: reduce) {
   .tutorialTargetRingPulse,
-  .tutorialTargetRingIntro {
+  .tutorialTargetRingIntro,
+  .tutorialHudNextPulse {
     animation: none;
   }
 
@@ -6633,10 +6656,7 @@ $programs_column: 800px;
   }
 }
 
-// Phones: grid health and the mission share one 44px status row ("Stable, 84 MW" on the left,
-// the mission and its info button on the right) instead of two 56px rows, so the game starts
-// higher up the screen. When the grid readout also carries an event chip there isn't room for
-// both, and the mission wraps onto its own row as before.
+// Phones: a grid status icon and the mission share one 44px row in every grid state.
 @media #{$single_pane_media} {
   .gameStatusBar {
     display: flex;
@@ -6677,7 +6697,7 @@ $programs_column: 800px;
     border: 0;
   }
 
-  // A stable grid shrinks to a checked bolt so the mission gets the rest of the row. The
+  // Grid health shrinks to an icon so the mission gets the rest of the row. The
   // button is the full 44px row height; its icon keeps the readout's 16px leading inset.
   .gameStatusBar .gridHealth.gridHealth-compact {
     flex: 0 0 auto;
@@ -6685,7 +6705,7 @@ $programs_column: 800px;
     padding-right: 0;
   }
 
-  // Beside the checked bolt even a mission with a named risk has the room it needs.
+  // Beside the status icon even a mission with a named risk has the room it needs.
   .gameStatusBar .gridHealth-compact + .missionSummary,
   .gameStatusBar .gridHealth-compact + .missionSummary:has(.missionRiskButton) {
     flex: 1 1 0;
@@ -6694,7 +6714,7 @@ $programs_column: 800px;
   }
 }
 
-.gridHealthStableButton {
+.gridHealthStatusButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6709,7 +6729,7 @@ $programs_column: 800px;
   outline-offset: -2px !important;
 }
 
-.gridHealthStableIcon {
+.gridHealthStatusIcon {
   position: relative;
   display: flex;
   line-height: 0;
