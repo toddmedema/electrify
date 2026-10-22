@@ -113,7 +113,7 @@ describe("tutorial mission metadata", () => {
       expect(capstones).toHaveLength(tutorial.id === 112 ? 2 : 1);
       capstones.forEach((step) => {
         expect(step.target).toBeUndefined();
-        expect(step.hint).toBeTruthy();
+        expect(!!step.hint).toBe(tutorial.id !== 0 && tutorial.id !== 1);
       });
     });
   });

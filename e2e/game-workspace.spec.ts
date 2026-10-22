@@ -34,6 +34,37 @@ async function settleSheets(page: Page) {
 }
 
 for (const theme of ["light", "dark"] as const) {
+  test(`mobile grid status keeps the header height during a blackout in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(page.viewportSize()!.width >= 700);
+    await startGame(page, theme);
+    const status = page.locator(".gridHealth");
+    await expect(status).toHaveClass(/gridHealth-stable/);
+    const initialHeight = (await page.locator("#appbar").boundingBox())!.height;
+    await page
+      .getByRole("button", { name: "Inspect Coal", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+    await expect(status).toHaveClass(/gridHealth-blackout/);
+    await expect(status.locator(".gridHealthMetric")).toHaveCount(0);
+    const icon = status.getByRole("button", {
+      name: /^Current grid status: Blackout/,
+    });
+    await expect(icon).toHaveCSS("height", "44px");
+    expect((await page.locator("#appbar").boundingBox())!.height).toBe(
+      initialHeight,
+    );
+    await icon.tap();
+    await expect(
+      page.getByRole("tooltip", { name: /^Blackout, .* short/ }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`grid-blackout-${theme}.png`),
+      animations: "disabled",
+    });
+  });
+
   test(`program statuses always sit below their names in ${theme}`, async ({
     page,
   }, testInfo) => {

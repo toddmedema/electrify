@@ -12,12 +12,9 @@ const generator = {
   capacityFactor: 0.45,
 } as GeneratorShoppingType;
 
-it("connects the commitment to construction and expected supply", () => {
-  expect(buildConsequenceMessage(generator, false)).toBe(
-    "$150M committed → Natural Gas Peaker online in 12 mo → +90MW typical supply",
-  );
-  expect(buildConsequenceMessage(generator, true)).toContain(
-    "$30M down payment",
+it("names the new plant and its construction time", () => {
+  expect(buildConsequenceMessage({ ...generator, name: "Solar" })).toBe(
+    "Construction started: new solar plant will be online in 12 months",
   );
 });
 

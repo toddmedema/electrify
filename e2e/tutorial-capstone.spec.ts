@@ -59,6 +59,12 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.locator(".tutorialHud").getByText("Tap the supply and demand chart"),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Inspect Coal", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.locator('[data-fuel="Coal"] .facilityDetails'),
+  ).toBeVisible();
   await page.locator("#chartSupplyDemand").click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
   await expect(page.locator("#speedChangeButtons")).toBeVisible();
@@ -80,13 +86,11 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
-  await page.getByRole("button", { name: "pause" }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
     page.getByText("Watch coal output climb slowly as sunlight fades."),
   ).toBeVisible();
-  await expect(
-    page.getByRole("note").filter({ hasText: "Pause to inspect the chart" }),
-  ).toBeVisible();
+  await expect(page.locator(".tutorialHudHint")).toHaveCount(0);
   await expectObjectiveDocked();
   await page.screenshot({ path: testInfo.outputPath("capstone.png") });
 
@@ -94,7 +98,9 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   // objective is docked outside the game surface, so the same control remains operable at every
   // viewport without a small-screen workaround.
   const coal = page.locator(".facilityRow", { hasText: "Coal" });
-  await coal.getByRole("button", { name: "Inspect Coal", exact: true }).click();
+  await expect(
+    coal.getByRole("button", { name: "Inspect Coal", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: "Pause Coal" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(

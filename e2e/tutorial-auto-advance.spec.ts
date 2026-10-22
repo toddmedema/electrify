@@ -79,7 +79,7 @@ for (const mission of [
       await expect(hud).toContainText(
         mission === "Generators"
           ? "Construction started"
-          : "bar shows usable stored energy",
+          : "vertical bar shows how much energy is stored",
       );
     } else if (mission === "Forecasting") {
       await page.locator(".facilityRow .facilityDisclosure").first().click();
@@ -174,7 +174,14 @@ for (const mission of [
       await expect(progress).toHaveAttribute("aria-valuenow", "0");
       const initialBox = await progress.boundingBox();
       expect(initialBox!.width).toBeGreaterThan(300);
-      await hud.getByRole("button", { name: "Next" }).click();
+      await page
+        .locator(
+          ".facilityRowHeader:has(.constructionProgress) .facilityDisclosure",
+        )
+        .click();
+      await expect(
+        page.locator(".facilityRow.selected .facilityDetails"),
+      ).toBeVisible();
       await expect(hud).toContainText("Tap 12× to start construction time");
       await page
         .getByRole("button", { name: "slow speed", exact: true })
@@ -191,6 +198,30 @@ for (const mission of [
       await expect(page.locator(".tutorialTargetRing")).toBeVisible();
       await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
       expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
+      // Seek the browser's animation timeline to check the reminders without waiting 12s.
+      const next = hud.getByRole("button", { name: "Next", exact: true });
+      const cue = next.locator(".tutorialHudNextPulse");
+      const reminders = await cue.evaluate((element) => {
+        const animation = element
+          .getAnimations()
+          .find(
+            (candidate) =>
+              candidate instanceof CSSAnimation &&
+              candidate.animationName === "tutorialNextPulse",
+          )!;
+        animation.pause();
+        return [5999, 6480, 7200, 12480].map((time) => {
+          animation.currentTime = time;
+          const transform = getComputedStyle(element).transform;
+          return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+        });
+      });
+      expect(reminders[0]).toBe(reminders[2]);
+      expect(reminders[1]).not.toBe(reminders[0]);
+      expect(reminders[3]).toBe(reminders[1]);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect(cue).toHaveCSS("animation-name", "none");
+      await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.screenshot({ path: testInfo.outputPath("year-progress.png") });
       await hud.getByRole("button", { name: "Next" }).click();
       await expect(hud).toContainText(

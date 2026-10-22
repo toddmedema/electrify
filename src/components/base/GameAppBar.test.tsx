@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
@@ -299,15 +305,47 @@ describe("GameAppBar", () => {
           name: "Stable, 72 MW demand met with 10 MW reserve",
         }),
       ).toBeVisible();
-
-      // Any warning keeps its words on screen.
-      now.reserveW = now.demandW * 0.05;
-      renderAppBar({ game: { ...game, inGame: true } });
-      expect(screen.getByText(/^Low reserve, /)).toBeVisible();
     } finally {
       mockPaneLayout = true;
     }
   });
+
+  it.each(["low-reserve", "at-limit", "blackout-ahead", "blackout"] as const)(
+    "keeps %s compact on phones with details available by tap",
+    async (state) => {
+      mockPaneLayout = false;
+      try {
+        const game = createGame({ scenarioId: 101 });
+        const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+        now.supplyW = now.demandW;
+        now.reserveW = state === "at-limit" ? 0 : now.demandW * 0.05;
+        if (state === "blackout") now.supplyW = now.demandW - 10e6;
+        if (state === "blackout-ahead") {
+          const later = game.timeline.find((tick) => tick.minute > now.minute)!;
+          later.demandW = later.supplyW + 10e6;
+        }
+        const health = getGridHealth(game, now);
+        expect(health.state).toBe(state);
+        const summary = `${health.label}, ${health.metric}`;
+        renderAppBar({ game: { ...game, inGame: true } });
+        const status = screen.getByRole("button", {
+          name: `Current grid status: ${summary}`,
+        });
+        expect(status).toHaveTextContent(/^$/);
+        expect(screen.queryByText(summary)).not.toBeInTheDocument();
+        fireEvent.click(status);
+        expect(
+          await screen.findByRole("tooltip", { name: summary }),
+        ).toBeVisible();
+        fireEvent.click(status);
+        await waitFor(() => {
+          expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+        });
+      } finally {
+        mockPaneLayout = true;
+      }
+    },
+  );
 
   it("warns when reachable reserve falls to five percent of demand", () => {
     const game = createGame({ scenarioId: 101 });

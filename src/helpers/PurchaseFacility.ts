@@ -21,7 +21,7 @@ export const purchaseFacility =
       dispatch(facilityPurchased(built.id));
       dispatch(
         snackbarOpen({
-          message: buildConsequenceMessage(facility, financed),
+          message: buildConsequenceMessage(facility),
           open: true,
           timeout: 8000,
           actionLabel: "Events",
