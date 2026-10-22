@@ -675,6 +675,7 @@ test("display settings, native shortcuts, and light/dark layouts remain usable a
   }
   expect(desktop.errors).toEqual([]);
   expect(desktop.externalRequests).toEqual([]);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   const closed = desktop.app.waitForEvent("close");
   await page.getByRole("button", { name: "Quit", exact: true }).click();
   await closed;

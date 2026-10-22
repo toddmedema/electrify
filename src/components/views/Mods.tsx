@@ -9,16 +9,17 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  Link,
   Paper,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from "@mui/material";
 import { getDesktop } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigateBack } from "../../reducers/Card";
+import { snackbarOpen } from "../../reducers/UI";
 import { launchCustomScenario } from "../../reducers/Game";
 import { POLICIES } from "../../data/Policies";
 import { modIssue, modScenario } from "../../mods/ModScenario";
@@ -29,12 +30,6 @@ import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
 import { useMenuKeys } from "../base/useMenuKeys";
 import { startWithSaveGuard } from "./StartGame";
-
-interface Notice {
-  severity: "success" | "warning" | "error";
-  text: string;
-  action?: { label: string; run: () => void };
-}
 
 const FACTOR_LABELS = {
   buildCost: "build cost",
@@ -78,17 +73,12 @@ export default function Mods(): React.JSX.Element {
   const [loaded, setLoaded] = React.useState(false);
   const [pending, setPending] = React.useState<string>();
   const busy = React.useRef(false);
-  const [notices, setNotices] = React.useState<Notice[]>([]);
-  const [showItemId, setShowItemId] = React.useState(false);
-  const [itemId, setItemId] = React.useState("");
   const [removing, setRemoving] = React.useState<InstalledMod>();
   const [publishing, setPublishing] = React.useState<InstalledMod>();
   const [playing, setPlaying] = React.useState<InstalledMod>();
   const [difficulty, setDifficulty] =
     React.useState<DifficultyType>(chosenDifficulty);
-  const [dialogError, setDialogError] = React.useState("");
   const [focusTarget, setFocusTarget] = React.useState<string>();
-  const noticeRef = React.useRef<HTMLDivElement>(null);
   const removeCancel = React.useRef<HTMLButtonElement>(null);
   const publishCancel = React.useRef<HTMLButtonElement>(null);
   const autoRefreshed = React.useRef(false);
@@ -107,10 +97,6 @@ export default function Mods(): React.JSX.Element {
       0,
     );
   }, [focusTarget]);
-  React.useEffect(() => {
-    if (notices.length)
-      noticeRef.current?.scrollIntoView?.({ block: "nearest" });
-  }, [notices]);
 
   /** One mod request at a time; a repeated click while busy is ignored, never disabled. */
   const request = React.useCallback(
@@ -145,36 +131,31 @@ export default function Mods(): React.JSX.Element {
       (result) => result && report(result),
     );
   const report = (result: ModLibrary, quiet = false) => {
-    const next: Notice[] = [];
-    if (result.error)
-      next.push({
-        severity: "error",
-        text: result.error,
-        action: result.unreadable
-          ? { label: "Reset mod library", run: reset }
-          : undefined,
-      });
-    if (result.warning)
-      next.push({ severity: "warning", text: result.warning });
-    if (
-      result.message &&
-      !(quiet && result.message === "Workshop mods are up to date.")
-    )
-      next.push({
-        severity: "success",
-        text: result.message,
-        action: result.published
-          ? {
-              label: "Open on Steam",
-              run: () =>
-                void request("browse", {
-                  kind: "browse",
-                  workshopId: result.published!.workshopId,
-                }).then((r) => r?.error && report(r)),
-            }
-          : undefined,
-      });
-    if (next.length || !quiet) setNotices(next);
+    // The shared system has one toast slot: keep warnings and results in the same message.
+    const message = [
+      result.error,
+      result.warning,
+      quiet && result.message === "Workshop mods are up to date."
+        ? undefined
+        : result.message,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (!message) return;
+    const published = result.published;
+    const action = result.unreadable
+      ? { actionLabel: "Reset mod library", action: reset }
+      : published
+        ? {
+            actionLabel: "Open on Steam",
+            action: () =>
+              act("browse", {
+                kind: "browse",
+                workshopId: published.workshopId,
+              }),
+          }
+        : {};
+    dispatch(snackbarOpen({ open: true, message, timeout: 10000, ...action }));
   };
   const act = (id: string, input: ModRequest) =>
     void request(id, input).then((result) => result && report(result));
@@ -222,12 +203,18 @@ export default function Mods(): React.JSX.Element {
     }).then((result) => {
       if (!result) return;
       if (result.error) {
-        setDialogError(result.error);
+        report(result);
         return;
       }
       setRemoving(undefined);
       report(result);
-      setFocusTarget(next ? primarySelector(next.key) : "#mods-import");
+      setFocusTarget(
+        next
+          ? primarySelector(next.key)
+          : steamOnline
+            ? "#mods-browse"
+            : "#mods-import",
+      );
     });
   };
   const confirmPublish = () => {
@@ -238,7 +225,7 @@ export default function Mods(): React.JSX.Element {
     }).then((result) => {
       if (!result) return;
       if (result.error) {
-        setDialogError(result.error);
+        report(result);
         return;
       }
       setPublishing(undefined);
@@ -251,8 +238,10 @@ export default function Mods(): React.JSX.Element {
     try {
       scenario = modScenario(playing.pack, playing.workshopId);
     } catch (error) {
-      setDialogError(
-        error instanceof Error ? error.message : "This mod can't start.",
+      dispatch(
+        snackbarOpen(
+          error instanceof Error ? error.message : "This mod can't start.",
+        ),
       );
       return;
     }
@@ -298,32 +287,6 @@ export default function Mods(): React.JSX.Element {
               A Workshop upload is in progress.
             </Alert>
           )}
-          {notices.length > 0 && (
-            <Stack spacing={1} ref={noticeRef}>
-              {notices.map((notice, index) => (
-                <Alert
-                  key={`${notice.severity}-${notice.text}`}
-                  severity={notice.severity}
-                  role={notice.severity === "success" ? "status" : "alert"}
-                  onClose={() =>
-                    setNotices((current) =>
-                      current.filter((_, i) => i !== index),
-                    )
-                  }
-                  action={
-                    notice.action && (
-                      <Button color="inherit" onClick={notice.action.run}>
-                        {notice.action.label}
-                      </Button>
-                    )
-                  }
-                >
-                  {notice.text}
-                </Alert>
-              ))}
-            </Stack>
-          )}
-
           <Box component="section" aria-labelledby="mods-installed">
             <Typography
               id="mods-installed"
@@ -331,7 +294,7 @@ export default function Mods(): React.JSX.Element {
               variant="overline"
               className="sectionLabel"
             >
-              Installed
+              Installed Mods
             </Typography>
             {!loaded && (
               <Stack
@@ -346,8 +309,7 @@ export default function Mods(): React.JSX.Element {
             )}
             {loaded && !entries.length && !library.unreadable && (
               <Typography color="text.secondary">
-                No mods yet. Import a scenario.json file or browse Steam
-                Workshop.
+                Install your first mod below
               </Typography>
             )}
             <Stack
@@ -421,7 +383,6 @@ export default function Mods(): React.JSX.Element {
                           aria-label={`Play ${p.title}`}
                           disabled={!!coop}
                           onClick={() => {
-                            setDialogError("");
                             setDifficulty(chosenDifficulty);
                             setPlaying(entry);
                           }}
@@ -456,7 +417,6 @@ export default function Mods(): React.JSX.Element {
                         <Button
                           aria-label={`${entry.source === "workshop" ? "Unsubscribe from" : "Remove"} ${p.title}`}
                           onClick={() => {
-                            setDialogError("");
                             setRemoving(entry);
                           }}
                         >
@@ -475,18 +435,7 @@ export default function Mods(): React.JSX.Element {
                 Reset the library to install mods again.
               </Typography>
             )}
-          </Box>
-
-          <Box component="section" aria-labelledby="mods-get">
-            <Typography
-              id="mods-get"
-              component="h2"
-              variant="overline"
-              className="sectionLabel"
-            >
-              Get mods
-            </Typography>
-            <Stack spacing={1.5}>
+            <Stack spacing={1.5} sx={{ mt: 2 }}>
               <Stack
                 className="settingsKeyboardRow"
                 direction="row"
@@ -495,18 +444,15 @@ export default function Mods(): React.JSX.Element {
                 sx={{ flexWrap: "wrap" }}
               >
                 <Button
-                  id="mods-import"
-                  variant={entries.length ? "outlined" : "contained"}
-                  onClick={importMod}
-                >
-                  {pending === "import" ? "Importing…" : "Import mod"}
-                </Button>
-                <Button
-                  variant="outlined"
+                  id="mods-browse"
+                  variant="contained"
                   disabled={!steamOnline}
                   onClick={() => act("browse", { kind: "browse" })}
                 >
                   Browse Workshop
+                </Button>
+                <Button id="mods-import" variant="outlined" onClick={importMod}>
+                  {pending === "import" ? "Importing…" : "Import mod"}
                 </Button>
                 {workshopEntries && (
                   <Button
@@ -526,46 +472,6 @@ export default function Mods(): React.JSX.Element {
                 Updates apply to new games. Your saves always keep the version
                 they started with.
               </Typography>
-              {steamOnline && (
-                <Box className="settingsKeyboardRow">
-                  <Button
-                    size="small"
-                    aria-expanded={showItemId}
-                    aria-controls="mods-item-id"
-                    onClick={() => setShowItemId((shown) => !shown)}
-                  >
-                    Add by Workshop item ID
-                  </Button>
-                </Box>
-              )}
-              {steamOnline && showItemId && (
-                <Stack
-                  id="mods-item-id"
-                  className="settingsKeyboardRow"
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  sx={{ flexWrap: "wrap", alignItems: "center" }}
-                >
-                  <TextField
-                    label="Workshop item ID"
-                    value={itemId}
-                    onChange={(e) => setItemId(e.target.value.trim())}
-                    size="small"
-                    slotProps={{
-                      htmlInput: { inputMode: "numeric", maxLength: 20 },
-                    }}
-                  />
-                  <Button
-                    disabled={!/^[1-9][0-9]{0,19}$/.test(itemId)}
-                    onClick={() =>
-                      act("subscribe", { kind: "subscribe", id: itemId })
-                    }
-                  >
-                    {pending === "subscribe" ? "Subscribing…" : "Subscribe"}
-                  </Button>
-                </Stack>
-              )}
             </Stack>
           </Box>
 
@@ -581,7 +487,15 @@ export default function Mods(): React.JSX.Element {
             <Stack spacing={1}>
               <Typography variant="body2" color="text.secondary">
                 Save the template, edit it in a text editor, then choose Import
-                mod.
+                mod.{" "}
+                <Link
+                  href="https://github.com/toddmedema/electrify#modding"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Read the modding guide
+                </Link>
+                .
               </Typography>
               <Stack
                 className="settingsKeyboardRow"
@@ -600,7 +514,6 @@ export default function Mods(): React.JSX.Element {
                     key={entry.key}
                     disabled={!steamOnline || !!issues.get(entry.key)}
                     onClick={() => {
-                      setDialogError("");
                       setPublishing(entry);
                     }}
                   >
@@ -635,11 +548,6 @@ export default function Mods(): React.JSX.Element {
             onChange={setDifficulty}
             showDescription
           />
-          {dialogError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPlaying(undefined)}>Cancel</Button>
@@ -671,11 +579,6 @@ export default function Mods(): React.JSX.Element {
               ? "This unsubscribes on Steam. Existing saves keep working."
               : "Existing saves keep working. Import the file again to reinstall."}
           </Typography>
-          {dialogError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -719,11 +622,6 @@ export default function Mods(): React.JSX.Element {
               ? "This uploads your current file to the existing Workshop item."
               : "This shares the scenario and your creator name publicly on Steam Workshop. Only publish content you have the right to share."}
           </Typography>
-          {dialogError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
           <Button

@@ -766,7 +766,11 @@ export default class Compositor extends React.Component<Props, {}> {
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={ui.snackbar.open}
           autoHideDuration={ui.snackbar.timeout}
-          onClose={closeSnackbar}
+          onClose={(_event, reason) => {
+            // A page action can open a new toast during the same click. Its click-away
+            // event must not immediately dismiss that result.
+            if (reason !== "clickaway") closeSnackbar();
+          }}
         >
           <SnackbarContent
             ref={this.snackbarContentRef}

@@ -347,7 +347,9 @@ button,
 .keyboardMenu .MuiTouchRipple-ripplePulsate {
   display: none;
 }
-.keyboardMenu :is(.settingsRow, .settingsKeyboardRow):focus-within {
+.keyboardMenu
+  .settingsGroup
+  :is(.settingsRow, .settingsKeyboardRow):focus-within {
   background: var(--bg-raised);
   box-shadow: inset 3px 0 var(--interactive-blue);
 }
@@ -4056,10 +4058,9 @@ $pane_header_height: 48px;
 }
 
 // Hang the explanation and hint off the action's text (20px icon + 8px gap) so every line starts
-// at one left edge, and keep lines to a readable length on wide screens.
+// at one left edge.
 .tutorialHud .tutorialPrompt,
 .tutorialHudHint {
-  max-width: 72ch;
   padding-left: 28px;
 }
 

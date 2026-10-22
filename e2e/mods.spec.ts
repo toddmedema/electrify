@@ -56,7 +56,12 @@ const ENTRIES: InstalledMod[] = [
   },
 ];
 
-async function mockDesktop(page: Page, steamOnline: boolean, theme: string) {
+async function mockDesktop(
+  page: Page,
+  steamOnline: boolean,
+  theme: string,
+  entries = ENTRIES,
+) {
   await page.addInitScript(
     ({ entries: initial, steamOnline, theme }) => {
       localStorage.clear();
@@ -110,6 +115,11 @@ async function mockDesktop(page: Page, steamOnline: boolean, theme: string) {
                 "Uploaded, but hidden until you accept the Steam Workshop agreement.",
               published: { workshopId: "456", agreement: true },
             };
+          case "template":
+            return {
+              entries,
+              message: "Template saved. Edit it, then choose Import mod.",
+            };
           default:
             return { entries };
         }
@@ -151,7 +161,7 @@ async function mockDesktop(page: Page, steamOnline: boolean, theme: string) {
         }),
       };
     },
-    { entries: ENTRIES, steamOnline, theme },
+    { entries, steamOnline, theme },
   );
 }
 
@@ -167,6 +177,18 @@ async function screenshot(page: Page, name: string) {
 
 const noHorizontalScroll = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+
+async function dismissToast(page: Page) {
+  const toast = page.locator(".snackbarContent");
+  await expect(toast).toBeVisible();
+  const box = (await toast.boundingBox())!;
+  // Compact layouts dismiss toasts by swiping rather than showing a close button.
+  await page.mouse.move(box.x + 24, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 184, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(toast).toBeHidden();
+}
 
 async function playAndCheckRun(page: Page, title: string) {
   await page
@@ -194,8 +216,14 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await mockDesktop(page, true, "light");
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByText("3 installed", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Manage mods", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Mods", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Quit", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Mods", exact: true }).click();
   const screenRoot = page.locator(".modsScreen");
   await expect(screenRoot).toBeVisible();
   await expect(
@@ -244,11 +272,16 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await page.evaluate(() => window.__mods.finishUpload?.());
   await expect(dialog).toHaveCount(0);
   await expect(
-    screenRoot.getByText(
-      "Uploaded, but hidden until you accept the Steam Workshop agreement.",
-    ),
+    page
+      .locator(".snackbarContent")
+      .getByText(
+        "Uploaded, but hidden until you accept the Steam Workshop agreement.",
+      ),
   ).toBeVisible();
-  await screenRoot.getByRole("button", { name: "Open on Steam" }).click();
+  await page
+    .locator(".snackbarContent")
+    .getByRole("button", { name: "Open on Steam" })
+    .click();
   await expect
     .poll(() => page.evaluate(() => window.__mods.requests.at(-1)))
     .toEqual({ kind: "browse", workshopId: "456" });
@@ -285,6 +318,12 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   ).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(screenRoot.getByLabel("Community Grid enabled")).toBeFocused();
+  const focusedRow = screenRoot
+    .locator(".settingsKeyboardRow")
+    .filter({ has: page.getByLabel("Community Grid enabled") });
+  await expect(focusedRow).toHaveCSS("box-shadow", "none");
+  await expect(focusedRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await dismissToast(page);
   expect(await noHorizontalScroll(page)).toBe(true);
   await screenshot(page, "mods-1280-light.png");
 
@@ -371,3 +410,36 @@ for (const layout of [
     expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
   });
 }
+
+test("empty mod library offers Workshop first and template results in the shared toast", async ({
+  page,
+}) => {
+  await mockDesktop(page, true, "dark", []);
+  await page.goto("/");
+  const mods = page.getByRole("button", { name: "Mods", exact: true });
+  await expect(mods).toHaveClass(/MuiButton-text/);
+  await mods.click();
+  const installed = page.getByRole("region", { name: "Installed Mods" });
+  await expect(
+    installed.getByText("Install your first mod below"),
+  ).toBeVisible();
+  const buttons = installed.getByRole("button");
+  await expect(buttons).toHaveText(["Browse Workshop", "Import mod"]);
+  await expect(buttons.first()).toHaveClass(/MuiButton-contained/);
+  await expect(page.getByText("Add by Workshop item ID")).toHaveCount(0);
+  const guide = page.getByRole("link", { name: "Read the modding guide" });
+  await expect(guide).toHaveAttribute(
+    "href",
+    "https://github.com/toddmedema/electrify#modding",
+  );
+  await page.getByRole("button", { name: "Save authoring template" }).click();
+  const message = "Template saved. Edit it, then choose Import mod.";
+  const toast = page.locator(".snackbarContent");
+  await expect(toast).toContainText(message);
+  await expect(page.locator(".modsScreen").getByText(message)).toHaveCount(0);
+  await screenshot(page, `mods-empty-${page.viewportSize()!.width}-dark.png`);
+  await dismissToast(page);
+  expect(await noHorizontalScroll(page)).toBe(true);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(mods).toBeFocused();
+});
