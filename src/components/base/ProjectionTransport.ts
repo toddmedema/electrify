@@ -20,6 +20,7 @@ const objectFields = {
   supplyByFuel: "dictionary",
   demandByType: "dictionary",
   renewableCapacityFactors: "dictionary",
+  transmissionCapacityLimitsWByCorridor: "dictionary",
   deferredResidential: "queue",
   deferredResidentialStart: "queue",
   deferredThermal: "queue",

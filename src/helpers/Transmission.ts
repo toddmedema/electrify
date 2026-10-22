@@ -42,6 +42,7 @@ import {
 import { pow } from "./Pow";
 
 export interface TransmissionConditions {
+  transmissionCapacityLimitsWByCorridor?: Record<string, number>;
   temperatureC: number;
   solarIrradianceWM2: number;
 }
@@ -93,8 +94,14 @@ export function transmissionRatingW(
     TRANSMISSION_CORRIDORS.find(({ id }) => id === line.corridorId) ??
     (isPeerCorridorId(line.corridorId) ? PEER_CORRIDOR_DERATE : undefined);
   if (!corridor) return 0;
+  // An incident caps the surviving route, including later upgrades on that same path.
+  const usableNameplateW = Math.min(
+    line.capacityW,
+    conditions.transmissionCapacityLimitsWByCorridor?.[line.corridorId] ??
+      Infinity,
+  );
   return Math.round(
-    line.capacityW * transmissionRatingFactor(corridor, conditions),
+    usableNameplateW * transmissionRatingFactor(corridor, conditions),
   );
 }
 
@@ -137,6 +144,7 @@ export function intertieContextForGame(
         | "tutorialIntertieStress"
         | "startingYear"
         | "multiplayer"
+        | "legacyWildfireIntertieAccess"
       >
     >,
 ): IntertieContext {
@@ -147,6 +155,7 @@ export function intertieContextForGame(
       location: game.location,
       customScenario: game.customScenario,
       multiplayer: game.multiplayer,
+      legacyWildfireIntertieAccess: game.legacyWildfireIntertieAccess,
     }),
     tutorialSupplyLimitW: game.tutorialIntertieStress?.active
       ? 150e6

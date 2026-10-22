@@ -1,3 +1,13 @@
+/** Resolved physical route availability shared by saved events and forecast ticks. */
+export function validTransmissionCapacityLimits(value: unknown): boolean {
+  return (
+    record(value) &&
+    Object.entries(value).every(
+      ([id, limitW]) => id.length > 0 && finite(limitW) && limitW >= 0,
+    )
+  );
+}
+
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -67,6 +77,13 @@ export function validWorldEvent(value: unknown): boolean {
     })
   )
     return false;
+  if (
+    value.effects.transmissionCapacityLimitsWByCorridor !== undefined &&
+    !validTransmissionCapacityLimits(
+      value.effects.transmissionCapacityLimitsWByCorridor,
+    )
+  )
+    return false;
   const scalarEffects = [
     "temperatureOffsetC",
     "demandMultiplier",
@@ -80,6 +97,7 @@ export function validWorldEvent(value: unknown): boolean {
     "operatingCostMultipliersByFuel",
     "facilityOutputMultipliersByFuel",
     "facilityOutputMultipliersById",
+    "transmissionCapacityLimitsWByCorridor",
   ];
   if (
     !Object.entries(value.effects).every(([key, effect]) =>

@@ -2,7 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
-import gameReducer, { generateNewTimeline } from "../../reducers/Game";
+import gameReducer from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
@@ -15,13 +15,6 @@ import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { emptyPolicies, programCustomers } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
-import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { wildfirePreparedness } from "../../helpers/Wildfire";
-import {
-  previewWildfire,
-  wildfirePreviewMonth,
-} from "../../helpers/WildfirePreview";
 
 /** The value beside a build-out fact's label, if the fact is shown. */
 const fact = (label: string) => {
@@ -598,151 +591,6 @@ test("the completion preview is capped at the run's last month", () => {
   );
   expect(fact("Duration")).toBe("48 monthsEnds after this run");
   expect(screen.getByText("Estimated demand · Dec 2035")).toBeInTheDocument();
-  view.unmount();
-});
-
-test("wildfire preparedness shows annual terms, previews the next season, and starts or stops", () => {
-  jest.useFakeTimers();
-  const worker = {
-    onmessage: null as ((event: { data: unknown }) => void) | null,
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
-  };
-  const stub = jest
-    .spyOn(client, "createPolicyPreviewWorker")
-    .mockReturnValue(worker as unknown as Worker);
-  const game = createGame({
-    scenarioId: CUSTOM_SCENARIO_ID,
-    scenario: {
-      ...SCENARIOS.find((s) => s.id === 111)!,
-      id: CUSTOM_SCENARIO_ID,
-      name: "Custom LA",
-    },
-  });
-  game.date = getDateFromMinute(3 * MINUTES_PER_MONTH, game.startingYear);
-  game.timeline = generateNewTimeline(game, 100000000, 1000000);
-  game.inGame = true;
-  const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
-  });
-  const view = render(
-    <Provider store={store}>
-      <ProgramsScreen onClose={jest.fn()} />
-    </Provider>,
-  );
-  // A full screen like Build: close on the left, the speed control beside the title.
-  expect(
-    screen.getByRole("button", { name: "Close customer programs" }),
-  ).toBeVisible();
-  expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
-  expect(
-    screen.queryByText(/Changes start next month/),
-  ).not.toBeInTheDocument();
-  const hazards = screen.getByRole("region", { name: "Resilience" });
-  fireEvent.click(
-    within(hazards).getByRole("button", {
-      name: /^Wildfire preparedness · Off · .*\/yr$/,
-    }),
-  );
-  const { annualCost } = wildfirePreparedness(store.getState().game)!;
-  expect(fact("Annual budget")).toContain(
-    `${formatMoneyConcise(annualCost)}/yr`,
-  );
-  expect(fact("Annual budget")).toContain(
-    `${formatMoneyConcise(annualCost / 12)}/mo while on · no upfront payment`,
-  );
-  expect(
-    screen.getByText("Next wildfire season", { exact: true }),
-  ).not.toBeVisible();
-  fireEvent.click(screen.getByText("Protection & fire season"));
-  expect(fact("Next wildfire season")).toBe("Aug 2022 to Feb 2023");
-  expect(fact("One-time cost")).toBeUndefined();
-  expect(fact("If funded now")).toBeUndefined();
-  act(() => jest.advanceTimersByTime(250));
-  const month = wildfirePreviewMonth(store.getState().game)!;
-  expect(worker.postMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ month }),
-  );
-  const result = previewWildfire(store.getState().game, month);
-  act(() => worker.onmessage!({ data: { result } }));
-  expect(
-    screen.getByText(/^Next wildfire season · simulated fire in /),
-  ).toBeVisible();
-  expect(screen.getByText(/^Customer load disconnected:/)).toHaveTextContent(
-    `${Math.round(result.standardIncident.disconnectedDemand * 100)}% → ${Math.round(result.preparedIncident.disconnectedDemand * 100)}%`,
-  );
-  expect(screen.getByText(/^Cash benefit:/)).toHaveTextContent(
-    `${formatMoneyConcise(result.cashBenefit)} before program cost`,
-  );
-  expect(screen.getByText(/^Cash benefit:/)).toBeVisible();
-  expect(screen.getByText("Effectiveness at this fire")).not.toBeVisible();
-  fireEvent.click(screen.getByText("Fire impact details"));
-  expect(fact("Effectiveness at this fire")).toContain(
-    `${Math.round(result.standardEffectiveness * 100)}% → ${Math.round(result.preparedEffectiveness * 100)}%`,
-  );
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Start preparedness (${formatMoneyConcise(annualCost)}/yr)`,
-    }),
-  );
-  expect(wildfirePreparedness(store.getState().game)!.active).toBe(true);
-  expect(
-    screen.getByRole("button", {
-      name: /^Wildfire preparedness · On · .*\/yr$/,
-    }),
-  ).toBeVisible();
-  fireEvent.click(
-    screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
-  );
-  expect(screen.getByText("On", { exact: true })).toBeVisible();
-  expect(
-    screen.getByRole("progressbar", {
-      name: "Wildfire preparedness effectiveness",
-    }),
-  ).toHaveAttribute("aria-valuenow", "0");
-  expect(
-    screen.getByText(/Ramping up · 12 months to full effectiveness/),
-  ).toBeVisible();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Turn off preparedness" }),
-  );
-  expect(wildfirePreparedness(store.getState().game)!.active).toBe(false);
-  view.unmount();
-  stub.mockRestore();
-  jest.useRealTimers();
-});
-
-test("an imported wildfire offers preparedness for its scheduled incident outside natural hazard regions", () => {
-  const game = createGame({
-    scenarioId: CUSTOM_SCENARIO_ID,
-    scenario: {
-      ...SCENARIOS.find((scenario) => scenario.id === 110)!,
-      id: CUSTOM_SCENARIO_ID,
-      startingYear: 2030,
-      eventScenarioIds: [111],
-    },
-  });
-  const store = configureStore({
-    reducer: { game: gameReducer, ui: uiReducer },
-    preloadedState: { game },
-  });
-  const view = render(
-    <Provider store={store}>
-      <ProgramsScreen onClose={jest.fn()} />
-    </Provider>,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
-  );
-  fireEvent.click(screen.getByText("Protection & fire season"));
-  expect(fact("Scenario wildfire")).toBe("Jan 2033 to Feb 2033");
-  expect(screen.queryByText("Next wildfire season")).not.toBeInTheDocument();
-  expect(
-    screen.queryByText(/^Next wildfire season · simulated fire/),
-  ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
-  expect(wildfirePreparedness(store.getState().game)?.active).toBe(true);
   view.unmount();
 });
 

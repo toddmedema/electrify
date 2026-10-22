@@ -226,7 +226,7 @@ the result before resuming. Saves retain unanswered prompts and replay actions r
 
 Accepted choices are story occurrences with the definition ID as their key and
 `attributes.choice` as the option ID. Future `WorldEvents` phase descriptions and previews can
-read these through `context.occurrences` (see `wildfirePrepared`) to branch narrative and effects.
+read these through `context.occurrences` (see winterization) to branch narrative and effects.
 The forecast cache includes occurrence attributes, so an answer refreshes future effects.
 Costs are charged once and retained as operating expenses through reforecasting.
 
@@ -234,12 +234,7 @@ The headless baseline bot explicitly selects the first free option. Add focused 
 for each consequential branch, including future effects, save and replay parity.
 Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch in a simulation;
 an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
-Wildfire preparedness is an optional ongoing program and never blocks the clock. Set
-`scenarioResponses: { "wildfire:LA:preparedness:0": "prepare" }` to start it. Its annual budget
-is billed over time and protection persists across years without another response. Effectiveness
-ramps linearly from its current value to 100% over 12 months after starting; stopping immediately
-ends billing and linearly decays the remaining effectiveness to zero over 12 months. Each accepted
-start/stop increments the final key number; map the next key to `stop` to turn it off. The bot
-checks once at the start of each month. Unknown options leave the program unchanged.
+Wildfire Emergency now uses ordinary construction and dispatch decisions rather than a scenario
+response or standing preparedness program. See [the intertie mission design](../../docs/wildfire-intertie.md).
 See [the scenario choice balance report](SCENARIO_CHOICE_BALANCE.md) for the reproducible
-Data Center, Deep Freeze and Wildfire win/loss matrix and price rationale.
+Data Center and Deep Freeze win/loss matrix and price rationale.

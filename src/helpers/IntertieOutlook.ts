@@ -21,7 +21,11 @@ import {
 
 type OutlookTick = Pick<
   TickPresentFutureType,
-  "minute" | "demandW" | "temperatureC" | "solarIrradianceWM2"
+  | "minute"
+  | "demandW"
+  | "temperatureC"
+  | "solarIrradianceWM2"
+  | "transmissionCapacityLimitsWByCorridor"
 >;
 
 export type DayPeriod = "overnight" | "morning" | "midday" | "evening";
@@ -188,6 +192,7 @@ export function intertieForecastKey(game: GameType): string {
     game.loadAdditions,
     game.worldEvents,
     game.storyEffectsDisabled,
+    game.legacyWildfireIntertieAccess,
     game.policies,
     game.tutorialIntertieStress?.active,
     game.transmission?.tradingPolicy,

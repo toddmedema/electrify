@@ -125,3 +125,18 @@ it("changes the outlook cutoff only when a modeled hourly reading leaves the vis
     ),
   ).toEqual([0, 1, 1, 1, 2, 2, 3]);
 });
+
+it("retains the wildfire restriction through the compact worker forecast", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  game.date = { ...game.date, minute: 35 * 1440, monthsElapsed: 35 };
+  game.timeline = generateNewTimeline(game, 1e9, game.timeline[0].customers);
+  const compact = computeOutlook("intertie", forecastWorkerSnapshot(game))!;
+  expect(
+    compact.find((tick) => tick.minute === 36 * 1440)
+      ?.transmissionCapacityLimitsWByCorridor,
+  ).toEqual({ "california-north": 4e6 });
+  expect(
+    compact.find((tick) => tick.minute === 38 * 1440)
+      ?.transmissionCapacityLimitsWByCorridor,
+  ).toBeUndefined();
+});

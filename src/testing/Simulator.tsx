@@ -1,8 +1,5 @@
 import { getTotalDebt } from "../helpers/Financials";
-import {
-  optionalScenarioChoice,
-  pendingScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
@@ -44,7 +41,6 @@ import {
 } from "../helpers/ObjectiveRules";
 import { getScenarioLocation } from "../helpers/Locations";
 import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
-import { summarizeWildfireImpact } from "../helpers/Wildfire";
 import { summarizeWeatherHazardImpact } from "../helpers/Hazards";
 import {
   ActiveWorldEventType,
@@ -133,9 +129,6 @@ export interface SimOptionsType {
   sellFacilityId?: number;
   sellAtMonth?: number;
   storyEffectsEnabled?: boolean;
-  // Recurring regional wildfire hazard, on by default. Off runs the identical strategy without it,
-  // isolating its effect for balance comparison.
-  wildfireHazardEnabled?: boolean;
   // Hail and extreme-cold hazards, on by default. Off runs the identical strategy without them.
   weatherHazardsEnabled?: boolean;
   // On by default, like the real game: a decided objective ends the run. Accounting checks that
@@ -159,7 +152,6 @@ export interface ResolvedSimOptionsType {
   sellFacilityId: number | null;
   sellAtMonth: number;
   storyEffectsEnabled: boolean;
-  wildfireHazardEnabled: boolean;
   weatherHazardsEnabled: boolean;
   endOnDecidedObjective: boolean;
   waiveDecisionGate: boolean;
@@ -200,9 +192,6 @@ export interface SimResultType {
   violationCountByRule: { [rule: string]: number };
   violationCount: number;
   storyOccurrences: ActiveWorldEventType[];
-  // Aggregate impact of the recurring regional wildfire hazard over the run (zeroed when it never
-  // fired or was disabled), for many-seed balance comparison.
-  wildfireImpact: import("../helpers/Wildfire").WildfireImpactSummaryType;
   // Aggregate hail and extreme-cold impact over the run (zeroed when disabled or never fired).
   weatherHazardImpact: import("../helpers/Hazards").WeatherHazardImpactSummaryType;
 }
@@ -267,9 +256,6 @@ function setUpGame(
   }
   if (!options.storyEffectsEnabled) {
     state = gameReducer(state, delta({ storyEffectsDisabled: true }));
-  }
-  if (!options.wildfireHazardEnabled) {
-    state = gameReducer(state, delta({ wildfireHazardDisabled: true }));
   }
   if (!options.weatherHazardsEnabled) {
     state = gameReducer(state, delta({ weatherHazardsDisabled: true }));
@@ -423,7 +409,6 @@ function resolveOptions(
     sellFacilityId: options.sellFacilityId ?? null,
     sellAtMonth: options.sellAtMonth || 0,
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
-    wildfireHazardEnabled: options.wildfireHazardEnabled !== false,
     weatherHazardsEnabled: options.weatherHazardsEnabled !== false,
     endOnDecidedObjective: options.endOnDecidedObjective !== false,
     waiveDecisionGate: options.waiveDecisionGate === true,
@@ -597,7 +582,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   let prevTick: TickPresentFutureType | null = null;
   let justBuilt = false;
   let lastTick: TickPresentFutureType | null = null;
-  let offerCheckedMonth: number | undefined;
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
@@ -632,29 +616,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         );
       }
       // Upfront response costs are explicit actions, not unexplained tick expenses.
-      prevTick = null;
-    }
-    // Optional choices (wildfire preparedness) are only taken up when the run asks for them; an
-    // unknown option leaves the ongoing program unchanged.
-    // They change at most monthly, so the bot looks once at the start of each month.
-    const offer =
-      state.replayPlayback || offerCheckedMonth === state.date.monthsElapsed
-        ? undefined
-        : optionalScenarioChoice(state);
-    offerCheckedMonth = state.date.monthsElapsed;
-    const offered = offer?.options.find(
-      (option) => option.id === resolved.scenarioResponses[offer.id],
-    );
-    if (offer && offered) {
-      state = cloneDeep(
-        gameReducer(
-          state,
-          chooseScenarioResponse({
-            decisionId: offer.id,
-            optionId: offered.id,
-          }),
-        ),
-      );
       prevTick = null;
     }
     tickState(state);
@@ -814,11 +775,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     violationCountByRule: collector.getCountByRule(),
     violationCount: collector.getTotalCount(),
     storyOccurrences: state.worldEvents.occurrences,
-    wildfireImpact: summarizeWildfireImpact(
-      [...state.monthlyHistory].reverse(),
-      state.worldEvents.occurrences,
-      state.startingYear,
-    ),
     weatherHazardImpact: summarizeWeatherHazardImpact(
       state.worldEvents.occurrences,
     ),

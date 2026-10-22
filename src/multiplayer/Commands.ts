@@ -65,6 +65,18 @@ const peerLine: Validator = (game, payload) => {
     : { payload };
 };
 
+/** Existing outside assets belong to one company; shared links still require both owners. */
+const upgradeLine: Validator = (game, payload) => {
+  const target = payload as { corridorId?: string; financed?: boolean } | null;
+  return target &&
+    typeof target.financed === "boolean" &&
+    game.transmission?.lines.some(
+      (line) => line.corridorId === target.corridorId,
+    )
+    ? { payload }
+    : { error: "Choose an owned connection" };
+};
+
 const policy: Validator = (_game, payload) =>
   validPolicyChange(payload) ? { payload } : { error: "Choose a valid policy" };
 
@@ -122,7 +134,7 @@ const GAME_COMMAND_VALIDATORS = {
       : { error: "Choose a valid facility upgrade" },
   cancelRetrofit: facility,
   buildTransmissionLine: peerLine,
-  upgradeTransmissionLine: peerLine,
+  upgradeTransmissionLine: upgradeLine,
   cancelTransmissionLine: line,
   togglePauseTransmissionLine: line,
   reprioritizeTransmissionLine: dispatchPosition(

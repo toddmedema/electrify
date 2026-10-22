@@ -17,7 +17,6 @@ import {
   storyPhaseKey,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
-  WILDFIRE_DECISION_KEY,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
@@ -319,85 +318,86 @@ describe("The Shale Boom pilot arc", () => {
 });
 
 describe("authored upcoming-event previews", () => {
-  it.each(STORY_ARC_DEFINITIONS.map((arc) => [arc.id, arc] as const))(
-    "%s hides exact outcomes in native and custom forecasts",
-    (_id, arc) => {
-      const difficulties: DifficultyType[] = [
-        "Intern",
-        "Employee",
-        "Manager",
-        "VP",
-        "CEO",
-      ];
-      for (const difficulty of difficulties) {
-        for (const scenarioId of [arc.scenarioId, 999]) {
-          const start = {
-            ...context(0, scenarioId),
-            difficulty,
-            customEvents:
-              scenarioId === 999
-                ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
-                : undefined,
-          };
-          const events = upcomingStoryPhases(start);
-          for (const event of events) {
-            expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
-            expect(event.startsMinute).toBeGreaterThan(start.date.minute);
-          }
-          // Current results and plant names cannot stand in for a future event's outcome.
-          const withResults = upcomingStoryPhases({
-            ...start,
-            snapshot: {
-              ...EMPTY_SNAPSHOT,
-              deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
-              demandWh12m: 100,
-              unservedWh12m: 30,
-              netIncome12m: -100,
-              facilities: [
-                {
-                  id: 1,
-                  name: "Current coal plant",
-                  fuel: "Coal",
-                  ageYears: 40,
-                  peakW: 100,
-                  operational: true,
-                },
-              ],
-            },
-          });
-          expect(
-            withResults.map(({ key, title, message }) => ({
-              key,
-              title,
-              message,
-            })),
-          ).toEqual(
-            events.map(({ key, title, message }) => ({ key, title, message })),
-          );
-          const hiddenIds = arc.phases
-            .filter(
-              (phase) =>
-                phase.forecastable === false ||
-                phase.preview(start, () => 0.5) === null,
-            )
-            .map((phase) => phase.id);
-          expect(
-            events.filter((event) =>
-              hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
-            ),
-          ).toEqual([]);
-          const previews = arc.phases.flatMap((phase) => {
-            const preview = phase.preview(start, () => 0.5);
-            return preview ? [preview] : [];
-          });
-          for (const preview of previews) {
-            // Also review the opening phase, which may already be active at month zero.
-            expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
-          }
+  it.each(
+    STORY_ARC_DEFINITIONS.filter((arc) => arc.scenarioId !== 111).map(
+      (arc) => [arc.id, arc] as const,
+    ),
+  )("%s hides exact outcomes in native and custom forecasts", (_id, arc) => {
+    const difficulties: DifficultyType[] = [
+      "Intern",
+      "Employee",
+      "Manager",
+      "VP",
+      "CEO",
+    ];
+    for (const difficulty of difficulties) {
+      for (const scenarioId of [arc.scenarioId, 999]) {
+        const start = {
+          ...context(0, scenarioId),
+          difficulty,
+          customEvents:
+            scenarioId === 999
+              ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
+              : undefined,
+        };
+        const events = upcomingStoryPhases(start);
+        for (const event of events) {
+          expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
+          expect(event.startsMinute).toBeGreaterThan(start.date.minute);
+        }
+        // Current results and plant names cannot stand in for a future event's outcome.
+        const withResults = upcomingStoryPhases({
+          ...start,
+          snapshot: {
+            ...EMPTY_SNAPSHOT,
+            deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
+            demandWh12m: 100,
+            unservedWh12m: 30,
+            netIncome12m: -100,
+            facilities: [
+              {
+                id: 1,
+                name: "Current coal plant",
+                fuel: "Coal",
+                ageYears: 40,
+                peakW: 100,
+                operational: true,
+              },
+            ],
+          },
+        });
+        expect(
+          withResults.map(({ key, title, message }) => ({
+            key,
+            title,
+            message,
+          })),
+        ).toEqual(
+          events.map(({ key, title, message }) => ({ key, title, message })),
+        );
+        const hiddenIds = arc.phases
+          .filter(
+            (phase) =>
+              phase.forecastable === false ||
+              phase.preview(start, () => 0.5) === null,
+          )
+          .map((phase) => phase.id);
+        expect(
+          events.filter((event) =>
+            hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
+          ),
+        ).toEqual([]);
+        const previews = arc.phases.flatMap((phase) => {
+          const preview = phase.preview(start, () => 0.5);
+          return preview ? [preview] : [];
+        });
+        for (const preview of previews) {
+          // Also review the opening phase, which may already be active at month zero.
+          expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
         }
       }
-    },
-  );
+    }
+  });
 
   it("keeps load-shedding forecasts vague and exact reductions in live history", () => {
     const start = { ...context(0, 113), difficulty: "Employee" as const };
@@ -426,24 +426,10 @@ describe("authored upcoming-event previews", () => {
     ).toHaveLength(3);
   });
 
-  it("describes future wildfire preparation without giving an exact damage reduction", () => {
-    const upcoming = upcomingStoryPhases({
-      ...context(0, 111),
-      occurrences: [
-        {
-          key: WILDFIRE_DECISION_KEY,
-          definitionId: "preparedness",
-          startsMinute: 0,
-          endsMinute: 0,
-          effects: {},
-          attributes: { choice: "prepare" },
-        },
-      ],
-    });
+  it("previews the single major wildfire transmission restriction", () => {
+    const upcoming = upcomingStoryPhases(context(0, 111));
     expect(upcoming).toHaveLength(1);
-    expect(upcoming[0].message).toBe(
-      "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses.",
-    );
+    expect(upcoming[0].message).toMatch(/intertie.*90%/i);
   });
 });
 
@@ -572,89 +558,30 @@ describe("generation and storage reliability scenarios", () => {
   });
 });
 
-describe("California wildfire emergency", () => {
-  const wildfireContext = (month: number) => ({
-    ...context(month, 111, 2468),
-    location: LOCATIONS.LA,
-    snapshot: {
-      ...EMPTY_SNAPSHOT,
-      facilities: [
-        {
-          id: 10,
-          name: "Natural Gas",
-          fuel: "Natural Gas" as const,
-          ageYears: 18,
-          peakW: 60,
-          operational: true,
-        },
-        {
-          id: 11,
-          name: "Solar Portfolio",
-          fuel: "Sun" as const,
-          ageYears: 6,
-          peakW: 40,
-          operational: true,
-        },
-        {
-          id: 12,
-          name: "Battery",
-          ageYears: 4,
-          peakW: 100,
-          operational: true,
-        },
-      ],
-    },
-  });
-
-  it("applies the fixed January 2025 emergency only to scenario 111", () => {
-    const january = resolveStoryAtDate(wildfireContext(12));
-    const february = resolveStoryAtDate(wildfireContext(13));
-
-    expect(january.occurrences[0]).toMatchObject({
-      key: "story:111:california-wildfire-2025:firestorm",
-      title: "Wildfire emergency",
+describe("wildfire intertie emergency", () => {
+  it("limits only the northern route for exactly the two emergency months", () => {
+    const start = resolveStoryAtDate(context(12, 111));
+    expect(start.occurrences[0]).toMatchObject({
+      key: "story:111:wildfire-intertie:outage",
       importance: "CRITICAL",
-      effects: { demandMultiplier: 0.94 },
-    });
-    expect(january.effects.facilityOutputMultipliersById).toBeDefined();
-    expect(january.effects.operatingExpensePerMonth).toBe(1_000_000);
-    expect(february.effects).toEqual(january.effects);
-    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
-    expect(
-      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 999 })
-        .occurrences,
-    ).toEqual([]);
-    expect(
-      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 0 }).occurrences,
-    ).toEqual([]);
-  });
-
-  it("previews one emergency and reports the recorded restoration result", () => {
-    const upcoming = upcomingStoryPhases(wildfireContext(0));
-    expect(upcoming.map((phase) => phase.key)).toEqual([
-      "story:111:california-wildfire-2025:firestorm",
-    ]);
-    expect(upcoming[0].message).toMatch(/safety shutoffs/i);
-
-    const onset = resolveStoryAtDate(wildfireContext(12)).occurrences[0];
-    const restoration = resolveStoryAtDate({
-      ...wildfireContext(14),
-      periodSnapshots: {
-        2: {
-          deliveredWhByFuel: {},
-          demandWh: 100,
-          unservedWh: 1,
-          netIncome: -10,
-          peakDemandW: 10,
-        },
+      effects: {
+        transmissionCapacityLimitsWByCorridor: { "california-north": 4e6 },
       },
-      occurrences: [onset],
-    }).occurrences[0];
-    expect(restoration).toMatchObject({
-      key: "story:111:california-wildfire-2025:restoration-complete",
-      attributes: { reliability: 0.99 },
     });
-    expect(restoration.message).toMatch(/met 99% of connected demand/i);
+    expect(start.effects.demandMultiplier ?? 1).toBe(1);
+    expect(start.effects.facilityOutputMultipliersById).toBeUndefined();
+    expect(start.effects.operatingExpensePerMonth).toBeUndefined();
+    expect(resolveStoryAtDate(context(13, 111)).effects).toEqual(start.effects);
+    expect(resolveStoryAtDate(context(14, 111)).effects).toEqual({});
+    expect(resolveStoryAtDate(context(12, 999)).active).toEqual([]);
+    expect(resolveStoryAtDate(context(12, 0)).active).toEqual([]);
+  });
+  it("announces restoration exactly once at the end of the outage", () => {
+    expect(resolveStoryAtDate(context(14, 111)).occurrences[0]).toMatchObject({
+      key: "story:111:wildfire-intertie:restored",
+      message: "The northern intertie is back at full capacity.",
+    });
+    expect(resolveStoryAtDate(context(15, 111)).occurrences).toEqual([]);
   });
 });
 

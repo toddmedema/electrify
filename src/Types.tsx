@@ -495,6 +495,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     importedW?: number;
     exportedW?: number;
     transmissionCapacityW?: number;
+    /** Resolved route restrictions shared by dispatch and intertie forecasts. */
+    transmissionCapacityLimitsWByCorridor?: Record<string, number>;
     marketPricePerMWh?: number;
     renewableCapacityFactors?: Record<string, number>;
   };
@@ -964,6 +966,8 @@ export interface ScenarioType {
   tutorialSteps?: TutorialStepType[];
   /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
   intertiesEnabled?: boolean;
+  /** Pre-existing, debt-free operational connections using this scenario's access allocation. */
+  startingInterties?: string[];
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -1083,35 +1087,6 @@ export interface GameEventType {
 export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
-/**
- * Authored regional wildfire hazard for recurring, location-aware emergencies.
- *
- * These are explicitly simplified game balance values, not observed fire statistics: the monthly
- * weights shape a seasonal risk that is never a guaranteed fire, and the severity bounds are the
- * readable range an incident may land in. Unknown locations carry no profile and therefore no
- * inferred risk.
- */
-export interface WildfireProfileType {
-  /** Expected disruptive incidents per year at baseline weather (sum of monthly weights is one). */
-  annualHazard: number;
-  /** Twelve monthly weights, index 0 = January, summing to one over the year. */
-  monthlyWeights: number[];
-  /** Share of customer load disconnected by safety shutoffs, sampled per incident. */
-  disconnectedDemand: { min: number; max: number };
-  /** Output retained by affected generators, sampled per incident. */
-  outputMultiplier: { min: number; max: number };
-  /** Share of fleet peak capacity constrained, sampled per incident. */
-  targetCapacityShare: { min: number; max: number };
-  /** Restoration cost per MWh of exposed monthly demand, charged each active month. */
-  restorationCostPerMWh: number;
-  /** Months after an incident before the next one may start. */
-  cooldownMonths: number;
-  /** Month (0-based) each fire season starts, used for the preparedness preview. */
-  preparednessMonth: number;
-  /** How many months the fire season lasts; ongoing preparedness also covers off-season fires. */
-  preparednessDurationMonths: number;
-}
-
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
 export type ResilienceUpgradeType =
   "hailResistant" | "coldWeatherPackage" | "solarTrackers";
@@ -1164,6 +1139,8 @@ export interface FacilityUpgradeInProgressType {
 }
 
 export interface WorldEventEffectsType {
+  /** Surviving nameplate capacity of each affected corridor, in watts, including upgrades. */
+  transmissionCapacityLimitsWByCorridor?: Record<string, number>;
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
   demandMultiplier?: number;
@@ -1411,9 +1388,12 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
-  // Headless balance harness only: run the identical strategy with the recurring regional wildfire
-  // hazard switched off, to isolate its effect. Undefined means enabled (the browser default).
+  // Legacy verification flag: keep earlier unranked runs ineligible for achievements.
   wildfireHazardDisabled?: boolean;
+  /** One-time future forecast refresh after retiring legacy wildfire systems. */
+  wildfireForecastRefresh?: boolean;
+  /** Preserve pre-redesign transmission assets, loans and co-op topology in scenario-111 saves. */
+  legacyWildfireIntertieAccess?: boolean;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).
   weatherHazardsDisabled?: boolean;

@@ -1,3 +1,7 @@
+import reducer, { generateNewTimeline } from "./reducers/Game";
+import { loaded } from "./reducers/GameActions";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
+import { DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import legacyFile from "./testing/fixtures/saves/legacy-rules-save.json";
 import { isFutureSave, SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import manifest from "./data/RunCompatibility.json";
@@ -331,4 +335,111 @@ describe("save upgrades", () => {
     expect(upgradeSave(save)).toEqual(save);
     expect(parseSave(parseSave(save))).toEqual(parseSave(save));
   });
+});
+
+it.each([3, 4])(
+  "retires legacy wildfire systems from schema %i without changing recorded results",
+  (schemaVersion) => {
+    const { save } = challengedSave();
+    runMonths(save.game, 1);
+    const recorded = clone(save.game);
+    const minute = save.game.date.minute;
+    const oldEvent = {
+      key: "wildfire:SF:1",
+      definitionId: "wildfire-smoke",
+      startsMinute: minute,
+      endsMinute: minute + 1440,
+      attributes: { heavySmokeDays: 3 },
+      effects: {
+        solarIrradianceMultiplier: 0.99,
+        solarIrradianceMultipliersByHour: { "10": 0.99 },
+      },
+    };
+    const old = {
+      ...save,
+      schemaVersion,
+      game: {
+        ...save.game,
+        worldEvents: {
+          active: [oldEvent],
+          occurrences: [oldEvent],
+          checkedKeys: [oldEvent.key],
+        },
+      },
+    };
+    const imported = parseSave(clone(old))!;
+    expect(imported).not.toBeNull();
+    expect(imported.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(imported.game.worldEvents.active).toEqual([]);
+    expect(imported.game.worldEvents.occurrences[0]).toMatchObject({
+      key: oldEvent.key,
+      attributes: oldEvent.attributes,
+      effects: {},
+    });
+    expect(imported.game.monthlyHistory).toEqual(recorded.monthlyHistory);
+    expect(imported.game.timeline).toEqual(recorded.timeline);
+    expect(imported.game.facilities).toEqual(recorded.facilities);
+    expect(imported.game.replayLog).toEqual(recorded.replayLog);
+    expect(imported.game.challenge).toMatchObject({ target: 400 });
+    expect(imported.game.wildfireForecastRefresh).toBe(true);
+  },
+);
+
+it("removes the retired custom wildfire selection while keeping the other selected events", () => {
+  const game = createGame({
+    scenarioId: 999,
+    scenario: {
+      ...DEFAULT_CUSTOM_SCENARIO,
+      eventScenarioIds: [108],
+    },
+  });
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  save.game.customScenario!.eventScenarioIds = [108, 111];
+  const restored = parseSave(save)!;
+  expect(restored).not.toBeNull();
+  expect(restored.game.customScenario!.eventScenarioIds).toEqual([108]);
+});
+
+it("preserves a previous wildfire mission's purchased connection, debt and cash", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  const line = save.game.transmission!.lines[0];
+  line.capacityW = 5e6;
+  line.buildCost = 1.8e6;
+  line.annualOperatingCost = 36000;
+  line.financed = true;
+  line.loanAmountLeft = 1e6;
+  line.loanMonthlyPayment = 10000;
+  line.interestRate = 0.06;
+  line.currentFlowW = 1e6;
+  const restored = parseSave(save)!;
+  expect(restored).not.toBeNull();
+  expect(restored.game.legacyWildfireIntertieAccess).toBe(true);
+  expect(restored.game.transmission!.lines).toEqual([line]);
+  expect(restored.game.timeline).toEqual(save.game.timeline);
+});
+
+it("refreshes only future wildfire forecast ticks after migration", () => {
+  const game = createGame({ scenarioId: 111, seed: 7 });
+  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
+  game.timeline = generateNewTimeline(
+    { ...game, storyEffectsDisabled: true },
+    1e9,
+    game.timeline[0].customers,
+    96,
+  );
+  const save = clone(serializeSave(game));
+  save.schemaVersion = 4;
+  const imported = parseSave(save)!;
+  expect(imported).not.toBeNull();
+  const refreshed = reducer(imported.game, loaded());
+  expect(refreshed.timeline[0]).toEqual(save.game.timeline[0]);
+  expect(refreshed.timeline[1].minute).toBe(game.date.minute + 15);
+  expect(refreshed.timeline[1].transmissionCapacityLimitsWByCorridor).toEqual({
+    "california-north": 4e6,
+  });
+  expect(refreshed.timeline[1].importedW).toBeLessThanOrEqual(4e6);
+  expect(refreshed.wildfireForecastRefresh).toBeUndefined();
 });

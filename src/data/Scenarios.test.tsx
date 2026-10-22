@@ -414,16 +414,14 @@ describe("authored starting fleets", () => {
     ).toMatchObject({ fuel: "Uranium", peakW: 500_000_000 });
   });
 
-  it("authors a Los Angeles-only January 2025 wildfire challenge", () => {
+  it("starts the wildfire mission with a pivotal operational import route", () => {
     const wildfire = getScenario(111)!;
-
     expect(wildfire).toMatchObject({
       name: "Wildfire Emergency",
-      icon: "wildfire emergency",
       locationId: "LA",
       startingYear: 2022,
-      durationMonths: 60,
-      startingCustomers: 16_000,
+      startingInterties: ["california-north"],
+      intertiesEnabled: true,
       reliabilityObjective: {
         year: 2025,
         month: 1,
@@ -431,20 +429,10 @@ describe("authored starting fleets", () => {
         minimumDemandServed: 0.995,
       },
     });
-    expect(wildfire.briefing?.threat).toMatch(
-      /safety shutoffs.*sales.*restoration costs/i,
-    );
-    expect(
-      wildfire.facilities.reduce(
-        (total, facility) => total + (facility.peakW || 0),
-        0,
-      ),
-    ).toBe(80_810_000);
-    expect(wildfire.facilities[0]).toEqual({
+    expect(wildfire.briefing?.threat).toMatch(/intertie.*90%/i);
+    expect(wildfire.facilities[0]).toMatchObject({
       name: "Natural Gas CC",
-      fuel: "Natural Gas",
-      peakW: 24_240_000,
-      initialAgeYears: 18,
+      peakW: 12000000,
     });
   });
 

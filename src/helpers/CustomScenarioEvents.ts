@@ -6,7 +6,7 @@ import { ScenarioType } from "../Types";
 import { getScenarioLocation } from "./Locations";
 
 export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
-  (scenario) => !scenario.tutorialSteps,
+  (scenario) => !scenario.tutorialSteps && scenario.id !== 111,
 );
 
 export function validCustomEventIds(value: unknown): boolean {

@@ -92,19 +92,11 @@ function commands(index, cores = os.availableParallelism()) {
   };
 }
 async function execute(plan, run) {
-  async function sequence(steps) {
-    const results = [];
-    for (const step of steps) results.push(await run(step));
-    return results;
-  }
-  async function cpu() {
-    const checks = await sequence(plan.cpu.filter((step) => !step.group));
-    const suites = await Promise.all(
-      plan.cpu.filter((step) => step.group).map(run),
-    );
-    return [...checks, ...suites];
-  }
-  return (await Promise.all([cpu(), sequence(plan.ui)])).flat();
+  const results = [];
+  // Match local check:ci's resource isolation. Covered Jest, simulations and native renderers
+  // each consume the runner's CPU budget; overlapping them makes UI deadlines load-dependent.
+  for (const step of [...plan.cpu, ...plan.ui]) results.push(await run(step));
+  return results;
 }
 
 async function main(index) {
@@ -118,8 +110,8 @@ async function main(index) {
   const run = (step) =>
     new Promise((resolve) => {
       console.error(`Starting ${step.name}`);
-      // Manifests were generated before packaging. Suppress their duplicate npm pre-hooks
-      // so parallel test branches never rewrite generated source beneath one another.
+      // Manifests were generated before packaging. Suppress redundant npm pre-hooks so every
+      // phase reads the same generated inputs as the shared production builds.
       const child = spawn(
         process.execPath,
         [
@@ -152,7 +144,7 @@ async function main(index) {
         resolve(code === 0);
       });
     });
-  // Independent CPU suites overlap; packaging/browser/native UI stay serial.
+  // Failures are collected without skipping any remaining CPU or UI phase.
   const results = await execute(plan, run);
   if (results.some((passed) => !passed)) process.exitCode = 1;
 }

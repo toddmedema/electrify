@@ -180,7 +180,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: "Customer programs",
     group: "Gameplay",
     keywords:
-      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment wildfire preparedness fire season",
+      "efficiency rooftop solar rebates build-out project pause resume completion demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
       <div>
         <p>
@@ -221,23 +221,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           data-center demand participates, cutting use by 20% during a separate
           four-hour window, even when supply is sufficient. They use less energy
           overall. Participants get 10% off electricity delivered all day.
-        </p>
-        <p>
-          <strong>Wildfire preparedness:</strong> In custom games in fire-prone
-          areas, fund crews, inspections and vegetation clearing year-round, as
-          California utilities do. You pay a fixed monthly cost while the
-          program is active, with no upfront payment or annual renewal. It takes
-          12 months to reach full protection. Turn it off and spending stops
-          immediately, but protection fades over the next 12 months. Restarting
-          builds on whatever protection remains.
-        </p>
-        <p>
-          Full protection halves customer disconnections from safety shutoffs
-          and output losses at affected generators. Partial protection gives
-          smaller benefits. You still face fires and restoration costs. The
-          preview estimates a typical fire next season, using the protection
-          you'll have by then. Changing the program won't affect a fire that's
-          already burning.
         </p>
       </div>
     ),

@@ -7,6 +7,7 @@ import {
   PEER_TRADE_MIN_PRICE_PER_MWH,
   edgeIdFromPeerCorridor,
   peerCorridorId,
+  isPeerCorridorId,
 } from "../data/Multiplayer";
 import {
   copyCommitmentMetadata,
@@ -215,8 +216,13 @@ export function createWorld(
       }),
     );
     const result = cloneGrid(game);
-    // Player links replace every outside market the scenario would otherwise offer.
-    result.transmission = { tradingPolicy: "BALANCED", lines: [] };
+    // Keep explicitly authored existing assets; player links replace optional outside markets.
+    result.transmission = {
+      tradingPolicy: "BALANCED",
+      lines: (result.transmission?.lines || []).filter((line) =>
+        scenario.startingInterties?.includes(line.corridorId),
+      ),
+    };
     result.inGame = true;
     result.speed = "NORMAL";
     result.runIdentity = undefined;
@@ -250,7 +256,7 @@ export function createWorld(
   grids.forEach((game, i) => {
     game.multiplayer!.peers = seats
       .filter((s) => s.id !== seats[i].id)
-      .map((seat, index) => {
+      .map((seat) => {
         const edge = edges.find(
           (e) =>
             [e.a, e.b].includes(seat.id) && [e.a, e.b].includes(seats[i].id),
@@ -267,7 +273,11 @@ export function createWorld(
           ...PEER_CORRIDOR_DERATE,
         };
         game.transmission!.lines.push({
-          id: index + 1,
+          id:
+            game.transmission!.lines.reduce(
+              (largest, line) => Math.max(largest, line.id),
+              0,
+            ) + 1,
           corridorId: corridor.id,
           name: seat.name,
           capacityW: corridor.capacityW,
@@ -387,7 +397,12 @@ function applyCommandOnce(
     if (!isGameCommand(name)) return "That game action is unavailable";
     const validation = validateGameCommand(game, name, command.payload);
     if ("error" in validation) return validation.error;
-    if (name === "upgradeTransmissionLine")
+    if (
+      name === "upgradeTransmissionLine" &&
+      isPeerCorridorId(
+        (validation.payload as { corridorId: string }).corridorId,
+      )
+    )
       return coSignUpgrade(
         world,
         sender,
@@ -563,7 +578,7 @@ export function stepWorld(world: World): void {
     if (!phase.next(settlements[i]).done)
       throw new Error("A grid settled more than once");
     const grid = world.grids[i];
-    let capacity = 0;
+    let capacity = currentTick(grid)!.transmissionCapacityW || 0;
     grid.transmission?.lines.forEach((line) => {
       const edgeId = edgeIdFromPeerCorridor(line.corridorId);
       const edge = world.edges.find((e) => e.id === edgeId);
@@ -829,6 +844,11 @@ function validReceipts(world: World, ids: Set<string>) {
 function validGrid(world: World, initial: World, i: number) {
   const g = world.grids[i];
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
+  const expectedConnections = initial.grids[i].transmission!.lines.filter(
+    (line) =>
+      !g.legacyWildfireIntertieAccess || isPeerCorridorId(line.corridorId),
+  );
+  const lineCount = expectedConnections.length;
   return (
     !!parseSave(
       serializeSave({
@@ -840,13 +860,12 @@ function validGrid(world: World, initial: World, i: number) {
       }),
     ) &&
     g.multiplayer?.peers?.length === world.seats.length - 1 &&
-    g.transmission?.lines.length === world.seats.length - 1 &&
+    g.transmission?.lines.length === lineCount &&
     new Set(g.multiplayer.peers.map((peer) => peer.id)).size ===
       world.seats.length - 1 &&
     new Set(g.transmission.lines.map((line) => line.corridorId)).size ===
-      world.seats.length - 1 &&
-    new Set(g.transmission.lines.map((line) => line.id)).size ===
-      world.seats.length - 1 &&
+      lineCount &&
+    new Set(g.transmission.lines.map((line) => line.id)).size === lineCount &&
     g.multiplayer.peers.every((peer) => {
       const expected = initial.grids[i].multiplayer!.peers!.find(
         (p) => p.id === peer.id,
@@ -871,8 +890,11 @@ function validGrid(world: World, initial: World, i: number) {
         )
       );
     }) &&
-    g.transmission.lines.every((line) =>
-      validTransmissionLine(line, g.date.year, accessContextForGame(g)),
+    g.transmission.lines.every(
+      (line) =>
+        expectedConnections.some(
+          (expected) => expected.corridorId === line.corridorId,
+        ) && validTransmissionLine(line, g.date.year, accessContextForGame(g)),
     )
   );
 }
@@ -1076,6 +1098,10 @@ function upgradeWorld(value: unknown): World {
     // Peer topology is checked against the complete roster after solo migrations.
     return {
       ...parsed.game,
+      // Schema 5 adds authored outside connections; older matches retain their peer-only topology.
+      ...(gameSchema! < 5 && grid.scenarioId === 111
+        ? { legacyWildfireIntertieAccess: true }
+        : {}),
       multiplayer: grid.multiplayer,
       transmission: grid.transmission,
     };

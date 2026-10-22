@@ -17,7 +17,6 @@ import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
-import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
 
 export interface StoryContextType {
   customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
@@ -1362,196 +1361,69 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   ],
 };
 
-export interface CaliforniaWildfireBalanceType {
-  disconnectedDemand: number;
-  targetCapacityShare: number;
-  outputMultiplier: number;
-  restorationCostPerMonth: number;
-}
-
-// Restoration is an inferred damage-severity proxy, not a validated cost curve:
-// LADWP's $78M electric restoration estimate × 1% municipal scale × 0.97436
-// (2025 to 2024 dollars) gives about $760k at 2.2375% disconnected customers.
-// Scale with the scenario's 2–10% severity, divide over January/February, and round.
-// See src/testing/SCENARIO_CHOICE_BALANCE.md; advance preparation remains separate.
-export const CALIFORNIA_WILDFIRE_BALANCE: Record<
-  DifficultyType,
-  CaliforniaWildfireBalanceType
-> = {
-  Intern: {
-    disconnectedDemand: 0.02,
-    targetCapacityShare: 0.3,
-    outputMultiplier: 0.65,
-    restorationCostPerMonth: 350000,
-  },
-  Employee: {
-    disconnectedDemand: 0.04,
-    targetCapacityShare: 0.4,
-    outputMultiplier: 0.55,
-    restorationCostPerMonth: 700000,
-  },
-  Manager: {
-    disconnectedDemand: 0.06,
-    targetCapacityShare: 0.5,
-    outputMultiplier: 0.45,
-    restorationCostPerMonth: 1000000,
-  },
-  VP: {
-    disconnectedDemand: 0.08,
-    targetCapacityShare: 0.6,
-    outputMultiplier: 0.35,
-    restorationCostPerMonth: 1350000,
-  },
-  CEO: {
-    disconnectedDemand: 0.1,
-    targetCapacityShare: 0.7,
-    outputMultiplier: 0.25,
-    restorationCostPerMonth: 1700000,
-  },
-};
-
-export const WILDFIRE_DECISION_KEY =
-  "story:111:california-wildfire-2025:preparedness";
-export function wildfirePrepared(
-  occurrences?: ActiveWorldEventType[],
-): boolean {
-  return (
-    occurrences?.some(
-      (event) =>
-        event.key === WILDFIRE_DECISION_KEY &&
-        event.attributes.choice === "prepare",
-    ) ?? false
-  );
-}
-// Advance inspection, staged backup equipment and response resources for the small
-// municipal system, priced for a meaningful cash-versus-resilience decision rather
-// than the lower historical spending proxy; post-fire restoration is separate.
-export function wildfirePreparationCost(_difficulty: DifficultyType): number {
-  return 2000000;
-}
-
+// The Bootleg fire reduced the Malin intertie from 2,967 MW to 285 MW in July 2021.
+// This authored January-February stress exercise uses a rounded 90% capacity loss, not a
+// reconstruction of the historical outage's duration. See docs/wildfire-intertie.md.
+export const WILDFIRE_INTERTIE_RETAINED_CAPACITY = 0.1;
+export const WILDFIRE_INTERTIE_CAPACITY_LIMIT_W = 4e6;
+export const WILDFIRE_CORRIDOR_ID = "california-north";
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
-  id: "california-wildfire-2025",
+  id: "wildfire-intertie",
   scenarioId: 111,
   phases: [
     {
-      id: "red-flag-warning",
-      schedule: { atMonth: 11 },
+      id: "readiness",
+      schedule: { atMonth: 1 },
+      forecastable: false,
       preview: () => null,
-      describe: () => ({
-        title: "Red-flag warning",
-        message:
-          "Extreme Santa Ana winds forecast for January. Fund preparedness or keep cash; choose to resume.",
+      describe: ({ difficulty }) => ({
+        title: "Prepare for a northern intertie outage",
+        message: `Your existing northern intertie will lose 90% of its capacity in January and February 2025. Prepare local supply, storage, or an independent connection. ${buildLeadTimeHint(difficulty)}`,
         concept: "forecast",
         kind: "WORLD_EVENT",
-        importance: "CRITICAL",
-        actionTarget: { card: "EVENTS" },
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
       }),
     },
     {
-      id: "firestorm",
+      id: "outage",
       schedule: { atMonth: 12 },
       durationMonths: 2,
-      preview: (context) => ({
-        title: "Wildfires may disrupt power",
-        message: wildfirePrepared(context.occurrences)
-          ? "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses."
-          : "Extreme fire weather may force safety shutoffs and limit generation.",
+      preview: () => ({
+        title: "Northern intertie wildfire outage",
+        message:
+          "The northern intertie will lose 90% of its capacity through February. Prepare replacement supply.",
       }),
-      describe: (context, random) => {
-        const original = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
-        const prepared = wildfirePrepared(context.occurrences);
-        const balance = {
-          ...original,
-          disconnectedDemand:
-            original.disconnectedDemand * (prepared ? 0.5 : 1),
-          outputMultiplier: prepared
-            ? (1 + original.outputMultiplier) / 2
-            : original.outputMultiplier,
-        };
-        const candidates = context.snapshot.facilities
-          .filter((facility) => facility.operational && !!facility.fuel)
-          .map((facility) => ({
-            ...facility,
-            score: random(`facility|${facility.id}`),
-          }))
-          .sort((a, b) => a.score - b.score || a.id - b.id);
-        const totalPeakW = candidates.reduce(
-          (total, facility) => total + facility.peakW,
-          0,
-        );
-        const targetPeakW = totalPeakW * balance.targetCapacityShare;
-        const selected: typeof candidates = [];
-        let selectedPeakW = 0;
-        for (const candidate of candidates) {
-          if (selectedPeakW >= targetPeakW) {
-            break;
-          }
-          selected.push(candidate);
-          selectedPeakW += candidate.peakW;
-        }
-        const outputMultipliers = Object.fromEntries(
-          selected.map((facility) => [
-            String(facility.id),
-            balance.outputMultiplier,
-          ]),
-        );
-        const selectedNames = selected.map((facility) => facility.name);
-        const affectedFacilities = selectedNames.length
-          ? selectedNames.join(", ")
-          : "No operating generators are affected";
-        return {
-          title: "Wildfire emergency",
-          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer demand is disconnected. ${affectedFacilities}${selectedNames.length ? `: output is down to ${percent(balance.outputMultiplier)}` : ""}. Repairs cost $${balance.restorationCostPerMonth / 1000000}M/month through February.`,
-          concept: "danger",
-          kind: "WORLD_EVENT",
-          importance: "CRITICAL",
-          actionTarget: FLEET_TARGET,
-          attributes: {
-            prepared,
-            disconnectedDemand: balance.disconnectedDemand,
-            targetCapacityShare: balance.targetCapacityShare,
-            selectedCapacityShare: share(selectedPeakW, totalPeakW),
-            selectedFacilityIds: selected.map((facility) => facility.id),
-            selectedFacilityNames: selectedNames,
-            outputMultiplier: balance.outputMultiplier,
-            restorationCostPerMonth: balance.restorationCostPerMonth,
+      describe: () => ({
+        title: "Northern intertie capacity down 90%",
+        message:
+          "Wildfire has cut the northern intertie to 10% capacity through February. Use local supply or an independent connection to cover the gap.",
+        concept: "danger",
+        kind: "WORLD_EVENT",
+        importance: "CRITICAL",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        attributes: { retainedCapacity: WILDFIRE_INTERTIE_RETAINED_CAPACITY },
+        effects: {
+          transmissionCapacityLimitsWByCorridor: {
+            [WILDFIRE_CORRIDOR_ID]: WILDFIRE_INTERTIE_CAPACITY_LIMIT_W,
           },
-          effects: {
-            demandMultiplier: 1 - balance.disconnectedDemand,
-            facilityOutputMultipliersById: outputMultipliers,
-            operatingExpensePerMonth: balance.restorationCostPerMonth,
-          },
-          turningPointPriority: 120,
-        };
-      },
+        },
+        turningPointPriority: 120,
+      }),
     },
     {
-      id: "restoration-complete",
+      id: "restored",
       schedule: { atMonth: 14 },
       preview: () => null,
-      describe: (context) => {
-        const period = context.periodSnapshots?.[2];
-        const demandWh = period?.demandWh || context.snapshot.demandWh12m;
-        const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
-        const reliability = reliabilityOf(demandWh, unservedWh);
-        const onset = context.occurrences?.find(
-          (event) =>
-            event.key === "story:111:california-wildfire-2025:firestorm",
-        );
-        const selectedNames = (onset?.attributes.selectedFacilityNames ||
-          []) as string[];
-        return {
-          title: "Wildfire restoration complete",
-          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved disconnections and output losses. " : ""}Safety shutoffs end and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal. The grid met ${percent(reliability)} of connected demand.`,
-          concept: "supply",
-          kind: "WORLD_EVENT",
-          importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
-          actionTarget: SUPPLY_DEMAND_TARGET,
-          attributes: { demandWh, unservedWh, reliability },
-          turningPointPriority: 110,
-        };
-      },
+      describe: () => ({
+        title: "Northern intertie restored",
+        message: "The northern intertie is back at full capacity.",
+        concept: "supply",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        turningPointPriority: 110,
+      }),
     },
   ],
 };
@@ -2094,33 +1966,6 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
     ),
   );
-  ascending(
-    "California wildfire disconnected demand",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].disconnectedDemand,
-    ),
-  );
-  ascending(
-    "California wildfire affected capacity",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].targetCapacityShare,
-    ),
-  );
-  descending(
-    "California wildfire output",
-    DIFFICULTY_ORDER.map(
-      (difficulty) => CALIFORNIA_WILDFIRE_BALANCE[difficulty].outputMultiplier,
-    ),
-  );
-  ascending(
-    "California wildfire restoration cost",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
-    ),
-  );
   ([0, 1, 2, 3] as const).forEach((step) => {
     descending(
       `Load shedding step ${step + 1} coal output`,
@@ -2298,6 +2143,14 @@ export function combineStoryEffects(
       combined.facilityOutputMultipliersByFuel =
         facilityOutputMultipliersByFuel;
     }
+    if (effects.transmissionCapacityLimitsWByCorridor)
+      for (const [id, limitW] of Object.entries(
+        effects.transmissionCapacityLimitsWByCorridor,
+      ))
+        (combined.transmissionCapacityLimitsWByCorridor ??= {})[id] = Math.min(
+          combined.transmissionCapacityLimitsWByCorridor?.[id] ?? Infinity,
+          limitW,
+        );
     const facilityOutputMultipliersById = multiplyEffects(
       combined.facilityOutputMultipliersById,
       effects.facilityOutputMultipliersById,
@@ -2341,26 +2194,6 @@ export function resolveStoryPhase(
     context.customEvents?.find((event) => event.scenarioId === arc.scenarioId);
   if (imported) {
     const effects = { ...description.effects };
-    if (arc.scenarioId === 111 && phase.id === "firestorm") {
-      const effectiveness = wildfirePreparednessEffectiveness(
-        context.occurrences || [],
-        context.location.id,
-        scheduledMonth * MINUTES_PER_MONTH,
-      );
-      effects.demandMultiplier =
-        1 - (1 - (effects.demandMultiplier ?? 1)) * (1 - 0.5 * effectiveness);
-      effects.facilityOutputMultipliersById = Object.fromEntries(
-        Object.entries(effects.facilityOutputMultipliersById || {}).map(
-          ([id, output]) => [id, 1 - (1 - output) * (1 - 0.5 * effectiveness)],
-        ),
-      );
-      description.attributes = {
-        ...description.attributes,
-        preparednessEffectiveness: effectiveness,
-        prepared: effectiveness > 0,
-        disconnectedDemand: 1 - effects.demandMultiplier,
-      };
-    }
     if (effects.operatingExpensePerMonth !== undefined)
       effects.operatingExpensePerMonth *= imported.moneyScale;
     // Prices per unit and percentage shocks retain their meaning in the receiving market.
@@ -2369,6 +2202,11 @@ export function resolveStoryPhase(
     if (effects.demandMultiplier !== undefined)
       changes.push(
         `Demand: ${Math.round(effects.demandMultiplier * 100)}% of normal`,
+      );
+    if (effects.transmissionCapacityLimitsWByCorridor)
+      Object.values(effects.transmissionCapacityLimitsWByCorridor).forEach(
+        (value) =>
+          changes.push(`Northern intertie limited to ${value / 1e6} MW`),
       );
     if (effects.temperatureOffsetC)
       changes.push(

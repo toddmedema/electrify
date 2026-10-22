@@ -1,10 +1,5 @@
+import { DEEP_FREEZE_DECISION_KEY, winterizationCost } from "./WorldEvents";
 import { ScenarioChoiceType } from "../Types";
-import {
-  WILDFIRE_DECISION_KEY,
-  wildfirePreparationCost,
-  DEEP_FREEZE_DECISION_KEY,
-  winterizationCost,
-} from "./WorldEvents";
 export const DATA_CENTER_DECISION_KEY = "story:106:data-center-boom:connection";
 // The same 100 MW connection earns the same contribution at every difficulty.
 // Demand, operating economics and customer retention already scale the challenge.
@@ -85,35 +80,6 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
           "Save cash for construction and accept February’s full output losses, including a 38% drop at gas plants.",
         message:
           "Construction budget kept. February 2021 output losses apply in full.",
-      },
-    ],
-  },
-  {
-    id: WILDFIRE_DECISION_KEY,
-    scenarioId: 111,
-    atMonth: 11,
-    title: "Wildfire preparedness",
-    message:
-      "Prepare crews and equipment for January's Santa Ana winds, or keep cash.",
-    options: [
-      {
-        id: "prepare",
-        label: "Fund preparedness",
-        cost: wildfirePreparationCost,
-        description:
-          "Halve customer disconnections and generator output losses in January and February.",
-        message:
-          "Preparedness halves January–February disconnections and output losses. Repair costs stay the same.",
-      },
-      {
-        id: "standard",
-        meaningful: false,
-        label: "Keep cash",
-        cost: () => 0,
-        description:
-          "Save cash and accept January and February’s full customer disconnections and generator output losses.",
-        message:
-          "Cash kept. January–February disconnections, output losses and repair costs apply in full.",
       },
     ],
   },
