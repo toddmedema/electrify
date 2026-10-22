@@ -90,7 +90,7 @@ else {
     void prepareAchievements()
       .then(renderApp)
       .catch(() => {
-        finishStartup();
+        document.getElementById("appStartup")?.remove();
         root.render(
           <div role="alert" style={{ padding: 24 }}>
             <h1>Electrify couldn't finish loading</h1>
