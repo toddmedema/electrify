@@ -12,8 +12,46 @@ import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DATA_CENTER_DECISION_KEY } from "../data/ScenarioChoices";
 import { WILDFIRE_DECISION_KEY } from "../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
-import { cacheProjection, selectProjection } from "./Projection";
+import {
+  cacheProjection,
+  ProjectionView,
+  selectProjection,
+} from "./Projection";
 import { cashRunwayMonths } from "./MissionStatus";
+
+let generate: jest.SpyInstance;
+let generatedForecast: ProjectionView["forecast"];
+beforeEach(() => {
+  const realGenerate = GameModule.generateNewTimeline;
+  generate = jest
+    .spyOn(GameModule, "generateNewTimeline")
+    .mockImplementation((...args) => {
+      const timeline = realGenerate(...args);
+      // Detach before buildProjection can transform anything: an in-place mutation
+      // must differ from the generator's original result too.
+      // Copy the enumerable game data only, as Jest's original equality did;
+      // cloneDeep otherwise exposes the non-enumerable commitment metadata.
+      generatedForecast = timeline.map((tick) => cloneDeep({ ...tick }));
+      return timeline;
+    });
+});
+afterEach(() => generate.mockRestore());
+
+function expectGeneratedForecast(
+  game: Parameters<typeof selectProjection>[0],
+  projection: ProjectionView,
+) {
+  // Inspect the real generation's inputs and output instead of running the same
+  // twenty-year forecast a second time just to construct an expected value.
+  expect(generate).toHaveBeenLastCalledWith(
+    game,
+    game.timeline[0].cash,
+    game.timeline[0].customers,
+    projection.forecast.length,
+    projection.projectionStepMinutes,
+  );
+  expect(projection.forecast).toEqual(generatedForecast);
+}
 
 it("adopts worker results with the original history identity without recalculating", () => {
   const game = createGame({ scenarioId: 111, seed: 7 });
@@ -92,15 +130,7 @@ it.each([
     const after = selectProjection(chosen, chosen.timeline[0]);
     expect(after).not.toBe(before);
     expect(after.financeProjected).not.toEqual(before.financeProjected);
-    expect(after.forecast).toEqual(
-      generateNewTimeline(
-        chosen,
-        chosen.timeline[0].cash,
-        chosen.timeline[0].customers,
-        after.forecast.length,
-        after.projectionStepMinutes,
-      ),
-    );
+    expectGeneratedForecast(chosen, after);
   },
 );
 
@@ -111,7 +141,6 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
     ...SCENARIOS.find((scenario) => scenario.id === 111)!,
     durationMonths: 1200,
   };
-  const generate = jest.spyOn(GameModule, "generateNewTimeline");
   const projection = selectProjection(game, game.timeline[0]);
   expect(generate).toHaveBeenCalledWith(
     game,
@@ -120,7 +149,6 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
     20 * 12 * 24,
     60,
   );
-  generate.mockRestore();
   expect(projection.cashProjected).toHaveLength(240);
   expect(projection.financeProjected).toHaveLength(240);
   expect(projection.forecast).toHaveLength(20 * 12 * 24);
@@ -148,15 +176,7 @@ it("refreshes projections when an intertie upgrade starts and completes", () => 
   const during = selectProjection(upgrading, upgrading.timeline[0]);
   expect(during).not.toBe(before);
   expect(during.financeProjected).not.toEqual(before.financeProjected);
-  expect(during.forecast).toEqual(
-    generateNewTimeline(
-      upgrading,
-      upgrading.timeline[0].cash,
-      upgrading.timeline[0].customers,
-      during.forecast.length,
-      during.projectionStepMinutes,
-    ),
-  );
+  expectGeneratedForecast(upgrading, during);
 
   const progressed = createNextState(upgrading, (draft) => {
     draft.transmission!.lines[0].upgrade!.yearsToBuildLeft -= 0.001;
@@ -171,13 +191,5 @@ it("refreshes projections when an intertie upgrade starts and completes", () => 
   });
   const after = selectProjection(completed, completed.timeline[0]);
   expect(after).not.toBe(during);
-  expect(after.forecast).toEqual(
-    generateNewTimeline(
-      completed,
-      completed.timeline[0].cash,
-      completed.timeline[0].customers,
-      after.forecast.length,
-      after.projectionStepMinutes,
-    ),
-  );
+  expectGeneratedForecast(completed, after);
 });
