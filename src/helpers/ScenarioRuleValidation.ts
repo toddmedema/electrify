@@ -15,6 +15,7 @@ import {
   scenarioRuleTargetOperations,
   scenarioRuleCapacityReportMonths,
   ruleObservationKey,
+  interpretScenarioRuleReport,
 } from "./ScenarioRuleRuntime";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { canonicalRuleJson } from "./RuleIdentity";
@@ -23,6 +24,10 @@ import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import { ruleChoices } from "./ScenarioRuleDependencies";
 import { scenarioRuleExpectedLoads } from "./ScenarioRuleDecisions";
 import { validRuleReportReceipt } from "./ScenarioRuleReports";
+import {
+  WILDFIRE_DECISION_KEY,
+  WILDFIRE_PREPARATION_COST,
+} from "../data/ScenarioChoiceRules";
 
 const bounded = (
   value: unknown,
@@ -143,13 +148,6 @@ function validOfficialOccurrence(
       "selectedFacilityNames",
       "selectedCapacityShare",
     ],
-    wildfireOnset: [
-      "prepared",
-      "selectedFacilityIds",
-      "selectedFacilityNames",
-      "selectedCapacityShare",
-      ...(custom ? ["preparednessEffectiveness"] : []),
-    ],
     nuclearTrip: ["selectedFacilityIds", "selectedFacilityNames"],
     shaleNormalization: ["gasShare", "reliability", "reportAvailable"],
     paradiseReview: ["shippedShare", "reliability", "reportAvailable"],
@@ -168,12 +166,6 @@ function validOfficialOccurrence(
       "reportAvailable",
     ],
     hurricaneRestoration: [
-      "demandWh",
-      "unservedWh",
-      "reliability",
-      "reportAvailable",
-    ],
-    wildfireRestoration: [
       "demandWh",
       "unservedWh",
       "reliability",
@@ -211,15 +203,9 @@ function validOfficialOccurrence(
     "variableShare",
     "coalShare",
     "coverage",
-    "preparednessEffectiveness",
   ])
     if (attrs[key] !== undefined && !bounded(attrs[key], 1)) return false;
   for (const [key, value] of Object.entries(fixed)) {
-    if (
-      review === "wildfireOnset" &&
-      ["outputMultiplier", "disconnectedDemand"].includes(key)
-    )
-      continue;
     if (canonicalRuleJson(attrs[key]) !== canonicalRuleJson(value))
       return false;
   }
@@ -241,9 +227,6 @@ function validOfficialOccurrence(
         ([fuel, value]) => [fuel, 1 - (1 - value) * (1 - protection)],
       ),
     );
-  if (definition.protection?.kind === "wildfirePreparedness" && protection > 0)
-    effects.demandMultiplier =
-      1 - (1 - (effects.demandMultiplier ?? 1)) * (1 - protection);
   if (definition.targets.length) {
     const ids = attrs.selectedFacilityIds;
     if (
@@ -254,27 +237,11 @@ function validOfficialOccurrence(
       return false;
     const targetEffects: Record<string, number> = {};
     for (const operation of definition.targets) {
-      const output =
-        definition.protection?.kind === "wildfirePreparedness"
-          ? 1 - (1 - operation.outputMultiplier) * (1 - protection)
-          : operation.outputMultiplier;
+      const output = operation.outputMultiplier;
       for (const id of ids)
         targetEffects[String(id)] = (targetEffects[String(id)] ?? 1) * output;
     }
     effects.facilityOutputMultipliersById = targetEffects;
-    if (
-      review === "wildfireOnset" &&
-      (attrs.outputMultiplier !==
-        (custom
-          ? definition.targets[0].outputMultiplier
-          : 1 -
-            (1 - definition.targets[0].outputMultiplier) * (1 - protection)) ||
-        attrs.disconnectedDemand !==
-          (custom
-            ? 1 - (effects.demandMultiplier ?? 1)
-            : Number(fixed.disconnectedDemand) * (1 - protection)))
-    )
-      return false;
   }
   if (canonicalRuleJson(event.effects) !== canonicalRuleJson(effects))
     return false;
@@ -416,6 +383,16 @@ function validSecondaryRuleReceipts(
 }
 
 export function validScenarioRuleState(game: GameType): boolean {
+  const historyBoundary = game.scenarioRuleHistoryStartMinute;
+  if (
+    historyBoundary !== undefined &&
+    (!Number.isSafeInteger(historyBoundary) ||
+      historyBoundary < 0 ||
+      historyBoundary > game.date.minute ||
+      ![101, 111].includes(game.scenarioId) ||
+      game.customScenario !== undefined)
+  )
+    return false;
   const rules = scenarioRules(
     getScenario(game.scenarioId, game.customScenario),
     game,
@@ -470,6 +447,34 @@ export function validScenarioRuleState(game: GameType): boolean {
       )
     )
       continue;
+    // The intertie redesign retires this native choice prospectively. Its already booked
+    // transaction remains history in saves carried forward from the original challenge.
+    if (
+      game.scenarioId === 111 &&
+      rules.namespace.kind === "official" &&
+      event.key === WILDFIRE_DECISION_KEY
+    ) {
+      const prepared = event.attributes.choice === "prepare";
+      if (
+        answered.has(event.key) ||
+        !["prepare", "standard"].includes(String(event.attributes.choice)) ||
+        event.definitionId !== event.key ||
+        event.startsMinute !== 35 * MINUTES_PER_MONTH ||
+        event.endsMinute !== event.startsMinute ||
+        event.startsMinute > game.date.minute ||
+        event.attributes.scenarioChoice !== true ||
+        event.attributes.cost !== (prepared ? WILDFIRE_PREPARATION_COST : 0) ||
+        event.attributes.upfrontGrant !== 0 ||
+        Object.keys(event.attributes).some(
+          (key) =>
+            !["choice", "cost", "upfrontGrant", "scenarioChoice"].includes(key),
+        ) ||
+        Object.keys(event.effects).length !== 0
+      )
+        return false;
+      answered.add(event.key);
+      continue;
+    }
     const choice = choices.find((choice) => choice.key === event.key);
     const option = choice?.options.find(
       (option) => option.id === event.attributes.choice,
@@ -618,10 +623,38 @@ export function validScenarioRuleState(game: GameType): boolean {
       )
     )
       return false;
+    const targetNames = groups.flatMap((group) =>
+      group.map((binding) => binding.name),
+    );
+    // A review can describe an earlier activation while owning no targets itself.
+    // Resolve these report facts through the same owner as live reporting. For a
+    // self-report, seed its names from the pinned bindings instead of trusting the
+    // reported names we are validating.
+    let reportNames: unknown = targetNames;
+    let affectedCount: unknown;
+    for (const report of [definition.report, ...(definition.reports ?? [])]) {
+      if (report?.kind !== "affectedFacilities") continue;
+      const facts = interpretScenarioRuleReport(report, rules, {
+        startingYear: game.startingYear,
+        completedMonths: definition.startMonth,
+        monthlyHistory: [],
+        occurrences: [
+          ...occurrences.filter((receipt) => receipt.key !== event.key),
+          {
+            ...event,
+            attributes: { selectedFacilityNames: targetNames },
+          },
+        ],
+      }).attributes;
+      if (facts.selectedFacilityNames !== undefined)
+        reportNames = facts.selectedFacilityNames;
+      if (facts.affectedFacilityCount !== undefined)
+        affectedCount = facts.affectedFacilityCount;
+    }
     if (
-      canonicalRuleJson(
-        groups.flatMap((group) => group.map((binding) => binding.name)),
-      ) !== canonicalRuleJson(event.attributes.selectedFacilityNames) ||
+      canonicalRuleJson(reportNames) !==
+        canonicalRuleJson(event.attributes.selectedFacilityNames) ||
+      affectedCount !== event.attributes.affectedFacilityCount ||
       canonicalRuleJson(
         groups.flatMap((group) => group.map((binding) => binding.id)),
       ) !== canonicalRuleJson(event.attributes.selectedFacilityIds)
@@ -629,8 +662,22 @@ export function validScenarioRuleState(game: GameType): boolean {
       return false;
   }
   for (const event of definitions) {
+    // A migrated native run has no journal for rules that did not exist when those
+    // months were played. This records coverage only; all current physical effects
+    // still resolve normally, and any receipt that is present was validated above.
+    const beforeJournal =
+      historyBoundary !== undefined &&
+      rules.namespace.kind === "official" &&
+      rules.namespace.scenarioId === game.scenarioId &&
+      event.source?.scenarioId === game.scenarioId &&
+      event.startMonth * MINUTES_PER_MONTH <= historyBoundary &&
+      !event.transactions.length &&
+      !event.targets.length &&
+      !event.requiresChoice &&
+      !rules.loads.some((load) => load.eventId === event.id);
     if (
       !game.storyEffectsDisabled &&
+      !beforeJournal &&
       event.startMonth <= game.date.monthsElapsed &&
       !(
         rules.namespace.kind === "official" &&

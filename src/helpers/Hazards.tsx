@@ -49,7 +49,7 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 /**
  * Hail damage to solar and extreme cold for gas (issue #73), as pure functions of game state.
  *
- * Like the wildfire hazard, every draw is addressed by (seed, dedicated stream, event key,
+ * Every draw is addressed by (seed, dedicated stream, event key,
  * attribute), so an occurrence is a pure function of its inputs and saving, forecasting or
  * reordering evaluation can never reroll it. The reducer decides when to check a month and how
  * to record the result; this module only answers what would happen and what hardening costs.

@@ -8,6 +8,10 @@ export function scenarioEffectsSummary(
   const rounded = (value: number) =>
     exact ? Number(value.toPrecision(12)) : Math.round(value);
   const changes: string[] = [];
+  for (const [corridor, limitW] of Object.entries(
+    effects.transmissionCapacityLimitsWByCorridor ?? {},
+  ))
+    changes.push(`${corridor} capacity limited to ${rounded(limitW / 1e6)} MW`);
   if (effects.demandMultiplier !== undefined)
     changes.push(
       `Demand: ${rounded(effects.demandMultiplier * 100)}% of normal`,

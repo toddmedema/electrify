@@ -117,15 +117,12 @@ test("platform plans retain all CPU shards, browser shards and full native suite
 });
 
 test(
-  "CPU suites overlap, UI stays serial, and failures never skip the other tests",
+  "heavy CPU and UI phases never overlap, and failures never skip the other tests",
   { timeout: 1000 },
   async () => {
     const seen = [];
-    const started = new Set();
-    let release;
-    const bothCpuStarted = new Promise((resolve) => {
-      release = resolve;
-    });
+    let activeHeavy = 0;
+    let peakHeavy = 0;
     const result = await execute(
       {
         cpu: [{ name: "check" }, { group: "unit" }, { group: "simulation" }],
@@ -133,22 +130,32 @@ test(
       },
       async (step) => {
         seen.push(step.name || step.group);
-        if (step.group) {
-          started.add(step.group);
-          if (started.size === 2) release();
-          await bothCpuStarted;
+        const heavy = step.group || step.name !== "check";
+        if (heavy) {
+          activeHeavy++;
+          peakHeavy = Math.max(peakHeavy, activeHeavy);
         }
+        await new Promise(setImmediate);
+        if (heavy) activeHeavy--;
         return step.name !== "check" && step.group !== "unit";
       },
     );
     assert.equal(result.length, 6);
     assert.equal(result.filter((passed) => !passed).length, 2);
-    assert.deepEqual([...started].sort(), ["simulation", "unit"]);
-    assert(seen.indexOf("check") < seen.indexOf("unit"));
-    assert.deepEqual(
-      seen.filter((name) => ["package", "browser", "native"].includes(name)),
-      ["package", "browser", "native"],
+    assert.equal(
+      peakHeavy,
+      1,
+      "one runner must run only one heavy phase at a time",
     );
+    assert.equal(activeHeavy, 0);
+    assert.deepEqual(seen, [
+      "check",
+      "unit",
+      "simulation",
+      "package",
+      "browser",
+      "native",
+    ]);
   },
 );
 

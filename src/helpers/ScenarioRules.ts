@@ -40,6 +40,7 @@ import { getScenarioLocation } from "./Locations";
 import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
 import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
+import { TRANSMISSION_CORRIDORS } from "../data/AdjacentMarkets";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -508,6 +509,15 @@ export function compileScenarioRules(
     event.loads?.forEach((load, j) =>
       checkLoad(load, `events[${i}].loads[${j}]`),
     );
+    for (const corridor of Object.keys(
+      event.effects?.transmissionCapacityLimitsMWByCorridor ?? {},
+    ))
+      if (!TRANSMISSION_CORRIDORS.some((route) => route.id === corridor))
+        add(
+          "unknown-corridor",
+          `events[${i}].effects.transmissionCapacityLimitsMWByCorridor.${corridor}`,
+          `${corridor} is not a registered transmission corridor.`,
+        );
     event.effects?.outputMultipliersBySelector?.forEach((target, j) => {
       if (
         target.target.selector === "startingAsset" &&
@@ -792,6 +802,15 @@ export function compileScenarioRules(
       );
     const effects: WorldEventEffectsType = {},
       source = event.effects ?? {};
+    if (source.transmissionCapacityLimitsMWByCorridor)
+      effects.transmissionCapacityLimitsWByCorridor = Object.fromEntries(
+        Object.entries(source.transmissionCapacityLimitsMWByCorridor).map(
+          ([corridor, value]) => [
+            corridor,
+            ruleNumber(value, params.difficulty) * 1e6,
+          ],
+        ),
+      );
     for (const [author, engine] of [
       ["fuelPriceMultipliers", "fuelPriceMultipliers"],
       ["outputMultipliersByFuel", "facilityOutputMultipliersByFuel"],
@@ -1009,6 +1028,12 @@ export function ruleDefinitionsFromSnapshot(
       const effects: NonNullable<
         import("../data/ScenarioRules").RuleEvent["effects"]
       > = {};
+      if (e.effects.transmissionCapacityLimitsWByCorridor)
+        effects.transmissionCapacityLimitsMWByCorridor = Object.fromEntries(
+          Object.entries(e.effects.transmissionCapacityLimitsWByCorridor).map(
+            ([corridor, value]) => [corridor, value / 1e6],
+          ),
+        );
       for (const [engine, author] of [
         ["fuelPriceMultipliers", "fuelPriceMultipliers"],
         ["facilityOutputMultipliersByFuel", "outputMultipliersByFuel"],

@@ -34,12 +34,8 @@ import {
 import {
   HURRICANE_BALANCE,
   END_OF_ERA_BALANCE,
-  CALIFORNIA_WILDFIRE_BALANCE,
 } from "./OfficialScenarioTargetRules";
-import {
-  WINTERIZATION_COST,
-  WILDFIRE_PREPARATION_COST,
-} from "./ScenarioChoiceRules";
+import { WINTERIZATION_COST } from "./ScenarioChoiceRules";
 export * from "./OfficialScenarioEffectRules";
 export * from "./OfficialScenarioTargetRules";
 export { LOAD_SHEDDING_BALANCE } from "./OfficialScenarioRules";
@@ -97,8 +93,6 @@ const DIFFICULTY_ORDER: DifficultyType[] = [
 
 export const winterizationCost = (difficulty: DifficultyType) =>
   WINTERIZATION_COST[difficulty];
-export const wildfirePreparationCost = (_difficulty: DifficultyType) =>
-  WILDFIRE_PREPARATION_COST;
 
 export function validateStoryDifficultyMonotonicity(): string[] {
   const problems: string[] = [];
@@ -240,33 +234,6 @@ export function validateStoryDifficultyMonotonicity(): string[] {
     "Compliance coal output",
     DIFFICULTY_ORDER.map(
       (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
-    ),
-  );
-  ascending(
-    "California wildfire disconnected demand",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].disconnectedDemand,
-    ),
-  );
-  ascending(
-    "California wildfire affected capacity",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].targetCapacityShare,
-    ),
-  );
-  descending(
-    "California wildfire output",
-    DIFFICULTY_ORDER.map(
-      (difficulty) => CALIFORNIA_WILDFIRE_BALANCE[difficulty].outputMultiplier,
-    ),
-  );
-  ascending(
-    "California wildfire restoration cost",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
     ),
   );
   ([0, 1, 2, 3] as const).forEach((step) => {
@@ -421,6 +388,14 @@ export function combineStoryEffects(
       combined.facilityOutputMultipliersByFuel =
         facilityOutputMultipliersByFuel;
     }
+    if (effects.transmissionCapacityLimitsWByCorridor)
+      for (const [id, limitW] of Object.entries(
+        effects.transmissionCapacityLimitsWByCorridor,
+      ))
+        (combined.transmissionCapacityLimitsWByCorridor ??= {})[id] = Math.min(
+          combined.transmissionCapacityLimitsWByCorridor?.[id] ?? Infinity,
+          limitW,
+        );
     const facilityOutputMultipliersById = multiplyEffects(
       combined.facilityOutputMultipliersById,
       effects.facilityOutputMultipliersById,

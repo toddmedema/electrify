@@ -1,13 +1,20 @@
 import "../Store";
 import { createHash } from "crypto";
 import cloneDeep from "lodash.clonedeep";
+import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 import { TICKS_PER_MONTH } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
 import { currentTick } from "../helpers/GameSelectors";
 import { publicRateCap } from "../helpers/Customers";
 import { getScenarioLocation } from "../helpers/Locations";
-import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import {
+  gameObjectiveResults,
+  reliabilityMonths,
+  reliabilityFailure,
+  runFailure,
+} from "../helpers/ObjectiveRules";
+import type { GameType } from "../Types";
 import {
   pendingScenarioChoice,
   optionalScenarioChoice,
@@ -24,6 +31,10 @@ import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import { checkMonth, InvariantCollector } from "./Invariants";
 import { coopSeats } from "./MultiplayerFixtures";
 import { loadSimData } from "./SimData";
+import {
+  projectUpstreamWildfireFacilities,
+  projectUpstreamWildfireGame,
+} from "./UpstreamWildfireComparison";
 const codec = require("../../electron/steam-multiplayer.cjs");
 export const OFFICIAL_WORLD_IDS = [
   100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
@@ -49,9 +60,54 @@ export const officialWorldHash = (value: unknown) =>
   createHash("sha256")
     .update(JSON.stringify(canonicalOfficialWorld(value)))
     .digest("hex");
+/** The upstream #602 oracle predates the new compact progress representation.
+ * Its original Game fields remain exact; the caller separately checks every new
+ * observation against the oracle's original completed-month supply/demand. */
+const gameHash = (game: GameType) =>
+  officialWorldHash(
+    game.scenarioId === 111 ? projectUpstreamWildfireGame(game) : game,
+  );
+const facilitiesHash = (game: GameType) =>
+  officialWorldHash(
+    game.scenarioId === 111
+      ? projectUpstreamWildfireFacilities(game.facilities)
+      : game.facilities,
+  );
+function legacyObjectiveObservation(game: GameType) {
+  const scenario = getScenario(game.scenarioId, game.customScenario)!;
+  return {
+    reliabilityMonths: reliabilityMonths(scenario, game.monthlyHistory),
+    reliabilityFailure: reliabilityFailure(scenario, game.monthlyHistory),
+    runFailure: runFailure(
+      game,
+      scenario,
+      game.monthlyHistory,
+      currentTick(game)!,
+      !!scenario.tutorialSteps,
+    ),
+  };
+}
 function stateHash(world: World) {
   const { rules: _sourceRules, ...physical } = world;
-  return officialWorldHash(physical);
+  if (world.gameSchema !== SAVE_SCHEMA_VERSION || SAVE_SCHEMA_VERSION !== 6)
+    throw new Error("Expected the verified schema5-to-6 save migration");
+  // The original2fc archive used schema3; the redesigned111 upstream archive
+  // used schema5. Certify current schema6 explicitly and project only that
+  // version field; every other World field remains in its independent hash.
+  const sourceShape = {
+    ...physical,
+    gameSchema: world.spec.scenarioId === 111 ? 5 : 3,
+  };
+  return officialWorldHash(
+    world.spec.scenarioId === 111
+      ? {
+          ...sourceShape,
+          grids: physical.grids.map((game) =>
+            projectUpstreamWildfireGame(game),
+          ),
+        }
+      : sourceShape,
+  );
 }
 function command(world: World, seat: string, action: Command) {
   const error = applyCommand(world, seat, {
@@ -66,11 +122,14 @@ function routePlan(scenarioId: number) {
   const play = STANDARD_BALANCE_PLAYS[scenarioId];
   const rate = play.scheduledActions?.find((action) => action.type === "rate");
   return {
-    initialBuild: [108, 110, 114].includes(scenarioId)
+    initialBuild: [108, 110, 111, 114].includes(scenarioId)
       ? {
           name: "Natural Gas Peaker",
           peakW: (
-            { 108: 350e6, 110: 700e6, 114: 200e6 } as Record<number, number>
+            { 108: 350e6, 110: 700e6, 111: 100e6, 114: 200e6 } as Record<
+              number,
+              number
+            >
           )[scenarioId],
           financed: true,
         }
@@ -89,6 +148,11 @@ function routePlan(scenarioId: number) {
 export function playOfficialWorldRoute(
   scenarioId: number,
   variant: "paired" | "split-shutdown" = "paired",
+  observeWildfireProgress?: (
+    game: GameType,
+    companyIndex: number,
+    month: number,
+  ) => void,
 ) {
   const scenario = getScenario(scenarioId)!;
   loadSimData(getScenarioLocation(scenario)!);
@@ -100,6 +164,9 @@ export function playOfficialWorldRoute(
     "initial",
   );
   const initial = cloneDeep(world);
+  initial.grids.forEach((game, index) =>
+    observeWildfireProgress?.(game, index, 0),
+  );
   for (const [index, seat] of world.seats.entries()) {
     const game = world.grids[index];
     if (plan.initialBuild) {
@@ -150,6 +217,8 @@ export function playOfficialWorldRoute(
   const receipts: unknown[] = [];
   const seen = new Set<string>();
   const optionalAnswered = new Set<string>();
+  const phaseCheckpoints: unknown[] = [];
+  const checkpointMonths = new Set<number>();
   let nativeCheckpoint: unknown;
   let steps = 0;
   const actionMonths = new Map<string, number>();
@@ -293,6 +362,39 @@ export function playOfficialWorldRoute(
     expect(world.paused).toBe(false);
     stepWorld(world);
     steps++;
+    const month = world.grids[0].date.monthsElapsed;
+    if (
+      scenarioId === 111 &&
+      [35, 36, 37, 38, 60].includes(month) &&
+      !checkpointMonths.has(month)
+    ) {
+      checkpointMonths.add(month);
+      const restored = restoreWorld(
+        codec.parse(codec.stringify(checkpointWorld(world))),
+        "restored",
+      );
+      expect(restored.grids.map((g) => g.monthlyHistory)).toEqual(
+        world.grids.map((g) => g.monthlyHistory),
+      );
+      expect(restored.grids.map((g) => g.worldEvents)).toEqual(
+        world.grids.map((g) => g.worldEvents),
+      );
+      world.grids.forEach((game, index) =>
+        observeWildfireProgress?.(game, index, month),
+      );
+      phaseCheckpoints.push({
+        month,
+        worldHash: stateHash(world),
+        companies: world.grids.map((g) => ({
+          monthlyHistoryHash: officialWorldHash(g.monthlyHistory),
+          facilitiesHash: facilitiesHash(g),
+          gameHash: gameHash(g),
+          objectiveObservation: legacyObjectiveObservation(g),
+          recentMonths: g.monthlyHistory.slice(0, 3),
+          occurrences: g.worldEvents.occurrences,
+        })),
+      });
+    }
     for (const [index, grid] of world.grids.entries())
       for (const receipt of grid.worldEvents.occurrences) {
         const key = `${index}:${receipt.key}`;
@@ -303,7 +405,7 @@ export function playOfficialWorldRoute(
           month: grid.date.monthsElapsed,
           receipt: cloneDeep(receipt),
           active: cloneDeep(grid.worldEvents.active),
-          facilitiesHash: officialWorldHash(grid.facilities),
+          facilitiesHash: facilitiesHash(grid),
         });
       }
   }
@@ -331,22 +433,27 @@ export function playOfficialWorldRoute(
       difficulty: g.difficulty,
       location: g.location,
       startingYear: g.startingYear,
-      facilitiesHash: officialWorldHash(g.facilities),
-      completeGameHash: officialWorldHash(g),
+      facilitiesHash: facilitiesHash(g),
+      completeGameHash: gameHash(g),
     })),
     companies: world.grids.map((g, i) => ({
       seat: world.seats[i].id,
       months: g.monthlyHistory.length,
       monthlyHistoryHash: officialWorldHash(g.monthlyHistory),
-      finalFacilitiesHash: officialWorldHash(g.facilities),
-      completeGameHash: officialWorldHash(g),
-      objectiveProgress: g.objectiveProgress,
-      objectiveResults: gameObjectiveResults(g),
+      finalFacilitiesHash: facilitiesHash(g),
+      completeGameHash: gameHash(g),
+      ...(scenarioId === 111
+        ? { objectiveObservation: legacyObjectiveObservation(g) }
+        : {
+            objectiveProgress: g.objectiveProgress,
+            objectiveResults: gameObjectiveResults(g),
+          }),
       occurrences: g.worldEvents.occurrences,
     })),
     decisions,
     receipts,
     nativeCheckpoint,
+    ...(scenarioId === 111 ? { phaseCheckpoints } : {}),
     outcomes: world.outcomes,
   });
 }

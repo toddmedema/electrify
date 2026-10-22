@@ -1,5 +1,9 @@
 # Scenario choice cost research
 
+**Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
+below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
+of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
+
 Research date: September 10, 2026. Applies to scenarios 106 (Data Center Boom),
 107 (Deep Freeze), and 111 (California Wildfires) in PR #347.
 

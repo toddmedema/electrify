@@ -1,5 +1,9 @@
 # Major scenario choice balance QA
 
+**Wildfire redesign:** the wildfire preparedness, restoration-cost and passive-grid comparisons
+below are historical. Scenario 111 now starts with a pivotal Northern intertie that loses 90%
+of its capacity; see [the current mission design](../../docs/wildfire-intertie.md).
+
 **Historical results:** the cash table and Wildfire keep-cash comparison below predate the
 scenario-sized intertie calibration. See the [current intertie balance report](../../docs/intertie-balance.md)
 for measured results and the updated reference plans. Wildfire preparedness now costs $2M at every difficulty (10× the historical $200k proxy),

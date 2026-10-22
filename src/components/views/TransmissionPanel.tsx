@@ -24,6 +24,7 @@ import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   Box,
   Button,
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -765,6 +766,15 @@ export default function TransmissionPanel({
                     const rating =
                       peer?.ratingW ??
                       (now ? transmissionRatingW(line, now) : line.capacityW);
+                    const routeLimitW =
+                      now?.transmissionCapacityLimitsWByCorridor?.[
+                        line.corridorId
+                      ];
+                    const retainedCapacity =
+                      routeLimitW === undefined
+                        ? 1
+                        : Math.min(1, routeLimitW / line.capacityW);
+                    const restricted = retainedCapacity <= 0.9;
                     const building = line.yearsToBuildLeft > 0;
                     // Remaining time plus elapsed simulation time preserves the original build duration.
                     const elapsedYears =
@@ -893,7 +903,20 @@ export default function TransmissionPanel({
                               >
                                 {reorderDisabled && icon}
                                 <span className="transmissionLineText">
-                                  <span>{line.name}</span>
+                                  <span className="transmissionLineName">
+                                    <span className="facilityName">
+                                      {line.name}
+                                    </span>
+                                    {restricted && !building && (
+                                      <Chip
+                                        className="storyDerateBadge"
+                                        color="warning"
+                                        size="small"
+                                        label={`${Math.round(retainedCapacity * 100)}% limit`}
+                                        aria-label={`Temporarily limited to ${Math.round(retainedCapacity * 100)}% of rated capacity`}
+                                      />
+                                    )}
+                                  </span>
                                   <Typography
                                     component="span"
                                     variant="body2"

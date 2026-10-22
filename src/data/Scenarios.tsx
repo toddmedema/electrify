@@ -1614,38 +1614,35 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "wildfire emergency",
     locationId: "LA",
     summary:
-      "Wildfires are coming to Los Angeles. Prepare for power shutoffs and costly repairs.",
+      "Your main import route will lose 90% of its capacity. Build a backup plan before wildfire season.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
-      fantasy: "Keep Los Angeles supplied while crews repair the grid.",
+      fantasy:
+        "Keep Los Angeles supplied when wildfire cuts your northern intertie.",
       objective:
-        "Keep all connected customers supplied during the January and February 2025 wildfire emergency.",
+        "Supply at least 99.5% of demand during the January and February 2025 intertie outage.",
       threat:
-        "Safety shutoffs help prevent sparks in high winds. They cut sales and generator output while restoration costs mount.",
+        "Your existing northern intertie will lose 90% of its capacity. Prepare local generation, storage, or an independent connection.",
     },
     ownership: "Public",
     startingYear: 2022,
     durationMonths: 60,
-    // A 1%-scale model of LADWP's roughly 1.6 million electric customers and 20,749 GWh of
-    // FY2023-24 retail sales. The demand scale reconciles the account-based load model to that
-    // annual energy total. https://www.ladwp.com/who-we-are/power-system
     startingCustomers: 16000,
     startingDemandScale: 3.55,
     dollarsPerkWh: 0.17,
     cash: 50000000,
     feePerKgCO2e: 50 / 1000,
+    intertiesEnabled: true,
+    startingInterties: ["california-north"],
     reliabilityObjective: officialReliabilityMetadata(111, 2022),
-    // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
-    // resources using its 2024 power-content mix as the portfolio anchor.
-    // https://www.ladwp.com/who-we-are/power-system/power-content-label
+    // A deliberately import-dependent utility, not LADWP's historical generation portfolio.
     facilities: [
-      // LADWP's in-basin gas stations were largely repowered as combined cycles
       {
         assetId: "scenario-111-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
-        peakW: 24240000,
+        peakW: 12000000,
         initialAgeYears: 18,
       },
       {
@@ -1655,28 +1652,10 @@ export const SCENARIOS: ScenarioType[] = [
         initialAgeYears: 6,
       },
       {
-        assetId: "scenario-111-uranium",
-        fuel: "Uranium",
-        peakW: 12120000,
-        initialAgeYears: 30,
-      },
-      {
         assetId: "scenario-111-wind",
         fuel: "Wind",
         peakW: 10500000,
         initialAgeYears: 8,
-      },
-      {
-        assetId: "scenario-111-coal",
-        fuel: "Coal",
-        peakW: 8890000,
-        initialAgeYears: 35,
-      },
-      {
-        assetId: "scenario-111-geothermal",
-        fuel: "Geothermal",
-        peakW: 8060000,
-        initialAgeYears: 20,
       },
       {
         assetId: "scenario-111-battery",
@@ -1685,9 +1664,9 @@ export const SCENARIOS: ScenarioType[] = [
         initialAgeYears: 4,
       },
     ],
-    endTitle: "After the firestorm",
+    endTitle: "After the wildfire outage",
     endMessage:
-      "Power shutoffs and repairs put pressure on both your generators and your budget. How much did you keep in reserve?",
+      "Your main import route lost 90% of its capacity. See how your replacement supply held up.",
   },
   {
     id: 113,

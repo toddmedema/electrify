@@ -15,9 +15,9 @@ import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { buildStorySnapshot } from "../helpers/Story";
 import { runFailure } from "../helpers/ObjectiveRules";
 import {
-  wildfirePreparedness,
-  wildfirePreparednessAnnualCost,
-} from "../helpers/Wildfire";
+  legacyWildfirePreparedness as wildfirePreparedness,
+  legacyWildfirePreparednessAnnualCost as wildfirePreparednessAnnualCost,
+} from "../helpers/LegacyWildfirePreparedness";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -28,12 +28,14 @@ import {
   runSimulation,
 } from "../testing/Simulator";
 import type { DifficultyType, GameType } from "../Types";
+import { frozenWildfireScenario } from "../testing/FrozenWildfireScenarios";
 import reducer, { delta, generateNewTimeline, tickState } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
 
 // Independent pre-conversion values: the existing public choices, not the new compiler's output.
 const catalog = [
   {
+    lane: "current",
     arc: 106,
     id: "connection",
     dueMonth: 48,
@@ -43,6 +45,7 @@ const catalog = [
     ],
   },
   {
+    lane: "current",
     arc: 107,
     id: "winterization",
     dueMonth: 36,
@@ -52,6 +55,7 @@ const catalog = [
     ],
   },
   {
+    lane: "frozen legacy",
     arc: 111,
     id: "preparedness",
     dueMonth: 35,
@@ -85,12 +89,18 @@ const pack = (
 const start = (input: ModPackage, difficulty: DifficultyType = "Employee") =>
   createGame({
     scenarioId: 999,
-    scenario: modScenario(input, undefined, difficulty),
+    scenario: scenarioFor(input, difficulty),
     difficulty,
     seed: input.seed,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
+const scenarioFor = (
+  input: ModPackage,
+  difficulty: DifficultyType = "Employee",
+) =>
+  input.baseScenarioId === 111
+    ? frozenWildfireScenario(input, difficulty)
+    : modScenario(input, undefined, difficulty);
 const now = (state: GameType) =>
   getTimeFromTimeline(state.date.minute, state.timeline)!;
 const definition = (state: GameType, arc: number): CompiledRuleChoice =>
@@ -159,7 +169,7 @@ test.each(
     ),
   ),
 )(
-  "arc $arc on $difficulty reaches and applies $option.id exactly once",
+  "$lane arc $arc on $difficulty reaches and applies $option.id exactly once",
   ({ arc, id, dueMonth, difficulty, option }) => {
     const before = start(pack(arc), difficulty);
     expect(definition(before, arc).dueMonth).toBe(dueMonth);
@@ -211,7 +221,7 @@ test.each(
 );
 
 test.each(catalog)(
-  "arc $arc with choices disabled records its free answer at the actual due boundary",
+  "$lane arc $arc with choices disabled records its free answer at the actual due boundary",
   ({ arc, id, dueMonth }) => {
     const input = pack(arc, false);
     const state = start(input);
@@ -330,6 +340,7 @@ test("phasing replaces only the imported campus and retains source offsets after
 
 test.each([
   {
+    lane: "current",
     arc: 107,
     id: "winterization",
     option: "winterize",
@@ -339,6 +350,7 @@ test.each([
     scaledCost: 30000000,
   },
   {
+    lane: "frozen legacy",
     arc: 111,
     id: "preparedness",
     option: "prepare",
@@ -348,7 +360,7 @@ test.each([
     scaledCost: 1000000,
   },
 ])(
-  "arc $arc relocates its full paid budget and keeps preparation ahead of the shock",
+  "$lane arc $arc relocates its full paid budget and keeps preparation ahead of the shock",
   ({ arc, id, option, dueMonth, onsetMonth, customers, scaledCost }) => {
     const before = start(
       pack(arc, true, {
@@ -382,9 +394,12 @@ test.each([
   },
 );
 
-test.each([107, 111])(
-  "arc %s preparation changes committed future effects without mutating either forecast source",
-  (arc) => {
+test.each([
+  { arc: 107, lane: "current" },
+  { arc: 111, lane: "frozen legacy" },
+])(
+  "$lane arc $arc preparation changes committed future effects without mutating either forecast source",
+  ({ arc }) => {
     const descriptor = catalog.find((entry) => entry.arc === arc)!;
     const before = start(pack(arc));
     advance(before, descriptor.dueMonth);
@@ -496,13 +511,13 @@ test.each([107, 111])(
 );
 
 test.each(catalog)(
-  "arc $arc's explicit paid/consequential branch matches the headless reducer path",
+  "$lane arc $arc's explicit paid/consequential branch matches the headless reducer path",
   ({ arc, id, dueMonth, options }) => {
     const selected = options[0].id;
     const input = pack(arc);
     const liveStart = createGame({
       scenarioId: 999,
-      scenario: modScenario(input),
+      scenario: scenarioFor(input),
       seed: input.seed,
       difficulty: "Employee",
     });
@@ -511,7 +526,7 @@ test.each(catalog)(
     advance(live, dueMonth + 1);
     const result = runSimulation({
       scenarioId: 999,
-      scenario: modScenario(input),
+      scenario: scenarioFor(input),
       seed: input.seed,
       difficulty: "Employee",
       months: dueMonth + 1,
@@ -564,7 +579,6 @@ test("a saved imported choice executes with catalog lookup and source price call
       scenario,
       seed: scenario.seed,
       difficulty: "Employee",
-      wildfireHazardEnabled: false,
       weatherHazardsEnabled: false,
     });
     advance(before, 36);

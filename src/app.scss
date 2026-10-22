@@ -707,7 +707,7 @@ $topbar_height: 56px;
 
 #topbar .MuiToolbar-root {
   min-height: $topbar_height !important;
-  flex-wrap: nowrap;
+  flex-flow: row nowrap !important;
   padding-top: env(safe-area-inset-top);
   padding-left: max(16px, env(safe-area-inset-left)) !important;
   padding-right: max(16px, env(safe-area-inset-right)) !important;
@@ -863,6 +863,16 @@ $topbar_height: 56px;
 
   #topbar .gameStatus .weak {
     font-size: var(--font-size-body2);
+  }
+}
+
+// Stack cash and date on narrow phones so the year stays visible beside all four speed choices.
+@media screen and (max-width: 399px) {
+  #topbar .gameStatus {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    line-height: 1.2;
   }
 }
 
@@ -3703,22 +3713,6 @@ $pane_header_height: 48px;
     }
   }
 
-  // A seasonal fire-risk notice: a warning, not an emergency. Amber carries the signal while the
-  // copy stays full-contrast; it never reveals a seeded ignition date, only that risk is elevated.
-  .wildfireRiskNotice {
-    border-left: 3px solid var(--warning-icon);
-    background: var(--warning-fill);
-    padding: $space-2;
-
-    .eventLogSectionHeader {
-      padding: 0 0 $space-1;
-    }
-
-    .MuiTypography-body2 {
-      color: $font_color_primary;
-    }
-  }
-
   // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
   // event should not look like a red, active emergency before it has happened.
   .upcomingEvents {
@@ -5536,7 +5530,12 @@ html[data-startup-visit="returning"] #appStartup {
 .transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
 }
-.transmissionLine .transmissionLineText > span:first-child {
+.transmissionLine .transmissionLineName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }

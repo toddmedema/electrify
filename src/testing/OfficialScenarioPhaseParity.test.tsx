@@ -345,7 +345,7 @@ beforeAll(() => {
   }
 });
 
-for (const scenarioId of scenarioIds) {
+for (const scenarioId of scenarioIds.filter((id) => id !== 111)) {
   test(`official ${scenarioId} retains every old starting grid, phase, preview and observed branch`, () => {
     for (const expected of reference.setups.filter(
       (item) => item.scenarioId === scenarioId,
@@ -469,4 +469,46 @@ test("the native coal derate preserves its independent target effects without wa
   // Copied from the independent old CEO phase: only the original older coal plant is derated.
   expect(actual.effects.facilityOutputMultipliersById).toEqual({ "1": 0.8 });
   expectLegacyPhase(actual, phase, expected.profile);
+});
+
+// #602 deliberately replaced native 111. Keep its old authority byte-identical and use the
+// separately captured upstream reference in UpstreamWildfireRules.test.tsx for current native play.
+test("the old native111 fixture stays immutable after the upstream intertie redesign supersedes its plant lottery", () => {
+  expect(
+    createHash("sha256")
+      .update(
+        fs.readFileSync(
+          path.join(__dirname, "fixtures/OfficialScenarioLegacyPhases.json"),
+        ),
+      )
+      .digest("hex"),
+  ).toBe("e9b598b2145f9de3dc5274488621d58d302f709c06aa68a80ee0797f89270318");
+  const retired = reference.cases.filter((item) => item.scenarioId === 111);
+  expect(retired).toHaveLength(30);
+  expect(
+    reference.setups.filter((item) => item.scenarioId === 111),
+  ).toHaveLength(5);
+  expect(
+    [
+      ...new Set(
+        retired.flatMap((item) =>
+          item.phases.map((index) => reference.phaseFacts[index].key),
+        ),
+      ),
+    ].sort(),
+  ).toEqual([
+    "story:111:california-wildfire-2025:firestorm",
+    "story:111:california-wildfire-2025:red-flag-warning",
+    "story:111:california-wildfire-2025:restoration-complete",
+  ]);
+  const rules = scenarioRules(getScenario(111), {
+    difficulty: "CEO",
+    seed: 12345,
+  })!;
+  expect(rules.namespace).toMatchObject({ arcId: "wildfire-intertie" });
+  expect(rules.events.map((event) => event.id).sort()).toEqual([
+    "outage",
+    "readiness",
+    "restored",
+  ]);
 });

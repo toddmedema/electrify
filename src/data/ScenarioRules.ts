@@ -40,6 +40,8 @@ export type ResolvedRuleSelector =
       targetCapacityShare: number;
     };
 export interface RuleEffects {
+  /** Absolute surviving corridor nameplate, including upgrades; overlapping limits take the minimum. */
+  transmissionCapacityLimitsMWByCorridor?: Record<string, RuleNumber>;
   fuelPriceMultipliers?: Partial<Record<PricedFuelNameType, RuleNumber>>;
   outputMultipliersByFuel?: Partial<Record<FuelNameType, RuleNumber>>;
   /** These commuting operations are unordered; the compiler gives them a canonical order. */

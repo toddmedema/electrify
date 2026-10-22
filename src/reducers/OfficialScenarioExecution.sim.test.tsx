@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { createHash } from "crypto";
 import { deserialize, serialize } from "v8";
 import { createNextState } from "@reduxjs/toolkit";
@@ -34,7 +36,13 @@ import {
   playOfficialExecution,
 } from "../testing/OfficialScenarioExecutionFixtures";
 import { createGameFromReplay } from "../testing/Simulator";
-import type { GameType } from "../Types";
+import type { DifficultyType, GameType, RunIdentity } from "../Types";
+import type { SimOptionsType } from "../testing/Simulator";
+import { projectUpstreamWildfireGame } from "../testing/UpstreamWildfireComparison";
+import {
+  intertieContextForGame,
+  intertieOfferLimits,
+} from "../helpers/Transmission";
 import {
   buildFacility,
   loaded,
@@ -45,6 +53,7 @@ import {
   tick,
   tickState,
   togglePauseFacility,
+  upgradeTransmissionLine,
 } from "./Game";
 
 jest.setTimeout(120000);
@@ -455,7 +464,7 @@ test("the real native nuclear outage keeps a paused original and ignores sold or
   ).toBe(0);
 });
 
-test.each([104, 111])(
+test.each([104])(
   "native %i storm targets never transfer to a plant bought on the same onset boundary",
   (scenarioId) => {
     const rules = scenarioRules(getScenario(scenarioId), {
@@ -596,3 +605,227 @@ test("the native aging warning rejects malformed or duplicate selected IDs besid
   expect(validScenarioRuleState(game)).toBe(true);
   expectSave(game, "unchanged aging warning neighbor");
 });
+
+test("native111 keeps its surviving-route cap through a real upgrade without attaching generator targets", () => {
+  const rules = scenarioRules(getScenario(111), {
+    difficulty: "CEO",
+    seed: 12345,
+  })!;
+  const event = rules.events.find((item) => item.id === "outage")!;
+  const { game } = playOfficialExecution(111, {
+    throughMonth: event.startMonth,
+  });
+  const upgraded = officialCommand(
+    game,
+    upgradeTransmissionLine({ corridorId: "california-north", financed: true }),
+  );
+  const north = upgraded.transmission!.lines.find(
+    (line) => line.corridorId === "california-north",
+  )!;
+  expect(north.upgrade).toBeDefined();
+  expect(upgraded.facilities).toEqual(game.facilities);
+  const effects = resolveStoryAtDate(nativeContext(upgraded)).effects;
+  expect(effects.transmissionCapacityLimitsWByCorridor).toEqual({
+    "california-north": 4e6,
+  });
+  expect(effects.facilityOutputMultipliersById).toBeUndefined();
+  const limits = intertieOfferLimits(
+    north,
+    intertieContextForGame(upgraded),
+    upgraded.date.minute,
+    { ...currentTick(upgraded)!, ...effects },
+  );
+  expect(limits.importLimitW).toBeLessThanOrEqual(4e6);
+  expect(limits.exportLimitW).toBeLessThanOrEqual(4e6);
+  expectSave(upgraded, "native111 upgraded surviving route");
+});
+
+interface UpstreamNativeSnapshot {
+  month: number;
+  fullGameHash: string;
+  fullGameKeys: string[];
+  fullGameFieldHashes: Record<string, string>;
+  monthlyHistoryHash: string;
+  facilitiesHash: string;
+  timelineHash: string;
+  transmissionHash: string;
+  worldEventsHash: string;
+  objective: {
+    verdict: string | null;
+    observedMonths: {
+      year: number;
+      month: number;
+      demandWh: number;
+      supplyWh: number;
+      servedShare: number;
+    }[];
+  };
+}
+interface UpstreamNativeCampaign {
+  options: Partial<SimOptionsType> & {
+    difficulty: DifficultyType;
+    seed: number;
+  };
+  actualOutcome: "completed" | "fired";
+  actualTerminalMonth: number;
+  actualFailure?: { reason: string };
+  checkpoints: UpstreamNativeSnapshot[];
+  final: UpstreamNativeSnapshot;
+}
+const upstreamNative: {
+  provenance: { sourceSHA256: string };
+  campaigns: UpstreamNativeCampaign[];
+  failureNeighbors: UpstreamNativeCampaign[];
+  identities: {
+    difficulty: DifficultyType;
+    seed: number;
+    runIdentity: RunIdentity;
+    hash: string;
+  }[];
+} = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "../testing/fixtures/UpstreamWildfireReference.json"),
+    "utf8",
+  ),
+);
+function expectUpstreamNative(
+  game: GameType,
+  expected: UpstreamNativeSnapshot,
+) {
+  const identity = upstreamNative.identities.find(
+    (item) => item.difficulty === game.difficulty && item.seed === game.seed,
+  )!;
+  const projected = projectUpstreamWildfireGame(
+    game,
+    identity.runIdentity.compatibilityId,
+  );
+  // Only the certified four asset tags, generated fingerprint, and separately validated new
+  // ledger differ structurally from upstream. Every original identity input and Game field stays.
+  expect(projected.runIdentity).toEqual(identity.runIdentity);
+  expect(digest(projected.runIdentity)).toBe(identity.hash);
+  expect(digest(projected.monthlyHistory)).toBe(expected.monthlyHistoryHash);
+  expect(digest(projected.facilities)).toBe(expected.facilitiesHash);
+  expect(digest(projected.timeline)).toBe(expected.timelineHash);
+  expect(digest(projected.transmission)).toBe(expected.transmissionHash);
+  expect(digest(projected.worldEvents)).toBe(expected.worldEventsHash);
+  expect(Object.keys(projected).sort()).toEqual(expected.fullGameKeys);
+  for (const key of expected.fullGameKeys) {
+    const value = projected[key as keyof typeof projected];
+    const hash = createHash("sha256")
+      .update(JSON.stringify(canonical(value)) ?? "undefined")
+      .digest("hex");
+    expect({ month: expected.month, field: key, hash }).toEqual({
+      month: expected.month,
+      field: key,
+      hash: expected.fullGameFieldHashes[key],
+    });
+  }
+  expect(digest(projected)).toBe(expected.fullGameHash);
+  const ledger = game.objectiveProgress;
+  // The upstream engine had no ledger. Bind the added evidence to its captured completed demand.
+  expect(ledger).toBeDefined();
+  const goals = gameObjectiveResults(game);
+  expect(goals).toHaveLength(1);
+  expect(goals[0].target).toBe(0.995);
+  expect(goals[0].observedMonths).toBe(
+    expected.objective.observedMonths.length,
+  );
+  const observations = expected.objective.observedMonths
+    .map((row) => [
+      (row.year - game.startingYear) * 12 + row.month - 1,
+      row.supplyWh,
+      row.demandWh,
+    ])
+    .sort((a, b) => a[0] - b[0]);
+  expect(
+    canonical(
+      ledger!.entries.find((entry) => entry.id === goals[0].id)!.observations,
+    ),
+  ).toEqual(canonical(observations));
+  expect(goals[0].status).toBe(
+    expected.objective.verdict
+      ? "failed"
+      : observations.length === 2
+        ? "completed"
+        : observations.length
+          ? "inProgress"
+          : "pending",
+  );
+  if (observations.length)
+    expect(canonical(goals[0].observed)).toBe(
+      canonical(
+        Math.min(
+          ...expected.objective.observedMonths.map((row) => row.servedShare),
+        ),
+      ),
+    );
+}
+
+test.each(upstreamNative.campaigns)(
+  "upstream native111 preserves all original Game fields on $options.difficulty seed$options.seed",
+  (expected) => {
+    expect(upstreamNative.provenance.sourceSHA256).toBe(
+      "786ad0027ac6c793fb74fdc62a43787e8128d523822726529fdcbab5751bec33",
+    );
+    const reached = new Set<number>();
+    const { game } = playOfficialExecution(
+      111,
+      {
+        monthClose(game) {
+          const old = expected.checkpoints.find(
+            (checkpoint) => checkpoint.month === game.date.monthsElapsed,
+          );
+          if (old) {
+            expectUpstreamNative(game, old);
+            reached.add(old.month);
+          }
+        },
+      },
+      {
+        difficulty: expected.options.difficulty,
+        seed: expected.options.seed,
+        plan: expected.options,
+      },
+    );
+    expect(reached.size).toBe(expected.checkpoints.length);
+    expect(game.date.monthsElapsed).toBe(expected.actualTerminalMonth);
+    expect(gameObjectiveResults(game)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: "completed",
+          target: 0.995,
+          observedMonths: 2,
+        }),
+      ]),
+    );
+    expectUpstreamNative(game, expected.final);
+  },
+);
+
+test.each(upstreamNative.failureNeighbors)(
+  "upstream native111 keeps the original missed-goal stop for $options",
+  (expected) => {
+    const { game, violations } = playOfficialExecution(
+      111,
+      {},
+      {
+        difficulty: expected.options.difficulty,
+        seed: expected.options.seed,
+        plan: expected.options,
+        stopOnFailure: true,
+      },
+    );
+    expect(violations).toEqual([]);
+    expect(game.date.monthsElapsed).toBe(expected.actualTerminalMonth);
+    expect(gameObjectiveResults(game)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: "failed",
+          target: 0.995,
+          reason: expected.actualFailure!.reason,
+        }),
+      ]),
+    );
+    expectUpstreamNative(game, expected.final);
+  },
+);

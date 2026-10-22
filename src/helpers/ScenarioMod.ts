@@ -21,6 +21,7 @@ import { validCompiledScenarioRules } from "./ScenarioRules";
 import { canonicalRuleJson, ruleDigest, utf8Bytes } from "./RuleIdentity";
 import { getScenarioLocation, isValidLocation } from "./Locations";
 import { validHydroInventorySource } from "../data/HydroSites";
+import { validFrozenStartingIntertieScenario } from "./FrozenStartingInterties";
 
 export function facilityModifier(
   game: Pick<GameType, "customScenario">,
@@ -85,6 +86,8 @@ function validModSetup(scenario: ScenarioType): boolean {
       "recommendationOrder",
       "ownership",
       "intertiesEnabled",
+      "startingInterties",
+      "startingIntertieAccess",
       "seed",
       "startingYear",
       "cash",
@@ -107,6 +110,12 @@ function validModSetup(scenario: ScenarioType): boolean {
   )
     return false;
   const location = getScenarioLocation(scenario);
+  if (
+    (scenario.startingInterties !== undefined ||
+      scenario.startingIntertieAccess !== undefined) &&
+    !validFrozenStartingIntertieScenario(scenario)
+  )
+    return false;
   if (
     !number(scenario.cash, 0, 1e12) ||
     !number(scenario.dollarsPerkWh, 0, 100) ||

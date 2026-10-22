@@ -347,10 +347,36 @@ function ruleDiagnostics(value, path = "") {
         ...Object.keys(maps),
         ...Object.keys(scalars),
         "outputMultipliersBySelector",
+        "transmissionCapacityLimitsMWByCorridor",
         "transactions",
       ])
     )
       return;
+    const corridorLimits = v.transmissionCapacityLimitsMWByCorridor;
+    if (
+      corridorLimits !== undefined &&
+      object(
+        corridorLimits,
+        at(p, "transmissionCapacityLimitsMWByCorridor"),
+        Object.keys(corridorLimits ?? {}),
+      )
+    ) {
+      const entries = Object.entries(corridorLimits);
+      if (!entries.length || entries.length > 64)
+        add(
+          "count-limit",
+          at(p, "transmissionCapacityLimitsMWByCorridor"),
+          "must contain 1–64 corridor limits.",
+        );
+      for (const [corridor, value] of entries) {
+        const path = at(
+          at(p, "transmissionCapacityLimitsMWByCorridor"),
+          corridor,
+        );
+        id(corridor, path);
+        magnitude(value, path, 0, 1e6);
+      }
+    }
     for (const [key, bounds] of Object.entries(maps))
       if (
         v[key] !== undefined &&

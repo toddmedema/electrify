@@ -2,7 +2,7 @@ import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
-import { wildfirePreparedness } from "./Wildfire";
+import { legacyWildfirePreparedness } from "./LegacyWildfirePreparedness";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 import { scenarioRules } from "./ScenarioRules";
 import { getScenario } from "../data/Scenarios";
@@ -14,7 +14,7 @@ import type { CompiledScenarioRules } from "../data/ScenarioRules";
 
 const catalogChoices = new Map<string, CompiledRuleChoice[]>();
 
-/** Official choices already consume common data before the remaining story catalog migrates. */
+/** Read launch-bound choices from the shared compiled rules. */
 export function scenarioChoicesForGame(game: GameType): {
   choices: CompiledRuleChoice[];
   rules?: CompiledScenarioRules;
@@ -160,12 +160,6 @@ export function pendingScenarioChoice(
       !game.worldEvents.occurrences.some((event) => event.key === choice.id),
   );
 }
-/** Choices the player may take up without the clock waiting on them: ongoing wildfire
- * preparedness, started or stopped from Customer programs through the same replayable action. */
-export function optionalScenarioChoice(game: GameType) {
-  if (game.storyEffectsDisabled) return undefined;
-  return wildfirePreparedness(game)?.choice;
-}
 export function validScenarioResponse(
   value: unknown,
 ): value is { decisionId: string; optionId: string } {
@@ -175,4 +169,9 @@ export function validScenarioResponse(
     typeof response.decisionId === "string" &&
     typeof response.optionId === "string"
   );
+}
+
+/** Only already-frozen old community arcs retain the optional saved program. */
+export function optionalScenarioChoice(game: GameType) {
+  return legacyWildfirePreparedness(game)?.choice;
 }

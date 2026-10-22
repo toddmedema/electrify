@@ -6,10 +6,7 @@ import { getScenario } from "../data/Scenarios";
 import { copyCommitmentMetadata } from "../helpers/Commitment";
 import { currentTick } from "../helpers/GameSelectors";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
-import {
-  optionalScenarioChoice,
-  pendingScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import gameReducer, {
   buildFacility,
   buildTransmissionLine,
@@ -26,7 +23,7 @@ import {
   chooseScenarioResponse,
   schedulePolicy,
 } from "../reducers/GameActions";
-import type { GameType } from "../Types";
+import type { DifficultyType, GameType } from "../Types";
 import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import {
   checkMonth,
@@ -37,6 +34,7 @@ import {
   createGame,
   type InitialBuildType,
   type ScheduledSimActionType,
+  type SimOptionsType,
 } from "./Simulator";
 
 export const OFFICIAL_EXECUTION_IDS = [
@@ -153,14 +151,20 @@ export interface OfficialExecutionObserver {
 export function playOfficialExecution(
   scenarioId: number,
   observer: OfficialExecutionObserver = {},
+  settings: {
+    difficulty?: DifficultyType;
+    seed?: number;
+    plan?: Partial<SimOptionsType>;
+    stopOnFailure?: boolean;
+  } = {},
 ) {
   const scenario = getScenario(scenarioId)!;
-  const plan = STANDARD_BALANCE_PLAYS[scenarioId];
+  const plan = settings.plan ?? STANDARD_BALANCE_PLAYS[scenarioId];
   let game = createGame({
     ...plan,
     scenarioId,
-    difficulty: "CEO",
-    seed: 12345,
+    difficulty: settings.difficulty ?? "CEO",
+    seed: settings.seed ?? 12345,
   });
   const collector = new InvariantCollector();
   const applyMonth = () => {
@@ -169,7 +173,6 @@ export function playOfficialExecution(
         game = applyScheduled(game, action);
   };
   applyMonth();
-  let offeredMonth = -1;
   const throughMonth = observer.throughMonth ?? scenario.durationMonths;
   while (game.date.monthsElapsed < throughMonth) {
     const pending = pendingScenarioChoice(game);
@@ -190,19 +193,6 @@ export function playOfficialExecution(
         throw new Error(`Rejected response ${pending.id}/${option.id}`);
       observer.choice?.(game, "answered", pending.id);
     }
-    const offer =
-      offeredMonth === game.date.monthsElapsed
-        ? undefined
-        : optionalScenarioChoice(game);
-    offeredMonth = game.date.monthsElapsed;
-    const option = offer?.options.find(
-      (item) => item.id === plan.scenarioResponses?.[offer.id],
-    );
-    if (offer && option)
-      game = officialCommand(
-        game,
-        chooseScenarioResponse({ decisionId: offer.id, optionId: option.id }),
-      );
     const month = game.date.monthsElapsed;
     observer.beforeTick?.(game, game.date.minute + TICK_MINUTES);
     tickState(game);
@@ -224,10 +214,12 @@ export function playOfficialExecution(
       (currentTick(game)?.cash ?? -1) < 0 ||
       hasChronicBlackouts(game.monthlyHistory, game.difficulty) ||
       failure
-    )
+    ) {
+      if (settings.stopOnFailure) break;
       throw new Error(
         `Official ${scenarioId} route ended at month ${game.date.monthsElapsed}: ${failure?.reason ?? "economic failure"}`,
       );
+    }
     observer.monthClose?.(game);
     if (
       plan.sellFacilityId !== undefined &&

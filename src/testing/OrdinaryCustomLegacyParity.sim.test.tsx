@@ -27,16 +27,24 @@ interface LegacyCustomCase {
   storyOccurrences: SimResultType["storyOccurrences"];
   oldInitialSave?: unknown;
 }
-const reference: {
+const upstream: {
   baselineCommit: string;
   significantDigits: number;
-  cases: LegacyCustomCase[];
+  custom: LegacyCustomCase[];
 } = JSON.parse(
   fs.readFileSync(
-    path.join(__dirname, "fixtures/OrdinaryCustomLegacyReference.json"),
+    path.join(__dirname, "fixtures/UpstreamWildfireWorldCustomReference.json"),
     "utf8",
   ),
 );
+const reference = { ...upstream, cases: upstream.custom };
+const previous: { baselineCommit: string; cases: LegacyCustomCase[] } =
+  JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "fixtures/OrdinaryCustomLegacyReference.json"),
+      "utf8",
+    ),
+  );
 
 jest.setTimeout(120000);
 beforeEach(() => jest.useFakeTimers());
@@ -47,17 +55,19 @@ afterEach(() => {
 
 test("the independent ordinary custom matrix covers mixed arcs and real target neighbors", () => {
   expect(reference.baselineCommit).toBe(
+    "b4afcd80c173934650a71e0e7586e8732d1b233e",
+  );
+  expect(previous.baselineCommit).toBe(
     "2fc5d50ebedd5d3695b9db7d75ca5b54c0912779",
   );
+  expect(previous.cases).toHaveLength(7);
   expect(reference.significantDigits).toBe(10);
   expect(reference.cases.map((item) => item.id)).toEqual([
-    "all14-Employee",
-    "all14-CEO",
+    "all13-Employee",
+    "all13-CEO",
     "nuclear-largest-operating",
     "nuclear-paused-largest",
     "nuclear-no-reactor",
-    "wildfire-standard",
-    "wildfire-prepare",
   ]);
   for (const item of reference.cases) {
     expect(item.options.scenario!.mod).toBeUndefined();
@@ -65,9 +75,12 @@ test("the independent ordinary custom matrix covers mixed arcs and real target n
   }
   expect(
     reference.cases
-      .filter((item) => item.id.startsWith("all14-"))
+      .filter((item) => item.id.startsWith("all13-"))
       .map((item) => item.options.scenario!.eventScenarioIds),
-  ).toEqual([[...OFFICIAL_WORLD_IDS], [...OFFICIAL_WORLD_IDS]]);
+  ).toEqual([
+    OFFICIAL_WORLD_IDS.filter((id) => id !== 111),
+    OFFICIAL_WORLD_IDS.filter((id) => id !== 111),
+  ]);
   expect(reference.cases.filter((item) => item.oldInitialSave)).toHaveLength(1);
 });
 
@@ -82,6 +95,9 @@ for (const expected of reference.cases)
     expect(result.violations).toEqual([]);
     expect(result.outcome).toBe("completed");
     expect(result.months).toHaveLength(options.scenario!.durationMonths);
+    // The pre-#605 upstream simulator had no objectiveResults API; ordinary
+    // custom games have no declared goals in either representation.
+    expect(result.objectiveResults).toEqual([]);
     expect(officialWorldHash(result.months)).toBe(expected.monthlyHistoryHash);
     expect(officialWorldHash(result.finalFacilities)).toBe(
       expected.finalFacilitiesHash,
@@ -95,7 +111,6 @@ for (const expected of reference.cases)
         finalNetWorth: result.finalNetWorth,
         firedAtMonth: result.firedAtMonth,
         bankruptAtMonth: result.bankruptAtMonth,
-        objectiveResults: result.objectiveResults,
         finalTransmissionLines: result.finalTransmissionLines,
       }),
     ).toEqual(expected.summary);
@@ -118,26 +133,9 @@ for (const [id, selected] of [
     expect(trip!.attributes.selectedFacilityIds).toEqual(selected);
   });
 
-for (const [id, effectiveness] of [
-  ["wildfire-standard", 0],
-  ["wildfire-prepare", 1],
-] as const)
-  test(`the immutable ${id} route reaches both the fire and recovery`, () => {
-    const expected = reference.cases.find((item) => item.id === id)!;
-    const fire = expected.storyOccurrences.find(
-      (item) => item.key === "story:111:california-wildfire-2025:firestorm",
-    );
-    expect(fire).toBeDefined();
-    expect(fire!.attributes.preparednessEffectiveness).toBe(effectiveness);
-    expect(
-      expected.storyOccurrences.some((item) =>
-        item.key.endsWith(":restoration-complete"),
-      ),
-    ).toBe(true);
-  });
-
 test("an actual old ordinary custom save remains valid without accepting stored native rules", () => {
   const original = reference.cases.find((item) => item.oldInitialSave)!;
+  expect(original.oldInitialSave).toMatchObject({ schemaVersion: 5 });
   loadSimData(getScenarioLocation(original.options.scenario)!);
   const parsed = parseSave(cloneDeep(original.oldInitialSave));
   expect(parsed).not.toBeNull();
@@ -148,4 +146,23 @@ test("an actual old ordinary custom save remains valid without accepting stored 
   forged.game.customScenario.rules = {};
   expect(parseSave(forged)).toBeNull();
   expect(parseSave(cloneDeep(original.oldInitialSave))).not.toBeNull();
+});
+
+test("the upstream retirement upgrades an actual earlier custom save without changing its authored fleet", () => {
+  const source = previous.cases.find((item) => item.oldInitialSave)!;
+  loadSimData(getScenarioLocation(source.options.scenario)!);
+  const upgraded = parseSave(cloneDeep(source.oldInitialSave));
+  expect(upgraded).not.toBeNull();
+  expect(upgraded!.game.customScenario!.mod).toBeUndefined();
+  expect(upgraded!.game.customScenario!.eventScenarioIds).toEqual(
+    source.options.scenario!.eventScenarioIds!.filter((id) => id !== 111),
+  );
+  expect(upgraded!.game.customScenario!.facilities).toEqual(
+    source.options.scenario!.facilities,
+  );
+  expect(
+    upgraded!.game.worldEvents.occurrences.some((event) =>
+      event.key.startsWith("story:111:"),
+    ),
+  ).toBe(false);
 });

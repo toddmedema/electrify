@@ -19,7 +19,6 @@ import {
 } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
-import { WildfireRiskNoticeType } from "../../helpers/Wildfire";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import { isPaneLayout } from "../../Globals";
 import { EvidenceTargetType, GameType } from "../../Types";
@@ -92,7 +91,6 @@ export interface StateProps {
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
   ongoing?: UpcomingStoryEventType[];
-  riskNotice?: WildfireRiskNoticeType;
 }
 
 export interface DispatchProps {
@@ -134,14 +132,7 @@ export default function EventLog(props: Props): React.JSX.Element {
       );
     }
   }, [evidenceRequest, facilityDragActive, onEvidenceReady, operations]);
-  const {
-    events,
-    onOpen,
-    onSelect,
-    upcoming = [],
-    ongoing = [],
-    riskNotice,
-  } = props;
+  const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
   const [historyFilters, setHistoryFilters] = React.useState<
     EventHistoryFilterType[]
   >(() => {
@@ -202,21 +193,6 @@ export default function EventLog(props: Props): React.JSX.Element {
           ref={historyAnchor}
           tabIndex={operations ? -1 : undefined}
         >
-          {riskNotice && (
-            <section
-              className="eventLogSection wildfireRiskNotice"
-              aria-labelledby="wildfireRiskNoticeTitle"
-            >
-              <header className="eventLogSectionHeader">
-                <Typography id="wildfireRiskNoticeTitle" variant="subtitle2">
-                  {riskNotice.title}
-                </Typography>
-              </header>
-              <Typography variant="body2" color="textSecondary">
-                {riskNotice.message}
-              </Typography>
-            </section>
-          )}
           {ongoing.length > 0 && (
             <section
               className="eventLogSection ongoingEvents"

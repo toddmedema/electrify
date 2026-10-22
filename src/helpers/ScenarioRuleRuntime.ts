@@ -23,7 +23,7 @@ import {
   survivingScenarioRuleTargets,
   ScenarioRuleTargetBinding,
 } from "./ScenarioRuleTargets";
-import { wildfirePreparednessEffectiveness } from "./Wildfire";
+import { legacyWildfirePreparednessEffectiveness } from "./LegacyWildfirePreparedness";
 import { canonicalRuleJson } from "./RuleIdentity";
 import {
   resolveScenarioRuleChoice,
@@ -84,7 +84,7 @@ export function scenarioRuleProtectionFactor(
       receivingScenarioId !== 999
     )
       ? 0.5 *
-        wildfirePreparednessEffectiveness(
+        legacyWildfirePreparednessEffectiveness(
           prior,
           locationId,
           event.startMonth * MINUTES_PER_MONTH,
@@ -577,13 +577,16 @@ export function scenarioRuleCapacityReportMonths(
       ),
     ),
   ].flatMap((report) =>
-    report.kind === "firmCoverage" || report.kind === "storageCoverage"
+    "throughMonth" in report &&
+    (rules.namespace.kind === "mod" ||
+      report.kind === "firmCoverage" ||
+      report.kind === "storageCoverage")
       ? [report.throughMonth]
       : [],
   );
 }
 
-/** Capture only the capacity facts required by reports, at the exact close of their window. */
+/** Version-1 imports retain closing capacity facts at every declared report window. */
 export function captureRuleReportObservation(
   game: GameType,
   context: StoryContextType,

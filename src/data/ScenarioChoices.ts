@@ -7,7 +7,7 @@ export {
   DATA_CENTER_GRANT,
 } from "./ScenarioChoiceRules";
 
-/** Transitional presentation adapter. The owning challenge choices themselves are plain data. */
+/** Presentation adapter for the common plain catalog choices. */
 export const SCENARIO_CHOICES: ScenarioChoiceType[] = SCENARIO_CHOICE_RULES.map(
   (entry) => ({
     id: catalogChoiceKey(entry),

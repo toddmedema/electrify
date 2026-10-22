@@ -137,7 +137,7 @@ test("history stays below priorities in a short pane without duplicate upcoming 
   for (const name of [
     "Data Center Boom",
     "Heatwave + Drought",
-    "Wildfire Emergency",
+    "Sudden Nuclear Shutdown",
   ]) {
     await page.getByRole("option", { name, exact: true }).click();
   }

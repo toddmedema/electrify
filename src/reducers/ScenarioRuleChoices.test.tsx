@@ -74,7 +74,6 @@ const game = (input = pack(), difficulty: DifficultyType = "Employee") =>
     scenario: modScenario(input, undefined, difficulty),
     difficulty,
     seed: input.seed,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
 const now = (state: GameType) =>
@@ -347,7 +346,6 @@ test("live, saved and headless explicit branches share monthly accounting and re
     months: 3,
     strategy: "none",
     scenarioResponses: { "mod:choice-grid:response": "accept" },
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
   expect(headless.violations).toEqual([]);
@@ -499,7 +497,6 @@ test("reordered equivalent frozen load definitions retain the same runtime sched
       scenarioId: 999,
       scenario,
       seed: input.seed,
-      wildfireHazardEnabled: false,
       weatherHazardsEnabled: false,
     });
   const a = make(original),

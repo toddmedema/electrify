@@ -14,7 +14,7 @@ interface LegacyCase {
   options: SimOptionsType;
   monthlyHistoryHash: string;
   finalFacilitiesHash: string;
-  summary: unknown;
+  summary: { wildfireImpact: unknown; [key: string]: unknown };
   objectiveResults: unknown;
   storyOccurrences: unknown;
   reachedStoryKeys: string[];
@@ -74,6 +74,16 @@ for (const expected of reference.cases)
     expect(result.months).toHaveLength(84);
     expect(digest(result.months)).toBe(expected.monthlyHistoryHash);
     expect(digest(result.finalFacilities)).toBe(expected.finalFacilitiesHash);
+    // Upstream #602 retired the regional-hazard summary API. Certify the old
+    // zero-impact observation explicitly; every physical hash remains unchanged.
+    const { wildfireImpact, ...summary } = expected.summary;
+    expect(wildfireImpact).toEqual({
+      averageSeverity: null,
+      incidentCount: 0,
+      totalDisconnectedWh: 0,
+      totalRestorationCost: 0,
+    });
+    expect(result).not.toHaveProperty("wildfireImpact");
     expect(
       canonical({
         outcome: result.outcome,
@@ -86,10 +96,9 @@ for (const expected of reference.cases)
         finalTransmissionLines: result.finalTransmissionLines,
         actionCount: result.actionCount,
         builds: result.builds,
-        wildfireImpact: result.wildfireImpact,
         weatherHazardImpact: result.weatherHazardImpact,
       }),
-    ).toEqual(expected.summary);
+    ).toEqual(summary);
     expect(canonical(result.objectiveResults)).toEqual(
       expected.objectiveResults,
     );

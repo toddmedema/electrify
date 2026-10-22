@@ -52,7 +52,6 @@ it("interprets mod debriefs from completed facts and marks a missing-history nei
     scenarioId: 999,
     scenario,
     seed: 42,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
   while (game.date.monthsElapsed < 2) tickState(game);

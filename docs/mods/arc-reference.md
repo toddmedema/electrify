@@ -166,15 +166,13 @@ This arc introduces no permanent industrial load.
 
 Preparation lead: 24 months.
 
-| Phase ID               | Relocated offset | Playable month | Active duration (Easy) |
-| ---------------------- | ---------------- | -------------- | ---------------------- |
-| `red-flag-warning`     | 35               | 36             | Message opening only   |
-| `firestorm`            | 36               | 37             | 2 months               |
-| `restoration-complete` | 38               | 39             | Message opening only   |
+| Phase ID    | Relocated offset | Playable month | Active duration (Easy) |
+| ----------- | ---------------- | -------------- | ---------------------- |
+| `readiness` | 25               | 26             | Message opening only   |
+| `outage`    | 36               | 37             | 2 months               |
+| `restored`  | 38               | 39             | Message opening only   |
 
-| Choice ID      | Due month | Option IDs            | Automatic response without choices |
-| -------------- | --------- | --------------------- | ---------------------------------- |
-| `preparedness` | 36        | `prepare`, `standard` | `standard`                         |
+This arc has no consequential choices.
 
 This arc introduces no permanent industrial load.
 

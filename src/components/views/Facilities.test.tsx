@@ -751,7 +751,9 @@ describe("the interties view", () => {
         return { ...result, buildCost: result.id === cheap ? 1e6 : 2e6 };
       });
     try {
-      renderProjects(createGame({ scenarioId: 111 }));
+      const game = createGame({ scenarioId: 111 });
+      game.transmission!.lines = [];
+      renderProjects(game);
       const first = () => screen.getAllByTestId(/^transmission-project-/)[0];
       expect(first()).toHaveAttribute("data-corridor-id", "california-north");
       const select = async (label: string) => {
@@ -779,21 +781,23 @@ describe("the interties view", () => {
   });
   it("updates capacity and purchase quote when selecting a larger tier", async () => {
     const onBuild = jest.fn();
-    renderProjects(createGame({ scenarioId: 111 }), onBuild);
+    const game = createGame({ scenarioId: 111 });
+    game.transmission!.lines = [];
+    renderProjects(game, onBuild);
     const north = screen.getByTestId("transmission-project-california-north");
     const slider = screen.getByRole("slider");
-    expect(north).toHaveTextContent("Import capacity4MW");
+    expect(north).toHaveTextContent("Import capacity40MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     fireEvent.change(slider, { target: { value: 3 } });
     expect(slider).toHaveAttribute("aria-valuenow", "3");
     expect(north).not.toHaveTextContent("Line capacity");
-    expect(north).toHaveTextContent("Import capacity5MW");
+    expect(north).toHaveTextContent("Import capacity50MW");
     expect(north).toHaveTextContent("Export capacity5MW");
     await user.click(
       within(north).getByRole("button", { name: /Review purchase/ }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent("Tier 3");
-    expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity5MW");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Import capacity50MW");
     expect(screen.getByRole("dialog")).toHaveTextContent("Export capacity5MW");
     await user.click(screen.getByRole("button", { name: "Pay cash" }));
     expect(onBuild).toHaveBeenCalledWith("california-north", false, 3);
@@ -856,6 +860,35 @@ describe("unified connections", () => {
     }));
     return game;
   }
+
+  it.each([
+    [55, 0, 1],
+    [90, 0, 1],
+    [95, 0, 0],
+    [55, 1, 0],
+  ] as const)(
+    "labels an operating intertie at %d%% capacity with %d years of construction left",
+    (percent, yearsToBuildLeft, badgeCount) => {
+      const game = connectedGame();
+      const line = game.transmission!.lines[0];
+      line.yearsToBuildLeft = yearsToBuildLeft;
+      getTimeFromTimeline(
+        game.date.minute,
+        game.timeline,
+      )!.transmissionCapacityLimitsWByCorridor = {
+        [line.corridorId]: (line.capacityW * percent) / 100,
+      };
+      renderFacilities(game, null);
+      expect(screen.queryAllByText(`${percent}% limit`)).toHaveLength(
+        badgeCount,
+      );
+      expect(
+        screen.queryAllByLabelText(
+          `Temporarily limited to ${percent}% of rated capacity`,
+        ),
+      ).toHaveLength(badgeCount);
+    },
+  );
 
   it("keeps connections outside dispatch and reports network flow only once", async () => {
     const game = connectedGame();

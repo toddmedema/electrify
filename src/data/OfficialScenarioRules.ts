@@ -34,8 +34,6 @@ export interface OfficialRulePresentation {
     | "hurricaneOutlook"
     | "hurricaneLandfall"
     | "hurricaneRestoration"
-    | "wildfireOnset"
-    | "wildfireRestoration"
     | "nuclearContingency"
     | "nuclearTrip";
   protection?: CompiledRuleEvent["protection"];

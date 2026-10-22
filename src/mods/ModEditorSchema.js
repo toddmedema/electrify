@@ -235,6 +235,15 @@ const load = () => ({
 });
 const effects = () => {
   const props = {};
+  props.transmissionCapacityLimitsMWByCorridor = {
+    type: "object",
+    minProperties: 1,
+    maxProperties: 64,
+    propertyNames: { type: "string", pattern: ID_PATTERN.source },
+    additionalProperties: magnitude(0, 1e6),
+    description:
+      "Surviving corridor nameplate in MW, including upgrades. Zero closes the route in both directions; overlapping caps use the smallest limit.",
+  };
   for (const [key, min, max, names] of [
     [
       "fuelPriceMultipliers",

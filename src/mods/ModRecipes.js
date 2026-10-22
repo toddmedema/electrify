@@ -32,6 +32,7 @@ function createModRecipes() {
         startMonth: 2,
         durationMonths: 2,
         effects: {
+          transmissionCapacityLimitsMWByCorridor: { "california-north": 4 },
           fuelPriceMultipliers: { "Natural Gas": 1.1 },
           outputMultipliersByFuel: { "Natural Gas": 0.95 },
           demandMultiplier: 1.05,

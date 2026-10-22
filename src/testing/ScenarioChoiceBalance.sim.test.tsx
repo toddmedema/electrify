@@ -6,7 +6,7 @@ import {
   STANDARD_BALANCE_PLAYS,
 } from "./BalancePlaybooks";
 import { runSimulationOnce } from "./SimulationTestHelpers";
-import { SimResultType, SimOptionsType } from "./Simulator";
+import { SimResultType } from "./Simulator";
 
 jest.setTimeout(120000);
 
@@ -14,35 +14,20 @@ jest.setTimeout(120000);
 const physicalObjectiveFailure = (result: SimResultType) =>
   scenarioObjectiveFailure(result.scenario, [...result.months].reverse());
 
-// Compare each branch with the same operating plan. The standard CEO wildfire reference
-// now buys preparedness instead of a late coal pause; retain that original operating
-// choice for both explicit branches here to compare the same operating plan.
 function choicePlay(scenarioId: number, difficulty: DifficultyType) {
-  const play: Partial<SimOptionsType> =
-    difficulty === "Intern"
-      ? INTERN_ONE_BUILD_PLAYS[scenarioId]
-      : STANDARD_BALANCE_PLAYS[scenarioId];
-  return scenarioId === 111 && difficulty === "CEO"
-    ? {
-        ...play,
-        scheduledActions: [
-          ...(play.scheduledActions || []),
-          { month: 59, type: "toggle" as const, facilityId: 5 },
-        ],
-      }
-    : play;
+  return difficulty === "Intern"
+    ? INTERN_ONE_BUILD_PLAYS[scenarioId]
+    : STANDARD_BALANCE_PLAYS[scenarioId];
 }
 
 describe("major scenario choice balance", () => {
-  [106, 107, 111].forEach((scenarioId) => {
+  [106, 107].forEach((scenarioId) => {
     (["Intern", "CEO"] as DifficultyType[]).forEach((difficulty) => {
       // Explicit IDs ensure accidentally removing a new choice cannot shrink this matrix.
       const optionIds =
         scenarioId === 106
           ? ["fast-track", "phased"]
-          : scenarioId === 107
-            ? ["winterize", "standard"]
-            : ["prepare", "standard"];
+          : ["winterize", "standard"];
       optionIds.forEach((optionId) => {
         it(`${scenarioId} ${difficulty} ${optionId} permits victory and genuine defeat`, () => {
           const decision = SCENARIO_CHOICES.find(
@@ -64,11 +49,9 @@ describe("major scenario choice balance", () => {
             // after responding, and leave it off through the emergency. Data Center simply
             // neglects expansion. No cash injection, forced state, or artificial price is used.
             scheduledActions:
-              scenarioId === 111
-                ? [{ month: 36, type: "toggle", facilityId: 1 }]
-                : scenarioId === 107
-                  ? [{ month: 37, type: "toggle", facilityId: 2 }]
-                  : [],
+              scenarioId === 107
+                ? [{ month: 37, type: "toggle", facilityId: 2 }]
+                : [],
           });
           [winning, losing].forEach((result) => {
             expect(
@@ -191,35 +174,6 @@ describe("major scenario choice balance", () => {
           }),
         );
       }
-    },
-  );
-
-  it.each(["Intern", "CEO"] as const)(
-    "wildfire offers two viable responses with different finances on %s",
-    (difficulty) => {
-      // The same runs the choice matrix above plays, so this reuses them rather than repeating them
-      const decision = SCENARIO_CHOICES.find(
-        (choice) => choice.scenarioId === 111,
-      )!;
-      const play = choicePlay(111, difficulty);
-      const simulate = (optionId: string) =>
-        runSimulationOnce({
-          scenarioId: 111,
-          difficulty,
-          ...play,
-          scenarioResponses: { [decision.id]: optionId },
-        });
-      const prepared = simulate("prepare");
-      const standard = simulate("standard");
-      [prepared, standard].forEach((result) => {
-        expect(result.violations).toEqual([]);
-        expect(result.outcome).toBe("completed");
-      });
-      expect(physicalObjectiveFailure(prepared)).toBeUndefined();
-      expect(physicalObjectiveFailure(standard)).toBeUndefined();
-      // With scarce imports, avoided disruptions can outweigh the preparedness fee.
-      // Do not force the free response to dominate the financed outcome in every grid.
-      expect(standard.finalCash).not.toBe(prepared.finalCash);
     },
   );
 });

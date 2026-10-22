@@ -17,14 +17,14 @@ const HEADLINERS: Record<
   107: { year: 2017, month: 49, phase: "uri" },
   108: { year: 2024, month: 29, phase: "heatwave-month-1" },
   110: { year: 2024, month: 30, lastMonth: 36, phase: "trip" },
-  111: { year: 2024, month: 12, phase: "firestorm" },
+  111: { year: 2024, month: 12, phase: "outage" },
   113: { year: 2018, month: 12, phase: "availability-step-1" },
   114: { year: 2014, month: 12, phase: "reservoir-step-1" },
   115: { year: 2021, month: 4, phase: "summer-peak-1" },
 };
 
 test.each(SCENARIOS.filter((scenario) => !scenario.tutorialSteps))(
-  "$name opens in January at least 36 months before its historical headline event",
+  "$name opens in January at least 36 months before its headline event",
   (scenario) => {
     const headline = HEADLINERS[scenario.id];
     expect(headline).toBeDefined();

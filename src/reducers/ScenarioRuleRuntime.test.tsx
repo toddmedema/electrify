@@ -16,6 +16,7 @@ import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame, runSimulation } from "../testing/Simulator";
+import { frozenAutomaticWildfireScenario } from "../testing/FrozenWildfireScenarios";
 import type { DifficultyType, GameType, GeneratorShoppingType } from "../Types";
 import reducer, {
   buildFacility,
@@ -139,13 +140,14 @@ test("commuting operation order cannot change persisted target associations in a
   expect(parseSave(serializeSave(state))).not.toBeNull();
 });
 
-test("save validation rejects protection that has no committed paid response", () => {
-  const input = pack();
-  delete input.scenario;
-  const state = game({
-    ...input,
-    baseScenarioId: 111,
-    officialArcs: [{ scenarioId: 111, includeChoices: false }],
+test("old frozen111 save validation rejects protection that has no committed paid response", () => {
+  const scenario = frozenAutomaticWildfireScenario();
+  const state = createGame({
+    scenarioId: 999,
+    scenario,
+    difficulty: "Employee",
+    seed: scenario.seed,
+    weatherHazardsEnabled: false,
   });
   advance(state, 36);
   expect(validScenarioRuleState(state)).toBe(true);
@@ -166,7 +168,6 @@ function game(input = pack(), difficulty: DifficultyType = "Employee") {
     scenario,
     seed: input.seed,
     difficulty,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
 }
@@ -581,7 +582,6 @@ test("compiled imported arcs activate, forecast and resume with installed catalo
       scenarioId: 999,
       scenario,
       seed: input.seed,
-      wildfireHazardEnabled: false,
       weatherHazardsEnabled: false,
     });
     const bridge = scenario.mod!.rules.arcEvents!.find(
@@ -788,7 +788,6 @@ test("headless simulation and manual ticks retain identical monthly accounting a
     scenarioId: 999,
     scenario,
     seed: input.seed,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
   advance(live, 3);
@@ -797,7 +796,6 @@ test("headless simulation and manual ticks retain identical monthly accounting a
     scenario,
     seed: input.seed,
     months: 3,
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
   expect(headless.violations).toEqual([]);

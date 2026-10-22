@@ -125,31 +125,6 @@ export function presentOfficialRuleOccurrence(
       effects.facilityOutputMultipliersById ??= {};
       break;
     }
-    case "wildfireOnset": {
-      const originalDisconnected = Number(attributes.disconnectedDemand);
-      const disconnected = originalDisconnected * (1 - protection);
-      const originalOutput = event.targets[0].outputMultiplier;
-      const output = 1 - (1 - originalOutput) * (1 - protection);
-      const prepared = priorChoice("preparedness", "prepare");
-      const eligiblePeakW = snapshot!.facilities
-        .filter((facility) => facility.operational && !!facility.fuel)
-        .reduce((sum, facility) => sum + facility.peakW, 0);
-      attributes.prepared = prepared;
-      attributes.disconnectedDemand = disconnected;
-      attributes.outputMultiplier = output;
-      attributes.selectedCapacityShare = share(
-        selected.reduce((sum, facility) => sum + facility.peakW, 0),
-        eligiblePeakW,
-      );
-      attributes.selectedFacilityIds = selectedIds;
-      attributes.selectedFacilityNames = selectedNames;
-      const affected = selectedNames.length
-        ? selectedNames.join(", ")
-        : "No operating generators are affected";
-      message = `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(disconnected * 100)}% of customer demand is disconnected. ${affected}${selectedNames.length ? `: output is down to ${percent(output)}` : ""}. Repairs cost $${Number(attributes.restorationCostPerMonth) / 1000000}M/month through February.`;
-      effects.facilityOutputMultipliersById ??= {};
-      break;
-    }
     case "nuclearTrip":
       attributes.selectedFacilityIds = selectedIds;
       attributes.selectedFacilityNames = selectedNames;
@@ -250,12 +225,8 @@ export function presentOfficialRuleOccurrence(
           : `Coal supplied ${percent(coalShare)} of last year's power. The grid met ${percent(reliability)} of demand at a ${snapshot!.netIncome12m >= 0 ? "profit" : "loss"}.`;
       break;
     }
-    case "hurricaneRestoration":
-    case "wildfireRestoration": {
-      const onsetId =
-        presentation.nativeReview === "hurricaneRestoration"
-          ? "landfall"
-          : "firestorm";
+    case "hurricaneRestoration": {
+      const onsetId = "landfall";
       const onsetDefinition = rules.events.find(
         (definition) => definition.source?.phaseId === onsetId,
       )!;
@@ -273,10 +244,7 @@ export function presentOfficialRuleOccurrence(
       const names = (onset?.attributes.selectedFacilityNames ?? []) as string[];
       Object.assign(attributes, { demandWh, unservedWh, reliability: served });
       importance = unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE";
-      message =
-        presentation.nativeReview === "hurricaneRestoration"
-          ? `${names.length ? `${names.join(", ")}: output` : "Plant output"} and oil prices return to normal. The grid met ${percent(served)} of demand during the storm.`
-          : `${priorChoice("preparedness", "prepare") ? "Your funded preparedness halved disconnections and output losses. " : ""}Safety shutoffs end and ${names.length ? names.join(", ") : "affected generators"} return to normal. The grid met ${percent(served)} of connected demand.`;
+      message = `${names.length ? `${names.join(", ")}: output` : "Plant output"} and oil prices return to normal. The grid met ${percent(served)} of demand during the storm.`;
       break;
     }
   }
@@ -300,22 +268,7 @@ export function presentOfficialRuleOccurrence(
     attributes,
     effects,
   };
-  if (
-    preview &&
-    presentation.nativeReview === "wildfireOnset" &&
-    priorChoice("preparedness", "prepare")
-  )
-    occurrence.message =
-      "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses.";
   if (context?.scenarioId === 999) {
-    if (presentation.nativeReview === "wildfireOnset") {
-      occurrence.attributes.outputMultiplier =
-        event.targets[0].outputMultiplier;
-      occurrence.attributes.preparednessEffectiveness = protection * 2;
-      occurrence.attributes.prepared = protection > 0;
-      occurrence.attributes.disconnectedDemand =
-        1 - (occurrence.effects.demandMultiplier ?? 1);
-    }
     const changes = scenarioEffectsSummary(occurrence.effects);
     if (!preview)
       occurrence.message = `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;

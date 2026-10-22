@@ -1,19 +1,44 @@
+import fs from "fs";
+import path from "path";
 import {
   resolveScenarioRuleTargets,
   survivingScenarioRuleTargets,
   type ScenarioRuleTargetFacility,
 } from "./ScenarioRuleTargets";
-import {
-  CALIFORNIA_WILDFIRE_BALANCE,
-  HURRICANE_BALANCE,
-  resolveStoryAtDate,
-  type StoryContextType,
-} from "../data/WorldEvents";
+import { resolveStoryAtDate, type StoryContextType } from "../data/WorldEvents";
 import { getScenario } from "../data/Scenarios";
-import { scenarioRules } from "./ScenarioRules";
+import { scenarioRules, validCompiledScenarioRules } from "./ScenarioRules";
 import { DIFFICULTY_IDS, LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
-import type { ResolvedRuleSelector } from "../data/ScenarioRules";
+import type {
+  CompiledScenarioRules,
+  ResolvedRuleSelector,
+} from "../data/ScenarioRules";
+import type { DifficultyType } from "../Types";
+
+const frozenWildfire: {
+  staticSnapshots: {
+    difficulty: DifficultyType;
+    seed: number;
+    rules: CompiledScenarioRules;
+  }[];
+} = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "../testing/fixtures/FrozenWildfireReference.json"),
+    "utf8",
+  ),
+);
+const oldWildfireRules = (
+  difficulty: DifficultyType,
+  seed: number,
+): CompiledScenarioRules =>
+  JSON.parse(
+    JSON.stringify(
+      frozenWildfire.staticSnapshots.find(
+        (item) => item.difficulty === difficulty && item.seed === seed,
+      )!.rules,
+    ),
+  );
 
 const facility = (
   id: number,
@@ -241,86 +266,90 @@ describe.each([
     scenarioId: 104,
     arcId: "hurricane-2008",
     phaseId: "landfall",
-    balance: HURRICANE_BALANCE,
+    lane: "current native104",
   },
   {
     scenarioId: 111,
     arcId: "california-wildfire-2025",
     phaseId: "firestorm",
-    balance: CALIFORNIA_WILDFIRE_BALANCE,
+    lane: "detached old111",
   },
-])(
-  "trusted official $scenarioId addresses",
-  ({ scenarioId, arcId, phaseId, balance }) => {
-    test.each(DIFFICULTY_IDS)(
-      "preserves %s target integration in the compiled native story resolver",
-      (difficulty) => {
-        const key = `story:${scenarioId}:${arcId}:${phaseId}`;
-        for (const seed of [1, 42, 12345]) {
-          const rules = scenarioRules(getScenario(scenarioId), {
-            difficulty,
+])("trusted $lane addresses", ({ scenarioId, arcId, phaseId }) => {
+  test.each(DIFFICULTY_IDS)(
+    "preserves %s target integration in the owning compiled story resolver",
+    (difficulty) => {
+      const key = `story:${scenarioId}:${arcId}:${phaseId}`;
+      for (const seed of [1, 42, 12345]) {
+        const rules =
+          scenarioId === 111
+            ? oldWildfireRules(difficulty, seed)
+            : scenarioRules(getScenario(scenarioId), { difficulty, seed })!;
+        expect(validCompiledScenarioRules(rules)).toBe(true);
+        const event = [...rules.events, ...(rules.arcEvents ?? [])].find(
+          (item) => item.source?.phaseId === phaseId,
+        )!;
+        const context: StoryContextType = {
+          rules,
+          seed,
+          scenarioId: scenarioId === 111 ? 999 : scenarioId,
+          difficulty,
+          date: getDateFromMinute(
+            event.startMonth * MINUTES_PER_MONTH,
+            rules.startingYear,
+          ),
+          location: LOCATIONS.SF,
+          snapshot: {
+            facilities: fleet,
+            demandWh12m: 1000,
+            unservedWh12m: 0,
+            deliveredWhByFuel12m: {},
+            netIncome12m: 1,
+            peakDemandW12m: 550,
+            firmPeakW: 500,
+            storagePeakW: 900,
+            storagePeakWh: 1000,
+          },
+        };
+        const current = resolveStoryAtDate(context).occurrences.find(
+          (item) => item.key === event.key,
+        )!;
+        const result = resolveScenarioRuleTargets(event.targets[0].target, {
+          seed,
+          eventKey: "mod:test-grid:imported-storm",
+          officialDrawKey: key,
+          facilities: fleet,
+        });
+        expect(result.targets.map((t) => t.id)).toEqual(
+          current.attributes.selectedFacilityIds,
+        );
+        expect(result.targets.map((t) => t.name)).toEqual(
+          current.attributes.selectedFacilityNames,
+        );
+        expect(
+          resolveScenarioRuleTargets(event.targets[0].target, {
             seed,
-          })!;
-          const event = rules.events.find((item) => item.key === key)!;
-          const context: StoryContextType = {
-            rules,
-            seed,
-            scenarioId,
-            difficulty,
-            date: getDateFromMinute(
-              event.startMonth * MINUTES_PER_MONTH,
-              rules.startingYear,
-            ),
-            location: LOCATIONS.SF,
-            snapshot: {
-              facilities: fleet,
-              demandWh12m: 1000,
-              unservedWh12m: 0,
-              deliveredWhByFuel12m: {},
-              netIncome12m: 1,
-              peakDemandW12m: 550,
-              firmPeakW: 500,
-              storagePeakW: 900,
-              storagePeakWh: 1000,
-            },
-          };
-          const current = resolveStoryAtDate(context).occurrences.find(
-            (item) => item.key === key,
-          )!;
-          const result = resolveScenarioRuleTargets(
-            {
-              selector: "seededOperatingCapacityShare",
-              targetCapacityShare: balance[difficulty].targetCapacityShare,
-            },
-            {
-              seed,
-              eventKey: "mod:test-grid:imported-storm",
-              officialDrawKey: key,
-              facilities: fleet,
-            },
-          );
-          expect(result.targets.map((t) => t.id)).toEqual(
-            current.attributes.selectedFacilityIds,
-          );
-          expect(result.targets.map((t) => t.name)).toEqual(
-            current.attributes.selectedFacilityNames,
-          );
-          expect(
-            resolveScenarioRuleTargets(
-              {
-                selector: "seededOperatingCapacityShare",
-                targetCapacityShare: balance[difficulty].targetCapacityShare,
-              },
-              {
-                seed,
-                eventKey: "mod:test-grid:imported-storm",
-                officialDrawKey: key,
-                facilities: [...fleet].reverse(),
-              },
-            ),
-          ).toEqual(result);
-        }
-      },
-    );
-  },
-);
+            eventKey: "mod:test-grid:imported-storm",
+            officialDrawKey: key,
+            facilities: [...fleet].reverse(),
+          }),
+        ).toEqual(result);
+      }
+    },
+  );
+});
+
+test("redesigned native111 has no generator target or seeded plant draw at any difficulty", () => {
+  for (const difficulty of DIFFICULTY_IDS)
+    for (const seed of [1, 42, 12345]) {
+      const rules = scenarioRules(getScenario(111), { difficulty, seed })!;
+      expect(rules.namespace).toMatchObject({ arcId: "wildfire-intertie" });
+      for (const event of rules.events) {
+        expect(event.targets).toEqual([]);
+        expect(event.source?.drawKey).toBeUndefined();
+      }
+      expect(
+        rules.events.find((event) => event.id === "outage")!.effects
+          .transmissionCapacityLimitsWByCorridor,
+      ).toEqual({ "california-north": 4e6 });
+    }
+});

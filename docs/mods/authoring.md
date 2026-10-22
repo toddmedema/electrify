@@ -46,20 +46,28 @@ construction and operating cost factors are `0.1–10`; output is `0–1`. Deman
 `0.1–10`. Static and simultaneous timed costs compose, so static `5` with timed `2`
 is the valid upper boundary `10`; static `5.01` with timed `2` is rejected.
 
-| Effect                            | Unit and boundary example                                                                                                                                                                       |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `temperatureOffsetC`              | Additive °C, `-30–30` per event. The recipe adds `1 °C`.                                                                                                                                        |
-| `operatingExpenseDollarsPerMonth` | `0–1e12` starting-year dollars per active month; `1000` adds $1,000/month.                                                                                                                      |
-| `transactions`                    | One-time `grant` or `charge`, `0–1e12` starting-year dollars. `10000` grants $10,000 once at onset.                                                                                             |
-| `carbonFeeDollarsPerTonneCO2e`    | Absolute `0–100000` dollars/tonne CO₂e. `25` replaces the initial fee with $25/tonne while active; `0` explicitly waives it. Co-reachable overlapping overrides are rejected.                   |
-| `outputMultipliersBySelector`     | Bind original generators at onset, then apply `0–1` output. `0` disables output; `1` leaves it unchanged. A sold original never transfers its target identity to a replacement.                 |
-| Permanent `loads`                 | `peakMW: 100` means 100 MW, converted once to watts. Alternatively, `peakShareOfStartingPeak: 0.2` means 100 MW on a 500 MW baseline. Choose exactly one sizing field. Load factor is `0.01–1`. |
+| Effect                                   | Unit and boundary example                                                                                                                                                                                                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `temperatureOffsetC`                     | Additive °C, `-30–30` per event. The recipe adds `1 °C`.                                                                                                                                                                                                                        |
+| `operatingExpenseDollarsPerMonth`        | `0–1e12` starting-year dollars per active month; `1000` adds $1,000/month.                                                                                                                                                                                                      |
+| `transactions`                           | One-time `grant` or `charge`, `0–1e12` starting-year dollars. `10000` grants $10,000 once at onset.                                                                                                                                                                             |
+| `carbonFeeDollarsPerTonneCO2e`           | Absolute `0–100000` dollars/tonne CO₂e. `25` replaces the initial fee with $25/tonne while active; `0` explicitly waives it. Co-reachable overlapping overrides are rejected.                                                                                                   |
+| `outputMultipliersBySelector`            | Bind original generators at onset, then apply `0–1` output. `0` disables output; `1` leaves it unchanged. A sold original never transfers its target identity to a replacement.                                                                                                 |
+| `transmissionCapacityLimitsMWByCorridor` | Map registered corridor IDs to absolute `0–1e6` MW caps. `{"california-north":4}` limits the northern route to 4 MW, including upgrades, before weather derating. `0` closes it in both directions. Overlapping caps take the smallest value; independent routes are unchanged. |
+| Permanent `loads`                        | `peakMW: 100` means 100 MW, converted once to watts. Alternatively, `peakShareOfStartingPeak: 0.2` means 100 MW on a 500 MW baseline. Choose exactly one sizing field. Load factor is `0.01–1`.                                                                                 |
 
 Months are one-based: month `1` opens before the first tick. The six-month recipe
 uses an event starting at month `2` for `2` months, active in months `2–3` and expired
 at month `4`. A seeded `{ "from": 2, "to": 3 }` start can open in either month.
 `"untilEnd"` lasts through the final playable month. A load's start is independent
 of event duration; permanent loads survive event expiry.
+
+A corridor cap changes an existing connection's physical rating; it does not build
+a line or grant import access. The northern-route example has no physical effect
+until that route is operating. Native Wildfire supplies an operating northern
+intertie; a community scenario based on it freezes its researched access limits
+with the starting connection. Older imported snapshots retain their original
+access terms and compiled effects.
 
 A choice resolves before its due month's simulation. Each option has exactly one
 `costDollars` or `grantDollars`, including a free `costDollars: 0` response. The

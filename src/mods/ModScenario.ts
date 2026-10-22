@@ -24,7 +24,7 @@ import { inEraRate } from "../data/RetailRates";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import {
   prepareCustomScenario,
-  validCustomEventScenario,
+  validOfficialArcScenario,
 } from "../helpers/CustomScenarioEvents";
 import {
   compileScenarioRules,
@@ -42,6 +42,10 @@ import { compileOfficialArcChoices } from "../helpers/ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "../helpers/ScenarioRuleDependencies";
 import { scenarioRuleCompositionDiagnostics } from "../helpers/ScenarioRuleComposition";
 import compatibilityManifest from "../data/RunCompatibility.json";
+import {
+  frozenWildfireStartingIntertieAccess,
+  validFrozenStartingIntertieScenario,
+} from "../helpers/FrozenStartingInterties";
 import type {
   CompiledScenarioRules,
   RuleObjective,
@@ -130,7 +134,14 @@ function resolveModSetup(input: unknown) {
       inEraMoney(base.feePerKgCO2e, startingYear, base.startingYear),
   };
   delete scenario.rules;
-  if (!validCustomEventScenario(scenario))
+  if (base.startingInterties?.length) {
+    scenario.startingIntertieAccess = frozenWildfireStartingIntertieAccess();
+    if (!validFrozenStartingIntertieScenario(scenario, pack.baseScenarioId))
+      throw new Error(
+        "The inherited northern intertie requires the original Los Angeles location and enabled interties.",
+      );
+  }
+  if (!validOfficialArcScenario(scenario))
     throw new Error("Unsupported scenario year or events.");
   const prepared = prepareCustomScenario(scenario);
   const durationMonths = overrides.durationMonths ?? prepared.durationMonths;

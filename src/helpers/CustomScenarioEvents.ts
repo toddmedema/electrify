@@ -7,29 +7,59 @@ import { getScenarioLocation } from "./Locations";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 
 export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
-  (scenario) => !scenario.tutorialSteps,
+  (scenario) => !scenario.tutorialSteps && scenario.id !== 111,
 );
 
 export function validCustomEventIds(value: unknown): boolean {
+  return validEventIds(value, CUSTOM_EVENT_SCENARIOS);
+}
+
+/** Community snapshots retain all bundled arcs, including already-frozen retired native data. */
+export function validOfficialArcIds(value: unknown): boolean {
+  return validEventIds(
+    value,
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps),
+  );
+}
+
+function validEventIds(
+  value: unknown,
+  scenarios: readonly ScenarioType[],
+): boolean {
   return (
     value === undefined ||
     (Array.isArray(value) &&
-      value.length <= CUSTOM_EVENT_SCENARIOS.length &&
+      value.length <= scenarios.length &&
       new Set(value).size === value.length &&
-      value.every((id) =>
-        CUSTOM_EVENT_SCENARIOS.some((scenario) => scenario.id === id),
-      ))
+      value.every((id) => scenarios.some((scenario) => scenario.id === id)))
   );
 }
 
 export function validCustomEventScenario(scenario?: ScenarioType): boolean {
+  return validEventScenario(scenario, !!scenario?.mod);
+}
+
+/** Fresh community resolution runs before the validated runtime snapshot has been attached. */
+export function validOfficialArcScenario(scenario?: ScenarioType): boolean {
+  return validEventScenario(scenario, true);
+}
+
+function validEventScenario(
+  scenario: ScenarioType | undefined,
+  community: boolean,
+): boolean {
   if (!scenario) return true;
   if (scenario.id === 999 && scenario.rules !== undefined) return false;
   const positive = (value: unknown) =>
     value === undefined ||
     (typeof value === "number" && Number.isFinite(value) && value > 0);
   return (
-    validCustomEventIds(scenario.eventScenarioIds) &&
+    (community ? validOfficialArcIds : validCustomEventIds)(
+      scenario.eventScenarioIds,
+    ) &&
+    (community ||
+      (scenario.startingInterties === undefined &&
+        scenario.startingIntertieAccess === undefined)) &&
     Number.isInteger(scenario.startingYear) &&
     scenario.startingYear >= 1980 &&
     scenario.startingYear <= 2100 &&

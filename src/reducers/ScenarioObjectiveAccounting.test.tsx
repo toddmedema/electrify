@@ -89,7 +89,6 @@ const simulate = (
     ...(financed
       ? { initialBuild: { name: "Solar", peakW: 20000000, financed: true } }
       : {}),
-    wildfireHazardEnabled: false,
     weatherHazardsEnabled: false,
   });
 

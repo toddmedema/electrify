@@ -5,14 +5,7 @@ import {
   GameEventImportanceType,
   StoryActionTargetType,
 } from "../../Types";
-import {
-  WILDFIRE_DECISION_KEY,
-  upcomingStoryPhases,
-} from "../../data/WorldEvents";
-import {
-  wildfireRiskNotice,
-  WildfireRiskNoticeType,
-} from "../../helpers/Wildfire";
+import { upcomingStoryPhases } from "../../data/WorldEvents";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
 import {
@@ -99,16 +92,15 @@ export function selectUpcomingStoryEvents(
     game.date.monthsElapsed,
     game.startingYear,
     game.location.id,
-    game.worldEvents.occurrences.find(
-      (event) => event.key === WILDFIRE_DECISION_KEY,
-    )?.attributes.choice || "standard",
     JSON.stringify(game.loadAdditions),
     JSON.stringify(customEvents),
     JSON.stringify(
       game.worldEvents.occurrences.map((event) => [
         event.key,
+        event.startsMinute,
         event.attributes.choice,
         event.attributes.ruleTargets,
+        event.attributes.startEffectiveness,
       ]),
     ),
     historyKey,
@@ -205,36 +197,6 @@ export function selectUpcomingStoryEvents(
   events.sort((a, b) => (a.startsMinute ?? 0) - (b.startsMinute ?? 0));
   upcomingCache = { key, events };
   return events;
-}
-
-let riskNoticeCache:
-  { key: string; notice: WildfireRiskNoticeType | undefined } | undefined;
-
-/**
- * The seasonal fire-risk notice for the Events pane, or undefined when there is none. Cached by
- * the inputs that can change it (the weather reading is not free to recompute on every render).
- */
-export function selectWildfireRiskNotice(
-  state: AppStateType,
-): WildfireRiskNoticeType | undefined {
-  const game = state.game;
-  if (!game.inGame) {
-    return undefined;
-  }
-  const key = [
-    game.seed,
-    game.scenarioId,
-    game.location.id,
-    game.date.monthsElapsed,
-    game.storyEffectsDisabled ? 1 : 0,
-    game.wildfireHazardDisabled ? 1 : 0,
-  ].join("|");
-  if (riskNoticeCache?.key === key) {
-    return riskNoticeCache.notice;
-  }
-  const notice = wildfireRiskNotice(game);
-  riskNoticeCache = { key, notice };
-  return notice;
 }
 
 /** Occurrences of one ongoing event, e.g. hail at four plants, summarised for the status bar. */

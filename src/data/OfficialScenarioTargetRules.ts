@@ -1,3 +1,4 @@
+import { DIFFICULTY_IDS } from "../Constants";
 import type {
   DifficultyType,
   StoryActionTargetType,
@@ -73,54 +74,6 @@ export const END_OF_ERA_BALANCE: Record<DifficultyType, EndOfEraBalanceType> = {
   },
   VP: { oldCoalOutput: 0.825, coalOM: 1.25, complianceCoalOutput: 0.5 },
   CEO: { oldCoalOutput: 0.8, coalOM: 1.3, complianceCoalOutput: 0.001 },
-};
-
-export interface CaliforniaWildfireBalanceType {
-  disconnectedDemand: number;
-  targetCapacityShare: number;
-  outputMultiplier: number;
-  restorationCostPerMonth: number;
-}
-
-// Restoration is an inferred damage-severity proxy, not a validated cost curve:
-// LADWP's $78M electric restoration estimate × 1% municipal scale × 0.97436
-// (2025 to 2024 dollars) gives about $760k at 2.2375% disconnected customers.
-// Scale with the scenario's 2–10% severity, divide over January/February, and round.
-// See src/testing/SCENARIO_CHOICE_BALANCE.md; advance preparation remains separate.
-export const CALIFORNIA_WILDFIRE_BALANCE: Record<
-  DifficultyType,
-  CaliforniaWildfireBalanceType
-> = {
-  Intern: {
-    disconnectedDemand: 0.02,
-    targetCapacityShare: 0.3,
-    outputMultiplier: 0.65,
-    restorationCostPerMonth: 350000,
-  },
-  Employee: {
-    disconnectedDemand: 0.04,
-    targetCapacityShare: 0.4,
-    outputMultiplier: 0.55,
-    restorationCostPerMonth: 700000,
-  },
-  Manager: {
-    disconnectedDemand: 0.06,
-    targetCapacityShare: 0.5,
-    outputMultiplier: 0.45,
-    restorationCostPerMonth: 1000000,
-  },
-  VP: {
-    disconnectedDemand: 0.08,
-    targetCapacityShare: 0.6,
-    outputMultiplier: 0.35,
-    restorationCostPerMonth: 1350000,
-  },
-  CEO: {
-    disconnectedDemand: 0.1,
-    targetCapacityShare: 0.7,
-    outputMultiplier: 0.25,
-    restorationCostPerMonth: 1700000,
-  },
 };
 
 const FLEET_TARGET: StoryActionTargetType = {
@@ -616,66 +569,45 @@ export const NUCLEAR_TRIP_RULES: OfficialScenarioRuleDefinition = {
   },
 };
 
-/** Fire damage and safety shutoffs share the ordinary selector/protection interpreter. */
+// The surviving route is capped in watts, including later upgrades on the same path.
+export const WILDFIRE_INTERTIE_RETAINED_CAPACITY = 0.1;
+export const WILDFIRE_INTERTIE_CAPACITY_LIMIT_W = 4e6;
+export const WILDFIRE_CORRIDOR_ID = "california-north";
+
+/** Native 111 uses the same plain corridor restriction as authored community events. */
 export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
   scenarioId: 111,
-  arcId: "california-wildfire-2025",
-  reliabilityNoun: "January and February 2025 wildfire emergency",
+  arcId: "wildfire-intertie",
+  reliabilityNoun: "January and February 2025 intertie outage",
   definitions: {
     events: [
       {
-        id: "red-flag-warning",
-        title: "Red-flag warning",
+        id: "readiness",
+        title: "Prepare for a northern intertie outage",
         message:
-          "Extreme Santa Ana winds forecast for January. Fund preparedness or keep cash; choose to resume.",
-        startMonth: 12,
-        visibility: "forecast",
+          "Your existing northern intertie will lose 90% of its capacity in January and February 2025. Prepare local supply, storage, or an independent connection.",
+        startMonth: 2,
+        visibility: "surprise",
       },
       {
-        id: "firestorm",
-        title: "Wildfire emergency",
+        id: "outage",
+        title: "Northern intertie capacity down 90%",
         message:
-          "Safety shutoffs disconnect demand and reduce affected generator output. Repairs continue for two months.",
+          "Wildfire has cut the northern intertie to 10% capacity through February. Use local supply or an independent connection to cover the gap.",
         startMonth: 13,
         durationMonths: 2,
         preview:
-          "Extreme fire weather may force safety shutoffs and limit generation.",
+          "The northern intertie will lose 90% of its capacity through February. Prepare replacement supply.",
         effects: {
-          demandMultiplier: byDifficulty(
-            CALIFORNIA_WILDFIRE_BALANCE,
-            (balance) => 1 - balance.disconnectedDemand,
-          ),
-          operatingExpenseDollarsPerMonth: byDifficulty(
-            CALIFORNIA_WILDFIRE_BALANCE,
-            (balance) => balance.restorationCostPerMonth,
-          ),
-          outputMultipliersBySelector: [
-            {
-              target: {
-                selector: "seededOperatingCapacityShare",
-                targetCapacityShare: byDifficulty(
-                  CALIFORNIA_WILDFIRE_BALANCE,
-                  (balance) => balance.targetCapacityShare,
-                ),
-              },
-              outputMultiplier: byDifficulty(
-                CALIFORNIA_WILDFIRE_BALANCE,
-                (balance) => balance.outputMultiplier,
-              ),
-            },
-          ],
-        },
-        report: {
-          id: "firestorm-affected",
-          kind: "affectedFacilities",
-          eventId: "firestorm",
+          transmissionCapacityLimitsMWByCorridor: {
+            [WILDFIRE_CORRIDOR_ID]: WILDFIRE_INTERTIE_CAPACITY_LIMIT_W / 1e6,
+          },
         },
       },
       {
-        id: "restoration-complete",
-        title: "Wildfire restoration complete",
-        message:
-          "Safety shutoffs end and repairs finish. Affected generators return to normal.",
+        id: "restored",
+        title: "Northern intertie restored",
+        message: "The northern intertie is back at full capacity.",
         startMonth: 15,
       },
     ],
@@ -692,7 +624,7 @@ export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
     debriefReports: [
       {
         id: "wildfire-reliability",
-        label: "January and February 2025 wildfire emergency",
+        label: "January and February 2025 intertie outage",
         kind: "reliability",
         fromMonth: 37,
         throughMonth: 38,
@@ -701,25 +633,25 @@ export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
     ],
   },
   presentation: {
-    "red-flag-warning": {
+    readiness: {
       hidePreview: true,
+      messageByDifficulty: Object.fromEntries(
+        DIFFICULTY_IDS.map((difficulty) => [
+          difficulty,
+          `Your existing northern intertie will lose 90% of its capacity in January and February 2025. Prepare local supply, storage, or an independent connection. ${buildLeadTimeHint(difficulty)}`,
+        ]),
+      ) as Record<DifficultyType, string>,
       source: {
         kind: "WORLD_EVENT",
         concept: "forecast",
-        importance: "CRITICAL",
-        actionTarget: { card: "EVENTS" },
+        importance: "NOTABLE",
+        actionTarget: FLEET_TARGET,
       },
     },
-    firestorm: {
-      nativeReview: "wildfireOnset",
-      previewTitle: "Wildfires may disrupt power",
-      protection: { kind: "wildfirePreparedness" },
-      attributesByDifficulty: attributesByDifficulty(
-        CALIFORNIA_WILDFIRE_BALANCE,
-        (balance) => ({ ...balance }),
-      ),
+    outage: {
+      previewTitle: "Northern intertie wildfire outage",
+      attributes: { retainedCapacity: WILDFIRE_INTERTIE_RETAINED_CAPACITY },
       source: {
-        drawKey: "story:111:california-wildfire-2025:firestorm",
         kind: "WORLD_EVENT",
         concept: "danger",
         importance: "CRITICAL",
@@ -727,28 +659,13 @@ export const CALIFORNIA_WILDFIRE_RULES: OfficialScenarioRuleDefinition = {
         turningPointPriority: 120,
       },
     },
-    "restoration-complete": {
-      nativeReview: "wildfireRestoration",
-      reports: [
-        {
-          id: "arc-111-restoration-complete-affected",
-          kind: "affectedFacilities",
-          eventId: "firestorm",
-        },
-      ],
-      relativeReports: [
-        {
-          id: "arc-111-restoration-complete-reliability",
-          kind: "reliability",
-          monthsBefore: 2,
-          minDemandServedShare: 0.999,
-        },
-      ],
+    restored: {
       hidePreview: true,
       source: {
         kind: "WORLD_EVENT",
         concept: "supply",
-        actionTarget: SUPPLY_DEMAND_TARGET,
+        importance: "NOTABLE",
+        actionTarget: FLEET_TARGET,
         turningPointPriority: 110,
       },
     },

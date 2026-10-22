@@ -753,6 +753,79 @@
           "effects": {
             "type": "object",
             "properties": {
+              "transmissionCapacityLimitsMWByCorridor": {
+                "type": "object",
+                "minProperties": 1,
+                "maxProperties": 64,
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+                },
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000,
+                      "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "byDifficulty": {
+                          "type": "object",
+                          "properties": {
+                            "Intern": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000,
+                              "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                            },
+                            "Employee": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000,
+                              "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                            },
+                            "Manager": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000,
+                              "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                            },
+                            "VP": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000,
+                              "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                            },
+                            "CEO": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000,
+                              "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope."
+                            }
+                          },
+                          "required": [
+                            "Intern",
+                            "Employee",
+                            "Manager",
+                            "VP",
+                            "CEO"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Complete difficulty table; every named difficulty is required and independently validated."
+                        }
+                      },
+                      "required": ["byDifficulty"],
+                      "additionalProperties": false,
+                      "description": "A bounded data-only object; unsupported fields are rejected."
+                    }
+                  ],
+                  "description": "multiplier (1 = unchanged); finite numbers 0–1000000. Resolved only in the declared scope. A scalar or one complete byDifficulty table; no nesting or expressions."
+                },
+                "description": "Surviving corridor nameplate in MW, including upgrades. Zero closes the route in both directions; overlapping caps use the smallest limit."
+              },
               "fuelPriceMultipliers": {
                 "type": "object",
                 "properties": {

@@ -25,7 +25,10 @@ import {
 import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
-import { validWorldEvent } from "./helpers/WorldEventValidation";
+import {
+  validWorldEvent,
+  validTransmissionCapacityLimits,
+} from "./helpers/WorldEventValidation";
 import { validScenarioRuleState } from "./helpers/ScenarioRuleValidation";
 import { validGameObjectiveProgress } from "./helpers/ObjectiveRules";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
@@ -483,6 +486,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     game.timeline.some(
       (tick) =>
         !validEmissions(tick) ||
+        (tick.transmissionCapacityLimitsWByCorridor !== undefined &&
+          !validTransmissionCapacityLimits(
+            tick.transmissionCapacityLimitsWByCorridor,
+          )) ||
         typeof tick.reserveW !== "number" ||
         !Number.isFinite(tick.reserveW) ||
         [
@@ -559,6 +566,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth) ||
     typeof game.meaningfulDecisionGateWaived !== "boolean"
+  )
+    return null;
+  if (
+    game.wildfireForecastRefresh !== undefined &&
+    typeof game.wildfireForecastRefresh !== "boolean"
+  )
+    return null;
+  if (
+    game.legacyWildfireIntertieAccess !== undefined &&
+    typeof game.legacyWildfireIntertieAccess !== "boolean"
   )
     return null;
   const worldEvents = game.worldEvents as

@@ -1,6 +1,12 @@
+import fs from "fs";
+import path from "path";
 import { OFFICIAL_SCENARIO_RULES } from "../data/OfficialScenarioRules";
 import * as officialCatalog from "../data/OfficialScenarioRules";
-import { scenarioRules } from "./ScenarioRules";
+import { scenarioRules, validCompiledScenarioRules } from "./ScenarioRules";
+import { resolveStoryAtDate } from "../data/WorldEvents";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
+import { getScenarioLocation } from "./Locations";
+import type { DifficultyType, ScenarioType } from "../Types";
 import {
   compileOfficialArcEvents,
   officialArcLoadScale,
@@ -16,7 +22,40 @@ import {
   type ScenarioRuleTargetFacility,
 } from "./ScenarioRuleTargets";
 import { prepareCustomScenario } from "./CustomScenarioEvents";
-import type { RuleDiagnostic } from "../data/ScenarioRules";
+import type {
+  CompiledScenarioRules,
+  RuleDiagnostic,
+} from "../data/ScenarioRules";
+
+const legacyWildfire: {
+  provenance: { sourceSHA256: string };
+  staticSnapshots: {
+    difficulty: DifficultyType;
+    seed: number;
+    receivingScenario: ScenarioType;
+    rules: CompiledScenarioRules;
+  }[];
+  budgetSnapshot: {
+    receivingScenario: ScenarioType;
+    rules: CompiledScenarioRules;
+  };
+} = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "../testing/fixtures/FrozenWildfireReference.json"),
+    "utf8",
+  ),
+);
+const frozenWildfireRules = (
+  difficulty: DifficultyType,
+  seed: number,
+): CompiledScenarioRules =>
+  JSON.parse(
+    JSON.stringify(
+      legacyWildfire.staticSnapshots.find(
+        (item) => item.difficulty === difficulty && item.seed === seed,
+      )!.rules,
+    ),
+  );
 
 const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
 const source = (id: number) =>
@@ -211,25 +250,34 @@ test("relocation keeps preparation for phases and choices and already-prepared a
   expect(compile([111])[0].startMonth).toBeGreaterThanOrEqual(24);
 });
 
-test("imported repair budgets scale with receiving size and era while percentage effects do not", () => {
-  const receiving = {
-    ...DEFAULT_CUSTOM_SCENARIO,
-    startingYear: 2050,
-    startingCustomers: 100000,
-  };
-  const settings = params({ receivingScenario: receiving });
-  const event = compileOfficialArcEvents(settings, [111]).find(
-    (item) => item.source.phaseId === "firestorm",
+test("frozen old repair budgets retain their receiving size and era after native111 retires plant damage", () => {
+  expect(legacyWildfire.provenance.sourceSHA256).toBe(
+    "5a2f887b02344fe10a51e07a43c0c2ff4342c0da17ffd17081031ad5baac5dcb",
+  );
+  const originalSnapshot = legacyWildfire.staticSnapshots.find(
+    (item) => item.difficulty === "Manager" && item.seed === 12345,
   )!;
-  const original = compile([111], {
-    namespace: { kind: "official", scenarioId: 111, arcId: "wildfire" },
-    receivingScenario: source(111),
-  }).find((item) => item.source.phaseId === "firestorm")!;
+  const rules: CompiledScenarioRules = JSON.parse(
+    JSON.stringify(legacyWildfire.budgetSnapshot.rules),
+  );
+  expect(validCompiledScenarioRules(rules)).toBe(true);
+  const event = rules.arcEvents!.find(
+    (item) => item.source?.phaseId === "firestorm",
+  )!;
+  const original = originalSnapshot.rules.arcEvents!.find(
+    (item) => item.source?.phaseId === "firestorm",
+  )!;
+  const originalScale = officialArcMoneyAmount(
+    1,
+    source(111),
+    originalSnapshot.receivingScenario,
+  );
+  expect(event.effects.operatingExpensePerMonth).toBe(3500000);
   expect(event.effects.operatingExpensePerMonth).toBeCloseTo(
     officialArcMoneyAmount(
-      original.effects.operatingExpensePerMonth!,
+      original.effects.operatingExpensePerMonth! / originalScale,
       source(111),
-      receiving,
+      legacyWildfire.budgetSnapshot.receivingScenario,
     ),
     5,
   );
@@ -243,6 +291,10 @@ test("imported repair budgets scale with receiving size and era while percentage
       startingCustomers: source(106).startingCustomers! * 2,
     }),
   ).toBe(2);
+  expect(
+    compile([111]).find((item) => item.source.phaseId === "outage")!.effects
+      .operatingExpensePerMonth,
+  ).toBeUndefined();
 });
 
 test("activation-dependent targets and preparation are data rather than opening-fleet observations", () => {
@@ -276,19 +328,29 @@ test("activation-dependent targets and preparation are data rather than opening-
   expect(phase(107, "uri").protection).toEqual({
     kind: "deepFreezeWinterization",
   });
-  expect(phase(111, "firestorm").protection).toEqual({
-    kind: "wildfirePreparedness",
-  });
+  expect(phase(111, "outage").targets).toEqual([]);
+  expect(phase(111, "outage").protection).toBeUndefined();
+  expect(
+    phase(111, "outage").effects.transmissionCapacityLimitsWByCorridor,
+  ).toEqual({ "california-north": 4e6 });
   expect(phase(104, "landfall").source.drawKey).toBe(
     "story:104:hurricane-2008:landfall",
   );
-  expect(phase(111, "firestorm").source.drawKey).toBe(
+  expect(phase(111, "outage").source.drawKey).toBeUndefined();
+  const retired = frozenWildfireRules("Manager", 12345).arcEvents!.find(
+    (event) => event.source?.phaseId === "firestorm",
+  )!;
+  expect(retired.protection).toEqual({ kind: "wildfirePreparedness" });
+  expect(retired.source!.drawKey).toBe(
     "story:111:california-wildfire-2025:firestorm",
   );
 });
 
 test("report definitions retain exact observation windows and never freeze an empty history as success", () => {
-  const events = compile([101, 102, 103, 104, 105, 107, 111]);
+  const events = [
+    ...compile([101, 102, 103, 104, 105, 107]),
+    ...frozenWildfireRules("Manager", 12345).arcEvents!,
+  ];
   for (const phaseId of [
     "normalization",
     "integration-review",
@@ -298,7 +360,7 @@ test("report definitions retain exact observation windows and never freeze an em
     "restoration-complete",
     "thaw",
   ]) {
-    const event = events.find((item) => item.source.phaseId === phaseId)!;
+    const event = events.find((item) => item.source?.phaseId === phaseId)!;
     expect(event.reports?.length).toBeGreaterThan(0);
     expect(event.message).not.toMatch(
       /100%|0%|profitable|every customer|met .*demand/,
@@ -317,7 +379,7 @@ test("report definitions retain exact observation windows and never freeze an em
   }
   expect(
     events
-      .find((item) => item.source.phaseId === "successor-review")!
+      .find((item) => item.source?.phaseId === "successor-review")!
       .reports?.map((report) => report.kind),
   ).toEqual(["fuelMix", "reliability", "profitLoss", "firmCoverage"]);
 });
@@ -508,9 +570,15 @@ test.each([104, 111] as const)(
   (scenarioId) => {
     for (const difficulty of DIFFICULTY_IDS) {
       for (const [index, seed] of [1, 42, 12345].entries()) {
-        const event = compile([scenarioId], { difficulty, seed }).find(
+        const rules =
+          scenarioId === 111
+            ? frozenWildfireRules(difficulty, seed)
+            : undefined;
+        const event = (
+          rules?.arcEvents ?? compile([104], { difficulty, seed })
+        ).find(
           (item) =>
-            item.source.phaseId ===
+            item.source?.phaseId ===
             (scenarioId === 104 ? "landfall" : "firestorm"),
         )!;
         const ids = expectedTargets[scenarioId][difficulty][index];
@@ -518,7 +586,7 @@ test.each([104, 111] as const)(
           const targets = resolveScenarioRuleTargets(event.targets[0].target, {
             seed,
             eventKey: event.key,
-            officialDrawKey: event.source.drawKey,
+            officialDrawKey: event.source!.drawKey,
             facilities,
           }).targets;
           expect(targets.map((target) => target.id)).toEqual(ids);
@@ -530,3 +598,43 @@ test.each([104, 111] as const)(
     }
   },
 );
+
+test("all fifteen detached old111 snapshots still resolve every pinned target and name through the common runtime", () => {
+  for (const difficulty of DIFFICULTY_IDS)
+    for (const [index, seed] of [1, 42, 12345].entries()) {
+      const rules = frozenWildfireRules(difficulty, seed);
+      expect(validCompiledScenarioRules(rules)).toBe(true);
+      const event = rules.arcEvents!.find(
+        (item) => item.source?.phaseId === "firestorm",
+      )!;
+      const ids = expectedTargets[111][difficulty][index];
+      for (const facilities of [targetFleet, [...targetFleet].reverse()]) {
+        const current = resolveStoryAtDate({
+          rules,
+          scenarioId: 999,
+          difficulty,
+          seed,
+          location: getScenarioLocation(DEFAULT_CUSTOM_SCENARIO)!,
+          date: getDateFromMinute(
+            event.startMonth * MINUTES_PER_MONTH,
+            rules.startingYear,
+          ),
+          snapshot: {
+            facilities,
+            demandWh12m: 1000,
+            unservedWh12m: 0,
+            deliveredWhByFuel12m: {},
+            netIncome12m: 1,
+            peakDemandW12m: 550,
+            firmPeakW: 500,
+            storagePeakW: 900,
+            storagePeakWh: 1000,
+          },
+        }).occurrences.find((item) => item.key === event.key)!;
+        expect(current.attributes.selectedFacilityIds).toEqual(ids);
+        expect(current.attributes.selectedFacilityNames).toEqual(
+          ids.map((id) => expectedNames[id]),
+        );
+      }
+    }
+});

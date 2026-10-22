@@ -113,38 +113,6 @@ export const SCENARIO_CHOICE_RULES: CatalogScenarioChoice[] = [
       ],
     },
   },
-  {
-    scenarioId: 111,
-    arcId: "california-wildfire-2025",
-    choice: {
-      id: "preparedness",
-      dueMonth: 12,
-      title: "Wildfire preparedness",
-      prompt:
-        "Prepare crews and equipment for January's Santa Ana winds, or keep cash.",
-      options: [
-        {
-          id: "prepare",
-          label: "Fund preparedness",
-          costDollars: WILDFIRE_PREPARATION_COST,
-          description:
-            "Halve customer disconnections and generator output losses in January and February.",
-          message:
-            "Preparedness halves January–February disconnections and output losses. Repair costs stay the same.",
-        },
-        {
-          id: "standard",
-          label: "Keep cash",
-          costDollars: 0,
-          meaningful: false,
-          description:
-            "Save cash and accept January and February’s full customer disconnections and generator output losses.",
-          message:
-            "Cash kept. January–February disconnections, output losses and repair costs apply in full.",
-        },
-      ],
-    },
-  },
 ];
 
 export const catalogChoiceKey = (entry: CatalogScenarioChoice): string =>
@@ -155,6 +123,6 @@ export const DATA_CENTER_DECISION_KEY = catalogChoiceKey(
 export const DEEP_FREEZE_DECISION_KEY = catalogChoiceKey(
   SCENARIO_CHOICE_RULES.find((entry) => entry.scenarioId === 107)!,
 );
-export const WILDFIRE_DECISION_KEY = catalogChoiceKey(
-  SCENARIO_CHOICE_RULES.find((entry) => entry.scenarioId === 111)!,
-);
+/** Historical receipt identity only; current native 111 has no response. */
+export const WILDFIRE_DECISION_KEY =
+  "story:111:california-wildfire-2025:preparedness";

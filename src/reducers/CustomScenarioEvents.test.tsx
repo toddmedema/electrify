@@ -1,21 +1,10 @@
 import cloneDeep from "lodash.clonedeep";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
-import {
-  customEventContext,
-  prepareCustomScenario,
-} from "../helpers/CustomScenarioEvents";
+import { prepareCustomScenario } from "../helpers/CustomScenarioEvents";
 import { createGame } from "../testing/Simulator";
-import reducer, { generateNewTimeline } from "./Game";
+import { generateNewTimeline } from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
-import { LOCATIONS } from "../Constants";
-import {
-  wildfirePreparedness,
-  isWildfireHazardEligible,
-} from "../helpers/Wildfire";
-import { chooseScenarioResponse } from "./GameActions";
-import { resolveStoryAtDate } from "../data/WorldEvents";
-import { buildStorySnapshot } from "../helpers/Story";
 
 function customGame() {
   return createGame({
@@ -55,47 +44,6 @@ test.each([[111, 111], [0], [987654], ["111"]])(
   },
 );
 
-test("an imported wildfire can be prepared for in an unprofiled location without enabling local random fires", () => {
-  const game = customGame();
-  game.location = LOCATIONS.PIT;
-  game.customScenario!.eventScenarioIds = [111];
-  expect(isWildfireHazardEligible(game)).toBe(false);
-  const program = wildfirePreparedness(game)!;
-  expect(program).toBeDefined();
-  const funded = reducer(
-    game,
-    chooseScenarioResponse({
-      decisionId: program.choice.id,
-      optionId: "prepare",
-    }),
-  );
-  const incident = (state: typeof game, month = 36) =>
-    resolveStoryAtDate({
-      seed: state.seed,
-      scenarioId: 999,
-      difficulty: state.difficulty,
-      date: getDateFromMinute(month * MINUTES_PER_MONTH, state.startingYear),
-      location: state.location,
-      customEvents: customEventContext(state.customScenario),
-      occurrences: state.worldEvents.occurrences,
-      snapshot: buildStorySnapshot(
-        state.monthlyHistory,
-        state.facilities,
-        state.date.minute,
-      ),
-    }).active.find((event) => event.key.endsWith(":firestorm"))!;
-  const normal = incident(game);
-  const protectedFire = incident(funded);
-  expect(protectedFire.attributes.preparednessEffectiveness).toBe(1);
-  expect(1 - protectedFire.effects.demandMultiplier!).toBeCloseTo(
-    (1 - normal.effects.demandMultiplier!) / 2,
-  );
-  expect(protectedFire.effects.operatingExpensePerMonth).toBe(
-    normal.effects.operatingExpensePerMonth,
-  );
-  expect(incident(funded, 37).effects).toEqual(protectedFire.effects);
-});
-
 test("changing custom event selection with the same seed invalidates forecast effects", () => {
   const game = customGame();
   game.date = getDateFromMinute(41 * MINUTES_PER_MONTH, game.startingYear);
@@ -110,28 +58,9 @@ test("changing custom event selection with the same seed invalidates forecast ef
   );
 });
 
-test("custom event monetary scale changes do not reuse another grid's forecast costs", () => {
-  const game = customGame();
-  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
-  // Keep dispatch changes from changing variable O&M: this checks only restoration budgets.
-  game.facilities.forEach((facility) => {
-    facility.variableOperatingCostPerMWh = undefined;
-  });
-  const baseline = generateNewTimeline(game, 1e9, 1e6, 1)[0];
-  game.customScenario!.eventScenarioIds = [111];
-  const single = generateNewTimeline(game, 1e9, 1e6, 1)[0];
-  game.customScenario!.startingCustomers! *= 2;
-  const double = generateNewTimeline(game, 1e9, 1e6, 1)[0];
-  expect(single.expensesOM).toBeGreaterThan(baseline.expensesOM);
-  expect(double.expensesOM - baseline.expensesOM).toBeCloseTo(
-    2 * (single.expensesOM - baseline.expensesOM),
-    6,
-  );
-});
-
 test("custom event save import rejects a nonnumeric grid scale before resolving event costs", () => {
   const game = customGame();
-  game.customScenario!.eventScenarioIds = [111];
+  game.customScenario!.eventScenarioIds = [108];
   const save = serializeSave(game);
   expect(parseSave(save)).not.toBeNull();
   const malformed = JSON.parse(JSON.stringify(save));
@@ -141,7 +70,7 @@ test("custom event save import rejects a nonnumeric grid scale before resolving 
 
 test("selected custom events survive save import with an identical future forecast", () => {
   const game = customGame();
-  game.customScenario!.eventScenarioIds = [108, 111];
+  game.customScenario!.eventScenarioIds = [108];
   const imported = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),
   )!.game;
@@ -149,19 +78,6 @@ test("selected custom events survive save import with an identical future foreca
     state.date = getDateFromMinute(41 * MINUTES_PER_MONTH, state.startingYear);
     return generateNewTimeline(state, 1e9, 1e6, 4);
   };
-  expect(imported.customScenario!.eventScenarioIds).toEqual([108, 111]);
+  expect(imported.customScenario!.eventScenarioIds).toEqual([108]);
   expect(future(imported)).toEqual(future(game));
-});
-
-test("imported wildfire forecasts target the receiving fleet after a fleet change", () => {
-  const game = customGame();
-  game.customScenario!.eventScenarioIds = [111];
-  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
-  const original = generateNewTimeline(game, 1e9, 1e6, 4);
-  const changedFleet = cloneDeep(game);
-  changedFleet.facilities[0].id += 100;
-  const changed = generateNewTimeline(changedFleet, 1e9, 1e6, 4);
-  expect(changed.map((tick) => tick.supplyW)).toEqual(
-    original.map((tick) => tick.supplyW),
-  );
 });
