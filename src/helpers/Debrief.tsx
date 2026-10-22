@@ -6,9 +6,14 @@ import {
   ScenarioType,
   VictoryDebriefType,
   VictoryFleetCapacityType,
+  ActiveWorldEventType,
+  ConceptNameType,
 } from "../Types";
-import { formatWatts, formatWattHours } from "./Format";
+import { formatWatts, formatWattHours, formatMoneyConcise } from "./Format";
 import { customerSalesRevenue } from "./Scoring";
+import { scenarioRules } from "./ScenarioRules";
+import { interpretScenarioRuleReport } from "./ScenarioRuleRuntime";
+import type { RuleReportMetric } from "./ScenarioRuleReports";
 
 type FleetAssetType = Partial<FacilityShoppingType> & {
   yearsToBuildLeft?: number;
@@ -82,6 +87,7 @@ export function buildVictoryDebrief(
   events: GameEventType[],
   months: MonthlyHistoryType[] = [],
   endingRate = scenario.dollarsPerkWh,
+  occurrences: ActiveWorldEventType[] = [],
 ): VictoryDebriefType {
   const unservedWh = Math.max(0, summary.demandWh - summary.supplyWh);
   const reliability =
@@ -98,7 +104,7 @@ export function buildVictoryDebrief(
     reliability,
     unservedWh,
     kgco2e: summary.kgco2e,
-    scenarioMetrics: scenarioMetrics(scenario, months, endingRate),
+    scenarioMetrics: scenarioMetrics(scenario, months, endingRate, occurrences),
     highlights: debriefHighlights(events),
   };
 }
@@ -119,7 +125,33 @@ function scenarioMetrics(
   scenario: ScenarioType,
   months: MonthlyHistoryType[],
   endingRate: number,
+  occurrences: ActiveWorldEventType[],
 ): VictoryDebriefType["scenarioMetrics"] {
+  const rules = scenarioRules(scenario);
+  if (rules)
+    return rules.debriefReports.flatMap((report) => {
+      const result = interpretScenarioRuleReport(report, rules, {
+        startingYear: rules.startingYear,
+        completedMonths: months.length,
+        monthlyHistory: months,
+        occurrences,
+        startingRateDollarsPerKWh: scenario.dollarsPerkWh,
+        endingRateDollarsPerKWh: endingRate,
+      });
+      return result.metrics.length
+        ? result.metrics.map((metric) => ({
+            label: metric.label,
+            value: reportMetricValue(metric),
+            concept: reportMetricConcept(metric),
+          }))
+        : [
+            {
+              label: result.label,
+              value: result.message,
+              concept: "goal" as const,
+            },
+          ];
+    });
   if (scenario.id === 106) {
     const afterArrival = months.filter(
       (month) => month.year > 2026 || (month.year === 2026 && month.month >= 1),
@@ -189,4 +221,34 @@ function scenarioMetrics(
     ];
   }
   return undefined;
+}
+
+function reportMetricValue(metric: RuleReportMetric): string {
+  if (!metric.available || metric.value === undefined) return "Unavailable";
+  if (typeof metric.value === "boolean") return metric.value ? "Yes" : "No";
+  if (typeof metric.value === "string") return metric.value;
+  switch (metric.unit) {
+    case "share":
+      return `${(metric.value * 100).toFixed(1)}%`;
+    case "Wh":
+      return formatWattHours(metric.value);
+    case "W":
+      return formatWatts(metric.value);
+    case "dollars":
+      return formatMoneyConcise(metric.value);
+    case "hours":
+      return `${metric.value.toFixed(1)} hours`;
+    default:
+      return String(metric.value);
+  }
+}
+
+function reportMetricConcept(metric: RuleReportMetric): ConceptNameType {
+  if (metric.id === "electricityRate") return "rate";
+  if (metric.unit === "dollars" || metric.id === "cashStayedPositive")
+    return "money";
+  if (metric.unit === "Wh" || metric.id === "blackoutMonths") return "blackout";
+  if (metric.unit === "W") return "supply";
+  if (metric.id === "affectedFacilities") return "generator";
+  return "goal";
 }

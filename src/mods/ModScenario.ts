@@ -33,6 +33,12 @@ import {
 import { modRuntimeDigest, modSetupDigest } from "../helpers/ScenarioMod";
 import { RULE_LIMITS } from "../helpers/ScenarioRulesSchema";
 import { utf8Bytes } from "../helpers/RuleIdentity";
+import {
+  prepareScenarioStartingPeak,
+  resolvedScenarioStartingPeak,
+} from "../helpers/ScenarioStartingPeak";
+import { compileOfficialArcEvents } from "../helpers/ScenarioRuleArcs";
+import { scenarioRuleCompositionDiagnostics } from "../helpers/ScenarioRuleComposition";
 import compatibilityManifest from "../data/RunCompatibility.json";
 import type {
   CompiledScenarioRules,
@@ -83,12 +89,7 @@ export function inheritedModObjectives(
     });
   return objectives;
 }
-function resolveMod(
-  input: unknown,
-  workshopId: string | undefined,
-  difficulty: DifficultyType,
-  startingPeakW: number,
-): { scenario: ScenarioType; diagnostics: ModDiagnostic[] } {
+function resolveModSetup(input: unknown) {
   const pack = validateMod(input);
   const base =
     pack.baseScenarioId === 999
@@ -155,6 +156,22 @@ function resolveMod(
       ...base.reliabilityObjective,
       year: base.reliabilityObjective.year + startingYear - base.startingYear,
     };
+  return { pack, base, arcs, startingYear, durationMonths, resolved };
+}
+
+/** Preparation uses precisely the same resolved baseline as compilation. */
+export async function prepareModStartingPeak(input: unknown): Promise<void> {
+  await prepareScenarioStartingPeak(resolveModSetup(input).resolved);
+}
+
+function resolveMod(
+  input: unknown,
+  workshopId: string | undefined,
+  difficulty: DifficultyType,
+  startingPeakW: number,
+): { scenario: ScenarioType; diagnostics: ModDiagnostic[] } {
+  const { pack, base, arcs, startingYear, durationMonths, resolved } =
+    resolveModSetup(input);
   const inherited =
     pack.objectives.mode === "inherit"
       ? inheritedModObjectives(base, startingYear)
@@ -185,13 +202,62 @@ function resolveMod(
       inheritedObjectiveIds: inherited.map((o) => o.id),
     };
   let rules: CompiledScenarioRules | undefined;
+  const needsStartingPeak =
+    !!pack.events?.some((event) =>
+      event.loads?.some((load) => load.peakShareOfStartingPeak !== undefined),
+    ) ||
+    !!pack.choices?.some((choice) =>
+      choice.options.some((option) =>
+        option.replaceLoad?.with.some(
+          (load) => load.peakShareOfStartingPeak !== undefined,
+        ),
+      ),
+    );
   for (const atDifficulty of DIFFICULTY_IDS) {
     try {
+      const peak =
+        startingPeakW ||
+        (needsStartingPeak
+          ? resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed)
+          : undefined) ||
+        0;
       const compiled = compileScenarioRules(definitions, {
         ...params,
+        startingPeakW: peak,
         difficulty: atDifficulty,
         diagnostics,
       });
+      if (arcs.length)
+        compiled.arcEvents = compileOfficialArcEvents(
+          {
+            ...params,
+            difficulty: atDifficulty,
+            receivingScenario: resolved,
+            diagnostics,
+          },
+          arcs.map((arc) => arc.scenarioId),
+        );
+      const quoteState = {
+        date: getDateFromMinute(0, startingYear),
+        startingYear,
+        difficulty: atDifficulty,
+        seed: pack.seed,
+        feePerKgCO2e: resolved.feePerKgCO2e,
+        location: getScenarioLocation(resolved),
+        facilities: [],
+        commissionedHydroSiteIds: [],
+        scenarioId: resolved.id,
+        customScenario: resolved,
+      } as unknown as GameType;
+      const staticCosts = Object.entries(pack.facilities ?? {}).flatMap(
+        ([name, factors]) => {
+          const quote = startingFacilityQuote(quoteState, { name });
+          return quote?.fuel ? [{ fuel: quote.fuel, ...factors }] : [];
+        },
+      );
+      diagnostics.push(
+        ...scenarioRuleCompositionDiagnostics(compiled, staticCosts),
+      );
       if (atDifficulty === difficulty) rules = compiled;
     } catch (error) {
       if (!(error instanceof RuleCompilationError)) throw error;

@@ -1,6 +1,10 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { GameEventType, MonthlyHistoryType } from "../Types";
 import { buildVictoryDebrief } from "./Debrief";
+import { modScenario } from "../mods/ModScenario";
+import { createGame } from "../testing/Simulator";
+import { tickState } from "../reducers/Game";
+import { summarizeHistory } from "./DateTime";
 
 const summary = {
   cash: 500000000,
@@ -9,6 +13,87 @@ const summary = {
   demandWh: 100,
   kgco2e: 2000000000,
 } as MonthlyHistoryType;
+
+it("interprets mod debriefs from completed facts and marks a missing-history neighbor unavailable", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "debrief-fixture",
+    title: "Debrief",
+    creator: "Creator",
+    version: "1",
+    description: "Recorded results.",
+    baseScenarioId: 999,
+    seed: 42,
+    officialArcs: [],
+    scenario: { startingCustomers: 10000, cash: 1e9, durationMonths: 6 },
+    objectives: { mode: "none" },
+    events: [
+      {
+        id: "outage",
+        title: "Outage",
+        message: "An original plant is offline.",
+        preview: "An original plant will be offline.",
+        startMonth: 1,
+        durationMonths: 1,
+        effects: {
+          outputMultipliersBySelector: [
+            { target: { selector: "largestOperating" }, outputMultiplier: 0 },
+          ],
+        },
+      },
+    ],
+    debriefReports: [
+      { id: "reliability", kind: "reliability", fromMonth: 1, throughMonth: 2 },
+      { id: "affected", kind: "affectedFacilities", eventId: "outage" },
+    ],
+  });
+  const game = createGame({
+    scenarioId: 999,
+    scenario,
+    seed: 42,
+    wildfireHazardEnabled: false,
+    weatherHazardsEnabled: false,
+  });
+  while (game.date.monthsElapsed < 2) tickState(game);
+  const months = game.monthlyHistory;
+  const debrief = buildVictoryDebrief(
+    scenario,
+    summarizeHistory(months),
+    game.facilities,
+    [],
+    months,
+    game.dollarsPerkWh,
+    game.worldEvents.occurrences,
+  );
+  expect(debrief.scenarioMetrics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        label: "Demand served",
+        value: expect.stringMatching(/%$/),
+      }),
+      expect.objectContaining({
+        label: "Affected facilities",
+        value: "Natural Gas Peaker",
+      }),
+    ]),
+  );
+  const incomplete = buildVictoryDebrief(
+    scenario,
+    summarizeHistory(months),
+    game.facilities,
+    [],
+    months.slice(0, 1),
+    game.dollarsPerkWh,
+    game.worldEvents.occurrences,
+  );
+  expect(incomplete.scenarioMetrics).toContainEqual(
+    expect.objectContaining({
+      label: "Grid reliability",
+      value: expect.stringContaining("Report unavailable"),
+    }),
+  );
+});
 
 it("captures a plain then-versus-now story and the latest meaningful beats", () => {
   const scenario = SCENARIOS.find((candidate) => candidate.id === 100)!;

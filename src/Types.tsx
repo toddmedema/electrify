@@ -1207,6 +1207,8 @@ export interface StorySnapshotType {
     ageYears: number;
     peakW: number;
     operational: boolean;
+    minuteCreated?: number;
+    startingAssetId?: string;
   }>;
 }
 

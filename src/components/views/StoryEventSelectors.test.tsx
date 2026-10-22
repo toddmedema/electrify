@@ -6,6 +6,7 @@ import {
   selectActiveEventGroups,
   selectUpcomingStoryEvents,
 } from "./StoryEventSelectors";
+import { modScenario } from "../../mods/ModScenario";
 
 function event(
   key: string,
@@ -31,6 +32,47 @@ function stateAt(minute: number, active: ActiveWorldEventType[]) {
   game.worldEvents.active = active;
   return { game } as AppStateType;
 }
+
+test("mod-only upcoming events use previews and keep surprises hidden without imported arcs or loads", () => {
+  const scenario = modScenario({
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "upcoming-fixture",
+    title: "Upcoming",
+    creator: "Creator",
+    version: "1",
+    description: "A forecast fixture.",
+    baseScenarioId: 999,
+    seed: 42,
+    officialArcs: [],
+    objectives: { mode: "none" },
+    events: [
+      {
+        id: "announced",
+        title: "Output limit",
+        message: "Output is lower.",
+        preview: "Output will fall.",
+        startMonth: 2,
+        durationMonths: 1,
+        effects: { outputMultipliersByFuel: { Coal: 0.5 } },
+      },
+      {
+        id: "hidden",
+        title: "Surprise",
+        message: "An unexpected event.",
+        visibility: "surprise",
+        startMonth: 2,
+      },
+    ],
+  });
+  const game = createGame({ scenarioId: 999, scenario, seed: 42 });
+  const before = JSON.stringify(game);
+  const events = selectUpcomingStoryEvents({ game } as AppStateType);
+  expect(events.map((event) => [event.title, event.message])).toEqual([
+    ["Output limit", "Output will fall."],
+  ]);
+  expect(JSON.stringify(game)).toBe(before);
+});
 
 describe("active event groups", () => {
   it("includes only critical and notable events in effect now", () => {

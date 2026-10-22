@@ -4,6 +4,10 @@ import type {
   PricedFuelNameType,
   ScenarioLoadAdditionType,
   WorldEventEffectsType,
+  GameEventKindType,
+  ConceptNameType,
+  GameEventImportanceType,
+  StoryActionTargetType,
 } from "../Types";
 
 /** Authoring quantities use human units; compilation freezes one complete difficulty table. */
@@ -79,6 +83,8 @@ export type RuleReport = {
       fromMonth: number;
       throughMonth: number;
       fuels: FuelNameType[];
+      /** Local generation by default; legacy reviews can compare delivered fuel to demand. */
+      basis?: "localGeneration" | "customerDemand";
     }
   | {
       kind:
@@ -197,6 +203,20 @@ export interface CompiledRuleEvent {
   transactions: { kind: "charge" | "grant"; amount: number }[];
   report?: RuleReport;
   endReport?: RuleReport;
+  /** Trusted catalog provenance, detached into the snapshot; never accepted in author data. */
+  source?: {
+    scenarioId: number;
+    arcId: string;
+    phaseId: string;
+    drawKey?: string;
+    kind?: GameEventKindType;
+    concept?: ConceptNameType;
+    importance?: GameEventImportanceType;
+    actionTarget?: StoryActionTargetType;
+    turningPointPriority?: number;
+  };
+  reports?: RuleReport[];
+  protection?: { kind: "deepFreezeWinterization" | "wildfirePreparedness" };
 }
 export interface CompiledRuleOption {
   id: string;
@@ -262,6 +282,7 @@ export interface CompiledScenarioRules {
   startingAssetIds: string[];
   officialArcs: RuleArc[];
   events: CompiledRuleEvent[];
+  arcEvents?: CompiledRuleEvent[];
   choices: CompiledRuleChoice[];
   objectives: CompiledRuleObjective[];
   loads: CompiledRuleLoad[];

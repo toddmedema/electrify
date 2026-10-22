@@ -26,6 +26,7 @@ import {
   modIssue,
   modScenario,
   modValidationDiagnostics,
+  prepareModStartingPeak,
 } from "../../mods/ModScenario";
 import {
   packageDigest,
@@ -74,6 +75,22 @@ export function modifierSummary(pack: ModPackage): string {
 const versionLabel = (version: string) => `v${version.replace(/^v/i, "")}`;
 const primarySelector = (key: string) =>
   `[data-mod-key="${CSS.escape(key)}"] [data-mod-primary]`;
+const needsStartingPeak = (pack: ModPackage): boolean =>
+  !!pack.events?.some((event) =>
+    event.loads?.some((load) => load.peakShareOfStartingPeak !== undefined),
+  ) ||
+  !!pack.choices?.some((choice) =>
+    choice.options.some((option) =>
+      option.replaceLoad?.with.some(
+        (load) => load.peakShareOfStartingPeak !== undefined,
+      ),
+    ),
+  );
+type PeakPreparation = {
+  digest: string;
+  status: "loading" | "ready" | "error";
+  error?: string;
+};
 
 /** Installed scenario mods: play them, get more, and share your own. */
 export default function Mods(): React.JSX.Element {
@@ -114,15 +131,74 @@ export default function Mods(): React.JSX.Element {
   const removeCancel = React.useRef<HTMLButtonElement>(null);
   const publishCancel = React.useRef<HTMLButtonElement>(null);
   const entries = library.entries;
+  const [peakPreparation, setPeakPreparation] = React.useState<
+    Record<string, PeakPreparation>
+  >({});
+  const [peakRetry, setPeakRetry] = React.useState(0);
+  const peakReadyByEntry = React.useMemo(
+    () =>
+      new Map(
+        entries.map((entry) => [
+          entry.key,
+          !needsStartingPeak(entry.pack) ||
+            (peakPreparation[entry.key]?.digest ===
+              JSON.stringify(entry.pack) &&
+              peakPreparation[entry.key]?.status === "ready"),
+        ]),
+      ),
+    [entries, peakPreparation],
+  );
+  React.useEffect(() => {
+    let cancelled = false;
+    const prepare = async () => {
+      for (const entry of entries.filter((entry) =>
+        needsStartingPeak(entry.pack),
+      )) {
+        const digest = JSON.stringify(entry.pack);
+        if (cancelled) return;
+        setPeakPreparation((previous) => ({
+          ...previous,
+          [entry.key]: { digest, status: "loading" },
+        }));
+        try {
+          await prepareModStartingPeak(entry.pack);
+          if (cancelled) return;
+          setPeakPreparation((previous) => ({
+            ...previous,
+            [entry.key]: { digest, status: "ready" },
+          }));
+        } catch (error) {
+          if (cancelled) return;
+          setPeakPreparation((previous) => ({
+            ...previous,
+            [entry.key]: {
+              digest,
+              status: "error",
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "The scenario data could not be loaded.",
+            },
+          }));
+        }
+      }
+    };
+    void prepare();
+    return () => {
+      cancelled = true;
+    };
+  }, [entries, peakRetry]);
   const diagnosticsByEntry = React.useMemo(
     () =>
       new Map(
         entries.map((entry) => [
           entry.key,
-          modValidationDiagnostics(entry.pack),
+          peakReadyByEntry.get(entry.key)
+            ? modValidationDiagnostics(entry.pack)
+            : [],
         ]),
       ),
-    [entries],
+    [entries, peakReadyByEntry],
   );
   const issues = React.useMemo(
     () =>
@@ -570,7 +646,14 @@ export default function Mods(): React.JSX.Element {
                 const issue = issues.get(entry.key);
                 const diagnostics = diagnosticsByEntry.get(entry.key) || [];
                 const summary = modifierSummary(p);
-                const playable = entry.enabled && !issue;
+                const peakReady = peakReadyByEntry.get(entry.key);
+                const preparation = peakPreparation[entry.key];
+                const preparationError =
+                  preparation?.digest === JSON.stringify(p) &&
+                  preparation.status === "error"
+                    ? preparation.error
+                    : undefined;
+                const playable = entry.enabled && !issue && peakReady;
                 const offlineWorkshop =
                   entry.source === "workshop" && !steamOnline;
                 return (
@@ -604,6 +687,29 @@ export default function Mods(): React.JSX.Element {
                         {summary}
                       </Typography>
                     )}
+                    {!peakReady &&
+                      (preparationError ? (
+                        <Alert severity="error" sx={{ mt: 1 }}>
+                          {preparationError}
+                          <Box className="settingsKeyboardRow">
+                            <Button
+                              onClick={() => setPeakRetry((value) => value + 1)}
+                            >
+                              Retry preparation
+                            </Button>
+                          </Box>
+                        </Alert>
+                      ) : (
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          role="status"
+                          sx={{ mt: 1, alignItems: "center" }}
+                        >
+                          <CircularProgress size={20} />
+                          <Typography>Preparing scenario…</Typography>
+                        </Stack>
+                      ))}
                     {diagnostics.map((diagnostic, index) => (
                       <Alert
                         key={`${diagnostic.path}:${index}`}
@@ -814,7 +920,8 @@ export default function Mods(): React.JSX.Element {
                       !steamOnline ||
                       !!pending ||
                       library.uploading ||
-                      !!issues.get(entry.key)
+                      !!issues.get(entry.key) ||
+                      !peakReadyByEntry.get(entry.key)
                     }
                     onClick={() => {
                       setPublishing(entry);

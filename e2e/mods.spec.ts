@@ -5,6 +5,7 @@ import { packageDigest } from "../src/mods/ModSchema";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
+import { readSavedGame } from "./save-fixture";
 
 declare global {
   interface Window {
@@ -223,6 +224,147 @@ async function playAndCheckRun(page: Page, title: string) {
   ).toBeVisible();
   expect(await noHorizontalScroll(page)).toBe(true);
 }
+
+test("cold share-load preparation stays isolated when another mod starts", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(120000);
+  const shareEntry = (id: string, baseScenarioId: number): InstalledMod => ({
+    key: `local:${id}`,
+    source: "local",
+    enabled: true,
+    pack: pack({
+      id,
+      title: id,
+      baseScenarioId,
+      officialArcs: [],
+      scenario: { durationMonths: 24 },
+      events: [
+        {
+          id: "arrival",
+          title: "Campus arrival",
+          message: "The campus connects.",
+          preview: "The campus will connect.",
+          startMonth: 6,
+          loads: [
+            {
+              id: "campus",
+              startMonth: 6,
+              peakShareOfStartingPeak: 0.1,
+              demandType: "Data Centers",
+              loadFactor: 0.8,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const entries = [
+    shareEntry("ready-grid", 999),
+    shareEntry("waiting-grid", 103),
+  ];
+  let releaseWeather!: () => void;
+  const weatherReleased = new Promise<void>((resolve) => {
+    releaseWeather = resolve;
+  });
+  let weatherPending = false;
+  await context.route("**/data/weather/PIT.bin", async (route) => {
+    weatherPending = true;
+    await weatherReleased;
+    await route.continue();
+  });
+  const workers: import("@playwright/test").Worker[] = [];
+  page.on("worker", (worker) => workers.push(worker));
+  await mockDesktop(page, false, "light", entries);
+  await page.goto("/");
+  try {
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    const mods = page.locator(".modsScreen");
+    await expect(mods.getByText("Preparing scenario…").first()).toBeVisible();
+    await expect(
+      mods.getByRole("button", { name: "Play ready-grid" }),
+    ).toBeVisible({ timeout: 60000 });
+    await expect.poll(() => weatherPending).toBe(true);
+    await expect.poll(() => workers.length).toBe(2);
+    await expect(
+      mods.getByRole("button", { name: "Play waiting-grid" }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    await screenshot(
+      page,
+      `mods-preparing-${page.viewportSize()!.width}-light.png`,
+    );
+    await playAndCheckRun(page, "ready-grid");
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    const pause = page
+      .getByRole("button", { name: "pause", exact: true })
+      .first();
+    if ((await pause.getAttribute("aria-pressed")) !== "true")
+      await pause.click();
+    const before = (await readSavedGame(page))!;
+    expect(before.customScenario!.mod!.rules.startingPeakW).toBeGreaterThan(0);
+    const weather = before.timeline.map(
+      ({
+        minute,
+        temperatureC,
+        windKph,
+        solarIrradianceWM2,
+        precipitationMm,
+      }) => ({
+        minute,
+        temperatureC,
+        windKph,
+        solarIrradianceWM2,
+        precipitationMm,
+      }),
+    );
+    expect(weather.some((tick) => tick.temperatureC !== 0)).toBe(true);
+    const finished = new Promise<void>((resolve) =>
+      workers[1].on("close", () => resolve()),
+    );
+    releaseWeather();
+    await finished;
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await openPane(
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
+    );
+    const rate = programs.getByRole("slider", {
+      name: "The rate you charge for electricity generation",
+    });
+    await rate.press("ArrowRight");
+    const after = (await readSavedGame(page))!;
+    expect(after.date.minute).toBe(before.date.minute);
+    expect(after.location.id).toBe(before.location.id);
+    expect(
+      after.timeline.map(
+        ({
+          minute,
+          temperatureC,
+          windKph,
+          solarIrradianceWM2,
+          precipitationMm,
+        }) => ({
+          minute,
+          temperatureC,
+          windKph,
+          solarIrradianceWM2,
+          precipitationMm,
+        }),
+      ),
+    ).toEqual(weather);
+  } finally {
+    releaseWeather();
+  }
+});
 
 test("desktop mod management, Workshop publishing and a modded run", async ({
   page,

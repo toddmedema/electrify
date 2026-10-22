@@ -373,6 +373,7 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
   const none = modScenario({
     ...pack(),
     baseScenarioId: 114,
+    officialArcs: [],
     scenario: { durationMonths: 6 },
     objectives: { mode: "none" },
   });
@@ -382,6 +383,7 @@ test("objective intent explicitly inherits, adds, replaces or removes only scena
   const replace = modScenario({
     ...pack(),
     baseScenarioId: 114,
+    officialArcs: [],
     scenario: { durationMonths: 6 },
     objectives: {
       mode: "replace",
@@ -405,7 +407,7 @@ test("package and runtime digests ignore editor metadata and collection order, b
     ...pack(),
     events: [
       { ...event("a"), startMonth: 1 },
-      { ...event("b"), startMonth: 2 },
+      { ...event("b"), startMonth: 13 },
     ],
   };
   const reordered = {

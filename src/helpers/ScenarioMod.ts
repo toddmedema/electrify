@@ -33,26 +33,6 @@ export function facilityModifier(
     );
   return modifier;
 }
-/** Message-only normalized events, using authored IDs rather than array positions. The event
- * interpreter owns mechanical/conditional events; this entry point is replaced in increment 3. */
-export function modNotificationsDue(
-  game: Pick<GameType, "customScenario" | "date">,
-): { notice: { title: string; message: string }; key: string }[] {
-  return (game.customScenario?.mod?.rules.events ?? []).flatMap((event) =>
-    event.startMonth === game.date.monthsElapsed &&
-    !event.requiresChoice &&
-    Object.keys(event.effects).length === 0 &&
-    event.targets.length === 0 &&
-    event.transactions.length === 0
-      ? [
-          {
-            notice: { title: event.title, message: event.message },
-            key: event.key,
-          },
-        ]
-      : [],
-  );
-}
 const plain = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 const keys = (v: Record<string, unknown>, allowed: readonly string[]) =>

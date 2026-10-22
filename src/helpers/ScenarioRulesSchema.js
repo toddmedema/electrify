@@ -270,7 +270,7 @@ function ruleDiagnostics(value, path = "") {
         ...(v?.kind === "affectedFacilities"
           ? ["eventId"]
           : ["fromMonth", "throughMonth"]),
-        ...(v?.kind === "fuelMix" ? ["fuels"] : []),
+        ...(v?.kind === "fuelMix" ? ["fuels", "basis"] : []),
         ...(v?.kind === "reliability" ? ["minDemandServedShare"] : []),
       ])
     )
@@ -281,6 +281,8 @@ function ruleDiagnostics(value, path = "") {
     if (v.kind === "affectedFacilities") id(v.eventId, at(p, "eventId"));
     else window(v, p);
     if (v.kind === "fuelMix") fuels(v.fuels, at(p, "fuels"));
+    if (v.basis !== undefined)
+      enumValue(v.basis, at(p, "basis"), ["localGeneration", "customerDemand"]);
     if (v.minDemandServedShare !== undefined)
       number(v.minDemandServedShare, at(p, "minDemandServedShare"), 0, 1);
   };

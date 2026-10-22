@@ -4,6 +4,7 @@ import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
 import { ScenarioType } from "../Types";
 import { getScenarioLocation } from "./Locations";
+import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 
 export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
   (scenario) => !scenario.tutorialSteps,
@@ -90,18 +91,28 @@ export function prepareCustomScenario(scenario: ScenarioType): ScenarioType {
           (load.startsYear === source.startingYear &&
             (load.startsMonth || 1) > 1),
       )
-      .map((load) => ({
-        ...load,
-        id: `custom-${source.id}-${load.id}`,
-        startsYear:
-          scenario.startingYear +
-          Math.max(3, load.startsYear - source.startingYear),
-        peakW:
-          (load.peakW * demand) /
-          ((source.startingCustomers ||
-            getStartingCustomers(getScenarioLocation(source))) *
-            (source.startingDemandScale || 1)),
-      })),
+      .map((load) => {
+        const month = relocateOfficialArcMonth(
+          source.id,
+          (load.startsYear - source.startingYear) * 12 +
+            (load.startsMonth ?? 1) -
+            1,
+          "load",
+        );
+        return {
+          ...load,
+          id: `custom-${source.id}-${load.id}`,
+          startsYear: scenario.startingYear + Math.floor(month / 12),
+          ...(load.startsMonth === undefined && month % 12 === 0
+            ? {}
+            : { startsMonth: (month % 12) + 1 }),
+          peakW:
+            (load.peakW * demand) /
+            ((source.startingCustomers ||
+              getStartingCustomers(getScenarioLocation(source))) *
+              (source.startingDemandScale || 1)),
+        };
+      }),
   );
   return {
     ...scenario,

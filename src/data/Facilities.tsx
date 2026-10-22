@@ -26,7 +26,9 @@ import {
   getViableLocationCount,
   getViableLocationsRemaining,
 } from "./FacilitySites";
-import { resolveStoryAtDate } from "./WorldEvents";
+import { resolveStoryAtDate, combineStoryEffects } from "./WorldEvents";
+import { scenarioRules } from "../helpers/ScenarioRules";
+import { getScenario } from "./Scenarios";
 import { applyDefaultResilience } from "../helpers/Hazards";
 import { pow } from "../helpers/Pow";
 
@@ -295,6 +297,7 @@ export function GENERATORS(
     state.date.minute,
   );
   const storyContext = {
+    rules: scenarioRules(getScenario(state.scenarioId, state.customScenario)),
     seed: state.seed,
     scenarioId: state.scenarioId,
     customEvents: customEventContext(state.customScenario),
@@ -319,8 +322,16 @@ export function GENERATORS(
     );
     const fee = state.storyEffectsDisabled
       ? state.feePerKgCO2e
-      : (resolveStoryAtDate({ ...storyContext, date }).effects
-          .carbonFeePerKgCO2e ?? state.feePerKgCO2e);
+      : (combineStoryEffects(
+          resolveStoryAtDate({ ...storyContext, date }).active.filter(
+            (event) =>
+              event.forecastable !== false ||
+              date.minute <= state.date.minute ||
+              state.worldEvents?.occurrences.some(
+                (recorded) => recorded.key === event.key,
+              ),
+          ),
+        ).carbonFeePerKgCO2e ?? state.feePerKgCO2e);
     carbonFeeCache.set(monthOffset, fee);
     return fee;
   };

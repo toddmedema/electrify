@@ -16,10 +16,21 @@ import {
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
-import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
+import { relocateOfficialArcMonth } from "../helpers/ScenarioArcTiming";
 import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
+import type { CompiledScenarioRules } from "./ScenarioRules";
+import type { MonthlyHistoryType } from "../Types";
+import {
+  resolveScenarioRuleEvents,
+  upcomingScenarioRuleEvents,
+} from "../helpers/ScenarioRuleRuntime";
 
 export interface StoryContextType {
+  rules?: CompiledScenarioRules;
+  monthlyHistory?: MonthlyHistoryType[];
+  completedMonths?: number;
+  startingRateDollarsPerKWh?: number;
+  endingRateDollarsPerKWh?: number;
   customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
   seed: number;
   scenarioId: number;
@@ -2468,10 +2479,12 @@ function resolvePhaseTiming(
     typeof phase.scheduleOffsetMonths === "function"
       ? phase.scheduleOffsetMonths(context)
       : phase.scheduleOffsetMonths || 0;
-  const scheduledMonth =
+  const scheduledMonth = relocateOfficialArcMonth(
+    arc.scenarioId,
     resolveStoryScheduleMonth(phase.schedule, context.seed, scheduleKey) +
-    offset +
-    (SCENARIO_PREPARATION_MONTHS[arc.scenarioId] || 0);
+      offset,
+    "phase",
+  );
   const durationMonths =
     typeof phase.durationMonths === "function"
       ? phase.durationMonths(context)
@@ -2487,6 +2500,10 @@ export function resolveStoryAtDate(
   context: StoryContextType,
   definitions: StoryArcDefinitionType[] = STORY_ARC_DEFINITIONS,
 ): ResolvedStoryType {
+  if (context.rules) {
+    const resolved = resolveScenarioRuleEvents(context);
+    return { ...resolved, effects: combineStoryEffects(resolved.active) };
+  }
   const occurrences: ResolvedStoryType["occurrences"] = [];
   const active: ResolvedStoryType["active"] = [];
   definitions
@@ -2503,11 +2520,11 @@ export function resolveStoryAtDate(
     .flatMap((arc) => arc.phases.map((phase) => ({ arc, phase })))
     // Persisted occurrence order is part of save/replay determinism too, so content-file order is
     // not allowed to decide it.
-    .sort((a, b) =>
-      storyPhaseKey(a.arc.scenarioId, a.arc.id, a.phase.id).localeCompare(
-        storyPhaseKey(b.arc.scenarioId, b.arc.id, b.phase.id),
-      ),
-    )
+    .sort((a, b) => {
+      const first = storyPhaseKey(a.arc.scenarioId, a.arc.id, a.phase.id);
+      const second = storyPhaseKey(b.arc.scenarioId, b.arc.id, b.phase.id);
+      return first < second ? -1 : first > second ? 1 : 0;
+    })
     .forEach(({ arc, phase }) => {
       const { scheduledMonth, durationMonths } = resolvePhaseTiming(
         arc,
@@ -2538,6 +2555,7 @@ export function upcomingStoryPhases(
   context: StoryContextType,
   definitions: StoryArcDefinitionType[] = STORY_ARC_DEFINITIONS,
 ): Array<ActiveWorldEventType & StoryPhaseDescriptionType> {
+  if (context.rules) return upcomingScenarioRuleEvents(context);
   return definitions
     .filter(
       (arc) =>

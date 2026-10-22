@@ -26,6 +26,7 @@ import { APP_VERSION } from "./AppVersion";
 import { decodeSave } from "./SaveEncoding";
 import { SAVE_SCHEMA_VERSION, upgradeSave } from "./SaveUpgrade";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
+import { validScenarioRuleState } from "./helpers/ScenarioRuleValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import { isValidDifficulty } from "./helpers/Difficulty";
@@ -573,6 +574,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  if (!validScenarioRuleState(game as GameType)) return null;
   if (
     game.policies !== undefined &&
     !validPolicies(

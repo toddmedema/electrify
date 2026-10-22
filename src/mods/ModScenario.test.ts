@@ -342,6 +342,7 @@ test("D2 rejects an inherited reliability window outside the term, including its
       modScenario({
         ...fixture(),
         baseScenarioId: 114,
+        officialArcs: [],
         scenario: { durationMonths },
       }),
     ).toThrow(/inherited.*reliability/i);
@@ -350,6 +351,7 @@ test("D2 rejects an inherited reliability window outside the term, including its
     modScenario({
       ...fixture(),
       baseScenarioId: 114,
+      officialArcs: [],
       scenario: { durationMonths: 60 },
     }),
   ).not.toThrow();

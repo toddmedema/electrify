@@ -25,6 +25,8 @@ import {
 } from "./ScenarioRulesSchema";
 import { canonicalRuleJson, utf8Bytes } from "./RuleIdentity";
 import { randomAt, RANDOM_STREAM } from "./Math";
+import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
+import { validOfficialArcMetadata } from "./ScenarioRuleArcs";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -213,6 +215,15 @@ export function compileScenarioRules(
     if ("fromMonth" in report) {
       within(report.fromMonth, `${path}.fromMonth`);
       within(report.throughMonth, `${path}.throughMonth`);
+      if (
+        report.kind === "deepFreeze" &&
+        report.throughMonth - report.fromMonth !== 2
+      )
+        add(
+          "invalid-report-window",
+          path,
+          "A deep-freeze report needs exactly three completed months: before, impact and recovery.",
+        );
     }
   };
   const checkLoad = (load: RuleLoad, path: string) => {
@@ -627,6 +638,8 @@ export function compileScenarioRules(
       normalizeReport,
     ),
   };
+  const composition = scenarioRuleCompositionDiagnostics(result);
+  if (composition.length) throw new RuleCompilationError(composition);
   if (utf8Bytes(canonicalRuleJson(result)).length > RULE_LIMITS.compiledBytes)
     throw new RuleCompilationError([
       {
@@ -801,6 +814,107 @@ export function validCompiledScenarioRules(
         .filter((o) => o.inherited)
         .map((o) => o.id),
     });
+    if (rules.arcEvents !== undefined) {
+      if (!Array.isArray(rules.arcEvents) || rules.arcEvents.length > 200)
+        return false;
+      const seen = new Set<string>();
+      for (const event of rules.arcEvents) {
+        if (
+          !validOfficialArcMetadata(event) ||
+          !event.source ||
+          !rules.officialArcs.some(
+            (arc) => arc.scenarioId === event.source!.scenarioId,
+          ) ||
+          seen.has(event.key)
+        )
+          return false;
+        seen.add(event.key);
+        const expectedKey =
+          rules.namespace.kind === "mod"
+            ? `mod:${rules.namespace.id}:arc:${event.source.scenarioId}:${event.source.arcId}:${event.source.phaseId}`
+            : `story:${event.source.scenarioId}:${event.source.arcId}:${event.source.phaseId}`;
+        if (
+          event.key !== expectedKey ||
+          !Number.isInteger(event.startMonth) ||
+          event.startMonth < 0 ||
+          event.startMonth >= rules.durationMonths ||
+          !event.possibleStartMonths ||
+          !Number.isInteger(event.possibleStartMonths.from) ||
+          !Number.isInteger(event.possibleStartMonths.to) ||
+          event.possibleStartMonths.from < 0 ||
+          event.possibleStartMonths.from > event.startMonth ||
+          event.possibleStartMonths.to < event.startMonth ||
+          event.possibleStartMonths.to >= rules.durationMonths
+        )
+          return false;
+        const {
+          source: _source,
+          protection: _protection,
+          reports: _reports,
+          ...plainEvent
+        } = event;
+        const probe = {
+          ...rules,
+          officialArcs: [],
+          events: [
+            {
+              ...plainEvent,
+              possibleStartMonths: {
+                from: event.startMonth,
+                to: event.startMonth,
+              },
+            },
+          ],
+          choices: [],
+          objectives: [],
+          loads: [],
+          debriefReports: event.reports ?? [],
+        };
+        delete probe.arcEvents;
+        const eventDefinitions = ruleDefinitionsFromSnapshot(probe);
+        eventDefinitions.events![0].startMonth = event.startMonth + 1;
+        eventDefinitions.events![0].preview ??= "This event will occur.";
+        for (const report of event.reports ?? []) {
+          if (
+            report.kind === "affectedFacilities" &&
+            !eventDefinitions.events!.some(
+              (definition) => definition.id === report.eventId,
+            )
+          )
+            eventDefinitions.events!.push({
+              id: report.eventId,
+              title: "Observed event",
+              message: "Observed event.",
+              preview: "This event will occur.",
+              startMonth: 1,
+            });
+        }
+        const checked = compileScenarioRules(eventDefinitions, {
+          namespace: rules.namespace,
+          difficulty: rules.difficulty,
+          seed: rules.seed,
+          startingYear: rules.startingYear,
+          durationMonths: rules.durationMonths,
+          startingPeakW: rules.startingPeakW,
+          startingAssetIds: rules.startingAssetIds,
+        });
+        const canonicalEvent = {
+          ...checked.events.find((definition) => definition.id === event.id)!,
+          key: event.key,
+          possibleStartMonths: event.possibleStartMonths,
+        };
+        if (event.preview === undefined) delete canonicalEvent.preview;
+        if (
+          canonicalRuleJson(comparableNumbers(canonicalEvent)) !==
+            canonicalRuleJson(comparableNumbers(plainEvent)) ||
+          canonicalRuleJson(checked.debriefReports) !==
+            canonicalRuleJson(event.reports ?? [])
+        )
+          return false;
+      }
+      normalized.arcEvents = rules.arcEvents;
+    }
+    if (scenarioRuleCompositionDiagnostics(normalized).length) return false;
     // Unit conversion can change the last binary digit on a round trip. Structural keys and all
     // bounds are checked first; this comparison permits only that insignificant numeric drift.
     return (

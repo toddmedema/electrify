@@ -4,7 +4,15 @@ import {
   startingFacilityQuote,
 } from "../helpers/StartingFacilities";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
-import { modNotificationsDue, validScenarioMod } from "../helpers/ScenarioMod";
+import { validScenarioMod } from "../helpers/ScenarioMod";
+import { scenarioRules } from "../helpers/ScenarioRules";
+import {
+  captureRuleReportObservation,
+  ruleConditionMet,
+  ruleEffectsForOccurrence,
+  ruleLoadKey,
+  ruleEvents,
+} from "../helpers/ScenarioRuleRuntime";
 import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
   gasConversionQuote,
@@ -663,6 +671,51 @@ export function logFuelCrossovers(state: GameType) {
 
 const MAX_WORLD_EVENT_CHECKS = 2400;
 
+/** All story entry points share the same definitions, activation facts and observations. */
+function storyContextAt(state: GameType, date = state.date) {
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+  );
+  return {
+    rules,
+    seed: state.seed,
+    scenarioId: state.scenarioId,
+    customEvents: customEventContext(state.customScenario),
+    difficulty: state.difficulty,
+    date,
+    location: state.location,
+    snapshot: buildStorySnapshot(
+      state.monthlyHistory,
+      state.facilities,
+      date.minute,
+    ),
+    occurrences: state.worldEvents.occurrences,
+    monthlyHistory: state.monthlyHistory,
+    completedMonths: state.date.monthsElapsed,
+    startingRateDollarsPerKWh: getScenario(
+      state.scenarioId,
+      state.customScenario,
+    )?.dollarsPerkWh,
+    endingRateDollarsPerKWh: state.dollarsPerkWh,
+  };
+}
+
+function openingRuleTransactions(state: GameType) {
+  return state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.ruleEvent === true &&
+        event.startsMinute === state.date.minute,
+    )
+    .reduce(
+      (sum, event) =>
+        sum +
+        Number(event.attributes.upfrontGrant ?? 0) -
+        Number(event.attributes.cost ?? 0),
+      0,
+    );
+}
+
 /** A standing program must outlive the bounded historical event log that records its changes. */
 function trimWorldEventOccurrences(state: GameType) {
   const occurrences = state.worldEvents.occurrences;
@@ -677,7 +730,38 @@ function trimWorldEventOccurrences(state: GameType) {
     retained.shift();
     retained.unshift(program);
   }
-  state.worldEvents.occurrences = retained;
+  // Rules are bounded at compilation. Their receipts and onset identities are run facts,
+  // independent of the rolling regional-hazard log.
+  const retainedSet = new Set(retained);
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+  );
+  if (rules) {
+    const protectedKeys = new Set(
+      ruleEvents(rules)
+        .filter((event) => event.protection?.kind === "wildfirePreparedness")
+        .map((event) => event.key),
+    );
+    occurrences.forEach((event, index) => {
+      if (!protectedKeys.has(event.key)) return;
+      const priorProgram = wildfirePreparednessChange(
+        occurrences.slice(0, index),
+        state.location.id,
+        event.startsMinute,
+      );
+      if (priorProgram) retainedSet.add(priorProgram);
+    });
+  }
+  state.worldEvents.occurrences = occurrences.filter(
+    (event) =>
+      retainedSet.has(event) ||
+      event.attributes.ruleEvent === true ||
+      event.attributes.ruleEventEnd === true ||
+      event.attributes.ruleObservation === true ||
+      (rules &&
+        event.attributes.scenarioChoice === true &&
+        !event.key.startsWith("wildfire:")),
+  );
 }
 
 /** Starts/ends authored events before this month's forecast is built. */
@@ -695,33 +779,30 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   );
   if (
     state.storyEffectsDisabled ||
-    (!state.customScenario?.eventScenarioIds?.length &&
+    (!scenarioRules(getScenario(state.scenarioId, state.customScenario)) &&
+      !state.customScenario?.eventScenarioIds?.length &&
       !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
   ) {
     return storyPriceFuels;
   }
+  const context = storyContextAt(state);
+  captureRuleReportObservation(state, context);
   const resolved = resolveStoryAtDate({
-    seed: state.seed,
-    scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
-    difficulty: state.difficulty,
-    date: state.date,
-    location: state.location,
-    snapshot: buildStorySnapshot(
-      state.monthlyHistory,
-      state.facilities,
-      state.date.minute,
-    ),
+    ...context,
     periodSnapshots: Object.fromEntries(
       [1, 2, 3, 4, 5, 6].map((months) => [
         months,
         buildStoryPeriodSnapshot(state.monthlyHistory, months),
       ]),
     ),
-    occurrences: state.worldEvents.occurrences,
   });
   resolved.occurrences.forEach((occurrence) => {
-    if (state.worldEvents.checkedKeys.includes(occurrence.key)) {
+    if (
+      state.worldEvents.checkedKeys.includes(occurrence.key) ||
+      state.worldEvents.occurrences.some(
+        (event) => event.key === occurrence.key,
+      )
+    ) {
       return;
     }
     state.worldEvents.checkedKeys.push(occurrence.key);
@@ -752,6 +833,27 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
     );
   }
   trimWorldEventOccurrences(state);
+  if (context.rules) {
+    for (const load of context.rules.loads) {
+      const key = ruleLoadKey(context.rules, load.id);
+      if (
+        !ruleConditionMet(
+          load.requiresChoice,
+          context.rules,
+          state.worldEvents.occurrences,
+        ) ||
+        state.loadAdditions.some((existing) => existing.id === key)
+      )
+        continue;
+      const {
+        eventId: _eventId,
+        startMonth: _startMonth,
+        requiresChoice: _requiresChoice,
+        ...addition
+      } = load;
+      state.loadAdditions.push({ ...addition, id: key });
+    }
+  }
   return storyPriceFuels;
 }
 
@@ -1313,6 +1415,7 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
+    !!scenarioRules(getScenario(state.scenarioId, state.customScenario)) ||
     !!state.customScenario?.eventScenarioIds?.length ||
     state.scenarioId === 104 ||
     state.scenarioId === 111 ||
@@ -1329,6 +1432,8 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
             facility.yearsToBuildLeft <= 0,
             facility.paused,
             facility.minuteOperational,
+            facility.minuteCreated,
+            facility.startingAssetId,
           ].join(":"),
         )
         .sort()
@@ -1336,6 +1441,10 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     : "";
   return [
     state.scenarioId,
+    state.customScenario?.mod?.runtimeDigest ??
+      JSON.stringify(
+        scenarioRules(getScenario(state.scenarioId, state.customScenario)),
+      ),
     JSON.stringify(customEventContext(state.customScenario)),
     state.difficulty,
     state.seed,
@@ -1375,13 +1484,21 @@ function storyEffectsAt(date: DateType, state: GameType) {
   if (cached) {
     return cached;
   }
-  const persisted = state.worldEvents.active.filter(
-    (event) =>
-      date.minute >= event.startsMinute && date.minute < event.endsMinute,
-  );
+  const context = storyContextAt(state, date);
+  const persisted = state.worldEvents.active
+    .filter(
+      (event) =>
+        date.minute >= event.startsMinute && date.minute < event.endsMinute,
+    )
+    .map((event) =>
+      event.attributes.ruleEvent === true
+        ? { ...event, effects: ruleEffectsForOccurrence(event, context) }
+        : event,
+    );
   if (
     state.storyEffectsDisabled ||
-    (!state.customScenario?.eventScenarioIds?.length &&
+    (!context.rules &&
+      !state.customScenario?.eventScenarioIds?.length &&
       !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
   ) {
     const effects = combineStoryEffects(persisted);
@@ -1390,18 +1507,7 @@ function storyEffectsAt(date: DateType, state: GameType) {
   }
   const persistedKeys = new Set(persisted.map((event) => event.key));
   const scheduled = resolveStoryAtDate({
-    seed: state.seed,
-    scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
-    difficulty: state.difficulty,
-    date,
-    location: state.location,
-    snapshot: buildStorySnapshot(
-      state.monthlyHistory,
-      state.facilities,
-      date.minute,
-    ),
-    occurrences: state.worldEvents.occurrences,
+    ...context,
   }).active.filter(
     (event) =>
       !persistedKeys.has(event.key) &&
@@ -1795,7 +1901,11 @@ export const gameSlice = createSlice({
           } = search;
           const facilitySearch = startingFacilitySearch(search);
           const generator = GENERATORS(
-            state,
+            // These are inherited assets, already committed before month-one timed discounts.
+            // Static package factors still apply through the retained custom scenario.
+            scenarioRules(scenario)
+              ? { ...state, storyEffectsDisabled: true }
+              : state,
             facilitySearch.peakW || 1000000,
             [],
             [],
@@ -1889,10 +1999,21 @@ export const gameSlice = createSlice({
       ];
 
       desktopSimulationHooks()?.initialize(state);
+      const rules = scenarioRules(scenario);
+      if (rules) {
+        updateWorldEvents(state);
+        const opening = state.timeline[0];
+        const transaction = openingRuleTransactions(state);
+        opening.cash += transaction;
+        opening.netWorth += transaction;
+      }
       // The first blank timeline is created before the authored fleet is resolved. Hydrology is
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.
-      if (state.facilities.some((facility) => facility.fuel === "Hydro")) {
+      if (
+        rules ||
+        state.facilities.some((facility) => facility.fuel === "Hydro")
+      ) {
         state.timeline = reforecastWeatherAndPrices(state);
       }
       // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
@@ -1909,12 +2030,6 @@ export const gameSlice = createSlice({
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
-      for (const { notice, key } of modNotificationsDue(state))
-        logGameEvent(state, "WORLD_EVENT", notice.message, {
-          title: notice.title,
-          importance: "NOTABLE",
-          reportedKey: key,
-        });
       // Anything the player did before the clock first moved -- setting a rate on the way in.
       // tickState picks up everything after this
       applyPendingReplayActions(state);
@@ -3604,12 +3719,6 @@ export function* tickStatePhases(
       // Reprice the company's credit off the year that just closed, before the forecast is built
       // against it. Operating results reprice monthly; new borrowing reprices immediately.
       refreshInterestRate(state, cash, now.netWorth);
-      for (const { notice, key } of modNotificationsDue(state))
-        logGameEvent(state, "WORLD_EVENT", notice.message, {
-          title: notice.title,
-          importance: "NOTABLE",
-          reportedKey: key,
-        });
       const storyPriceFuels = updateWorldEvents(state);
       // The recurring regional hazard resolves on its own path, after the authored story, so a
       // custom game in a profiled area can meet a wildfire without inheriting any authored arc.
@@ -3630,7 +3739,11 @@ export function* tickStatePhases(
         const target = followedTargetRate(state);
         if (target !== undefined) state.dollarsPerkWh = target;
       }
-      state.timeline = generateNewTimeline(state, cash, customers);
+      state.timeline = generateNewTimeline(
+        state,
+        cash + openingRuleTransactions(state),
+        customers,
+      );
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
       // Advised once per plant: a paused-and-resumed plant is the player's informed choice
@@ -3744,6 +3857,7 @@ export function* tickStatePhases(
           state.eventLog,
           state.monthlyHistory,
           state.dollarsPerkWh,
+          state.worldEvents.occurrences,
         );
 
         if (!isReplay) {
@@ -5109,19 +5223,44 @@ function* supplyFacilitiesFinancesPhases(
   const rebookingFrame = prev === now;
   const bookedThisFrame = (event: ActiveWorldEventType) =>
     event.startsMinute === now.minute;
-  const choiceGrant = state.worldEvents.occurrences
+  // Forecast payments are virtual receipts through this same transaction owner. Live state
+  // only receives a receipt when updateWorldEvents activates the event at its owning boundary.
+  const rules = scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+  );
+  const futureReceipts =
+    rules &&
+    !state.storyEffectsDisabled &&
+    now.minute > state.date.minute &&
+    now.minute % MINUTES_PER_MONTH === 0
+      ? resolveStoryAtDate(storyContextAt(state, tickDate)).occurrences.filter(
+          (event) =>
+            event.attributes.ruleEvent === true &&
+            event.forecastable !== false &&
+            !state.worldEvents.occurrences.some(
+              (recorded) => recorded.key === event.key,
+            ),
+        )
+      : [];
+  const transactionOccurrences = futureReceipts.length
+    ? [...state.worldEvents.occurrences, ...futureReceipts]
+    : state.worldEvents.occurrences;
+  const choiceGrant = transactionOccurrences
     .filter(
       (event) =>
-        event.attributes.scenarioChoice === true && bookedThisFrame(event),
+        (event.attributes.scenarioChoice === true ||
+          event.attributes.ruleEvent === true) &&
+        bookedThisFrame(event),
     )
     .reduce(
       (total, event) => total + Number(event.attributes.upfrontGrant || 0),
       0,
     );
-  const immediateCosts = state.worldEvents.occurrences
+  const immediateCosts = transactionOccurrences
     .filter(
       (event) =>
         (event.attributes.scenarioChoice === true ||
+          event.attributes.ruleEvent === true ||
           event.attributes.retrofit === true) &&
         bookedThisFrame(event),
     )
@@ -5809,8 +5948,13 @@ function buildFacilityHelper(
     const {
       viableLocationsRemaining: _viableLocationsRemaining,
       resilienceExtraBuildCost: _resilienceExtraBuildCost,
+      startingAssetId: _startingAssetId,
+      assetId: _assetId,
       ...facilitySnapshot
-    } = g;
+    } = g as FacilityShoppingType & {
+      startingAssetId?: string;
+      assetId?: string;
+    };
     const facility = {
       ...facilitySnapshot,
       hydroSiteId: hydroSiteId ?? g.hydroSiteId,

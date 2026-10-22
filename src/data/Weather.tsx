@@ -52,6 +52,12 @@ export function selectWeatherLocation(id: string): void {
   if (!weatherSeries.has(id)) throw new Error(`Weather not loaded for ${id}`);
   loadedLocation = id;
 }
+/** A menu forecast needs actual local and watershed records, never a dummy reading. */
+export function hasWeather(location: LocationType): boolean {
+  return [location.id, location.watershedId].every(
+    (id) => !id || weatherSeries.has(id),
+  );
+}
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,

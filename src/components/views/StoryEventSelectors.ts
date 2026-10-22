@@ -16,6 +16,8 @@ import {
 } from "../../helpers/Wildfire";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
+import { scenarioRules } from "../../helpers/ScenarioRules";
+import { getScenario } from "../../data/Scenarios";
 
 export interface UpcomingStoryEventType {
   key: string;
@@ -38,9 +40,13 @@ export function selectUpcomingStoryEvents(
   state: AppStateType,
 ): UpcomingStoryEventType[] {
   const game = state.game;
+  const rules = scenarioRules(
+    getScenario(game.scenarioId, game.customScenario),
+  );
   const customEvents = customEventContext(game.customScenario);
   if (
     !game.loadAdditions?.length &&
+    !rules &&
     !STORY_ARC_DEFINITIONS.some(
       (arc) =>
         arc.scenarioId === game.scenarioId ||
@@ -86,6 +92,10 @@ export function selectUpcomingStoryEvents(
     .join("|");
   const key = [
     game.seed,
+    game.customScenario?.mod?.runtimeDigest ??
+      JSON.stringify(
+        scenarioRules(getScenario(game.scenarioId, game.customScenario)),
+      ),
     game.scenarioId,
     game.difficulty,
     game.date.monthsElapsed,
@@ -96,6 +106,13 @@ export function selectUpcomingStoryEvents(
     )?.attributes.choice || "standard",
     JSON.stringify(game.loadAdditions),
     JSON.stringify(customEvents),
+    JSON.stringify(
+      game.worldEvents.occurrences.map((event) => [
+        event.key,
+        event.attributes.choice,
+        event.attributes.ruleTargets,
+      ]),
+    ),
     historyKey,
     fleetKey,
   ].join("|");
@@ -103,6 +120,7 @@ export function selectUpcomingStoryEvents(
     return upcomingCache.events;
   }
   const events: UpcomingStoryEventType[] = upcomingStoryPhases({
+    rules: scenarioRules(getScenario(game.scenarioId, game.customScenario)),
     seed: game.seed,
     scenarioId: game.scenarioId,
     customEvents,
