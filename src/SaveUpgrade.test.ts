@@ -350,7 +350,10 @@ it.each([3, 4])(
       startsMinute: minute,
       endsMinute: minute + 1440,
       attributes: { heavySmokeDays: 3 },
-      effects: { solarIrradianceMultipliersByHour: { "10": 0.99 } },
+      effects: {
+        solarIrradianceMultiplier: 0.99,
+        solarIrradianceMultipliersByHour: { "10": 0.99 },
+      },
     };
     const old = {
       ...save,

@@ -126,6 +126,7 @@ const migrations: ((
         return event;
       const effects = { ...event.effects };
       for (const key of [
+        "solarIrradianceMultiplier",
         "solarIrradianceMultipliersByHour",
         "serviceInterruptionFraction",
         "localBackupWhPerMonth",
@@ -151,7 +152,9 @@ const migrations: ((
         ...(hadRetired || removedSelection || game.scenarioId === 111
           ? { wildfireForecastRefresh: true }
           : {}),
-        ...(legacyLines ? { legacyWildfireIntertieAccess: true } : {}),
+        ...(legacyLines || (game.scenarioId === 111 && object(game.multiplayer))
+          ? { legacyWildfireIntertieAccess: true }
+          : {}),
         worldEvents: {
           ...events,
           active: events.active.filter((event) => !retired(event)),

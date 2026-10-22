@@ -7,6 +7,10 @@ capacity (a 4 MW surviving-route cap); it returns to normal in March. The restri
 before the ordinary weather rating. Upgrading the same route cannot raise this cap.
 The Desert connection remains an independent alternative.
 
+Co-op retains this authored outside connection alongside the player links, so the outage
+still affects an existing import route. That connection belongs to its company; only shared
+player links require a co-signed upgrade. Existing co-op saves retain their previous topology.
+
 The severity is grounded in [CAISO's September 20, 2021 opening brief, printed page 7](https://www.caiso.com/documents/sep20-2021-openingbrief-amendedscopingmemo-ruling-phase2-reliableelectricservice-extremeweatherevents-r20-11-003.pdf#page=10).
 It reports that the Bootleg fire tripped three of four lines north of Malin on July 9,
 reducing Malin transfer capacity from 2,967 MW to 285 MW, approximately a 90% loss.

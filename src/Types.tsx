@@ -1392,7 +1392,7 @@ export interface GameType {
   wildfireHazardDisabled?: boolean;
   /** One-time future forecast refresh after retiring legacy wildfire systems. */
   wildfireForecastRefresh?: boolean;
-  /** Preserve pre-redesign connection purchases and loans in existing scenario-111 saves. */
+  /** Preserve pre-redesign transmission assets, loans and co-op topology in scenario-111 saves. */
   legacyWildfireIntertieAccess?: boolean;
   // Headless balance harness only: run the identical strategy with hail and extreme-cold hazards
   // switched off. Undefined means enabled (the browser default).

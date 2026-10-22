@@ -1,3 +1,4 @@
+import { getScenario } from "./Scenarios";
 import type { GameType } from "../Types";
 import { INTERTIE_UPGRADE_STEP, MAX_INTERTIE_UPGRADES } from "../Constants";
 import {
@@ -357,8 +358,18 @@ export function corridorsForGame(
       date: Pick<GameType["date"], "year">;
     },
 ) {
-  if (game.multiplayer)
-    return game.multiplayer.peers?.map((p) => p.corridor) ?? [];
+  if (game.multiplayer) {
+    const starting = game.legacyWildfireIntertieAccess
+      ? []
+      : getScenario(game.scenarioId, game.customScenario)?.startingInterties ||
+        [];
+    return [
+      ...(game.multiplayer.peers?.map((p) => p.corridor) ?? []),
+      ...corridorsForLocation(game.location)
+        .filter((c) => starting.includes(c.id))
+        .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!),
+    ];
+  }
   return corridorsForLocation(game.location)
     .filter(({ id }) => corridorOpenInYear(id, game.date.year))
     .map((c) => effectiveCorridor(c.id, accessContextForGame(game))!);

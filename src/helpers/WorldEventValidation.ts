@@ -3,7 +3,7 @@ export function validTransmissionCapacityLimits(value: unknown): boolean {
   return (
     record(value) &&
     Object.entries(value).every(
-      ([id, ratio]) => id.length > 0 && finite(ratio) && ratio >= 0,
+      ([id, limitW]) => id.length > 0 && finite(limitW) && limitW >= 0,
     )
   );
 }

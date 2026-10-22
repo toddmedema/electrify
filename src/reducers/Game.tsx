@@ -306,6 +306,7 @@ import {
 } from "../Types";
 import { pow } from "../helpers/Pow";
 import {
+  isPeerCorridorId,
   PEER_TRADE_BASE_PRICE_PER_MWH,
   PEER_TRADE_GAS_HEAT_RATE,
   PEER_TRADE_MIN_PRICE_PER_MWH,
@@ -1683,7 +1684,7 @@ export const gameSlice = createSlice({
         ...state.facilities.filter((facility) => !variable(facility)),
       ];
 
-      if (state.transmission && !state.multiplayer) {
+      if (state.transmission) {
         state.transmission.lines = (scenario.startingInterties || []).map(
           (corridorId, index) => {
             const quote = intertieBuildQuote(
@@ -4775,7 +4776,8 @@ function* supplyFacilitiesFinancesPhases(
     }
   }
   const operatingLines = transmission.lines.filter(
-    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0 && !state.multiplayer,
+    ({ yearsToBuildLeft, corridorId }) =>
+      yearsToBuildLeft <= 0 && !isPeerCorridorId(corridorId),
   );
   const intertieContext = intertieContextForGame(state);
   const tradingYear = intertieYear(now.minute, state.startingYear);

@@ -193,3 +193,102 @@ test("a saved match restores retired companies frozen and rejects a changed spec
   ).toThrow(/incomplete|original game build/);
   expect(() => restoreWorld({ ...saved, schema: 1 }, "restored")).toThrow();
 });
+
+test("co-op preserves the wildfire mission's pivotal existing intertie and its outage", () => {
+  loadSimData("LA");
+  const world = start({ scenarioId: 111, difficulty: "Manager" }, 2);
+  for (const game of world.grids) {
+    expect(
+      game.transmission!.lines.find(
+        (line) => line.corridorId === "california-north",
+      ),
+    ).toMatchObject({ capacityW: 40e6, yearsToBuildLeft: 0 });
+    expect(new Set(game.transmission!.lines.map((line) => line.id)).size).toBe(
+      2,
+    );
+  }
+  stepWorld(world);
+  expect(world.grids.every((game) => currentTick(game)!.importedW! > 0)).toBe(
+    true,
+  );
+  for (
+    let tick = 0;
+    tick < 36 * 96 && world.grids[0].date.monthsElapsed < 36;
+    tick++
+  ) {
+    if (world.paused)
+      world.seats.forEach((_seat, i) => command(world, i, { kind: "ready" }));
+    stepWorld(world);
+  }
+  expect(world.grids[0].date.monthsElapsed).toBe(36);
+  for (const game of world.grids) {
+    const north = game.transmission!.lines.find(
+      (line) => line.corridorId === "california-north",
+    )!;
+    expect(Math.abs(north.currentFlowW)).toBeLessThanOrEqual(4e6);
+    expect(currentTick(game)!.transmissionCapacityLimitsWByCorridor).toEqual({
+      "california-north": 4e6,
+    });
+  }
+  const restored = restoreWorld(
+    JSON.parse(JSON.stringify(checkpointWorld(world))),
+    "new-epoch",
+  );
+  const northernConnections = (match: World) =>
+    match.grids.map((game) =>
+      game.transmission!.lines.find(
+        (line) => line.corridorId === "california-north",
+      ),
+    );
+  expect(northernConnections(restored)).toEqual(northernConnections(world));
+});
+
+test("an existing outside intertie upgrades without charging a peer or requiring a co-signature", () => {
+  loadSimData("LA");
+  const world = start({ scenarioId: 111, difficulty: "Manager" }, 2);
+  expect(
+    command(world, 0, {
+      kind: "action",
+      name: "upgradeTransmissionLine",
+      payload: { corridorId: "california-north", financed: true },
+    }),
+  ).toBeUndefined();
+  expect(
+    world.grids[0].transmission!.lines.find(
+      (line) => line.corridorId === "california-north",
+    )!.upgrade,
+  ).toBeDefined();
+  expect(
+    world.grids[1].transmission!.lines.find(
+      (line) => line.corridorId === "california-north",
+    )!.upgrade,
+  ).toBeUndefined();
+  expect(world.edges.every((edge) => !edge.approval)).toBe(true);
+  expect(() =>
+    restoreWorld(
+      JSON.parse(JSON.stringify(checkpointWorld(world))),
+      "restored-upgrade",
+    ),
+  ).not.toThrow();
+});
+
+test("older wildfire co-op checkpoints keep their original peer-only topology", () => {
+  loadSimData("LA");
+  const world = start({ scenarioId: 111, difficulty: "Manager" }, 2);
+  const checkpoint = JSON.parse(
+    JSON.stringify(checkpointWorld(world)),
+  ) as World;
+  checkpoint.gameSchema = 4;
+  checkpoint.grids.forEach((game) => {
+    game.transmission!.lines = game.transmission!.lines.filter((line) =>
+      line.corridorId.startsWith("peer:"),
+    );
+    game.transmission!.lines[0].id = 1;
+  });
+  const restored = restoreWorld(checkpoint, "older-topology");
+  restored.grids.forEach((game) => {
+    expect(game.legacyWildfireIntertieAccess).toBe(true);
+    expect(game.transmission!.lines).toHaveLength(1);
+    expect(game.transmission!.lines[0].corridorId).toBe("peer:0-1");
+  });
+});

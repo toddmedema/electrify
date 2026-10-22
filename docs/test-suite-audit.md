@@ -1,5 +1,9 @@
 # Test-suite audit
 
+The wildfire-specific keep decisions below describe the system at audit time. The later
+[intertie mission redesign](wildfire-intertie.md) retires those smoke and preparedness suites
+and replaces them with route-limit, save/replay, seeded balance and three-width browser checks.
+
 Reviewed the complete tracked test inventory at master commit `0f71ec68` on October 15, 2026: **358 executable test files plus the golden-output snapshot**. Three subagents reviewed browser tests, React components, simulation/domain tests, and the remaining runtime/platform suites. The primary agent also reviewed saves, achievements, audio, native runtime, Firestore rules, CI tooling and the combined diff.
 
 | Review area                                                                  | Original executable files |
