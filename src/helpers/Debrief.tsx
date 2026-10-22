@@ -129,29 +129,42 @@ function scenarioMetrics(
 ): VictoryDebriefType["scenarioMetrics"] {
   const rules = scenarioRules(scenario);
   if (rules)
-    return rules.debriefReports.flatMap((report) => {
-      const result = interpretScenarioRuleReport(report, rules, {
-        startingYear: rules.startingYear,
-        completedMonths: months.length,
-        monthlyHistory: months,
-        occurrences,
-        startingRateDollarsPerKWh: scenario.dollarsPerkWh,
-        endingRateDollarsPerKWh: endingRate,
-      });
-      return result.metrics.length
-        ? result.metrics.map((metric) => ({
-            label: metric.label,
-            value: reportMetricValue(metric),
-            concept: reportMetricConcept(metric),
-          }))
-        : [
-            {
-              label: result.label,
-              value: result.message,
-              concept: "goal" as const,
-            },
-          ];
-    });
+    return [
+      ...rules.debriefReports.flatMap((report) => {
+        const result = interpretScenarioRuleReport(report, rules, {
+          startingYear: rules.startingYear,
+          completedMonths: months.length,
+          monthlyHistory: months,
+          occurrences,
+          startingRateDollarsPerKWh: scenario.dollarsPerkWh,
+          endingRateDollarsPerKWh: endingRate,
+        });
+        return result.metrics.length
+          ? result.metrics.map((metric) => ({
+              label: metric.label,
+              value: reportMetricValue(metric),
+              concept: reportMetricConcept(metric),
+            }))
+          : [
+              {
+                label: result.label,
+                value: result.message,
+                concept: "goal" as const,
+              },
+            ];
+      }),
+      ...occurrences
+        .filter(
+          (event) =>
+            event.attributes.ruleChoice === true &&
+            event.attributes.automatic === true,
+        )
+        .map((event) => ({
+          label: event.title ?? "Automatic response",
+          value: event.message ?? "Resolved automatically",
+          concept: "goal" as const,
+        })),
+    ];
   if (scenario.id === 106) {
     const afterArrival = months.filter(
       (month) => month.year > 2026 || (month.year === 2026 && month.month >= 1),

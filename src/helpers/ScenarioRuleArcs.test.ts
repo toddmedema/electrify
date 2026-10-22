@@ -1,7 +1,7 @@
 import {
   compileOfficialArcEvents,
   officialArcLoadScale,
-  officialArcMoneyScale,
+  officialArcMoneyAmount,
   relocateOfficialArcMonth,
   validOfficialArcMetadata,
   type OfficialArcCompileParameters,
@@ -216,8 +216,11 @@ test("imported repair budgets scale with receiving size and era while percentage
     receivingScenario: source(111),
   }).find((item) => item.source.phaseId === "firestorm")!;
   expect(event.effects.operatingExpensePerMonth).toBeCloseTo(
-    original.effects.operatingExpensePerMonth! *
-      officialArcMoneyScale(source(111), receiving),
+    officialArcMoneyAmount(
+      original.effects.operatingExpensePerMonth!,
+      source(111),
+      receiving,
+    ),
     5,
   );
   expect(event.effects.demandMultiplier).toBe(

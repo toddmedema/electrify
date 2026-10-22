@@ -4,6 +4,14 @@ import type {
   RuleDiagnostic,
 } from "../data/ScenarioRules";
 import type { FuelNameType } from "../Types";
+import {
+  createScenarioRuleChoiceGraph,
+  scenarioRuleChoiceEnvelope,
+  scenarioRuleConditionsCanCoexist,
+  scenarioRuleDependencyDiagnostics,
+  type RuleDependencyOptions,
+  type ScenarioRuleChoiceGraph,
+} from "./ScenarioRuleDependencies";
 
 export interface RuleStaticCostFactor {
   fuel: FuelNameType;
@@ -27,63 +35,39 @@ function factorEnvelope(
   entries: { event: CompiledRuleEvent; value: number }[],
   month: number,
   term: number,
+  graph: ScenarioRuleChoiceGraph,
 ) {
-  const groups = new Map<string, typeof entries>();
-  entries.forEach((entry) => {
-    const condition = entry.event.requiresChoice;
-    const key = condition
-      ? `${condition.arc ?? "own"}:${condition.choiceId}`
-      : `event:${entry.event.key}`;
-    groups.set(key, [...(groups.get(key) ?? []), entry]);
-  });
-  let min = 1,
-    max = 1,
-    positiveMin = 1;
-  for (const group of groups.values()) {
-    const options = group[0].event.requiresChoice
-      ? [
-          undefined,
-          ...new Set(
-            group.flatMap((entry) => entry.event.requiresChoice!.optionIds),
-          ),
-        ]
-      : [undefined];
-    const outcomes = options.map((option) => {
-      let low = 1,
-        high = 1,
-        positive = 1;
-      group.forEach(({ event, value }) => {
-        if (
-          event.requiresChoice &&
-          (option === undefined ||
-            !event.requiresChoice.optionIds.includes(option))
-        )
-          return;
-        const guaranteed =
-          month >= event.possibleStartMonths.to &&
-          month <
-            (event.durationUntilEnd
-              ? term
-              : event.possibleStartMonths.from + event.durationMonths);
-        low *= guaranteed ? value : Math.min(1, value);
-        high *= guaranteed ? value : Math.max(1, value);
-        positive *= value === 0 ? 1 : guaranteed ? value : Math.min(1, value);
-      });
-      return { low, high, positive };
-    });
-    min *= Math.min(...outcomes.map((outcome) => outcome.low));
-    max *= Math.max(...outcomes.map((outcome) => outcome.high));
-    positiveMin *= Math.min(...outcomes.map((outcome) => outcome.positive));
-  }
-  return { min, max, positiveMin };
+  return scenarioRuleChoiceEnvelope(
+    graph,
+    month,
+    entries.map(({ event, value }) => {
+      const guaranteed =
+        month >= event.possibleStartMonths.to &&
+        month <
+          (event.durationUntilEnd
+            ? term
+            : event.possibleStartMonths.from + event.durationMonths);
+      return {
+        requiresChoice: event.requiresChoice,
+        min: guaranteed ? value : Math.min(1, value),
+        max: guaranteed ? value : Math.max(1, value),
+        positiveMin: value === 0 ? 1 : guaranteed ? value : Math.min(1, value),
+      };
+    }),
+  );
 }
 
 export function scenarioRuleCompositionDiagnostics(
   rules: CompiledScenarioRules,
   staticCosts: readonly RuleStaticCostFactor[] = [],
+  options: RuleDependencyOptions = {},
 ): RuleDiagnostic[] {
   const events = [...rules.events, ...(rules.arcEvents ?? [])];
-  const diagnostics: RuleDiagnostic[] = [];
+  const graph = createScenarioRuleChoiceGraph(rules, options);
+  const diagnostics = scenarioRuleDependencyDiagnostics(rules, options).filter(
+    (diagnostic) => diagnostic.severity === "error",
+  );
+  if (diagnostics.length) return diagnostics;
   const seen = new Set<string>();
   const add = (code: string, path: string, month: number, message: string) => {
     const identity = `${code}:${path}`;
@@ -105,15 +89,13 @@ export function scenarioRuleCompositionDiagnostics(
     );
     for (let i = 0; i < fees.length; i++)
       for (let j = i + 1; j < fees.length; j++) {
-        const first = fees[i].requiresChoice,
-          second = fees[j].requiresChoice;
-        const exclusive =
-          first &&
-          second &&
-          first.arc === second.arc &&
-          first.choiceId === second.choiceId &&
-          !first.optionIds.some((id) => second.optionIds.includes(id));
-        if (!exclusive)
+        if (
+          scenarioRuleConditionsCanCoexist(
+            graph,
+            [fees[i].requiresChoice, fees[j].requiresChoice],
+            month,
+          )
+        )
           add(
             "overlapping-carbon-fee",
             "events.carbonFeeDollarsPerTonneCO2e",
@@ -149,6 +131,7 @@ export function scenarioRuleCompositionDiagnostics(
         values,
         month,
         rules.durationMonths,
+        graph,
       );
       const output = path.startsWith("facilityOutput");
       const zeroInflow = path === "hydroRunoffMultiplier" && min === 0;

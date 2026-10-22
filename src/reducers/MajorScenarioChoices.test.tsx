@@ -202,7 +202,7 @@ describe("scenario decision speed restoration", () => {
   afterEach(() => jest.useRealTimers());
 
   it.each(["SLOW", "NORMAL", "FAST", "PAUSED"] as const)(
-    "restores %s after a valid response",
+    "stays paused after a valid response from %s",
     (speed) => {
       const game = ready(106, 48 - TICK_MINUTES / MINUTES_PER_MONTH);
       game.speed = speed;
@@ -218,7 +218,7 @@ describe("scenario decision speed restoration", () => {
         invalid,
         choose(DATA_CENTER_DECISION_KEY, "phased"),
       );
-      expect(chosen.speed).toBe(speed);
+      expect(chosen.speed).toBe("PAUSED");
       expect(chosen.scenarioChoicePause).toBeUndefined();
     },
   );

@@ -227,6 +227,8 @@ export interface CompiledRuleOption {
   grant: number;
   replaceLoad?: RuleLoadReference & { with: CompiledRuleLoad[] };
   eventIds?: string[];
+  /** Trusted catalog presentation/scoring metadata, never authored by a package. */
+  meaningful?: false;
 }
 export interface CompiledRuleChoice {
   id: string;
@@ -238,6 +240,8 @@ export interface CompiledRuleChoice {
   options: CompiledRuleOption[];
   freeOptionId: string;
   automatic?: boolean;
+  /** Detached catalog reference for adapted choices; never accepted as author data. */
+  source?: { scenarioId: number; arcId: string; choiceId: string };
 }
 export type CompiledRuleObjective = ObjectiveBase & {
   required: boolean;
@@ -283,6 +287,7 @@ export interface CompiledScenarioRules {
   officialArcs: RuleArc[];
   events: CompiledRuleEvent[];
   arcEvents?: CompiledRuleEvent[];
+  arcChoices?: CompiledRuleChoice[];
   choices: CompiledRuleChoice[];
   objectives: CompiledRuleObjective[];
   loads: CompiledRuleLoad[];

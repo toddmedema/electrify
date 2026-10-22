@@ -18,6 +18,11 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { buildStorySnapshot } from "../../helpers/Story";
 import { scenarioRules } from "../../helpers/ScenarioRules";
 import { getScenario } from "../../data/Scenarios";
+import { scenarioChoicesForGame } from "../../helpers/ScenarioChoices";
+import {
+  ruleConditionMet,
+  scenarioRuleForecastOccurrences,
+} from "../../helpers/ScenarioRuleRuntime";
 
 export interface UpcomingStoryEventType {
   key: string;
@@ -127,7 +132,13 @@ export function selectUpcomingStoryEvents(
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
-    occurrences: game.worldEvents.occurrences,
+    occurrences: rules
+      ? scenarioRuleForecastOccurrences(
+          rules,
+          game.worldEvents.occurrences,
+          rules.durationMonths - 1,
+        )
+      : game.worldEvents.occurrences,
     snapshot: buildStorySnapshot(
       game.monthlyHistory,
       game.facilities,
@@ -140,6 +151,42 @@ export function selectUpcomingStoryEvents(
       label: `Expected ${date.month} ${date.year}`,
     };
   });
+  const choiceContext = scenarioChoicesForGame(game);
+  for (const choice of choiceContext.choices) {
+    if (
+      choice.dueMonth < game.date.monthsElapsed ||
+      game.worldEvents.occurrences.some((event) => event.key === choice.key) ||
+      (choice.requiresChoice &&
+        (!choiceContext.rules ||
+          !ruleConditionMet(
+            choice.requiresChoice,
+            choiceContext.rules,
+            game.worldEvents.occurrences,
+          )))
+    )
+      continue;
+    const startsMinute = choice.dueMonth * MINUTES_PER_MONTH;
+    const date = getDateFromMinute(startsMinute, game.startingYear);
+    const free = choice.options.find(
+      (option) => option.id === choice.freeOptionId,
+    )!;
+    events.push({
+      key: choice.key,
+      startsMinute,
+      label: choice.automatic
+        ? `Automatic response · ${date.month} ${date.year}`
+        : startsMinute === game.date.minute
+          ? "Decision required · Paused"
+          : `Decision · ${date.month} ${date.year}`,
+      title: choice.title,
+      message: choice.automatic
+        ? `This will resolve automatically: ${free.label}. ${free.description}`
+        : choice.prompt,
+      concept: "goal",
+      importance: "NOTABLE",
+      actionTarget: { card: "EVENTS" },
+    });
+  }
   for (const addition of game.loadAdditions ?? []) {
     const startsMinute =
       ((addition.startsYear - game.startingYear) * 12 +

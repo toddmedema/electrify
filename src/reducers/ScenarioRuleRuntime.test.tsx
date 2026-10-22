@@ -150,12 +150,7 @@ test("save validation rejects protection that has no committed paid response", (
     baseScenarioId: 111,
     officialArcs: [{ scenarioId: 111, includeChoices: false }],
   });
-  state.date = getDateFromMinute(36 * MINUTES_PER_MONTH, state.startingYear);
-  for (let month = 0; month <= 36; month++) {
-    const resolved = resolveStoryAtDate(context(state, month));
-    state.worldEvents.occurrences.push(...resolved.occurrences);
-    if (month === 36) state.worldEvents.active = resolved.active;
-  }
+  advance(state, 36);
   expect(validScenarioRuleState(state)).toBe(true);
   const fire = state.worldEvents.occurrences.find((item) =>
     item.key.endsWith(":firestorm"),

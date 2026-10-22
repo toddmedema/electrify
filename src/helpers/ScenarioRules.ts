@@ -27,6 +27,8 @@ import { canonicalRuleJson, utf8Bytes } from "./RuleIdentity";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
 import { validOfficialArcMetadata } from "./ScenarioRuleArcs";
+import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
+import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
 
 export class RuleCompilationError extends Error {
   constructor(public diagnostics: RuleDiagnostic[]) {
@@ -638,7 +640,15 @@ export function compileScenarioRules(
       normalizeReport,
     ),
   };
-  const composition = scenarioRuleCompositionDiagnostics(result);
+  const dependencyDiagnostics = scenarioRuleDependencyDiagnostics(result, {
+    allowUnresolvedArcChoices: true,
+  });
+  diagnostics.push(
+    ...dependencyDiagnostics.filter((d) => d.severity === "warning"),
+  );
+  const composition = scenarioRuleCompositionDiagnostics(result, [], {
+    allowUnresolvedArcChoices: true,
+  });
   if (composition.length) throw new RuleCompilationError(composition);
   if (utf8Bytes(canonicalRuleJson(result)).length > RULE_LIMITS.compiledBytes)
     throw new RuleCompilationError([
@@ -814,6 +824,69 @@ export function validCompiledScenarioRules(
         .filter((o) => o.inherited)
         .map((o) => o.id),
     });
+    if (rules.arcChoices !== undefined) {
+      if (!Array.isArray(rules.arcChoices) || rules.arcChoices.length > 200)
+        return false;
+      const seen = new Set<string>();
+      for (const choice of rules.arcChoices) {
+        if (
+          !validOfficialArcChoiceMetadata(choice) ||
+          !choice.source ||
+          !rules.officialArcs.some(
+            (arc) =>
+              arc.scenarioId === choice.source!.scenarioId &&
+              !!choice.automatic === !arc.includeChoices,
+          ) ||
+          seen.has(choice.key)
+        )
+          return false;
+        seen.add(choice.key);
+        const expectedKey =
+          rules.namespace.kind === "mod"
+            ? `mod:${rules.namespace.id}:arc:${choice.source.scenarioId}:choice:${choice.source.choiceId}`
+            : `story:${choice.source.scenarioId}:${choice.source.arcId}:${choice.source.choiceId}`;
+        if (choice.key !== expectedKey) return false;
+        const {
+          source: _source,
+          automatic: _automatic,
+          ...plainChoice
+        } = choice;
+        const meaningful = plainChoice.options.map(
+          ({ meaningful, ...option }) => ({ option, meaningful }),
+        );
+        const genericChoice = {
+          ...plainChoice,
+          options: meaningful.map((entry) => entry.option),
+        };
+        const probe = {
+          ...rules,
+          choices: [genericChoice],
+          events: [],
+          loads: [],
+          objectives: [],
+          debriefReports: [],
+        };
+        delete probe.arcEvents;
+        delete probe.arcChoices;
+        const definitions = ruleDefinitionsFromSnapshot(probe);
+        const checked = compileScenarioRules(definitions, {
+          namespace: rules.namespace,
+          difficulty: rules.difficulty,
+          seed: rules.seed,
+          startingYear: rules.startingYear,
+          durationMonths: rules.durationMonths,
+          startingPeakW: rules.startingPeakW,
+          startingAssetIds: rules.startingAssetIds,
+        });
+        const canonicalChoice = { ...checked.choices[0], key: choice.key };
+        if (
+          canonicalRuleJson(comparableNumbers(canonicalChoice)) !==
+          canonicalRuleJson(comparableNumbers(genericChoice))
+        )
+          return false;
+      }
+      normalized.arcChoices = rules.arcChoices;
+    }
     if (rules.arcEvents !== undefined) {
       if (!Array.isArray(rules.arcEvents) || rules.arcEvents.length > 200)
         return false;

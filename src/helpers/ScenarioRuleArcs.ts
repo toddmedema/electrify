@@ -75,13 +75,15 @@ export function officialArcLoadScale(
 }
 
 /** Fixed company budgets change with receiving-grid size and era, never percentage shocks. */
-export function officialArcMoneyScale(
+export function officialArcMoneyAmount(
+  amount: number,
   source: ScenarioType,
   receiving: ScenarioType,
 ): number {
-  return (
-    officialArcLoadScale(source, receiving) *
-    inEraMoney(1, receiving.startingYear, source.startingYear)
+  return inEraMoney(
+    amount * officialArcLoadScale(source, receiving),
+    receiving.startingYear,
+    source.startingYear,
   );
 }
 
@@ -207,10 +209,7 @@ export function compileOfficialArcEvents(
             customEvents: [
               {
                 scenarioId,
-                moneyScale: officialArcMoneyScale(
-                  source,
-                  params.receivingScenario,
-                ),
+                moneyScale: 1,
               },
             ],
           }
@@ -278,6 +277,12 @@ export function compileOfficialArcEvents(
               : {}),
           },
         };
+        if (imported && event.effects.operatingExpensePerMonth !== undefined)
+          event.effects.operatingExpensePerMonth = officialArcMoneyAmount(
+            event.effects.operatingExpensePerMonth,
+            source,
+            params.receivingScenario,
+          );
         const preview = phase.preview(context, (attribute) => {
           // Current catalog previews do not draw. Keep the trusted resolver's addressed draw if one does.
           const probe: StoryPhaseDefinitionType = {

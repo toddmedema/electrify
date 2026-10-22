@@ -13,10 +13,17 @@ import {
   StoryActionTargetType,
   WorldEventEffectsType,
 } from "../Types";
+import { scenarioEffectsSummary } from "../helpers/ScenarioEffectsSummary";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { relocateOfficialArcMonth } from "../helpers/ScenarioArcTiming";
+import {
+  DEEP_FREEZE_DECISION_KEY,
+  WILDFIRE_DECISION_KEY,
+  WINTERIZATION_COST,
+  WILDFIRE_PREPARATION_COST,
+} from "./ScenarioChoiceRules";
 import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
 import type { CompiledScenarioRules } from "./ScenarioRules";
 import type { MonthlyHistoryType } from "../Types";
@@ -24,6 +31,11 @@ import {
   resolveScenarioRuleEvents,
   upcomingScenarioRuleEvents,
 } from "../helpers/ScenarioRuleRuntime";
+export {
+  DEEP_FREEZE_DECISION_KEY,
+  WILDFIRE_DECISION_KEY,
+  WINTERIZATION_COST,
+} from "./ScenarioChoiceRules";
 
 export interface StoryContextType {
   rules?: CompiledScenarioRules;
@@ -1122,19 +1134,6 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
-export const DEEP_FREEZE_DECISION_KEY =
-  "story:107:texas-deep-freeze:winterization";
-// Rounded 2020-dollar planning allowance: about $82M for the 3,827 MW resource
-// portfolio plus representative pre-freeze expansion, not a literal plant retrofit quote.
-// Observed thermal-fleet spending and a conservative wind allowance inform the scale;
-// see src/testing/SCENARIO_CHOICE_BALANCE.md. Difficulty changes risk, not service cost.
-export const WINTERIZATION_COST = {
-  Intern: 90000000,
-  Employee: 90000000,
-  Manager: 90000000,
-  VP: 90000000,
-  CEO: 90000000,
-};
 export function winterizationCost(difficulty: DifficultyType): number {
   return WINTERIZATION_COST[difficulty];
 }
@@ -1421,8 +1420,6 @@ export const CALIFORNIA_WILDFIRE_BALANCE: Record<
   },
 };
 
-export const WILDFIRE_DECISION_KEY =
-  "story:111:california-wildfire-2025:preparedness";
 export function wildfirePrepared(
   occurrences?: ActiveWorldEventType[],
 ): boolean {
@@ -1434,11 +1431,8 @@ export function wildfirePrepared(
     ) ?? false
   );
 }
-// Advance inspection, staged backup equipment and response resources for the small
-// municipal system, priced for a meaningful cash-versus-resilience decision rather
-// than the lower historical spending proxy; post-fire restoration is separate.
 export function wildfirePreparationCost(_difficulty: DifficultyType): number {
-  return 2000000;
+  return WILDFIRE_PREPARATION_COST;
 }
 
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
@@ -2376,44 +2370,7 @@ export function resolveStoryPhase(
       effects.operatingExpensePerMonth *= imported.moneyScale;
     // Prices per unit and percentage shocks retain their meaning in the receiving market.
     // Fixed restoration budgets scale to grid size and era; source-city choices are not imported.
-    const changes: string[] = [];
-    if (effects.demandMultiplier !== undefined)
-      changes.push(
-        `Demand: ${Math.round(effects.demandMultiplier * 100)}% of normal`,
-      );
-    if (effects.temperatureOffsetC)
-      changes.push(
-        `Temperature: ${effects.temperatureOffsetC > 0 ? "+" : ""}${effects.temperatureOffsetC}°C`,
-      );
-    if (effects.hydroRunoffMultiplier !== undefined)
-      changes.push(
-        `Hydro inflow: ${Math.round(effects.hydroRunoffMultiplier * 100)}% of normal`,
-      );
-    if (effects.operatingExpensePerMonth)
-      changes.push(
-        `Restoration: $${Math.round(effects.operatingExpensePerMonth).toLocaleString("en-US")}/month`,
-      );
-    for (const [label, values] of [
-      ["fuel price", effects.fuelPriceMultipliers],
-      ["construction cost", effects.buildCostMultipliersByFuel],
-      ["operating cost", effects.operatingCostMultipliersByFuel],
-      ["output", effects.facilityOutputMultipliersByFuel],
-    ] as const) {
-      Object.entries(values || {}).forEach(([fuel, value]) =>
-        changes.push(
-          `${fuel} ${label}: ${Math.round(value! * 100)}% of normal`,
-        ),
-      );
-    }
-    if (
-      effects.facilityOutputMultipliersById &&
-      Object.keys(effects.facilityOutputMultipliersById).length
-    )
-      changes.push("Affected generators have reduced output");
-    if (effects.carbonFeePerKgCO2e !== undefined)
-      changes.push(
-        `Carbon fee: $${Math.round(effects.carbonFeePerKgCO2e * 1000)}/tonne`,
-      );
+    const changes = scenarioEffectsSummary(effects);
     description = {
       ...description,
       effects,

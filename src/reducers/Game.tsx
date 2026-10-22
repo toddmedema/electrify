@@ -6,12 +6,26 @@ import {
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import { scenarioRules } from "../helpers/ScenarioRules";
+import { canonicalRuleJson } from "../helpers/RuleIdentity";
+import { getScenarioLocation } from "../helpers/Locations";
+import { getStartingCustomers } from "../data/LocationProfiles";
+import {
+  scenarioRuleChoiceLoadPlan,
+  scenarioRuleLoadOrder,
+  scenarioRuleReplacedLoadIds,
+} from "../helpers/ScenarioRuleDecisions";
+import type {
+  CompiledRuleChoice,
+  CompiledRuleOption,
+  CompiledScenarioRules,
+} from "../data/ScenarioRules";
 import {
   captureRuleReportObservation,
   ruleConditionMet,
   ruleEffectsForOccurrence,
   ruleLoadKey,
   ruleEvents,
+  scenarioRuleForecastOccurrences,
 } from "../helpers/ScenarioRuleRuntime";
 import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
@@ -47,6 +61,8 @@ import { startingFacilityStarts } from "../helpers/StartingFacilityStarts";
 import {
   optionalScenarioChoice,
   pendingScenarioChoice,
+  pendingScenarioRuleChoice,
+  scenarioChoicesForGame,
   validScenarioResponse,
 } from "../helpers/ScenarioChoices";
 import { getViableLocationCount } from "../data/FacilitySites";
@@ -689,7 +705,14 @@ function storyContextAt(state: GameType, date = state.date) {
       state.facilities,
       date.minute,
     ),
-    occurrences: state.worldEvents.occurrences,
+    occurrences:
+      rules && date.minute > state.date.minute
+        ? scenarioRuleForecastOccurrences(
+            rules,
+            state.worldEvents.occurrences,
+            date.monthsElapsed,
+          )
+        : state.worldEvents.occurrences,
     monthlyHistory: state.monthlyHistory,
     completedMonths: state.date.monthsElapsed,
     startingRateDollarsPerKWh: getScenario(
@@ -834,9 +857,14 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   }
   trimWorldEventOccurrences(state);
   if (context.rules) {
+    const replaced = scenarioRuleReplacedLoadIds(
+      context.rules,
+      state.worldEvents.occurrences,
+    );
     for (const load of context.rules.loads) {
       const key = ruleLoadKey(context.rules, load.id);
       if (
+        replaced.has(key) ||
         !ruleConditionMet(
           load.requiresChoice,
           context.rules,
@@ -853,6 +881,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       } = load;
       state.loadAdditions.push({ ...addition, id: key });
     }
+    state.loadAdditions = scenarioRuleLoadOrder(state.loadAdditions);
   }
   return storyPriceFuels;
 }
@@ -1803,7 +1832,15 @@ export const gameSlice = createSlice({
         scenario.mod &&
         (!validScenarioMod(scenario.mod, scenario) ||
           scenario.mod.parameters.difficulty !== state.difficulty ||
-          scenario.mod.parameters.seed !== state.seed)
+          scenario.mod.parameters.seed !== state.seed ||
+          a.cash !== scenario.cash ||
+          a.customers !==
+            (scenario.startingCustomers ??
+              getStartingCustomers(getScenarioLocation(scenario))) ||
+          canonicalRuleJson(a.facilities) !==
+            canonicalRuleJson(scenario.facilities) ||
+          canonicalRuleJson(a.location) !==
+            canonicalRuleJson(getScenarioLocation(scenario)))
       )
         throw new Error(
           "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
@@ -2027,6 +2064,8 @@ export const gameSlice = createSlice({
         );
       }
       state.timeline = reforecastSupply(state);
+      resolveAutomaticScenarioChoices(state);
+      if (pendingScenarioChoice(state)) setForegroundSpeed(state, "PAUSED");
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
@@ -2283,6 +2322,7 @@ export const gameSlice = createSlice({
         // The loading screen reads this back rather than looking the scenario's location up,
         // which is what makes the replay run against the weather the original player saw
         location: cloneDeep(replay.location),
+        customScenario: cloneDeep(replay.customScenario),
         meaningfulDecisionGateWaived: !!replay.meaningfulDecisionGateWaived,
         replayPlayback: {
           actions: cloneDeep(replay.actions),
@@ -2395,18 +2435,15 @@ export const gameSlice = createSlice({
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
+      const blocking = !!pendingScenarioChoice(state);
       if (
         !state.replayPlayback &&
         applyScenarioResponse(state, action.payload)
       ) {
         recordReplayAction(state, "chooseScenarioResponse", action.payload);
-        if (
-          !pendingScenarioChoice(state) &&
-          state.scenarioChoicePause !== undefined
-        ) {
-          setForegroundSpeed(state, state.scenarioChoicePause);
+        if (blocking) {
           delete state.scenarioChoicePause;
-          ensureTicking(state);
+          setForegroundSpeed(state, "PAUSED");
         }
       }
     });
@@ -3055,9 +3092,36 @@ function applyCancelRetrofit(state: GameType, payload: unknown): boolean {
   return true;
 }
 
+/** Immediate company transfers are separate from delivered-energy sales and facility income. */
+function bookScenarioTransaction(
+  now: TickPresentFutureType,
+  cost: number,
+  grant: number,
+): void {
+  now.cash += grant - cost;
+  now.netWorth += grant - cost;
+  now.revenue += grant;
+  now.revenueGrants = (now.revenueGrants ?? 0) + grant;
+  now.expensesOM += cost;
+}
+
 /** Accepts one authored choice for live play, replay and headless simulation. */
 function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   if (!validScenarioResponse(payload)) return false;
+  const compiled = pendingScenarioRuleChoice(state);
+  if (compiled?.key === payload.decisionId) {
+    const rules = scenarioChoicesForGame(state).rules!;
+    const option = compiled.options.find(
+      (option) => option.id === payload.optionId,
+    );
+    if (
+      !option ||
+      !applyCompiledScenarioResponse(state, rules, compiled, option)
+    )
+      return false;
+    resolveAutomaticScenarioChoices(state);
+    return true;
+  }
   // A pending story choice the clock waits on, or an optional one the player chose to take up
   const optional = optionalScenarioChoice(state);
   const decision = [pendingScenarioChoice(state), optional].find(
@@ -3074,11 +3138,7 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     return false;
   const upfrontGrant = option.upfrontGrant?.(state.difficulty) ?? 0;
   if (!Number.isFinite(upfrontGrant) || upfrontGrant < 0) return false;
-  now.cash += upfrontGrant - cost;
-  now.netWorth += upfrontGrant - cost;
-  now.revenue += upfrontGrant;
-  now.revenueGrants = (now.revenueGrants || 0) + upfrontGrant;
-  now.expensesOM += cost;
+  bookScenarioTransaction(now, cost, upfrontGrant);
   if (option.loadAdditions)
     state.loadAdditions = cloneDeep(option.loadAdditions);
   state.worldEvents.occurrences.push({
@@ -3133,6 +3193,134 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     });
   state.timeline = reforecastSupply(state, true);
   return true;
+}
+
+function applyCompiledScenarioResponse(
+  state: GameType,
+  rules: CompiledScenarioRules,
+  decision: CompiledRuleChoice,
+  option: CompiledRuleOption,
+): boolean {
+  const sharedStoryRules = !!scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    !now ||
+    state.date.minute !== decision.dueMonth * MINUTES_PER_MONTH ||
+    state.worldEvents.occurrences.some((event) => event.key === decision.key) ||
+    !Number.isFinite(option.cost) ||
+    option.cost < 0 ||
+    (option.cost > 0 && now.cash < option.cost) ||
+    !Number.isFinite(option.grant) ||
+    option.grant < 0
+  )
+    return false;
+  const loads = scenarioRuleChoiceLoadPlan(state, rules, decision, option);
+  if (!loads) return false;
+  const before = new Set(
+    state.worldEvents.occurrences.map((event) => event.key),
+  );
+  const beforeEffects = sharedStoryRules
+    ? storyEffectsAt(state.date, state)
+    : undefined;
+  const previousLoadIds = new Set(state.loadAdditions.map((load) => load.id));
+  bookScenarioTransaction(now, option.cost, option.grant);
+  state.loadAdditions = loads;
+  const message = decision.automatic
+    ? `Resolved automatically: ${option.label}. ${option.message}`
+    : option.message;
+  state.worldEvents.occurrences.push({
+    key: decision.key,
+    definitionId: decision.key,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: {
+      choice: option.id,
+      cost: option.cost,
+      upfrontGrant: option.grant,
+      scenarioChoice: true,
+      ...(sharedStoryRules
+        ? { ruleChoice: true, automatic: !!decision.automatic }
+        : {}),
+    },
+    effects: {},
+    title: decision.title,
+    message,
+  });
+  logGameEvent(state, "WORLD_EVENT", message, {
+    title: decision.title,
+    importance: "NOTABLE",
+    storyPhaseKey: decision.key,
+    turningPointPriority: 115,
+  });
+  if (!decision.automatic && option.meaningful !== false)
+    recordMeaningfulDecision(state, {
+      lever: decision.key,
+      label: decision.title,
+      kind: "policy",
+      before: "undecided",
+      after: option.id,
+    });
+  if (sharedStoryRules) updateWorldEvents(state);
+  for (const event of state.worldEvents.occurrences) {
+    if (
+      before.has(event.key) ||
+      event.attributes.ruleEvent !== true ||
+      event.startsMinute !== state.date.minute
+    )
+      continue;
+    const grant = Number(event.attributes.upfrontGrant ?? 0),
+      cost = Number(event.attributes.cost ?? 0);
+    bookScenarioTransaction(now, cost, grant);
+  }
+  const effects = sharedStoryRules
+    ? storyEffectsAt(state.date, state)
+    : undefined;
+  const connectsNow = state.loadAdditions.some(
+    (load) =>
+      !previousLoadIds.has(load.id) &&
+      (load.startsYear - state.startingYear) * 12 +
+        (load.startsMonth ?? 1) -
+        1 <=
+        state.date.monthsElapsed,
+  );
+  // A future connection or protection commitment must not project customer growth a second
+  // time into this already forecast frame. Rebuild demand only when this opening changes it.
+  if (
+    connectsNow ||
+    effects?.demandMultiplier !== beforeEffects?.demandMultiplier ||
+    effects?.temperatureOffsetC !== beforeEffects?.temperatureOffsetC
+  ) {
+    state.timeline = generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      state.timeline.length,
+    );
+  } else {
+    if (
+      effects?.hydroRunoffMultiplier !== beforeEffects?.hydroRunoffMultiplier ||
+      canonicalRuleJson(effects?.fuelPriceMultipliers ?? {}) !==
+        canonicalRuleJson(beforeEffects?.fuelPriceMultipliers ?? {})
+    )
+      state.timeline = reforecastWeatherAndPrices(state);
+    state.timeline = reforecastSupply(state, true);
+  }
+  return true;
+}
+
+/** Automatic arc branches use the same atomic transition, without adding a player replay action. */
+function resolveAutomaticScenarioChoices(state: GameType): void {
+  let choice = pendingScenarioRuleChoice(state, true);
+  while (choice) {
+    const rules = scenarioChoicesForGame(state).rules!;
+    const freeOptionId = choice.freeOptionId;
+    const option = choice.options.find((option) => option.id === freeOptionId);
+    if (!option || !applyCompiledScenarioResponse(state, rules, choice, option))
+      return;
+    choice = pendingScenarioRuleChoice(state, true);
+  }
 }
 
 function applyPolicyEdit(
@@ -3744,6 +3932,7 @@ export function* tickStatePhases(
         cash + openingRuleTransactions(state),
         customers,
       );
+      resolveAutomaticScenarioChoices(state);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
       // Advised once per plant: a paused-and-resumed plant is the player's informed choice
@@ -5228,14 +5417,29 @@ function* supplyFacilitiesFinancesPhases(
   const rules = scenarioRules(
     getScenario(state.scenarioId, state.customScenario),
   );
+  const futureContext =
+    rules &&
+    now.minute > state.date.minute &&
+    now.minute % MINUTES_PER_MONTH === 0
+      ? storyContextAt(state, tickDate)
+      : undefined;
   const futureReceipts =
     rules &&
     !state.storyEffectsDisabled &&
     now.minute > state.date.minute &&
     now.minute % MINUTES_PER_MONTH === 0
-      ? resolveStoryAtDate(storyContextAt(state, tickDate)).occurrences.filter(
+      ? [
+          ...resolveStoryAtDate(futureContext!).occurrences,
+          ...futureContext!.occurrences.filter(
+            (event) =>
+              event.attributes.ruleChoice === true &&
+              event.attributes.automatic === true &&
+              event.startsMinute === now.minute,
+          ),
+        ].filter(
           (event) =>
-            event.attributes.ruleEvent === true &&
+            (event.attributes.ruleEvent === true ||
+              event.attributes.ruleChoice === true) &&
             event.forecastable !== false &&
             !state.worldEvents.occurrences.some(
               (recorded) => recorded.key === event.key,

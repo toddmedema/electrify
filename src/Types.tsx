@@ -370,6 +370,8 @@ export interface ReplayType {
   // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
+  /** Internal deterministic playback carries a mod's exact detached launch snapshot. */
+  customScenario?: ScenarioType;
   actions: ReplayActionType[];
   meaningfulDecisionGateWaived?: boolean;
   // Month-end cash of the original run in cents, oldest first, so playback can tell when a later

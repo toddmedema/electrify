@@ -144,14 +144,21 @@ test("mod event selection carries its future demand into the chosen era without 
     scenario: {
       startingYear: 2040,
       dollarsPerkWh: 0.3,
-      durationMonths: 72,
+      durationMonths: 120,
     },
   });
   expect(scenario.loadAdditions).toEqual([
     expect.objectContaining({ label: "Data Centers", startsYear: 2046 }),
   ]);
   expect(scenario.dollarsPerkWh).toBe(0.3);
-  expect(scenario.durationMonths).toBe(72);
+  expect(scenario.durationMonths).toBe(120);
+  expect(() =>
+    modScenario({
+      ...fixture(),
+      officialArcs: [{ scenarioId: 106, includeChoices: true }],
+      scenario: { startingYear: 2040, durationMonths: 72 },
+    }),
+  ).toThrow(/outside this 72-month run/);
 });
 
 test("base scenario existing industrial loads remain present when the era changes", () => {

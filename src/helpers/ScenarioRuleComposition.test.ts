@@ -7,8 +7,13 @@ import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
 import { modScenario } from "../mods/ModScenario";
 import { validScenarioMod } from "./ScenarioMod";
 import { DIFFICULTY_IDS } from "../Constants";
+import * as dependencies from "./ScenarioRuleDependencies";
 import type { ModPackage } from "../mods/ModSchema";
-import type { RuleEvent, ScenarioRuleDefinitions } from "../data/ScenarioRules";
+import type {
+  RuleChoice,
+  RuleEvent,
+  ScenarioRuleDefinitions,
+} from "../data/ScenarioRules";
 
 const params = {
   namespace: { kind: "mod" as const, id: "composition" },
@@ -191,4 +196,165 @@ test("composition diagnostics are structured compile failures", () => {
   expect((failure as RuleCompilationError).diagnostics[0].code).toBe(
     "composed-factor",
   );
+});
+
+const branch = (
+  id: string,
+  requiresChoice?: RuleChoice["requiresChoice"],
+): RuleChoice => ({
+  id,
+  dueMonth: 1,
+  title: id,
+  prompt: "Choose your response.",
+  options: ["a", "b"].map((optionId) => ({
+    id: optionId,
+    label: optionId,
+    description: "A response.",
+    message: "Response recorded.",
+    costDollars: 0,
+  })),
+  ...(requiresChoice ? { requiresChoice } : {}),
+});
+
+test("different descendant choices on opposite branches cannot create a factor or carbon-fee overlap", () => {
+  const choices = [
+    branch("root"),
+    branch("left", { choiceId: "root", optionIds: ["a"] }),
+    branch("right", { choiceId: "root", optionIds: ["b"] }),
+  ];
+  const events = ["left", "right"].map((id) => ({
+    ...event(`effect-${id}`, {
+      demandMultiplier: 4,
+      carbonFeeDollarsPerTonneCO2e: id === "left" ? 0 : 100,
+    }),
+    requiresChoice: { choiceId: id, optionIds: ["a"] },
+  }));
+  expect(() => compile(events, { choices })).not.toThrow();
+  const possibleTogether = choices.map((choice) =>
+    choice.id === "right"
+      ? { ...choice, requiresChoice: { choiceId: "root", optionIds: ["a"] } }
+      : choice,
+  );
+  expect(() => compile(events, { choices: possibleTogether })).toThrow(
+    /carbon fees|compose/,
+  );
+});
+
+test("a due blocking choice has an answer on every playable branch", () => {
+  const choices = [branch("response")];
+  const events = [
+    event("first", { demandMultiplier: 4 }),
+    event("second", { demandMultiplier: 4 }),
+    ...["a", "b"].map((id) => ({
+      ...event(`offset-${id}`, { demandMultiplier: 0.5 }),
+      requiresChoice: { choiceId: "response", optionIds: [id] },
+    })),
+  ];
+  expect(() => compile(events, { choices })).not.toThrow();
+  expect(() =>
+    compile(
+      events.filter((definition) => definition.id !== "offset-b"),
+      {
+        choices,
+      },
+    ),
+  ).toThrow(/compose/);
+});
+
+test("cross-branch minima preserve low factors without multiplying mutually exclusive paths", () => {
+  const choices = [
+    branch("root"),
+    branch("left", { choiceId: "root", optionIds: ["a"] }),
+    branch("right", { choiceId: "root", optionIds: ["b"] }),
+  ];
+  const events = ["left", "right"].map((id) => ({
+    ...event(`effect-${id}`, { demandMultiplier: 0.2 }),
+    requiresChoice: { choiceId: id, optionIds: ["a"] },
+  }));
+  expect(() => compile(events, { choices })).not.toThrow();
+  expect(() =>
+    compile(events, {
+      choices: choices.map((choice) =>
+        choice.id === "right"
+          ? {
+              ...choice,
+              requiresChoice: { choiceId: "root", optionIds: ["a"] },
+            }
+          : choice,
+      ),
+    }),
+  ).toThrow(/compose/);
+});
+
+test("the maximum deep multi-option forest is compiled with bounded choice work", () => {
+  const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  const choices = Array.from({ length: 32 }, (_, index) => ({
+    ...branch(`decision-${index}`),
+    options: optionIds.map((id) => ({
+      id,
+      label: id,
+      description: "A response.",
+      message: "Response recorded.",
+      costDollars: 0,
+    })),
+    ...(index
+      ? {
+          requiresChoice: {
+            choiceId: `decision-${index - 1}`,
+            optionIds: optionIds.slice(0, 7),
+          },
+        }
+      : {}),
+  }));
+  const events = Array.from({ length: 100 }, (_, index) => ({
+    ...event(`effect-${index}`, { demandMultiplier: 1.001 }, 1, 1200),
+    requiresChoice: {
+      choiceId: `decision-${index % choices.length}`,
+      optionIds: ["a"],
+    },
+  }));
+  const original = dependencies.scenarioRuleChoiceEnvelope;
+  let guarded = false;
+  let reads = 0;
+  const spy = jest
+    .spyOn(dependencies, "scenarioRuleChoiceEnvelope")
+    .mockImplementation((graph, month, factors) => {
+      if (guarded) return original(graph, month, factors);
+      guarded = true;
+      const restore = graph.nodes.map((node) => {
+        const descriptor = Object.getOwnPropertyDescriptor(
+          node.choice,
+          "options",
+        )!;
+        const options = node.choice.options;
+        Object.defineProperty(node.choice, "options", {
+          configurable: true,
+          get: () => {
+            if (++reads > choices.length * optionIds.length)
+              throw new Error(
+                "Choice ancestry expanded beyond bounded choice-option work.",
+              );
+            return options;
+          },
+        });
+        return () => Object.defineProperty(node.choice, "options", descriptor);
+      });
+      try {
+        return original(graph, month, factors);
+      } finally {
+        restore.forEach((reset) => reset());
+      }
+    });
+  try {
+    const compiled = compileScenarioRules(
+      { choices, events, objectives: [] },
+      { ...params, durationMonths: 1200 },
+    );
+    expect(compiled.choices).toHaveLength(32);
+    expect(compiled.events).toHaveLength(100);
+    expect(guarded).toBe(true);
+    expect(reads).toBeLessThanOrEqual(choices.length * optionIds.length);
+  } finally {
+    spy.mockRestore();
+  }
 });

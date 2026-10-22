@@ -10,6 +10,7 @@ import type {
   GameType,
   WorldEventEffectsType,
 } from "../Types";
+import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { interpretRuleReport, RuleReportContext } from "./ScenarioRuleReports";
 import {
@@ -19,6 +20,10 @@ import {
 } from "./ScenarioRuleTargets";
 import { wildfirePreparednessEffectiveness } from "./Wildfire";
 import { canonicalRuleJson } from "./RuleIdentity";
+import {
+  resolveScenarioRuleChoice,
+  ruleChoices,
+} from "./ScenarioRuleDependencies";
 
 type Occurrence = ResolvedStoryType["occurrences"][number];
 export const scenarioRuleTargetOperations = (event: CompiledRuleEvent) =>
@@ -84,15 +89,57 @@ export function ruleConditionMet(
   occurrences: readonly ActiveWorldEventType[] = [],
 ): boolean {
   if (!condition) return true;
-  const key =
-    condition.arc === undefined
-      ? rules.choices.find((c) => c.id === condition.choiceId)?.key
-      : `mod:${rules.namespace.kind === "mod" ? rules.namespace.id : rules.namespace.scenarioId}:arc:${condition.arc}:choice:${condition.choiceId}`;
+  const key = resolveScenarioRuleChoice(condition, rules)?.key;
   return occurrences.some(
     (event) =>
       event.key === key &&
       condition.optionIds.includes(String(event.attributes.choice)),
   );
+}
+
+/** A disabled arc prompt commits to its free branch; forecasts can project that fact purely. */
+export function scenarioRuleForecastOccurrences(
+  rules: CompiledScenarioRules,
+  occurrences: readonly ActiveWorldEventType[],
+  throughMonth: number,
+): ActiveWorldEventType[] {
+  const result = [...occurrences];
+  const automatic = ruleChoices(rules).filter(
+    (choice) => choice.automatic && choice.dueMonth <= throughMonth,
+  );
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const choice of automatic) {
+      if (
+        result.some((event) => event.key === choice.key) ||
+        !ruleConditionMet(choice.requiresChoice, rules, result)
+      )
+        continue;
+      const option = choice.options.find(
+        (option) => option.id === choice.freeOptionId,
+      )!;
+      result.push({
+        key: choice.key,
+        definitionId: choice.key,
+        startsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        endsMinute: choice.dueMonth * MINUTES_PER_MONTH,
+        attributes: {
+          choice: option.id,
+          cost: option.cost,
+          upfrontGrant: option.grant,
+          scenarioChoice: true,
+          ruleChoice: true,
+          automatic: true,
+        },
+        effects: {},
+        title: choice.title,
+        message: `Resolved automatically: ${option.label}. ${option.message}`,
+      });
+      progressed = true;
+    }
+  }
+  return result;
 }
 
 function bindingsOf(
@@ -314,6 +361,22 @@ function resolveEvent(
     effects: event.effects,
   };
   occurrence.effects = ruleEffectsForOccurrence(occurrence, context);
+  if (
+    context.rules!.namespace.kind === "mod" &&
+    event.source &&
+    (event.protection || event.effects.operatingExpensePerMonth !== undefined)
+  ) {
+    const summary = scenarioEffectsSummary(occurrence.effects);
+    occurrence.message = [
+      `${context.location.name}: ${preview ? "Expected conditions: " : ""}${summary.join("; ")}.`,
+      noMatch
+        ? "No eligible owned facility remains; no output effect was applied."
+        : "",
+      ...reports.map((report) => report.message),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
   return occurrence;
 }
 

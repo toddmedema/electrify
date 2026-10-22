@@ -38,6 +38,8 @@ import {
   resolvedScenarioStartingPeak,
 } from "../helpers/ScenarioStartingPeak";
 import { compileOfficialArcEvents } from "../helpers/ScenarioRuleArcs";
+import { compileOfficialArcChoices } from "../helpers/ScenarioRuleChoices";
+import { scenarioRuleDependencyDiagnostics } from "../helpers/ScenarioRuleDependencies";
 import { scenarioRuleCompositionDiagnostics } from "../helpers/ScenarioRuleComposition";
 import compatibilityManifest from "../data/RunCompatibility.json";
 import type {
@@ -227,7 +229,7 @@ function resolveMod(
         difficulty: atDifficulty,
         diagnostics,
       });
-      if (arcs.length)
+      if (arcs.length) {
         compiled.arcEvents = compileOfficialArcEvents(
           {
             ...params,
@@ -237,6 +239,44 @@ function resolveMod(
           },
           arcs.map((arc) => arc.scenarioId),
         );
+        compiled.arcChoices = compileOfficialArcChoices(
+          {
+            ...params,
+            difficulty: atDifficulty,
+            receivingScenario: resolved,
+            diagnostics,
+          },
+          arcs,
+        );
+      }
+      diagnostics.push(...scenarioRuleDependencyDiagnostics(compiled));
+      for (const [i, choice] of [
+        ...compiled.choices,
+        ...(compiled.arcChoices ?? []),
+      ].entries()) {
+        for (const [j, option] of choice.options.entries()) {
+          const replacement = option.replaceLoad;
+          if (!replacement?.arc) continue;
+          const id = `custom-${replacement.arc}-${replacement.loadId}`;
+          const target = resolved.loadAdditions?.find((load) => load.id === id);
+          const start =
+            target &&
+            (target.startsYear - startingYear) * 12 +
+              (target.startsMonth ?? 1) -
+              1;
+          if (start === undefined || start <= choice.dueMonth)
+            diagnostics.push({
+              code:
+                start === undefined ? "unknown-load" : "load-already-started",
+              path: `choices[${i}].options[${j}].replaceLoad`,
+              severity: "error",
+              message:
+                start === undefined
+                  ? `Arc ${replacement.arc} does not supply future load ${replacement.loadId}.`
+                  : "A choice can replace a load only before its start month.",
+            });
+        }
+      }
       const quoteState = {
         date: getDateFromMinute(0, startingYear),
         startingYear,

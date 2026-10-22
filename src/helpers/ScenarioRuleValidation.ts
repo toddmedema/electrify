@@ -10,6 +10,8 @@ import {
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { canonicalRuleJson } from "./RuleIdentity";
 import { ID_PATTERN } from "./ScenarioRulesSchema";
+import { ruleChoices } from "./ScenarioRuleDependencies";
+import { scenarioRuleExpectedLoads } from "./ScenarioRuleDecisions";
 
 const bounded = (
   value: unknown,
@@ -76,7 +78,77 @@ export function validScenarioRuleState(game: GameType): boolean {
   const ruleOccurrences = occurrences.filter(
     (event) => event.attributes.ruleEvent === true,
   );
-  if (!rules) return ruleOccurrences.length === 0;
+  if (!rules)
+    return (
+      ruleOccurrences.length === 0 &&
+      !occurrences.some((event) => event.attributes.ruleChoice === true)
+    );
+  const choices = ruleChoices(rules);
+  const answered = new Set<string>();
+  for (const [index, event] of occurrences.entries()) {
+    if (
+      event.attributes.ruleChoice !== true &&
+      !(
+        event.attributes.scenarioChoice === true &&
+        !event.key.startsWith("wildfire:")
+      )
+    )
+      continue;
+    const choice = choices.find((choice) => choice.key === event.key);
+    const option = choice?.options.find(
+      (option) => option.id === event.attributes.choice,
+    );
+    if (
+      !choice ||
+      !option ||
+      answered.has(choice.key) ||
+      event.attributes.ruleChoice !== true ||
+      event.attributes.scenarioChoice !== true ||
+      event.startsMinute !== choice.dueMonth * MINUTES_PER_MONTH ||
+      event.endsMinute !== event.startsMinute ||
+      event.startsMinute > game.date.minute ||
+      event.attributes.cost !== option.cost ||
+      event.attributes.upfrontGrant !== option.grant ||
+      event.attributes.automatic !== !!choice.automatic ||
+      (choice.automatic && option.id !== choice.freeOptionId) ||
+      !ruleConditionMet(
+        choice.requiresChoice,
+        rules,
+        occurrences.slice(0, index),
+      )
+    )
+      return false;
+    answered.add(choice.key);
+  }
+  for (const choice of choices) {
+    if (
+      game.storyEffectsDisabled ||
+      answered.has(choice.key) ||
+      !ruleConditionMet(choice.requiresChoice, rules, occurrences)
+    )
+      continue;
+    const dueMinute = choice.dueMonth * MINUTES_PER_MONTH;
+    if (
+      game.date.minute > dueMinute ||
+      (choice.automatic && game.date.minute === dueMinute)
+    )
+      return false;
+  }
+  const byId = (loads: GameType["loadAdditions"]) =>
+    [...loads].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (
+    canonicalRuleJson(byId(game.loadAdditions)) !==
+    canonicalRuleJson(
+      byId(
+        scenarioRuleExpectedLoads(
+          getScenario(game.scenarioId, game.customScenario)!,
+          rules,
+          occurrences,
+        ),
+      ),
+    )
+  )
+    return false;
   const definitions = ruleEvents(rules);
   const seen = new Set<string>();
   for (const event of ruleOccurrences) {
@@ -90,6 +162,11 @@ export function validScenarioRuleState(game: GameType): boolean {
       !validRuleTargetBindings(event.attributes.ruleTargets) ||
       event.startsMinute !== definition.startMonth * MINUTES_PER_MONTH ||
       event.startsMinute > game.date.minute ||
+      !ruleConditionMet(
+        definition.requiresChoice,
+        rules,
+        occurrences.slice(0, occurrences.indexOf(event)),
+      ) ||
       event.endsMinute !==
         Math.min(
           rules.durationMonths,

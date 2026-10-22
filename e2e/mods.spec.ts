@@ -207,7 +207,11 @@ async function dismissToast(page: Page) {
   await expect(toast).toBeHidden();
 }
 
-async function playAndCheckRun(page: Page, title: string) {
+async function playAndCheckRun(
+  page: Page,
+  title: string,
+  initialChoice?: string,
+) {
   await page
     .getByRole("button", { name: `Play ${title}`, exact: true })
     .click();
@@ -216,7 +220,9 @@ async function playAndCheckRun(page: Page, title: string) {
   await expect(dialog).toContainText("Modded run · unranked · no achievements");
   await dialog.getByRole("button", { name: "Start", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Build", exact: true }),
+    initialChoice
+      ? page.getByRole("dialog", { name: new RegExp(initialChoice) })
+      : page.getByRole("button", { name: "Build", exact: true }),
   ).toBeVisible({ timeout: 60000 });
   // The whole run says, in words, that it is modded and unranked.
   await expect(
@@ -365,6 +371,243 @@ test("cold share-load preparation stays isolated when another mod starts", async
     releaseWeather();
   }
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`a mod choice blocks, explains funding and updates the saved forecast once in ${theme}`, async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    const entry: InstalledMod = {
+      key: "local:choice-grid",
+      source: "local",
+      enabled: true,
+      pack: pack({
+        id: "choice-grid",
+        title: "Choice Grid",
+        officialArcs: [],
+        objectives: { mode: "none" },
+        scenario: {
+          durationMonths: 6,
+          cash: 1000000000,
+          startingCustomers: 10000,
+          dollarsPerkWh: 0.2,
+        },
+        choices: [
+          {
+            id: "grid-bond",
+            dueMonth: 1,
+            title: "Grid investment",
+            prompt: "Choose support before the new demand connects.",
+            options: [
+              {
+                id: "expensive",
+                label: "Fund every upgrade",
+                description: "Commit the full upgrade budget.",
+                message: "Upgrades funded.",
+                costDollars: 2000000000,
+              },
+              {
+                id: "funded",
+                label: "Accept support",
+                description: "Accept support and connect the new demand now.",
+                message: "Support accepted.",
+                grantDollars: 50000,
+              },
+              {
+                id: "standard",
+                label: "Keep the current plan",
+                description:
+                  "Keep the existing demand forecast without support.",
+                message: "Current plan kept.",
+                costDollars: 0,
+              },
+            ],
+          },
+          {
+            id: "later-review",
+            dueMonth: 1,
+            title: "Operating plan",
+            prompt: "Choose the plan to use after this investment.",
+            options: Array.from({ length: 8 }, (_, index) => ({
+              id: `response-${index + 1}`,
+              label: `Operating plan ${index + 1}`,
+              description: `Keep the committed investment with operating plan ${index + 1}.`,
+              message: `Operating plan ${index + 1} selected.`,
+              costDollars: 0,
+            })),
+          },
+        ],
+        events: [
+          {
+            id: "new-demand",
+            title: "New demand connects",
+            message: "The funded connection increases demand.",
+            preview: "The funded connection will increase demand.",
+            startMonth: 1,
+            durationMonths: 2,
+            requiresChoice: { choiceId: "grid-bond", optionIds: ["funded"] },
+            effects: { demandMultiplier: 1.5 },
+          },
+        ],
+      }),
+    };
+    await mockDesktop(page, false, theme, [entry]);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    await playAndCheckRun(page, "Choice Grid", "Grid investment");
+    let dialog = page.getByRole("dialog", { name: /Grid investment/ });
+    await expect(dialog).toBeVisible();
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Fund every upgrade ($2B)" }),
+    ).toBeDisabled();
+    await expect(dialog.getByText(/Insufficient cash/)).toBeVisible();
+    await expect(
+      dialog.getByText("One-time grant: $50k", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Accept support", exact: true }),
+    ).toBeFocused();
+    for (const button of await dialog.getByRole("button").all()) {
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width,
+      );
+    }
+    const before = (await readSavedGame(page))!;
+    expect(before.date.minute).toBe(0);
+    expect(before.speed).toBe("PAUSED");
+    expect(
+      before.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:grid-bond",
+      ),
+    ).toHaveLength(0);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeVisible();
+    await screenshot(
+      page,
+      `mod-choice-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: /Grid investment/ });
+    await expect(
+      dialog.getByRole("button", { name: "Accept support", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+    const next = page.getByRole("dialog", { name: /Operating plan/ });
+    await expect(next).toBeVisible();
+    await expect(next.getByRole("button")).toHaveCount(8);
+    await expect(
+      next.getByRole("button", { name: "Operating plan 1", exact: true }),
+    ).toBeFocused();
+    const committed = (await readSavedGame(page))!;
+    expect(committed.date.minute).toBe(before.date.minute);
+    expect(committed.speed).toBe("PAUSED");
+    expect(committed.timeline[0].cash - before.timeline[0].cash).toBe(50000);
+    expect(committed.timeline[0].demandW).toBeGreaterThan(
+      before.timeline[0].demandW * 1.4,
+    );
+    expect(
+      committed.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:grid-bond",
+      ),
+    ).toHaveLength(1);
+    for (let index = 0; index < 7; index++) await page.keyboard.press("Tab");
+    const last = next.getByRole("button", {
+      name: "Operating plan 8",
+      exact: true,
+    });
+    await expect(last).toBeFocused();
+    await expect(last).toBeInViewport();
+    const lastDescription = next.getByText(
+      "Keep the committed investment with operating plan 8.",
+      { exact: true },
+    );
+    await lastDescription.scrollIntoViewIfNeeded();
+    await expect(lastDescription).toBeInViewport();
+    await expect(last).toBeFocused();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    await screenshot(
+      page,
+      `mod-eight-options-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    await page.keyboard.press("Enter");
+    await expect(
+      page.locator("[data-scenario-choice]"),
+      "all simultaneous decisions are answered",
+    ).toHaveCount(0);
+    const answered = (await readSavedGame(page))!;
+    expect(answered.speed).toBe("PAUSED");
+    expect(answered.timeline[0].cash).toBe(committed.timeline[0].cash);
+    expect(
+      answered.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:grid-bond",
+      ),
+    ).toHaveLength(1);
+    expect(
+      answered.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:later-review",
+      ),
+    ).toHaveLength(1);
+    const programs = page.getByRole("region", {
+      name: "Programs",
+      exact: true,
+    });
+    await openPane(
+      programs,
+      page.getByRole("button", { name: "Programs", exact: true }),
+    );
+    await programs
+      .getByRole("slider", {
+        name: "The rate you charge for electricity generation",
+      })
+      .press("ArrowRight");
+    const reforecast = (await readSavedGame(page))!;
+    expect(reforecast.date.minute).toBe(0);
+    expect(
+      reforecast.timeline.reduce(
+        (sum, tick) => sum + (tick.revenueGrants ?? 0),
+        0,
+      ),
+    ).toBe(50000);
+    expect(
+      reforecast.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:grid-bond",
+      ),
+    ).toHaveLength(1);
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Build", exact: true }),
+    ).toBeVisible({ timeout: 60000 });
+    await expect(page.locator("[data-scenario-choice]")).toHaveCount(0);
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    const resumed = (await readSavedGame(page))!;
+    expect(
+      resumed.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:choice-grid:grid-bond",
+      ),
+    ).toHaveLength(1);
+    expect(
+      resumed.timeline.reduce(
+        (sum, tick) => sum + (tick.revenueGrants ?? 0),
+        0,
+      ),
+    ).toBe(50000);
+    expect(resumed.speed).toBe("PAUSED");
+  });
+}
 
 test("desktop mod management, Workshop publishing and a modded run", async ({
   page,

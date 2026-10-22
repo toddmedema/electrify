@@ -334,7 +334,12 @@ function setUpGame(
  * history to see what a balance change actually did.
  */
 export function createGameFromReplay(replay: ReplayType): GameType {
+  if (replay.scenarioId === 999 && !replay.customScenario)
+    throw new Error(
+      "A mod replay requires its exact normalized scenario snapshot.",
+    );
   const scenario =
+    replay.customScenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === replay.scenarioId) ||
     SCENARIOS[0];
   // The replay's own location, not the scenario's: that is the whole point of recording it, and

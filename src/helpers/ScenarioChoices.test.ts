@@ -1,3 +1,4 @@
+import { SCENARIO_CHOICE_RULES } from "../data/ScenarioChoiceRules";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import reducer from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
@@ -70,7 +71,7 @@ test.each([null, "prepare", {}, { decisionId: 1, optionId: "yes" }])(
 test("generic reducer accepts another scenario's authored option without wildfire wiring", () => {
   const game = createGame({ scenarioId: 101 });
   const definition: ScenarioChoiceType = {
-    id: "test-other-scenario",
+    id: "story:101:test-policy:test-other-scenario",
     scenarioId: 101,
     atMonth: 0,
     title: "New policy",
@@ -80,6 +81,32 @@ test("generic reducer accepts another scenario's authored option without wildfir
     ],
   };
   SCENARIO_CHOICES.push(definition);
+  SCENARIO_CHOICE_RULES.push({
+    scenarioId: 101,
+    arcId: "test-policy",
+    choice: {
+      id: "test-other-scenario",
+      dueMonth: 1,
+      title: definition.title,
+      prompt: definition.message,
+      options: [
+        {
+          id: "adopt",
+          label: "Adopt",
+          description: "Adopt policy",
+          message: "Policy adopted",
+          costDollars: 0,
+        },
+        {
+          id: "retain",
+          label: "Retain",
+          description: "Retain policy",
+          message: "Policy retained",
+          costDollars: 0,
+        },
+      ],
+    },
+  });
   try {
     expect(
       reducer(
@@ -103,5 +130,6 @@ test("generic reducer accepts another scenario's authored option without wildfir
     expect(chosen.replayLog?.at(-1)?.type).toBe("chooseScenarioResponse");
   } finally {
     SCENARIO_CHOICES.pop();
+    SCENARIO_CHOICE_RULES.pop();
   }
 });
