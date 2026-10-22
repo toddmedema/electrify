@@ -4,6 +4,48 @@ The wildfire-specific keep decisions below describe the system at audit time. Th
 [intertie mission redesign](wildfire-intertie.md) retires those smoke and preparedness suites
 and replaces them with route-limit, save/replay, seeded balance and three-width browser checks.
 
+## CI failure review, October 22, 2026
+
+The latest 100 pull-request workflow runs, from October 16–22, contained 69 passes,
+24 failures and seven cancellations. Excluding cancellations, 26% failed. Failures
+appeared on 15 of the 53 branches in that sample. These are run and branch counts,
+not a count of distinct pull requests or a claim that every failure had one cause.
+
+| Failed gate              | Runs affected | Representative evidence                                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Covered unit tests       |             7 | [Wildfire PR](https://github.com/toddmedema/electrify/actions/runs/39805411120), [loading animation](https://github.com/toddmedema/electrify/actions/runs/39718943350), [Steam hardening](https://github.com/toddmedema/electrify/actions/runs/39688988001)                             |
+| Packaged Electron tests  |            10 | [Native keyboard journey](https://github.com/toddmedema/electrify/actions/runs/39731522677), [quit-checkpoint fixture](https://github.com/toddmedema/electrify/actions/runs/39573431898), [Mac fullscreen transition](https://github.com/toddmedema/electrify/actions/runs/39488670840) |
+| Production browser tests |             5 | [Build dialog](https://github.com/toddmedema/electrify/actions/runs/39069149669), [changed workspace navigation](https://github.com/toddmedema/electrify/actions/runs/38975988514)                                                                                                      |
+| Multiplayer renderer     |             4 | [Shared speed](https://github.com/toddmedema/electrify/actions/runs/39353213733), [peer transport](https://github.com/toddmedema/electrify/actions/runs/38993990000)                                                                                                                    |
+| Bundle size              |             2 | [CSS ceiling](https://github.com/toddmedema/electrify/actions/runs/38986456084)                                                                                                                                                                                                         |
+| Build prerequisite       |             1 | [Missing Electron distribution](https://github.com/toddmedema/electrify/actions/runs/39642311317)                                                                                                                                                                                       |
+
+Gate counts overlap when one run failed in several places. Required fan-in and
+coverage jobs that repeated an upstream failure are not counted as extra causes.
+Six of the seven covered-unit failures included a test timeout. The same Insights
+zoom/pan test exceeded its 15-second deadline in five runs across four branches;
+DataCenterSetup also timed out in two runs, one shared with Insights. The remaining
+unit failure was a dialog-close assertion, rather than a Jest timeout.
+
+The CI scheduler had a reproducible resource-isolation defect: it ran covered Jest
+and simulations concurrently with the native renderer on one runner, while local
+`check:ci` runs those heavy gates serially. In the failed wildfire run, the native
+suite ran from 15:33:05–15:35:29 UTC and both Jest suites started at 15:33:48 UTC.
+Insights took 165 seconds for the suite and its zoom/pan case timed out. This
+overlap is a source of timing pressure that local validation did not reproduce;
+the logs alone cannot attribute every timeout to CPU contention.
+
+`platform-tests.execute` now runs each CPU and UI phase sequentially while still
+attempting every planned gate after failures. Its behavioral regression failed
+against the previous scheduler because three heavy phases overlapped, and passes
+with a maximum of one. Platform plans, both CPU shards, browser shards, coverage
+floors, native targets, worker counts and test deadlines are retained. Native
+platform behavior, stale UI journeys and genuine bundle regressions require their
+own fixes; serial scheduling does not make those failures disappear. Remote CI
+must establish the resulting reliability under hosted-runner load.
+
+## Original test inventory review, October 15, 2026
+
 Reviewed the complete tracked test inventory at master commit `0f71ec68` on October 15, 2026: **358 executable test files plus the golden-output snapshot**. Three subagents reviewed browser tests, React components, simulation/domain tests, and the remaining runtime/platform suites. The primary agent also reviewed saves, achievements, audio, native runtime, Firestore rules, CI tooling and the combined diff.
 
 | Review area                                                                  | Original executable files |
@@ -501,11 +543,11 @@ Paired local runs on Node 24.14.0 used `test:ci -- --runInBand --runTestsByPath`
 files below and coverage enabled. These are single-run timings, not runtime ceilings or an
 estimate of whole-suite savings.
 
-| Suite | Before | After |
-| --- | ---: | ---: |
-| `src/components/views/Insights.test.tsx` | 27.456 s | 23.058 s |
-| `src/helpers/Projection.test.ts` | 6.113 s | 5.833 s |
-| Combined suite time | 33.569 s | 28.891 s (14% lower) |
+| Suite                                    |   Before |                After |
+| ---------------------------------------- | -------: | -------------------: |
+| `src/components/views/Insights.test.tsx` | 27.456 s |             23.058 s |
+| `src/helpers/Projection.test.ts`         |  6.113 s |              5.833 s |
+| Combined suite time                      | 33.569 s | 28.891 s (14% lower) |
 
 All 42 retained cases passed, compared with 43 before consolidation. The focused coverage
 runs do not meet repository-wide coverage thresholds on their own. Valid forecast cases passed;
