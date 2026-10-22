@@ -1689,6 +1689,19 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      if (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined)
+        throw new Error(
+          "Community rules require a validated Modded · Unranked snapshot.",
+        );
+      if (
+        scenario.mod &&
+        (!validScenarioMod(scenario.mod, scenario) ||
+          scenario.mod.parameters.difficulty !== state.difficulty ||
+          scenario.mod.parameters.seed !== state.seed)
+      )
+        throw new Error(
+          "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
+        );
       const canonicalIdentity = captureRunIdentity(
         scenario,
         state.seed,
@@ -1804,12 +1817,13 @@ export const gameSlice = createSlice({
               initialReservoirFraction,
               hydroAssignments[startingIndex],
             );
-            if (label) {
+            if (label || search.assetId) {
               const built = state.facilities.find(
                 ({ id }) => !existingIds.has(id),
               );
               if (built) {
-                built.name = label;
+                if (label) built.name = label;
+                if (search.assetId) built.startingAssetId = search.assetId;
               }
             }
           } else {
@@ -1829,12 +1843,13 @@ export const gameSlice = createSlice({
                 initialAgeYears,
                 initialReservoirFraction,
               );
-              if (label) {
+              if (label || search.assetId) {
                 const built = state.facilities.find(
                   ({ id }) => !existingIds.has(id),
                 );
                 if (built) {
-                  built.name = label;
+                  if (label) built.name = label;
+                  if (search.assetId) built.startingAssetId = search.assetId;
                 }
               }
             } else {
@@ -1894,6 +1909,12 @@ export const gameSlice = createSlice({
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
+      for (const { notice, key } of modNotificationsDue(state))
+        logGameEvent(state, "WORLD_EVENT", notice.message, {
+          title: notice.title,
+          importance: "NOTABLE",
+          reportedKey: key,
+        });
       // Anything the player did before the clock first moved -- setting a rate on the way in.
       // tickState picks up everything after this
       applyPendingReplayActions(state);
@@ -3307,7 +3328,12 @@ export function launchCustomScenario(
   scenario: ScenarioType,
   difficulty: DifficultyType,
 ) {
-  if (scenario.mod && !validScenarioMod(scenario.mod))
+  if (
+    scenario.rules !== undefined ||
+    (scenario.mod &&
+      (!validScenarioMod(scenario.mod, scenario) ||
+        scenario.mod.parameters.difficulty !== difficulty))
+  )
     throw new Error(
       "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
     );

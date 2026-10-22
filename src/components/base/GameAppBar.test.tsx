@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
-import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
+import { modScenario } from "../../mods/ModScenario";
 import { TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
@@ -75,22 +75,23 @@ describe("GameAppBar", () => {
     expect(onSavedGames).toHaveBeenCalledTimes(1);
   });
   it("labels a modded run as unranked in words for the whole run", () => {
-    const game = createGame({ scenarioId: 101 });
+    const scenario = modScenario({
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "grid",
+      title: "Grid",
+      creator: "A",
+      version: "1",
+      description: "A modded grid for testing its unranked label.",
+      seed: 42,
+      baseScenarioId: 999,
+      objectives: { mode: "inherit" },
+    });
+    const game = createGame({ scenarioId: 999, scenario });
     const { unmount } = renderAppBar();
     expect(screen.queryByText("Modded · Unranked")).toBeNull();
     unmount();
-    renderAppBar({
-      game: {
-        ...game,
-        inGame: true,
-        customScenario: {
-          ...DEFAULT_CUSTOM_SCENARIO,
-          mod: {
-            source: { id: "grid", title: "Grid", creator: "A", version: "1" },
-          },
-        },
-      },
-    });
+    renderAppBar({ game: { ...game, inGame: true } });
     expect(screen.getByText("Modded · Unranked")).toBeInTheDocument();
   });
   afterEach(() => {

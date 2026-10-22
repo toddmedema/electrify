@@ -6,6 +6,7 @@ const path = require("node:path");
 const { ModStore, readPackage, MAX_PACKAGES } = require("./mods.cjs");
 const {
   parseMod,
+  packageDigest,
   MAX_MOD_BYTES,
   MOD_API_VERSION,
 } = require("../src/mods/ModSchema.js");
@@ -16,6 +17,8 @@ const fixture = (patch = {}) => ({
   title: "Test Grid",
   creator: "Test Creator",
   version: "1",
+  description: "A community scenario for the test grid.",
+  objectives: { mode: "inherit" },
   seed: 42,
   baseScenarioId: 999,
   ...patch,
@@ -59,8 +62,22 @@ test("strict data-only parser rejects scripts, unknown fields, excessive sizes a
     { facilities: { Solar: { buildCost: -1 } } },
     { programs: { solar: Infinity } },
     { scenario: { startingYear: 1700 } },
-    { scenario: { eventScenarioIds: [100, 100] } },
-    { notifications: [{ month: 0, title: "bad", message: "bad" }] },
+    // Prototype fields are replaced in place, without a legacy adapter.
+    { scenario: { eventScenarioIds: [100] } },
+    {
+      notifications: [
+        { month: 1, title: "Review", message: "Review the grid." },
+      ],
+    },
+    {
+      officialArcs: [
+        { scenarioId: 100, includeChoices: true },
+        { scenarioId: 100, includeChoices: true },
+      ],
+    },
+    {
+      events: [{ id: "opening", startMonth: 0, title: "bad", message: "bad" }],
+    },
     { seed: 1.5 },
     { title: "Hidden‮txt.exe" },
     { creator: "Zero​width" },
@@ -96,16 +113,16 @@ test("validation errors name the field and how to fix it", () => {
   };
   assert.match(
     message({ facilities: { Solr: { buildCost: 0.8 } } }),
-    /^facilities\.Solr is not a supported facility\. Use one of: Coal, .*Solar/,
+    /^facilities\.Solr is not a supported field\. Use one of: Coal, .*Solar/,
   );
   assert.equal(
     message({ scenario: { startingYear: 1700 } }),
-    "scenario.startingYear must be a whole number from 1,980 to 2,100.",
+    "scenario.startingYear must be a whole number from 1980 to 2100.",
   );
   assert.match(message("{ not json"), /^scenario\.json is not valid JSON \(/);
   assert.equal(
-    message({ notifications: [{ month: 2, title: "t" }] }),
-    "notifications[0].message is required.",
+    message({ events: [{ id: "opening", startMonth: 2, title: "t" }] }),
+    "events[0].message must be non-empty text.",
   );
 });
 
@@ -500,6 +517,7 @@ test("publishing retries update the same created item, keep it after removal, an
   const failed = await store.request({
     kind: "publish",
     key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
   });
   assert.equal(failed.error, "upload failed");
   // The UI sees the created item immediately, even though the upload failed.
@@ -507,6 +525,7 @@ test("publishing retries update the same created item, keep it after removal, an
   const result = await store.request({
     kind: "publish",
     key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
   });
   assert.equal(
     result.message,
@@ -522,6 +541,7 @@ test("publishing retries update the same created item, keep it after removal, an
   const update = await store.request({
     kind: "publish",
     key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
   });
   assert.equal(update.message, "Published to Steam Workshop.");
   assert.equal(creates, 1);
@@ -540,11 +560,74 @@ test("publishing rejects packages for another game version before reaching Steam
     file,
     JSON.stringify(fixture({ gameApi: MOD_API_VERSION + 1 })),
   );
-  await store.request({ kind: "import" });
-  assert.match(
-    (await store.request({ kind: "publish", key: "local:test-grid" })).error,
-    /current game version/,
+  const rejected = await store.request({ kind: "import" });
+  assert.match(rejected.error, /gameApi must be 1/);
+  assert.equal(rejected.entries.length, 0);
+  assert.ok(
+    rejected.diagnostics.some(
+      (d) => d.code === "game-api" && d.path === "gameApi",
+    ),
   );
+  assert.match(
+    (
+      await store.request({
+        kind: "publish",
+        key: "local:test-grid",
+        packageDigest: packageDigest(fixture()),
+      })
+    ).error,
+    /no longer installed/,
+  );
+});
+
+test("publishing requires the exact package digest validated by the renderer before creating or staging an upload", async (t) => {
+  let creates = 0;
+  let uploads = 0;
+  const { store } = setup(t, {
+    workshop: () => ({
+      create: async () => {
+        creates++;
+        return { id: "456", agreement: false };
+      },
+      publish: async () => {
+        uploads++;
+        return { id: "456", agreement: false };
+      },
+    }),
+  });
+  await store.request({ kind: "import" });
+  const checkedDigest = packageDigest(fixture());
+  const stale = await store.read();
+  stale.entries[0].pack.version = "2";
+  await store.write(stale);
+  for (const requested of [
+    undefined,
+    "sha256-" + "0".repeat(64),
+    checkedDigest,
+  ]) {
+    const result = await store.request({
+      kind: "publish",
+      key: "local:test-grid",
+      packageDigest: requested,
+    });
+    assert.match(result.error, /digest|changed|validat/i);
+    assert.equal(creates, 0);
+    assert.equal(uploads, 0);
+    assert.deepEqual(
+      fs
+        .readdirSync(store.directory)
+        .filter((name) => name.startsWith("upload-")),
+      [],
+    );
+  }
+  const accepted = await store.request({
+    kind: "publish",
+    key: "local:test-grid",
+    packageDigest: packageDigest(fixture({ version: "2" })),
+  });
+  assert.equal(accepted.error, undefined);
+  assert.equal(creates, 1);
+  assert.equal(uploads, 1);
 });
 
 test("listing never waits behind a slow upload", async (t) => {
@@ -558,7 +641,11 @@ test("listing never waits behind a slow upload", async (t) => {
   };
   const { store } = setup(t, { workshop: () => workshop });
   await store.request({ kind: "import" });
-  const upload = store.request({ kind: "publish", key: "local:test-grid" });
+  const upload = store.request({
+    kind: "publish",
+    key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
+  });
   while (!finish) await new Promise((resolve) => setImmediate(resolve));
   let browsed = false;
   store.openUrl = () => {
@@ -694,7 +781,13 @@ test("unfinished uploads have a bounded disk footprint before any new Steam item
   for (let i = 0; i < MAX_PACKAGES; i++)
     fs.mkdirSync(path.join(store.directory, `upload-${i}`));
   assert.match(
-    (await store.request({ kind: "publish", key: "local:test-grid" })).error,
+    (
+      await store.request({
+        kind: "publish",
+        key: "local:test-grid",
+        packageDigest: packageDigest(fixture()),
+      })
+    ).error,
     /Restart Electrify/,
   );
 });
@@ -748,7 +841,11 @@ test("Workshop-agreement actions survive reopening and can be explicitly dismiss
     }),
   });
   await store.request({ kind: "import" });
-  await store.request({ kind: "publish", key: "local:test-grid" });
+  await store.request({
+    kind: "publish",
+    key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
+  });
   const reopened = new ModStore(root);
   assert.deepEqual((await reopened.request({ kind: "list" })).agreements, [
     "456",

@@ -5,7 +5,11 @@ import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { TextEncoder } from "util";
 import Mods, { modifierSummary } from "./Mods";
-import { MOD_API_VERSION, ModPackage } from "../../mods/ModSchema";
+import {
+  MOD_API_VERSION,
+  ModPackage,
+  packageDigest,
+} from "../../mods/ModSchema";
 import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DesktopBridge } from "../../Desktop";
 import { launchCustomScenario } from "../../reducers/Game";
@@ -26,6 +30,8 @@ const pack = (patch: Partial<ModPackage> = {}): ModPackage => ({
   title: "Community Grid",
   creator: "Ada",
   version: "1.0.0",
+  description: "A community grid with its own planning decisions.",
+  objectives: { mode: "inherit" },
   seed: 42,
   baseScenarioId: 999,
   ...patch,
@@ -153,7 +159,7 @@ test("entries show creator, version and source, and incompatible mods explain wh
   expect(screen.getByText("by Bo · v1.0.0 · Workshop")).toBeInTheDocument();
   expect(
     screen.getByText(
-      "Made for a different game version. Ask Ada for an update.",
+      "gameApi must be 1. This package targets an unsupported game contract.",
     ),
   ).toBeInTheDocument();
   expect(screen.queryByLabelText("Play Old Grid")).toBeNull();
@@ -278,6 +284,11 @@ test("publishing stays open while uploading and offers the Steam page afterwards
   ).toBeInTheDocument();
   await userEvent.click(screen.getByText("Publish publicly"));
   expect(await screen.findByText("Uploading…")).toBeInTheDocument();
+  expect(requests).toContainEqual({
+    kind: "publish",
+    key: "local:community-grid",
+    packageDigest: packageDigest(pack()),
+  });
   await userEvent.click(screen.getByText("Close"));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await userEvent.click(

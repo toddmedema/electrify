@@ -23,6 +23,7 @@ export function validCustomEventIds(value: unknown): boolean {
 
 export function validCustomEventScenario(scenario?: ScenarioType): boolean {
   if (!scenario) return true;
+  if (scenario.id === 999 && scenario.rules !== undefined) return false;
   const positive = (value: unknown) =>
     value === undefined ||
     (typeof value === "number" && Number.isFinite(value) && value > 0);

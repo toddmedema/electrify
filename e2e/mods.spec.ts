@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { packageDigest } from "../src/mods/ModSchema";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -22,6 +23,8 @@ const pack = (patch: Partial<InstalledMod["pack"]>) => ({
   title: "Community Grid",
   creator: "Community author",
   version: "1.0.0",
+  description: "A community grid with its own planning decisions.",
+  objectives: { mode: "inherit" as const },
   seed: 42,
   baseScenarioId: 999,
   ...patch,
@@ -245,7 +248,7 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await expect(screenRoot.getByText("by Bo · v2 · Workshop")).toBeVisible();
   await expect(
     screenRoot.getByText(
-      "Made for a different game version. Ask Community author for an update.",
+      "gameApi must be 1. This package targets an unsupported game contract.",
     ),
   ).toBeVisible();
   await expect(screenRoot.getByText(/rules-|Seed/)).toHaveCount(0);
@@ -280,6 +283,15 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await expect(
     dialog.getByRole("button", { name: "Uploading…" }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      window.__mods.requests.find((r) => r.kind === "publish"),
+    ),
+  ).toEqual({
+    kind: "publish",
+    key: "local:community-grid",
+    packageDigest: packageDigest(ENTRIES[0].pack),
+  });
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await screenRoot.getByRole("button", { name: "Browse Workshop" }).click();

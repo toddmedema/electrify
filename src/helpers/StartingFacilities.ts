@@ -11,6 +11,7 @@ export function startingFacilitySearch(
   search: ScenarioFacilityType,
 ): Partial<FacilityShoppingType> {
   const {
+    assetId: _assetId,
     hydroSiteId: _site,
     initialAgeYears: _age,
     initialReservoirFraction: _reservoir,

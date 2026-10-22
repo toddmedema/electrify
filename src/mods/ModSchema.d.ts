@@ -1,10 +1,16 @@
+import type {
+  RuleArc,
+  RuleChoice,
+  RuleEvent,
+  RuleObjectiveIntent,
+  RuleReport,
+} from "../data/ScenarioRules";
 // Types for ModSchema.js. ModSchema.test.ts checks every key list below against these types and
 // the facility catalog, so the JavaScript validator and the TypeScript model cannot drift apart.
 import type {
   FacilityModifierType,
   ModFacilityNameType,
   ScenarioModType,
-  ScenarioNoticeType,
   ScenarioType,
 } from "../Types";
 
@@ -18,7 +24,6 @@ export type ModScenarioOverrides = Partial<
     | "dollarsPerkWh"
     | "durationMonths"
     | "feePerKgCO2e"
-    | "eventScenarioIds"
     | "ownership"
     | "endTitle"
     | "endMessage"
@@ -34,12 +39,18 @@ export interface ModPackage {
   title: string;
   creator: string;
   version: string;
+  description: string;
+  $schema?: string;
   seed: number;
   baseScenarioId: number;
   scenario?: ModScenarioOverrides;
   facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
   programs?: Partial<Record<ModProgramId, number>>;
-  notifications?: ScenarioNoticeType[];
+  officialArcs?: RuleArc[];
+  events?: RuleEvent[];
+  choices?: RuleChoice[];
+  objectives: RuleObjectiveIntent;
+  debriefReports?: RuleReport[];
 }
 
 export interface ModDiagnostic {
@@ -62,3 +73,5 @@ export const FACILITY_MODIFIER_KEYS: readonly (keyof FacilityModifierType)[];
 export const PROGRAM_KEYS: readonly ModProgramId[];
 export function parseMod(input: string): ModPackage;
 export function validateMod(value: unknown): ModPackage;
+
+export function packageDigest(value: unknown): string;

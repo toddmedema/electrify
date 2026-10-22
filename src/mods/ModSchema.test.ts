@@ -12,6 +12,7 @@ import {
   PROGRAM_KEYS,
   SCENARIO_OVERRIDE_KEYS,
 } from "./ModSchema";
+import { modScenario } from "./ModScenario";
 import { SCENARIOS } from "../data/Scenarios";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
@@ -29,7 +30,6 @@ const OVERRIDE_KEYS: Record<keyof ModScenarioOverrides, true> = {
   dollarsPerkWh: true,
   durationMonths: true,
   feePerKgCO2e: true,
-  eventScenarioIds: true,
   ownership: true,
   endTitle: true,
   endMessage: true,
@@ -135,9 +135,11 @@ test("independent structural failures retain stable diagnostic paths", () => {
     version: "1",
     seed: 1,
     baseScenarioId: 999,
+    description: "Plan the community grid.",
+    objectives: { mode: "inherit" },
     facilities: { Solar: { buildCost: 1e308, yearsToBuild: 0 } },
     programs: { solar: 11 },
-    notifications: [{ month: 0, title: "", message: "Review." }],
+    events: [{ id: "review", startMonth: 0, title: "", message: "Review." }],
   };
   const diagnostics = modDiagnostics(pack);
   expect(diagnostics).toEqual(
@@ -149,8 +151,8 @@ test("independent structural failures retain stable diagnostic paths", () => {
       }),
       expect.objectContaining({ path: "facilities.Solar.yearsToBuild" }),
       expect.objectContaining({ path: "programs.solar" }),
-      expect.objectContaining({ path: "notifications[0].month" }),
-      expect.objectContaining({ path: "notifications[0].title" }),
+      expect.objectContaining({ path: "events[0].startMonth" }),
+      expect.objectContaining({ path: "events[0].title" }),
     ]),
   );
   expect(() => validateMod(pack)).toThrow(ModValidationError);
@@ -158,7 +160,7 @@ test("independent structural failures retain stable diagnostic paths", () => {
     modDiagnostics({
       ...pack,
       scenario: null,
-      notifications: [null],
+      events: [null],
       facilities: { Solar: null },
     }),
   ).not.toThrow();
@@ -167,7 +169,7 @@ test("independent structural failures retain stable diagnostic paths", () => {
       ...pack,
       facilities: { Solar: { buildCost: 0.1, yearsToBuild: 10 } },
       programs: { solar: 1 },
-      notifications: [],
+      events: [],
     }),
   ).toEqual([]);
 });
@@ -181,19 +183,23 @@ test("bad multipliers and nonfinite results are rejected at the quote owner", ()
   );
   expect(ScenarioMod.modScaledValue(5, 10, "cost")).toBe(50);
   const game = createGame({ scenarioId: 100, seed: 1, difficulty: "Manager" });
-  game.customScenario = {
-    ...SCENARIOS.find((s) => s.id === 100)!,
-    id: 999,
-    mod: {
-      source: {
-        id: "bad-grid",
-        title: "Grid",
-        creator: "Author",
-        version: "1",
-      },
-      facilities: { Solar: { buildCost: 1e308 } },
+  game.customScenario = modScenario(
+    {
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "bad-grid",
+      title: "Grid",
+      creator: "Author",
+      version: "1",
+      description: "Plan the grid.",
+      seed: 1,
+      baseScenarioId: 999,
+      objectives: { mode: "none" },
     },
-  };
+    undefined,
+    "Manager",
+  );
+  game.customScenario.mod!.facilities = { Solar: { buildCost: 1e308 } };
   expect(() => GENERATORS(game, 1e8, [], [])).toThrow(
     /Invalid mod facility modifier/,
   );

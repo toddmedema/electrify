@@ -170,6 +170,7 @@ export function matchScenario(spec: MatchSpec): {
     !scenario ||
     scenario.tutorialSteps ||
     scenario.mod !== undefined ||
+    (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined) ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
     !isValidLocation(location)

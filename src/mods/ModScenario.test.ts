@@ -11,6 +11,7 @@ import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
+import { modRuntimeDigest, modSetupDigest } from "../helpers/ScenarioMod";
 import { standardCustomRate } from "../helpers/CustomScenarioEvents";
 import { policyTotalCost } from "../helpers/Policies";
 import { serializeSave, parseSave } from "../SaveGame";
@@ -28,6 +29,8 @@ const fixture = (): ModPackage => ({
   version: "1",
   seed: 42,
   baseScenarioId: 999,
+  description: "Plan a reliable community grid.",
+  objectives: { mode: "inherit" },
   facilities: {
     Solar: { buildCost: 0.5 },
     Battery: { annualOperatingCost: 2 },
@@ -40,49 +43,59 @@ test("valid content resolves to a detached scenario carrying only its runtime ef
   const scenario = modScenario(pack, "123");
   expect(scenario.id).toBe(999);
   expect(scenario.seed).toBe(42);
-  expect(scenario.mod).toEqual({
-    source: {
-      id: "test-grid",
-      title: "Test Grid",
-      creator: "Creator",
-      version: "1",
-      workshopId: "123",
-    },
-    facilities: pack.facilities,
-    programs: pack.programs,
-  });
+  expect(scenario.mod).toEqual(
+    expect.objectContaining({
+      source: expect.objectContaining({
+        id: "test-grid",
+        title: "Test Grid",
+        creator: "Creator",
+        version: "1",
+        workshopId: "123",
+      }),
+      facilities: pack.facilities,
+      programs: pack.programs,
+    }),
+  );
   expect(scenario).not.toHaveProperty("modPackage");
   pack.facilities!.Solar!.buildCost = 9;
   expect(scenario.mod!.facilities!.Solar!.buildCost).toBe(0.5);
-  expect(modIssue({ ...fixture(), gameApi: MOD_API_VERSION + 1 })).toBe(
-    "Made for a different game version. Ask Creator for an update.",
+  expect(modIssue({ ...fixture(), gameApi: MOD_API_VERSION + 1 })).toMatch(
+    /gameApi must be 1/,
   );
   expect(modIssue(fixture())).toBeUndefined();
   expect(() => modScenario({ ...fixture(), baseScenarioId: 998 })).toThrow(
     /baseScenarioId is not a scenario/,
   );
   expect(() =>
-    modScenario({ ...fixture(), scenario: { eventScenarioIds: [998] } }),
+    modScenario({
+      ...fixture(),
+      officialArcs: [{ scenarioId: 998, includeChoices: true }],
+    }),
   ).toThrow();
   expect(() => validateMod({ ...fixture(), engineScript: "bad" })).toThrow(
     /engineScript is not a supported field/,
   );
 });
 
-test("notifications after the resolved scenario end are rejected", () => {
-  const notice = { month: 13, title: "Late", message: "Too late." };
+test("message events after the resolved scenario end are rejected", () => {
+  const notice = {
+    id: "late",
+    startMonth: 13,
+    title: "Late",
+    message: "Too late.",
+  };
   expect(() =>
     modScenario({
       ...fixture(),
       scenario: { durationMonths: 12 },
-      notifications: [notice],
+      events: [notice],
     }),
-  ).toThrow("notifications[0].month is after the scenario ends (month 12).");
+  ).toThrow(/events\[0\].startMonth.*month 13.*month 12/);
   expect(() =>
     modScenario({
       ...fixture(),
       scenario: { durationMonths: 13 },
-      notifications: [notice],
+      events: [notice],
     }),
   ).not.toThrow();
 });
@@ -127,9 +140,9 @@ test("money the author left unset follows a changed starting year", () => {
 test("mod event selection carries its future demand into the chosen era without replacing author prices or duration", () => {
   const scenario = modScenario({
     ...fixture(),
+    officialArcs: [{ scenarioId: 106, includeChoices: true }],
     scenario: {
       startingYear: 2040,
-      eventScenarioIds: [106],
       dollarsPerkWh: 0.3,
       durationMonths: 72,
     },
@@ -169,7 +182,7 @@ const regularGame = () =>
 const moddedGame = (pack = fixture()) =>
   createGame({
     scenarioId: 999,
-    scenario: modScenario(pack),
+    scenario: modScenario(pack, undefined, "Manager"),
     seed: 42,
     difficulty: "Manager",
   });
@@ -220,16 +233,26 @@ test("first-release runtime snapshots reject unknown names, oversized text and f
 test("mod notifications are committed once and survive save loading", () => {
   const game = moddedGame({
     ...fixture(),
-    notifications: [
-      { month: 1, title: "Review grid", message: "Check the first month." },
+    events: [
+      {
+        id: "review-grid",
+        startMonth: 1,
+        title: "Review grid",
+        message: "Check the first month.",
+      },
     ],
   });
+  expect(
+    game.eventLog.filter((event) => event.title === "Review grid"),
+  ).toHaveLength(1);
   for (let i = 0; i < TICKS_PER_MONTH; i++) tickState(game);
   expect(
     game.eventLog.filter((event) => event.title === "Review grid"),
   ).toHaveLength(1);
   const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!;
-  expect(restored.game.reportedEventKeys).toContain("mod-notice:0");
+  expect(restored.game.reportedEventKeys).toContain(
+    "mod:test-grid:review-grid",
+  );
   for (let i = 0; i < 4; i++) tickState(restored.game);
   expect(
     restored.game.eventLog.filter((event) => event.title === "Review grid"),
@@ -335,8 +358,14 @@ test("D2 rejects an inherited reliability window outside the term, including its
 test("D4 rejects edited saved factors beyond the package bounds", () => {
   const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
   save.game.customScenario.mod.facilities.Solar.buildCost = 1e308;
+  save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
+    save.game.customScenario.mod,
+  );
   expect(parseSave(save)).toBeNull();
   save.game.customScenario.mod.facilities.Solar.buildCost = 10;
+  save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
+    save.game.customScenario.mod,
+  );
   expect(parseSave(save)).not.toBeNull();
 });
 
@@ -345,8 +374,13 @@ test("diagnostics retain every independently unavailable asset and objective pat
     ...fixture(),
     baseScenarioId: 108,
     scenario: { startingYear: 1980, durationMonths: 6 },
-    notifications: [
-      { month: 12, title: "Review", message: "Review the grid." },
+    events: [
+      {
+        id: "review",
+        startMonth: 12,
+        title: "Review",
+        message: "Review the grid.",
+      },
     ],
   });
   expect(
@@ -369,36 +403,70 @@ test("diagnostics retain every independently unavailable asset and objective pat
         severity: "error",
       }),
       expect.objectContaining({
-        code: "notice-outside-term",
-        path: "notifications[0].month",
+        code: "outside-term",
+        path: "events[0].startMonth",
         severity: "error",
       }),
     ]),
   );
 });
 
-test("runtime snapshots enforce notice count, month and text limits and safe metadata", () => {
-  for (const notifications of [
-    Array.from({ length: 101 }, () => ({
-      month: 1,
-      title: "Review",
-      message: "Check grid.",
-    })),
-    [{ month: 0, title: "Review", message: "Check grid." }],
-    [{ month: 1201, title: "Review", message: "Check grid." }],
-    [{ month: 1, title: "x".repeat(101), message: "Check grid." }],
-    [{ month: 1, title: "Review", message: "x".repeat(501) }],
-    [{ month: 1, title: "Unsafe\u202e", message: "Check grid." }],
+test("runtime snapshots reject edited event count, month and text even with a fresh digest", () => {
+  const original = moddedGame({
+    ...fixture(),
+    events: [
+      {
+        id: "review",
+        startMonth: 2,
+        title: "Review",
+        message: "Check the grid.",
+      },
+    ],
+  });
+  for (const mutate of [
+    (mod: ScenarioModType) => {
+      mod.rules.events = Array.from({ length: 101 }, (_, i) => ({
+        ...mod.rules.events[0],
+        id: `event-${i}`,
+        key: `mod:test-grid:event-${i}`,
+      }));
+    },
+    (mod: ScenarioModType) => {
+      mod.rules.events[0].startMonth = -1;
+    },
+    (mod: ScenarioModType) => {
+      mod.rules.events[0].possibleStartMonths = { from: 1200, to: 1200 };
+    },
+    (mod: ScenarioModType) => {
+      mod.rules.events[0].title = "x".repeat(101);
+    },
+    (mod: ScenarioModType) => {
+      mod.rules.events[0].message = "x".repeat(501);
+    },
+    (mod: ScenarioModType) => {
+      mod.rules.events[0].title = "Unsafe\u202e";
+    },
   ]) {
-    const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
-    save.game.customScenario.mod.notifications = notifications;
+    const save = JSON.parse(JSON.stringify(serializeSave(original)));
+    mutate(save.game.customScenario.mod);
+    save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
+      save.game.customScenario.mod,
+    );
     expect(parseSave(save)).toBeNull();
   }
 });
 
 test("launch rechecks the inherited fleet instead of silently dropping assets", () => {
-  const scenario = modScenario({ ...fixture(), baseScenarioId: 108 });
+  const scenario = modScenario(
+    { ...fixture(), baseScenarioId: 108 },
+    undefined,
+    "Manager",
+  );
   scenario.startingYear = 1980;
+  scenario.mod!.parameters.startingYear = 1980;
+  scenario.mod!.rules.startingYear = 1980;
+  scenario.mod!.setupDigest = modSetupDigest(scenario);
+  scenario.mod!.runtimeDigest = modRuntimeDigest(scenario.mod!);
   expect(() =>
     createGame({ scenarioId: 999, scenario, seed: 42, difficulty: "Manager" }),
   ).toThrow(/unavailable in 1980/);

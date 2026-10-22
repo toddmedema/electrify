@@ -1,9 +1,9 @@
 import {
-  MOD_API_VERSION,
   ModPackage,
   ModDiagnostic,
   ModValidationError,
   validateMod,
+  packageDigest,
 } from "./ModSchema";
 import { DIFFICULTY_IDS } from "../Constants";
 import { getDateFromMinute } from "../helpers/DateTime";
@@ -21,10 +21,24 @@ import {
 } from "../data/Scenarios";
 import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
+import { getStartingCustomers } from "../data/LocationProfiles";
 import {
   prepareCustomScenario,
   validCustomEventScenario,
 } from "../helpers/CustomScenarioEvents";
+import {
+  compileScenarioRules,
+  RuleCompilationError,
+} from "../helpers/ScenarioRules";
+import { modRuntimeDigest, modSetupDigest } from "../helpers/ScenarioMod";
+import { RULE_LIMITS } from "../helpers/ScenarioRulesSchema";
+import { utf8Bytes } from "../helpers/RuleIdentity";
+import compatibilityManifest from "../data/RunCompatibility.json";
+import type {
+  CompiledScenarioRules,
+  RuleObjective,
+  ScenarioRuleDefinitions,
+} from "../data/ScenarioRules";
 import type {
   DifficultyType,
   GameType,
@@ -32,129 +46,232 @@ import type {
   ScenarioType,
 } from "../Types";
 
-/** Why a package cannot start in this build, or undefined when it can. */
 export function modIssue(pack: ModPackage): string | undefined {
-  try {
-    const errors = modValidationDiagnostics(pack).filter(
-      (d) => d.severity === "error",
-    );
-    return errors.length ? errors.map((d) => d.message).join("\n") : undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : "This mod can't start.";
-  }
+  const errors = modValidationDiagnostics(pack).filter(
+    (d) => d.severity === "error",
+  );
+  return errors.length ? errors.map((d) => d.message).join("\n") : undefined;
 }
-
-/**
- * Resolves a package into the custom scenario a run starts from. The run keeps only the resolved
- * scenario and its small `mod` effects, never the authoring package itself.
- */
-export function modScenario(
-  input: ModPackage,
-  workshopId?: string,
-  difficulty?: DifficultyType,
-): ScenarioType {
+/** Replace-ready inherited objective definitions use the base's fixed offsets, including preparation. */
+export function inheritedModObjectives(
+  base: ScenarioType,
+  startingYear = base.startingYear,
+): RuleObjective[] {
+  const objectives: RuleObjective[] = [];
+  if (base.reliabilityObjective) {
+    const o = base.reliabilityObjective;
+    const fromMonth =
+      absoluteMonth(o.year + startingYear - base.startingYear, o.month) -
+      absoluteMonth(startingYear, 1) +
+      1;
+    objectives.push({
+      id: `base-${base.id}-reliability`,
+      metric: "monthlyReliability",
+      label: o.goal ?? o.label,
+      fromMonth,
+      throughMonth: fromMonth + (o.durationMonths ?? 1) - 1,
+      minDemandServedShare: o.minimumDemandServed,
+    });
+  }
+  if (base.minimumCustomerRetention !== undefined)
+    objectives.push({
+      id: `base-${base.id}-retention`,
+      metric: "customerRetention",
+      label: "Retain your starting customers",
+      deadlineMonth: base.durationMonths,
+      minRetainedShare: base.minimumCustomerRetention,
+    });
+  return objectives;
+}
+function resolveMod(
+  input: unknown,
+  workshopId: string | undefined,
+  difficulty: DifficultyType,
+  startingPeakW: number,
+): { scenario: ScenarioType; diagnostics: ModDiagnostic[] } {
   const pack = validateMod(input);
-  if (pack.gameApi !== MOD_API_VERSION)
-    throw new Error(
-      `Made for a different game version. Ask ${pack.creator} for an update.`,
-    );
   const base =
-    pack.baseScenarioId === CUSTOM_SCENARIO_ID
+    pack.baseScenarioId === 999
       ? DEFAULT_CUSTOM_SCENARIO
-      : SCENARIOS.find((s) => s.id === pack.baseScenarioId && !s.tutorialSteps);
-  if (!base) throw new Error("Unknown base scenario.");
-  const overrides = pack.scenario || {};
-  const startingYear = overrides.startingYear ?? base.startingYear;
-  const mod: ScenarioModType = {
-    source: {
-      id: pack.id,
-      title: pack.title,
-      creator: pack.creator,
-      version: pack.version,
-      ...(workshopId ? { workshopId } : {}),
-    },
-    ...(pack.facilities ? { facilities: pack.facilities } : {}),
-    ...(pack.programs ? { programs: pack.programs } : {}),
-    ...(pack.notifications ? { notifications: pack.notifications } : {}),
-  };
+      : SCENARIOS.find(
+          (s) => s.id === pack.baseScenarioId && !s.tutorialSteps,
+        )!;
+  const overrides = pack.scenario ?? {},
+    startingYear = overrides.startingYear ?? base.startingYear;
+  const arcs =
+    pack.officialArcs ??
+    (pack.baseScenarioId === 999
+      ? []
+      : [{ scenarioId: pack.baseScenarioId, includeChoices: true }]);
   const scenario: ScenarioType = {
     ...JSON.parse(JSON.stringify(base)),
     ...overrides,
-    // Money the author did not set follows the chosen era, as on the custom game screen.
+    id: CUSTOM_SCENARIO_ID,
+    name: pack.title,
+    seed: pack.seed,
+    startingYear,
+    eventScenarioIds: arcs.map((a) => a.scenarioId).sort((a, b) => a - b),
     cash:
       overrides.cash ?? inEraMoney(base.cash, startingYear, base.startingYear),
     feePerKgCO2e:
       overrides.feePerKgCO2e ??
       inEraMoney(base.feePerKgCO2e, startingYear, base.startingYear),
-    id: CUSTOM_SCENARIO_ID,
-    name: pack.title,
-    seed: pack.seed,
-    eventScenarioIds:
-      overrides.eventScenarioIds ??
-      (pack.baseScenarioId === CUSTOM_SCENARIO_ID ? [] : [pack.baseScenarioId]),
-    mod,
   };
+  delete scenario.rules;
   if (!validCustomEventScenario(scenario))
     throw new Error("Unsupported scenario year or events.");
   const prepared = prepareCustomScenario(scenario);
   const durationMonths = overrides.durationMonths ?? prepared.durationMonths;
   const resolved: ScenarioType = {
     ...prepared,
-    reliabilityObjective: base.reliabilityObjective
-      ? {
-          ...base.reliabilityObjective,
-          year:
-            base.reliabilityObjective.year + startingYear - base.startingYear,
-        }
-      : undefined,
-    // A base scenario can also contain existing industrial demand at launch.
-    // Event preparation adds only future loads, so preserve that starting demand.
-    loadAdditions: [
-      ...(base.loadAdditions || [])
-        .filter(
-          (load) =>
-            load.startsYear < base.startingYear ||
-            (load.startsYear === base.startingYear &&
-              (load.startsMonth || 1) === 1),
-        )
-        .map((load) => ({
-          ...load,
-          startsYear: load.startsYear + startingYear - base.startingYear,
-        })),
-      ...(prepared.loadAdditions || []),
-    ],
-    // An author's explicit price and duration are part of the package contract. Otherwise an
-    // authored base keeps its own tariff carried into the chosen era; a custom base uses the
-    // standard regional tariff the custom game screen would.
+    startingCustomers:
+      scenario.startingCustomers ??
+      getStartingCustomers(getScenarioLocation(scenario)),
+    durationMonths,
     dollarsPerkWh:
       overrides.dollarsPerkWh ??
-      (pack.baseScenarioId === CUSTOM_SCENARIO_ID
+      (pack.baseScenarioId === 999
         ? prepared.dollarsPerkWh
         : inEraRate(base.dollarsPerkWh, startingYear, base.startingYear)),
-    durationMonths,
+    loadAdditions: [
+      ...(base.loadAdditions ?? [])
+        .filter(
+          (l) =>
+            l.startsYear < base.startingYear ||
+            (l.startsYear === base.startingYear && (l.startsMonth ?? 1) === 1),
+        )
+        .map((l) => ({
+          ...l,
+          startsYear: l.startsYear + startingYear - base.startingYear,
+        })),
+      ...(prepared.loadAdditions ?? []),
+    ],
   };
-  const diagnostics = resolvedScenarioDiagnostics(
-    resolved,
-    pack.baseScenarioId,
-    difficulty ? [difficulty] : DIFFICULTY_IDS,
-  );
-  const errors = diagnostics.filter((d) => d.severity === "error");
-  if (errors.length) throw new ModValidationError(diagnostics);
-  return resolved;
-}
-
-/** Catalog checks live here, shared by import/details, Play, Publish and author tooling. */
-export function modValidationDiagnostics(input: unknown): ModDiagnostic[] {
-  try {
-    const pack = validateMod(input);
-    const scenario = modScenario(pack);
-    return resolvedScenarioDiagnostics(
-      scenario,
+  if (pack.objectives.mode !== "inherit") {
+    delete resolved.reliabilityObjective;
+    delete resolved.minimumCustomerRetention;
+  } else if (base.reliabilityObjective)
+    resolved.reliabilityObjective = {
+      ...base.reliabilityObjective,
+      year: base.reliabilityObjective.year + startingYear - base.startingYear,
+    };
+  const inherited =
+    pack.objectives.mode === "inherit"
+      ? inheritedModObjectives(base, startingYear)
+      : [];
+  const definitions: ScenarioRuleDefinitions = {
+    officialArcs: arcs,
+    objectives:
+      pack.objectives.mode === "replace"
+        ? pack.objectives.items
+        : [
+            ...inherited,
+            ...(pack.objectives.mode === "inherit"
+              ? (pack.objectives.add ?? [])
+              : []),
+          ],
+    ...(pack.events ? { events: pack.events } : {}),
+    ...(pack.choices ? { choices: pack.choices } : {}),
+    ...(pack.debriefReports ? { debriefReports: pack.debriefReports } : {}),
+  };
+  const diagnostics: ModDiagnostic[] = [],
+    params = {
+      namespace: { kind: "mod" as const, id: pack.id },
+      seed: pack.seed,
+      startingYear,
+      durationMonths,
+      startingPeakW,
+      startingAssetIds: resolved.facilities.map((f) => f.assetId!),
+      inheritedObjectiveIds: inherited.map((o) => o.id),
+    };
+  let rules: CompiledScenarioRules | undefined;
+  for (const atDifficulty of DIFFICULTY_IDS) {
+    try {
+      const compiled = compileScenarioRules(definitions, {
+        ...params,
+        difficulty: atDifficulty,
+        diagnostics,
+      });
+      if (atDifficulty === difficulty) rules = compiled;
+    } catch (error) {
+      if (!(error instanceof RuleCompilationError)) throw error;
+      diagnostics.push(...error.diagnostics);
+    }
+  }
+  // A rejected compilation still gets independent starting-fleet diagnostics; it can never launch.
+  rules ??= compileScenarioRules({ objectives: [] }, { ...params, difficulty });
+  const runtime: Omit<ScenarioModType, "runtimeDigest"> = {
+    runtimeVersion: 1,
+    gameApi: 1,
+    packageDigest: packageDigest(pack),
+    setupDigest: modSetupDigest(resolved),
+    modRuntimeId: compatibilityManifest.modRuntimeId,
+    source: {
+      id: pack.id,
+      title: pack.title,
+      creator: pack.creator,
+      version: pack.version,
+      description: pack.description,
+      ...(workshopId ? { workshopId } : {}),
+    },
+    parameters: {
+      baseScenarioId: pack.baseScenarioId,
+      startingYear,
+      durationMonths,
+      seed: pack.seed,
+      difficulty,
+      startingCustomers: resolved.startingCustomers!,
+      startingDemandScale: resolved.startingDemandScale ?? 1,
+    },
+    rules,
+    ...(pack.facilities ? { facilities: pack.facilities } : {}),
+    ...(pack.programs ? { programs: pack.programs } : {}),
+  };
+  resolved.mod = { ...runtime, runtimeDigest: modRuntimeDigest(runtime) };
+  diagnostics.push(
+    ...resolvedScenarioDiagnostics(
+      resolved,
       pack.baseScenarioId,
       DIFFICULTY_IDS,
-    );
+    ),
+  );
+  if (utf8Bytes(JSON.stringify(resolved)).length > RULE_LIMITS.compiledBytes)
+    diagnostics.push({
+      code: "compiled-bytes",
+      path: "rules",
+      severity: "error",
+      message:
+        "Compiled mod snapshot exceeds512KiB including metadata, parameters and imported content.",
+    });
+  return {
+    scenario: resolved,
+    diagnostics: diagnostics.filter(
+      (d, i, all) =>
+        all.findIndex(
+          (v) =>
+            v.code === d.code && v.path === d.path && v.message === d.message,
+        ) === i,
+    ),
+  };
+}
+/** One detached runtime snapshot for the selected difficulty. Library changes never enter it. */
+export function modScenario(
+  input: ModPackage,
+  workshopId?: string,
+  difficulty: DifficultyType = "Employee",
+  startingPeakW = 0,
+): ScenarioType {
+  const resolved = resolveMod(input, workshopId, difficulty, startingPeakW);
+  if (resolved.diagnostics.some((d) => d.severity === "error"))
+    throw new ModValidationError(resolved.diagnostics);
+  return resolved.scenario;
+}
+export function modValidationDiagnostics(input: unknown): ModDiagnostic[] {
+  try {
+    return resolveMod(input, undefined, "Employee", 0).diagnostics;
   } catch (error) {
-    return error instanceof ModValidationError
+    return error instanceof ModValidationError ||
+      error instanceof RuleCompilationError
       ? error.diagnostics
       : [
           {
@@ -195,14 +312,6 @@ function resolvedScenarioDiagnostics(
         `Inherited reliability objective from base ${baseId} requires months ${first}–${last}, but this run ends at month ${duration}. Extend scenario.durationMonths to at least ${last}.`,
       );
   }
-  scenario.mod?.notifications?.forEach((notice, index) => {
-    if (notice.month > duration)
-      add(
-        "notice-outside-term",
-        `notifications[${index}].month`,
-        `notifications[${index}].month is after the scenario ends (month ${duration}).`,
-      );
-  });
   const location = getScenarioLocation(scenario);
   if (!location) {
     add(

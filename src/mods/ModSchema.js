@@ -1,49 +1,39 @@
-/* Shared by the renderer and Electron main. Keep this parser dependency-free. */
-
-/**
- * The game contract a package targets: which facility names, base scenarios, event arcs and
- * modifier meanings it may rely on. Bump it deliberately, and only when a change would make an
- * existing package mean something different or stop working (a facility or scenario removed or
- * renamed, a modifier's meaning changed). Additive changes keep the same version. Ordinary
- * releases never invalidate installed mods; ModSchema.test.ts pins the version 1 catalog.
- */
+/* Package-only parsing; Electron main must never import the TypeScript catalog. */
+const {
+  ruleDiagnostics,
+  isRuleJson,
+  ID_PATTERN,
+  UNSAFE_TEXT,
+  UNSAFE_MARKUP,
+  FACILITY_NAMES,
+  FACILITY_MODIFIER_KEYS,
+  PROGRAM_KEYS,
+} = require("../helpers/ScenarioRulesSchema");
+const { ruleDigest, utf8Bytes } = require("../helpers/RuleIdentity");
 const MOD_API_VERSION = 1;
 const MOD_SCENARIO_IDS = [
   100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
 ];
 const MAX_MOD_BYTES = 256 * 1024;
-// Steam Workshop titles are limited to 128 bytes of UTF-8.
-const MAX_TITLE_BYTES = 128;
-const FACILITY_NAMES = [
-  "Coal",
-  "Nuclear",
-  "Natural Gas Peaker",
-  "Natural Gas CC",
-  "Oil",
-  "Biomass",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-  "Solar",
-  "Hydro",
-  "Geothermal",
-  "Enhanced Geothermal",
-  "Battery",
-  "Pumped Hydro",
-];
 const PACKAGE_KEYS = [
+  "$schema",
   "schemaVersion",
   "gameApi",
   "id",
   "title",
   "creator",
   "version",
+  "description",
   "seed",
   "baseScenarioId",
   "scenario",
   "facilities",
   "programs",
-  "notifications",
+  "officialArcs",
+  "events",
+  "choices",
+  "objectives",
+  "debriefReports",
 ];
 const SCENARIO_OVERRIDE_KEYS = [
   "cash",
@@ -53,90 +43,86 @@ const SCENARIO_OVERRIDE_KEYS = [
   "dollarsPerkWh",
   "durationMonths",
   "feePerKgCO2e",
-  "eventScenarioIds",
   "ownership",
   "endTitle",
   "endMessage",
 ];
-const FACILITY_MODIFIER_KEYS = [
-  "buildCost",
-  "annualOperatingCost",
-  "yearsToBuild",
+const COMPUTED_KEYS = [
+  "runtimeVersion",
+  "packageDigest",
+  "setupDigest",
+  "runtimeDigest",
+  "modRuntimeId",
+  "multiplayerCompatibilityId",
+  "compatibilityId",
 ];
-const PROGRAM_KEYS = ["efficiency", "solar"];
-const NOTIFICATION_KEYS = ["month", "title", "message"];
-// Control characters, zero-width marks and bidirectional overrides can disguise text.
-// eslint-disable-next-line no-control-regex
-const UNSAFE_TEXT = /[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩]/;
-const ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
-
 class ModValidationError extends Error {
   constructor(diagnostics) {
-    super(diagnostics.map((item) => item.message).join("\n"));
+    super(diagnostics.map((d) => d.message).join("\n"));
     this.name = "ModValidationError";
     this.diagnostics = diagnostics;
   }
 }
-function diagnostic(code, path, reason) {
-  return { code, path, severity: "error", message: `${path} ${reason}` };
-}
-function fail(path, reason) {
-  throw new ModValidationError([diagnostic("invalid-package", path, reason)]);
-}
-function plainObject(value) {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-const formatNumber = (value) => value.toLocaleString("en-US");
-
-/** Collect independent failures without traversing malformed parent values. */
 function modDiagnostics(p) {
   const diagnostics = [];
-  const add = (code, path, reason) =>
-    diagnostics.push(diagnostic(code, path, reason));
-  const object = (value, path, keys, noun = "field") => {
-    if (!plainObject(value)) {
-      add("invalid-object", path || "Package", "must be an object.");
+  const add = (code, path, message) =>
+    diagnostics.push({
+      code,
+      path,
+      severity: "error",
+      message: `${path} ${message}`,
+    });
+  if (!isRuleJson(p)) {
+    add(
+      "invalid-json",
+      "Package",
+      "must contain only finite plain JSON data, without functions, accessors or cycles.",
+    );
+    return diagnostics;
+  }
+  const object = (v, path, keys) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) {
+      add("invalid-object", path, "must be an object.");
       return false;
     }
-    for (const key of Object.keys(value))
+    Object.keys(v).forEach((key) => {
       if (!keys.includes(key))
         add(
-          "unknown-field",
+          COMPUTED_KEYS.includes(key) ? "computed-field" : "unknown-field",
           path ? `${path}.${key}` : key,
-          `is not a supported ${noun}. Use one of: ${keys.join(", ")}.`,
+          COMPUTED_KEYS.includes(key)
+            ? "is computed by the game and must not be authored."
+            : `is not a supported field. Use one of: ${keys.join(", ")}.`,
         );
+    });
     return true;
   };
-  const text = (value, path, max) => {
-    if (value === undefined) {
-      add("missing-field", path, "is required.");
-      return;
-    }
-    if (typeof value !== "string" || !value.trim()) {
+  const text = (v, path, max) => {
+    if (typeof v !== "string" || !v.trim()) {
       add("invalid-text", path, "must be non-empty text.");
       return;
     }
-    if (value.length > max)
+    if (v.length > max)
       add("text-limit", path, `must be at most ${max} characters.`);
-    if (UNSAFE_TEXT.test(value))
+    if (UNSAFE_TEXT.test(v) || UNSAFE_MARKUP.test(v))
       add(
         "unsafe-text",
         path,
-        "must not contain control or text-direction characters.",
+        "must be plain text without control characters, HTML or URLs.",
       );
   };
-  const number = (value, path, min, max, integer = false) => {
+  const number = (v, path, min, max, integer = false) => {
     if (
-      typeof value !== "number" ||
-      !Number.isFinite(value) ||
-      value < min ||
-      value > max ||
-      (integer && !Number.isInteger(value))
+      typeof v !== "number" ||
+      !Number.isFinite(v) ||
+      v < min ||
+      v > max ||
+      (integer && !Number.isInteger(v))
     )
       add(
         "number-bounds",
         path,
-        `must be ${integer ? "a whole number" : "a number"} from ${formatNumber(min)} to ${formatNumber(max)}.`,
+        `must be ${integer ? "a whole number" : "a number"} from ${min} to ${max}.`,
       );
   };
   if (!object(p, "", PACKAGE_KEYS)) return diagnostics;
@@ -146,7 +132,12 @@ function modDiagnostics(p) {
       "schemaVersion",
       "must be 1. Export a new authoring template.",
     );
-  number(p.gameApi, "gameApi", 1, 1000, true);
+  if (p.gameApi !== 1)
+    add(
+      "game-api",
+      "gameApi",
+      "must be 1. This package targets an unsupported game contract.",
+    );
   if (typeof p.id !== "string" || !ID_PATTERN.test(p.id))
     add(
       "invalid-id",
@@ -154,18 +145,23 @@ function modDiagnostics(p) {
       "must be 1–64 lowercase letters, digits or hyphens, starting and ending with a letter or digit.",
     );
   text(p.title, "title", 100);
-  if (
-    typeof p.title === "string" &&
-    new TextEncoder().encode(p.title).length > MAX_TITLE_BYTES
-  )
-    add(
-      "title-bytes",
-      "title",
-      `must fit Steam's ${MAX_TITLE_BYTES}-byte title limit.`,
-    );
+  if (typeof p.title === "string" && utf8Bytes(p.title).length > 128)
+    add("title-bytes", "title", "must fit Steam's 128-byte title limit.");
   text(p.creator, "creator", 100);
   text(p.version, "version", 40);
+  text(p.description, "description", 2000);
   number(p.seed, "seed", 0, 4294967295, true);
+  if (
+    p.$schema !== undefined &&
+    (typeof p.$schema !== "string" ||
+      p.$schema.length > 2048 ||
+      UNSAFE_TEXT.test(p.$schema))
+  )
+    add(
+      "editor-schema",
+      "$schema",
+      "must be an editor schema string of at most 2048 safe characters.",
+    );
   if (p.baseScenarioId !== 999 && !MOD_SCENARIO_IDS.includes(p.baseScenarioId))
     add(
       "unknown-base",
@@ -200,108 +196,126 @@ function modDiagnostics(p) {
     for (const key of ["endTitle", "endMessage"])
       if (p.scenario[key] !== undefined)
         text(p.scenario[key], `scenario.${key}`, 500);
-    const ids = p.scenario.eventScenarioIds;
-    if (ids !== undefined) {
-      if (!Array.isArray(ids) || ids.length > 20)
-        add(
-          "list-limit",
-          "scenario.eventScenarioIds",
-          "must be a list of at most 20 IDs.",
-        );
-      if (Array.isArray(ids)) {
-        if (new Set(ids).size !== ids.length)
-          add(
-            "duplicate-id",
-            "scenario.eventScenarioIds",
-            "must not repeat an ID.",
-          );
-        ids.forEach((id, index) => {
-          if (!MOD_SCENARIO_IDS.includes(id))
-            add(
-              "unknown-arc",
-              `scenario.eventScenarioIds[${index}]`,
-              `is not a scenario. Use one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
-            );
-        });
-      }
-    }
   }
   if (
     p.facilities !== undefined &&
-    object(p.facilities, "facilities", FACILITY_NAMES, "facility")
+    object(p.facilities, "facilities", FACILITY_NAMES)
   )
-    for (const [name, value] of Object.entries(p.facilities)) {
-      if (object(value, `facilities.${name}`, FACILITY_MODIFIER_KEYS))
-        for (const [key, factor] of Object.entries(value))
+    for (const [name, v] of Object.entries(p.facilities))
+      if (object(v, `facilities.${name}`, FACILITY_MODIFIER_KEYS))
+        for (const [key, n] of Object.entries(v))
           if (FACILITY_MODIFIER_KEYS.includes(key))
-            number(factor, `facilities.${name}.${key}`, 0.1, 10);
-    }
+            number(n, `facilities.${name}.${key}`, 0.1, 10);
+  if (p.programs !== undefined && object(p.programs, "programs", PROGRAM_KEYS))
+    for (const [key, n] of Object.entries(p.programs))
+      if (PROGRAM_KEYS.includes(key)) number(n, `programs.${key}`, 0.1, 10);
+  let objectives = [];
   if (
-    p.programs !== undefined &&
-    object(p.programs, "programs", PROGRAM_KEYS, "program")
-  )
-    for (const [key, factor] of Object.entries(p.programs))
-      if (PROGRAM_KEYS.includes(key))
-        number(factor, `programs.${key}`, 0.1, 10);
-  if (p.notifications !== undefined) {
-    if (!Array.isArray(p.notifications) || p.notifications.length > 100)
+    object(p.objectives, "objectives", [
+      "mode",
+      ...(p.objectives?.mode === "inherit"
+        ? ["add"]
+        : p.objectives?.mode === "replace"
+          ? ["items"]
+          : []),
+    ])
+  ) {
+    if (!["inherit", "replace", "none"].includes(p.objectives.mode))
       add(
-        "list-limit",
-        "notifications",
-        "must be a list of at most 100 notifications.",
+        "objective-intent",
+        "objectives.mode",
+        "must explicitly be inherit, replace or none.",
       );
-    if (Array.isArray(p.notifications))
-      p.notifications.forEach((n, index) => {
-        const path = `notifications[${index}]`;
-        if (!object(n, path, NOTIFICATION_KEYS)) return;
-        number(n.month, `${path}.month`, 1, 1200, true);
-        text(n.title, `${path}.title`, 100);
-        text(n.message, `${path}.message`, 500);
-      });
+    if (p.objectives.mode === "replace" || p.objectives.add !== undefined) {
+      objectives =
+        p.objectives.mode === "replace" ? p.objectives.items : p.objectives.add;
+      if (!Array.isArray(objectives)) {
+        add(
+          "invalid-list",
+          `objectives.${p.objectives.mode === "replace" ? "items" : "add"}`,
+          "must be a list.",
+        );
+        objectives = [];
+      }
+    }
+  }
+  const definitions = { objectives };
+  for (const key of ["events", "choices", "debriefReports", "officialArcs"])
+    if (p[key] !== undefined) definitions[key] = p[key];
+  diagnostics.push(...ruleDiagnostics(definitions));
+  if (Array.isArray(p.officialArcs)) {
+    const seen = new Set();
+    p.officialArcs.forEach((arc, i) => {
+      if (!arc || !MOD_SCENARIO_IDS.includes(arc.scenarioId))
+        add(
+          "unknown-arc",
+          `officialArcs[${i}].scenarioId`,
+          "must name an importable non-tutorial scenario.",
+        );
+      else if (seen.has(arc.scenarioId))
+        add(
+          "duplicate-id",
+          `officialArcs[${i}].scenarioId`,
+          "must not repeat an arc.",
+        );
+      else seen.add(arc.scenarioId);
+    });
   }
   return diagnostics;
 }
-
-/** Validates an already-decoded package and returns a detached copy. */
 function validateMod(value) {
-  let p;
-  try {
-    p = JSON.parse(JSON.stringify(value));
-  } catch {
-    fail("Package", "must be plain JSON data.");
-  }
-  const diagnostics = modDiagnostics(p);
+  const diagnostics = modDiagnostics(value);
   if (diagnostics.length) throw new ModValidationError(diagnostics);
-  if (new TextEncoder().encode(JSON.stringify(p)).length > MAX_MOD_BYTES)
-    fail("Package", "must be at most 256 KiB.");
-  return p;
+  const json = JSON.stringify(value);
+  if (utf8Bytes(json).length > MAX_MOD_BYTES)
+    throw new ModValidationError([
+      {
+        code: "package-bytes",
+        path: "Package",
+        severity: "error",
+        message: "Package must be at most 256 KiB.",
+      },
+    ]);
+  return JSON.parse(json);
 }
-
-/** Decodes and validates one scenario.json. */
 function parseMod(input) {
-  if (typeof input !== "string") fail("scenario.json", "must be UTF-8 text.");
-  if (new TextEncoder().encode(input).length > MAX_MOD_BYTES)
-    fail("scenario.json", "must be at most 256 KiB.");
+  if (typeof input !== "string" || utf8Bytes(input).length > MAX_MOD_BYTES)
+    throw new ModValidationError([
+      {
+        code: "package-bytes",
+        path: "scenario.json",
+        severity: "error",
+        message: "Choose scenario.json UTF-8 text under 256 KiB.",
+      },
+    ]);
   let value;
   try {
     value = JSON.parse(input);
   } catch (error) {
-    fail(
-      "scenario.json",
-      `is not valid JSON (${error instanceof Error ? error.message : "syntax error"}).`,
-    );
+    throw new ModValidationError([
+      {
+        code: "invalid-json",
+        path: "scenario.json",
+        severity: "error",
+        message: `scenario.json is not valid JSON (${error.message}).`,
+      },
+    ]);
   }
   return validateMod(value);
 }
-
+function packageDigest(value) {
+  const { $schema: _schema, ...content } = validateMod(value);
+  return ruleDigest(content);
+}
 module.exports = {
   modDiagnostics,
-  parseMod,
   validateMod,
+  parseMod,
+  packageDigest,
   ModValidationError,
   MOD_API_VERSION,
-  MAX_MOD_BYTES,
   MOD_SCENARIO_IDS,
+  MAX_MOD_BYTES,
   FACILITY_NAMES,
   SCENARIO_OVERRIDE_KEYS,
   FACILITY_MODIFIER_KEYS,

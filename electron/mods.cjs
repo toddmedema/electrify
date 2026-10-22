@@ -7,6 +7,7 @@ const {
   MAX_MOD_BYTES,
   MOD_API_VERSION,
   ModValidationError,
+  packageDigest,
 } = require("../src/mods/ModSchema.js");
 const { atomicWriteAsync } = require("./storage.cjs");
 const { itemId } = require("./steam-workshop.cjs");
@@ -462,7 +463,7 @@ class ModStore {
       case "refresh":
         return this.refresh(library);
       case "publish":
-        return this.publish(library, find());
+        return this.publish(library, find(), input.packageDigest);
       default:
         throw new Error("Unknown mod action.");
     }
@@ -520,12 +521,16 @@ class ModStore {
       version: "1.0.0",
       seed: 42,
       baseScenarioId: 999,
-      scenario: { durationMonths: 240, eventScenarioIds: [100] },
+      description: "Plan your grid through a changing electricity market.",
+      objectives: { mode: "inherit" },
+      officialArcs: [{ scenarioId: 100, includeChoices: true }],
+      scenario: { durationMonths: 240 },
       facilities: { Solar: { buildCost: 0.8 } },
       programs: { efficiency: 0.8 },
-      notifications: [
+      events: [
         {
-          month: 12,
+          id: "first-year",
+          startMonth: 12,
           title: "First year",
           message: "Review your grid before the next year.",
         },
@@ -636,7 +641,15 @@ class ModStore {
     };
   }
 
-  async publish(library, entry) {
+  async publish(library, entry, validatedDigest) {
+    const pack = validateMod(entry.pack);
+    if (
+      typeof validatedDigest !== "string" ||
+      validatedDigest !== packageDigest(pack)
+    )
+      throw new Error(
+        "The package digest differs from the package validated for publishing. Review and validate it again.",
+      );
     if (entry.source !== "local")
       throw new Error("Only your own local mods can be published.");
     if (entry.pack.gameApi !== MOD_API_VERSION)

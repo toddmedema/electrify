@@ -1,3 +1,4 @@
+import type { CompiledScenarioRules } from "./data/ScenarioRules";
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
@@ -591,6 +592,7 @@ export function isStorage<T extends { peakWh?: number }>(
 
 interface SharedOperatingType
   extends LoanInfo, LifetimeTotals, ConstructionEmissions {
+  startingAssetId?: string;
   id: number; // Monotonically increasing
   // Signed for storage: negative while charging
   currentW: number;
@@ -914,32 +916,39 @@ export interface FacilityModifierType {
   yearsToBuild?: number;
 }
 
-export interface ScenarioNoticeType {
-  /** Months from the start of the run. */
-  month: number;
-  title: string;
-  message: string;
-}
-
-/**
- * A data-only mod's run-local effects, frozen into the run when it starts. Saves keep this small
- * runtime shape rather than the authoring package, so later schema, catalog or scenario changes
- * cannot make a modded save unreadable: unknown facility names simply match nothing.
- */
+/** A detached first-release runtime; no installed package/library is consulted by simulation. */
 export interface ScenarioModType {
+  runtimeVersion: 1;
+  gameApi: 1;
+  packageDigest: string;
+  setupDigest: string;
+  runtimeDigest: string;
+  modRuntimeId: string;
   source: {
     id: string;
     title: string;
     creator: string;
     version: string;
+    description: string;
     workshopId?: string;
   };
+  parameters: {
+    baseScenarioId: number;
+    startingYear: number;
+    durationMonths: number;
+    seed: number;
+    difficulty: DifficultyType;
+    startingCustomers: number;
+    startingDemandScale: number;
+  };
+  rules: CompiledScenarioRules;
   facilities?: Partial<Record<ModFacilityNameType, FacilityModifierType>>;
   programs?: Partial<Record<Extract<PolicyId, "efficiency" | "solar">, number>>;
-  notifications?: ScenarioNoticeType[];
 }
 
 export interface ScenarioType {
+  /** Trusted built-ins use the common rules without assigning mod provenance. */
+  rules?: CompiledScenarioRules;
   /** Immutable mod effects; installed updates never mutate a running game. */
   mod?: ScenarioModType;
   /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
@@ -1003,6 +1012,8 @@ export interface ScenarioType {
 
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
+  /** Catalog identity of the original asset; never transferred to a replacement. */
+  assetId?: string;
   initialAgeYears?: number;
   /**
    * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the

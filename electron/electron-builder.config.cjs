@@ -17,6 +17,8 @@ module.exports = {
     "build/**/*",
     "electron/**/*.cjs",
     "src/mods/ModSchema.js",
+    "src/helpers/ScenarioRulesSchema.js",
+    "src/helpers/RuleIdentity.js",
     "!electron/*.test.cjs",
     "!electron/electron-builder.config.cjs",
     "desktop-config.json",

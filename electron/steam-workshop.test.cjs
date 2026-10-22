@@ -51,7 +51,7 @@ for (const platform of ["win32", "linux", "darwin"])
     assert.deepEqual(
       await workshop.publish(
         "123",
-        { title: "Test", version: "1" },
+        { title: "Test", version: "1", description: "A community scenario." },
         "/tmp/stage",
         { setVisibility: true },
       ),
@@ -59,7 +59,11 @@ for (const platform of ["win32", "linux", "darwin"])
     );
     await workshop.publish(
       "123",
-      { title: "Test", version: "2" },
+      {
+        title: "Test",
+        version: "2",
+        description: "An updated community scenario.",
+      },
       "/tmp/stage",
     );
     // Public only on the first upload; later updates keep the creator's Steam setting.
@@ -119,7 +123,11 @@ test("an invalid update handle never starts an upload", async () => {
       fakeApi({ start: () => handle }).api,
     );
     await assert.rejects(
-      workshop.publish("123", { title: "T", version: "1" }, "/tmp/stage"),
+      workshop.publish(
+        "123",
+        { title: "T", version: "1", description: "A community scenario." },
+        "/tmp/stage",
+      ),
       /could not start/,
     );
   }

@@ -27,7 +27,11 @@ import {
   modScenario,
   modValidationDiagnostics,
 } from "../../mods/ModScenario";
-import type { ModPackage, ModProgramId } from "../../mods/ModSchema";
+import {
+  packageDigest,
+  type ModPackage,
+  type ModProgramId,
+} from "../../mods/ModSchema";
 import type {
   InstalledMod,
   ModImportConflict,
@@ -345,6 +349,7 @@ export default function Mods(): React.JSX.Element {
     void request(`publish:${publishing.key}`, {
       kind: "publish",
       key: publishing.key,
+      packageDigest: packageDigest(publishing.pack),
     }).then((result) => {
       if (!result) return;
       if (result.error) {

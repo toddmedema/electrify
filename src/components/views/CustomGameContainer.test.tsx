@@ -1,3 +1,4 @@
+import { modScenario } from "../../mods/ModScenario";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
 import { launchCustomScenario } from "../../reducers/Game";
@@ -17,14 +18,19 @@ const setup: ScenarioType = {
   name: "My setup",
   startingYear: 2030,
 };
-const modded: ScenarioType = {
-  ...DEFAULT_CUSTOM_SCENARIO,
-  name: "Community Grid",
-  mod: {
-    source: { id: "grid", title: "Community Grid", creator: "A", version: "1" },
-    facilities: { Solar: { buildCost: 0.5 } },
-  },
-};
+const modded = modScenario({
+  schemaVersion: 1,
+  gameApi: 1,
+  id: "grid",
+  title: "Community Grid",
+  creator: "A",
+  version: "1",
+  description: "A community grid that must not seed custom setup.",
+  seed: 42,
+  baseScenarioId: 999,
+  objectives: { mode: "inherit" },
+  facilities: { Solar: { buildCost: 0.5 } },
+});
 const state = (customScenario?: ScenarioType) =>
   ({
     ui: {},

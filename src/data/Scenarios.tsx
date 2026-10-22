@@ -145,8 +145,18 @@ export const SCENARIOS: ScenarioType[] = [
       // Coal rather than gas: it cannot turn down below its minimum output, so the midday sun
       // pushes supply visibly above demand instead of hiding the supply line under it. Sized so
       // it still ramps fast enough to cover the evening without a shortfall.
-      { fuel: "Coal", peakW: 600000000, initialAgeYears: 12 },
-      { fuel: "Sun", peakW: 600000000, initialAgeYears: 5 },
+      {
+        assetId: "scenario-0-coal",
+        fuel: "Coal",
+        peakW: 600000000,
+        initialAgeYears: 12,
+      },
+      {
+        assetId: "scenario-0-sun",
+        fuel: "Sun",
+        peakW: 600000000,
+        initialAgeYears: 5,
+      },
     ],
     tutorialSteps: [
       {
@@ -224,7 +234,14 @@ export const SCENARIOS: ScenarioType[] = [
     durationMonths: 12,
     endTitle: "Mission complete!",
     endMessage: "You built your first generator and put it to work.",
-    facilities: [{ fuel: "Coal", peakW: 600000000, initialAgeYears: 15 }],
+    facilities: [
+      {
+        assetId: "scenario-1-coal",
+        fuel: "Coal",
+        peakW: 600000000,
+        initialAgeYears: 15,
+      },
+    ],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
@@ -324,8 +341,18 @@ export const SCENARIOS: ScenarioType[] = [
     endMessage:
       "You stored extra energy and put it to work when customers needed it.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 500000000, initialAgeYears: 35 },
-      { fuel: "Coal", peakW: 480000000, initialAgeYears: 25 },
+      {
+        assetId: "scenario-2-pumped-hydro",
+        name: "Pumped Hydro",
+        peakWh: 500000000,
+        initialAgeYears: 35,
+      },
+      {
+        assetId: "scenario-2-coal",
+        fuel: "Coal",
+        peakW: 480000000,
+        initialAgeYears: 25,
+      },
     ],
     tutorialSteps: [
       {
@@ -444,8 +471,18 @@ export const SCENARIOS: ScenarioType[] = [
     endMessage:
       "You raised enough revenue to cover costs and keep the lights on.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
-      { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
+      {
+        assetId: "scenario-4-pumped-hydro",
+        name: "Pumped Hydro",
+        peakWh: 1000000000,
+        initialAgeYears: 30,
+      },
+      {
+        assetId: "scenario-4-coal",
+        fuel: "Coal",
+        peakW: 600000000,
+        initialAgeYears: 25,
+      },
     ],
     tutorialSteps: [
       {
@@ -543,8 +580,18 @@ export const SCENARIOS: ScenarioType[] = [
     endTitle: "Mission complete!",
     endMessage: "You won more customers while keeping the business profitable.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
-      { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
+      {
+        assetId: "scenario-3-pumped-hydro",
+        name: "Pumped Hydro",
+        peakWh: 1000000000,
+        initialAgeYears: 30,
+      },
+      {
+        assetId: "scenario-3-coal",
+        fuel: "Coal",
+        peakW: 600000000,
+        initialAgeYears: 25,
+      },
     ],
     tutorialSteps: [
       {
@@ -619,7 +666,14 @@ export const SCENARIOS: ScenarioType[] = [
     endTitle: "Mission complete!",
     endMessage:
       "You used the forecast to prevent a blackout. Time to run your own grid!",
-    facilities: [{ fuel: "Coal", peakW: 450000000, initialAgeYears: 20 }],
+    facilities: [
+      {
+        assetId: "scenario-5-coal",
+        fuel: "Coal",
+        peakW: 450000000,
+        initialAgeYears: 20,
+      },
+    ],
     tutorialSteps: [
       {
         card: "FACILITIES",
@@ -782,9 +836,15 @@ export const SCENARIOS: ScenarioType[] = [
     facilities: [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
       // much nameplate to create observable daytime surplus after customer demand.
-      { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
+      {
+        assetId: "scenario-112-sun",
+        fuel: "Sun",
+        peakW: 800000000,
+        initialAgeYears: 5,
+      },
       // A peaker, the backup the tutorial pauses and restores
       {
+        assetId: "scenario-112-natural-gas-peaker",
         name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 500000000,
@@ -1024,12 +1084,18 @@ export const SCENARIOS: ScenarioType[] = [
     facilities: [
       // California's 2010-vintage gas was mostly combined cycle
       {
+        assetId: "scenario-100-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 200000000,
         initialAgeYears: 10,
       },
-      { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
+      {
+        assetId: "scenario-100-coal",
+        fuel: "Coal",
+        peakW: 300000000,
+        initialAgeYears: 30,
+      },
     ],
   },
   {
@@ -1053,7 +1119,14 @@ export const SCENARIOS: ScenarioType[] = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.05, // 0.6 x EIA 2006 PA average retail, 8.68 cents
     durationMonths: 12 * 20,
-    facilities: [{ fuel: "Coal", peakW: 500000000, initialAgeYears: 25 }],
+    facilities: [
+      {
+        assetId: "scenario-103-coal",
+        fuel: "Coal",
+        peakW: 500000000,
+        initialAgeYears: 25,
+      },
+    ],
   },
   {
     id: 105,
@@ -1078,9 +1151,24 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.094, // 0.6 x EIA 2004 HI average retail, 15.7 cents
     durationMonths: 156,
     facilities: [
-      { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
-      { fuel: "Wind", peakW: 150000000, initialAgeYears: 8 },
-      { fuel: "Oil", peakW: 450000000, initialAgeYears: 20 },
+      {
+        assetId: "scenario-105-sun",
+        fuel: "Sun",
+        peakW: 50000000,
+        initialAgeYears: 5,
+      },
+      {
+        assetId: "scenario-105-wind",
+        fuel: "Wind",
+        peakW: 150000000,
+        initialAgeYears: 8,
+      },
+      {
+        assetId: "scenario-105-oil",
+        fuel: "Oil",
+        peakW: 450000000,
+        initialAgeYears: 20,
+      },
     ],
   },
   {
@@ -1106,8 +1194,18 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.07, // 0.6 x EIA 2002 CA average retail, 12.19 cents
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Uranium", peakW: 400000000, initialAgeYears: 15 },
-      { fuel: "Oil", peakW: 100000000, initialAgeYears: 20 },
+      {
+        assetId: "scenario-101-uranium",
+        fuel: "Uranium",
+        peakW: 400000000,
+        initialAgeYears: 15,
+      },
+      {
+        assetId: "scenario-101-oil",
+        fuel: "Oil",
+        peakW: 100000000,
+        initialAgeYears: 20,
+      },
     ],
   },
   {
@@ -1134,15 +1232,26 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.08,
     durationMonths: 12 * 20,
     facilities: [
-      { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },
+      {
+        assetId: "scenario-104-oil",
+        fuel: "Oil",
+        peakW: 220000000,
+        initialAgeYears: 25,
+      },
       // 1990-vintage island combustion turbines
       {
+        assetId: "scenario-104-natural-gas-peaker",
         name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 200000000,
         initialAgeYears: 10,
       },
-      { fuel: "Coal", peakW: 100000000, initialAgeYears: 30 },
+      {
+        assetId: "scenario-104-coal",
+        fuel: "Coal",
+        peakW: 100000000,
+        initialAgeYears: 30,
+      },
     ],
   },
   {
@@ -1170,8 +1279,18 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.033, // 0.6 x 1980 US retail scaled by PA/US in 1990 (7.65 / 6.57)
     durationMonths: 12 * 20,
     facilities: [
-      { fuel: "Coal", peakW: 200000000, initialAgeYears: 35 },
-      { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
+      {
+        assetId: "scenario-102-coal",
+        fuel: "Coal",
+        peakW: 200000000,
+        initialAgeYears: 35,
+      },
+      {
+        assetId: "scenario-102-coal-2",
+        fuel: "Coal",
+        peakW: 300000000,
+        initialAgeYears: 20,
+      },
     ],
   },
   {
@@ -1219,12 +1338,18 @@ export const SCENARIOS: ScenarioType[] = [
     feePerKgCO2e: 0,
     facilities: [
       {
+        assetId: "scenario-106-natural-gas-peaker",
         name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 75000000,
         initialAgeYears: 0,
       },
-      { fuel: "Oil", peakW: 55000000, initialAgeYears: 27 },
+      {
+        assetId: "scenario-106-oil",
+        fuel: "Oil",
+        peakW: 55000000,
+        initialAgeYears: 27,
+      },
     ],
     loadAdditions: [
       {
@@ -1294,14 +1419,30 @@ export const SCENARIOS: ScenarioType[] = [
       // Capacity-weighted commissioning cohorts, rounded for these aggregates;
       // see docs/starting-facility-ages.md for the utility's plant/PPA sources.
       {
+        assetId: "scenario-107-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 1497000000,
         initialAgeYears: 30,
       },
-      { fuel: "Coal", peakW: 700000000, initialAgeYears: 33 },
-      { fuel: "Uranium", peakW: 430000000, initialAgeYears: 29 },
-      { fuel: "Wind", peakW: 1200000000, initialAgeYears: 4 },
+      {
+        assetId: "scenario-107-coal",
+        fuel: "Coal",
+        peakW: 700000000,
+        initialAgeYears: 33,
+      },
+      {
+        assetId: "scenario-107-uranium",
+        fuel: "Uranium",
+        peakW: 430000000,
+        initialAgeYears: 29,
+      },
+      {
+        assetId: "scenario-107-wind",
+        fuel: "Wind",
+        peakW: 1200000000,
+        initialAgeYears: 4,
+      },
     ],
     endTitle: "After the thaw",
     endMessage:
@@ -1358,22 +1499,44 @@ export const SCENARIOS: ScenarioType[] = [
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
     facilities: [
       {
+        assetId: "scenario-108-hydro",
         fuel: "Hydro",
         peakW: 171570000,
         initialAgeYears: 30,
         hydroSiteId: "azutan-2-esp",
       },
-      { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
-      { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
       {
+        assetId: "scenario-108-sun",
+        fuel: "Sun",
+        peakW: 320430000,
+        initialAgeYears: 5,
+      },
+      {
+        assetId: "scenario-108-wind",
+        fuel: "Wind",
+        peakW: 320070000,
+        initialAgeYears: 8,
+      },
+      {
+        assetId: "scenario-108-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 263160000,
         initialAgeYears: 12,
       },
-      { fuel: "Uranium", peakW: 71170000, initialAgeYears: 30 },
+      {
+        assetId: "scenario-108-uranium",
+        fuel: "Uranium",
+        peakW: 71170000,
+        initialAgeYears: 30,
+      },
       // 1% of national storage power, represented as a four-hour equivalent.
-      { name: "Battery", peakWh: 134240000, initialAgeYears: 3 },
+      {
+        assetId: "scenario-108-battery",
+        name: "Battery",
+        peakWh: 134240000,
+        initialAgeYears: 3,
+      },
     ],
     endTitle: "The heat finally breaks",
     endMessage:
@@ -1424,21 +1587,38 @@ export const SCENARIOS: ScenarioType[] = [
     },
     facilities: [
       {
+        assetId: "scenario-110-grand-nuclear-unit",
         fuel: "Uranium",
         peakW: 500000000,
         initialAgeYears: 22,
         label: "Grand Nuclear Unit",
       },
-      { fuel: "Wind", peakW: 250000000, initialAgeYears: 6 },
-      { fuel: "Sun", peakW: 200000000, initialAgeYears: 5 },
+      {
+        assetId: "scenario-110-wind",
+        fuel: "Wind",
+        peakW: 250000000,
+        initialAgeYears: 6,
+      },
+      {
+        assetId: "scenario-110-sun",
+        fuel: "Sun",
+        peakW: 200000000,
+        initialAgeYears: 5,
+      },
       // France keeps its few gas turbines as reserve
       {
+        assetId: "scenario-110-natural-gas-peaker",
         name: "Natural Gas Peaker",
         fuel: "Natural Gas",
         peakW: 50000000,
         initialAgeYears: 15,
       },
-      { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
+      {
+        assetId: "scenario-110-battery",
+        name: "Battery",
+        peakWh: 200000000,
+        initialAgeYears: 3,
+      },
     ],
     endTitle: "After the shutdown",
     endMessage:
@@ -1485,17 +1665,48 @@ export const SCENARIOS: ScenarioType[] = [
     facilities: [
       // LADWP's in-basin gas stations were largely repowered as combined cycles
       {
+        assetId: "scenario-111-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 24240000,
         initialAgeYears: 18,
       },
-      { fuel: "Sun", peakW: 17000000, initialAgeYears: 6 },
-      { fuel: "Uranium", peakW: 12120000, initialAgeYears: 30 },
-      { fuel: "Wind", peakW: 10500000, initialAgeYears: 8 },
-      { fuel: "Coal", peakW: 8890000, initialAgeYears: 35 },
-      { fuel: "Geothermal", peakW: 8060000, initialAgeYears: 20 },
-      { name: "Battery", peakWh: 20000000, initialAgeYears: 4 },
+      {
+        assetId: "scenario-111-sun",
+        fuel: "Sun",
+        peakW: 17000000,
+        initialAgeYears: 6,
+      },
+      {
+        assetId: "scenario-111-uranium",
+        fuel: "Uranium",
+        peakW: 12120000,
+        initialAgeYears: 30,
+      },
+      {
+        assetId: "scenario-111-wind",
+        fuel: "Wind",
+        peakW: 10500000,
+        initialAgeYears: 8,
+      },
+      {
+        assetId: "scenario-111-coal",
+        fuel: "Coal",
+        peakW: 8890000,
+        initialAgeYears: 35,
+      },
+      {
+        assetId: "scenario-111-geothermal",
+        fuel: "Geothermal",
+        peakW: 8060000,
+        initialAgeYears: 20,
+      },
+      {
+        assetId: "scenario-111-battery",
+        name: "Battery",
+        peakWh: 20000000,
+        initialAgeYears: 4,
+      },
     ],
     endTitle: "After the firestorm",
     endMessage:
@@ -1558,14 +1769,39 @@ export const SCENARIOS: ScenarioType[] = [
     // PUMPED_HYDRO_SITES_BY_LOCATION has no researched site count for Johannesburg, so the game
     // cannot place the plant, and inventing one from the map is what that table forbids.
     facilities: [
-      { fuel: "Coal", peakW: 385000000, initialAgeYears: 37 },
+      {
+        assetId: "scenario-113-coal",
+        fuel: "Coal",
+        peakW: 385000000,
+        initialAgeYears: 37,
+      },
       // The diesel peakers are the standard Oil facility - fast-start internal combustion
       // engines, so they keep the catalog's icon, fuel price and economics rather than a
       // one-off label that would need its own artwork.
-      { fuel: "Oil", peakW: 24000000, initialAgeYears: 11 },
-      { fuel: "Uranium", peakW: 18600000, initialAgeYears: 34 },
-      { fuel: "Wind", peakW: 20000000, initialAgeYears: 4 },
-      { fuel: "Sun", peakW: 15000000, initialAgeYears: 3 },
+      {
+        assetId: "scenario-113-oil",
+        fuel: "Oil",
+        peakW: 24000000,
+        initialAgeYears: 11,
+      },
+      {
+        assetId: "scenario-113-uranium",
+        fuel: "Uranium",
+        peakW: 18600000,
+        initialAgeYears: 34,
+      },
+      {
+        assetId: "scenario-113-wind",
+        fuel: "Wind",
+        peakW: 20000000,
+        initialAgeYears: 4,
+      },
+      {
+        assetId: "scenario-113-sun",
+        fuel: "Sun",
+        peakW: 15000000,
+        initialAgeYears: 3,
+      },
     ],
     endTitle: "Five years of breakdowns",
     endMessage:
@@ -1658,6 +1894,7 @@ export const SCENARIOS: ScenarioType[] = [
       // the thing that empties it. On the default half-pool the lake cannot survive its first
       // dry season at any load worth playing, and the customers are gone before the rains fail.
       {
+        assetId: "scenario-114-hydro",
         fuel: "Hydro",
         peakW: 435000000,
         hydroSiteId: "kariba-zmb",
@@ -1666,8 +1903,18 @@ export const SCENARIOS: ScenarioType[] = [
       },
       // The emergency diesel is the standard Oil facility, so it keeps the catalog's icon and
       // economics rather than a one-off label that would need its own artwork.
-      { fuel: "Oil", peakW: 16000000, initialAgeYears: 15 },
-      { fuel: "Sun", peakW: 6000000, initialAgeYears: 1 },
+      {
+        assetId: "scenario-114-oil",
+        fuel: "Oil",
+        peakW: 16000000,
+        initialAgeYears: 15,
+      },
+      {
+        assetId: "scenario-114-sun",
+        fuel: "Sun",
+        peakW: 6000000,
+        initialAgeYears: 1,
+      },
     ],
     endTitle: "Two dry years",
     endMessage:
@@ -1726,17 +1973,38 @@ export const SCENARIOS: ScenarioType[] = [
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop
     // and allocated solar that had been built by then.
     facilities: [
-      { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
+      {
+        assetId: "scenario-115-coal",
+        fuel: "Coal",
+        peakW: 300000000,
+        initialAgeYears: 20,
+      },
       // Delhi's gas stations (Pragati, Bawana) are combined cycles
       {
+        assetId: "scenario-115-natural-gas-cc",
         name: "Natural Gas CC",
         fuel: "Natural Gas",
         peakW: 200000000,
         initialAgeYears: 15,
       },
-      { fuel: "Sun", peakW: 50000000, initialAgeYears: 4 },
-      { fuel: "Wind", peakW: 30000000, initialAgeYears: 7 },
-      { name: "Battery", peakWh: 40000000, initialAgeYears: 1 },
+      {
+        assetId: "scenario-115-sun",
+        fuel: "Sun",
+        peakW: 50000000,
+        initialAgeYears: 4,
+      },
+      {
+        assetId: "scenario-115-wind",
+        fuel: "Wind",
+        peakW: 30000000,
+        initialAgeYears: 7,
+      },
+      {
+        assetId: "scenario-115-battery",
+        name: "Battery",
+        peakWh: 40000000,
+        initialAgeYears: 1,
+      },
     ],
     endTitle: "The monsoon finally arrived",
     endMessage:
@@ -1805,6 +2073,7 @@ export const DEFAULT_CUSTOM_SCENARIO: ScenarioType = {
   facilities: [
     // Representative California peaker age at the default 2020 opening (EIA-860).
     {
+      assetId: "scenario-999-natural-gas-peaker",
       name: "Natural Gas Peaker",
       fuel: "Natural Gas",
       peakW: 500000000,

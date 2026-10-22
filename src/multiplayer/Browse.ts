@@ -67,6 +67,7 @@ function validCustom(value: unknown): value is ScenarioType {
   return (
     custom.id === CUSTOM_SCENARIO_ID &&
     custom.mod === undefined &&
+    custom.rules === undefined &&
     typeof custom.name === "string" &&
     Number.isSafeInteger(custom.startingYear) &&
     Number.isSafeInteger(custom.durationMonths) &&

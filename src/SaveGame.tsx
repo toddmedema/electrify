@@ -616,7 +616,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (!validCustomEventScenario(game.customScenario)) return null;
   if (
     game.customScenario?.mod !== undefined &&
-    (!validScenarioMod(game.customScenario.mod) ||
+    (!validScenarioMod(game.customScenario.mod, game.customScenario) ||
+      game.customScenario.mod.parameters.difficulty !== game.difficulty ||
+      game.customScenario.mod.parameters.seed !== game.seed ||
       game.scenarioId !== 999 ||
       game.customScenario.id !== 999)
   )
