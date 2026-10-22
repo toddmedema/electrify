@@ -1962,6 +1962,12 @@ $pane_header_height: 48px;
   align-items: center;
 }
 
+.loadingPlants {
+  display: block;
+  width: min(90vw, 600px);
+  height: auto;
+}
+
 .base_main {
   position: absolute;
   width: 100%;

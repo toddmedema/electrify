@@ -1,12 +1,7 @@
 import * as React from "react";
-import {
-  Button,
-  CircularProgress,
-  Stack,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Button, Stack, Typography, useTheme } from "@mui/material";
 import { GameType } from "../../Types";
+import PowerPlantLoading from "../base/PowerPlantLoading";
 
 export interface StateProps {
   game: GameType;
@@ -60,7 +55,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
 
   public render() {
     return (
-      <div className="flex-fully-centered">
+      <div className="loadingScreen flex-fully-centered">
         <div id="logo" className="fadein-slow">
           <LoadingLogo />
         </div>
@@ -82,7 +77,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
           </Stack>
         ) : (
           <Stack spacing={2} sx={{ alignItems: "center" }}>
-            <CircularProgress className="fadein-fast" size={60} />
+            <PowerPlantLoading />
             <Typography role="status">{this.state.progress}</Typography>
           </Stack>
         )}
