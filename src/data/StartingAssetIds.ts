@@ -1,4 +1,4 @@
-/** Stable IDs of bundled original assets. Scenarios.test pins parity with authored fleets. */
+/** Stable IDs of bundled original assets. ScenarioRules.test pins parity with authored fleets. */
 export const STARTING_ASSET_IDS: Readonly<Record<number, readonly string[]>> = {
   "0": ["scenario-0-coal", "scenario-0-sun"],
   "1": ["scenario-1-coal"],
@@ -41,10 +41,7 @@ export const STARTING_ASSET_IDS: Readonly<Record<number, readonly string[]>> = {
   "111": [
     "scenario-111-natural-gas-cc",
     "scenario-111-sun",
-    "scenario-111-uranium",
     "scenario-111-wind",
-    "scenario-111-coal",
-    "scenario-111-geothermal",
     "scenario-111-battery",
   ],
   "112": ["scenario-112-sun", "scenario-112-natural-gas-peaker"],

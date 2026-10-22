@@ -39,9 +39,16 @@ const compile = (
   imports = arcs,
 ) => compileOfficialArcChoices(parameters(patch), imports);
 
-test("all official transactions, due dates, outcome messages and phased schedules match the independent pre-conversion reducer capture", () => {
+test("compatible official choices match the independent pre-conversion reducer capture without rewriting retired wildfire facts", () => {
   expect(reference.cases).toHaveLength(30);
-  for (const expected of reference.cases) {
+  const compatible = reference.cases.filter(
+    (entry) => entry.scenarioId === 106 || entry.scenarioId === 107,
+  );
+  expect(compatible).toHaveLength(20);
+  expect(
+    reference.cases.filter((entry) => entry.scenarioId === 111),
+  ).toHaveLength(10);
+  for (const expected of compatible) {
     const scenario = source(expected.scenarioId);
     const [choice] = compile(
       {
@@ -81,7 +88,7 @@ test("all official transactions, due dates, outcome messages and phased schedule
   }
 });
 
-test("all three choices adapt complete difficulty values into detached data with exact preparation offsets", () => {
+test("both current choices adapt complete difficulty values into detached data with exact preparation offsets", () => {
   for (const difficulty of DIFFICULTY_IDS) {
     const choices = compile({ difficulty });
     expect(
@@ -89,12 +96,10 @@ test("all three choices adapt complete difficulty values into detached data with
     ).toEqual([
       [106, 48],
       [107, 36],
-      [111, 35],
     ]);
     expect(choices.map((choice) => choice.key)).toEqual([
       "mod:choice-import:arc:106:choice:connection",
       "mod:choice-import:arc:107:choice:winterization",
-      "mod:choice-import:arc:111:choice:preparedness",
     ]);
     expect(JSON.parse(JSON.stringify(choices))).toEqual(choices);
     expect(choices.every(validOfficialArcChoiceMetadata)).toBe(true);
@@ -111,6 +116,29 @@ test("all three choices adapt complete difficulty values into detached data with
         .every((option) => !/\{(?:cost|grant)\}/.test(option.description)),
     ).toBe(true);
   }
+});
+
+test("the current wildfire arc imports no choice and exposes no retired preparedness reference", () => {
+  expect(compile({}, [{ scenarioId: 111, includeChoices: true }])).toEqual([]);
+  const wildfire = source(111);
+  expect(
+    compile(
+      {
+        namespace: {
+          kind: "official",
+          scenarioId: 111,
+          arcId: "catalog",
+        },
+        startingYear: wildfire.startingYear,
+        durationMonths: wildfire.durationMonths,
+        receivingScenario: wildfire,
+      },
+      [{ scenarioId: 111, includeChoices: true }],
+    ),
+  ).toEqual([]);
+  expect(
+    officialArcChoiceReferences().some((entry) => entry.scenarioId === 111),
+  ).toBe(false);
 });
 
 test("connection budgets and both permanent loads scale with the receiving grid and era, and labels describe the actual relocated schedules", () => {
@@ -154,36 +182,26 @@ test("connection budgets and both permanent loads scale with the receiving grid 
   expect(officialArcLoadScale(original, receiving)).toBe(2);
 });
 
-test("freeze and wildfire protection prices scale once, preserving the exact free and consequential responses", () => {
-  for (const id of [107, 111]) {
-    const original = source(id);
-    const receiving = {
-      ...original,
-      id: 999,
-      startingYear: original.startingYear + 10,
-      startingCustomers: original.startingCustomers! * 3,
-    };
-    const [choice] = compile(
-      { receivingScenario: receiving, startingYear: receiving.startingYear },
-      [{ scenarioId: id, includeChoices: true }],
-    );
-    const paid = choice.options.find((option) => option.cost > 0)!;
-    expect(paid.cost).toBe(
-      officialArcMoneyAmount(
-        id === 107 ? 90000000 : 2000000,
-        original,
-        receiving,
-      ),
-    );
-    expect(choice.freeOptionId).toBe("standard");
-    expect(
-      choice.options.find((option) => option.id === "standard"),
-    ).toMatchObject({ cost: 0, grant: 0, meaningful: false });
-    expect(paid.message).toContain(
-      id === 107 ? "February 2031" : "January–February",
-    );
-    expect(paid.message).not.toContain("2021");
-  }
+test("freeze protection prices scale once, preserving the exact free and consequential responses", () => {
+  const original = source(107);
+  const receiving = {
+    ...original,
+    id: 999,
+    startingYear: original.startingYear + 10,
+    startingCustomers: original.startingCustomers! * 3,
+  };
+  const [choice] = compile(
+    { receivingScenario: receiving, startingYear: receiving.startingYear },
+    [{ scenarioId: 107, includeChoices: true }],
+  );
+  const paid = choice.options.find((option) => option.cost > 0)!;
+  expect(paid.cost).toBe(officialArcMoneyAmount(90000000, original, receiving));
+  expect(choice.freeOptionId).toBe("standard");
+  expect(
+    choice.options.find((option) => option.id === "standard"),
+  ).toMatchObject({ cost: 0, grant: 0, meaningful: false });
+  expect(paid.message).toContain("February 2031");
+  expect(paid.message).not.toContain("2021");
 });
 
 test("includeChoices false compiles an automatic free response without dropping the choice or its consequences", () => {
@@ -195,7 +213,6 @@ test("includeChoices false compiles an automatic free response without dropping 
     choices.map((choice) => [choice.automatic, choice.freeOptionId]),
   ).toEqual([
     [true, "fast-track"],
-    [true, "standard"],
     [true, "standard"],
   ]);
   expect(
@@ -210,9 +227,21 @@ test("includeChoices false compiles an automatic free response without dropping 
 test("all relocated choices and every possible replacement load are diagnosed outside the term", () => {
   const diagnostics: RuleDiagnostic[] = [];
   compile({ durationMonths: 30, diagnostics });
-  expect(
-    diagnostics.filter((diagnostic) => diagnostic.code === "outside-term"),
-  ).toHaveLength(5);
+  const outsideTerm = diagnostics.filter(
+    (diagnostic) => diagnostic.code === "outside-term",
+  );
+  expect(outsideTerm.map((diagnostic) => diagnostic.path)).toEqual([
+    "rules.officialArcs[106].choices.connection.dueMonth",
+    "rules.officialArcs[106].choices.connection.replaceLoad.manassas-data-centers-phase-one.startMonth",
+    "rules.officialArcs[106].choices.connection.replaceLoad.manassas-data-centers-phase-two.startMonth",
+    "rules.officialArcs[107].choices.winterization.dueMonth",
+  ]);
+  expect(outsideTerm.map((diagnostic) => diagnostic.message)).toEqual([
+    expect.stringContaining("requires month 49"),
+    expect.stringContaining("requires month 73"),
+    expect.stringContaining("requires month 97"),
+    expect.stringContaining("requires month 37"),
+  ]);
   expect(
     diagnostics.every(
       (diagnostic) =>

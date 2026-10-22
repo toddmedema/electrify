@@ -1,5 +1,6 @@
 import { SCENARIO_CHOICE_RULES } from "../data/ScenarioChoiceRules";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
+import { SCENARIOS } from "../data/Scenarios";
 import reducer from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import {
@@ -69,7 +70,8 @@ test.each([null, "prepare", {}, { decisionId: 1, optionId: "yes" }])(
 );
 
 test("generic reducer accepts another scenario's authored option without wildfire wiring", () => {
-  const game = createGame({ scenarioId: 101 });
+  const scenarioIndex = SCENARIOS.findIndex((scenario) => scenario.id === 101);
+  const originalScenario = SCENARIOS[scenarioIndex];
   const definition: ScenarioChoiceType = {
     id: "story:101:test-policy:test-other-scenario",
     scenarioId: 101,
@@ -108,6 +110,11 @@ test("generic reducer accepts another scenario's authored option without wildfir
     },
   });
   try {
+    // Compiled catalog rules bind at launch. Isolate the temporary authored
+    // definition from earlier games and leave their cached snapshots intact.
+    SCENARIOS[scenarioIndex] = { ...originalScenario };
+    const game = createGame({ scenarioId: 101 });
+    expect(pendingScenarioChoice(game)?.id).toBe(definition.id);
     expect(
       reducer(
         game,
@@ -129,6 +136,7 @@ test("generic reducer accepts another scenario's authored option without wildfir
     expect(pendingScenarioChoice(chosen)).toBeUndefined();
     expect(chosen.replayLog?.at(-1)?.type).toBe("chooseScenarioResponse");
   } finally {
+    SCENARIOS[scenarioIndex] = originalScenario;
     SCENARIO_CHOICES.pop();
     SCENARIO_CHOICE_RULES.pop();
   }

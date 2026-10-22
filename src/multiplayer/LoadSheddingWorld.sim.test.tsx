@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import cloneDeep from "lodash.clonedeep";
+import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 import { TICKS_PER_MONTH } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { getScenario } from "../data/Scenarios";
@@ -140,6 +141,12 @@ export function loadSheddingWorldEvidence(
 ) {
   const { rules: _initialRules, ...initial } = result.initial;
   const { rules: _finalRules, ...world } = result.world;
+  expect(SAVE_SCHEMA_VERSION).toBe(6);
+  expect(initial.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  expect(world.gameSchema).toBe(SAVE_SCHEMA_VERSION);
+  // The source capture used native save schema3. Keep every other World field.
+  initial.gameSchema = 3;
+  world.gameSchema = 3;
   return canonical({
     initialWorldHash: digest(initial),
     finalWorldHash: digest(world),

@@ -20,6 +20,7 @@ import * as User from "./User";
 import * as Globals from "../Globals";
 import { serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
+import { EMPTY_HISTORY } from "../helpers/DateTime";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -363,27 +364,40 @@ describe("ending a scenario from inside the reducer", () => {
 describe("scenario reliability windows", () => {
   it("requires every month in a multi-month event to meet the target", () => {
     const heatwave = SCENARIOS.find((scenario) => scenario.id === 108)!;
-    const failedAugust = [
-      {
-        year: 2026,
-        month: 8,
-        demandWh: 100,
-        supplyWh: 99,
-      } as MonthlyHistoryType,
-    ];
+    const suppliedWindow = [8, 7, 6].map((month) => ({
+      ...EMPTY_HISTORY,
+      year: 2026,
+      month,
+      demandWh: 100,
+      supplyWh: 100,
+    }));
+    const failedAugust = suppliedWindow.map((month) =>
+      month.month === 8 ? { ...month, supplyWh: 99 } : month,
+    );
     expect(scenarioObjectiveFailure(heatwave, failedAugust)).toMatch(
-      /2026 heatwave and drought/,
+      /You served 99\.00%.*2026 heatwave and drought.*99\.5%/,
     );
 
     const afterWindow = [
       {
+        ...EMPTY_HISTORY,
         year: 2026,
         month: 9,
         demandWh: 100,
         supplyWh: 99,
-      } as MonthlyHistoryType,
+      },
     ];
-    expect(scenarioObjectiveFailure(heatwave, afterWindow)).toBeUndefined();
+    expect(scenarioObjectiveFailure(heatwave, afterWindow)).toMatch(
+      /unverifiable.*each of its 3 months/,
+    );
+    const complete = [...afterWindow, ...suppliedWindow];
+    expect(scenarioObjectiveFailure(heatwave, complete)).toBeUndefined();
+    expect(
+      scenarioObjectiveFailure(heatwave, suppliedWindow.slice(0, 2)),
+    ).toMatch(/unverifiable/);
+    expect(
+      scenarioObjectiveFailure(heatwave, [...complete, suppliedWindow[0]]),
+    ).toMatch(/unverifiable/);
   });
 });
 

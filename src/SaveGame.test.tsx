@@ -7,6 +7,7 @@ import gameReducer, {
 import { isResumedGame, parseSave, serializeSave } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
+import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 
 jest.mock("./AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -456,21 +457,28 @@ describe("SaveGame", () => {
   });
 
   it("persists and validates scenario demand calibration state", () => {
-    const configured: GameType = {
-      ...game,
-      startingDemandScale: 7.5,
-      loadAdditions: [
-        {
-          id: "fixture",
-          label: "Fixture load",
-          startsYear: 2026,
-          startsMonth: 4,
-          peakW: 100_000_000,
-          loadFactor: 0.9,
-          demandType: "Data Centers",
-        },
-      ],
-    };
+    const loadAdditions: GameType["loadAdditions"] = [
+      {
+        id: "fixture",
+        label: "Fixture load",
+        startsYear: 2026,
+        startsMonth: 4,
+        peakW: 100_000_000,
+        loadFactor: 0.9,
+        demandType: "Data Centers",
+      },
+    ];
+    const configured = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: game.location.id,
+        location: game.location,
+        startingDemandScale: 7.5,
+        loadAdditions,
+      },
+      seed: OPTIONS.seed,
+    });
     expect(parseSave(serializeSave(configured))!.game).toMatchObject({
       startingDemandScale: 7.5,
       loadAdditions: configured.loadAdditions,

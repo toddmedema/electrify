@@ -243,6 +243,7 @@
       "!src/helpers/CustomGameForecastClient.ts",
       "!src/helpers/DataCenterSetupClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
+      "!src/helpers/ScenarioStartingPeakClient.ts",
       "!src/components/base/ProjectionWorkerClient.ts",
       "!src/components/base/OutlookWorkerClient.ts",
       "!src/multiplayer/WorkerClient.ts",

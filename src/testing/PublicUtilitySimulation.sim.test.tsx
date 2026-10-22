@@ -276,13 +276,33 @@ describe("researched public-utility scenarios", () => {
   it("enforces Data Center Boom's customer-retention boundary independently of outage timing", () => {
     const required =
       manassas.startingCustomers! * manassas.minimumCustomerRetention!;
-    const history = [{ ...EMPTY_HISTORY, customers: required }];
+    const history = Array.from(
+      { length: manassas.durationMonths },
+      (_, month) => ({
+        ...EMPTY_HISTORY,
+        year: manassas.startingYear + Math.floor(month / 12),
+        month: (month % 12) + 1,
+        demandWh: 100,
+        supplyWh: 100,
+        customers: required,
+      }),
+    ).reverse();
+    expect(history).toHaveLength(manassas.durationMonths);
+    expect(history[0]).toMatchObject({
+      year:
+        manassas.startingYear + Math.floor((manassas.durationMonths - 1) / 12),
+      month: ((manassas.durationMonths - 1) % 12) + 1,
+    });
     expect(scenarioObjectiveFailure(manassas, history)).toBeUndefined();
     expect(
       scenarioObjectiveFailure(manassas, [
         { ...history[0], customers: required - 1 },
+        ...history.slice(1),
       ]),
     ).toContain("Customer attrition");
+    expect(scenarioObjectiveFailure(manassas, history.slice(1))).toMatch(
+      /exactly one completed record/i,
+    );
   });
 
   it.each(difficulties)(

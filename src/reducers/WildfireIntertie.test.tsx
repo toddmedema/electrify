@@ -130,13 +130,14 @@ test("composes route restrictions and rejects corrupt saved capacity limits", ()
         },
       }),
     ).toBe(false);
-  const game = atMonth(36);
-  game.worldEvents.active.push({
+  const game = createGame({ scenarioId: 111, seed: 12345 });
+  const active = {
     ...event,
     startsMinute: game.date.minute,
     endsMinute: game.date.minute + MINUTES_PER_MONTH,
-  });
-  game.worldEvents.occurrences = cloneDeep(game.worldEvents.active);
+  };
+  game.worldEvents.active.push(active);
+  game.worldEvents.occurrences.push(cloneDeep(active));
   const restored = parseSave(serializeSave(game))!;
   expect(restored).not.toBeNull();
   expect(restored.game.worldEvents.active).toEqual(game.worldEvents.active);

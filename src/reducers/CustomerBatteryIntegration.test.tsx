@@ -1,6 +1,7 @@
 import cloneDeep from "lodash.clonedeep";
 import { GAME_TO_REAL_YEARS, TICK_MINUTES, TICKS_PER_HOUR } from "../Constants";
 import { CUSTOMER_BATTERIES } from "../data/CustomerBatteries";
+import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { customerBatteryFleet } from "../helpers/CustomerBatteries";
 import {
   getDateFromMinute,
@@ -21,7 +22,13 @@ import { isStorage } from "../Types";
 import { generateNewTimeline, tickState } from "./Game";
 
 function fixture(minute = MINUTES_PER_MONTH + 12 * 60, scenarioId = 100) {
-  const game = createGame({ scenarioId, seed: 44 });
+  const game = createGame({
+    scenarioId,
+    ...(scenarioId === CUSTOM_SCENARIO_ID
+      ? { scenario: DEFAULT_CUSTOM_SCENARIO }
+      : {}),
+    seed: 44,
+  });
   game.date = getDateFromMinute(minute, game.startingYear);
   game.monthlyHistory = Array.from({ length: game.date.monthsElapsed }, () =>
     summarizeTimeline(game.timeline, game.startingYear),
@@ -157,7 +164,11 @@ test("an isolated later forecast starts with the preceding tick's actual stored 
 });
 
 test("Off retains battery energy across an actual month rollover and save/load", () => {
-  const game = fixture(2 * MINUTES_PER_MONTH - 2 * TICK_MINUTES);
+  const game = fixture(
+    2 * MINUTES_PER_MONTH - 2 * TICK_MINUTES,
+    CUSTOM_SCENARIO_ID,
+  );
+  expect(game.scenarioId).toBe(CUSTOM_SCENARIO_ID);
   game.policies!.programs.battery.tier = "Off";
   const energy = fleet(game).capacityWh * 0.4;
   game.timeline[0].customerBatteryWh = energy;

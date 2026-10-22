@@ -664,7 +664,7 @@ test("publishing rejects missing, stale, unsafe or oversized generated Rules bef
         creates++;
         return { id: "456", agreement: false };
       },
-      publish: async (_id, _pack, _stage, options) => {
+      publish: async (_id, _pack, _stage, _options) => {
         uploads++;
         return { id: "456", agreement: false };
       },

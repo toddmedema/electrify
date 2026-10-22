@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import VictoryConditions from "./VictoryConditions";
-import { SCENARIOS } from "../../data/Scenarios";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
 import { modScenario } from "../../mods/ModScenario";
 import { objectiveDefinition } from "../../helpers/ScenarioObjectives";
 
@@ -12,6 +12,7 @@ it.each(["Public", "Investor"] as const)(
       <VictoryConditions
         scenario={{
           ...SCENARIOS.find((scenario) => scenario.id === 100)!,
+          id: CUSTOM_SCENARIO_ID,
           ownership,
           durationMonths: 72,
           startingYear: 2020,

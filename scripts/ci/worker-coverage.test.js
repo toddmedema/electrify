@@ -42,4 +42,6 @@ test("Jest coverage excludes webpack-only worker constructors while retaining th
       `${file} cannot be instrumented by CommonJS Jest`,
     );
   assert.equal(covered("src/components/base/useOutlookWorker.ts"), true);
+  assert.equal(covered("src/helpers/ScenarioStartingPeak.ts"), true);
+  assert.equal(covered("src/helpers/ScenarioStartingPeakCalculation.ts"), true);
 });

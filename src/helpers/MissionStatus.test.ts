@@ -1,6 +1,11 @@
 import { createNextState as produce } from "@reduxjs/toolkit";
 import { createGame } from "../testing/Simulator";
-import { SCENARIOS, TUTORIALS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import {
+  SCENARIOS,
+  TUTORIALS,
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+} from "../data/Scenarios";
 import { GameType, MonthlyHistoryType } from "../Types";
 import {
   EMPTY_HISTORY,
@@ -526,7 +531,11 @@ test.each([
       draft.customScenario =
         duration === undefined
           ? undefined
-          : { ...wildfire, durationMonths: duration };
+          : {
+              ...DEFAULT_CUSTOM_SCENARIO,
+              startingYear: draft.startingYear,
+              durationMonths: duration,
+            };
     });
     const generate = jest
       .spyOn(GameModule, "generateNewTimeline")

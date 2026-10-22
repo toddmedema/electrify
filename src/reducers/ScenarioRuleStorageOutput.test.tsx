@@ -133,8 +133,7 @@ test.each([1, 0.5, 0])(
     const battery = originalBattery(game);
     const tick = currentTick(game)!;
     const limitedPeakW = battery.peakW * multiplier;
-    expect(tick.demandW).toBeGreaterThan(0);
-    if (multiplier === 0.5) expect(tick.demandW).toBeGreaterThan(limitedPeakW);
+    expect(tick.demandW).toBeGreaterThan(battery.peakW / 2);
     expect(battery.currentW).toBeCloseTo(
       Math.min(tick.demandW, limitedPeakW),
       5,
