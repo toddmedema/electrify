@@ -9,6 +9,7 @@ import { MOD_API_VERSION, ModPackage } from "../../mods/ModSchema";
 import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DesktopBridge } from "../../Desktop";
 import { launchCustomScenario } from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
 
 Object.assign(global, { TextEncoder });
 jest.mock("./StartGame", () => ({
@@ -69,16 +70,23 @@ function setup(
   } as unknown as DesktopBridge;
   const store = configureStore({
     reducer: {
-      ui: () => ({ coop: undefined, previewDifficulty: undefined }),
+      ui: uiReducer,
       game: () => ({ difficulty: "VP" }),
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: {
+          ignoredActions: ["ui/snackbarOpen"],
+          ignoredPaths: ["ui.snackbar.action"],
+        },
+      }),
   });
   render(
     <Provider store={store}>
       <Mods />
     </Provider>,
   );
-  return { requests, mods };
+  return { requests, mods, store };
 }
 
 afterEach(() => {
@@ -97,6 +105,39 @@ test("modifiers read as player-facing changes with program names", () => {
   ).toBe(
     "Solar build cost −20% · Solar build time +50% · Efficiency rebates cost −50%",
   );
+});
+
+test("an empty library keeps installation actions together with Workshop first", async () => {
+  setup([], undefined, true);
+  const installed = await screen.findByRole("region", {
+    name: "Installed Mods",
+  });
+  expect(
+    await within(installed).findByText("Install your first mod below"),
+  ).toBeVisible();
+  const buttons = within(installed).getAllByRole("button");
+  expect(buttons.map((button) => button.textContent)).toEqual([
+    "Browse Workshop",
+    "Import mod",
+  ]);
+  expect(buttons[0]).toHaveClass("MuiButton-contained");
+  expect(buttons[1]).toHaveClass("MuiButton-outlined");
+  expect(screen.queryByText("Add by Workshop item ID")).toBeNull();
+});
+
+test("saving a template uses the shared toast without inserting a body message", async () => {
+  const message = "Template saved. Edit it, then choose Import mod.";
+  const { store } = setup([], (input, entries) => ({
+    entries,
+    ...(input.kind === "template" ? { message } : {}),
+  }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Save authoring template" }),
+  );
+  await waitFor(() =>
+    expect(store.getState().ui.snackbar).toMatchObject({ open: true, message }),
+  );
+  expect(screen.queryByText(message)).toBeNull();
 });
 
 test("entries show creator, version and source, and incompatible mods explain why", async () => {
@@ -129,9 +170,9 @@ test("entries show creator, version and source, and incompatible mods explain wh
   expect(screen.getByLabelText("Shared Grid enabled")).toBeEnabled();
 });
 
-test("removing asks first, keeps errors in the dialog, and moves focus to the next mod", async () => {
+test("removing asks first, toasts errors without closing the dialog, and focuses the next mod", async () => {
   let fail = true;
-  setup(
+  const { store } = setup(
     [local(), local({ id: "second", title: "Second Grid" })],
     (input, entries) => {
       if (input.kind !== "remove") return { entries };
@@ -156,17 +197,47 @@ test("removing asks first, keeps errors in the dialog, and moves focus to the ne
   ).toBeInTheDocument();
   await waitFor(() => expect(screen.getByText("Cancel")).toHaveFocus());
   await userEvent.click(within(screen.getByRole("dialog")).getByText("Remove"));
-  expect(
-    await screen.findByText("The mod library is busy."),
-  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(store.getState().ui.snackbar.message).toBe(
+      "The mod library is busy.",
+    ),
+  );
+  expect(screen.queryByText("The mod library is busy.")).toBeNull();
+  expect(screen.getByRole("dialog")).toBeVisible();
   await userEvent.click(within(screen.getByRole("dialog")).getByText("Remove"));
-  expect(
-    await screen.findByText("Removed Community Grid."),
-  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(store.getState().ui.snackbar.message).toBe(
+      "Removed Community Grid.",
+    ),
+  );
   await waitFor(() =>
     expect(screen.getByLabelText("Play Second Grid")).toHaveFocus(),
   );
 });
+
+test.each([false, true])(
+  "removing the last mod focuses an available install action when Steam online is %s",
+  async (online) => {
+    setup(
+      [local()],
+      (input, entries) => ({ entries: input.kind === "remove" ? [] : entries }),
+      online,
+    );
+    await userEvent.click(
+      await screen.findByLabelText("Remove Community Grid"),
+    );
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByText("Remove"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: online ? "Browse Workshop" : "Import mod",
+        }),
+      ).toHaveFocus(),
+    );
+  },
+);
 
 test("Play asks for a difficulty and launches through the shared custom launcher", async () => {
   setup([local()]);
@@ -188,7 +259,7 @@ test("Play asks for a difficulty and launches through the shared custom launcher
 
 test("publishing stays open while uploading and offers the Steam page afterwards", async () => {
   let finish: (value: ModLibrary) => void = () => {};
-  const { requests } = setup(
+  const { requests, store } = setup(
     [local()],
     (input, entries) => {
       if (input.kind === "publish")
@@ -215,12 +286,15 @@ test("publishing stays open while uploading and offers the Steam page afterwards
       published: { workshopId: "456", agreement: true },
     }),
   );
-  expect(
-    await screen.findByText(
+  expect(store.getState().ui.snackbar).toMatchObject({
+    open: true,
+    message:
       "Uploaded, but hidden until you accept the Steam Workshop agreement.",
-    ),
-  ).toBeInTheDocument();
-  await userEvent.click(screen.getByText("Open on Steam"));
+    actionLabel: "Open on Steam",
+  });
+  act(() =>
+    store.getState().ui.snackbar.action?.({} as React.MouseEvent<HTMLElement>),
+  );
   await waitFor(() =>
     expect(requests).toContainEqual({ kind: "browse", workshopId: "456" }),
   );
@@ -230,7 +304,7 @@ test("publishing stays open while uploading and offers the Steam page afterwards
 });
 
 test("opening with Steam running refreshes downloads quietly", async () => {
-  const { requests } = setup(
+  const { requests, store } = setup(
     [],
     (input, entries) =>
       input.kind === "refresh"
@@ -245,18 +319,17 @@ test("opening with Steam running refreshes downloads quietly", async () => {
   );
   expect(await screen.findByText("Shared Grid")).toBeInTheDocument();
   expect(requests.map((r) => r.kind)).toEqual(["list", "refresh"]);
-  expect(screen.getByText("Installed 1 mod.")).toBeInTheDocument();
-  expect(
-    screen.getByText(
-      "Skipped Workshop item 123: not a data-only scenario package.",
-    ),
-  ).toBeInTheDocument();
+  expect(store.getState().ui.snackbar).toMatchObject({
+    open: true,
+    message:
+      "Skipped Workshop item 123: not a data-only scenario package. Installed 1 mod.",
+  });
   await userEvent.click(screen.getByText("Browse Workshop"));
   expect(requests).toContainEqual({ kind: "browse" });
 });
 
 test("an unreadable library can be reset from the screen", async () => {
-  const { requests } = setup([], (input) =>
+  const { requests, store } = setup([], (input) =>
     input.kind === "reset"
       ? { entries: [], message: "Mod library reset." }
       : {
@@ -265,10 +338,18 @@ test("an unreadable library can be reset from the screen", async () => {
           error: "Your mod library couldn't be read.",
         },
   );
-  expect(
-    await screen.findByText("Your mod library couldn't be read."),
-  ).toBeInTheDocument();
-  await userEvent.click(screen.getByText("Reset mod library"));
-  expect(await screen.findByText("Mod library reset.")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(store.getState().ui.snackbar).toMatchObject({
+      open: true,
+      message: "Your mod library couldn't be read.",
+      actionLabel: "Reset mod library",
+    }),
+  );
+  act(() =>
+    store.getState().ui.snackbar.action?.({} as React.MouseEvent<HTMLElement>),
+  );
+  await waitFor(() =>
+    expect(store.getState().ui.snackbar.message).toBe("Mod library reset."),
+  );
   expect(requests.map((r) => r.kind)).toEqual(["list", "reset"]);
 });

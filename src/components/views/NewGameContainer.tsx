@@ -49,9 +49,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         );
       }
     },
-    onManual: () => {
-      dispatch(navigate("MANUAL"));
-    },
     onTutorial: (scenarioId: number) => {
       if (coop()) return;
       void runSaveTransition(() => startTutorial(dispatch, scenarioId));

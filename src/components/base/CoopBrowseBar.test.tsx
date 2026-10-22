@@ -129,7 +129,6 @@ test("choosing together drops the lessons and the personal recommendations", () 
       onBack={jest.fn()}
       onCustomGame={jest.fn()}
       onDetails={jest.fn()}
-      onManual={jest.fn()}
       onTutorial={jest.fn()}
     />,
   );

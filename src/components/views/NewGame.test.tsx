@@ -9,7 +9,6 @@ function props(overrides: Partial<Props> = {}): Props {
     onBack: jest.fn(),
     onCustomGame: jest.fn(),
     onDetails: jest.fn(),
-    onManual: jest.fn(),
     onTutorial: jest.fn(),
     ...overrides,
   };

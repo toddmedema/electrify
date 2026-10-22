@@ -479,3 +479,40 @@ The long seeded scenario economics files, golden outputs, all-scenario and CEO l
 | src/workers/Projection.worker.test.ts                      | Retain             | Retain same-run initialization/cache reuse, city/watershed/seed invalidation and selective failed-load retries.                                                                                                               |
 
 | src/testing/**snapshots**/GoldenOutputs.sim.test.tsx.snap | Retain unchanged | Reviewed protected absolute scenario-output baselines; no rebaseline. |
+
+## Performance follow-up: October 21, 2026
+
+The timing inventory and focused runs pointed to repeated forecast work in Insights. Layer,
+preset and viewport controls now reuse a frozen real game and its frozen real projection,
+with simulation data reset before each case. Cache-invalidation regressions keep independent
+games. The overlapping unsaved/saved preset journeys share their editing setup while retaining
+both remounts and restore behavior, and now verify the displayed layer order. An icon-component
+assertion was replaced with the enabled, named control it represented.
+
+Projection tests inspect the real generator's arguments and a detached copy of its enumerable
+output, avoiding four duplicate twenty-year simulations. Copying before returning preserves
+detection of downstream mutations; omitting hidden metadata matches the original equality.
+
+Paired local runs on Node 24.14.0 used `test:ci -- --runInBand --runTestsByPath` with the two
+files below and coverage enabled. These are single-run timings, not runtime ceilings or an
+estimate of whole-suite savings.
+
+| Suite | Before | After |
+| --- | ---: | ---: |
+| `src/components/views/Insights.test.tsx` | 27.456 s | 23.058 s |
+| `src/helpers/Projection.test.ts` | 6.113 s | 5.833 s |
+| Combined suite time | 33.569 s | 28.891 s (14% lower) |
+
+All 42 retained cases passed, compared with 43 before consolidation. The focused coverage
+runs do not meet repository-wide coverage thresholds on their own. Valid forecast cases passed;
+temporary wrong-input and in-place-output mutations both failed at the intended assertions.
+The merged preset journey and a viewport case also passed individually. A subagent review
+identified output aliasing and mutable simulation-data leakage; both were corrected before
+integrated validation.
+
+All fourteen `npm run check:ci` gates passed, including repository-wide coverage thresholds,
+long simulations, tick performance, production builds, browser layouts and multiplayer.
+
+Weather validation was already below one second locally. The data-center calibration matrix,
+simulation seed/difficulty matrices, golden outputs and import/replay safety checks remain:
+their distinct domain coverage does not justify further trimming in this pass.

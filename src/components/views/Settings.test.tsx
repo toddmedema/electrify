@@ -36,7 +36,6 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onManageSaves: () => undefined,
-    onManageMods: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
@@ -120,7 +119,7 @@ describe("Settings", () => {
     expect(localStorage.getItem("steamTimelineEnabled")).toBe("true");
     expect(screen.getByRole("switch", { name: /^Sound$/ })).not.toBeChecked();
   });
-  it("offers mod management only when the desktop bridge supports it", async () => {
+  it("keeps mod management and quitting out of Settings even with a desktop bridge", async () => {
     const state = {
       display: { fullscreen: true, width: 1, height: 1, resolutions: [] },
       steam: { available: false, online: false, cloudEnabled: false },
@@ -129,19 +128,15 @@ describe("Settings", () => {
       apiVersion: 1,
       getState: jest.fn(async () => state),
       onStateChanged: jest.fn(() => () => {}),
+      mods: jest.fn(async () => ({ entries: [] })),
+      quit: jest.fn(),
     } as unknown as DesktopBridge;
-    const { unmount } = renderSettings();
+    renderSettings();
+    await screen.findByRole("switch", { name: "Controller vibration" });
     expect(screen.queryByText("Manage mods")).toBeNull();
-    unmount();
-    window.electrifyDesktop = {
-      ...window.electrifyDesktop,
-      mods: jest.fn(async () => ({ entries: [{}, {}, {}] })),
-    } as unknown as DesktopBridge;
-    const onManageMods = jest.fn();
-    renderSettings({ onManageMods });
-    expect(await screen.findByText("3 installed")).toBeInTheDocument();
-    await userEvent.click(screen.getByText("Manage mods"));
-    expect(onManageMods).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", { name: "Mods" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quit" })).toBeNull();
+    expect(window.electrifyDesktop.mods).not.toHaveBeenCalled();
   });
 
   it("changes appearance and units with direct choices", async () => {
