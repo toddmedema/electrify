@@ -92,7 +92,6 @@ import {
 import PolicyDemandChart, {
   PolicyDemandChartPlaceholder,
 } from "../base/PolicyDemandChart";
-import LegacyWildfireProgram from "./LegacyWildfireProgram";
 import { generateNewTimeline } from "../../reducers/Game";
 import { HOURS_PER_YEAR_REAL, TICKS_PER_YEAR } from "../../Constants";
 import { getSolarOutputFactor } from "../../helpers/Energy";
@@ -966,7 +965,6 @@ export function ProgramsScreen({
               policiesOn={policiesOn}
               onOpen={open}
             />
-            <LegacyWildfireProgram game={game} />
           </>
         ) : (
           <Box className="customerProgramDetail">

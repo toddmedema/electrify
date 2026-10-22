@@ -1,8 +1,5 @@
 import { getTotalDebt } from "../helpers/Financials";
-import {
-  optionalScenarioChoice,
-  pendingScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
@@ -588,7 +585,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   let prevTick: TickPresentFutureType | null = null;
   let justBuilt = false;
   let lastTick: TickPresentFutureType | null = null;
-  let offerCheckedMonth: number | undefined;
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
@@ -627,28 +623,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         );
       }
       // Upfront response costs are explicit actions, not unexplained tick expenses.
-      prevTick = null;
-    }
-    // Detached old campaigns retain their requested optional program changes. As before,
-    // the bot considers a new offer once per month and leaves unknown options unchanged.
-    const offer =
-      state.replayPlayback || offerCheckedMonth === state.date.monthsElapsed
-        ? undefined
-        : optionalScenarioChoice(state);
-    offerCheckedMonth = state.date.monthsElapsed;
-    const offered = offer?.options.find(
-      (option) => option.id === resolved.scenarioResponses[offer.id],
-    );
-    if (offer && offered) {
-      state = cloneDeep(
-        gameReducer(
-          state,
-          chooseScenarioResponse({
-            decisionId: offer.id,
-            optionId: offered.id,
-          }),
-        ),
-      );
       prevTick = null;
     }
     tickState(state);

@@ -105,7 +105,6 @@ const migrations: ((
     const hadRetired = [...events.active, ...events.occurrences].some(retired);
     const removedSelection =
       object(game.customScenario) &&
-      game.customScenario.mod === undefined &&
       Array.isArray(game.customScenario.eventScenarioIds) &&
       game.customScenario.eventScenarioIds.includes(111);
     const legacyLines =
@@ -138,9 +137,6 @@ const migrations: ((
     });
     const customScenario =
       object(game.customScenario) &&
-      // Detached community setups are digest-bound and validated after migration.
-      // Their arc inventory is not the ordinary Custom Game selection policy.
-      game.customScenario.mod === undefined &&
       Array.isArray(game.customScenario.eventScenarioIds)
         ? {
             ...game.customScenario,

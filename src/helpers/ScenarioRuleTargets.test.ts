@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import {
   resolveScenarioRuleTargets,
   survivingScenarioRuleTargets,
@@ -10,35 +8,7 @@ import { getScenario } from "../data/Scenarios";
 import { scenarioRules, validCompiledScenarioRules } from "./ScenarioRules";
 import { DIFFICULTY_IDS, LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
-import type {
-  CompiledScenarioRules,
-  ResolvedRuleSelector,
-} from "../data/ScenarioRules";
-import type { DifficultyType } from "../Types";
-
-const frozenWildfire: {
-  staticSnapshots: {
-    difficulty: DifficultyType;
-    seed: number;
-    rules: CompiledScenarioRules;
-  }[];
-} = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, "../testing/fixtures/FrozenWildfireReference.json"),
-    "utf8",
-  ),
-);
-const oldWildfireRules = (
-  difficulty: DifficultyType,
-  seed: number,
-): CompiledScenarioRules =>
-  JSON.parse(
-    JSON.stringify(
-      frozenWildfire.staticSnapshots.find(
-        (item) => item.difficulty === difficulty && item.seed === seed,
-      )!.rules,
-    ),
-  );
+import type { ResolvedRuleSelector } from "../data/ScenarioRules";
 
 const facility = (
   id: number,
@@ -268,22 +238,16 @@ describe.each([
     phaseId: "landfall",
     lane: "current native104",
   },
-  {
-    scenarioId: 111,
-    arcId: "california-wildfire-2025",
-    phaseId: "firestorm",
-    lane: "detached old111",
-  },
 ])("trusted $lane addresses", ({ scenarioId, arcId, phaseId }) => {
   test.each(DIFFICULTY_IDS)(
     "preserves %s target integration in the owning compiled story resolver",
     (difficulty) => {
       const key = `story:${scenarioId}:${arcId}:${phaseId}`;
       for (const seed of [1, 42, 12345]) {
-        const rules =
-          scenarioId === 111
-            ? oldWildfireRules(difficulty, seed)
-            : scenarioRules(getScenario(scenarioId), { difficulty, seed })!;
+        const rules = scenarioRules(getScenario(scenarioId), {
+          difficulty,
+          seed,
+        })!;
         expect(validCompiledScenarioRules(rules)).toBe(true);
         const event = [...rules.events, ...(rules.arcEvents ?? [])].find(
           (item) => item.source?.phaseId === phaseId,
@@ -291,7 +255,7 @@ describe.each([
         const context: StoryContextType = {
           rules,
           seed,
-          scenarioId: scenarioId === 111 ? 999 : scenarioId,
+          scenarioId,
           difficulty,
           date: getDateFromMinute(
             event.startMonth * MINUTES_PER_MONTH,

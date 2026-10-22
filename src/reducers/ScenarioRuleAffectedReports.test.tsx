@@ -20,7 +20,12 @@ const input: ModPackage = {
   objectives: { mode: "none" },
   scenario: { durationMonths: 6, cash: 1e9 },
   debriefReports: [
-    { id: "outage-window", kind: "reliability", fromMonth: 1, throughMonth: 1 },
+    {
+      id: "closing-capacity",
+      kind: "firmCoverage",
+      fromMonth: 1,
+      throughMonth: 1,
+    },
   ],
   events: [
     {
@@ -95,7 +100,7 @@ test("a reached review reports its referenced onset while retaining its own empt
     expect(parseSave(serializeSave(game))).not.toBeNull();
   }
 
-  // Version-1 mod journals pin closing capacity facts even for a reliability report.
+  // Closing capacity facts are recorded only for a declared capacity report.
   const observation = game.worldEvents.occurrences.find(
     (event) => event.key === "mod:affected-report:observation:0",
   )!;

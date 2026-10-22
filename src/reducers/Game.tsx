@@ -68,7 +68,6 @@ import {
 import { defaultDispatchIndex } from "../helpers/DispatchOrder";
 import { startingFacilityStarts } from "../helpers/StartingFacilityStarts";
 import {
-  optionalScenarioChoice,
   pendingScenarioChoice,
   pendingScenarioRuleChoice,
   scenarioChoicesForGame,
@@ -215,13 +214,6 @@ import {
 } from "../data/DemandProfiles";
 import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
 import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
-import {
-  isLegacyWildfireProgramGame,
-  legacyWildfirePreparedness,
-  legacyWildfirePreparednessAnnualCost,
-  legacyWildfirePreparednessChange,
-  legacyWildfirePreparednessEffectiveness,
-} from "../helpers/LegacyWildfirePreparedness";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -735,16 +727,7 @@ function openingRuleTransactions(state: GameType) {
 function trimWorldEventOccurrences(state: GameType) {
   const occurrences = state.worldEvents.occurrences;
   if (occurrences.length <= MAX_WORLD_EVENT_CHECKS) return;
-  const program = legacyWildfirePreparednessChange(
-    occurrences,
-    state.location.id,
-    state.date.minute,
-  );
   const retained = occurrences.slice(-MAX_WORLD_EVENT_CHECKS);
-  if (program && !retained.includes(program)) {
-    retained.shift();
-    retained.unshift(program);
-  }
   // Rules are bounded at compilation. Their receipts and onset identities are run facts,
   // independent of the rolling regional-hazard log.
   const retainedSet = new Set(retained);
@@ -755,22 +738,6 @@ function trimWorldEventOccurrences(state: GameType) {
   const declaredKeys = new Set(
     rules ? ruleEvents(rules).map((event) => event.key) : [],
   );
-  if (rules) {
-    const protectedKeys = new Set(
-      ruleEvents(rules)
-        .filter((event) => event.protection?.kind === "wildfirePreparedness")
-        .map((event) => event.key),
-    );
-    occurrences.forEach((event, index) => {
-      if (!protectedKeys.has(event.key)) return;
-      const priorProgram = legacyWildfirePreparednessChange(
-        occurrences.slice(0, index),
-        state.location.id,
-        event.startsMinute,
-      );
-      if (priorProgram) retainedSet.add(priorProgram);
-    });
-  }
   state.worldEvents.occurrences = occurrences.filter(
     (event) =>
       retainedSet.has(event) ||
@@ -3024,11 +2991,8 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
     return true;
   }
   // A pending story choice the clock waits on, or an optional one the player chose to take up
-  const optional = optionalScenarioChoice(state);
-  const decision = [pendingScenarioChoice(state), optional].find(
-    (choice) => choice?.id === payload.decisionId,
-  );
-  if (!decision) return false;
+  const decision = pendingScenarioChoice(state);
+  if (!decision || decision.id !== payload.decisionId) return false;
   const option = decision.options.find(
     (option) => option.id === payload.optionId,
   );
@@ -3052,19 +3016,6 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
       cost,
       upfrontGrant,
       scenarioChoice: true,
-      ...(decision.id === optional?.id
-        ? {
-            startEffectiveness: legacyWildfirePreparednessEffectiveness(
-              state.worldEvents.occurrences,
-              state.location.id,
-              state.date.minute,
-            ),
-            annualCost:
-              option.id === "prepare"
-                ? legacyWildfirePreparedness(state)!.annualCost
-                : 0,
-          }
-        : {}),
     },
     effects: {},
     title: decision.title,
@@ -3078,18 +3029,10 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   });
   if (option.meaningful !== false)
     recordMeaningfulDecision(state, {
-      lever:
-        decision.id === optional?.id
-          ? `wildfire:${state.location.id.toLowerCase()}:preparedness`
-          : decision.id,
+      lever: decision.id,
       label: decision.title,
       kind: "policy",
-      before:
-        decision.id === optional?.id
-          ? option.id === "prepare"
-            ? "stop"
-            : "prepare"
-          : "undecided",
+      before: "undecided",
       after: option.id,
     });
   state.timeline = reforecastSupply(state, true);
@@ -5397,13 +5340,6 @@ function* supplyFacilitiesFinancesPhases(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
-  if (isLegacyWildfireProgramGame(state))
-    expensesOM +=
-      legacyWildfirePreparednessAnnualCost(
-        state.worldEvents.occurrences,
-        state.location.id,
-        now.minute,
-      ) / ticksPerYear;
   if (!rebookingFrame) expensesOM += immediateCosts;
   // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.

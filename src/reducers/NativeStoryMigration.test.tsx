@@ -5,7 +5,7 @@ import { SAVE_SCHEMA_VERSION } from "../SaveUpgrade";
 import { WILDFIRE_DECISION_KEY } from "../data/ScenarioChoiceRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
-import reference from "../testing/fixtures/FrozenWildfireLifecycleReference.json";
+import reference from "../testing/fixtures/NativeWildfireAnsweredReference.json";
 import { createGame } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 

@@ -2,24 +2,15 @@ import "../Store";
 import fs from "fs";
 import path from "path";
 import cloneDeep from "lodash.clonedeep";
-import { TICKS_PER_MONTH } from "../Constants";
 import type { DifficultyType, ScenarioType } from "../Types";
 import { decodeReplay } from "../Replay";
 import { parseSave } from "../SaveGame";
-import { getScenarioLocation } from "../helpers/Locations";
 import { validScenarioMod, modRuntimeDigest } from "../helpers/ScenarioMod";
-import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { loadSimData } from "../testing/SimData";
 import {
   OFFICIAL_WORLD_IDS,
   officialWorldHash,
 } from "../testing/OfficialWorldRoutes";
-import {
-  createGameFromReplay,
-  runSimulation,
-  type SimOptionsType,
-} from "../testing/Simulator";
-import { tickState } from "./Game";
+import { runSimulation, type SimOptionsType } from "../testing/Simulator";
 
 interface FrozenCase {
   group: number;
@@ -72,7 +63,9 @@ test("the immutable old DTO matrix covers every arc at two difficulties", () => 
   expect(reference.oldEnvelopeCases).toHaveLength(1);
 });
 
-for (const expected of reference.cases)
+for (const expected of reference.cases.filter(
+  (item) => !item.ids.includes(111),
+))
   test(`old group ${expected.group} on ${expected.difficulty} runs its frozen rules without recompiling the package`, () => {
     const scenario = cloneDeep(expected.scenario);
     expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
@@ -101,48 +94,25 @@ for (const expected of reference.cases)
     expect(scenario).toEqual(expected.scenario);
   });
 
-test("an actual old save and internal replay retain their detached imported rules", () => {
-  const source = reference.oldEnvelopeCases[0];
-  const expected = reference.cases.find(
-    (item) =>
-      item.group === source.group && item.difficulty === source.difficulty,
-  )!;
-  loadSimData(getScenarioLocation(expected.scenario)!);
-  const saved = parseSave(cloneDeep(source.save));
-  const replay = decodeReplay(cloneDeep(source.replay));
-  expect(saved).not.toBeNull();
-  expect(replay).not.toBeNull();
-  expect(saved!.game.customScenario).toEqual(expected.scenario);
-  expect(replay!.customScenario).toEqual(expected.scenario);
-  const resumed = cloneDeep(saved!.game);
-  const playback = createGameFromReplay(replay!);
-  for (let tick = 0; tick < 2 * TICKS_PER_MONTH; tick++) {
-    expect(pendingScenarioChoice(resumed)).toBeUndefined();
-    expect(pendingScenarioChoice(playback)).toBeUndefined();
-    tickState(resumed);
-    tickState(playback);
+test("retired private111 prototype DTOs and their enclosing documents are unsupported", () => {
+  for (const item of reference.cases.filter((entry) =>
+    entry.ids.includes(111),
+  )) {
+    expect(
+      item.scenario.mod!.rules.arcEvents!.some(
+        (event) => event.source?.arcId === "california-wildfire-2025",
+      ),
+    ).toBe(true);
+    expect(validScenarioMod(item.scenario.mod, item.scenario)).toBe(false);
   }
-  expect(resumed.monthlyHistory).toHaveLength(2);
-  expect(playback.monthlyHistory).toEqual(resumed.monthlyHistory);
-  // The old JSON save stores nonfinite quote-only lcWh as null. Fresh replay quotes
-  // retain Infinity. Certify those two known cells, then compare every other field.
-  let quoteOnlyNulls = 0;
-  const serializedQuotes = playback.facilities.map((facility, index) => {
-    if (resumed.facilities[index].lcWh !== null) return facility;
-    expect(["Wind", "Sun"]).toContain(facility.fuel);
-    expect(facility.lcWh).toBe(Infinity);
-    quoteOnlyNulls++;
-    return { ...facility, lcWh: null };
-  });
-  expect(quoteOnlyNulls).toBe(2);
-  expect(serializedQuotes).toEqual(resumed.facilities);
-  expect(playback.worldEvents).toEqual(resumed.worldEvents);
-  expect(resumed.customScenario).toEqual(expected.scenario);
-  expect(playback.customScenario).toEqual(expected.scenario);
+  for (const source of reference.oldEnvelopeCases) {
+    expect(parseSave(cloneDeep(source.save))).toBeNull();
+    expect(decodeReplay(cloneDeep(source.replay))).toBeNull();
+  }
 });
 
-test("frozen legacy arc compatibility still rejects newly forged trusted metadata", () => {
-  const original = reference.cases.find((item) => item.group === 1)!.scenario;
+test("valid frozen arc snapshots reject forged trusted metadata", () => {
+  const original = reference.cases.find((item) => item.group === 0)!.scenario;
   expect(validScenarioMod(original.mod, original)).toBe(true);
   const edited = cloneDeep(original);
   const event = edited.mod!.rules.arcEvents!.find((event) => event.source)!;

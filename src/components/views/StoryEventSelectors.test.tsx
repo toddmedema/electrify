@@ -7,6 +7,7 @@ import {
   selectUpcomingStoryEvents,
 } from "./StoryEventSelectors";
 import { modScenario } from "../../mods/ModScenario";
+import type { ModPackage } from "../../mods/ModSchema";
 
 function event(
   key: string,
@@ -75,6 +76,84 @@ test("mod-only upcoming events use previews and keep surprises hidden without im
 });
 
 describe("active event groups", () => {
+  it("uses the updated run's title and expiry when a package reuses its event ID", () => {
+    const input = (
+      version: string,
+      title: string,
+      duration: number,
+    ): ModPackage => ({
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "updated-active-event",
+      title: "Status review",
+      creator: "Author",
+      version,
+      description: "A scenario with an opening output warning.",
+      baseScenarioId: 999,
+      seed: 42,
+      objectives: { mode: "none" },
+      officialArcs: [],
+      scenario: { startingYear: 2020, durationMonths: 6, cash: 1e9 },
+      events: [
+        {
+          id: "warning",
+          title,
+          message: "Prepare local supply.",
+          preview: "A warning will appear.",
+          startMonth: 1,
+          durationMonths: duration,
+          effects: { demandMultiplier: 1.1 },
+        },
+      ],
+    });
+    const oldGame = createGame({
+      scenarioId: 999,
+      scenario: modScenario(input("1", "Original warning", 1)),
+      seed: 42,
+    });
+    const oldGroups = selectActiveEventGroups({
+      game: oldGame,
+    } as AppStateType);
+    expect(oldGroups).toEqual([
+      expect.objectContaining({
+        title: "Original warning",
+        throughLabel: "through Jan 2020",
+      }),
+    ]);
+    expect(
+      selectActiveEventGroups({
+        game: {
+          ...oldGame,
+          worldEvents: { ...oldGame.worldEvents, active: [] },
+        },
+      } as unknown as AppStateType),
+    ).toEqual([]);
+    const newGame = createGame({
+      scenarioId: 999,
+      scenario: modScenario(input("2", "Updated warning", 3)),
+      seed: 42,
+    });
+    expect(newGame.customScenario!.mod!.runtimeDigest).not.toBe(
+      oldGame.customScenario!.mod!.runtimeDigest,
+    );
+    expect(newGame.worldEvents.active[0].title).toBe("Updated warning");
+    const newGroups = selectActiveEventGroups({
+      game: newGame,
+    } as AppStateType);
+    expect(newGroups).toEqual([
+      expect.objectContaining({
+        title: "Updated warning",
+        throughLabel: "through Mar 2020",
+      }),
+    ]);
+    expect(selectActiveEventGroups({ game: newGame } as AppStateType)).toBe(
+      newGroups,
+    );
+    expect(selectActiveEventGroups({ game: oldGame } as AppStateType)).toEqual(
+      oldGroups,
+    );
+  });
+
   it("includes only critical and notable events in effect now", () => {
     const now = 13 * MINUTES_PER_MONTH;
     const groups = selectActiveEventGroups(

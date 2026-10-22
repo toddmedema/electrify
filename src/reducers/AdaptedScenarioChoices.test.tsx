@@ -14,10 +14,6 @@ import {
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { buildStorySnapshot } from "../helpers/Story";
 import { runFailure } from "../helpers/ObjectiveRules";
-import {
-  legacyWildfirePreparedness as wildfirePreparedness,
-  legacyWildfirePreparednessAnnualCost as wildfirePreparednessAnnualCost,
-} from "../helpers/LegacyWildfirePreparedness";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -28,7 +24,6 @@ import {
   runSimulation,
 } from "../testing/Simulator";
 import type { DifficultyType, GameType } from "../Types";
-import { frozenWildfireScenario } from "../testing/FrozenWildfireScenarios";
 import reducer, { delta, generateNewTimeline, tickState } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
 
@@ -51,16 +46,6 @@ const catalog = [
     dueMonth: 36,
     options: [
       { id: "winterize", cost: 90000000, grant: 0 },
-      { id: "standard", cost: 0, grant: 0 },
-    ],
-  },
-  {
-    lane: "frozen legacy",
-    arc: 111,
-    id: "preparedness",
-    dueMonth: 35,
-    options: [
-      { id: "prepare", cost: 2000000, grant: 0 },
       { id: "standard", cost: 0, grant: 0 },
     ],
   },
@@ -97,10 +82,7 @@ const start = (input: ModPackage, difficulty: DifficultyType = "Employee") =>
 const scenarioFor = (
   input: ModPackage,
   difficulty: DifficultyType = "Employee",
-) =>
-  input.baseScenarioId === 111
-    ? frozenWildfireScenario(input, difficulty)
-    : modScenario(input, undefined, difficulty);
+) => modScenario(input, undefined, difficulty);
 const now = (state: GameType) =>
   getTimeFromTimeline(state.date.minute, state.timeline)!;
 const definition = (state: GameType, arc: number): CompiledRuleChoice =>
@@ -349,16 +331,6 @@ test.each([
     customers: 157567,
     scaledCost: 30000000,
   },
-  {
-    lane: "frozen legacy",
-    arc: 111,
-    id: "preparedness",
-    option: "prepare",
-    dueMonth: 35,
-    onsetMonth: 36,
-    customers: 8000,
-    scaledCost: 1000000,
-  },
 ])(
   "$lane arc $arc relocates its full paid budget and keeps preparation ahead of the shock",
   ({ arc, id, option, dueMonth, onsetMonth, customers, scaledCost }) => {
@@ -394,16 +366,13 @@ test.each([
   },
 );
 
-test.each([
-  { arc: 107, lane: "current" },
-  { arc: 111, lane: "frozen legacy" },
-])(
+test.each([{ arc: 107, lane: "current" }])(
   "$lane arc $arc preparation changes committed future effects without mutating either forecast source",
   ({ arc }) => {
     const descriptor = catalog.find((entry) => entry.arc === arc)!;
     const before = start(pack(arc));
     advance(before, descriptor.dueMonth);
-    const protectedId = arc === 107 ? "winterize" : "prepare";
+    const protectedId = "winterize";
     const after = reducer(
       before,
       respond(key(arc, descriptor.id), protectedId),
@@ -424,44 +393,22 @@ test.each([
     const visible = protectedEvent.occurrences.find(
       (event) => event.key === onset.key,
     )!;
-    const visibleConditions =
-      arc === 107
-        ? [
-            `Natural Gas output: ${Math.round(visible.effects.facilityOutputMultipliersByFuel!["Natural Gas"]! * 100)}% of normal`,
-          ]
-        : [
-            `Demand: ${Math.round(visible.effects.demandMultiplier! * 100)}% of normal`,
-            `Restoration: $${Math.round(visible.effects.operatingExpensePerMonth!).toLocaleString("en-US")}/month`,
-          ];
+    const visibleConditions = [
+      `Natural Gas output: ${Math.round(visible.effects.facilityOutputMultipliersByFuel!["Natural Gas"]! * 100)}% of normal`,
+    ];
     visibleConditions.forEach((condition) =>
       expect(visible.message).toContain(condition),
     );
-    const unchangedField =
-      arc === 107 ? "demandMultiplier" : "operatingExpensePerMonth";
+    const unchangedField = "demandMultiplier";
     expect(protectedEvent.effects[unchangedField]).toBe(
       standard.effects[unchangedField],
     );
-    const affectedLosses =
-      arc === 107
-        ? (["Natural Gas", "Coal", "Uranium", "Wind"] as const).map((fuel) => [
-            1 - standard.effects.facilityOutputMultipliersByFuel![fuel]!,
-            1 - protectedEvent.effects.facilityOutputMultipliersByFuel![fuel]!,
-          ])
-        : [
-            [
-              1 - standard.effects.demandMultiplier!,
-              1 - protectedEvent.effects.demandMultiplier!,
-            ],
-            ...Object.keys(
-              standard.effects.facilityOutputMultipliersById ?? {},
-            ).map((facilityId) => [
-              1 - standard.effects.facilityOutputMultipliersById![facilityId],
-              1 -
-                protectedEvent.effects.facilityOutputMultipliersById![
-                  facilityId
-                ],
-            ]),
-          ];
+    const affectedLosses = (
+      ["Natural Gas", "Coal", "Uranium", "Wind"] as const
+    ).map((fuel) => [
+      1 - standard.effects.facilityOutputMultipliersByFuel![fuel]!,
+      1 - protectedEvent.effects.facilityOutputMultipliersByFuel![fuel]!,
+    ]);
     expect(affectedLosses.length).toBeGreaterThan(1);
     affectedLosses.forEach(([originalLoss, preparedLoss]) =>
       expect(preparedLoss).toBeCloseTo(originalLoss / 2, 10),
@@ -478,8 +425,8 @@ test.each([
     };
     const baseline = forecast(before),
       committed = forecast(after);
-    const improvedMetric = arc === 107 ? "supplyW" : "demandW";
-    const unchangedMetric = arc === 107 ? "demandW" : "temperatureC";
+    const improvedMetric = "supplyW";
+    const unchangedMetric = "demandW";
     expect(committed.map((tick) => tick[unchangedMetric])).toEqual(
       baseline.map((tick) => tick[unchangedMetric]),
     );
@@ -499,14 +446,6 @@ test.each([
     expect(restore(activated).worldEvents.occurrences).toEqual(
       activated.worldEvents.occurrences,
     );
-    expect(wildfirePreparedness(activated)?.active ?? false).toBe(false);
-    expect(
-      wildfirePreparednessAnnualCost(
-        activated.worldEvents.occurrences,
-        activated.location.id,
-        activated.date.minute,
-      ),
-    ).toBe(0);
   },
 );
 

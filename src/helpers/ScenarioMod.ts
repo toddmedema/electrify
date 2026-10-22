@@ -111,7 +111,8 @@ function validModSetup(scenario: ScenarioType): boolean {
     return false;
   const location = getScenarioLocation(scenario);
   if (
-    (scenario.startingInterties !== undefined ||
+    (scenario.mod?.parameters.baseScenarioId === 111 ||
+      scenario.startingInterties !== undefined ||
       scenario.startingIntertieAccess !== undefined) &&
     !validFrozenStartingIntertieScenario(scenario)
   )

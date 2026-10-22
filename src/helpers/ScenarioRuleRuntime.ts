@@ -23,7 +23,6 @@ import {
   survivingScenarioRuleTargets,
   ScenarioRuleTargetBinding,
 } from "./ScenarioRuleTargets";
-import { legacyWildfirePreparednessEffectiveness } from "./LegacyWildfirePreparedness";
 import { canonicalRuleJson } from "./RuleIdentity";
 import {
   resolveScenarioRuleChoice,
@@ -46,51 +45,25 @@ export const ruleEvents = (rules: CompiledScenarioRules): CompiledRuleEvent[] =>
 export const ruleLoadKey = (rules: CompiledScenarioRules, id: string) =>
   `${rules.namespace.kind === "mod" ? `mod:${rules.namespace.id}` : `story:${rules.namespace.scenarioId}:${rules.namespace.arcId}`}:load:${id}`;
 
-/** Protection is fixed from paid responses recorded before activation, including regional ramp. */
+/** Protection is fixed by the paid winterization response recorded before activation. */
 export function scenarioRuleProtectionFactor(
   event: CompiledRuleEvent,
   rules: CompiledScenarioRules,
   occurrences: readonly ActiveWorldEventType[],
-  locationId: string,
-  receivingScenarioId?: number,
 ): number {
   if (!event.protection) return 0;
-  const choiceId =
-    event.protection.kind === "deepFreezeWinterization"
-      ? "winterization"
-      : "preparedness";
-  const option =
-    event.protection.kind === "deepFreezeWinterization"
-      ? "winterize"
-      : "prepare";
   const source = event.source;
-  const prior = occurrences.filter(
+  return occurrences.some(
     (occurrence) =>
-      occurrence.startsMinute <= event.startMonth * MINUTES_PER_MONTH,
-  );
-  const protectedChoice = prior.some(
-    (occurrence) =>
-      occurrence.attributes.choice === option &&
+      occurrence.startsMinute <= event.startMonth * MINUTES_PER_MONTH &&
+      occurrence.attributes.choice === "winterize" &&
       (occurrence.key ===
-        `story:${source?.scenarioId}:${source?.arcId}:${choiceId}` ||
+        `story:${source?.scenarioId}:${source?.arcId}:winterization` ||
         occurrence.key ===
-          `mod:${rules.namespace.kind === "mod" ? rules.namespace.id : ""}:arc:${source?.scenarioId}:choice:${choiceId}`),
-  );
-  const regional =
-    event.protection.kind === "wildfirePreparedness" &&
-    !(
-      rules.namespace.kind === "official" &&
-      rules.namespace.scenarioId === 111 &&
-      receivingScenarioId !== 999
-    )
-      ? 0.5 *
-        legacyWildfirePreparednessEffectiveness(
-          prior,
-          locationId,
-          event.startMonth * MINUTES_PER_MONTH,
-        )
-      : 0;
-  return 1 - (1 - (protectedChoice ? 0.5 : 0)) * (1 - regional);
+          `mod:${rules.namespace.kind === "mod" ? rules.namespace.id : ""}:arc:${source?.scenarioId}:choice:winterization`),
+  )
+    ? 0.5
+    : 0;
 }
 
 /** Choice answers, activations and receipts share the existing persisted occurrence owner. */
@@ -209,9 +182,6 @@ export function ruleEffectsForOccurrence(
         ([fuel, multiplier]) => [fuel, 1 - (1 - multiplier) * (1 - protection)],
       ),
     );
-  if (definition.protection?.kind === "wildfirePreparedness" && protection > 0)
-    effects.demandMultiplier =
-      1 - (1 - (effects.demandMultiplier ?? 1)) * (1 - protection);
   const byId: Record<string, number> = {};
   const operations = scenarioRuleTargetOperations(definition);
   const facilities = context.snapshot.facilities.map((f) => ({
@@ -222,10 +192,7 @@ export function ruleEffectsForOccurrence(
     const multiplier = operations[index]?.outputMultiplier;
     if (multiplier === undefined) return;
     survivingScenarioRuleTargets(bindings, facilities).forEach((target) => {
-      const output =
-        definition.protection?.kind === "wildfirePreparedness"
-          ? 1 - (1 - multiplier) * (1 - protection)
-          : multiplier;
+      const output = multiplier;
       byId[String(target.id)] = (byId[String(target.id)] ?? 1) * output;
     });
   });
@@ -359,8 +326,6 @@ function resolveEvent(
     event,
     context.rules!,
     context.occurrences ?? [],
-    context.location.id,
-    context.scenarioId,
   );
   const reportContext = {
     ...context,
@@ -577,16 +542,13 @@ export function scenarioRuleCapacityReportMonths(
       ),
     ),
   ].flatMap((report) =>
-    "throughMonth" in report &&
-    (rules.namespace.kind === "mod" ||
-      report.kind === "firmCoverage" ||
-      report.kind === "storageCoverage")
+    report.kind === "firmCoverage" || report.kind === "storageCoverage"
       ? [report.throughMonth]
       : [],
   );
 }
 
-/** Version-1 imports retain closing capacity facts at every declared report window. */
+/** Capture closing capacity facts only when a report needs them. */
 export function captureRuleReportObservation(
   game: GameType,
   context: StoryContextType,

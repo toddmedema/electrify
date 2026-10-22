@@ -100,7 +100,6 @@ export function selectUpcomingStoryEvents(
         event.startsMinute,
         event.attributes.choice,
         event.attributes.ruleTargets,
-        event.attributes.startEffectiveness,
       ]),
     ),
     historyKey,
@@ -239,8 +238,17 @@ export function selectActiveEventGroups(
   if (inEffect.length === 0) {
     return NO_ACTIVE_GROUPS;
   }
-  const cacheKey =
-    game.startingYear + "|" + inEffect.map((event) => event.key).join("|");
+  const cacheKey = JSON.stringify([
+    game.startingYear,
+    inEffect.map((event) => [
+      event.key,
+      event.title,
+      event.concept,
+      event.importance,
+      event.startsMinute,
+      event.endsMinute,
+    ]),
+  ]);
   if (activeGroupsCache?.key === cacheKey) {
     return activeGroupsCache.groups;
   }

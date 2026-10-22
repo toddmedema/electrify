@@ -2,7 +2,6 @@ import { DifficultyType, GameType, ScenarioChoiceType } from "../Types";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
-import { legacyWildfirePreparedness } from "./LegacyWildfirePreparedness";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 import { scenarioRules } from "./ScenarioRules";
 import { getScenario } from "../data/Scenarios";
@@ -169,9 +168,4 @@ export function validScenarioResponse(
     typeof response.decisionId === "string" &&
     typeof response.optionId === "string"
   );
-}
-
-/** Only already-frozen old community arcs retain the optional saved program. */
-export function optionalScenarioChoice(game: GameType) {
-  return legacyWildfirePreparedness(game)?.choice;
 }

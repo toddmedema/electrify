@@ -24,6 +24,7 @@ import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import { ruleChoices } from "./ScenarioRuleDependencies";
 import { scenarioRuleExpectedLoads } from "./ScenarioRuleDecisions";
 import { validRuleReportReceipt } from "./ScenarioRuleReports";
+import type { ScenarioRuleTargetBinding } from "./ScenarioRuleTargets";
 import {
   WILDFIRE_DECISION_KEY,
   WILDFIRE_PREPARATION_COST,
@@ -69,7 +70,8 @@ export function validRuleTargetBindings(value: unknown): boolean {
               Number.isInteger(binding.id) &&
               binding.id >= 0 &&
               typeof binding.minuteCreated === "number" &&
-              Number.isFinite(binding.minuteCreated) &&
+              Number.isSafeInteger(binding.minuteCreated) &&
+              binding.minuteCreated >= 0 &&
               typeof binding.peakW === "number" &&
               Number.isFinite(binding.peakW) &&
               binding.peakW >= 0 &&
@@ -216,7 +218,6 @@ function validOfficialOccurrence(
     game.worldEvents.occurrences.filter(
       (receipt) => receipt.startsMinute <= event.startsMinute,
     ),
-    game.location.id,
   );
   if (
     definition.protection?.kind === "deepFreezeWinterization" &&
@@ -535,6 +536,9 @@ export function validScenarioRuleState(game: GameType): boolean {
     return false;
   const definitions = ruleEvents(rules);
   const seen = new Set<string>();
+  const ownedFacilities = new Map(
+    game.facilities.map((facility) => [facility.id, facility]),
+  );
   for (const event of ruleOccurrences) {
     if (seen.has(event.key)) return false;
     seen.add(event.key);
@@ -590,7 +594,6 @@ export function validScenarioRuleState(game: GameType): boolean {
         definition,
         rules,
         occurrences.slice(0, occurrences.indexOf(event)),
-        game.location.id,
       )
     )
       return false;
@@ -605,15 +608,32 @@ export function validScenarioRuleState(game: GameType): boolean {
       event.attributes.cost !== charge
     )
       return false;
-    const groups = JSON.parse(String(event.attributes.ruleTargets)) as Array<
-      Array<{ id: number; startingAssetId?: string; name: string }>
-    >;
+    const groups = JSON.parse(
+      String(event.attributes.ruleTargets),
+    ) as ScenarioRuleTargetBinding[][];
     const operations = scenarioRuleTargetOperations(definition);
     if (
       groups.length !== operations.length ||
       groups.some(
         (group, index) =>
           new Set(group.map((target) => target.id)).size !== group.length ||
+          group.some((target) => {
+            if (target.minuteCreated > event.startsMinute) return true;
+            const owned = ownedFacilities.get(target.id);
+            // A unit that predates activation, or retains its original catalog
+            // identity, cannot be a later ID-reusing purchase. At the opening
+            // itself a sale/rebuild can reuse an ID at the same clock minute.
+            if (
+              !owned ||
+              (owned.minuteCreated >= event.startsMinute &&
+                owned.startingAssetId === undefined)
+            )
+              return false;
+            return (
+              target.minuteCreated !== owned.minuteCreated ||
+              target.startingAssetId !== owned.startingAssetId
+            );
+          }) ||
           (operations[index].target.selector === "startingAsset" &&
             group.some(
               (target) =>

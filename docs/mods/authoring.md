@@ -66,8 +66,8 @@ A corridor cap changes an existing connection's physical rating; it does not bui
 a line or grant import access. The northern-route example has no physical effect
 until that route is operating. Native Wildfire supplies an operating northern
 intertie; a community scenario based on it freezes its researched access limits
-with the starting connection. Older imported snapshots retain their original
-access terms and compiled effects.
+with the starting connection. Run-local snapshots retain resolved access terms and compiled effects after
+library updates or removal.
 
 A choice resolves before its due month's simulation. Each option has exactly one
 `costDollars` or `grantDollars`, including a free `costDollars: 0` response. The

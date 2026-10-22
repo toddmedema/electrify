@@ -16,7 +16,6 @@ import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame, runSimulation } from "../testing/Simulator";
-import { frozenAutomaticWildfireScenario } from "../testing/FrozenWildfireScenarios";
 import type { DifficultyType, GameType, GeneratorShoppingType } from "../Types";
 import reducer, {
   buildFacility,
@@ -140,8 +139,13 @@ test("commuting operation order cannot change persisted target associations in a
   expect(parseSave(serializeSave(state))).not.toBeNull();
 });
 
-test("old frozen111 save validation rejects protection that has no committed paid response", () => {
-  const scenario = frozenAutomaticWildfireScenario();
+test("imported freeze protection requires a committed paid response", () => {
+  const scenario = modScenario({
+    ...pack(),
+    baseScenarioId: 107,
+    scenario: { cash: 1e12 },
+    officialArcs: [{ scenarioId: 107, includeChoices: false }],
+  });
   const state = createGame({
     scenarioId: 999,
     scenario,
@@ -149,18 +153,19 @@ test("old frozen111 save validation rejects protection that has no committed pai
     seed: scenario.seed,
     weatherHazardsEnabled: false,
   });
-  advance(state, 36);
+  advance(state, 49);
   expect(validScenarioRuleState(state)).toBe(true);
-  const fire = state.worldEvents.occurrences.find((item) =>
-    item.key.endsWith(":firestorm"),
+  const freeze = state.worldEvents.occurrences.find((item) =>
+    item.key.endsWith(":uri"),
   )!;
-  expect(fire.attributes.ruleProtectionFactor).toBe(0);
-  fire.attributes.ruleProtectionFactor = 1;
+  expect(freeze.attributes.ruleProtectionFactor).toBe(0);
+  freeze.attributes.ruleProtectionFactor = 1;
   state.worldEvents.active.find(
-    (item) => item.key === fire.key,
+    (item) => item.key === freeze.key,
   )!.attributes.ruleProtectionFactor = 1;
   expect(validScenarioRuleState(state)).toBe(false);
 });
+
 function game(input = pack(), difficulty: DifficultyType = "Employee") {
   const scenario = modScenario(input, undefined, difficulty);
   return createGame({

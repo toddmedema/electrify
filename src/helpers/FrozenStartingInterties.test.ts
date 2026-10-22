@@ -1,11 +1,8 @@
-import fs from "fs";
-import path from "path";
 import cloneDeep from "lodash.clonedeep";
 import type { ScenarioType } from "../Types";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
 import { createGame } from "../testing/Simulator";
-import { parseSave } from "../SaveGame";
 import {
   accessContextForGame,
   effectiveCorridor,
@@ -38,16 +35,6 @@ const pack = (): ModPackage => ({
   officialArcs: [],
   objectives: { mode: "none" },
 });
-const legacy: {
-  cases: { group: number; difficulty: string; scenario: ScenarioType }[];
-  oldEnvelopeCases: { save: unknown }[];
-} = JSON.parse(
-  fs.readFileSync(
-    path.join(__dirname, "../testing/fixtures/FrozenLegacyArcSnapshots.json"),
-    "utf8",
-  ),
-);
-
 test("fresh base-111 community setup freezes the native40MW connection and access rather than the500MW regional route", () => {
   const scenario = modScenario(pack(), undefined, "Employee", 1e8);
   expect(validScenarioMod(scenario.mod, scenario)).toBe(true);
@@ -85,6 +72,13 @@ test("forged frozen allocation, source, location and starting assets fail even w
   const original = modScenario(pack(), undefined, "Employee", 1e8);
   const edits: ((scenario: ScenarioType) => void)[] = [
     (scenario) => {
+      delete scenario.startingInterties;
+      delete scenario.startingIntertieAccess;
+    },
+    (scenario) => {
+      delete scenario.startingIntertieAccess;
+    },
+    (scenario) => {
       scenario.startingIntertieAccess!.allocations[0].capacityW = 500e6;
     },
     (scenario) => {
@@ -116,38 +110,35 @@ test("forged frozen allocation, source, location and starting assets fail even w
   expect(validFrozenStartingIntertieAccess(reordered)).toBe(true);
 });
 
-test("old community setup and schema3/4 envelopes retain arc111 and never gain new starting rights", () => {
-  const original = legacy.cases.find(
-    (entry) => entry.group === 1 && entry.difficulty === "Employee",
-  )!.scenario;
-  expect(original.eventScenarioIds).toContain(111);
-  expect(validOfficialArcIds(original.eventScenarioIds)).toBe(true);
+test("current111 is an official arc while ordinary Custom Game excludes it", () => {
+  expect(validOfficialArcIds([111])).toBe(true);
   expect(validCustomEventIds([111])).toBe(false);
-  expect(validScenarioMod(original.mod, original)).toBe(true);
+});
+
+test("removing both researched starting facts cannot enable generic500MW access after rehash", () => {
+  const original = modScenario(pack(), undefined, "Employee", 1e8);
   const game = createGame({
     scenarioId: 999,
-    scenario: cloneDeep(original),
+    scenario: original,
     difficulty: "Employee",
-    seed: original.seed,
+    seed: 7,
   });
-  expect(game.transmission!.lines).toEqual([]);
+  const edited = cloneDeep(original);
+  delete edited.startingIntertieAccess;
+  delete edited.startingInterties;
+  edited.mod!.setupDigest = modSetupDigest(edited);
+  edited.mod!.runtimeDigest = modRuntimeDigest(edited.mod!);
+  const unsafeContext = accessContextForGame({
+    ...game,
+    customScenario: edited,
+  });
+  expect(effectiveCorridor("california-north", unsafeContext)!.capacityW).toBe(
+    500e6,
+  );
+  expect(validScenarioMod(edited.mod, edited)).toBe(false);
+  expect(validScenarioMod(original.mod, original)).toBe(true);
   expect(
     effectiveCorridor("california-north", accessContextForGame(game))!
       .capacityW,
-  ).toBe(500e6);
-  for (const schemaVersion of [3, 4]) {
-    const envelope = cloneDeep(legacy.oldEnvelopeCases[0].save) as {
-      schemaVersion: number;
-      game: { customScenario: ScenarioType };
-    };
-    envelope.schemaVersion = schemaVersion;
-    const savedSetup = cloneDeep(envelope.game.customScenario);
-    const restored = parseSave(envelope);
-    expect(restored).not.toBeNull();
-    expect(restored!.game.customScenario).toEqual(savedSetup);
-    expect(restored!.game.customScenario!.eventScenarioIds).toContain(111);
-    const forged = cloneDeep(envelope);
-    forged.game.customScenario.mod = {} as ScenarioType["mod"];
-    expect(parseSave(forged)).toBeNull();
-  }
+  ).toBe(40e6);
 });

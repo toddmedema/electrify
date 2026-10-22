@@ -1,6 +1,6 @@
 import type { WorldEventEffectsType } from "../Types";
 
-/** Mechanical conditions share one formatter across legacy imports and frozen live rules. */
+/** Mechanical conditions share one formatter across native and community rules. */
 export function scenarioEffectsSummary(
   effects: WorldEventEffectsType,
   exact = false,

@@ -176,7 +176,7 @@ export function compileOfficialArcChoices(
     const definitions = SCENARIO_CHOICE_RULES.filter(
       (item) => item.scenarioId === arc.scenarioId,
     );
-    // Until the legacy presentation adapter retires, do not silently drop an unconverted choice.
+    // Every registered native choice must have a declarative adaptation.
     for (const legacy of SCENARIO_CHOICES.filter(
       (item) => item.scenarioId === arc.scenarioId,
     ))
@@ -400,7 +400,7 @@ export function validOfficialArcChoiceMetadata(value: unknown): boolean {
       ["scenarioId", "arcId", "choiceId"].includes(key),
     ) &&
     typeof source.scenarioId === "number" &&
-    [106, 107, 111].includes(source.scenarioId) &&
+    [106, 107].includes(source.scenarioId) &&
     typeof source.arcId === "string" &&
     ID_PATTERN.test(source.arcId) &&
     typeof source.choiceId === "string" &&

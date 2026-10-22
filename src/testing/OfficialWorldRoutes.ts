@@ -15,10 +15,7 @@ import {
   runFailure,
 } from "../helpers/ObjectiveRules";
 import type { GameType } from "../Types";
-import {
-  pendingScenarioChoice,
-  optionalScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import type { Command, World } from "../multiplayer/Types";
 import {
   applyCommand,
@@ -216,7 +213,6 @@ export function playOfficialWorldRoute(
   const decisions: unknown[] = [];
   const receipts: unknown[] = [];
   const seen = new Set<string>();
-  const optionalAnswered = new Set<string>();
   const phaseCheckpoints: unknown[] = [];
   const checkpointMonths = new Set<number>();
   let nativeCheckpoint: unknown;
@@ -318,11 +314,7 @@ export function playOfficialWorldRoute(
             payload: plan.sellFacilityId,
           });
       }
-      const required = pendingScenarioChoice(world.grids[index]);
-      const optional = optionalAnswered.has(seat.id)
-        ? undefined
-        : optionalScenarioChoice(game);
-      const choice = required ?? optional;
+      const choice = pendingScenarioChoice(world.grids[index]);
       if (!choice) continue;
       const option = choice.options[Math.min(index, choice.options.length - 1)];
       if (!nativeCheckpoint) {
@@ -347,7 +339,6 @@ export function playOfficialWorldRoute(
         payload: { decisionId: choice.id, optionId: option.id },
       });
       expect(pendingScenarioChoice(world.grids[index])?.id).not.toBe(choice.id);
-      if (optional && !required) optionalAnswered.add(seat.id);
       decisions.push({
         seat: seat.id,
         month: game.date.monthsElapsed,

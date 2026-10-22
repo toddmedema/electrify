@@ -2,7 +2,7 @@ import type { FrozenStartingIntertieAccessType, ScenarioType } from "../Types";
 import { getLocation, getScenarioLocation } from "./Locations";
 import { canonicalRuleJson } from "./RuleIdentity";
 
-/** Versioned source facts, independent of later native catalog allocations. */
+/** Researched source facts frozen by the first-release contract. */
 const WILDFIRE_ACCESS_V1: FrozenStartingIntertieAccessType = {
   version: 1,
   sourceScenarioId: 111,

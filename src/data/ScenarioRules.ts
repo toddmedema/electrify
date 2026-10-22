@@ -219,7 +219,7 @@ export interface CompiledRuleEvent {
     turningPointPriority?: number;
   };
   reports?: RuleReport[];
-  protection?: { kind: "deepFreezeWinterization" | "wildfirePreparedness" };
+  protection?: { kind: "deepFreezeWinterization" };
 }
 export interface CompiledRuleOption {
   id: string;

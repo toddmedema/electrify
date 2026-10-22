@@ -38,7 +38,7 @@ export interface OfficialArcSource {
 export interface CompiledOfficialArcEvent extends CompiledRuleEvent {
   source: OfficialArcSource;
   reports?: RuleReport[];
-  protection?: { kind: "deepFreezeWinterization" | "wildfirePreparedness" };
+  protection?: { kind: "deepFreezeWinterization" };
 }
 
 export interface OfficialArcCompileParameters {
@@ -259,6 +259,7 @@ export function validOfficialArcMetadata(value: unknown): boolean {
     ]) ||
     !IMPORTABLE_ARCS.includes(Number(source.scenarioId)) ||
     typeof source.scenarioId !== "number" ||
+    (source.scenarioId === 111 && source.arcId !== "wildfire-intertie") ||
     !identifier(source.arcId) ||
     !identifier(source.phaseId) ||
     (source.previewTitle !== undefined &&
@@ -297,12 +298,9 @@ export function validOfficialArcMetadata(value: unknown): boolean {
   if (
     source.drawKey !== undefined &&
     !(
-      (source.scenarioId === 104 &&
-        source.arcId === "hurricane-2008" &&
-        source.phaseId === "landfall") ||
-      (source.scenarioId === 111 &&
-        source.arcId === "california-wildfire-2025" &&
-        source.phaseId === "firestorm")
+      source.scenarioId === 104 &&
+      source.arcId === "hurricane-2008" &&
+      source.phaseId === "landfall"
     )
   )
     return false;
@@ -315,18 +313,11 @@ export function validOfficialArcMetadata(value: unknown): boolean {
   if (value.protection !== undefined) {
     if (!record(value.protection) || !only(value.protection, ["kind"]))
       return false;
-    if (
-      !(
-        value.protection.kind === "deepFreezeWinterization" &&
-        source.scenarioId === 107 &&
-        source.phaseId === "uri"
-      ) &&
-      !(
-        value.protection.kind === "wildfirePreparedness" &&
-        source.scenarioId === 111 &&
-        source.phaseId === "firestorm"
-      )
-    )
+    if (!(
+      value.protection.kind === "deepFreezeWinterization" &&
+      source.scenarioId === 107 &&
+      source.phaseId === "uri"
+    ))
       return false;
   }
   // Generic compiled-event/report validation owns effects, targets and report quantities.
