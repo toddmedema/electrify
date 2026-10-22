@@ -94,16 +94,16 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Prepare crews and equipment for January's Santa Ana winds, or keep cash.",
+      "Reserve local backup for critical sites during January's fire response, or keep cash.",
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
         description:
-          "Halve customer disconnections and generator output losses in January and February.",
+          "Reserve one mobile generator: up to 150 kW for 24 hours (3.6 MWh) at eligible local critical sites.",
         message:
-          "Preparedness halves January–February disconnections and output losses. Repair costs stay the same.",
+          "Local critical-load backup reserved: 150 kW for 24 hours (3.6 MWh). Fire isolation and repair costs remain.",
       },
       {
         id: "standard",
@@ -111,9 +111,9 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         label: "Keep cash",
         cost: () => 0,
         description:
-          "Save cash and accept January and February’s full customer disconnections and generator output losses.",
+          "Keep the deployment budget. Respond to damaged lines and customer interruptions without the reserved local backup.",
         message:
-          "Cash kept. January–February disconnections, output losses and repair costs apply in full.",
+          "Cash kept. Standard response applies, with no reserved local critical-load backup.",
       },
     ],
   },

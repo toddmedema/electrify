@@ -432,7 +432,7 @@ describe("authored starting fleets", () => {
       },
     });
     expect(wildfire.briefing?.threat).toMatch(
-      /safety shutoffs.*sales.*restoration costs/i,
+      /fire damage.*emergency isolation.*sales.*connected grid.*repair costs/i,
     );
     expect(
       wildfire.facilities.reduce(

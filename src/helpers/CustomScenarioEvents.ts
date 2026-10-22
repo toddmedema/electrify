@@ -3,6 +3,7 @@ import { getStartingCustomers } from "../data/LocationProfiles";
 import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
 import { ScenarioType } from "../Types";
+import { CALIFORNIA_WILDFIRE_REPAIR_COST_YEAR } from "../data/CaliforniaWildfire";
 import { getScenarioLocation } from "./Locations";
 
 export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
@@ -48,15 +49,25 @@ export function customEventContext(scenario?: ScenarioType) {
     (scenario.startingDemandScale || 1);
   return CUSTOM_EVENT_SCENARIOS.filter((source) =>
     scenario.eventScenarioIds?.includes(source.id),
-  ).map((source) => ({
-    scenarioId: source.id,
-    moneyScale:
-      (demand /
-        ((source.startingCustomers ||
-          getStartingCustomers(getScenarioLocation(source))) *
-          (source.startingDemandScale || 1))) *
-      inEraMoney(1, scenario.startingYear, source.startingYear),
-  }));
+  ).map((source) => {
+    // Wildfire repairs are sourced in the event's 2025 dollars, not its 2022 starting money.
+    // Preserve the same event lead time when moving that cost to the receiving scenario.
+    const sourceCostYear =
+      source.id === 111
+        ? CALIFORNIA_WILDFIRE_REPAIR_COST_YEAR
+        : source.startingYear;
+    const receivingCostYear =
+      scenario.startingYear + sourceCostYear - source.startingYear;
+    return {
+      scenarioId: source.id,
+      moneyScale:
+        (demand /
+          ((source.startingCustomers ||
+            getStartingCustomers(getScenarioLocation(source))) *
+            (source.startingDemandScale || 1))) *
+        inEraMoney(1, receivingCostYear, sourceCostYear),
+    };
+  });
 }
 
 export function standardCustomRate(scenario: ScenarioType): number {

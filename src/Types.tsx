@@ -440,6 +440,10 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     supplyW: number; // Watts
     availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
+    /** Load isolated from the grid, before finite local emergency backup. Monthly energy equivalent. */
+    disconnectedDemandW?: number;
+    /** Emergency power delivered locally; excluded from grid dispatch and electricity sales. */
+    localBackupW?: number;
     reserveW?: number; // Signed supply margin plus local spare output reachable next tick
     importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity
     // Components sum to demandW; monthly chart averages preserve the breakdown in saves.
@@ -526,6 +530,9 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  /** Isolated customer energy left unserved after local emergency backup. */
+  interruptedWh?: number;
+  localBackupWh?: number;
   // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;
@@ -1083,33 +1090,13 @@ export interface GameEventType {
 export type StoryAttributeValueType =
   string | number | boolean | string[] | number[];
 
-/**
- * Authored regional wildfire hazard for recurring, location-aware emergencies.
- *
- * These are explicitly simplified game balance values, not observed fire statistics: the monthly
- * weights shape a seasonal risk that is never a guaranteed fire, and the severity bounds are the
- * readable range an incident may land in. Unknown locations carry no profile and therefore no
- * inferred risk.
- */
+/** NOAA heavy-smoke observations and a separately sourced severe-episode solar template. */
 export interface WildfireProfileType {
-  /** Expected disruptive incidents per year at baseline weather (sum of monthly weights is one). */
-  annualHazard: number;
-  /** Twelve monthly weights, index 0 = January, summing to one over the year. */
-  monthlyWeights: number[];
-  /** Share of customer load disconnected by safety shutoffs, sampled per incident. */
-  disconnectedDemand: { min: number; max: number };
-  /** Output retained by affected generators, sampled per incident. */
-  outputMultiplier: { min: number; max: number };
-  /** Share of fleet peak capacity constrained, sampled per incident. */
-  targetCapacityShare: { min: number; max: number };
-  /** Restoration cost per MWh of exposed monthly demand, charged each active month. */
-  restorationCostPerMWh: number;
-  /** Months after an incident before the next one may start. */
-  cooldownMonths: number;
-  /** Month (0-based) each fire season starts, used for the preparedness preview. */
-  preparednessMonth: number;
-  /** How many months the fire season lasts; ongoing preparedness also covers off-season fires. */
-  preparednessDurationMonths: number;
+  locationId: "LA" | "SF";
+  sourceYears: number[];
+  dailyReferenceAttenuation: number[];
+  localStartHour: number;
+  localEndHour: number;
 }
 
 export type WeatherHazardType = "HAIL" | "EXTREME_COLD";
@@ -1166,7 +1153,15 @@ export interface FacilityUpgradeInProgressType {
 export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
+  /** Share of incident sunlight retained, applied before rooftop and utility PV; [0, 1]. */
+  solarIrradianceMultiplier?: number;
+  /** Additional attenuation only in specified local hours (integer keys 0–23); values [0, 1]. */
+  solarIrradianceMultipliersByHour?: Record<string, number>;
   demandMultiplier?: number;
+  /** Monthly energy-equivalent share isolated by local delivery damage; [0, 1]. */
+  serviceInterruptionFraction?: number;
+  /** Finite emergency energy available locally in each active month, independent of grid supply. */
+  localBackupWhPerMonth?: number;
   /** Multiplies modeled watershed inflow before it reaches a hydro reservoir. */
   hydroRunoffMultiplier?: number;
   // An override rather than a multiplier. Content validation rejects overlapping policy phases.
@@ -1394,6 +1389,8 @@ export interface GameType {
   date: DateType;
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
+  /** A schema upgrade retired obsolete incident effects; rebuild only unplayed ticks after loading. */
+  wildfireForecastRefresh?: boolean;
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   // Newest first, capped at MAX_EVENTS.
   eventLog: GameEventType[];

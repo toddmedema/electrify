@@ -11,6 +11,7 @@ const laCustomScenario: ScenarioType = {
   ...wildfireScenario,
   id: CUSTOM_SCENARIO_ID,
   name: "Custom LA",
+  facilities: [{ name: "Natural Gas Peaker", peakW: 20e6 }],
 };
 
 const SEEDS = [101, 202, 303, 404, 505, 606];
@@ -77,34 +78,34 @@ describe("recurring wildfire hazard balance (many seeds, real reducer)", () => {
     off.forEach((result) => expect(result.violationCount).toBe(0));
   });
 
-  it("produces incidents, disconnected energy and restoration cost only when enabled", () => {
+  it("replays observed smoke without inventing outages, repair bills or gas derates", () => {
     const onAgg = aggregate(on);
     const offAgg = aggregate(off);
 
     // The hazard is not vacuous: at least one incident across the sample.
     expect(onAgg.incidents).toBeGreaterThan(0);
-    // Enabled runs book disconnected energy and restoration cost; disabled runs book none.
-    expect(onAgg.disconnectedWh).toBeGreaterThan(0);
-    expect(onAgg.restorationCost).toBeGreaterThan(0);
+    // Overhead smoke alone establishes neither disconnected load nor physical damage.
+    expect(onAgg.disconnectedWh).toBe(0);
+    expect(onAgg.restorationCost).toBe(0);
     expect(offAgg.incidents).toBe(0);
     expect(offAgg.disconnectedWh).toBe(0);
     expect(offAgg.restorationCost).toBe(0);
 
-    // Severity stays within the authored bounds.
-    on.forEach((result) => {
-      result.storyOccurrences
-        .filter((e) => e.definitionId === "recurring-wildfire")
-        .forEach((incident) => {
-          const severity = incident.attributes.severity as number;
-          expect(severity).toBeGreaterThanOrEqual(0);
-          expect(severity).toBeLessThan(1);
-        });
+    on.forEach((result, index) => {
+      const incidents = result.storyOccurrences.filter(
+        (e) => e.definitionId === "wildfire-smoke",
+      );
+      incidents.forEach((incident) => {
+        expect(incident.attributes.heavySmokeDays).toBeGreaterThan(0);
+        expect(Object.keys(incident.effects)).toEqual([
+          "solarIrradianceMultipliersByHour",
+        ]);
+      });
+      // The same non-solar fleet has exactly the same service and finances over ten years.
+      const flows = (result: SimResultType) =>
+        result.months.map(({ chartAverage: _chartAverage, ...month }) => month);
+      expect(flows(result)).toEqual(flows(off[index]));
     });
-
-    // The hazard degrades connected-demand reliability relative to the identical no-hazard run.
-    const onReliability = onAgg.reliabilitySum / SEEDS.length;
-    const offReliability = offAgg.reliabilitySum / SEEDS.length;
-    expect(onReliability).toBeLessThan(offReliability);
   });
 
   it("does not guarantee bankruptcy: most enabled runs still complete", () => {

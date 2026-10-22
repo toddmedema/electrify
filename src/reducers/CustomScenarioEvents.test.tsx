@@ -87,13 +87,16 @@ test("an imported wildfire can be prepared for in an unprofiled location without
   const normal = incident(game);
   const protectedFire = incident(funded);
   expect(protectedFire.attributes.preparednessEffectiveness).toBe(1);
-  expect(1 - protectedFire.effects.demandMultiplier!).toBeCloseTo(
-    (1 - normal.effects.demandMultiplier!) / 2,
+  expect(protectedFire.effects.serviceInterruptionFraction).toBe(
+    normal.effects.serviceInterruptionFraction,
   );
+  expect(protectedFire.effects.localBackupWhPerMonth).toBe(3_600_000);
+  expect(normal.effects.localBackupWhPerMonth).toBe(0);
+  expect(protectedFire.effects.facilityOutputMultipliersById).toBeUndefined();
   expect(protectedFire.effects.operatingExpensePerMonth).toBe(
     normal.effects.operatingExpensePerMonth,
   );
-  expect(incident(funded, 37).effects).toEqual(protectedFire.effects);
+  expect(incident(funded, 37)).toBeUndefined();
 });
 
 test("changing custom event selection with the same seed invalidates forecast effects", () => {

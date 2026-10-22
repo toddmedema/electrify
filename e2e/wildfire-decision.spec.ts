@@ -22,12 +22,12 @@ for (const theme of ["light", "dark"]) {
     await expect(region).toBeVisible({ timeout: 75000 });
     await expectDialogToFit(region);
     const fund = region.getByRole("button", {
-      name: /^Fund preparedness \(\$2M\)$/,
+      name: /^Fund preparedness \(\$200k\)$/,
     });
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Paused");
-    await expect(region).not.toContainText("Spend $2M");
-    await expect(region).toContainText("Prepare crews and equipment");
+    await expect(region).toContainText("Reserve local backup");
+    await expect(region).toContainText("150 kW for 24 hours (3.6 MWh)");
     await expect(region).not.toContainText("Cash available");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")
@@ -107,14 +107,19 @@ for (const theme of ["light", "dark"]) {
     );
     await fast.click();
     await expect(
-      page.getByText("Through Feb 2025", { exact: true }),
+      page.getByText("Through Jan 2025", { exact: true }),
     ).toBeVisible({
       timeout: 15000,
     });
+    await page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
     await expect(
       page.getByText(
         theme === "light"
-          ? /Prepared crews are in place/
+          ? /Reserved local backup provides up to 150 kW/
           : /Standard response is in place/,
       ),
     ).toBeVisible();

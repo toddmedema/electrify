@@ -12,6 +12,14 @@ import type { GameType, VictoryType } from "./Types";
 import { achievementHooks } from "./achievements/Achievements";
 import { installSimulationHooks } from "./achievements/SimulationHooks";
 import { emptyPolicies } from "./helpers/Policies";
+import gameReducer, {
+  generateNewTimeline,
+  loaded,
+  resume,
+  tickState,
+} from "./reducers/Game";
+import { MINUTES_PER_MONTH } from "./helpers/DateTime";
+import { serializeCommitmentMetadata } from "./helpers/Commitment";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const OLD_RULES = legacyFile.save.game.runIdentity.compatibilityId;
@@ -31,6 +39,135 @@ function challengedSave() {
 }
 
 describe("save upgrades", () => {
+  it.each(["recurring-wildfire", "california-wildfire-2025:firestorm"])(
+    "retires schema 3 active %s effects while preserving booked progress and rebuilding only future ticks",
+    (definitionId) => {
+      const game = createGame({
+        scenarioId: 101,
+        seed: 31337,
+        initialBuild: {
+          name: "Natural Gas Peaker",
+          peakW: 500_000_000,
+          financed: true,
+        },
+      });
+      game.facilities = game.facilities.filter(
+        (facility) => facility.fuel === "Natural Gas",
+      );
+      game.facilities[0].yearsToBuildLeft = 0;
+      runMonths(game, 1);
+      game.challenge = {
+        run: projectAuthoredRunReference(game.runIdentity)!,
+        target: 400,
+      };
+      const legacy = {
+        key: `wildfire:${definitionId}:old`,
+        definitionId,
+        startsMinute: MINUTES_PER_MONTH,
+        endsMinute: 3 * MINUTES_PER_MONTH,
+        attributes: {
+          outputMultiplier: 0.25,
+          selectedFacilityIds: [game.facilities[0].id],
+        },
+        effects: {
+          demandMultiplier: 0.9,
+          facilityOutputMultipliersById: { [game.facilities[0].id]: 0.25 },
+          operatingExpensePerMonth: 1_000_000,
+        },
+      };
+      const completed = {
+        ...legacy,
+        key: "wildfire:completed",
+        startsMinute: 0,
+        endsMinute: 1,
+      };
+      game.worldEvents.active = [legacy];
+      game.worldEvents.occurrences = [completed, legacy];
+      const opening = game.timeline[0];
+      game.timeline = generateNewTimeline(
+        game,
+        opening.cash,
+        opening.customers,
+      );
+      for (let index = 0; index < 8; index++) tickState(game);
+      const raw = clone(serializeSave(game));
+      raw.schemaVersion = 3;
+      raw.game.runIdentity!.compatibilityId = OLD_RULES;
+      raw.game.challenge!.run.compatibilityId = OLD_RULES;
+      const source = JSON.stringify(raw);
+      const restored = parseSave(raw)!;
+      expect(restored.schemaVersion).toBe(4);
+      expect(restored.game.worldEvents.active[0].effects).toEqual({});
+      expect(restored.game.worldEvents.occurrences).toEqual(
+        raw.game.worldEvents.occurrences,
+      );
+      expect(restored.game.wildfireForecastRefresh).toBe(true);
+      expect(restored.commitmentForecast).toEqual(raw.commitmentForecast);
+      expect(restored.game.monthlyHistory).toEqual(raw.game.monthlyHistory);
+      expect(restored.game.facilities).toEqual(raw.game.facilities);
+      expect(restored.game.replayLog).toEqual(raw.game.replayLog);
+      expect(restored.game.challenge).toEqual(game.challenge);
+      expect(restored.game.runIdentity).toEqual(game.runIdentity);
+      expect(JSON.stringify(raw)).toBe(source);
+      const committed = raw.game.timeline.filter(
+        (tick) => tick.minute <= game.date.minute,
+      );
+      const committedMetadata = serializeCommitmentMetadata(
+        restored.game.timeline.filter(
+          (tick) => tick.minute <= game.date.minute,
+        ),
+      );
+      const loadedGame = gameReducer(
+        gameReducer(undefined, resume(restored.game)),
+        loaded(),
+      );
+      expect(loadedGame.wildfireForecastRefresh).toBeUndefined();
+      expect(
+        loadedGame.timeline.filter((tick) => tick.minute <= game.date.minute),
+      ).toEqual(committed);
+      expect(
+        serializeCommitmentMetadata(
+          loadedGame.timeline.filter((tick) => tick.minute <= game.date.minute),
+        ),
+      ).toEqual(committedMetadata);
+      expect(loadedGame.monthlyHistory).toEqual(raw.game.monthlyHistory);
+      expect(loadedGame.facilities).toEqual(raw.game.facilities);
+      expect(loadedGame.replayLog).toEqual(raw.game.replayLog);
+      const future = loadedGame.timeline.filter(
+        (tick) => tick.minute > game.date.minute,
+      );
+      expect(future.length).toBeGreaterThan(0);
+      expect(
+        Math.max(
+          ...future.map((tick) => tick.supplyByFuel["Natural Gas"] || 0),
+        ),
+      ).toBeGreaterThan(game.facilities[0].peakW * 0.25);
+      expect(upgradeSave(restored)).toEqual(restored);
+    },
+  );
+
+  it("does not reinterpret completed legacy wildfire records or repair corrupt active effects", () => {
+    const raw = clone(serializeSave(createGame({ scenarioId: 101 })));
+    raw.schemaVersion = 3;
+    const completed = {
+      key: "wildfire:old",
+      definitionId: "recurring-wildfire",
+      startsMinute: 0,
+      endsMinute: 0,
+      attributes: { outputMultiplier: 0.25 },
+      effects: { demandMultiplier: 0.9, operatingExpensePerMonth: 1000 },
+    };
+    raw.game.worldEvents.active = [completed];
+    raw.game.worldEvents.occurrences = [completed];
+    const restored = parseSave(raw)!;
+    expect(restored.game.worldEvents).toEqual(raw.game.worldEvents);
+    expect(restored.game.wildfireForecastRefresh).toBeUndefined();
+    raw.game.worldEvents.active = [
+      { ...completed, endsMinute: 1440, effects: { demandMultiplier: -1 } },
+    ];
+    expect(parseSave(raw)).toBeNull();
+  });
+
   it("upgrades schema 2 programs with new offers Off while preserving existing cohorts and spending", () => {
     const game = createGame({
       scenarioId: 100,

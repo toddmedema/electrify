@@ -217,9 +217,20 @@ describe("major scenario choice balance", () => {
       });
       expect(physicalObjectiveFailure(prepared)).toBeUndefined();
       expect(physicalObjectiveFailure(standard)).toBeUndefined();
-      // With scarce imports, avoided disruptions can outweigh the preparedness fee.
-      // Do not force the free response to dominate the financed outcome in every grid.
-      expect(standard.finalCash).not.toBe(prepared.finalCash);
+      // Reserving local support costs money; its finite service benefit is recorded separately.
+      expect(standard.finalCash).toBeGreaterThan(prepared.finalCash);
+      expect(
+        prepared.months.reduce(
+          (sum, month) => sum + (month.localBackupWh ?? 0),
+          0,
+        ),
+      ).toBeCloseTo(3.6e6, 4);
+      expect(
+        standard.months.reduce(
+          (sum, month) => sum + (month.localBackupWh ?? 0),
+          0,
+        ),
+      ).toBe(0);
     },
   );
 });

@@ -69,10 +69,13 @@ export function validWorldEvent(value: unknown): boolean {
     return false;
   const scalarEffects = [
     "temperatureOffsetC",
+    "solarIrradianceMultiplier",
     "demandMultiplier",
     "hydroRunoffMultiplier",
     "carbonFeePerKgCO2e",
     "operatingExpensePerMonth",
+    "serviceInterruptionFraction",
+    "localBackupWhPerMonth",
   ];
   const mapEffects = [
     "fuelPriceMultipliers",
@@ -83,13 +86,28 @@ export function validWorldEvent(value: unknown): boolean {
   ];
   if (
     !Object.entries(value.effects).every(([key, effect]) =>
-      scalarEffects.includes(key)
-        ? finite(effect) && (key === "temperatureOffsetC" || effect >= 0)
-        : mapEffects.includes(key) &&
-          record(effect) &&
-          Object.values(effect).every(
-            (amount) => finite(amount) && amount >= 0,
-          ),
+      key === "solarIrradianceMultipliersByHour"
+        ? record(effect) &&
+          Object.entries(effect).every(
+            ([hour, amount]) =>
+              /^(?:[0-9]|1[0-9]|2[0-3])$/.test(hour) &&
+              finite(amount) &&
+              amount >= 0 &&
+              amount <= 1,
+          )
+        : scalarEffects.includes(key)
+          ? finite(effect) &&
+            (key === "temperatureOffsetC" || effect >= 0) &&
+            (![
+              "solarIrradianceMultiplier",
+              "serviceInterruptionFraction",
+            ].includes(key) ||
+              effect <= 1)
+          : mapEffects.includes(key) &&
+            record(effect) &&
+            Object.values(effect).every(
+              (amount) => finite(amount) && amount >= 0,
+            ),
     )
   )
     return false;

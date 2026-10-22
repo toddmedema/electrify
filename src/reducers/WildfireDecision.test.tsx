@@ -96,25 +96,31 @@ test("preparedness costs cash once, records operating expense and survives save/
   ).toEqual(after);
 });
 
-test("prepared crews halve physical losses, keep restoration cost, and recovery explains the choice", () => {
+test("preparedness reserves finite local backup without changing isolation, plants or repairs", () => {
   const before = ready();
   const after = reducer(before, chooseWildfireResponse("prepare"));
   const standard = emergency(before).effects;
   const prepared = emergency(after).effects;
-  expect(1 - prepared.demandMultiplier!).toBeCloseTo(
-    (1 - standard.demandMultiplier!) / 2,
+  expect(prepared.serviceInterruptionFraction).toBe(
+    standard.serviceInterruptionFraction,
   );
-  for (const [id, output] of Object.entries(
-    standard.facilityOutputMultipliersById!,
-  ))
-    expect(prepared.facilityOutputMultipliersById![id]).toBe((1 + output) / 2);
+  expect(prepared.facilityOutputMultipliersById).toBeUndefined();
+  expect(prepared.facilityOutputMultipliersByFuel).toBeUndefined();
+  expect(standard.localBackupWhPerMonth).toBe(0);
+  expect(prepared.localBackupWhPerMonth).toBe(3_600_000);
   expect(prepared.operatingExpensePerMonth).toBe(
     standard.operatingExpensePerMonth,
   );
-  expect(emergency(after, 14).occurrences[0].message).toContain(
-    "funded preparedness",
+  expect(emergency(after, 13).effects).toMatchObject({
+    operatingExpensePerMonth: 260_000,
+  });
+  expect(
+    emergency(after, 13).effects.serviceInterruptionFraction,
+  ).toBeUndefined();
+  expect(emergency(after, 15).occurrences[0].message).toContain(
+    "finite backup",
   );
-  expect(emergency(after, 14).effects).toEqual({});
+  expect(emergency(after, 15).effects).toEqual({});
 });
 
 test("keeping cash retains baseline effects", () => {
@@ -186,7 +192,7 @@ test("another reforecast preserves the upfront charge in O&M", () => {
   expect(now(forecast).cash).toBe(now(funded).cash);
 });
 
-test("forecast refresh includes funded disconnections without changing customer counts", () => {
+test("forecast refresh keeps isolated grid demand identical with either backup choice", () => {
   const before = ready();
   const after = cloneDeep(reducer(before, chooseWildfireResponse("prepare")));
   const standard = cloneDeep(before);
@@ -198,7 +204,7 @@ test("forecast refresh includes funded disconnections without changing customer 
   const baseline = generateNewTimeline(standard, 100000000, 1000000);
   const prepared = generateNewTimeline(after, 100000000, 1000000);
   expect(prepared[0].customers).toBe(baseline[0].customers);
-  expect(prepared[0].demandW / baseline[0].demandW).toBeCloseTo(0.98 / 0.96, 8);
+  expect(prepared[0].demandW).toBe(baseline[0].demandW);
   const repeatedBaseline = generateNewTimeline(standard, 100000000, 1000000);
   expect(repeatedBaseline[0].demandW).toBe(baseline[0].demandW);
 });
@@ -227,14 +233,21 @@ test("an unanswered choice blocks ticks and speed changes and survives save/load
 
 // Preparation is an advance resource package, independent of later damage/restoration.
 test.each(["Intern", "Employee", "Manager", "VP", "CEO"] as const)(
-  "wildfire preparation commits a meaningful $2M budget on %s",
-  (difficulty) => expect(wildfirePreparationCost(difficulty)).toBe(2000000),
+  "wildfire preparation uses the same $200k readiness allowance on %s",
+  (difficulty) => expect(wildfirePreparationCost(difficulty)).toBe(200000),
 );
 
-test("restoration scales with authored damage severity independently of advance preparation", () => {
+test("historical restoration and isolation stay the same across difficulties", () => {
   expect(
     Object.values(CALIFORNIA_WILDFIRE_BALANCE).map(
       (b) => b.restorationCostPerMonth,
     ),
-  ).toEqual([350000, 700000, 1000000, 1350000, 1700000]);
+  ).toEqual([260000, 260000, 260000, 260000, 260000]);
+  expect(
+    new Set(
+      Object.values(CALIFORNIA_WILDFIRE_BALANCE).map(
+        (balance) => balance.serviceInterruptionFraction,
+      ),
+    ).size,
+  ).toBe(1);
 });

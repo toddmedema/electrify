@@ -18,6 +18,15 @@ import { buildLeadTimeHint } from "../helpers/BuildLeadTime";
 import { randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
 import { wildfirePreparednessEffectiveness } from "../helpers/Wildfire";
+import {
+  CALIFORNIA_WILDFIRE_ACCOUNT_HOURS,
+  CALIFORNIA_WILDFIRE_BACKUP_HOURS,
+  CALIFORNIA_WILDFIRE_BACKUP_POWER_W,
+  CALIFORNIA_WILDFIRE_BACKUP_WH,
+  CALIFORNIA_WILDFIRE_READINESS_COST,
+  CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
+  CALIFORNIA_WILDFIRE_SERVICE_INTERRUPTION_FRACTION,
+} from "./CaliforniaWildfire";
 
 export interface StoryContextType {
   customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
@@ -1363,52 +1372,25 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
 };
 
 export interface CaliforniaWildfireBalanceType {
-  disconnectedDemand: number;
-  targetCapacityShare: number;
-  outputMultiplier: number;
+  serviceInterruptionFraction: number;
   restorationCostPerMonth: number;
 }
 
-// Restoration is an inferred damage-severity proxy, not a validated cost curve:
-// LADWP's $78M electric restoration estimate × 1% municipal scale × 0.97436
-// (2025 to 2024 dollars) gives about $760k at 2.2375% disconnected customers.
-// Scale with the scenario's 2–10% severity, divide over January/February, and round.
-// See src/testing/SCENARIO_CHOICE_BALANCE.md; advance preparation remains separate.
+// Historical exposure and repairs do not change with difficulty. The scenario's operating
+// economics supply the financial challenge; difficulty must not alter this physical evidence.
 export const CALIFORNIA_WILDFIRE_BALANCE: Record<
   DifficultyType,
   CaliforniaWildfireBalanceType
-> = {
-  Intern: {
-    disconnectedDemand: 0.02,
-    targetCapacityShare: 0.3,
-    outputMultiplier: 0.65,
-    restorationCostPerMonth: 350000,
-  },
-  Employee: {
-    disconnectedDemand: 0.04,
-    targetCapacityShare: 0.4,
-    outputMultiplier: 0.55,
-    restorationCostPerMonth: 700000,
-  },
-  Manager: {
-    disconnectedDemand: 0.06,
-    targetCapacityShare: 0.5,
-    outputMultiplier: 0.45,
-    restorationCostPerMonth: 1000000,
-  },
-  VP: {
-    disconnectedDemand: 0.08,
-    targetCapacityShare: 0.6,
-    outputMultiplier: 0.35,
-    restorationCostPerMonth: 1350000,
-  },
-  CEO: {
-    disconnectedDemand: 0.1,
-    targetCapacityShare: 0.7,
-    outputMultiplier: 0.25,
-    restorationCostPerMonth: 1700000,
-  },
-};
+> = Object.fromEntries(
+  DIFFICULTY_ORDER.map((difficulty) => [
+    difficulty,
+    {
+      serviceInterruptionFraction:
+        CALIFORNIA_WILDFIRE_SERVICE_INTERRUPTION_FRACTION,
+      restorationCostPerMonth: CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
+    },
+  ]),
+) as Record<DifficultyType, CaliforniaWildfireBalanceType>;
 
 export const WILDFIRE_DECISION_KEY =
   "story:111:california-wildfire-2025:preparedness";
@@ -1423,11 +1405,10 @@ export function wildfirePrepared(
     ) ?? false
   );
 }
-// Advance inspection, staged backup equipment and response resources for the small
-// municipal system, priced for a meaningful cash-versus-resilience decision rather
-// than the lower historical spending proxy; post-fire restoration is separate.
+// Reserve finite local critical-load backup and its deployment resources. Post-fire repairs
+// remain separate; this allowance is a transferred readiness proxy, not a hardware quotation.
 export function wildfirePreparationCost(_difficulty: DifficultyType): number {
-  return 2000000;
+  return CALIFORNIA_WILDFIRE_READINESS_COST;
 }
 
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
@@ -1451,75 +1432,38 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
     {
       id: "firestorm",
       schedule: { atMonth: 12 },
-      durationMonths: 2,
+      durationMonths: 1,
       preview: (context) => ({
         title: "Wildfires may disrupt power",
         message: wildfirePrepared(context.occurrences)
-          ? "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses."
-          : "Extreme fire weather may force safety shutoffs and limit generation.",
+          ? "Damaged lines may interrupt customer service. Reserved backup will support local critical loads."
+          : "Damaged lines may interrupt customer service as repair costs mount.",
       }),
-      describe: (context, random) => {
-        const original = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
+      describe: (context) => {
+        const balance = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
         const prepared = wildfirePrepared(context.occurrences);
-        const balance = {
-          ...original,
-          disconnectedDemand:
-            original.disconnectedDemand * (prepared ? 0.5 : 1),
-          outputMultiplier: prepared
-            ? (1 + original.outputMultiplier) / 2
-            : original.outputMultiplier,
-        };
-        const candidates = context.snapshot.facilities
-          .filter((facility) => facility.operational && !!facility.fuel)
-          .map((facility) => ({
-            ...facility,
-            score: random(`facility|${facility.id}`),
-          }))
-          .sort((a, b) => a.score - b.score || a.id - b.id);
-        const totalPeakW = candidates.reduce(
-          (total, facility) => total + facility.peakW,
-          0,
-        );
-        const targetPeakW = totalPeakW * balance.targetCapacityShare;
-        const selected: typeof candidates = [];
-        let selectedPeakW = 0;
-        for (const candidate of candidates) {
-          if (selectedPeakW >= targetPeakW) {
-            break;
-          }
-          selected.push(candidate);
-          selectedPeakW += candidate.peakW;
-        }
-        const outputMultipliers = Object.fromEntries(
-          selected.map((facility) => [
-            String(facility.id),
-            balance.outputMultiplier,
-          ]),
-        );
-        const selectedNames = selected.map((facility) => facility.name);
-        const affectedFacilities = selectedNames.length
-          ? selectedNames.join(", ")
-          : "No operating generators are affected";
         return {
           title: "Wildfire emergency",
-          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer demand is disconnected. ${affectedFacilities}${selectedNames.length ? `: output is down to ${percent(balance.outputMultiplier)}` : ""}. Repairs cost $${balance.restorationCostPerMonth / 1000000}M/month through February.`,
+          message: `Fire damage and emergency isolation interrupt customer service. Estimated January 14–28 interruptions equal ${(balance.serviceInterruptionFraction * 100).toFixed(2)}% of monthly demand. ${prepared ? "Reserved local backup provides up to 150 kW for 24 hours (3.6 MWh) at eligible critical sites. " : "Standard response is in place. "}Response and repairs cost $0.26M/month through March.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
-          actionTarget: FLEET_TARGET,
+          actionTarget: { card: "EVENTS" },
           attributes: {
             prepared,
-            disconnectedDemand: balance.disconnectedDemand,
-            targetCapacityShare: balance.targetCapacityShare,
-            selectedCapacityShare: share(selectedPeakW, totalPeakW),
-            selectedFacilityIds: selected.map((facility) => facility.id),
-            selectedFacilityNames: selectedNames,
-            outputMultiplier: balance.outputMultiplier,
+            evidenceId: "ladwp-2025-jan14-28",
+            estimatedAccountHours: CALIFORNIA_WILDFIRE_ACCOUNT_HOURS,
+            serviceInterruptionFraction: balance.serviceInterruptionFraction,
+            localBackupPowerW: prepared
+              ? CALIFORNIA_WILDFIRE_BACKUP_POWER_W
+              : 0,
+            localBackupHours: prepared ? CALIFORNIA_WILDFIRE_BACKUP_HOURS : 0,
+            localBackupWh: prepared ? CALIFORNIA_WILDFIRE_BACKUP_WH : 0,
             restorationCostPerMonth: balance.restorationCostPerMonth,
           },
           effects: {
-            demandMultiplier: 1 - balance.disconnectedDemand,
-            facilityOutputMultipliersById: outputMultipliers,
+            serviceInterruptionFraction: balance.serviceInterruptionFraction,
+            localBackupWhPerMonth: prepared ? CALIFORNIA_WILDFIRE_BACKUP_WH : 0,
             operatingExpensePerMonth: balance.restorationCostPerMonth,
           },
           turningPointPriority: 120,
@@ -1527,23 +1471,35 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       },
     },
     {
+      id: "repairs",
+      schedule: { atMonth: 13 },
+      durationMonths: 2,
+      preview: () => null,
+      describe: () => ({
+        title: "Wildfire repairs continue",
+        message:
+          "Crews rebuild damaged distribution equipment. Response and repairs cost $0.26M/month through March.",
+        concept: "supply",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "EVENTS" },
+        effects: {
+          operatingExpensePerMonth: CALIFORNIA_WILDFIRE_REPAIR_COST_PER_MONTH,
+        },
+      }),
+    },
+    {
       id: "restoration-complete",
-      schedule: { atMonth: 14 },
+      schedule: { atMonth: 15 },
       preview: () => null,
       describe: (context) => {
-        const period = context.periodSnapshots?.[2];
+        const period = context.periodSnapshots?.[3];
         const demandWh = period?.demandWh || context.snapshot.demandWh12m;
         const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
         const reliability = reliabilityOf(demandWh, unservedWh);
-        const onset = context.occurrences?.find(
-          (event) =>
-            event.key === "story:111:california-wildfire-2025:firestorm",
-        );
-        const selectedNames = (onset?.attributes.selectedFacilityNames ||
-          []) as string[];
         return {
-          title: "Wildfire restoration complete",
-          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved disconnections and output losses. " : ""}Safety shutoffs end and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal. The grid met ${percent(reliability)} of connected demand.`,
+          title: "Emergency restoration complete",
+          message: `Service to standing structures was restored by March 21. Rebuilding continues. ${wildfirePrepared(context.occurrences) ? "Your preparedness reserved finite backup for local critical loads. " : ""}The grid met ${percent(reliability)} of connected demand.`,
           concept: "supply",
           kind: "WORLD_EVENT",
           importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
@@ -2095,23 +2051,10 @@ export function validateStoryDifficultyMonotonicity(): string[] {
     ),
   );
   ascending(
-    "California wildfire disconnected demand",
+    "California wildfire service interruption",
     DIFFICULTY_ORDER.map(
       (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].disconnectedDemand,
-    ),
-  );
-  ascending(
-    "California wildfire affected capacity",
-    DIFFICULTY_ORDER.map(
-      (difficulty) =>
-        CALIFORNIA_WILDFIRE_BALANCE[difficulty].targetCapacityShare,
-    ),
-  );
-  descending(
-    "California wildfire output",
-    DIFFICULTY_ORDER.map(
-      (difficulty) => CALIFORNIA_WILDFIRE_BALANCE[difficulty].outputMultiplier,
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].serviceInterruptionFraction,
     ),
   );
   ascending(
@@ -2254,12 +2197,28 @@ export function combineStoryEffects(
     combined.demandMultiplier =
       (combined.demandMultiplier || 1) * (effects.demandMultiplier || 1);
     if (
+      combined.solarIrradianceMultiplier !== undefined ||
+      effects.solarIrradianceMultiplier !== undefined
+    ) {
+      combined.solarIrradianceMultiplier =
+        (combined.solarIrradianceMultiplier ?? 1) *
+        (effects.solarIrradianceMultiplier ?? 1);
+    }
+    if (
       combined.hydroRunoffMultiplier !== undefined ||
       effects.hydroRunoffMultiplier !== undefined
     ) {
       combined.hydroRunoffMultiplier =
         (combined.hydroRunoffMultiplier ?? 1) *
         (effects.hydroRunoffMultiplier ?? 1);
+    }
+    const solarIrradianceMultipliersByHour = multiplyEffects(
+      combined.solarIrradianceMultipliersByHour,
+      effects.solarIrradianceMultipliersByHour,
+    );
+    if (solarIrradianceMultipliersByHour !== undefined) {
+      combined.solarIrradianceMultipliersByHour =
+        solarIrradianceMultipliersByHour;
     }
     const fuelPriceMultipliers = multiplyEffects(
       combined.fuelPriceMultipliers,
@@ -2281,6 +2240,16 @@ export function combineStoryEffects(
     );
     if (operatingCostMultipliersByFuel !== undefined) {
       combined.operatingCostMultipliersByFuel = operatingCostMultipliersByFuel;
+    }
+    if (effects.serviceInterruptionFraction !== undefined) {
+      combined.serviceInterruptionFraction =
+        1 -
+        (1 - (combined.serviceInterruptionFraction ?? 0)) *
+          (1 - effects.serviceInterruptionFraction);
+    }
+    if (effects.localBackupWhPerMonth !== undefined) {
+      combined.localBackupWhPerMonth =
+        (combined.localBackupWhPerMonth ?? 0) + effects.localBackupWhPerMonth;
     }
     if (
       combined.operatingExpensePerMonth !== undefined ||
@@ -2347,18 +2316,16 @@ export function resolveStoryPhase(
         context.location.id,
         scheduledMonth * MINUTES_PER_MONTH,
       );
-      effects.demandMultiplier =
-        1 - (1 - (effects.demandMultiplier ?? 1)) * (1 - 0.5 * effectiveness);
-      effects.facilityOutputMultipliersById = Object.fromEntries(
-        Object.entries(effects.facilityOutputMultipliersById || {}).map(
-          ([id, output]) => [id, 1 - (1 - output) * (1 - 0.5 * effectiveness)],
-        ),
-      );
+      effects.localBackupWhPerMonth =
+        CALIFORNIA_WILDFIRE_BACKUP_WH * effectiveness;
       description.attributes = {
         ...description.attributes,
         preparednessEffectiveness: effectiveness,
         prepared: effectiveness > 0,
-        disconnectedDemand: 1 - effects.demandMultiplier,
+        localBackupPowerW: CALIFORNIA_WILDFIRE_BACKUP_POWER_W * effectiveness,
+        localBackupHours:
+          effectiveness > 0 ? CALIFORNIA_WILDFIRE_BACKUP_HOURS : 0,
+        localBackupWh: effects.localBackupWhPerMonth,
       };
     }
     if (effects.operatingExpensePerMonth !== undefined)
@@ -2369,6 +2336,14 @@ export function resolveStoryPhase(
     if (effects.demandMultiplier !== undefined)
       changes.push(
         `Demand: ${Math.round(effects.demandMultiplier * 100)}% of normal`,
+      );
+    if (effects.serviceInterruptionFraction !== undefined)
+      changes.push(
+        `Estimated interruptions from the historical January 14–28 window: ${(effects.serviceInterruptionFraction * 100).toFixed(2)}% of monthly demand`,
+      );
+    if (effects.localBackupWhPerMonth)
+      changes.push(
+        `Local critical-load backup: ${(effects.localBackupWhPerMonth / 1e6).toFixed(2)} MWh in total`,
       );
     if (effects.temperatureOffsetC)
       changes.push(
@@ -2409,6 +2384,9 @@ export function resolveStoryPhase(
       message: `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`,
       actionTarget: { card: "FACILITIES", view: "FLEET" },
     };
+    if (arc.scenarioId === 111 && phase.id === "restoration-complete") {
+      description.message = `${context.location.name}: Response and repair charges have ended. Rebuilding continues. The grid met ${percent(Number(description.attributes?.reliability ?? 1))} of connected demand during the response.`;
+    }
     const eventYear =
       context.date.year -
       Math.floor(context.date.monthsElapsed / 12) +

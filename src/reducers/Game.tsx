@@ -180,29 +180,21 @@ import {
   resolveStoryAtDate,
   STORY_ARC_DEFINITIONS,
 } from "../data/WorldEvents";
-import {
-  getMonthlyClimatology,
-  getRawSolarIrradianceWM2,
-  getWeather,
-} from "../data/Weather";
+import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
 import {
   wildfirePreparednessEffectiveness,
   wildfirePreparedness,
   wildfirePreparednessAnnualCost,
   wildfirePreparednessChange,
-  activeWildfire,
-  dailyFireWeatherReading,
   isWildfireHazardEligible,
   sampleWildfireIncident,
   WILDFIRE_DEFINITION_ID,
-  wildfireDraw,
-  wildfireInCooldown,
-  wildfireMonthlyProbability,
   wildfireIncidentEffects,
   wildfireOccurrenceKey,
-  weatherFireRiskModifier,
 } from "../helpers/Wildfire";
 import { getWildfireProfile } from "../data/WildfireProfiles";
+import { serviceInterruption } from "../helpers/ServiceInterruption";
+import { CALIFORNIA_WILDFIRE_BACKUP_KGCO2E_PER_MWH } from "../data/CaliforniaWildfire";
 import { COLD_MAX_GAS_PRICE_MULTIPLIER } from "../data/Hazards";
 import {
   activeWeatherHazardsFor,
@@ -751,164 +743,55 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
 }
 
 /**
- * Runs the recurring regional wildfire hazard check at monthly rollover, before this month's
- * forecast is built. An eligible location (a profiled area in a custom game -- never the authored
- * scenario 111, whose fixed firestorm is preserved) rolls one addressed draw per month. An
- * ignition persists a time-bounded occurrence whose effects flow through the same story-effect
- * machinery as authored events, so disconnected load, constrained generators and restoration cost
- * are accounted exactly once. The check is a pure function of (seed, location, absolute month),
- * so saving, forecasting or reordering evaluation cannot reroll it; the dedupe key keeps a resumed
- * month from announcing twice.
+ * Bootstrap a whole historical smoke year, preserving observed seasonality and clustering.
+ * Only NOAA heavy detections receive the separately sourced severe-episode solar template.
+ * No plant exposure, delivery interruption or repair expense is inferred from overhead smoke.
  */
 function updateWildfireHazards(state: GameType): void {
-  if (!isWildfireHazardEligible(state)) {
-    return;
-  }
+  if (!isWildfireHazardEligible(state)) return;
   const profile = getWildfireProfile(state.location.id);
-  if (!profile) {
-    return;
-  }
+  if (!profile) return;
   const locationId = state.location.id;
   const monthsElapsed = state.date.monthsElapsed;
-  // Report restoration for any wildfire that just expired at the start of this month. Occurrences
-  // retain expired incidents, so this is detected from them (active no longer holds it).
-  state.worldEvents.occurrences.forEach((event) => {
-    if (event.definitionId !== WILDFIRE_DEFINITION_ID) {
-      return;
-    }
-    if (!event.key.startsWith(`wildfire:${locationId}:`)) {
-      return;
-    }
-    if (event.endsMinute !== state.date.minute) {
-      return; // Still active, or expired in an earlier month.
-    }
-    const selectedNames = (event.attributes.selectedFacilityNames ||
-      []) as string[];
-    logGameEvent(
-      state,
-      "WORLD_EVENT",
-      `Wildfire restoration complete: safety shutoffs are lifted and ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal.`,
-      {
-        importance: "NOTABLE",
-        actionTarget: { card: "FACILITIES", view: "FLEET" },
-        title: "Wildfire restoration complete",
-        concept: "supply",
-        storyPhaseKey: event.key,
-        reportedKey: `wildfire-recovery:${event.key}`,
-      },
-    );
-  });
-  // One active wildfire per region, and a cooldown after each incident.
-  if (activeWildfire(state.worldEvents.active, locationId)) {
-    return;
-  }
-  if (
-    wildfireInCooldown(
-      state.worldEvents.occurrences,
-      locationId,
-      monthsElapsed,
-      profile,
-    )
-  ) {
-    return;
-  }
   const occurrenceKey = wildfireOccurrenceKey(locationId, monthsElapsed);
-  if (state.worldEvents.checkedKeys.includes(occurrenceKey)) {
-    return; // Already checked this month (e.g. a save resumed mid-month).
-  }
-  const monthIndex = state.date.monthNumber - 1;
-  const modifier = weatherFireRiskModifier(
-    dailyFireWeatherReading(state.date, state.seed),
-    getMonthlyClimatology(monthIndex),
-  );
-  const probability = wildfireMonthlyProbability(profile, monthIndex, modifier);
-  const ignites =
-    wildfireDraw(state.seed, locationId, monthsElapsed, "occurrence") <
-    probability;
-  if (!ignites) {
-    state.worldEvents.checkedKeys.push(occurrenceKey);
-    if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
-      state.worldEvents.checkedKeys.splice(
-        0,
-        state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
-      );
-    }
-    return;
-  }
-  const snapshot = buildStorySnapshot(
-    state.monthlyHistory,
-    state.facilities,
-    state.date.minute,
-  );
-  const effectiveness = wildfirePreparednessEffectiveness(
-    state.worldEvents.occurrences,
-    locationId,
-    monthsElapsed * MINUTES_PER_MONTH,
-  );
-  const prepared = effectiveness > 0;
+  if (state.worldEvents.checkedKeys.includes(occurrenceKey)) return;
+  state.worldEvents.checkedKeys.push(occurrenceKey);
   const incident = sampleWildfireIncident({
     profile,
     seed: state.seed,
     locationId,
     monthsElapsed,
-    snapshot,
-    effectiveness,
+    startingYear: state.startingYear,
   });
-  const startsMinute = monthsElapsed * MINUTES_PER_MONTH;
-  const endsMinute =
-    (monthsElapsed + incident.durationMonths) * MINUTES_PER_MONTH;
-  const affected = incident.selectedFacilityNames.length
-    ? incident.selectedFacilityNames.join(", ")
-    : "no operating generators";
-  const endLabel = getDateFromMinute(endsMinute - 1, state.startingYear);
-  const message = `${prepared ? `Prepared crews are in place. Preparedness is ${Math.round(effectiveness * 100)}% effective. ` : ""}${Math.round(incident.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affected} are limited to ${Math.round(incident.outputMultiplier * 100)}% output, with restoration costing ${formatMoneyConcise(incident.restorationCostPerMonth)} per month through ${endLabel.month} ${endLabel.year}.`;
+  if (!incident) {
+    trimWorldEventRecords(state);
+    return;
+  }
+  const message = `Solar receives about ${((1 - incident.solarIrradianceMultiplier) * 100).toFixed(1)}% less sunlight from 10am to 6pm this month because of wildfire smoke.`;
   const occurrence: ActiveWorldEventType = {
     key: occurrenceKey,
     definitionId: WILDFIRE_DEFINITION_ID,
-    startsMinute,
-    endsMinute,
-    // A hidden surprise until it happens; once persisted its effects still enter forecasts.
+    startsMinute: monthsElapsed * MINUTES_PER_MONTH,
+    endsMinute: (monthsElapsed + 1) * MINUTES_PER_MONTH,
     forecastable: false,
-    title: "Wildfire emergency",
+    title: "Wildfire smoke",
     message,
     concept: "danger",
-    importance: "CRITICAL",
+    importance: "NOTABLE",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
-    attributes: {
-      locationId,
-      monthsElapsed,
-      prepared,
-      preparednessEffectiveness: effectiveness,
-      severity: incident.severity,
-      disconnectedDemand: incident.disconnectedDemand,
-      outputMultiplier: incident.outputMultiplier,
-      targetCapacityShare: incident.targetCapacityShare,
-      durationMonths: incident.durationMonths,
-      selectedFacilityIds: incident.selectedFacilityIds,
-      selectedFacilityNames: incident.selectedFacilityNames,
-      restorationCostPerMonth: incident.restorationCostPerMonth,
-    },
-    effects: wildfireIncidentEffects(incident),
+    attributes: { locationId, monthsElapsed, ...incident },
+    effects: wildfireIncidentEffects(incident, profile),
   };
-  state.worldEvents.checkedKeys.push(occurrenceKey);
   state.worldEvents.active.push(occurrence);
   state.worldEvents.occurrences.push(occurrence);
-  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
-    state.worldEvents.checkedKeys.splice(
-      0,
-      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
-    );
-  }
-  trimWorldEventOccurrences(state);
+  trimWorldEventRecords(state);
   logGameEvent(state, "WORLD_EVENT", message, {
-    importance: "CRITICAL",
+    importance: occurrence.importance,
     actionTarget: occurrence.actionTarget,
     title: occurrence.title,
     concept: occurrence.concept,
     storyPhaseKey: occurrence.key,
-    turningPointPriority: 120,
     reportedKey: occurrence.key,
-    pause: true,
   });
 }
 
@@ -1254,8 +1137,7 @@ function endWeatherHazardsForFacility(state: GameType, id: number) {
           : event.endsMinute,
     };
   });
-  // The effects cache keys active events by key, not by their effects, and a cold snap keeps its
-  // key and window here. Selling is rare, so dropping the whole cache is the cheap correct fix.
+  // Selling changes the affected equipment. Discard cached effects immediately after the edit.
   if (edited) storyEffectsCache.clear();
 }
 
@@ -1285,7 +1167,7 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
     return cached.id;
   }
   const json = JSON.stringify(
-    occurrences.map((event) => [event.key, event.attributes]),
+    occurrences.map((event) => [event.key, event.attributes, event.effects]),
   );
   let id = occurrencesKeyIds.get(json);
   if (id === undefined) {
@@ -1341,9 +1223,7 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
 }
 
 function storyEffectsAt(date: DateType, state: GameType) {
-  const activeKey = state.worldEvents.active
-    .map((event) => event.key)
-    .join("|");
+  const activeKey = occurrencesKey(state.worldEvents.active);
   const lastOccurrence = state.worldEvents.occurrences.at(-1);
   // Immer produces a fresh draft identity on every reducer call and forecasts use shallow state
   // copies, so an object-keyed WeakMap missed almost every lookup. These are the stable inputs
@@ -2162,6 +2042,33 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(loaded, (state) => {
+      if (state.wildfireForecastRefresh) {
+        const snapshot = current(state);
+        const recorded = snapshot.timeline.filter(
+          (tick) => tick.minute <= snapshot.date.minute,
+        );
+        const latest = recorded.at(-1);
+        const futureTicks = snapshot.timeline.length - recorded.length;
+        if (latest && futureTicks > 0) {
+          state.timeline = [
+            ...recorded,
+            ...generateNewTimeline(
+              {
+                ...snapshot,
+                date: getDateFromMinute(
+                  snapshot.date.minute + TICK_MINUTES,
+                  snapshot.startingYear,
+                ),
+                timeline: recorded,
+              },
+              latest.cash,
+              latest.customers,
+              futureTicks,
+            ),
+          ];
+        }
+        delete state.wildfireForecastRefresh;
+      }
       // Saves carry the commitment forecast, so this only runs for one that somehow lacks it.
       // Rebuild just that metadata after the data tables have loaded, and keep every recorded
       // value: a full reforecast re-dispatches the tick that already happened, rewriting its
@@ -2178,7 +2085,10 @@ export const gameSlice = createSlice({
       });
       if (needsCommitmentForecast) {
         const forecast = reforecastSupply(state, true);
-        state.timeline = original(state.timeline)!.map((tick, i) => {
+        const retainedTimeline = isDraft(state.timeline)
+          ? original(state.timeline)!
+          : state.timeline;
+        state.timeline = retainedTimeline.map((tick, i) => {
           const recorded = { ...tick };
           copyCommitmentMetadata(forecast[i], recorded);
           return recorded;
@@ -4091,6 +4001,29 @@ function getDemandW(
     now.evRecoveredW = charging.recoveredW;
     now.demandByType.Transportation = charging.transportationW;
   }
+  delete now.disconnectedDemandW;
+  delete now.localBackupW;
+  if (effects.serviceInterruptionFraction !== undefined) {
+    const demandW = DEMAND_TYPES.reduce(
+      (total, type) => total + now.demandByType[type],
+      0,
+    );
+    // Ordinary rooftop PV shuts off at isolated premises. It cannot erase their interrupted load.
+    const interruption = serviceInterruption(
+      demandW + (now.rooftopSolarW ?? 0),
+      effects,
+    );
+    for (const type of DEMAND_TYPES)
+      now.demandByType[type] *= 1 - effects.serviceInterruptionFraction;
+    if (now.shiftedResidentialW !== undefined)
+      now.shiftedResidentialW *= 1 - effects.serviceInterruptionFraction;
+    now.disconnectedDemandW = interruption.disconnectedDemandW;
+    now.localBackupW = interruption.localBackupW;
+    if (now.rooftopSolarW !== undefined)
+      now.rooftopSolarW *= 1 - effects.serviceInterruptionFraction;
+    if (now.rooftopSurplusW !== undefined)
+      now.rooftopSurplusW *= 1 - effects.serviceInterruptionFraction;
+  }
   now.customerBillingRate = customerBillingRate(
     game,
     now,
@@ -4135,11 +4068,11 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
       const forecast = {
         ...t,
         ...fuelPrices,
-        solarIrradianceWM2: getRawSolarIrradianceWM2(
-          date,
-          state.location,
-          weather.CLOUD_PCT,
-        ),
+        solarIrradianceWM2:
+          getRawSolarIrradianceWM2(date, state.location, weather.CLOUD_PCT) *
+          (effects.solarIrradianceMultiplier ?? 1) *
+          (effects.solarIrradianceMultipliersByHour?.[String(date.hourOfDay)] ??
+            1),
         windKph: weather.WIND_KPH,
         windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
@@ -5117,19 +5050,29 @@ function* supplyFacilitiesFinancesPhases(
     customerRevenue + revenueExports + (rebookingFrame ? 0 : choiceGrant);
 
   // Facilities expenses
-  let kgco2e = 0;
+  // This finite local package is diesel; its fuel is included in the reservation allowance.
+  // Count its combustion separately from grid dispatch and electricity sales.
+  const backupKgco2e =
+    ((((now.localBackupW ?? 0) / ticksPerHour) * GAME_TO_REAL_YEARS) / 1e6) *
+    CALIFORNIA_WILDFIRE_BACKUP_KGCO2E_PER_MWH;
+  let kgco2e = backupKgco2e;
   // The part of kgco2e the carbon fee is charged on: biogenic combustion is exempt
-  let feeableKgco2e = 0;
+  let feeableKgco2e = backupKgco2e;
   // Some authored emergencies carry company-level response costs that do not belong to a single
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
-  expensesOM +=
-    wildfirePreparednessAnnualCost(
-      state.worldEvents.occurrences,
-      state.location.id,
-      now.minute,
-    ) / ticksPerYear;
+  if (
+    state.scenarioId === CUSTOM_SCENARIO_ID &&
+    state.customScenario?.eventScenarioIds?.includes(111) &&
+    !state.storyEffectsDisabled
+  )
+    expensesOM +=
+      wildfirePreparednessAnnualCost(
+        state.worldEvents.occurrences,
+        state.location.id,
+        now.minute,
+      ) / ticksPerYear;
   if (!rebookingFrame) expensesOM += immediateCosts;
   // Hail repair costs fall due one tick after onset, in the window (prev, now]. The pre-roll
   // frames and a forecast's first frame share prev and now minutes, so they never charge one.

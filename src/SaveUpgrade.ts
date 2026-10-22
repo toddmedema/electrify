@@ -1,3 +1,5 @@
+import { validWorldEvent } from "./helpers/WorldEventValidation";
+
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -37,6 +39,51 @@ const migrations: ((
     return {
       ...save,
       game: { ...save.game, policies: { ...policies, programs } },
+    };
+  },
+  // 3 -> 4: retire the old wildfire plant lottery prospectively. Historical occurrences and
+  // booked results remain evidence of the rules that produced them; active copies suppress
+  // rerolling the same authored phase until its original end.
+  (save) => {
+    if (!object(save.game)) return save;
+    const game = save.game;
+    if (!object(game.worldEvents)) return save;
+    const worldEvents = game.worldEvents;
+    if (!Array.isArray(worldEvents.active) || !object(game.date)) return save;
+    const minute = game.date.minute;
+    if (typeof minute !== "number" || !Number.isFinite(minute)) return save;
+    let retired = false;
+    const active = worldEvents.active.map((event) => {
+      if (
+        !object(event) ||
+        !validWorldEvent(event) ||
+        !object(event.attributes) ||
+        typeof event.endsMinute !== "number" ||
+        event.endsMinute <= minute ||
+        !(
+          event.definitionId === "recurring-wildfire" ||
+          (event.definitionId === "california-wildfire-2025:firestorm" &&
+            ("outputMultiplier" in event.attributes ||
+              "selectedFacilityIds" in event.attributes))
+        )
+      )
+        return event;
+      retired = true;
+      return {
+        ...event,
+        effects: {},
+        message:
+          "Earlier wildfire impacts remain in recorded history. No further generator restrictions or restoration charges apply to this event.",
+      };
+    });
+    if (!retired) return save;
+    return {
+      ...save,
+      game: {
+        ...game,
+        wildfireForecastRefresh: true,
+        worldEvents: { ...worldEvents, active },
+      },
     };
   },
 ];

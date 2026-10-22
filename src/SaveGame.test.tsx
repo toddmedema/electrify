@@ -260,6 +260,68 @@ describe("SaveGame", () => {
     expect(parseSave(raw)).toBeNull();
   });
 
+  it.each(["disconnectedDemandW", "localBackupW"] as const)(
+    "validates optional tick and chart service metric %s",
+    (field) => {
+      const recorded = {
+        ...game,
+        date: { ...game.date, minute: 1440 },
+        monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
+      };
+      const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
+      delete raw.game.timeline[0][field];
+      delete raw.game.monthlyHistory[0].chartAverage[field];
+      expect(parseSave(raw)).not.toBeNull();
+      for (const value of [0, 123.5]) {
+        raw.game.timeline[0][field] = value;
+        raw.game.monthlyHistory[0].chartAverage[field] = value;
+        expect(parseSave(raw)).not.toBeNull();
+      }
+      for (const value of [-1, NaN, Infinity, "1", null]) {
+        raw.game.timeline[0][field] = value;
+        raw.game.monthlyHistory[0].chartAverage[field] = 0;
+        expect(parseSave(raw)).toBeNull();
+        raw.game.timeline[0][field] = 0;
+        raw.game.monthlyHistory[0].chartAverage[field] = value;
+        expect(parseSave(raw)).toBeNull();
+      }
+    },
+  );
+
+  it.each(["interruptedWh", "localBackupWh"] as const)(
+    "validates optional monthly service energy %s",
+    (field) => {
+      const raw = JSON.parse(
+        JSON.stringify(
+          serializeSave({
+            ...game,
+            date: { ...game.date, minute: 1440 },
+            monthlyHistory: [
+              summarizeTimeline(game.timeline, game.startingYear),
+            ],
+          }),
+        ),
+      );
+      for (const value of [undefined, 0, 123.5]) {
+        raw.game.monthlyHistory[0][field] = value;
+        expect(parseSave(raw)).not.toBeNull();
+      }
+      for (const value of [-1, NaN, Infinity, "1", null]) {
+        raw.game.monthlyHistory[0][field] = value;
+        expect(parseSave(raw)).toBeNull();
+      }
+    },
+  );
+
+  it.each(["true", 1, null])(
+    "rejects an invalid future refresh marker %p",
+    (value) => {
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.wildfireForecastRefresh = value;
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
   it("round-trips validated decision progress", () => {
     const missingCurrent = JSON.parse(JSON.stringify(serializeSave(game)));
     delete missingCurrent.game.meaningfulDecisions;

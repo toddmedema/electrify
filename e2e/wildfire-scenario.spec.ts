@@ -17,7 +17,9 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   ).toBeVisible();
   await expect(page.getByText("LOS ANGELES, CA")).toBeVisible();
   await expect(
-    page.getByText(/They cut sales and generator output/),
+    page.getByText(
+      /Fire damage and emergency isolation interrupt customer service/,
+    ),
   ).toBeVisible();
 
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
@@ -42,15 +44,24 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   await expect(
     page.getByRole("heading", { name: "Ongoing events" }),
   ).toBeVisible({ timeout: 25000 });
+  await page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
   // The status bar's event chip names it too; check the ongoing card itself
   const ongoing = page.locator(".ongoingEvents:visible");
   await expect(
     ongoing.getByText("Wildfire emergency", { exact: true }),
   ).toBeVisible();
   await expect(
-    ongoing.getByText("Through Feb 2025", { exact: true }),
+    ongoing.getByText("Through Jan 2025", { exact: true }),
   ).toBeVisible();
-  await expect(ongoing).toContainText("Repairs cost $0.7M/month");
+  await expect(ongoing).toContainText(
+    "Estimated January 14–28 interruptions equal 0.31% of monthly demand",
+  );
+  await expect(ongoing).toContainText("Response and repairs cost $0.26M/month");
+  await expect(ongoing).not.toContainText("generators are limited");
   await expect(page.getByText("Red-flag warning")).toBeVisible();
 
   const horizontalOverflow = await page
@@ -75,26 +86,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
     page.getByRole("button", { name: "Facilities", exact: true }),
   );
   await expect(eventsNav.locator(".gameDockEmergency")).toBeVisible();
-  const limitedPlant = page
-    .locator(".facilityDisclosure")
-    .filter({ has: page.getByLabel(/^Temporarily limited to/) })
-    .first();
-  await limitedPlant.click();
-  const maximum = page
-    .getByRole("region", { name: "Operation" })
-    .locator(".facilityStat")
-    .filter({ has: page.getByText("Current maximum output", { exact: true }) });
-  await maximum.scrollIntoViewIfNeeded();
-  await expect(maximum.locator(".facilityStatNote")).toHaveText(
-    /^<?\d+% of nameplate$/,
-  );
-  const noteHeight = await maximum
-    .locator(".facilityStatNote")
-    .evaluate((el) => ({
-      height: el.getBoundingClientRect().height,
-      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
-    }));
-  expect(noteHeight.height).toBeLessThanOrEqual(noteHeight.lineHeight + 1);
+  await openPane(page.locator(".eventLog"), eventsNav);
 
   if (
     reviewDir &&
@@ -104,7 +96,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
     await page.screenshot({
       path: path.join(
         reviewDir,
-        `wildfire-capacity-${testInfo.project.name}.png`,
+        `wildfire-service-${testInfo.project.name}.png`,
       ),
       fullPage: true,
     });

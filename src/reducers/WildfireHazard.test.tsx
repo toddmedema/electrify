@@ -1,270 +1,137 @@
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import { SCENARIOS, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
-import { ActiveWorldEventType, GameType } from "../Types";
+import { GameType } from "../Types";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { getWildfireProfile } from "../data/WildfireProfiles";
-import {
-  optionalScenarioChoice,
-  pendingScenarioChoice,
-} from "../helpers/ScenarioChoices";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { chooseScenarioResponse } from "./GameActions";
 import gameReducer, { tickState } from "./Game";
-import { WILDFIRE_DEFINITION_ID } from "../helpers/Wildfire";
+import {
+  WILDFIRE_DEFINITION_ID,
+  sampleWildfireIncident,
+  wildfirePreparedness,
+} from "../helpers/Wildfire";
 
-const LA = getWildfireProfile("LA")!;
-const wildfireScenario = SCENARIOS.find((s) => s.id === 111)!;
-
-function customGameAtLA(seed: number): GameType {
+const historical = SCENARIOS.find((s) => s.id === 111)!;
+function custom(seed: number): GameType {
   return createGame({
     scenarioId: CUSTOM_SCENARIO_ID,
-    scenario: {
-      ...wildfireScenario,
-      id: CUSTOM_SCENARIO_ID,
-      name: "Custom LA",
-    },
+    scenario: { ...historical, id: CUSTOM_SCENARIO_ID, name: "Custom LA" },
     seed,
   });
 }
-
-type Respond = (
-  decision: NonNullable<ReturnType<typeof pendingScenarioChoice>>,
-) => string | undefined;
-
-/** Answers any pending choice (via respond, defaulting to the free option), takes up any optional
- * choice respond names, then ticks one month. */
-function tickOneMonth(state: GameType, respond?: Respond): GameType {
-  const decision = pendingScenarioChoice(state);
-  if (decision && !state.replayPlayback) {
-    const optionId = respond
-      ? respond(decision)
-      : decision.options.find((o) => o.cost(state.difficulty) === 0)?.id;
-    if (optionId) {
-      state = cloneDeep(
+function month(game: GameType): GameType {
+  const decision = pendingScenarioChoice(game);
+  const state = decision
+    ? cloneDeep(
         gameReducer(
-          state,
-          chooseScenarioResponse({ decisionId: decision.id, optionId }),
+          game,
+          chooseScenarioResponse({
+            decisionId: decision.id,
+            optionId: decision.options.find(
+              (o) => o.cost(game.difficulty) === 0,
+            )!.id,
+          }),
         ),
-      );
-    }
-  }
-  // Optional choices, like a season's wildfire preparedness, are only taken up when asked.
-  const offer = optionalScenarioChoice(state);
-  const offered = offer && respond?.(offer);
-  if (offer && offered && offer.options.some((o) => o.id === offered)) {
-    state = cloneDeep(
-      gameReducer(
-        state,
-        chooseScenarioResponse({ decisionId: offer.id, optionId: offered }),
-      ),
-    );
-  }
+      )
+    : game;
   const target = state.date.monthsElapsed + 1;
-  while (state.date.monthsElapsed < target) {
-    tickState(state);
-  }
+  while (state.date.monthsElapsed < target) tickState(state);
   return state;
 }
-
-/** Ticks month by month until an active wildfire appears (or maxMonths elapse). */
-function runToActiveWildfire(
-  game: GameType,
-  maxMonths: number,
-  respond?: Respond,
-): { state: GameType; incident: ActiveWorldEventType } | undefined {
-  let state = game;
-  for (let i = 0; i < maxMonths; i++) {
-    state = tickOneMonth(state, respond);
-    const incident = state.worldEvents.active.find(
-      (event) => event.definitionId === WILDFIRE_DEFINITION_ID,
+const profile = getWildfireProfile("LA")!;
+const seed = Array.from({ length: 100 }, (_, i) => i + 1).find((value) =>
+  Array.from({ length: 12 }, (_, m) => m).some((monthsElapsed) =>
+    sampleWildfireIncident({
+      profile,
+      seed: value,
+      locationId: "LA",
+      monthsElapsed,
+      startingYear: historical.startingYear,
+    }),
+  ),
+)!;
+function firstSmoke() {
+  let state = custom(seed);
+  for (let m = 0; m < 24; m++) {
+    state = month(state);
+    const event = state.worldEvents.active.find(
+      (e) => e.definitionId === WILDFIRE_DEFINITION_ID,
     );
-    if (incident) {
-      return { state, incident };
-    }
+    if (event) return { state, event };
   }
-  return undefined;
+  throw new Error("Observed heavy smoke year did not produce a smoke event");
 }
 
-const wildfireOccurrences = (state: GameType) =>
-  state.worldEvents.occurrences.filter(
-    (event) => event.definitionId === WILDFIRE_DEFINITION_ID,
-  );
-
-// Find a seed that ignites within the first year so these tests are grounded in a real event.
-// runToActiveWildfire stops as soon as a fire appears, so early-igniting seeds are cheap.
-function findIgnitingSeed(maxSeeds = 40): number {
-  for (let seed = 1; seed <= maxSeeds; seed++) {
-    if (runToActiveWildfire(customGameAtLA(seed), 12)) return seed;
-  }
-  throw new Error("No wildfire ignition found for any seed in the first year");
-}
-
-const IGNITING_SEED = findIgnitingSeed();
-
-// A seed whose FIRST fire ignites after the preparedness month, so a season funded ahead of time
-// is in place before it. A seed whose first fire precedes August is skipped, because the
-// test observes that first fire.
-function findSeedIgnitingAfterPreparedness(maxSeeds = 60): number | undefined {
-  for (let seed = 1; seed <= maxSeeds; seed++) {
-    let state = customGameAtLA(seed);
-    for (let m = 0; m < 14; m++) {
-      state = tickOneMonth(state, (decision) =>
-        decision.id.startsWith("wildfire:") ? "standard" : undefined,
-      );
-      const incident = state.worldEvents.active.find(
-        (event) => event.definitionId === WILDFIRE_DEFINITION_ID,
-      );
-      if (incident) {
-        const onsetMonth = Math.floor(
-          incident.startsMinute / MINUTES_PER_MONTH,
-        );
-        if (onsetMonth > LA.preparednessMonth) return seed;
-        break; // First fire is before the preparedness month; try the next seed.
-      }
-    }
-  }
-  return undefined;
-}
-
-describe("recurring wildfire hazard integration", () => {
-  it("creates exactly one occurrence at ignition and applies its effects", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { state, incident } = result!;
-    // Exactly one occurrence exists (not duplicated).
-    expect(wildfireOccurrences(state).length).toBe(1);
-    // Connected demand excludes exactly the disconnected share.
-    const disconnected = incident.attributes.disconnectedDemand as number;
-    expect(incident.effects.demandMultiplier).toBeCloseTo(1 - disconnected, 12);
-    expect(disconnected).toBeGreaterThan(0);
-    expect(disconnected).toBeLessThan(1);
-    // Effects are present and bounded.
-    expect(incident.effects.demandMultiplier).toBeLessThan(1);
-    expect(incident.effects.demandMultiplier).toBeGreaterThan(0);
-    expect(incident.effects.operatingExpensePerMonth).toBeGreaterThan(0);
+describe("historical smoke integration", () => {
+  it("applies only an hourly solar effect and names the affected fuel", () => {
+    const { state, event } = firstSmoke();
+    expect(Object.keys(event.effects)).toEqual([
+      "solarIrradianceMultipliersByHour",
+    ]);
     expect(
-      Object.keys(incident.effects.facilityOutputMultipliersById || {}).length,
-    ).toBeGreaterThan(0);
-    // It is active and logged as a critical event.
-    expect(state.worldEvents.active.some((e) => e.key === incident.key)).toBe(
-      true,
+      Object.keys(event.effects.solarIrradianceMultipliersByHour!),
+    ).toHaveLength(8);
+    expect(event.effects.solarIrradianceMultipliersByHour!["10"]).toBeLessThan(
+      1,
     );
-    expect(state.eventLog.some((e) => e.storyPhaseKey === incident.key)).toBe(
-      true,
-    );
+    expect(
+      event.effects.solarIrradianceMultipliersByHour!["9"],
+    ).toBeUndefined();
+    expect(event.message).toContain("Solar receives");
+    expect(event.attributes.heavySmokeDays).toBeGreaterThan(0);
+    expect(event.attributes.sourceYear).toBeGreaterThanOrEqual(2017);
+    expect(
+      state.worldEvents.occurrences.filter((e) => e.key === event.key),
+    ).toHaveLength(1);
+    expect(
+      state.eventLog.filter((e) => e.storyPhaseKey === event.key),
+    ).toHaveLength(1);
+    expect(wildfirePreparedness(state)).toBeUndefined();
   });
 
-  it("keeps incident attributes when a cloned state continues through rollovers", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { state: midEvent, incident } = result!;
-
-    // Continuing a copied state must not redraw already-persisted onset attributes.
-    const reloaded = cloneDeep(midEvent);
-    // Advance a couple more months; the incident must not be re-drawn or duplicated.
-    let after = tickOneMonth(reloaded);
-    after = tickOneMonth(after);
-    const sameKey = wildfireOccurrences(after).filter(
-      (e) => e.key === incident.key,
-    );
-    expect(sameKey.length).toBe(1); // Still exactly one.
-    // Onset attributes (facility selection, severity) are unchanged.
-    expect(sameKey[0].attributes.selectedFacilityIds).toEqual(
-      incident.attributes.selectedFacilityIds,
-    );
-    expect(sameKey[0].attributes.severity).toBe(incident.attributes.severity);
-  });
-
-  it("expires an incident and records its occurrence and restoration exactly once", () => {
-    const result = runToActiveWildfire(customGameAtLA(IGNITING_SEED), 12);
-    expect(result).toBeDefined();
-    const { state: midEvent, incident } = result!;
-    const durationMonths = incident.attributes.durationMonths as number;
-    const onset = midEvent.date.monthsElapsed;
-    // Tick to just past the end of the window (the month it expires).
-    let after = midEvent;
-    for (let i = 0; i < durationMonths + 1; i++) {
-      after = tickOneMonth(after);
-    }
-    expect(after.worldEvents.active.some((e) => e.key === incident.key)).toBe(
+  it("preserves onset facts across resumed rollovers and expires at the month boundary", () => {
+    const { state, event } = firstSmoke();
+    let next = month(cloneDeep(state));
+    expect(next.worldEvents.active.some((e) => e.key === event.key)).toBe(
       false,
     );
-    const recoveryEvents = () =>
-      after.eventLog.filter(
-        (e) =>
-          e.title === "Wildfire restoration complete" &&
-          e.storyPhaseKey === incident.key,
-      );
-    expect(recoveryEvents()).toHaveLength(1);
-    // More rollovers must retain the original occurrence without recreating it or its notice.
-    while (after.date.monthsElapsed < onset + 12) {
-      after = tickOneMonth(after);
-    }
+    next = month(next);
     expect(
-      wildfireOccurrences(after).filter((e) => e.key === incident.key),
-    ).toHaveLength(1);
-    expect(recoveryEvents()).toHaveLength(1);
+      next.worldEvents.occurrences.filter((e) => e.key === event.key),
+    ).toEqual([event]);
+    expect(event.endsMinute - event.startsMinute).toBe(MINUTES_PER_MONTH);
   });
 
-  it("applies preparedness when the player funds it before onset", () => {
-    const seed = findSeedIgnitingAfterPreparedness();
-    expect(seed).toBeDefined();
-    // A run that funds preparedness (answers "prepare" for the wildfire choice).
-    const prepared = runToActiveWildfire(
-      customGameAtLA(seed!),
-      14,
-      (decision) =>
-        decision.id.startsWith("wildfire:") ? "prepare" : undefined,
-    );
-    // A control run that declines it.
-    const standard = runToActiveWildfire(
-      customGameAtLA(seed!),
-      14,
-      (decision) =>
-        decision.id.startsWith("wildfire:") ? "standard" : undefined,
-    );
-    expect(prepared).toBeDefined();
-    expect(standard).toBeDefined();
-    if (!prepared || !standard)
-      throw new Error("Expected both wildfire runs to ignite");
-    expect(prepared.incident.attributes.prepared).toBe(true);
-    expect(standard.incident.attributes.prepared).toBe(false);
-    // Preparedness halves disconnections and output losses.
-    const preparedDisconnected = prepared.incident.attributes
-      .disconnectedDemand as number;
-    const standardDisconnected = standard.incident.attributes
-      .disconnectedDemand as number;
-    const preparedOutput = prepared.incident.attributes
-      .outputMultiplier as number;
-    const standardOutput = standard.incident.attributes
-      .outputMultiplier as number;
-    const effectiveness = prepared.incident.attributes
-      .preparednessEffectiveness as number;
-    expect(effectiveness).toBeGreaterThan(0);
-    expect(effectiveness).toBeLessThanOrEqual(1);
-    expect(preparedDisconnected).toBeCloseTo(
-      standardDisconnected * (1 - effectiveness / 2),
-    );
-    expect(1 - preparedOutput).toBeCloseTo(
-      (1 - standardOutput) * (1 - effectiveness / 2),
-    );
-    expect(preparedDisconnected).toBeLessThan(standardDisconnected);
-    expect(preparedOutput).toBeGreaterThan(standardOutput);
-    // Restoration cost is unchanged by preparedness.
+  it("replays the same observations independently of fleet order and preparedness", () => {
+    const { state, event } = firstSmoke();
+    const draft = cloneDeep(custom(seed));
+    draft.facilities.reverse();
+    let repeated = draft;
+    while (repeated.date.monthsElapsed < state.date.monthsElapsed)
+      repeated = month(repeated);
     expect(
-      prepared.incident.attributes.restorationCostPerMonth as number,
-    ).toBeCloseTo(
-      standard.incident.attributes.restorationCostPerMonth as number,
-      6,
-    );
+      repeated.worldEvents.occurrences.find((e) => e.key === event.key),
+    ).toEqual(event);
   });
 
-  it("does not create a random wildfire in the authored scenario 111", () => {
-    const game = createGame({ scenarioId: 111, seed: IGNITING_SEED });
-    let state = game;
-    for (let i = 0; i < 24; i++) {
-      state = tickOneMonth(state);
-    }
-    expect(wildfireOccurrences(state).length).toBe(0);
+  it("does not infer smoke risk for unknown cities or overlap the authored mission", () => {
+    let authored = createGame({ scenarioId: 111, seed });
+    for (let m = 0; m < 12; m++) authored = month(authored);
+    expect(
+      authored.worldEvents.occurrences.filter(
+        (e) => e.definitionId === WILDFIRE_DEFINITION_ID,
+      ),
+    ).toEqual([]);
+    const unknown = custom(seed);
+    unknown.location.id = "unprofiled";
+    expect(wildfirePreparedness(unknown)).toBeUndefined();
+    for (let m = 0; m < 12; m++) month(unknown);
+    expect(
+      unknown.worldEvents.occurrences.filter(
+        (e) => e.definitionId === WILDFIRE_DEFINITION_ID,
+      ),
+    ).toEqual([]);
   });
 });

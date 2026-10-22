@@ -2,19 +2,13 @@ import path from "path";
 import { expect, Page, test } from "./fixtures";
 import { openPane } from "./layout";
 
-/**
- * Recurring, location-aware wildfire hazards (issue #62) in a custom LA game.
- *
- * The seed is fixed so the run is deterministic: with it, a custom game in Los Angeles starting
- * January 2020 has no ignition from February through August, its first fire starts in September
- * 2020 (inside the August 2020 fire season), and it lasts one month. The seed was
- * verified against the real reducer (runSimulation) before being pinned here; if the hazard's
- * draws or weather data change, re-derive it rather than editing the flow.
- */
-const SEED = 25;
-
-// The plan's acceptance line covers desktop and mobile presentation in both themes.
-const REVIEW_PROJECTS = new Set(["desktop-chromium", "mobile-390px"]);
+// Seed 1 resamples the observed 2020 LA record: two heavy-smoke days in August, then eleven in September.
+const SEED = 1;
+const REVIEW_PROJECTS = new Set([
+  "desktop-chromium",
+  "mobile-390px",
+  "mobile-360px",
+]);
 
 async function startSeededLosAngelesGame(
   page: Page,
@@ -52,7 +46,7 @@ async function startSeededLosAngelesGame(
   await page.getByRole("option", { name: "Los Angeles, CA" }).click();
   await expect(search).toHaveValue("Los Angeles, CA");
 
-  // Pin the seed so the ignition month is known; the default start year (2020) stays as-is.
+  // Pin the observed smoke year; the default start year (2020) stays as-is.
   await page.getByRole("textbox", { name: "Seed" }).fill(String(SEED));
 
   // The default custom fleet (one 500MW gas plant) cannot cover LA's summer peak, so the run
@@ -116,227 +110,71 @@ async function captureReviewScreenshot(
 }
 
 for (const theme of ["light", "dark"] as const) {
-  // Light starts ongoing preparedness; dark leaves it off, so both branches and both
-  // palettes' Events presentation are exercised.
-  const fund = theme === "light";
-
-  test(`recurring wildfire: preparedness, onset and recovery (${theme})`, async ({
+  test(`recurring smoke: solar scope and expiry (${theme})`, async ({
     page,
   }, testInfo) => {
     test.skip(!REVIEW_PROJECTS.has(testInfo.project.name));
-    // Nine simulated months at fast speed plus the setup flow; keep a wide margin.
-    test.setTimeout(180_000);
-
+    test.setTimeout(180000);
     await startSeededLosAngelesGame(page, theme);
-    const heightsBeforeEvents = await statusBarHeights(page);
-    await openEventsPane(page);
-
-    // January 2020 is an above-average-risk month for the LA profile, so the seasonal notice is
-    // up before anything happens. It explains the risk without revealing a seeded ignition date.
-    const notice = page.locator(".wildfireRiskNotice:visible");
-    await expect(notice).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Elevated wildfire risk" }),
-    ).toBeVisible();
-    await expect(notice).toContainText(
-      "raise the chance of a wildfire emergency",
-    );
-
-    // Preparedness is an optional customer program, never a prompt the clock waits on. The run
-    // advances to spring so the next wildfire season is the August 2020 illustration.
-    await setFastSpeed(page);
-    await expect(page.locator("#appbar:visible").first()).toContainText(
-      /(Mar|Apr|May|Jun) 2020/,
-      { timeout: 60_000 },
-    );
-    // The overview resumes the player's speed after each decision. Pause explicitly
-    // so starting and immediately reopening preparedness measures its initial state.
-    await page
-      .locator("#appbar:visible")
-      .getByRole("button", { name: "pause" })
-      .click();
     await openProgramsPane(page);
     const programs = page.getByRole("region", {
       name: "Programs",
       exact: true,
     });
     await expect(
-      programs.getByRole("button", { name: "Close Programs" }),
-    ).toBeVisible();
-    await programs
-      .getByRole("button", {
-        name: /^Wildfire preparedness · Off · .*\/yr$/,
-      })
-      .click();
-    // Reviewing a program decision pauses the clock; the overview can stay open while playing.
-    await expect(
-      page.locator("#appbar:visible").getByRole("button", { name: "pause" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(programs).toContainText("Annual budget");
-    await expect(programs).toContainText("no upfront payment");
-    await expect(programs).toContainText("Next wildfire season");
-    await expect(programs).not.toContainText("One-time cost");
-    await expect(programs).not.toContainText("If funded now");
-    // The page simulates a typical fire with and without funded crews.
-    await expect(
-      programs.getByText(/^Customer load disconnected:/),
-    ).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(programs.getByText(/^Cash benefit:/)).toBeVisible();
-    if (fund) {
-      await programs
-        .getByRole("button", { name: /^Start preparedness \(/ })
-        .click();
-      await expect(
-        programs.getByRole("button", {
-          name: /^Wildfire preparedness · On · .*\/yr$/,
-        }),
-      ).toBeVisible();
-    }
-    if (fund) {
-      await programs
-        .getByRole("button", { name: /^Wildfire preparedness · On/ })
-        .click();
-      await expect(programs.getByText("On", { exact: true })).toBeVisible();
-      await expect(
-        programs.getByRole("progressbar", {
-          name: "Wildfire preparedness effectiveness",
-        }),
-      ).toHaveAttribute("aria-valuenow", "0");
-      await expect(programs).toContainText(
-        "Ramping up · 12 months to full effectiveness",
-      );
-      await programs
-        .getByRole("button", { name: "Turn off preparedness" })
-        .click();
-      await programs
-        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
-        .click();
-      await programs
-        .getByRole("button", { name: /^Start preparedness/ })
-        .click();
-      await programs
-        .getByRole("button", { name: /^Wildfire preparedness · On/ })
-        .click();
-      await expect(
-        programs.getByRole("button", { name: "Turn off preparedness" }),
-      ).toBeEnabled();
-      await expect(
-        programs.getByText(/^Customer load disconnected:/),
-      ).toBeVisible({ timeout: 30000 });
-    }
-    await captureReviewScreenshot(
-      page,
-      testInfo,
-      `wildfire-hazard-preparedness-${theme}-${testInfo.project.name}.png`,
-    );
+      programs.getByRole("button", { name: /^Wildfire preparedness/ }),
+    ).toHaveCount(0);
     await programs.getByRole("button", { name: "Close Programs" }).click();
-    await expect(programs).toHaveCount(0);
+    const heights = await statusBarHeights(page);
     await openEventsPane(page);
-
-    // September 2020: the seeded ignition. A critical event pauses the game and pins an ongoing
-    // card in Events with the disconnected share, constrained generators and restoration cost.
     await setFastSpeed(page);
     const ongoing = page.locator(".ongoingEvents:visible");
     await expect(
-      page.getByRole("heading", { name: "Ongoing events" }),
-    ).toBeVisible({ timeout: 60_000 });
-    await expect(
-      ongoing.getByText("Wildfire emergency", { exact: true }),
-    ).toBeVisible();
-    await expect(ongoing).toContainText(
-      /% of customer load is disconnected by safety shutoffs/,
-    );
-    await expect(ongoing).toContainText(/limited to \d+% output/);
-    await expect(ongoing).toContainText(
-      /restoration costing \$[\d.,]+[MKmk]? per month/,
-    );
-    await expect(ongoing).toContainText("Through Sep 2020");
-    if (fund) {
-      await expect(ongoing).toContainText("Prepared crews are in place");
-    } else {
-      await expect(ongoing).not.toContainText("Prepared crews are in place");
-    }
-    // The mission status names the active incident and its date, while the Events card
-    // carries severity. The shared status row keeps its height at every viewport.
-    const activeEvents = page
+      ongoing.getByText("Wildfire smoke", { exact: true }),
+    ).toBeVisible({ timeout: 90000 });
+    await page
       .locator("#appbar:visible")
-      .getByRole("button", { name: /^Active: Wildfire emergency\./ });
-    await expect(activeEvents).toHaveAccessibleName(
-      /Active: Wildfire emergency\. Wildfire emergency, through Sep 2020/,
+      .getByRole("button", { name: "pause", exact: true })
+      .click();
+    await expect(ongoing).toContainText(
+      /Solar receives about [\d.]+% less sunlight from 10am to 6pm this month/,
     );
-    await expect(
-      ongoing.getByRole("button", { name: /^Wildfire emergency/ }),
-    ).toHaveClass(/importance-CRITICAL/);
-    expect(await statusBarHeights(page)).toEqual(heightsBeforeEvents);
+    await expect(ongoing).not.toContainText("Natural Gas");
+    await expect(ongoing).not.toContainText("disconnected");
+    await expect(ongoing).not.toContainText("Restoration costs");
+    await expect(ongoing).toContainText("Through Aug 2020");
+    await expect(page.locator(".wildfireRiskNotice:visible")).toContainText(
+      "Heavy wildfire smoke can reduce sunlight",
+    );
+    expect(await statusBarHeights(page)).toEqual(heights);
+    const clippedStatus = await page
+      .locator("#topbar:visible .gameStatus")
+      .evaluate((status) => {
+        const bounds = status.getBoundingClientRect();
+        return [...status.querySelectorAll(".gameStatusValue")].some(
+          (value) => value.getBoundingClientRect().right > bounds.right + 1,
+        );
+      });
+    expect(clippedStatus).toBe(false);
     expect(
       await page.evaluate(
-        () => document.documentElement.scrollWidth - window.innerWidth,
+        () => document.documentElement.scrollWidth - innerWidth,
       ),
     ).toBeLessThanOrEqual(1);
-
-    // The risk notice stays up alongside the incident: September is a peak-risk month.
-    await expect(page.locator(".wildfireRiskNotice:visible")).toBeVisible();
     await captureReviewScreenshot(
       page,
       testInfo,
-      `wildfire-hazard-events-${theme}-${testInfo.project.name}.png`,
+      `wildfire-smoke-${theme}-${testInfo.project.name}.png`,
     );
-
-    if (fund) {
-      await openProgramsPane(page);
-      // Reopening the tool restores the wildfire detail that was being reviewed.
-      await expect(
-        programs.getByRole("heading", {
-          name: "Wildfire preparedness",
-          exact: true,
-        }),
-      ).toBeVisible();
-      const protection = programs.getByRole("progressbar", {
-        name: "Wildfire preparedness effectiveness",
-      });
-      const effectiveness = Number(
-        await protection.getAttribute("aria-valuenow"),
-      );
-      expect(effectiveness).toBeGreaterThan(0);
-      expect(effectiveness).toBeLessThan(100);
-      await programs
-        .getByRole("button", { name: "Turn off preparedness" })
-        .click();
-      await programs
-        .getByRole("button", { name: /^Wildfire preparedness · Off/ })
-        .click();
-      await expect(protection).toHaveAttribute(
-        "aria-valuenow",
-        String(effectiveness),
-      );
-      await expect(programs).toContainText(
-        "Fading · 12 months of protection remaining",
-      );
-      await expect(
-        programs.getByText(/^Customer load disconnected:/),
-      ).toBeVisible({ timeout: 30000 });
-      await captureReviewScreenshot(
-        page,
-        testInfo,
-        `wildfire-decay-${theme}-${testInfo.project.name}.png`,
-      );
-      await programs.getByRole("button", { name: "Close Programs" }).click();
-      await openEventsPane(page);
-    }
-
-    // October 2020: the one-month incident expires. Restoration is reported once and the ongoing
-    // card clears; the ignition row returns to history.
     await setFastSpeed(page);
     await expect(
-      page.getByRole("heading", { name: "Ongoing events" }),
-    ).toBeHidden({ timeout: 60_000 });
-    await expect(activeEvents).toHaveCount(0);
+      ongoing.getByRole("button", { name: /Through Aug 2020/ }),
+    ).toBeHidden({ timeout: 30000 });
     await expect(
       page
         .getByRole("region", { name: "Event history", exact: true })
-        .getByText("Wildfire restoration complete", { exact: true }),
+        .getByText("Wildfire smoke", { exact: true })
+        .first(),
     ).toBeVisible();
   });
 }

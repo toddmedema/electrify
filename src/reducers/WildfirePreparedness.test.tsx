@@ -1,7 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { getWildfireProfile } from "../data/WildfireProfiles";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
 import { TICKS_PER_YEAR } from "../Constants";
@@ -21,6 +20,7 @@ import {
 import {
   activePreparedness,
   wildfirePreparedness,
+  wildfirePreparednessAnnualCost,
   wildfirePreparednessEffectiveness,
 } from "../helpers/Wildfire";
 import {
@@ -28,9 +28,7 @@ import {
   wildfirePreviewMonth,
 } from "../helpers/WildfirePreview";
 
-const LA = getWildfireProfile("LA")!;
-
-/** A custom Los Angeles game in April, between fire seasons, with a live forecast. */
+/** A custom game with the selected historical wildfire and a live forecast. */
 function ready(cash = 100000000, month = 3): GameType {
   const game = createGame({
     scenarioId: CUSTOM_SCENARIO_ID,
@@ -38,6 +36,7 @@ function ready(cash = 100000000, month = 3): GameType {
       ...SCENARIOS.find((s) => s.id === 111)!,
       id: CUSTOM_SCENARIO_ID,
       name: "Custom LA",
+      eventScenarioIds: [111],
     },
     seed: 7,
   });
@@ -62,10 +61,10 @@ test("preparedness is an optional program: the clock never waits on it", () => {
   expect(reducer(game, setSpeed("FAST")).speed).toBe("FAST");
 });
 
-test("starting has no upfront cost, persists through later seasons, and saves/replays", () => {
+test("starting reserves backup immediately with no upfront cost, and saves/replays", () => {
   const before = ready();
-  const { annualCost, season } = wildfirePreparedness(before)!;
-  expect(annualCost).toBeGreaterThan(0);
+  const { annualCost } = wildfirePreparedness(before)!;
+  expect(annualCost).toBe(200_000);
   const action = fund(before);
   const after = reducer(before, action);
   expect(now(after).cash).toBe(now(before).cash);
@@ -73,12 +72,7 @@ test("starting has no upfront cost, persists through later seasons, and saves/re
   expect(
     optionalScenarioChoice(after)!.options.map((option) => option.id),
   ).toEqual(["stop"]);
-  for (const month of [
-    season.startMonth,
-    season.endMonth,
-    season.startMonth + 12,
-    season.startMonth + 24,
-  ])
+  for (const month of [3, 12, 24, 36])
     expect(activePreparedness(after.worldEvents.occurrences, "LA", month)).toBe(
       true,
     );
@@ -143,8 +137,8 @@ test("each year books the annual budget and stopping removes future costs withou
   );
   expect(wildfirePreparedness(stopped)!.active).toBe(false);
   for (const [month, effectiveness] of [
-    [16, 1],
-    [22, 0.5],
+    [16, 0],
+    [22, 0],
     [28, 0],
   ])
     expect(
@@ -197,33 +191,21 @@ test("a low-cash run can start, but disabled story effects and replay playback r
   expect(reducer(playback, fund(playback))).toBe(playback);
 });
 
-test("the preview simulates a typical fire both ways through the real forecast", () => {
+test("the preview compares finite local service through the real forecast without changing the game", () => {
   const game = ready();
+  const before = serializeSave(game).game;
   const month = wildfirePreviewMonth(game)!;
-  // The season's highest-risk month still ahead.
-  const { season } = wildfirePreparedness(game)!;
-  const weights = Array.from(
-    { length: season.endMonth - season.startMonth },
-    (_, i) => LA.monthlyWeights[(season.startMonth + i) % 12],
-  );
-  expect(LA.monthlyWeights[month % 12]).toBe(Math.max(...weights));
+  expect(month).toBe(36);
   const result = previewWildfire(game, month);
-  expect(result.preparedIncident.disconnectedDemand).toBeCloseTo(
-    result.standardIncident.disconnectedDemand *
-      (1 - result.preparedEffectiveness / 2),
+  expect(result.standard.localBackupWh || 0).toBe(0);
+  expect(result.prepared.localBackupWh).toBeCloseTo(3_600_000, 1);
+  expect(result.standard.interruptedWh).toBeGreaterThan(
+    result.prepared.interruptedWh!,
   );
-  expect(result.preparedIncident.selectedFacilityIds).toEqual(
-    result.standardIncident.selectedFacilityIds,
-  );
-  // Connected customer demand is higher with preparedness at every point of the day.
-  result.preparedDemandW.forEach((w, i) =>
-    expect(w).toBeGreaterThan(result.standardDemandW[i]),
-  );
-  expect(result.noFire.supplyWh).toBeGreaterThan(result.standard.supplyWh);
-  expect(result.prepared.supplyWh).toBeGreaterThan(result.standard.supplyWh);
-  expect(result.cashBenefit).toBeGreaterThan(0);
-  // Simulating never changes the game it was asked about.
-  expect(game.worldEvents.active).toEqual([]);
+  expect(result.standard.demandWh).toBe(result.prepared.demandWh);
+  expect(result.standard.supplyWh).toBe(result.prepared.supplyWh);
+  expect(serializeSave(game).game).toEqual(before);
+  expect(previewWildfire(game, month)).toEqual(result);
 });
 
 test("the program and its change sequence survive event-history trimming", () => {
@@ -252,17 +234,17 @@ test("the program and its change sequence survive event-history trimming", () =>
   ).not.toBeNull();
 });
 
-test("the preview stays within the remaining run and advances to the next season", () => {
+test("the preview stays within the run and ends when the incident starts", () => {
   const game = ready();
   game.customScenario!.durationMonths = 8;
-  expect(wildfirePreviewMonth(game)).toBe(7);
-  game.date = getDateFromMinute(8 * MINUTES_PER_MONTH, game.startingYear);
   expect(wildfirePreviewMonth(game)).toBeUndefined();
-  game.customScenario!.durationMonths = 36;
-  expect(wildfirePreviewMonth(game)).toBe(20);
+  game.customScenario!.durationMonths = 60;
+  expect(wildfirePreviewMonth(game)).toBe(36);
+  game.date = getDateFromMinute(36 * MINUTES_PER_MONTH, game.startingYear);
+  expect(wildfirePreviewMonth(game)).toBeUndefined();
 });
 
-test("ramps, decays and restarts continuously, including save/load and trimmed history", () => {
+test("reservation availability changes immediately and its charges expire after the incident month", () => {
   const initial = ready(100000000, 0);
   let game = cloneDeep(reducer(initial, fund(initial)));
   const effectiveness = (month: number) =>
@@ -271,42 +253,46 @@ test("ramps, decays and restarts continuously, including save/load and trimmed h
       "LA",
       month * MINUTES_PER_MONTH,
     );
-  expect(effectiveness(0)).toBe(0);
-  expect(effectiveness(0.5)).toBeCloseTo(1 / 24);
-  expect(effectiveness(6)).toBe(0.5);
-  expect(effectiveness(12)).toBe(1);
-  expect(effectiveness(24)).toBe(1);
-  const moveTo = (month: number) => {
-    game = cloneDeep(game);
-    game.date = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
-    advancePolicies(game, month);
-    game.timeline = generateNewTimeline(game, 100000000, 1000000);
-  };
-  moveTo(6);
-  game = reducer(
-    game,
-    chooseScenarioResponse({
-      decisionId: wildfirePreparedness(game)!.choice.id,
-      optionId: "stop",
-    }),
+  expect(effectiveness(0)).toBe(1);
+  expect(effectiveness(0.5)).toBe(1);
+  game.date = getDateFromMinute(6 * MINUTES_PER_MONTH, game.startingYear);
+  game.timeline = generateNewTimeline(game, 100000000, 1000000);
+  game = cloneDeep(
+    reducer(
+      game,
+      chooseScenarioResponse({
+        decisionId: wildfirePreparedness(game)!.choice.id,
+        optionId: "stop",
+      }),
+    ),
   );
-  expect(effectiveness(6)).toBe(0.5);
-  expect(effectiveness(12)).toBe(0.25);
-  expect(effectiveness(18)).toBe(0);
-  expect(effectiveness(30)).toBe(0);
-  moveTo(12);
+  expect(effectiveness(6)).toBe(0);
+  expect(effectiveness(12)).toBe(0);
+  game = cloneDeep(reducer(game, fund(game)));
   const loaded = parseSave(
     JSON.parse(JSON.stringify(serializeSave(game))),
   )!.game;
-  expect(wildfirePreparedness(loaded)!.effectiveness).toBe(0.25);
-  // Only the latest change is needed after the event log is compacted.
-  game.worldEvents.occurrences = game.worldEvents.occurrences.slice(-1);
-  expect(effectiveness(12)).toBe(0.25);
-  game = reducer(game, fund(game));
-  expect(effectiveness(12)).toBe(0.25);
-  expect(effectiveness(18)).toBe(0.625);
-  expect(effectiveness(24)).toBe(1);
-  const preview = previewWildfire(game, 20);
-  expect(preview.preparedEffectiveness).toBeCloseTo(0.75);
-  expect(preview.standardEffectiveness).toBeCloseTo(0.25 / 3);
+  expect(wildfirePreparedness(loaded)!.effectiveness).toBe(1);
+  expect(
+    wildfirePreparednessAnnualCost(
+      game.worldEvents.occurrences,
+      "LA",
+      36 * MINUTES_PER_MONTH,
+    ),
+  ).toBe(200_000);
+  expect(
+    wildfirePreparednessAnnualCost(
+      game.worldEvents.occurrences,
+      "LA",
+      37 * MINUTES_PER_MONTH,
+    ),
+  ).toBe(0);
+  game.date = getDateFromMinute(37 * MINUTES_PER_MONTH, game.startingYear);
+  expect(wildfirePreparedness(game)).toBeUndefined();
+});
+
+test("smoke-exposed locations alone do not offer the historical response reservation", () => {
+  const game = ready();
+  game.customScenario!.eventScenarioIds = [];
+  expect(wildfirePreparedness(game)).toBeUndefined();
 });

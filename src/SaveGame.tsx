@@ -331,6 +331,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (typeof game !== "object" || game === null) {
     return null;
   }
+  if (
+    game.wildfireForecastRefresh !== undefined &&
+    typeof game.wildfireForecastRefresh !== "boolean"
+  )
+    return null;
   // Shared grids are restored only as a validated whole world, never as a solo import.
   if (game.multiplayer) return null;
   if (
@@ -510,12 +515,27 @@ export function parseSave(raw: unknown): SaveGameType | null {
       const record = month as Partial<GameType["monthlyHistory"][number]>;
       const chart = record.chartAverage;
       if (
+        [record.interruptedWh, record.localBackupWh].some(
+          (value) =>
+            value !== undefined &&
+            (typeof value !== "number" || !Number.isFinite(value) || value < 0),
+        )
+      )
+        return true;
+      if (
         chart !== undefined &&
         (typeof chart !== "object" ||
           chart === null ||
           !chart.demandByType ||
           !chart.supplyByFuel ||
           !chart.renewableCapacityFactors ||
+          [chart.disconnectedDemandW, chart.localBackupW].some(
+            (value) =>
+              value !== undefined &&
+              (typeof value !== "number" ||
+                !Number.isFinite(value) ||
+                value < 0),
+          ) ||
           Object.values(chart).some((value) =>
             typeof value === "number"
               ? !Number.isFinite(value)
@@ -670,6 +690,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !validDeferredCharging(t.deferredChargingStart) ||
         [
           t.customerBillingRate,
+          t.disconnectedDemandW,
+          t.localBackupW,
           t.deferredResidentialWh,
           t.deferredResidentialWhStart,
           t.thermalShiftedW,

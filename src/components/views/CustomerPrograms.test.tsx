@@ -12,7 +12,7 @@ import { ProgramsScreen } from "./CustomerPrograms";
 import { PolicyId } from "../../Types";
 import { GENERATORS } from "../../data/Facilities";
 import { POLICIES } from "../../data/Policies";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatWattHours } from "../../helpers/Format";
 import { emptyPolicies, programCustomers } from "../../helpers/Policies";
 import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../../data/Scenarios";
@@ -601,7 +601,7 @@ test("the completion preview is capped at the run's last month", () => {
   view.unmount();
 });
 
-test("wildfire preparedness shows annual terms, previews the next season, and starts or stops", () => {
+test("wildfire reservation shows finite support, previews the selected incident, and starts or stops", () => {
   jest.useFakeTimers();
   const worker = {
     onmessage: null as ((event: { data: unknown }) => void) | null,
@@ -614,9 +614,10 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   const game = createGame({
     scenarioId: CUSTOM_SCENARIO_ID,
     scenario: {
-      ...SCENARIOS.find((s) => s.id === 111)!,
+      ...SCENARIOS.find((scenario) => scenario.id === 111)!,
       id: CUSTOM_SCENARIO_ID,
       name: "Custom LA",
+      eventScenarioIds: [111],
     },
   });
   game.date = getDateFromMinute(3 * MINUTES_PER_MONTH, game.startingYear);
@@ -631,34 +632,17 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
       <ProgramsScreen onClose={jest.fn()} />
     </Provider>,
   );
-  // A full screen like Build: close on the left, the speed control beside the title.
-  expect(
-    screen.getByRole("button", { name: "Close customer programs" }),
-  ).toBeVisible();
-  expect(screen.getByRole("group", { name: "game speed" })).toBeVisible();
-  expect(
-    screen.queryByText(/Changes start next month/),
-  ).not.toBeInTheDocument();
-  const hazards = screen.getByRole("region", { name: "Resilience" });
   fireEvent.click(
-    within(hazards).getByRole("button", {
-      name: /^Wildfire preparedness · Off · .*\/yr$/,
-    }),
+    screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
   );
-  const { annualCost } = wildfirePreparedness(store.getState().game)!;
-  expect(fact("Annual budget")).toContain(
-    `${formatMoneyConcise(annualCost)}/yr`,
+  expect(fact("Annualized reservation budget")).toContain("$200k/yr");
+  expect(fact("Local critical-load backup")).toContain("150 kW for 24 hours");
+  expect(fact("Local critical-load backup")).toContain(
+    "3.6 MWh of initial fuel",
   );
-  expect(fact("Annual budget")).toContain(
-    `${formatMoneyConcise(annualCost / 12)}/mo while on · no upfront payment`,
-  );
-  expect(
-    screen.getByText("Next wildfire season", { exact: true }),
-  ).not.toBeVisible();
-  fireEvent.click(screen.getByText("Protection & fire season"));
-  expect(fact("Next wildfire season")).toBe("Aug 2022 to Feb 2023");
-  expect(fact("One-time cost")).toBeUndefined();
-  expect(fact("If funded now")).toBeUndefined();
+  fireEvent.click(screen.getByText("Reservation & incident"));
+  expect(fact("Scenario wildfire")).toBe("Jan 2025");
+  expect(fact("Automatic end")).toContain("Feb 2025");
   act(() => jest.advanceTimersByTime(250));
   const month = wildfirePreviewMonth(store.getState().game)!;
   expect(worker.postMessage).toHaveBeenCalledWith(
@@ -666,44 +650,22 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   );
   const result = previewWildfire(store.getState().game, month);
   act(() => worker.onmessage!({ data: { result } }));
+  expect(screen.getByText(/^Estimated customer interruptions ·/)).toBeVisible();
+  expect(screen.getByText(/^Estimated interrupted energy:/)).toHaveTextContent(
+    formatWattHours(result.prepared.interruptedWh || 0),
+  );
+  expect(screen.getByText(/^Local backup supplied:/)).toHaveTextContent(
+    "3.6 MWh maximum",
+  );
   expect(
-    screen.getByText(/^Next wildfire season · simulated fire in /),
-  ).toBeVisible();
-  expect(screen.getByText(/^Customer load disconnected:/)).toHaveTextContent(
-    `${Math.round(result.standardIncident.disconnectedDemand * 100)}% → ${Math.round(result.preparedIncident.disconnectedDemand * 100)}%`,
-  );
-  expect(screen.getByText(/^Cash benefit:/)).toHaveTextContent(
-    `${formatMoneyConcise(result.cashBenefit)} before program cost`,
-  );
-  expect(screen.getByText(/^Cash benefit:/)).toBeVisible();
-  expect(screen.getByText("Effectiveness at this fire")).not.toBeVisible();
-  fireEvent.click(screen.getByText("Fire impact details"));
-  expect(fact("Effectiveness at this fire")).toContain(
-    `${Math.round(result.standardEffectiveness * 100)}% → ${Math.round(result.preparedEffectiveness * 100)}%`,
-  );
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Start preparedness (${formatMoneyConcise(annualCost)}/yr)`,
-    }),
-  );
+    screen.queryByText(/50% fewer|Generator losses also halved|Cash benefit:/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
   expect(wildfirePreparedness(store.getState().game)!.active).toBe(true);
-  expect(
-    screen.getByRole("button", {
-      name: /^Wildfire preparedness · On · .*\/yr$/,
-    }),
-  ).toBeVisible();
   fireEvent.click(
     screen.getByRole("button", { name: /^Wildfire preparedness · On/ }),
   );
-  expect(screen.getByText("On", { exact: true })).toBeVisible();
-  expect(
-    screen.getByRole("progressbar", {
-      name: "Wildfire preparedness effectiveness",
-    }),
-  ).toHaveAttribute("aria-valuenow", "0");
-  expect(
-    screen.getByText(/Ramping up · 12 months to full effectiveness/),
-  ).toBeVisible();
+  expect(fact("Reservation")).toContain("Reserved");
   fireEvent.click(
     screen.getByRole("button", { name: "Turn off preparedness" }),
   );
@@ -713,7 +675,7 @@ test("wildfire preparedness shows annual terms, previews the next season, and st
   jest.useRealTimers();
 });
 
-test("an imported wildfire offers preparedness for its scheduled incident outside natural hazard regions", () => {
+test("the historical reservation is available outside smoke regions only when that scenario is selected", () => {
   const game = createGame({
     scenarioId: CUSTOM_SCENARIO_ID,
     scenario: {
@@ -735,12 +697,8 @@ test("an imported wildfire offers preparedness for its scheduled incident outsid
   fireEvent.click(
     screen.getByRole("button", { name: /^Wildfire preparedness · Off/ }),
   );
-  fireEvent.click(screen.getByText("Protection & fire season"));
-  expect(fact("Scenario wildfire")).toBe("Jan 2033 to Feb 2033");
-  expect(screen.queryByText("Next wildfire season")).not.toBeInTheDocument();
-  expect(
-    screen.queryByText(/^Next wildfire season · simulated fire/),
-  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("Reservation & incident"));
+  expect(fact("Scenario wildfire")).toBe("Jan 2033");
   fireEvent.click(screen.getByRole("button", { name: /^Start preparedness/ }));
   expect(wildfirePreparedness(store.getState().game)?.active).toBe(true);
   view.unmount();

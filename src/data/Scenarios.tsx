@@ -1450,7 +1450,7 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "wildfire emergency",
     locationId: "LA",
     summary:
-      "Wildfires are coming to Los Angeles. Prepare for power shutoffs and costly repairs.",
+      "Wildfires are coming to Los Angeles. Prepare for damaged power lines, local outages and costly repairs.",
     themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
@@ -1458,7 +1458,7 @@ export const SCENARIOS: ScenarioType[] = [
       objective:
         "Keep all connected customers supplied during the January and February 2025 wildfire emergency.",
       threat:
-        "Safety shutoffs help prevent sparks in high winds. They cut sales and generator output while restoration costs mount.",
+        "Fire damage and emergency isolation interrupt customer service and cut sales. Keep the connected grid supplied while repair costs mount.",
     },
     ownership: "Public",
     startingYear: 2022,

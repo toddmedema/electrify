@@ -53,7 +53,6 @@ import {
 import { electricVehicleEligibility } from "../../data/ElectricVehicles";
 import { customerBatteryFleet } from "../../helpers/CustomerBatteries";
 import { GENERATORS } from "../../data/Facilities";
-import { SCENARIO_PREPARATION_MONTHS } from "../../data/ScenarioPreparation";
 import {
   deriveExpandedSummary,
   MINUTES_PER_MONTH,
@@ -91,7 +90,6 @@ import {
 } from "../../helpers/WildfirePreview";
 import {
   wildfirePreparedness,
-  wildfireSeasonOdds,
   WildfirePreparednessType,
 } from "../../helpers/Wildfire";
 import CatalogTitleBar from "../base/CatalogTitleBar";
@@ -126,7 +124,7 @@ const PROGRAM_ICONS: Record<PolicyId, typeof ScheduleIcon> = {
   battery: BatteryChargingFullIcon,
 };
 const WILDFIRE_SUMMARY =
-  "Crews, inspections and vegetation clearing reduce wildfire damage. Fires and restoration costs remain.";
+  "Reserve finite backup for local critical sites during the selected wildfire scenario.";
 
 const BUILDOUT_IDS: BuildoutPolicyId[] = ["efficiency", "solar"];
 
@@ -482,10 +480,10 @@ function useEstimate<T>(
 
 /** Keep the standing program's status and yearly budget visible in the list. */
 function preparednessStatus(preparedness: WildfirePreparednessType): string {
-  return `${preparedness.active ? "On" : "Off"} · ${formatPercent(preparedness.effectiveness)} effective · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
+  return `${preparedness.active ? "On" : "Off"} · ${formatMoneyConcise(preparedness.annualCost)}/yr`;
 }
 
-/** Season facts and a simulated typical wildfire, met with and without funded crews. */
+/** Reservation terms and the selected historical episode, with finite local support. */
 function WildfireDetails({
   game,
   preparedness,
@@ -499,162 +497,89 @@ function WildfireDetails({
   result?: WildfirePreviewResult;
   error?: string;
 }) {
-  const { season, effectiveness, remainingMonths, active } = preparedness;
-  const importedFire =
-    game.scenarioId === 999 &&
-    game.customScenario?.eventScenarioIds?.includes(111);
-  const fireMonth = 12 + SCENARIO_PREPARATION_MONTHS[111];
-  const progress = active
-    ? effectiveness >= 1
-      ? "Fully effective"
-      : `Ramping up · ${Math.ceil(remainingMonths)} months to full effectiveness`
-    : effectiveness > 0
-      ? `Fading · ${Math.ceil(remainingMonths)} months of protection remaining`
-      : "No protection";
-  const offLabel = active ? "Stop now" : "Keep off";
-  const onLabel = active ? "Keep on" : "Start now";
-  const facts: ProgramFact[] = [
-    {
-      label: "Annual budget",
-      value: `${formatMoneyConcise(preparedness.annualCost)}/yr`,
-      detail: `${formatMoneyConcise(preparedness.annualCost / 12)}/mo while on · no upfront payment`,
-    },
-    {
-      label: "At full effectiveness",
-      value: "50% fewer disconnections",
-      detail: "Generator losses also halved",
-    },
-  ];
-  const terms: ProgramFact[] = [
-    { label: "Builds and fades", value: "12 months each" },
-    {
-      label: importedFire ? "Scenario wildfire" : "Next wildfire season",
-      value: importedFire
-        ? `${labelMonth(game, fireMonth)} to ${labelMonth(game, fireMonth + 1)}`
-        : `${labelMonth(game, season.startMonth)} to ${labelMonth(game, season.endMonth - 1)}`,
-    },
-  ];
-  const standard = result?.standardIncident;
-  const prepared = result?.preparedIncident;
+  const { active, fireMonth } = preparedness;
+  const offLabel = "No reserved backup";
+  const onLabel = "Reserved local backup";
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
       <Typography>{WILDFIRE_SUMMARY}</Typography>
-      <Box
-        className="customerProgramProject"
-        sx={{ display: "grid", gap: 1.5 }}
-      >
-        <Typography variant="subtitle2">
-          {formatPercent(effectiveness)} effective
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={effectiveness * 100}
-          aria-label="Wildfire preparedness effectiveness"
-          aria-valuetext={`${formatPercent(effectiveness)} effective · ${progress}`}
-          color={effectiveness >= 1 ? "success" : "primary"}
-          sx={{ height: 8, borderRadius: 1 }}
+      <ProgramFacts
+        facts={[
+          {
+            label: "Annualized reservation budget",
+            value: `${formatMoneyConcise(preparedness.annualCost)}/yr`,
+            detail: `${formatMoneyConcise(preparedness.annualCost / 12)}/mo while on · ends after ${labelMonth(game, fireMonth)}`,
+          },
+          {
+            label: "Local critical-load backup",
+            value: "150 kW for 24 hours",
+            detail: "One mobile generator · 3.6 MWh of initial fuel",
+          },
+          {
+            label: "Reservation",
+            value: active ? "Reserved" : "Not reserved",
+            detail: "Available immediately when funded",
+          },
+        ]}
+      />
+      <ProgramDetails label="Reservation & incident">
+        <ProgramFacts
+          facts={[
+            { label: "Scenario wildfire", value: labelMonth(game, fireMonth) },
+            {
+              label: "Automatic end",
+              value: labelMonth(game, fireMonth + 1),
+              detail: "Charges stop after the incident month",
+            },
+          ]}
+          secondary
         />
-        <Typography variant="body2">{progress}</Typography>
-      </Box>
-      <ProgramFacts facts={facts} />
-      <ProgramDetails label="Protection & fire season">
-        <ProgramFacts facts={terms} secondary />
         <Typography variant="body2" color="text.secondary">
-          {importedFire
-            ? "Protection when the fire starts determines its impact."
-            : wildfireSeasonOdds(preparedness.profile)}
+          Backup serves eligible local critical sites. Damaged feeders, customer
+          isolation and repair costs remain.
         </Typography>
       </ProgramDetails>
-      {!importedFire && month === undefined && (
-        <Typography variant="body2" color="textSecondary">
-          The next wildfire season starts after this run ends; protection still
-          applies to earlier fires.
+      {month === undefined ? (
+        <Typography variant="body2" color="text.secondary">
+          The incident has started or falls outside this run. Its recorded
+          backup allowance does not change.
         </Typography>
-      )}
-      {!importedFire && month !== undefined && (
+      ) : (
         <>
-          <Box>
-            <Typography component="h3" variant="subtitle1">
-              Next wildfire season · simulated fire in {labelMonth(game, month)}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              A simulated fire in the season’s highest-risk month; actual fires
-              may differ.
-            </Typography>
-          </Box>
+          <Typography component="h3" variant="subtitle1">
+            Estimated customer interruptions · {labelMonth(game, month)}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Monthly energy estimate from reported account interruptions; this
+            chart does not reproduce consecutive outage hours.
+          </Typography>
           {error ? (
             <Alert severity="error">{error}</Alert>
-          ) : !result || !standard || !prepared ? (
-            <>
-              <Typography variant="body2">
-                {offLabel} ━ · {onLabel} ┄
-              </Typography>
-              <PolicyDemandChartPlaceholder />
-              <Box aria-hidden>
-                {Array.from({ length: 2 }, (_, i) => (
-                  <Typography key={i}>
-                    <Skeleton width={i % 2 ? "60%" : "80%"} />
-                  </Typography>
-                ))}
-              </Box>
-            </>
+          ) : !result ? (
+            <PolicyDemandChartPlaceholder />
           ) : (
             <>
               <Typography variant="body2">
                 {offLabel} ━ · {onLabel} ┄
               </Typography>
               <PolicyDemandChart
-                current={result.standardDemandW}
-                changed={result.preparedDemandW}
+                current={result.standardInterruptedW}
+                changed={result.preparedInterruptedW}
                 labels={[offLabel, onLabel]}
-                ariaLabel={`Customer demand still connected during a simulated wildfire: ${offLabel} and ${onLabel}, over a representative day`}
+                ariaLabel="Estimated customer power interrupted with no reserved backup and with reserved local backup, over a representative day"
               />
               <Box role="status">
                 <Typography>
-                  Customer load disconnected:{" "}
-                  {formatPercent(standard.disconnectedDemand)} →{" "}
-                  {formatPercent(prepared.disconnectedDemand)}
+                  Estimated interrupted energy:{" "}
+                  {formatWattHours(result.standard.interruptedWh || 0)} →{" "}
+                  {formatWattHours(result.prepared.interruptedWh || 0)}
                 </Typography>
                 <Typography>
-                  Cash benefit: {formatMoneyConcise(result.cashBenefit)} before
-                  program cost
+                  Local backup supplied:{" "}
+                  {formatWattHours(result.prepared.localBackupWh || 0)} (3.6 MWh
+                  maximum)
                 </Typography>
               </Box>
-              <ProgramDetails label="Fire impact details">
-                <ProgramFacts
-                  facts={[
-                    {
-                      label: "Effectiveness at this fire",
-                      value: `${formatPercent(result.standardEffectiveness)} → ${formatPercent(result.preparedEffectiveness)}`,
-                      detail: `${offLabel} → ${onLabel}`,
-                    },
-                    ...(standard.selectedFacilityNames.length > 0
-                      ? [
-                          {
-                            label: "Generator output",
-                            value: `${formatPercent(standard.outputMultiplier)} → ${formatPercent(prepared.outputMultiplier)}`,
-                            detail: standard.selectedFacilityNames.join(", "),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: "Electricity supplied",
-                      value: `${formatWattHours(result.standard.supplyWh)} → ${formatWattHours(result.prepared.supplyWh)}`,
-                      detail: `${labelMonth(game, month)} · ${formatWattHours(result.noFire.supplyWh)} with no fire`,
-                    },
-                    ...(standard.restorationCostPerMonth > 0
-                      ? [
-                          {
-                            label: "Restoration",
-                            value: `${formatMoneyConcise(standard.restorationCostPerMonth)}/mo`,
-                            detail: "Same with either plan",
-                          },
-                        ]
-                      : []),
-                  ]}
-                  secondary
-                />
-              </ProgramDetails>
             </>
           )}
         </>
@@ -663,7 +588,6 @@ function WildfireDetails({
   );
 }
 
-/** The catalog of programs, grouped by the problem each one helps solve. */
 function ProgramList({
   game,
   programs,
@@ -1107,10 +1031,7 @@ export function ProgramsScreen({
     snapshot,
   );
   const fireMonth =
-    selected === "wildfire" &&
-    !game.customScenario?.eventScenarioIds?.includes(111)
-      ? wildfirePreviewMonth(snapshot)
-      : undefined;
+    selected === "wildfire" ? wildfirePreviewMonth(snapshot) : undefined;
   const wildfireEstimate = useEstimate<WildfirePreviewResult>(
     fireMonth === undefined
       ? undefined

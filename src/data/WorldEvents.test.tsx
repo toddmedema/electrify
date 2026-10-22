@@ -442,7 +442,7 @@ describe("authored upcoming-event previews", () => {
     });
     expect(upcoming).toHaveLength(1);
     expect(upcoming[0].message).toBe(
-      "Safety shutoffs may disrupt supply, with prepared crews reducing generation losses.",
+      "Damaged lines may interrupt customer service. Reserved backup will support local critical loads.",
     );
   });
 });
@@ -614,12 +614,21 @@ describe("California wildfire emergency", () => {
       key: "story:111:california-wildfire-2025:firestorm",
       title: "Wildfire emergency",
       importance: "CRITICAL",
-      effects: { demandMultiplier: 0.94 },
+      attributes: { evidenceId: "ladwp-2025-jan14-28" },
     });
-    expect(january.effects.facilityOutputMultipliersById).toBeDefined();
-    expect(january.effects.operatingExpensePerMonth).toBe(1_000_000);
-    expect(february.effects).toEqual(january.effects);
-    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
+    expect(january.effects.serviceInterruptionFraction).toBeGreaterThan(0);
+    expect(january.effects.serviceInterruptionFraction).toBeLessThan(0.01);
+    expect(january.effects.demandMultiplier).toBe(1);
+    expect(january.effects.facilityOutputMultipliersById).toBeUndefined();
+    expect(january.effects.operatingExpensePerMonth).toBe(260_000);
+    expect(february.effects).toMatchObject({
+      operatingExpensePerMonth: 260_000,
+    });
+    expect(february.effects.serviceInterruptionFraction).toBeUndefined();
+    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual(
+      february.effects,
+    );
+    expect(resolveStoryAtDate(wildfireContext(15)).effects).toEqual({});
     expect(
       resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 999 })
         .occurrences,
@@ -629,18 +638,40 @@ describe("California wildfire emergency", () => {
     ).toEqual([]);
   });
 
+  it("does not invent plant damage from fuel type or a seeded plant lottery", () => {
+    const onset = resolveStoryAtDate({
+      ...wildfireContext(12),
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        facilities: [10, 11, 12, 13].map((id) => ({
+          id,
+          name: `Gas plant ${id}`,
+          fuel: "Natural Gas",
+          ageYears: 5,
+          peakW: 50,
+          operational: true,
+        })),
+      },
+    }).occurrences[0];
+
+    expect(onset.effects.facilityOutputMultipliersById).toBeUndefined();
+    expect(onset.effects.facilityOutputMultipliersByFuel).toBeUndefined();
+    expect(onset.message).toContain("customer service");
+    expect(onset.message).not.toContain("Gas plant");
+  });
+
   it("previews one emergency and reports the recorded restoration result", () => {
     const upcoming = upcomingStoryPhases(wildfireContext(0));
     expect(upcoming.map((phase) => phase.key)).toEqual([
       "story:111:california-wildfire-2025:firestorm",
     ]);
-    expect(upcoming[0].message).toMatch(/safety shutoffs/i);
+    expect(upcoming[0].message).toMatch(/damaged lines/i);
 
     const onset = resolveStoryAtDate(wildfireContext(12)).occurrences[0];
     const restoration = resolveStoryAtDate({
-      ...wildfireContext(14),
+      ...wildfireContext(15),
       periodSnapshots: {
-        2: {
+        3: {
           deliveredWhByFuel: {},
           demandWh: 100,
           unservedWh: 1,
@@ -655,6 +686,20 @@ describe("California wildfire emergency", () => {
       attributes: { reliability: 0.99 },
     });
     expect(restoration.message).toMatch(/met 99% of connected demand/i);
+  });
+
+  it("reports imported recovery as a completed response rather than another upcoming event", () => {
+    const recovery = resolveStoryAtDate({
+      ...wildfireContext(15),
+      scenarioId: 999,
+      customEvents: [{ scenarioId: 111, moneyScale: 1 }],
+    }).occurrences[0];
+    expect(recovery.message).toContain(
+      "Response and repair charges have ended",
+    );
+    expect(recovery.message).toContain("Rebuilding continues");
+    expect(recovery.message).not.toContain("upcoming");
+    expect(recovery.effects).toEqual({});
   });
 });
 

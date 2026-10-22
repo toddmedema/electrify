@@ -223,21 +223,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           overall. Participants get 10% off electricity delivered all day.
         </p>
         <p>
-          <strong>Wildfire preparedness:</strong> In custom games in fire-prone
-          areas, fund crews, inspections and vegetation clearing year-round, as
-          California utilities do. You pay a fixed monthly cost while the
-          program is active, with no upfront payment or annual renewal. It takes
-          12 months to reach full protection. Turn it off and spending stops
-          immediately, but protection fades over the next 12 months. Restarting
-          builds on whatever protection remains.
+          <strong>Wildfire preparedness:</strong> Custom games with the selected
+          Wildfire Emergency scenario can reserve one mobile generator for
+          eligible local critical sites. The annualized $200k reservation budget
+          is billed monthly while on, with no upfront payment. Availability is
+          immediate; charges end after the incident month. Turning it off stops
+          future charges.
         </p>
         <p>
-          Full protection halves customer disconnections from safety shutoffs
-          and output losses at affected generators. Partial protection gives
-          smaller benefits. You still face fires and restoration costs. The
-          preview estimates a typical fire next season, using the protection
-          you'll have by then. Changing the program won't affect a fire that's
-          already burning.
+          The package supports up to 150 kW for 24 hours, with 3.6 MWh of
+          initial fuel. It cannot reconnect customers through damaged or
+          isolated feeders, prevent smoke or reduce repair costs. The preview
+          estimates interrupted energy and local backup service for the selected
+          incident; it does not simulate consecutive outage hours. Changing the
+          program cannot alter an incident already recorded.
         </p>
       </div>
     ),
