@@ -115,10 +115,12 @@ test("an empty library keeps installation actions together with Workshop first",
   expect(
     await within(installed).findByText("Install your first mod below"),
   ).toBeVisible();
+  await within(installed).findByRole("button", { name: "Check for updates" });
   const buttons = within(installed).getAllByRole("button");
   expect(buttons.map((button) => button.textContent)).toEqual([
     "Browse Workshop",
     "Import mod",
+    "Check for updates",
   ]);
   expect(buttons[0]).toHaveClass("MuiButton-contained");
   expect(buttons[1]).toHaveClass("MuiButton-outlined");
@@ -202,7 +204,7 @@ test("removing asks first, toasts errors without closing the dialog, and focuses
       "The mod library is busy.",
     ),
   );
-  expect(screen.queryByText("The mod library is busy.")).toBeNull();
+  expect(screen.getByText("The mod library is busy.")).toBeInTheDocument();
   expect(screen.getByRole("dialog")).toBeVisible();
   await userEvent.click(within(screen.getByRole("dialog")).getByText("Remove"));
   await waitFor(() =>
@@ -276,8 +278,13 @@ test("publishing stays open while uploading and offers the Steam page afterwards
   ).toBeInTheDocument();
   await userEvent.click(screen.getByText("Publish publicly"));
   expect(await screen.findByText("Uploading…")).toBeInTheDocument();
-  await userEvent.click(screen.getByText("Cancel"));
-  expect(screen.getByText("Uploading…")).toBeInTheDocument();
+  await userEvent.click(screen.getByText("Close"));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Browse Workshop" }),
+  );
+  expect(requests).toContainEqual({ kind: "browse" });
+  expect(screen.queryByRole("dialog")).toBeNull();
   await act(async () =>
     finish({
       entries: [{ ...local(), workshopId: "456" }],
@@ -319,11 +326,12 @@ test("opening with Steam running refreshes downloads quietly", async () => {
   );
   expect(await screen.findByText("Shared Grid")).toBeInTheDocument();
   expect(requests.map((r) => r.kind)).toEqual(["list", "refresh"]);
-  expect(store.getState().ui.snackbar).toMatchObject({
-    open: true,
-    message:
-      "Skipped Workshop item 123: not a data-only scenario package. Installed 1 mod.",
-  });
+  expect(
+    screen.getByText(
+      "Skipped Workshop item 123: not a data-only scenario package.",
+    ),
+  ).toBeVisible();
+  expect(store.getState().ui.snackbar.open).toBe(false);
   await userEvent.click(screen.getByText("Browse Workshop"));
   expect(requests).toContainEqual({ kind: "browse" });
 });
@@ -352,4 +360,132 @@ test("an unreadable library can be reset from the screen", async () => {
     expect(store.getState().ui.snackbar.message).toBe("Mod library reset."),
   );
   expect(requests.map((r) => r.kind)).toEqual(["list", "reset"]);
+});
+
+test("a rejected IPC keeps the installed library visible and offers persistent Retry", async () => {
+  let fail = true;
+  const { store } = setup([local()], (input, entries) => {
+    if (input.kind === "template" && fail) {
+      fail = false;
+      throw new Error("IPC disconnected");
+    }
+    return { entries };
+  });
+  await screen.findByText("Community Grid");
+  await userEvent.click(screen.getByText("Save authoring template"));
+  expect(screen.getByText("Community Grid")).toBeVisible();
+  expect(screen.queryByText("Install your first mod below")).toBeNull();
+  expect(
+    screen.getByText(
+      "Mods couldn't be loaded. Check the connection and Retry.",
+    ),
+  ).toBeVisible();
+  act(() => {
+    store.dispatch({ type: "ui/snackbarOpen", payload: { open: false } });
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(
+        "Mods couldn't be loaded. Check the connection and Retry.",
+      ),
+    ).toBeNull(),
+  );
+});
+
+test("a staged import shows both identities and requires an explicit replacement choice", async () => {
+  const { requests } = setup([local()], (input, entries) => ({
+    entries,
+    ...(input.kind === "import"
+      ? {
+          importConflict: {
+            token: "preview",
+            existing: pack(),
+            incoming: pack({
+              title: "Other grid",
+              creator: "Bo",
+              version: "9",
+            }),
+          },
+        }
+      : {}),
+  }));
+  await screen.findByText("Community Grid");
+  await userEvent.click(screen.getByText("Import mod"));
+  const dialog = await screen.findByRole("dialog");
+  expect(
+    within(dialog).getByText("Community Grid · by Ada · v1.0.0"),
+  ).toBeVisible();
+  expect(within(dialog).getByText("Other grid · by Bo · v9")).toBeVisible();
+  await userEvent.click(within(dialog).getByText("Install as copy"));
+  expect(requests).toContainEqual({
+    kind: "resolveImport",
+    token: "preview",
+    action: "copy",
+  });
+});
+
+test("a stale browse response cannot undo a completed upload", async () => {
+  let finishUpload: (value: ModLibrary) => void = () => {};
+  let finishBrowse: (value: ModLibrary) => void = () => {};
+  setup(
+    [local()],
+    (input, entries) => {
+      if (input.kind === "publish")
+        return new Promise((resolve) => {
+          finishUpload = resolve;
+        });
+      if (input.kind === "browse")
+        return new Promise((resolve) => {
+          finishBrowse = resolve;
+        });
+      return { entries };
+    },
+    true,
+  );
+  await userEvent.click(await screen.findByText("Publish Community Grid"));
+  await userEvent.click(screen.getByText("Publish publicly"));
+  await userEvent.click(screen.getByText("Close"));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await userEvent.click(screen.getByText("Browse Workshop"));
+  await act(async () =>
+    finishUpload({ entries: [{ ...local(), workshopId: "456" }] }),
+  );
+  expect(screen.getByText("Update Community Grid on Workshop")).toBeVisible();
+  await act(async () => finishBrowse({ entries: [local()] }));
+  expect(screen.getByText("Update Community Grid on Workshop")).toBeVisible();
+});
+
+test("unrelated imports and browsing do not dismiss unresolved Workshop actions or download status", async () => {
+  const { requests } = setup(
+    [local()],
+    (input, entries) => {
+      if (input.kind === "refresh")
+        return {
+          entries,
+          warning: "Skipped Workshop item 123: truncated download.",
+          downloads: [{ id: "777", status: "queued" }],
+        };
+      if (input.kind === "import")
+        return { entries, error: "The imported file has an invalid title." };
+      return { entries };
+    },
+    true,
+  );
+  expect(
+    await screen.findByText("Skipped Workshop item 123: truncated download."),
+  ).toBeVisible();
+  await userEvent.click(screen.getByText("Import mod"));
+  expect(
+    screen.getByText("The imported file has an invalid title."),
+  ).toBeVisible();
+  expect(
+    screen.getByText("Skipped Workshop item 123: truncated download."),
+  ).toBeVisible();
+  await userEvent.click(screen.getByText("Browse Workshop"));
+  expect(requests).toContainEqual({ kind: "browse" });
+  expect(screen.getByText("Workshop item 777: Queued")).toBeVisible();
+  expect(
+    screen.getByText("Skipped Workshop item 123: truncated download."),
+  ).toBeVisible();
 });

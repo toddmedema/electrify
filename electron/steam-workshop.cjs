@@ -142,6 +142,10 @@ class SteamWorkshop {
       .getSubscribedItems()
       .map((id) => id.toString());
   }
+  downloadStatus(id) {
+    const state = this.steam.client.workshop.state(itemId(id));
+    return state & 16 ? "downloading" : "queued";
+  }
   /** Install info for a finished download; otherwise asks Steam to download it and returns null. */
   installedOrQueueDownload(id) {
     const workshop = this.steam.client.workshop;

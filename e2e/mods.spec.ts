@@ -280,8 +280,15 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await expect(
     dialog.getByRole("button", { name: "Uploading…" }),
   ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await screenRoot.getByRole("button", { name: "Browse Workshop" }).click();
+  await expect(
+    screenRoot.getByRole("button", {
+      name: "Publish Community Grid",
+      exact: true,
+    }),
+  ).toBeDisabled();
   await page.evaluate(() => window.__mods.finishUpload?.());
   await expect(dialog).toHaveCount(0);
   await expect(
@@ -437,7 +444,11 @@ test("empty mod library offers Workshop first and template results in the shared
     installed.getByText("Install your first mod below"),
   ).toBeVisible();
   const buttons = installed.getByRole("button");
-  await expect(buttons).toHaveText(["Browse Workshop", "Import mod"]);
+  await expect(buttons).toHaveText([
+    "Browse Workshop",
+    "Import mod",
+    "Check for updates",
+  ]);
   await expect(buttons.first()).toHaveClass(/MuiButton-contained/);
   await expect(page.getByText("Add by Workshop item ID")).toHaveCount(0);
   const guide = page.getByRole("link", { name: "Read the modding guide" });
@@ -456,3 +467,78 @@ test("empty mod library offers Workshop first and template results in the shared
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(mods).toBeFocused();
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`an empty library finishes its first Workshop subscription on overlay return in ${theme}`, async ({
+    page,
+  }) => {
+    await mockDesktop(page, true, theme, []);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    const root = page.locator(".modsScreen");
+    await expect(root.getByText("Install your first mod below")).toBeVisible();
+    await expect(
+      root.getByRole("button", { name: "Check for updates" }),
+    ).toBeEnabled();
+    await root.getByRole("button", { name: "Browse Workshop" }).click();
+    await page.evaluate((installed) => {
+      const bridge = window.electrifyDesktop!;
+      const previous = bridge.mods!;
+      let checks = 0;
+      bridge.mods = async (input) => {
+        if (input.kind !== "refresh") return previous(input);
+        window.__mods.requests.push(input);
+        checks++;
+        return checks === 1
+          ? { entries: [], downloads: [{ id: "777", status: "queued" }] }
+          : { entries: [installed], downloads: [] };
+      };
+      window.dispatchEvent(new Event("blur"));
+      window.dispatchEvent(new Event("focus"));
+    }, ENTRIES[2]);
+    await expect(root.getByText("Workshop item 777: Queued")).toBeVisible();
+    await expect(root.getByText("Shared Grid", { exact: true })).toBeVisible();
+    await expect(root.getByText("Workshop item 777: Queued")).toHaveCount(0);
+    expect(await noHorizontalScroll(page)).toBe(true);
+  });
+
+  test(`library recovery remains actionable after its toast is dismissed in ${theme}`, async ({
+    page,
+  }) => {
+    await mockDesktop(page, false, theme, []);
+    await page.addInitScript(() => {
+      const previous = window.electrifyDesktop!.mods!;
+      let broken = true;
+      window.electrifyDesktop!.mods = async (input) => {
+        if (input.kind === "reset") {
+          window.__mods.requests.push(input);
+          broken = false;
+          return { entries: [], message: "Mod library reset." };
+        }
+        if (input.kind === "list" && broken) {
+          window.__mods.requests.push(input);
+          return {
+            entries: [],
+            unreadable: true,
+            error:
+              "Your mod library couldn't be read. Reset it to start over; the old files are kept.",
+          };
+        }
+        return previous(input);
+      };
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    const root = page.locator(".modsScreen");
+    await expect(
+      root.getByRole("button", { name: "Reset mod library" }),
+    ).toBeVisible();
+    await dismissToast(page);
+    await root.getByRole("button", { name: "Reset mod library" }).click();
+    await expect(
+      root.getByRole("button", { name: "Reset mod library" }),
+    ).toHaveCount(0);
+    await expect(root.getByText("Install your first mod below")).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+  });
+}

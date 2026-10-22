@@ -153,8 +153,17 @@ test("imports persist offline, enable state survives updates, removal leaves sna
     enabled: false,
   });
   fs.writeFileSync(file, JSON.stringify(fixture({ version: "2" })));
+  const collision = await store.request({ kind: "import" });
+  assert.equal(collision.importConflict.incoming.version, "2");
+  assert.equal(collision.entries[0].pack.version, "1");
   assert.equal(
-    (await store.request({ kind: "import" })).message,
+    (
+      await store.request({
+        kind: "resolveImport",
+        token: collision.importConflict.token,
+        action: "update",
+      })
+    ).message,
     "Updated Test Grid.",
   );
   const restored = await entries(new ModStore(root));
@@ -163,6 +172,109 @@ test("imports persist offline, enable state survives updates, removal leaves sna
   await store.request({ kind: "remove", key: "local:test-grid" });
   assert.deepEqual(await entries(store), []);
   assert.equal(snapshot.version, "1");
+});
+
+test("one damaged entry is quarantined without rolling healthy siblings or publication mappings back", async (t) => {
+  const { store } = setup(t);
+  const healthy = {
+    key: "local:test-grid",
+    source: "local",
+    enabled: false,
+    pack: fixture({ version: "2" }),
+  };
+  await store.write({
+    entries: [healthy],
+    published: { "test-grid": { workshopId: "456", uploaded: true } },
+  });
+  const original = {
+    ...healthy,
+    key: "local:bad-grid",
+    pack: fixture({
+      id: "bad-grid",
+      title: "Unsafe\u202etitle",
+      facilities: { Solar: { buildCost: 1e308 } },
+    }),
+  };
+  fs.writeFileSync(
+    store.filename,
+    JSON.stringify({
+      entries: [healthy, original],
+      published: { "test-grid": { workshopId: "456", uploaded: true } },
+    }),
+  );
+  const result = await store.request({ kind: "list" });
+  assert.equal(result.unreadable, undefined);
+  assert.equal(result.entries[0].pack.version, "2");
+  assert.equal(result.entries[0].workshopId, "456");
+  assert.equal(result.quarantined.length, 1);
+  assert.doesNotMatch(result.quarantined[0].title, /\u202e/);
+  assert.deepEqual(JSON.parse(result.quarantined[0].original), original);
+  assert.match(result.quarantined[0].diagnostic, /buildCost/);
+  await store.request({ kind: "enable", key: healthy.key, enabled: true });
+  assert.equal((await store.request({ kind: "list" })).quarantined.length, 1);
+  const discarded = await store.request({
+    kind: "discard",
+    key: result.quarantined[0].key,
+  });
+  assert.deepEqual(discarded.quarantined, []);
+  assert.equal(discarded.entries[0].workshopId, "456");
+});
+
+test("a collision is reviewed before Update or Install as copy, and copies never inherit publication identity", async (t) => {
+  const { file, store } = setup(t);
+  await store.request({ kind: "import" });
+  const library = await store.read();
+  library.published["test-grid"] = { workshopId: "456", uploaded: true };
+  library.entries[0].enabled = false;
+  await store.write(library);
+  fs.writeFileSync(
+    file,
+    JSON.stringify(
+      fixture({
+        title: "Different Grid",
+        creator: "Different Creator",
+        version: "9",
+      }),
+    ),
+  );
+  const preview = await store.request({ kind: "import" });
+  assert.equal(preview.importConflict.existing.title, "Test Grid");
+  assert.equal(preview.importConflict.incoming.creator, "Different Creator");
+  assert.equal(preview.entries[0].pack.title, "Test Grid");
+  const copy = await store.request({
+    kind: "resolveImport",
+    token: preview.importConflict.token,
+    action: "copy",
+  });
+  assert.equal(copy.entries.length, 2);
+  const added = copy.entries.find((e) => e.pack.title === "Different Grid");
+  assert.notEqual(added.pack.id, "test-grid");
+  assert.equal(added.workshopId, undefined);
+  assert.equal(copy.entries[0].enabled, false);
+  const again = await store.request({ kind: "import" });
+  const update = await store.request({
+    kind: "resolveImport",
+    token: again.importConflict.token,
+    action: "update",
+  });
+  assert.equal(
+    update.entries.find((e) => e.pack.id === "test-grid").workshopId,
+    "456",
+  );
+  assert.equal(
+    update.entries.find((e) => e.pack.id === "test-grid").enabled,
+    false,
+  );
+  assert.match(
+    (
+      await store.request({
+        kind: "resolveImport",
+        token: again.importConflict.token,
+        action: "update",
+      })
+    ).error,
+    /expired/,
+  );
 });
 
 test("symlinks and malformed updates cannot replace installed content", async (t) => {
@@ -224,9 +336,20 @@ test("refresh copies only installed data, works offline afterward, and unsubscri
     (await store.request({ kind: "refresh" })).message,
     "Installed 1 mod.",
   );
+  const before = fs.statSync(store.filename).mtimeMs;
+  const previous = fs.existsSync(`${store.filename}.previous`)
+    ? fs.readFileSync(`${store.filename}.previous`, "utf8")
+    : null;
   assert.equal(
     (await store.request({ kind: "refresh" })).message,
     "Workshop mods are up to date.",
+  );
+  assert.equal(fs.statSync(store.filename).mtimeMs, before);
+  assert.equal(
+    fs.existsSync(`${store.filename}.previous`)
+      ? fs.readFileSync(`${store.filename}.previous`, "utf8")
+      : null,
+    previous,
   );
   fs.rmSync(installed.folder, { recursive: true });
   assert.equal((await entries(new ModStore(root)))[0].pack.title, "Test Grid");
@@ -239,6 +362,65 @@ test("refresh copies only installed data, works offline afterward, and unsubscri
   connected = true;
   await store.request({ kind: "remove", key: "workshop:123" });
   assert.equal((await entries(store)).length, 0);
+});
+
+test("refresh returns queued, downloading and skipped identities separately", async (t) => {
+  const { store } = setup(t, {
+    workshop: () => ({
+      subscribed: () => ["111", "222", "333"],
+      installedOrQueueDownload: (id) => {
+        if (id === "333") throw new Error("Download is truncated.");
+        return null;
+      },
+      downloadStatus: (id) => (id === "111" ? "queued" : "downloading"),
+    }),
+  });
+  const result = await store.request({ kind: "refresh" });
+  assert.deepEqual(
+    result.downloads.map(({ id, status }) => ({ id, status })),
+    [
+      { id: "111", status: "queued" },
+      { id: "222", status: "downloading" },
+      { id: "333", status: "skipped" },
+    ],
+  );
+  assert.match(result.downloads[2].message, /truncated/);
+});
+
+test("writing a recovered library preserves its last-good backup even if replacement fails", async (t) => {
+  const { store } = setup(t);
+  await store.request({ kind: "import" });
+  const library = await store.read();
+  library.published["test-grid"] = { workshopId: "456", uploaded: true };
+  await store.write(library);
+  // A completed neighbor makes the previous file the fully published library.
+  await store.request({
+    kind: "enable",
+    key: "local:test-grid",
+    enabled: false,
+  });
+  const backup = fs.readFileSync(`${store.filename}.previous`, "utf8");
+  fs.writeFileSync(store.filename, "broken JSON");
+  const rename = t.mock.method(fs.promises, "rename", async () => {
+    throw new Error("disk unavailable");
+  });
+  const failed = await store.request({
+    kind: "enable",
+    key: "local:test-grid",
+    enabled: false,
+  });
+  assert.match(failed.error, /disk unavailable/);
+  assert.equal(failed.entries[0].workshopId, "456");
+  assert.equal(fs.readFileSync(`${store.filename}.previous`, "utf8"), backup);
+  rename.mock.restore();
+  const success = await store.request({
+    kind: "enable",
+    key: "local:test-grid",
+    enabled: false,
+  });
+  assert.equal(success.entries[0].enabled, false);
+  assert.equal(success.entries[0].workshopId, "456");
+  assert.equal(fs.readFileSync(`${store.filename}.previous`, "utf8"), backup);
 });
 
 test("one bad Workshop item is skipped while good items still install", async (t) => {
@@ -378,6 +560,12 @@ test("listing never waits behind a slow upload", async (t) => {
   await store.request({ kind: "import" });
   const upload = store.request({ kind: "publish", key: "local:test-grid" });
   while (!finish) await new Promise((resolve) => setImmediate(resolve));
+  let browsed = false;
+  store.openUrl = () => {
+    browsed = true;
+  };
+  await store.request({ kind: "browse" });
+  assert.equal(browsed, true);
   const listed = await store.request({ kind: "list" });
   assert.equal(listed.uploading, true);
   assert.equal(listed.entries.length, 1);
@@ -428,7 +616,9 @@ test("a corrupt library recovers its last completed transaction without deleting
   });
   await store.write({ entries: [], published: {} });
   fs.writeFileSync(store.filename, "broken JSON");
-  assert.equal((await entries(store))[0].pack.title, "Test Grid");
+  const recovered = await store.request({ kind: "list" });
+  assert.equal(recovered.recovered, true);
+  assert.equal(recovered.entries[0].pack.title, "Test Grid");
   assert.equal(fs.readFileSync(store.filename, "utf8"), "broken JSON");
   fs.writeFileSync(`${store.filename}.previous`, "also broken");
   const unreadable = await store.request({ kind: "list" });
@@ -459,7 +649,9 @@ test("library entries are rebuilt from known fields and must be self-consistent"
     fs.mkdirSync(store.directory, { recursive: true });
     fs.writeFileSync(store.filename, JSON.stringify(bad));
     fs.rmSync(`${store.filename}.previous`, { force: true });
-    assert.equal((await store.request({ kind: "list" })).unreadable, true);
+    const result = await store.request({ kind: "list" });
+    assert.equal(result.unreadable, undefined);
+    assert.equal(result.quarantined.length, 1);
   }
   fs.writeFileSync(
     store.filename,
@@ -516,4 +708,51 @@ test("packaged builds include every repository file the main process loads outsi
       .readFileSync(path.join(__dirname, file), "utf8")
       .matchAll(/require\("\.\.\/(src\/[^"]+)"\)/g))
       assert.ok(files.includes(target), `${file} requires ${target}`);
+});
+
+test("malformed quarantine siblings and oversized entries retain bounded originals without rolling back healthy mods", async (t) => {
+  const { store } = setup(t);
+  const healthy = {
+    key: "local:test-grid",
+    source: "local",
+    enabled: true,
+    pack: fixture({ version: "newest" }),
+  };
+  fs.mkdirSync(store.directory, { recursive: true });
+  fs.writeFileSync(
+    store.filename,
+    JSON.stringify({
+      entries: [
+        healthy,
+        { pack: fixture({ unknown: "x".repeat(MAX_MOD_BYTES) }) },
+      ],
+      quarantined: [null],
+      published: {},
+    }),
+  );
+  const result = await store.request({ kind: "list" });
+  assert.equal(result.unreadable, undefined);
+  assert.equal(result.entries[0].pack.version, "newest");
+  assert.equal(result.quarantined.length, 2);
+  assert.equal(result.quarantined[0].originalTruncated, true);
+  for (const entry of result.quarantined)
+    assert.ok(Buffer.byteLength(entry.original) <= MAX_MOD_BYTES);
+  assert.equal(result.quarantined[1].original, "null");
+});
+
+test("Workshop-agreement actions survive reopening and can be explicitly dismissed", async (t) => {
+  const { root, store } = setup(t, {
+    workshop: () => ({
+      create: async () => ({ id: "456", agreement: true }),
+      publish: async () => ({ agreement: true }),
+    }),
+  });
+  await store.request({ kind: "import" });
+  await store.request({ kind: "publish", key: "local:test-grid" });
+  const reopened = new ModStore(root);
+  assert.deepEqual((await reopened.request({ kind: "list" })).agreements, [
+    "456",
+  ]);
+  await reopened.request({ kind: "dismissAgreement", workshopId: "456" });
+  assert.deepEqual((await reopened.request({ kind: "list" })).agreements, []);
 });

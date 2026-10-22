@@ -7,9 +7,34 @@ export interface InstalledMod {
   enabled: boolean;
   pack: ModPackage;
 }
+export interface QuarantinedMod {
+  key: string;
+  title: string;
+  creator: string;
+  version: string;
+  /** Recovery data only. Never compiled, enabled, or published. */
+  original: string;
+  originalTruncated?: boolean;
+  diagnostic: string;
+}
+export interface ModImportConflict {
+  token: string;
+  existing: Pick<ModPackage, "id" | "title" | "creator" | "version">;
+  incoming: Pick<ModPackage, "id" | "title" | "creator" | "version">;
+}
+export interface ModDownload {
+  id: string;
+  status: "queued" | "downloading" | "skipped";
+  message?: string;
+}
 /** Every mod request resolves with this; failures arrive as player-facing `error` text. */
 export interface ModLibrary {
   entries: InstalledMod[];
+  quarantined?: QuarantinedMod[];
+  recovered?: boolean;
+  agreements?: string[];
+  downloads?: ModDownload[];
+  importConflict?: ModImportConflict;
   message?: string;
   /** Partial success, such as one Workshop item skipped during refresh. */
   warning?: string;
@@ -27,5 +52,12 @@ export type ModRequest =
   | { kind: "list" | "import" | "template" | "refresh" | "reset" }
   | { kind: "browse"; workshopId?: string }
   | { kind: "subscribe"; id: string }
+  | { kind: "dismissAgreement"; workshopId: string }
+  | { kind: "discard"; key: string }
+  | {
+      kind: "resolveImport";
+      token: string;
+      action: "update" | "copy" | "cancel";
+    }
   | { kind: "remove" | "publish"; key: string }
   | { kind: "enable"; key: string; enabled: boolean };

@@ -28,7 +28,13 @@ import {
   modValidationDiagnostics,
 } from "../../mods/ModScenario";
 import type { ModPackage, ModProgramId } from "../../mods/ModSchema";
-import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
+import type {
+  InstalledMod,
+  ModImportConflict,
+  ModLibrary,
+  ModRequest,
+} from "../../mods/Types";
+import { useWorkshopRefresh } from "../../mods/useWorkshopRefresh";
 import type { DifficultyType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
@@ -72,11 +78,29 @@ export default function Mods(): React.JSX.Element {
   const chosenDifficulty = useAppSelector(
     (state) => state.ui.previewDifficulty ?? state.game.difficulty,
   );
-  const steamOnline = !!useDesktopState()?.steam.online;
+  const steam = useDesktopState()?.steam;
+  const steamOnline = !!steam?.online;
+  const steamAvailable = !!steam?.available;
   const [library, setLibrary] = React.useState<ModLibrary>({ entries: [] });
   const [loaded, setLoaded] = React.useState(false);
   const [pending, setPending] = React.useState<string>();
   const busy = React.useRef(false);
+  const generation = React.useRef(0);
+  const mounted = React.useRef(true);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const [notices, setNotices] = React.useState<
+    Record<string, { result: ModLibrary; request: ModRequest }>
+  >({});
+  const [agreements, setAgreements] = React.useState<string[]>([]);
+  const [recoveryDismissed, setRecoveryDismissed] = React.useState(false);
+  const [conflict, setConflict] = React.useState<ModImportConflict>();
+  const libraryRef = React.useRef(library);
+  libraryRef.current = library;
   const [removing, setRemoving] = React.useState<InstalledMod>();
   const [publishing, setPublishing] = React.useState<InstalledMod>();
   const [playing, setPlaying] = React.useState<InstalledMod>();
@@ -85,7 +109,6 @@ export default function Mods(): React.JSX.Element {
   const [focusTarget, setFocusTarget] = React.useState<string>();
   const removeCancel = React.useRef<HTMLButtonElement>(null);
   const publishCancel = React.useRef<HTMLButtonElement>(null);
-  const autoRefreshed = React.useRef(false);
   const entries = library.entries;
   const diagnosticsByEntry = React.useMemo(
     () =>
@@ -122,33 +145,100 @@ export default function Mods(): React.JSX.Element {
     );
   }, [focusTarget]);
 
-  /** One mod request at a time; a repeated click while busy is ignored, never disabled. */
+  /** Mutations are serialized; listing and opening Steam remain available during uploads. */
   const request = React.useCallback(
     async (id: string, input: ModRequest): Promise<ModLibrary | undefined> => {
-      if (busy.current) return undefined;
-      busy.current = true;
-      setPending(id);
+      const independent = input.kind === "list" || input.kind === "browse";
+      if (!independent && busy.current) return undefined;
+      const startedWhileBusy = busy.current;
+      if (!independent) {
+        generation.current++;
+        busy.current = true;
+        setPending(id);
+      }
+      const requestGeneration = generation.current;
+      const category =
+        input.kind === "refresh" || input.kind === "subscribe"
+          ? "workshop"
+          : input.kind === "import" || input.kind === "resolveImport"
+            ? "import"
+            : input.kind === "list" || input.kind === "reset"
+              ? "library"
+              : input.kind;
       try {
         const bridge = getDesktop()?.mods;
         const result: ModLibrary = bridge
           ? await bridge(input)
-          : { entries: [], error: "Mods need the Electrify desktop app." };
-        setLibrary(result);
+          : {
+              ...libraryRef.current,
+              error: "Mods need the Electrify desktop app.",
+            };
+        if (!mounted.current) return result;
+        // A read-only response cannot overwrite a newer mutation or dismiss its actions.
+        const fresh =
+          !independent ||
+          (!startedWhileBusy &&
+            !busy.current &&
+            requestGeneration === generation.current);
+        if (fresh)
+          setLibrary((previous) => ({
+            ...result,
+            ...(result.downloads === undefined &&
+            input.kind !== "reset" &&
+            previous.downloads
+              ? { downloads: previous.downloads }
+              : {}),
+          }));
+        const failed =
+          result.error ||
+          result.warning ||
+          result.unreadable ||
+          result.diagnostics?.length;
+        setNotices((previous) => {
+          const next = { ...previous };
+          const key = result.unreadable ? "library" : category;
+          if (failed) next[key] = { result, request: input };
+          else if (fresh) delete next[key];
+          return next;
+        });
+        if (result.agreements && fresh) setAgreements(result.agreements);
+        else if (result.published?.agreement)
+          setAgreements((previous) =>
+            Array.from(new Set([...previous, result.published!.workshopId])),
+          );
+        if (result.importConflict) setConflict(result.importConflict);
         return result;
       } catch {
         const result = {
-          entries: [],
-          error: "Mods couldn't be loaded. Restart Electrify and try again.",
+          ...libraryRef.current,
+          error: "Mods couldn't be loaded. Check the connection and Retry.",
         };
-        setLibrary(result);
+        if (mounted.current) {
+          setNotices((previous) => ({
+            ...previous,
+            [category]: { result, request: input },
+          }));
+        }
         return result;
       } finally {
-        busy.current = false;
-        setPending(undefined);
-        setLoaded(true);
+        if (!independent) busy.current = false;
+        if (mounted.current) {
+          if (!independent) setPending(undefined);
+          setLoaded(true);
+        }
       }
     },
     [],
+  );
+  const refresh = React.useCallback(
+    () => request("refresh", { kind: "refresh" }),
+    [request],
+  );
+  const canRefresh = React.useCallback(() => !busy.current, []);
+  const downloads = useWorkshopRefresh(
+    loaded && steamOnline && !library.unreadable,
+    refresh,
+    canRefresh,
   );
   const reset = () =>
     void request("reset", { kind: "reset" }).then(
@@ -190,15 +280,6 @@ export default function Mods(): React.JSX.Element {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request]);
-  React.useEffect(() => {
-    // Pick up finished Workshop downloads whenever the screen opens with Steam running.
-    if (!loaded || !steamOnline || autoRefreshed.current) return;
-    autoRefreshed.current = true;
-    void request("refresh", { kind: "refresh" }).then(
-      (result) => result && report(result, true),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, steamOnline, request]);
 
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
@@ -217,6 +298,19 @@ export default function Mods(): React.JSX.Element {
       report(result);
       if (result.focusKey) setFocusTarget(primarySelector(result.focusKey));
     });
+  const resolveImport = (action: "update" | "copy" | "cancel") => {
+    if (!conflict) return;
+    void request("resolveImport", {
+      kind: "resolveImport",
+      token: conflict.token,
+      action,
+    }).then((result) => {
+      if (!result) return;
+      report(result);
+      if (!result.error) setConflict(undefined);
+      if (result.focusKey) setFocusTarget(primarySelector(result.focusKey));
+    });
+  };
   const confirmRemove = () => {
     if (!removing) return;
     const index = entries.findIndex((e) => e.key === removing.key);
@@ -280,7 +374,6 @@ export default function Mods(): React.JSX.Element {
     );
   };
 
-  const workshopEntries = entries.some((e) => e.source === "workshop");
   const localEntries = entries.filter((e) => e.source === "local");
   const uploading = pending?.startsWith("publish:");
   return (
@@ -306,15 +399,123 @@ export default function Mods(): React.JSX.Element {
             Community scenarios with their own rules and events. Modded runs are
             unranked and don&apos;t earn achievements.
           </Typography>
-          {library.diagnostics?.map((diagnostic, index) => (
+          {Object.entries(notices).map(
+            ([key, { result, request: retryRequest }]) => (
+              <Alert
+                key={key}
+                severity={result.error ? "error" : "warning"}
+                onClose={() =>
+                  setNotices((previous) => {
+                    const next = { ...previous };
+                    delete next[key];
+                    return next;
+                  })
+                }
+                sx={{ overflowWrap: "anywhere" }}
+              >
+                {[result.error, result.warning].filter(Boolean).join(" ")}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  className="settingsKeyboardRow"
+                  sx={{ flexWrap: "wrap", mt: 1 }}
+                >
+                  {result.unreadable ? (
+                    <Button disabled={!!pending} onClick={reset}>
+                      Reset mod library
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={
+                        !!pending ||
+                        (retryRequest.kind === "refresh" &&
+                          !downloads.available)
+                      }
+                      onClick={() =>
+                        retryRequest.kind === "refresh"
+                          ? downloads.check()
+                          : act(
+                              "retry",
+                              retryRequest.kind === "resolveImport"
+                                ? { kind: "import" }
+                                : retryRequest,
+                            )
+                      }
+                    >
+                      Retry
+                    </Button>
+                  )}
+                </Stack>
+              </Alert>
+            ),
+          )}
+          {library.recovered && !recoveryDismissed && (
             <Alert
-              key={`${diagnostic.path}:${index}`}
-              severity={diagnostic.severity}
+              severity="warning"
+              onClose={() => setRecoveryDismissed(true)}
             >
-              <strong>{diagnostic.path}</strong>:{" "}
-              <span>{diagnostic.message}</span>
+              Recovered the previous mod library. Your healthy mods and
+              publication records were kept.
+            </Alert>
+          )}
+          {agreements.map((workshopId) => (
+            <Alert
+              key={workshopId}
+              severity="warning"
+              onClose={
+                pending
+                  ? undefined
+                  : () =>
+                      act("dismissAgreement", {
+                        kind: "dismissAgreement",
+                        workshopId,
+                      })
+              }
+            >
+              Accept the Steam Workshop agreement to make your upload visible.
+              <Box className="settingsKeyboardRow">
+                <Button
+                  onClick={() => act("browse", { kind: "browse", workshopId })}
+                >
+                  Open on Steam
+                </Button>
+              </Box>
             </Alert>
           ))}
+          {downloads.timedOut && (
+            <Alert severity="warning">
+              Steam is still downloading after two minutes. Check your
+              connection, then retry.
+              <Box className="settingsKeyboardRow">
+                <Button
+                  disabled={!steamOnline || !!pending}
+                  onClick={downloads.check}
+                >
+                  Retry downloads
+                </Button>
+              </Box>
+            </Alert>
+          )}
+          {library.downloads
+            ?.filter((item) => item.status !== "skipped")
+            .map((item) => (
+              <Typography key={item.id} role="status">
+                Workshop item {item.id}:{" "}
+                {item.status === "queued" ? "Queued" : "Downloading…"}
+              </Typography>
+            ))}
+          {Object.values(notices)
+            .flatMap((notice) => notice.result.diagnostics || [])
+            .map((diagnostic, index) => (
+              <Alert
+                key={`${diagnostic.path}:${index}`}
+                severity={diagnostic.severity}
+              >
+                <strong>{diagnostic.path}</strong>:{" "}
+                <span>{diagnostic.message}</span>
+              </Alert>
+            ))}
           {coop && (
             <Alert severity="info" role="status">
               Leave co-op to play a modded scenario.
@@ -345,11 +546,15 @@ export default function Mods(): React.JSX.Element {
                 <Typography>Loading mods…</Typography>
               </Stack>
             )}
-            {loaded && !entries.length && !library.unreadable && (
-              <Typography color="text.secondary">
-                Install your first mod below
-              </Typography>
-            )}
+            {loaded &&
+              !entries.length &&
+              !library.unreadable &&
+              !Object.values(notices).some((notice) => notice.result.error) &&
+              !library.quarantined?.length && (
+                <Typography color="text.secondary">
+                  Install your first mod below
+                </Typography>
+              )}
             <Stack
               component="ul"
               spacing={1.5}
@@ -439,6 +644,7 @@ export default function Mods(): React.JSX.Element {
                         control={
                           <Switch
                             checked={entry.enabled}
+                            disabled={!!pending}
                             slotProps={{
                               input: {
                                 "aria-label": `${p.title} enabled`,
@@ -459,6 +665,7 @@ export default function Mods(): React.JSX.Element {
                       />
                       {!offlineWorkshop && (
                         <Button
+                          disabled={!!pending}
                           aria-label={`${entry.source === "workshop" ? "Unsubscribe from" : "Remove"} ${p.title}`}
                           onClick={() => {
                             setRemoving(entry);
@@ -474,6 +681,38 @@ export default function Mods(): React.JSX.Element {
                 );
               })}
             </Stack>
+            {library.quarantined?.map((entry) => (
+              <Alert
+                key={entry.key}
+                severity="error"
+                sx={{ mt: 1, overflowWrap: "anywhere" }}
+              >
+                <Typography component="h3">
+                  {entry.title} — quarantined
+                </Typography>
+                <Typography variant="body2">
+                  by {entry.creator} · {versionLabel(entry.version)}
+                </Typography>
+                <Typography variant="body2">{entry.diagnostic}</Typography>
+                <Typography variant="body2">
+                  This entry cannot run. Reimport a corrected package, or
+                  discard the retained invalid entry.
+                </Typography>
+                <Box className="settingsKeyboardRow">
+                  <Button
+                    disabled={!!pending}
+                    onClick={() =>
+                      act(`discard:${entry.key}`, {
+                        kind: "discard",
+                        key: entry.key,
+                      })
+                    }
+                  >
+                    Discard invalid entry
+                  </Button>
+                </Box>
+              </Alert>
+            ))}
             {!entries.length && library.unreadable && (
               <Typography color="text.secondary">
                 Reset the library to install mods again.
@@ -495,13 +734,20 @@ export default function Mods(): React.JSX.Element {
                 >
                   Browse Workshop
                 </Button>
-                <Button id="mods-import" variant="outlined" onClick={importMod}>
+                <Button
+                  id="mods-import"
+                  variant="outlined"
+                  disabled={!!pending || library.unreadable}
+                  onClick={importMod}
+                >
                   {pending === "import" ? "Importing…" : "Import mod"}
                 </Button>
-                {workshopEntries && (
+                {steamAvailable && (
                   <Button
-                    disabled={!steamOnline}
-                    onClick={() => act("refresh", { kind: "refresh" })}
+                    disabled={
+                      !!pending || !downloads.available || library.unreadable
+                    }
+                    onClick={downloads.check}
                   >
                     {pending === "refresh" ? "Checking…" : "Check for updates"}
                   </Button>
@@ -548,7 +794,10 @@ export default function Mods(): React.JSX.Element {
                 useFlexGap
                 sx={{ flexWrap: "wrap" }}
               >
-                <Button onClick={() => act("template", { kind: "template" })}>
+                <Button
+                  disabled={!!pending}
+                  onClick={() => act("template", { kind: "template" })}
+                >
                   {pending === "template"
                     ? "Saving…"
                     : "Save authoring template"}
@@ -556,7 +805,12 @@ export default function Mods(): React.JSX.Element {
                 {localEntries.map((entry) => (
                   <Button
                     key={entry.key}
-                    disabled={!steamOnline || !!issues.get(entry.key)}
+                    disabled={
+                      !steamOnline ||
+                      !!pending ||
+                      library.uploading ||
+                      !!issues.get(entry.key)
+                    }
                     onClick={() => {
                       setPublishing(entry);
                     }}
@@ -571,6 +825,64 @@ export default function Mods(): React.JSX.Element {
           </Box>
         </Stack>
       </Box>
+
+      <Dialog
+        open={!!conflict}
+        onClose={() => resolveImport("cancel")}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="mod-import-title"
+      >
+        <DialogTitle id="mod-import-title">
+          A mod with this ID is already installed
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Review the title, creator and version before replacing it.
+          </Typography>
+          {conflict && (
+            <Stack spacing={2} sx={{ mt: 2, overflowWrap: "anywhere" }}>
+              <Box>
+                <Typography component="h3">Installed</Typography>
+                <Typography>
+                  {conflict.existing.title} · by {conflict.existing.creator} ·{" "}
+                  {versionLabel(conflict.existing.version)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography component="h3">Imported file</Typography>
+                <Typography>
+                  {conflict.incoming.title} · by {conflict.incoming.creator} ·{" "}
+                  {versionLabel(conflict.incoming.version)}
+                </Typography>
+              </Box>
+              <Typography variant="body2">
+                Update keeps its enabled state and Workshop identity. A copy
+                gets a new ID and has no publication identity.
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+          <Button
+            autoFocus
+            disabled={!!pending}
+            onClick={() => resolveImport("cancel")}
+          >
+            Cancel
+          </Button>
+          <Button disabled={!!pending} onClick={() => resolveImport("copy")}>
+            Install as copy
+          </Button>
+          <Button
+            disabled={!!pending}
+            variant="contained"
+            onClick={() => resolveImport("update")}
+          >
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={!!playing}
@@ -638,11 +950,17 @@ export default function Mods(): React.JSX.Element {
           <Button
             autoFocus
             ref={removeCancel}
+            disabled={!!pending}
             onClick={() => !pending && setRemoving(undefined)}
           >
             Cancel
           </Button>
-          <Button color="error" variant="contained" onClick={confirmRemove}>
+          <Button
+            disabled={!!pending}
+            color="error"
+            variant="contained"
+            onClick={confirmRemove}
+          >
             {pending?.startsWith("remove:")
               ? removing?.source === "workshop"
                 ? "Unsubscribing…"
@@ -656,7 +974,7 @@ export default function Mods(): React.JSX.Element {
 
       <Dialog
         open={!!publishing}
-        onClose={uploading ? undefined : () => setPublishing(undefined)}
+        onClose={() => setPublishing(undefined)}
         fullWidth
         maxWidth="xs"
         aria-labelledby="mod-publish-title"
@@ -681,11 +999,15 @@ export default function Mods(): React.JSX.Element {
           <Button
             autoFocus
             ref={publishCancel}
-            onClick={() => !uploading && setPublishing(undefined)}
+            onClick={() => setPublishing(undefined)}
           >
-            Cancel
+            {uploading ? "Close" : "Cancel"}
           </Button>
-          <Button variant="contained" onClick={confirmPublish}>
+          <Button
+            disabled={!!pending}
+            variant="contained"
+            onClick={confirmPublish}
+          >
             {uploading
               ? "Uploading…"
               : publishing?.workshopId
