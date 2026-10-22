@@ -30,6 +30,7 @@ import {
   retrofitCost,
 } from "../../helpers/Hazards";
 import { formatMoneyConcise } from "../../helpers/Format";
+import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -120,6 +121,33 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it.each([
+    [2000, 0, 0, false, "filling"],
+    [500, 0, 0, false, "draining"],
+    [1000, 0, 0, false, "steady"],
+    [2000, 1000, 0, false, "spilling"],
+    [500, 0, 1000, true, "draining"],
+    [500, 0, 0, true, "filling"],
+  ])(
+    "reports hydro water movement on mount and selection",
+    async (inflow, spill, bypass, paused, label) => {
+      const hydroGame = createGame({ scenarioId: 108 });
+      const hydro = hydroGame.facilities.find((f) => f.fuel === "Hydro")!;
+      hydroGame.facilities = [hydro];
+      hydro.reservoirWh = hydro.reservoirCapacityWh! / (spill ? 1 : 2);
+      hydro.currentW = (1000 * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS;
+      hydro.hydroLastInflowWh = Number(inflow);
+      hydro.hydroLastSpillWh = Number(spill);
+      hydro.hydroLastBypassWh = Number(bypass);
+      hydro.paused = Boolean(paused);
+      renderFacilities(hydroGame, null);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).not.toHaveTextContent("50%");
+      await user.click(rows()[0]);
+      expect(rows()[0]).toHaveTextContent(String(label));
+    },
+  );
 
   it("keeps facility icons inspectable while a tutorial hides reordering", async () => {
     const tutorial = createGame({ scenarioId: 0 });
