@@ -936,6 +936,7 @@ export interface ScenarioModType {
     creator: string;
     version: string;
     description: string;
+    objectiveMode: "inherit" | "replace" | "none";
     workshopId?: string;
   };
   parameters: {

@@ -15,12 +15,54 @@ import {
 
 export interface RuleStaticCostFactor {
   fuel: FuelNameType;
+  facility?: string;
   buildCost?: number;
   annualOperatingCost?: number;
 }
 
+type FactorRange = {
+  path: string;
+  min: number;
+  max: number;
+  positiveMin: number;
+};
+
+/** The same static/timed multiplication owns validation and the author report. */
+function staticRanges(
+  timed: readonly FactorRange[],
+  staticCosts: readonly RuleStaticCostFactor[],
+) {
+  return staticCosts.flatMap((cost) =>
+    (["buildCost", "annualOperatingCost"] as const).flatMap((field) => {
+      if (cost[field] === undefined) return [];
+      const path = `${field === "buildCost" ? "buildCostMultipliersByFuel" : "operatingCostMultipliersByFuel"}.${cost.fuel}`;
+      const range = timed.find((factor) => factor.path === path) ?? {
+        min: 1,
+        max: 1,
+        positiveMin: 1,
+      };
+      const factor = cost[field]!;
+      return [
+        {
+          path: `${path}.${cost.facility ?? factor}`,
+          min: range.min * factor,
+          max: range.max * factor,
+          positiveMin: range.positiveMin * factor,
+          field,
+          factor,
+          timedPath: path,
+        },
+      ];
+    }),
+  );
+}
+
 /** Conservative possible-window bounds are independent of the selected seed. */
-function possibleAt(event: CompiledRuleEvent, month: number, term: number) {
+export function scenarioRulePossibleAt(
+  event: CompiledRuleEvent,
+  month: number,
+  term: number,
+) {
   return (
     event.durationMonths > 0 &&
     month >= event.possibleStartMonths.from &&
@@ -28,6 +70,21 @@ function possibleAt(event: CompiledRuleEvent, month: number, term: number) {
       (event.durationUntilEnd
         ? term
         : event.possibleStartMonths.to + event.durationMonths)
+  );
+}
+
+export function scenarioRuleGuaranteedAt(
+  event: CompiledRuleEvent,
+  month: number,
+  term: number,
+) {
+  return (
+    event.durationMonths > 0 &&
+    month >= event.possibleStartMonths.to &&
+    month <
+      (event.durationUntilEnd
+        ? term
+        : event.possibleStartMonths.from + event.durationMonths)
   );
 }
 
@@ -41,12 +98,7 @@ function factorEnvelope(
     graph,
     month,
     entries.map(({ event, value }) => {
-      const guaranteed =
-        month >= event.possibleStartMonths.to &&
-        month <
-          (event.durationUntilEnd
-            ? term
-            : event.possibleStartMonths.from + event.durationMonths);
+      const guaranteed = scenarioRuleGuaranteedAt(event, month, term);
       return {
         requiresChoice: event.requiresChoice,
         min: guaranteed ? value : Math.min(1, value),
@@ -55,6 +107,52 @@ function factorEnvelope(
       };
     }),
   );
+}
+
+function factorEntries(events: readonly CompiledRuleEvent[]) {
+  const paths = new Map<
+    string,
+    { event: CompiledRuleEvent; value: number }[]
+  >();
+  const collect = (path: string, value: number, event: CompiledRuleEvent) =>
+    paths.set(path, [...(paths.get(path) ?? []), { event, value }]);
+  events.forEach((event) => {
+    for (const field of ["demandMultiplier", "hydroRunoffMultiplier"] as const)
+      if (event.effects[field] !== undefined)
+        collect(field, event.effects[field]!, event);
+    for (const field of [
+      "fuelPriceMultipliers",
+      "buildCostMultipliersByFuel",
+      "operatingCostMultipliersByFuel",
+      "facilityOutputMultipliersByFuel",
+    ] as const)
+      Object.entries(event.effects[field] ?? {}).forEach(([fuel, value]) =>
+        collect(`${field}.${fuel}`, value, event),
+      );
+  });
+  return paths;
+}
+
+/** The author's monthly bounds use the compiler's exact branch-feasible factor owner. */
+export function scenarioRuleCompositionRanges(
+  rules: CompiledScenarioRules,
+  staticCosts: readonly RuleStaticCostFactor[] = [],
+) {
+  const graph = createScenarioRuleChoiceGraph(rules);
+  const events = [...rules.events, ...(rules.arcEvents ?? [])];
+  return Array.from({ length: rules.durationMonths }, (_, month) => {
+    const timed = [
+      ...factorEntries(
+        events.filter((event) =>
+          scenarioRulePossibleAt(event, month, rules.durationMonths),
+        ),
+      ),
+    ].map(([path, values]) => ({
+      path,
+      ...factorEnvelope(values, month, rules.durationMonths, graph),
+    }));
+    return { month, factors: [...timed, ...staticRanges(timed, staticCosts)] };
+  });
 }
 
 export function scenarioRuleCompositionDiagnostics(
@@ -82,7 +180,7 @@ export function scenarioRuleCompositionDiagnostics(
   };
   for (let month = 0; month < rules.durationMonths; month++) {
     const possible = events.filter((event) =>
-      possibleAt(event, month, rules.durationMonths),
+      scenarioRulePossibleAt(event, month, rules.durationMonths),
     );
     const fees = possible.filter(
       (event) => event.effects.carbonFeePerKgCO2e !== undefined,
@@ -103,29 +201,7 @@ export function scenarioRuleCompositionDiagnostics(
             `Timed carbon fees ${fees[i].id} and ${fees[j].id} can overlap; move one window`,
           );
       }
-    const paths = new Map<
-      string,
-      { event: CompiledRuleEvent; value: number }[]
-    >();
-    const collect = (path: string, value: number, event: CompiledRuleEvent) =>
-      paths.set(path, [...(paths.get(path) ?? []), { event, value }]);
-    possible.forEach((event) => {
-      for (const field of [
-        "demandMultiplier",
-        "hydroRunoffMultiplier",
-      ] as const)
-        if (event.effects[field] !== undefined)
-          collect(field, event.effects[field]!, event);
-      for (const field of [
-        "fuelPriceMultipliers",
-        "buildCostMultipliersByFuel",
-        "operatingCostMultipliersByFuel",
-        "facilityOutputMultipliersByFuel",
-      ] as const)
-        Object.entries(event.effects[field] ?? {}).forEach(([fuel, value]) =>
-          collect(`${field}.${fuel}`, value, event),
-        );
-    });
+    const paths = factorEntries(possible);
     for (const [path, values] of paths) {
       const { min, max, positiveMin } = factorEnvelope(
         values,
@@ -146,21 +222,16 @@ export function scenarioRuleCompositionDiagnostics(
           month,
           `${path} can compose to ${min}–${max}; keep the combined factor inside ${output ? "0–1" : "0.1–10"}`,
         );
-      for (const staticCost of staticCosts) {
-        const field =
-          path === `buildCostMultipliersByFuel.${staticCost.fuel}`
-            ? "buildCost"
-            : path === `operatingCostMultipliersByFuel.${staticCost.fuel}`
-              ? "annualOperatingCost"
-              : undefined;
-        if (!field) continue;
-        const factor = staticCost[field] ?? 1;
-        if (min * factor < 0.1 - 1e-12 || max * factor > 10 + 1e-12)
+      for (const combined of staticRanges(
+        [{ path, min, max, positiveMin }],
+        staticCosts,
+      ).filter((range) => range.timedPath === path)) {
+        if (combined.min < 0.1 - 1e-12 || combined.max > 10 + 1e-12)
           add(
             "composed-static-factor",
-            `${path}.${factor}`,
+            combined.path,
             month,
-            `Static ${field} ${factor} and timed ${path} can compose outside 0.1–10`,
+            `Static ${combined.field} ${combined.factor} and timed ${path} can compose outside 0.1–10`,
           );
       }
     }

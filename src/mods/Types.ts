@@ -60,5 +60,10 @@ export type ModRequest =
       action: "update" | "copy" | "cancel";
     }
   | { kind: "remove"; key: string }
-  | { kind: "publish"; key: string; packageDigest: string }
+  | {
+      kind: "publish";
+      key: string;
+      packageDigest: string;
+      rulesDescription: string;
+    }
   | { kind: "enable"; key: string; enabled: boolean };

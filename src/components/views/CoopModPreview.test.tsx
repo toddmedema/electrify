@@ -169,6 +169,8 @@ test("a guest renders only the safe summary while the snapshot is arriving and c
     screen.getByRole("heading", { level: 1, name: "Connection planning" }),
   ).toBeVisible();
   expect(screen.getByText("By Fixture author · v1.2")).toBeVisible();
+  expect(screen.getByText("Jan 2020–Jun 2020")).toBeVisible();
+  expect(screen.queryByText(/^·/)).toBeNull();
   expect(
     screen.getByRole("button", { name: "Receiving scenario…" }),
   ).toBeDisabled();
@@ -196,7 +198,8 @@ test("a guest renders only the safe summary while the snapshot is arriving and c
 
 test("a received snapshot shows author claims and announced facts while keeping hidden surprises hidden", async () => {
   const mods = desktop();
-  const selected = scenario();
+  // A guest reads the host's frozen forecast without preparing any local simulation data.
+  const selected = modScenario(pack, "777", "Employee", 14000000);
   setup(
     coop({
       modScenario: selected,
@@ -208,6 +211,10 @@ test("a received snapshot shows author claims and announced facts while keeping 
   expect(
     screen.getByRole("region", { name: "Author description" }),
   ).toHaveTextContent(pack.description);
+  expect(
+    screen.getByRole("region", { name: "Resolved setup" }),
+  ).toHaveTextContent("14 MW");
+  expect(screen.queryByText("Preparing baseline forecast…")).toBeNull();
   const timeline = screen.getByRole("region", { name: "Announced timeline" });
   expect(timeline).toHaveTextContent("Announced cost support");
   expect(timeline).toHaveTextContent("Connection funding");

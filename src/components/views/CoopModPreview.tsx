@@ -7,12 +7,13 @@ import { navigateBack } from "../../reducers/Card";
 import { coopControls } from "../../multiplayer/Registry";
 import { modBrowseSummary } from "../../multiplayer/ModBrowse";
 import { getScenario } from "../../data/Scenarios";
-import { getScenarioLocation } from "../../helpers/Locations";
 import { getDesktop } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { MONTHS, difficultyLabel } from "../../Constants";
 import ScreenPage from "../base/ScreenPage";
 import CoopBrowseBar, { CoopStartButton } from "../base/CoopBrowseBar";
+import ModDetails from "../base/ModDetails";
+import { useMenuKeys } from "../base/useMenuKeys";
 
 /** Optional, explicit Workshop subscription; a shared session never calls it on its own. */
 export function KeepModCopy({ scenario }: { scenario: ScenarioType }) {
@@ -82,19 +83,11 @@ export default function CoopModPreview({ coop }: { coop: CoopSelectionType }) {
   };
   const date = (month: number) =>
     `${MONTHS[month % 12]} ${(summary?.startingYear ?? 2020) + Math.floor(month / 12)}`;
-  const events = scenario?.mod
-    ? [...scenario.mod.rules.events, ...(scenario.mod.rules.arcEvents ?? [])]
-        .filter((event) => event.visibility === "forecast")
-        .sort((a, b) => a.startMonth - b.startMonth || a.id.localeCompare(b.id))
-    : [];
-  const choices = scenario?.mod
-    ? [
-        ...scenario.mod.rules.choices,
-        ...(scenario.mod.rules.arcChoices ?? []),
-      ].sort((a, b) => a.dueMonth - b.dueMonth || a.id.localeCompare(b.id))
-    : [];
+  const menuKeys = useMenuKeys(false, back);
   return (
     <ScreenPage
+      {...menuKeys}
+      className="keyboardMenu"
       id="gameCard"
       title={summary?.title ?? "Community scenarios"}
       onBack={back}
@@ -145,73 +138,45 @@ export default function CoopModPreview({ coop }: { coop: CoopSelectionType }) {
               {coop.receivingScenario && (
                 <Typography role="status">Receiving scenario…</Typography>
               )}
-              {scenario?.mod && (
-                <Box component="section" aria-label="Author description">
-                  <Typography>{scenario.mod.source.description}</Typography>
-                </Box>
-              )}
-              <Typography>
-                Based on{" "}
-                {getScenario(summary.baseScenarioId)?.name ?? "Custom game"} ·{" "}
-                {summary.durationMonths} months ·{" "}
-                {difficultyLabel(summary.difficulty)}
-              </Typography>
-              <Typography color="text.secondary">
-                {scenario && getScenarioLocation(scenario)?.name} · {date(0)}–
-                {date(summary.durationMonths - 1)}
-              </Typography>
-              <Box component="section" aria-label="Scenario objectives">
-                <Typography component="h3" variant="h6">
-                  Objectives
-                </Typography>
-                {!summary.objectives.length && (
+              {scenario ? (
+                <ModDetails scenario={scenario} />
+              ) : (
+                <>
                   <Typography>
-                    No scenario goals. Reach the final month; ordinary game
-                    failures still apply.
+                    Based on{" "}
+                    {getScenario(summary.baseScenarioId)?.name ?? "Custom game"}{" "}
+                    · {summary.durationMonths} months ·{" "}
+                    {difficultyLabel(summary.difficulty)}
                   </Typography>
-                )}
-                {summary.objectives.map((goal) => (
-                  <Box key={goal.id} sx={{ mt: 1.5 }}>
-                    <Typography component="h4" variant="subtitle2">
-                      {goal.label}
-                      {!goal.required && " · Optional"}
+                  <Typography color="text.secondary">
+                    {date(0)}–{date(summary.durationMonths - 1)}
+                  </Typography>
+                  <Box component="section" aria-label="Scenario objectives">
+                    <Typography component="h3" variant="h6">
+                      Objectives
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {goal.definition}
-                    </Typography>
-                    <Typography variant="body2">
-                      {goal.target} · {goal.window}
-                    </Typography>
+                    {!summary.objectives.length && (
+                      <Typography>
+                        No scenario goals. Reach the final month; ordinary game
+                        failures still apply.
+                      </Typography>
+                    )}
+                    {summary.objectives.map((goal) => (
+                      <Box key={goal.id} sx={{ mt: 1.5 }}>
+                        <Typography component="h4" variant="subtitle2">
+                          {goal.label}
+                          {!goal.required && " · Optional"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {goal.definition}
+                        </Typography>
+                        <Typography variant="body2">
+                          {goal.target} · {goal.window}
+                        </Typography>
+                      </Box>
+                    ))}
                   </Box>
-                ))}
-              </Box>
-              {scenario && (
-                <Box component="section" aria-label="Announced timeline">
-                  <Typography component="h3" variant="h6">
-                    Announced events and decisions
-                  </Typography>
-                  {!events.length && !choices.length && (
-                    <Typography variant="body2">
-                      No announced events or decisions.
-                    </Typography>
-                  )}
-                  {events.map((event) => (
-                    <Typography key={event.key} variant="body2" sx={{ mt: 1 }}>
-                      Month {event.startMonth + 1} · {date(event.startMonth)}:{" "}
-                      {event.title}
-                      {event.preview ? ` — ${event.preview}` : ""}
-                    </Typography>
-                  ))}
-                  {choices.map((choice) => (
-                    <Typography key={choice.key} variant="body2" sx={{ mt: 1 }}>
-                      Month {choice.dueMonth + 1} · {date(choice.dueMonth)}:{" "}
-                      {choice.title} ·{" "}
-                      {choice.automatic
-                        ? "Resolved automatically"
-                        : "Each company chooses"}
-                    </Typography>
-                  ))}
-                </Box>
+                </>
               )}
               {!host && scenario && <KeepModCopy scenario={scenario} />}
             </>

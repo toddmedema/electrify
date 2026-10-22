@@ -3,7 +3,10 @@ import {
   RuleCompilationError,
   validCompiledScenarioRules,
 } from "./ScenarioRules";
-import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
+import {
+  scenarioRuleCompositionDiagnostics,
+  scenarioRuleCompositionRanges,
+} from "./ScenarioRuleComposition";
 import { modScenario } from "../mods/ModScenario";
 import { validScenarioMod } from "./ScenarioMod";
 import { DIFFICULTY_IDS } from "../Constants";
@@ -149,6 +152,66 @@ test("timed quotes and running costs include the relevant static facility factor
       { fuel: "Coal", buildCost: 6, annualOperatingCost: 0.1 },
     ]).map((diagnostic) => diagnostic.code),
   ).toEqual(["composed-static-factor", "composed-static-factor"]);
+});
+
+test("author month ranges compose the same static and timed costs, including unchanged months", () => {
+  const rules = compile([
+    event(
+      "construction",
+      {
+        constructionCostMultipliersByFuel: { Coal: 2 },
+        operatingCostMultipliersByFuel: { Coal: 0.5 },
+      },
+      2,
+      1,
+    ),
+  ]);
+  const costs = [
+    {
+      fuel: "Coal" as const,
+      facility: "Coal Plant",
+      buildCost: 5,
+      annualOperatingCost: 0.2,
+    },
+  ];
+  const months = scenarioRuleCompositionRanges(rules, costs);
+  expect(months).toHaveLength(120);
+  expect(months[0].factors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        path: "buildCostMultipliersByFuel.Coal.Coal Plant",
+        min: 5,
+        max: 5,
+      }),
+      expect.objectContaining({
+        path: "operatingCostMultipliersByFuel.Coal.Coal Plant",
+        min: 0.2,
+        max: 0.2,
+      }),
+    ]),
+  );
+  expect(months[1].factors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        path: "buildCostMultipliersByFuel.Coal.Coal Plant",
+        min: 10,
+        max: 10,
+      }),
+      expect.objectContaining({
+        path: "operatingCostMultipliersByFuel.Coal.Coal Plant",
+        min: 0.1,
+        max: 0.1,
+      }),
+    ]),
+  );
+  expect(scenarioRuleCompositionDiagnostics(rules, costs)).toEqual([]);
+  const invalidCosts = [{ ...costs[0], buildCost: 5.01 }];
+  expect(
+    scenarioRuleCompositionRanges(rules, invalidCosts)[1].factors,
+  ).toContainEqual(expect.objectContaining({ min: 10.02, max: 10.02 }));
+  expect(
+    scenarioRuleCompositionDiagnostics(rules, invalidCosts),
+  ).toContainEqual(expect.objectContaining({ code: "composed-static-factor" }));
 });
 
 const pack = (baseScenarioId: number): ModPackage => ({

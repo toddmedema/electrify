@@ -1,0 +1,94 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "objective-recipes",
+  "title": "Measured objective recipes",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
+  "seed": 42,
+  "baseScenarioId": 999,
+  "officialArcs": [],
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 6,
+    "startingCustomers": 10000,
+    "cash": 1000000000
+  },
+  "objectives": {
+    "mode": "replace",
+    "items": [
+      {
+        "id": "reliability",
+        "label": "Serve monthly demand",
+        "metric": "monthlyReliability",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "minDemandServedShare": 0.5
+      },
+      {
+        "id": "retention",
+        "label": "Retain customers",
+        "metric": "customerRetention",
+        "deadlineMonth": 6,
+        "minRetainedShare": 0.5,
+        "required": false
+      },
+      {
+        "id": "budget",
+        "label": "Observe total emissions",
+        "metric": "emissionsBudget",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "budgetTonnesCO2e": 1000000000,
+        "required": false
+      },
+      {
+        "id": "intensity",
+        "label": "Observe the footprint",
+        "metric": "emissionsPerDeliveredMWh",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "maxKgCO2ePerMWh": 1000000,
+        "required": false
+      },
+      {
+        "id": "local-gas",
+        "label": "Track local fuel delivery",
+        "metric": "localFuelShare",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "fuels": ["Natural Gas"],
+        "minShare": 0.5,
+        "required": false
+      },
+      {
+        "id": "coal-retirement",
+        "label": "Keep coal retired",
+        "metric": "fuelRetirement",
+        "deadlineMonth": 3,
+        "fuel": "Coal",
+        "required": false
+      },
+      {
+        "id": "bills",
+        "label": "Limit billed rates",
+        "metric": "monthlyBilledRate",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "maxDollarsPerKWh": 1,
+        "required": false
+      },
+      {
+        "id": "debt",
+        "label": "Limit closing principal",
+        "metric": "monthEndDebt",
+        "fromMonth": 1,
+        "throughMonth": 6,
+        "maxDebtDollars": 1000000000000,
+        "required": false
+      }
+    ]
+  }
+}

@@ -120,8 +120,9 @@ export default function CoopBrowseBar({
                       onClick={() => coopControls()?.copyCode()}
                     >
                       {/* Phones drop "invite" so the host's three actions share one row. */}
-                      Copy <span className="coopWideOnly">invite&nbsp;</span>
-                      code
+                      <span>
+                        Copy <span className="coopWideOnly">invite </span>code
+                      </span>
                     </Button>
                   )}
                 </>

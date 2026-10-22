@@ -114,6 +114,8 @@ function scenarioLocation(scenario: ScenarioType): LocationType {
 export interface SimOptionsType {
   // Explicit branch coverage; unspecified decisions retain the baseline first-free response.
   scenarioResponses?: Record<string, string>;
+  // Authoring CLI requires a deliberate branch policy; ordinary simulation keeps its free bot.
+  scenarioResponseMode?: "strict" | "freeFallback";
   initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   // A scenario that isn't in SCENARIOS - a custom game, or one being tried out. Its id wins over
@@ -609,6 +611,10 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     if (decision && !state.replayPlayback) {
       const choiceDifficulty = state.difficulty;
       const requested = resolved.scenarioResponses[decision.id];
+      if (requested === undefined && options.scenarioResponseMode === "strict")
+        throw new Error(
+          `Simulation has no response for ${decision.id} at month ${state.date.monthsElapsed + 1}. Add it to --responses or use --free-fallback.`,
+        );
       const option = decision.options.find((option) =>
         requested !== undefined
           ? option.id === requested

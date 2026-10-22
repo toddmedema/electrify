@@ -6,6 +6,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import { openPane } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { readSavedGame } from "./save-fixture";
+import type { DesktopInputFrame } from "../src/Desktop";
 
 declare global {
   interface Window {
@@ -184,21 +185,28 @@ async function screenshot(page: Page, name: string) {
 
 /** Keep the evidence clear of a fractional scroll edge without changing its layout. */
 async function scrollEvidenceIntoView(label: Locator) {
+  await label.scrollIntoViewIfNeeded();
   await label.evaluate((element) => {
-    element.scrollIntoView({ block: "start" });
-    for (
-      let parent = element.parentElement;
-      parent;
-      parent = parent.parentElement
-    ) {
-      if (
-        parent.scrollHeight > parent.clientHeight &&
-        /auto|scroll/.test(getComputedStyle(parent).overflowY)
+    let scroller = element.closest<HTMLElement>(".MuiDialogContent-root");
+    if (!scroller)
+      for (
+        let parent = element.parentElement;
+        parent;
+        parent = parent.parentElement
       ) {
-        parent.scrollTop -= 8;
-        break;
+        if (
+          parent.scrollHeight > parent.clientHeight &&
+          /auto|scroll/.test(getComputedStyle(parent).overflowY)
+        ) {
+          scroller = parent;
+          break;
+        }
       }
-    }
+    if (scroller)
+      scroller.scrollTop +=
+        element.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        8;
   });
 }
 
@@ -863,11 +871,14 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
     await page.evaluate(() =>
       window.__mods.requests.find((r) => r.kind === "publish"),
     ),
-  ).toEqual({
-    kind: "publish",
-    key: "local:community-grid",
-    packageDigest: packageDigest(ENTRIES[0].pack),
-  });
+  ).toEqual(
+    expect.objectContaining({
+      kind: "publish",
+      key: "local:community-grid",
+      packageDigest: packageDigest(ENTRIES[0].pack),
+      rulesDescription: expect.stringContaining("Rules"),
+    }),
+  );
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await screenRoot.getByRole("button", { name: "Browse Workshop" }).click();
@@ -921,6 +932,13 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
   await expect(
     screenRoot.getByRole("button", {
       name: "Play Community Grid",
+      exact: true,
+    }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    screenRoot.getByRole("button", {
+      name: "Author validation report for Community Grid",
       exact: true,
     }),
   ).toBeFocused();
@@ -1128,5 +1146,411 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
     await expect(root.getByText("Install your first mod below")).toBeVisible();
     expect(await noHorizontalScroll(page)).toBe(true);
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`mod details distinguish player rules from the complete author report in ${theme}`, async ({
+    page,
+  }) => {
+    const entry: InstalledMod = {
+      key: "local:read-the-rules",
+      source: "local",
+      enabled: true,
+      pack: pack({
+        id: "read-the-rules",
+        title: "Connection Planning",
+        description:
+          "Prepare your grid before deciding how to connect a new campus.",
+        officialArcs: [],
+        scenario: {
+          durationMonths: 6,
+          startingYear: 2020,
+          startingCustomers: 10000,
+          cash: 1e9,
+        },
+        facilities: { Solar: { buildCost: 0.8 } },
+        objectives: {
+          mode: "replace",
+          items: [
+            {
+              id: "serve-demand",
+              label: "Keep your grid reliable",
+              metric: "monthlyReliability",
+              fromMonth: 1,
+              throughMonth: 6,
+              minDemandServedShare: 0.9,
+            },
+          ],
+        },
+        choices: [
+          {
+            id: "connection",
+            title: "Campus connection plan",
+            prompt: "Choose a plan for your grid.",
+            dueMonth: 2,
+            options: [
+              {
+                id: "accept",
+                label: "Accept connection",
+                description: "Receive funding and connect the campus.",
+                message: "Your grid accepted the connection.",
+                grantDollars: 1e6,
+              },
+              {
+                id: "decline",
+                label: "Keep the current plan",
+                description: "Continue without the new campus.",
+                message: "Your grid kept its current plan.",
+                costDollars: 0,
+              },
+            ],
+          },
+        ],
+        events: [
+          {
+            id: "campus",
+            title: "Campus connection",
+            message: "The campus connects.",
+            preview: "The campus will connect after your grid accepts.",
+            startMonth: 2,
+            requiresChoice: { choiceId: "connection", optionIds: ["accept"] },
+            loads: [
+              {
+                id: "campus-load",
+                startMonth: 2,
+                peakMW: 1,
+                loadFactor: 0.8,
+                demandType: "Data Centers",
+              },
+            ],
+          },
+          {
+            id: "private",
+            title: "Private gas shortage",
+            message: "Gas prices rise unexpectedly.",
+            startMonth: 4,
+            durationMonths: {
+              byDifficulty: {
+                Intern: 1,
+                Employee: 1,
+                Manager: 1,
+                VP: 2,
+                CEO: 2,
+              },
+            },
+            visibility: "surprise",
+            effects: {
+              fuelPriceMultipliers: {
+                "Natural Gas": {
+                  byDifficulty: {
+                    Intern: 1,
+                    Employee: 1.2,
+                    Manager: 1.25,
+                    VP: 1.3,
+                    CEO: 1.4,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      }),
+    };
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await mockDesktop(page, false, theme, [entry]);
+    await page.addInitScript(() => {
+      let frame: DesktopInputFrame = {
+        connected: false,
+        actions: [],
+        glyphs: {},
+      };
+      const bridge = window.electrifyDesktop!;
+      bridge.setInputContext = async () => ({ ...frame, actions: [] });
+      bridge.onInput = (listener) => {
+        const receive = (event: Event) => {
+          frame = (event as CustomEvent<DesktopInputFrame>).detail;
+          listener(frame);
+        };
+        window.addEventListener("modDetailsInput", receive);
+        return () => window.removeEventListener("modDetailsInput", receive);
+      };
+    });
+    const input = async (action: "down" | "confirm" | "back") => {
+      await page.evaluate(
+        (action) =>
+          window.dispatchEvent(
+            new CustomEvent("modDetailsInput", {
+              detail: {
+                connected: true,
+                actions: [action],
+                glyphs: {
+                  down: { label: "D-pad down" },
+                  confirm: { label: "A" },
+                  back: { label: "B" },
+                },
+              },
+            }),
+          ),
+        action,
+      );
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+    };
+    const controllerSelect = async (control: Locator) => {
+      for (let index = 0; index < 30; index++) {
+        if (
+          await control.evaluate(
+            (element) => element === document.activeElement,
+          )
+        )
+          return;
+        await input("down");
+      }
+      await expect(
+        control,
+        "details controls stay reachable with controller navigation",
+      ).toBeFocused();
+    };
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mods", exact: true }).click();
+    const play = page.getByRole("button", {
+      name: "Play Connection Planning",
+      exact: true,
+    });
+    await expect(play).toBeEnabled({ timeout: 60000 });
+    await play.click();
+    const details = page.getByRole("dialog", {
+      name: "Play Connection Planning",
+      exact: true,
+    });
+    await expect(
+      details.getByRole("region", { name: "Author description" }),
+    ).toContainText(entry.pack.description);
+    await expect(
+      details.getByRole("region", { name: "Resolved setup" }),
+    ).toContainText("Starting peak demand");
+    await expect(
+      details.getByRole("region", { name: "Resolved setup" }),
+    ).not.toContainText("Preparing baseline forecast");
+    await expect(
+      details.getByRole("region", { name: "Scenario objectives" }),
+    ).toContainText("Keep your grid reliable");
+    const timeline = details.getByRole("region", {
+      name: "Announced timeline",
+    });
+    await expect(timeline).toContainText("Campus connection plan");
+    await expect(timeline).toContainText("Feb 2020");
+    await expect(timeline).toContainText("1 MW");
+    await expect(timeline).not.toContainText("Private gas shortage");
+    const fleet = details.getByRole("button", {
+      name: "Starting fleet",
+      exact: true,
+    });
+    await fleet.focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      details.getByRole("region", { name: "Starting fleet" }),
+    ).toContainText("Starting-asset ID:");
+    const modifier = details.getByRole("button", {
+      name: "Static modifiers",
+      exact: true,
+    });
+    await modifier.focus();
+    await page.keyboard.press("Space");
+    await expect(
+      details.getByRole("region", { name: "Static modifiers" }),
+    ).toContainText("0.8");
+    for (const button of await details.getByRole("button").all())
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const bounds = (await details.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    const goal = details.getByText("Keep your grid reliable", { exact: true });
+    await scrollEvidenceIntoView(goal);
+    await expect(goal).toBeInViewport({ ratio: 1 });
+    await expect(
+      details.getByRole("heading", {
+        name: "Play Connection Planning",
+        exact: true,
+      }),
+    ).toBeInViewport({ ratio: 1 });
+    await screenshot(
+      page,
+      `mod-details-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    await page.keyboard.press("Escape");
+    await expect(details).toBeHidden();
+    const author = page.getByRole("button", {
+      name: "Author validation report for Connection Planning",
+      exact: true,
+    });
+    await author.focus();
+    await page.keyboard.press("Enter");
+    const report = page.getByRole("dialog", {
+      name: "Author validation report: Connection Planning",
+      exact: true,
+    });
+    await expect(report).toContainText(
+      "Author tools show every rule, including hidden surprises.",
+    );
+    const reportDefault = report.getByRole("button", {
+      name: "Easy",
+      exact: true,
+    });
+    await expect(reportDefault).toHaveAttribute("aria-pressed", "true");
+    await expect(reportDefault).toBeInViewport({ ratio: 1 });
+    const reportPicker = report.getByRole("group", {
+      name: "Difficulty",
+      exact: true,
+    });
+    const pickerBounds = (await reportPicker.boundingBox())!;
+    expect(pickerBounds.x).toBeGreaterThanOrEqual(0);
+    expect(pickerBounds.x + pickerBounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    for (const button of await reportPicker.getByRole("button").all()) {
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      expect(bounds.x).toBeGreaterThanOrEqual(pickerBounds.x);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+        pickerBounds.x + pickerBounds.width,
+      );
+      const label = await button.evaluate((element) => {
+        const text = Array.from(element.childNodes).find(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+        )!;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        return {
+          height: range.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+        };
+      });
+      expect(label.height).toBeLessThanOrEqual(label.lineHeight + 1);
+    }
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await expect(
+      report.getByRole("heading", {
+        name: "Author validation report: Connection Planning",
+        exact: true,
+      }),
+    ).toBeInViewport({ ratio: 1 });
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    await screenshot(
+      page,
+      `mod-author-difficulty-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    const complete = report.getByRole("button", {
+      name: "Complete event and decision timeline",
+      exact: true,
+    });
+    await complete.focus();
+    await page.keyboard.press("Enter");
+    const privateRule = report.getByText(/Month 4.*Private gas shortage/);
+    const privateRow = privateRule.locator("..");
+    await expect(privateRow).toContainText(
+      "Natural Gas fuel price: 120% of normal",
+    );
+    await scrollEvidenceIntoView(privateRow);
+    await expect(privateRow).toBeInViewport({ ratio: 1 });
+    const scroller = await privateRow.evaluate((element) => {
+      const content = element.closest(".MuiDialogContent-root")!;
+      const row = element.getBoundingClientRect();
+      const clip = content.getBoundingClientRect();
+      return {
+        rowTop: row.top,
+        rowBottom: row.bottom,
+        clipTop: clip.top,
+        clipBottom: clip.bottom,
+        scrollTop: content.scrollTop,
+        clientHeight: content.clientHeight,
+        scrollHeight: content.scrollHeight,
+      };
+    });
+    expect(scroller.rowTop).toBeGreaterThanOrEqual(scroller.clipTop);
+    expect(scroller.rowBottom).toBeLessThanOrEqual(scroller.clipBottom);
+    await test.info().attach("author-report-scroller-geometry", {
+      body: JSON.stringify(scroller, null, 2),
+      contentType: "application/json",
+    });
+    if (process.env.REVIEW_SCREENSHOT_DIR)
+      await fs.writeFile(
+        path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `mod-author-geometry-${page.viewportSize()!.width}-${theme}.json`,
+        ),
+        JSON.stringify(scroller, null, 2),
+      );
+    await expect(
+      page.locator("iframe#webpack-dev-server-client-overlay"),
+    ).toHaveCount(0);
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await screenshot(
+      page,
+      `mod-author-report-${page.viewportSize()!.width}-${theme}.png`,
+    );
+    const expert = report.getByRole("button", { name: "Expert", exact: true });
+    await expert.focus();
+    await page.keyboard.press("Enter");
+    await expect(expert).toHaveAttribute("aria-pressed", "true");
+    await expect(privateRow).toContainText(
+      "Natural Gas fuel price: 140% of normal",
+    );
+    await expect(privateRow).toContainText("Active for 2 months");
+    await expect(
+      report.getByRole("button", {
+        name: "Inherited objectives: replace-ready JSON",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await expect(
+      report.getByRole("button", {
+        name: "Difficulty validation",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await scrollEvidenceIntoView(privateRow);
+    await expect(privateRow).toBeInViewport({ ratio: 1 });
+    for (const button of await report.getByRole("button").all())
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const closeReport = report.getByRole("button", {
+      name: "Close report",
+      exact: true,
+    });
+    await closeReport.focus();
+    await expect(closeReport).toBeFocused();
+    await expect(closeReport).toBeInViewport({ ratio: 1 });
+    await input("back");
+    await expect(report).toBeHidden();
+    await play.focus();
+    await input("confirm");
+    await expect(details).toBeVisible();
+    await controllerSelect(
+      details.getByRole("button", { name: "Starting fleet", exact: true }),
+    );
+    await input("confirm");
+    await expect(
+      details.getByRole("region", { name: "Starting fleet" }),
+    ).toBeVisible();
+    await input("back");
+    await expect(details).toBeHidden();
+    expect(await page.evaluate(() => window.__mods.scores)).toBe(0);
+    await playAndCheckRun(page, "Connection Planning");
+    const saved = (await readSavedGame(page))!;
+    expect(saved.customScenario!.mod!.rules.startingPeakW).toBeGreaterThan(0);
   });
 }

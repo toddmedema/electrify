@@ -516,6 +516,9 @@ test("publishing retries update the same created item, keep it after removal, an
   await store.request({ kind: "import" });
   const failed = await store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture()),
   });
@@ -524,6 +527,9 @@ test("publishing retries update the same created item, keep it after removal, an
   assert.equal(failed.entries[0].workshopId, "456");
   const result = await store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture()),
   });
@@ -540,6 +546,9 @@ test("publishing retries update the same created item, keep it after removal, an
   await store.request({ kind: "import" });
   const update = await store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture()),
   });
@@ -549,6 +558,13 @@ test("publishing retries update the same created item, keep it after removal, an
   assert.deepEqual(
     uploads.map((u) => u.setVisibility),
     [true, true, false],
+  );
+  assert.deepEqual(
+    uploads.map((u) => u.description),
+    Array(3).fill(
+      fixture().description +
+        "\n\nRules\nBase: Custom game\nDuration:240months",
+    ),
   );
 });
 
@@ -572,6 +588,9 @@ test("publishing rejects packages for another game version before reaching Steam
     (
       await store.request({
         kind: "publish",
+        rulesDescription:
+          fixture().description +
+          "\n\nRules\nBase: Custom game\nDuration:240months",
         key: "local:test-grid",
         packageDigest: packageDigest(fixture()),
       })
@@ -607,6 +626,9 @@ test("publishing requires the exact package digest validated by the renderer bef
   ]) {
     const result = await store.request({
       kind: "publish",
+      rulesDescription:
+        fixture().description +
+        "\n\nRules\nBase: Custom game\nDuration:240months",
       key: "local:test-grid",
       packageDigest: requested,
     });
@@ -622,10 +644,63 @@ test("publishing requires the exact package digest validated by the renderer bef
   }
   const accepted = await store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture({ version: "2" })),
   });
   assert.equal(accepted.error, undefined);
+  assert.equal(creates, 1);
+  assert.equal(uploads, 1);
+});
+
+test("publishing rejects missing, stale, unsafe or oversized generated Rules before creating an item", async (t) => {
+  let creates = 0;
+  let uploads = 0;
+  const { store } = setup(t, {
+    workshop: () => ({
+      create: async () => {
+        creates++;
+        return { id: "456", agreement: false };
+      },
+      publish: async (_id, _pack, _stage, options) => {
+        uploads++;
+        return { id: "456", agreement: false };
+      },
+    }),
+  });
+  await store.request({ kind: "import" });
+  const prefix = fixture().description + "\n\nRules\n";
+  for (const rulesDescription of [
+    undefined,
+    "An old authored claim.\n\nRules\nDuration: 6 months",
+    prefix + "<script>unsafe</script>",
+    prefix + "é".repeat(4000),
+  ]) {
+    const result = await store.request({
+      kind: "publish",
+      key: "local:test-grid",
+      packageDigest: packageDigest(fixture()),
+      rulesDescription,
+    });
+    assert.ok(result.error);
+    assert.equal(creates, 0);
+    assert.equal(uploads, 0);
+    assert.deepEqual(
+      fs
+        .readdirSync(store.directory)
+        .filter((name) => name.startsWith("upload-")),
+      [],
+    );
+  }
+  const result = await store.request({
+    kind: "publish",
+    key: "local:test-grid",
+    packageDigest: packageDigest(fixture()),
+    rulesDescription: prefix + "x".repeat(7999 - Buffer.byteLength(prefix)),
+  });
+  assert.equal(result.error, undefined);
   assert.equal(creates, 1);
   assert.equal(uploads, 1);
 });
@@ -643,6 +718,9 @@ test("listing never waits behind a slow upload", async (t) => {
   await store.request({ kind: "import" });
   const upload = store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture()),
   });
@@ -671,6 +749,30 @@ test("templates are written by main with its own game version", async (t) => {
   );
   const pack = parseMod(fs.readFileSync(target, "utf8"));
   assert.equal(pack.gameApi, MOD_API_VERSION);
+  assert.equal(pack.$schema, "./scenario.schema.json");
+  const schema = JSON.parse(
+    fs.readFileSync(path.join(root, "scenario.schema.json"), "utf8"),
+  );
+  assert.deepEqual(
+    schema,
+    require("../src/mods/ModEditorSchema").createModEditorSchema(),
+  );
+  const withoutSchema = { ...pack };
+  delete withoutSchema.$schema;
+  assert.equal(packageDigest(pack), packageDigest(withoutSchema));
+});
+
+test("offline template cancellation and schema-name collisions write no partial pair", async (t) => {
+  const root = temporary(t);
+  const store = new ModStore(root, { chooseSave: async () => undefined });
+  const cancelled = await store.request({ kind: "template" });
+  assert.equal(cancelled.error, undefined);
+  assert.equal(cancelled.message, undefined);
+  assert.deepEqual(cancelled.entries, []);
+  assert.deepEqual(fs.readdirSync(root), []);
+  store.chooseSave = async () => path.join(root, "scenario.schema.json");
+  assert.match((await store.request({ kind: "template" })).error, /reserved/);
+  assert.deepEqual(fs.readdirSync(root), []);
 });
 
 test("browsing opens the app's Workshop or a single item page", async (t) => {
@@ -784,6 +886,9 @@ test("unfinished uploads have a bounded disk footprint before any new Steam item
     (
       await store.request({
         kind: "publish",
+        rulesDescription:
+          fixture().description +
+          "\n\nRules\nBase: Custom game\nDuration:240months",
         key: "local:test-grid",
         packageDigest: packageDigest(fixture()),
       })
@@ -843,6 +948,9 @@ test("Workshop-agreement actions survive reopening and can be explicitly dismiss
   await store.request({ kind: "import" });
   await store.request({
     kind: "publish",
+    rulesDescription:
+      fixture().description +
+      "\n\nRules\nBase: Custom game\nDuration:240months",
     key: "local:test-grid",
     packageDigest: packageDigest(fixture()),
   });

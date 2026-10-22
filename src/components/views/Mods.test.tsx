@@ -14,13 +14,21 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DesktopBridge } from "../../Desktop";
 import { launchCustomScenario } from "../../reducers/Game";
 import uiReducer from "../../reducers/UI";
+import { buildModAuthorReport } from "../../mods/ModAuthoring";
+import { loadSimData } from "../../testing/SimData";
 
 Object.assign(global, { TextEncoder });
 jest.mock("./StartGame", () => ({
   startWithSaveGuard: (_dispatch: unknown, start: () => void) => start(),
 }));
 jest.mock("../../reducers/Game", () => ({
+  __esModule: true,
+  ...jest.requireActual("../../reducers/Game"),
   launchCustomScenario: jest.fn(),
+}));
+jest.mock("../../mods/ModScenario", () => ({
+  ...jest.requireActual("../../mods/ModScenario"),
+  prepareModStartingPeak: jest.fn().mockResolvedValue(undefined),
 }));
 
 const pack = (patch: Partial<ModPackage> = {}): ModPackage => ({
@@ -265,6 +273,226 @@ test("Play asks for a difficulty and launches through the shared custom launcher
   );
 });
 
+test("the launch details separate author claims from computed rules before starting", async () => {
+  setup([local({ description: "Prepare your grid for a changing market." })]);
+  await userEvent.click(await screen.findByLabelText("Play Community Grid"));
+  const dialog = screen.getByRole("dialog", { name: "Play Community Grid" });
+  expect(
+    within(dialog).getByRole("region", { name: "Author description" }),
+  ).toHaveTextContent("Prepare your grid for a changing market.");
+  expect(
+    within(dialog).getByRole("region", { name: "Scenario objectives" }),
+  ).toHaveTextContent(/No scenario goals|No objectives/);
+  expect(
+    within(dialog).getByRole("button", { name: /Starting fleet/ }),
+  ).toBeEnabled();
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+  await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+});
+
+test("an author explicitly opens the complete validation report without launching", async () => {
+  setup([local()]);
+  await userEvent.click(
+    await screen.findByRole("button", {
+      name: "Author validation report for Community Grid",
+    }),
+  );
+  const dialog = screen.getByRole("dialog", {
+    name: "Author validation report: Community Grid",
+  });
+  expect(within(dialog).getByRole("alert")).toHaveTextContent(
+    "Author tools show every rule, including hidden surprises.",
+  );
+  expect(
+    within(dialog).getByRole("region", { name: "Scenario diagnostics" }),
+  ).toBeVisible();
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "Close report" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("the author can inspect every difficulty's complete resolved report", async () => {
+  await loadSimData("SF");
+  const entry = local({
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      startingCustomers: 10000,
+    },
+    events: [
+      {
+        id: "difficulty-support",
+        title: "Difficulty support",
+        message: "Fuel conditions change.",
+        preview: "Fuel conditions will change.",
+        startMonth: 1,
+        durationMonths: {
+          byDifficulty: { Intern: 1, Employee: 2, Manager: 3, VP: 4, CEO: 5 },
+        },
+        effects: {
+          fuelPriceMultipliers: {
+            "Natural Gas": {
+              byDifficulty: {
+                Intern: 0.8,
+                Employee: 0.9,
+                Manager: 1,
+                VP: 1.1,
+                CEO: 1.2,
+              },
+            },
+          },
+        },
+      },
+    ],
+  });
+  const expected = buildModAuthorReport(entry.pack);
+  expect(
+    expected.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "error",
+    ),
+  ).toEqual([]);
+  const expertSetup = expected.difficulties.CEO!.sections.find(
+    (section) => section.id === "setup",
+  )!;
+  const expertPeak = expertSetup.rows.find(
+    (row) => row.label === "Starting peak demand",
+  )!.value;
+  expect(expertPeak).toMatch(/^[1-9].* MW$/);
+  const expertTimeline = expected.difficulties.CEO!.sections.find(
+    (section) => section.id === "timeline",
+  )!;
+  expect(expertTimeline.rows).not.toEqual(
+    expected.difficulties.Employee!.sections.find(
+      (section) => section.id === "timeline",
+    )!.rows,
+  );
+  setup([entry]);
+  await userEvent.click(
+    await screen.findByRole("button", {
+      name: "Author validation report for Community Grid",
+    }),
+  );
+  const dialog = screen.getByRole("dialog", {
+    name: "Author validation report: Community Grid",
+  });
+  expect(within(dialog).getByRole("button", { name: "Easy" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await userEvent.click(within(dialog).getByRole("button", { name: "Expert" }));
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "Resolved setup" }),
+  );
+  expect(
+    within(dialog).getByRole("region", { name: "Resolved setup" }),
+  ).toHaveTextContent(expertPeak);
+  expect(
+    within(dialog).getByRole("region", { name: "Resolved setup" }),
+  ).toHaveTextContent(
+    expertSetup.rows.find((row) => row.label === "Difficulty")!.value,
+  );
+  await userEvent.click(
+    within(dialog).getByRole("button", {
+      name: expertTimeline.title,
+    }),
+  );
+  const timeline = within(dialog).getByRole("region", {
+    name: expertTimeline.title,
+  });
+  expect(timeline).toHaveTextContent("Active for 5 months");
+  expect(timeline).toHaveTextContent("Natural Gas fuel price: 120% of normal");
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "Beginner" }),
+  );
+  expect(timeline).toHaveTextContent("Active for 1 month");
+  expect(timeline).toHaveTextContent("Natural Gas fuel price: 80% of normal");
+  expect(timeline).not.toHaveTextContent("120% of normal");
+  expect(
+    within(dialog).getByRole("button", {
+      name: "Inherited objectives: replace-ready JSON",
+    }),
+  ).toBeEnabled();
+  await userEvent.click(
+    within(dialog).getByRole("button", {
+      name: "Difficulty validation",
+    }),
+  );
+  expect(
+    within(dialog).getByRole("region", { name: "Difficulty validation" }),
+  ).toHaveTextContent("CEO");
+  expect(
+    within(dialog).getByRole("region", { name: "Scenario diagnostics" }),
+  ).toHaveTextContent("scenario.durationMonths");
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "Close report" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await userEvent.click(
+    screen.getByRole("button", { name: "Play Community Grid" }),
+  );
+  const playDialog = screen.getByRole("dialog", {
+    name: "Play Community Grid",
+  });
+  expect(
+    within(playDialog).getByRole("button", { name: "Hard" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(launchCustomScenario).not.toHaveBeenCalled();
+});
+
+test("private event warnings remain available only in the explicit author report", async () => {
+  setup([
+    local({
+      officialArcs: [],
+      scenario: { durationMonths: 6 },
+      events: [
+        {
+          id: "private-transformer",
+          title: "Surprise transformer failure",
+          message: "A transformer fails.",
+          visibility: "surprise",
+          startMonth: 5,
+          durationMonths: 3,
+          effects: { outputMultipliersByFuel: { "Natural Gas": 0.8 } },
+        },
+      ],
+    }),
+  ]);
+  const play = await screen.findByRole("button", {
+    name: "Play Community Grid",
+  });
+  expect(
+    screen.queryAllByText(/private-transformer|Surprise transformer failure/),
+  ).toHaveLength(0);
+  await userEvent.click(play);
+  const dialog = screen.getByRole("dialog", { name: "Play Community Grid" });
+  expect(
+    within(dialog).queryAllByText(
+      /private-transformer|Surprise transformer failure/,
+    ),
+  ).toHaveLength(0);
+  await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await userEvent.click(
+    screen.getByRole("button", {
+      name: "Author validation report for Community Grid",
+    }),
+  );
+  expect(
+    screen.getByRole("region", { name: "Scenario diagnostics" }),
+  ).toHaveTextContent(
+    "Surprise transformer failure may continue beyond the term",
+  );
+  expect(
+    screen.getByRole("region", { name: "Scenario diagnostics" }),
+  ).toHaveTextContent("events.private-transformer.durationMonths");
+});
+
 test("publishing stays open while uploading and offers the Steam page afterwards", async () => {
   let finish: (value: ModLibrary) => void = () => {};
   const { requests, store } = setup(
@@ -284,11 +512,14 @@ test("publishing stays open while uploading and offers the Steam page afterwards
   ).toBeInTheDocument();
   await userEvent.click(screen.getByText("Publish publicly"));
   expect(await screen.findByText("Uploading…")).toBeInTheDocument();
-  expect(requests).toContainEqual({
-    kind: "publish",
-    key: "local:community-grid",
-    packageDigest: packageDigest(pack()),
-  });
+  expect(requests).toContainEqual(
+    expect.objectContaining({
+      kind: "publish",
+      key: "local:community-grid",
+      packageDigest: packageDigest(pack()),
+      rulesDescription: expect.stringContaining("Rules"),
+    }),
+  );
   await userEvent.click(screen.getByText("Close"));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await userEvent.click(

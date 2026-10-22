@@ -166,12 +166,43 @@ export async function prepareModStartingPeak(input: unknown): Promise<void> {
   await prepareScenarioStartingPeak(resolveModSetup(input).resolved);
 }
 
+/** Quote ownership supplies the fuel mapping; reports never maintain a second catalogue. */
+export function modStaticCostFactors(
+  scenario: ScenarioType,
+  facilities: ModPackage["facilities"],
+  difficulty: DifficultyType,
+  seed: number,
+) {
+  const quoteState = {
+    date: getDateFromMinute(0, scenario.startingYear),
+    startingYear: scenario.startingYear,
+    difficulty,
+    seed,
+    feePerKgCO2e: scenario.feePerKgCO2e,
+    location: getScenarioLocation(scenario),
+    facilities: [],
+    commissionedHydroSiteIds: [],
+    scenarioId: scenario.id,
+    customScenario: scenario,
+  } as unknown as GameType;
+  return Object.entries(facilities ?? {}).flatMap(([name, factors]) => {
+    const quote = startingFacilityQuote(quoteState, { name });
+    return quote?.fuel
+      ? [{ fuel: quote.fuel, facility: name, ...factors }]
+      : [];
+  });
+}
+
 function resolveMod(
   input: unknown,
   workshopId: string | undefined,
   difficulty: DifficultyType,
   startingPeakW: number,
-): { scenario: ScenarioType; diagnostics: ModDiagnostic[] } {
+): {
+  scenario: ScenarioType;
+  diagnostics: ModDiagnostic[];
+  scenarios: Partial<Record<DifficultyType, ScenarioType>>;
+} {
   const { pack, base, arcs, startingYear, durationMonths, resolved } =
     resolveModSetup(input);
   const inherited =
@@ -204,24 +235,14 @@ function resolveMod(
       inheritedObjectiveIds: inherited.map((o) => o.id),
     };
   let rules: CompiledScenarioRules | undefined;
-  const needsStartingPeak =
-    !!pack.events?.some((event) =>
-      event.loads?.some((load) => load.peakShareOfStartingPeak !== undefined),
-    ) ||
-    !!pack.choices?.some((choice) =>
-      choice.options.some((option) =>
-        option.replaceLoad?.with.some(
-          (load) => load.peakShareOfStartingPeak !== undefined,
-        ),
-      ),
-    );
+  const compiledByDifficulty: Partial<
+    Record<DifficultyType, CompiledScenarioRules>
+  > = {};
   for (const atDifficulty of DIFFICULTY_IDS) {
     try {
       const peak =
         startingPeakW ||
-        (needsStartingPeak
-          ? resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed)
-          : undefined) ||
+        resolvedScenarioStartingPeak(resolved, atDifficulty, pack.seed) ||
         0;
       const compiled = compileScenarioRules(definitions, {
         ...params,
@@ -277,28 +298,17 @@ function resolveMod(
             });
         }
       }
-      const quoteState = {
-        date: getDateFromMinute(0, startingYear),
-        startingYear,
-        difficulty: atDifficulty,
-        seed: pack.seed,
-        feePerKgCO2e: resolved.feePerKgCO2e,
-        location: getScenarioLocation(resolved),
-        facilities: [],
-        commissionedHydroSiteIds: [],
-        scenarioId: resolved.id,
-        customScenario: resolved,
-      } as unknown as GameType;
-      const staticCosts = Object.entries(pack.facilities ?? {}).flatMap(
-        ([name, factors]) => {
-          const quote = startingFacilityQuote(quoteState, { name });
-          return quote?.fuel ? [{ fuel: quote.fuel, ...factors }] : [];
-        },
+      const staticCosts = modStaticCostFactors(
+        resolved,
+        pack.facilities,
+        atDifficulty,
+        pack.seed,
       );
       diagnostics.push(
         ...scenarioRuleCompositionDiagnostics(compiled, staticCosts),
       );
       if (atDifficulty === difficulty) rules = compiled;
+      compiledByDifficulty[atDifficulty] = compiled;
     } catch (error) {
       if (!(error instanceof RuleCompilationError)) throw error;
       diagnostics.push(...error.diagnostics);
@@ -318,6 +328,7 @@ function resolveMod(
       creator: pack.creator,
       version: pack.version,
       description: pack.description,
+      objectiveMode: pack.objectives.mode,
       ...(workshopId ? { workshopId } : {}),
     },
     parameters: {
@@ -334,6 +345,20 @@ function resolveMod(
     ...(pack.programs ? { programs: pack.programs } : {}),
   };
   resolved.mod = { ...runtime, runtimeDigest: modRuntimeDigest(runtime) };
+  const scenarios: Partial<Record<DifficultyType, ScenarioType>> = {};
+  for (const atDifficulty of DIFFICULTY_IDS) {
+    const compiled = compiledByDifficulty[atDifficulty];
+    if (!compiled) continue;
+    const version: Omit<ScenarioModType, "runtimeDigest"> = {
+      ...runtime,
+      parameters: { ...runtime.parameters, difficulty: atDifficulty },
+      rules: compiled,
+    };
+    scenarios[atDifficulty] = {
+      ...resolved,
+      mod: { ...version, runtimeDigest: modRuntimeDigest(version) },
+    };
+  }
   diagnostics.push(
     ...resolvedScenarioDiagnostics(
       resolved,
@@ -351,6 +376,7 @@ function resolveMod(
     });
   return {
     scenario: resolved,
+    scenarios,
     diagnostics: diagnostics.filter(
       (d, i, all) =>
         all.findIndex(
@@ -359,6 +385,27 @@ function resolveMod(
         ) === i,
     ),
   };
+}
+/** Author tools resolve the same setup before loading its data, without inventing another model. */
+export function modResolvedSetup(input: unknown): ScenarioType {
+  return resolveModSetup(input).resolved;
+}
+/** Compile all difficulties once for author reports; errors remain aggregated and non-launchable. */
+export function modAuthoringScenarios(input: unknown): {
+  scenarios: Partial<Record<DifficultyType, ScenarioType>>;
+  diagnostics: ModDiagnostic[];
+} {
+  try {
+    const { scenarios, diagnostics } = resolveMod(
+      input,
+      undefined,
+      "Employee",
+      0,
+    );
+    return { scenarios, diagnostics };
+  } catch (_error) {
+    return { scenarios: {}, diagnostics: modValidationDiagnostics(input) };
+  }
 }
 /** One detached runtime snapshot for the selected difficulty. Library changes never enter it. */
 export function modScenario(

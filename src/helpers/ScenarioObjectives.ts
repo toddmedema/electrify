@@ -18,28 +18,11 @@ import {
   UNSAFE_TEXT,
 } from "./ScenarioRulesSchema";
 
-const DEFINITIONS: Record<CompiledRuleObjective["metric"], string> = {
-  monthlyReliability:
-    "Delivered customer electricity divided by customer demand each completed month.",
-  customerRetention:
-    "Customers at the deadline divided by the run's recorded starting customers.",
-  emissionsBudget:
-    "Total electricity and construction emissions over the window, including imports and exports.",
-  emissionsPerDeliveredMWh:
-    "Total emissions, including imports, exports and construction, per delivered customer MWh over the window.",
-  localFuelShare:
-    "Selected fuels' delivered electricity divided by all local fuel-delivered electricity over the window; imports and storage discharge have no fuel provenance.",
-  fuelRetirement:
-    "Own no asset of the specified fuel, including paused and unfinished assets, at the deadline and every later month close.",
-  monthlyBilledRate:
-    "Billed customer revenue per delivered kWh each month, excluding grants and exports, in starting-year dollars.",
-  monthEndDebt:
-    "Loan principal at each completed month close, in starting-year dollars; interest expenses are excluded.",
-};
+import { OBJECTIVE_DEFINITIONS } from "./ScenarioObjectiveDefinitions";
 
 export const objectiveDefinition = (
   metric: CompiledRuleObjective["metric"],
-): string => DEFINITIONS[metric];
+): string => OBJECTIVE_DEFINITIONS[metric];
 
 const byId = (a: { id: string }, b: { id: string }) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0;

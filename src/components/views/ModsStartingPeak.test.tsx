@@ -89,12 +89,12 @@ afterEach(() => {
   delete window.electrifyDesktop;
 });
 
-it("does not load simulation data for mods without share-based loads", async () => {
+it("prepares every mod's real baseline before exposing its launch details", async () => {
   setup([entry("ordinary-grid", false)]);
   expect(
     await screen.findByRole("button", { name: "Play ordinary-grid" }),
   ).toBeEnabled();
-  expect(mockPrepare).not.toHaveBeenCalled();
+  expect(mockPrepare).toHaveBeenCalledWith(entry("ordinary-grid", false).pack);
 });
 
 it("shows preparation until the baseline is ready, then validates and enables play", async () => {

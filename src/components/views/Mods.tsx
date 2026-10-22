@@ -23,13 +23,12 @@ import { delta as uiDelta, snackbarOpen } from "../../reducers/UI";
 import { launchCustomScenario } from "../../reducers/Game";
 import { POLICIES } from "../../data/Policies";
 import {
-  modIssue,
   modScenario,
   modValidationDiagnostics,
   prepareModStartingPeak,
 } from "../../mods/ModScenario";
 import {
-  packageDigest,
+  modDiagnostics,
   type ModPackage,
   type ModProgramId,
 } from "../../mods/ModSchema";
@@ -40,8 +39,14 @@ import type {
   ModRequest,
 } from "../../mods/Types";
 import { useWorkshopRefresh } from "../../mods/useWorkshopRefresh";
+import {
+  buildModAuthorReport,
+  buildModPublication,
+  modPlayerDiagnostics,
+} from "../../mods/ModAuthoring";
 import CoopModPreview from "./CoopModPreview";
 import CoopBrowseBar from "../base/CoopBrowseBar";
+import ModDetails, { ModFacts } from "../base/ModDetails";
 import type { DifficultyType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
@@ -77,17 +82,6 @@ export function modifierSummary(pack: ModPackage): string {
 const versionLabel = (version: string) => `v${version.replace(/^v/i, "")}`;
 const primarySelector = (key: string) =>
   `[data-mod-key="${CSS.escape(key)}"] [data-mod-primary]`;
-const needsStartingPeak = (pack: ModPackage): boolean =>
-  !!pack.events?.some((event) =>
-    event.loads?.some((load) => load.peakShareOfStartingPeak !== undefined),
-  ) ||
-  !!pack.choices?.some((choice) =>
-    choice.options.some((option) =>
-      option.replaceLoad?.with.some(
-        (load) => load.peakShareOfStartingPeak !== undefined,
-      ),
-    ),
-  );
 type PeakPreparation = {
   digest: string;
   status: "loading" | "ready" | "error";
@@ -135,6 +129,9 @@ function ModsLibrary(): React.JSX.Element {
   const [removing, setRemoving] = React.useState<InstalledMod>();
   const [publishing, setPublishing] = React.useState<InstalledMod>();
   const [playing, setPlaying] = React.useState<InstalledMod>();
+  const [authoring, setAuthoring] = React.useState<InstalledMod>();
+  const [authorDifficulty, setAuthorDifficulty] =
+    React.useState<DifficultyType>("Employee");
   const [difficulty, setDifficulty] =
     React.useState<DifficultyType>(chosenDifficulty);
   const [focusTarget, setFocusTarget] = React.useState<string>();
@@ -145,27 +142,45 @@ function ModsLibrary(): React.JSX.Element {
     Record<string, PeakPreparation>
   >({});
   const [peakRetry, setPeakRetry] = React.useState(0);
+  const preparationRef = React.useRef(peakPreparation);
+  preparationRef.current = peakPreparation;
+  const structuralByEntry = React.useMemo(
+    () =>
+      new Map(entries.map((entry) => [entry.key, modDiagnostics(entry.pack)])),
+    [entries],
+  );
   const peakReadyByEntry = React.useMemo(
     () =>
       new Map(
         entries.map((entry) => [
           entry.key,
-          !needsStartingPeak(entry.pack) ||
+          structuralByEntry
+            .get(entry.key)
+            ?.some((diagnostic) => diagnostic.severity === "error") ||
             (peakPreparation[entry.key]?.digest ===
               JSON.stringify(entry.pack) &&
               peakPreparation[entry.key]?.status === "ready"),
         ]),
       ),
-    [entries, peakPreparation],
+    [entries, peakPreparation, structuralByEntry],
   );
   React.useEffect(() => {
     let cancelled = false;
     const prepare = async () => {
-      for (const entry of entries.filter((entry) =>
-        needsStartingPeak(entry.pack),
-      )) {
+      for (const entry of entries) {
         const digest = JSON.stringify(entry.pack);
         if (cancelled) return;
+        if (
+          structuralByEntry
+            .get(entry.key)
+            ?.some((diagnostic) => diagnostic.severity === "error")
+        )
+          continue;
+        if (
+          preparationRef.current[entry.key]?.digest === digest &&
+          preparationRef.current[entry.key]?.status === "ready"
+        )
+          continue;
         setPeakPreparation((previous) => ({
           ...previous,
           [entry.key]: { digest, status: "loading" },
@@ -197,7 +212,7 @@ function ModsLibrary(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [entries, peakRetry]);
+  }, [entries, peakRetry, structuralByEntry]);
   const diagnosticsByEntry = React.useMemo(
     () =>
       new Map(
@@ -205,10 +220,10 @@ function ModsLibrary(): React.JSX.Element {
           entry.key,
           peakReadyByEntry.get(entry.key)
             ? modValidationDiagnostics(entry.pack)
-            : [],
+            : (structuralByEntry.get(entry.key) ?? []),
         ]),
       ),
-    [entries, peakReadyByEntry],
+    [entries, peakReadyByEntry, structuralByEntry],
   );
   const issues = React.useMemo(
     () =>
@@ -223,6 +238,39 @@ function ModsLibrary(): React.JSX.Element {
         ]),
       ),
     [entries, diagnosticsByEntry],
+  );
+  const playingDetails = React.useMemo(() => {
+    if (!playing) return undefined;
+    try {
+      return {
+        scenario: modScenario(playing.pack, playing.workshopId, difficulty),
+      };
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "This mod cannot be resolved.",
+      };
+    }
+  }, [playing, difficulty]);
+  const authorReport = React.useMemo(
+    () => authoring && buildModAuthorReport(authoring.pack),
+    [authoring],
+  );
+  const authorFacts = React.useMemo(
+    () =>
+      authorReport && {
+        ...authorReport,
+        sections: [
+          ...(authorReport.difficulties[authorDifficulty]?.sections ?? []),
+          // Inherited JSON and aggregate validity belong to the whole package.
+          ...authorReport.sections.filter((section) =>
+            ["inherited", "difficulties"].includes(section.id),
+          ),
+        ],
+      },
+    [authorReport, authorDifficulty],
   );
 
   // Focus moves once the list has re-rendered, after any closing dialog has let go of it.
@@ -427,15 +475,24 @@ function ModsLibrary(): React.JSX.Element {
   };
   const confirmPublish = () => {
     if (!publishing) return;
-    const issue = modIssue(publishing.pack);
-    if (issue) {
-      dispatch(snackbarOpen(issue));
+    let publication;
+    try {
+      publication = buildModPublication(publishing.pack);
+    } catch (error) {
+      dispatch(
+        snackbarOpen(
+          error instanceof Error
+            ? error.message
+            : "This mod cannot be published.",
+        ),
+      );
       return;
     }
     void request(`publish:${publishing.key}`, {
       kind: "publish",
       key: publishing.key,
-      packageDigest: packageDigest(publishing.pack),
+      packageDigest: publication.packageDigest,
+      rulesDescription: publication.description,
     }).then((result) => {
       if (!result) return;
       if (result.error) {
@@ -665,7 +722,9 @@ function ModsLibrary(): React.JSX.Element {
               {entries.map((entry) => {
                 const p = entry.pack;
                 const issue = issues.get(entry.key);
-                const diagnostics = diagnosticsByEntry.get(entry.key) || [];
+                const diagnostics = modPlayerDiagnostics(
+                  diagnosticsByEntry.get(entry.key) || [],
+                );
                 const summary = modifierSummary(p);
                 const peakReady = peakReadyByEntry.get(entry.key);
                 const preparation = peakPreparation[entry.key];
@@ -768,6 +827,18 @@ function ModsLibrary(): React.JSX.Element {
                           }}
                         >
                           {coop ? "Choose" : "Play"}
+                        </Button>
+                      )}
+                      {entry.source === "local" && (
+                        <Button
+                          disabled={!peakReady && !preparationError}
+                          aria-label={`Author validation report for ${p.title}`}
+                          onClick={() => {
+                            setAuthorDifficulty("Employee");
+                            setAuthoring(entry);
+                          }}
+                        >
+                          Author report
                         </Button>
                       )}
                       <FormControlLabel
@@ -1020,37 +1091,127 @@ function ModsLibrary(): React.JSX.Element {
         open={!!playing}
         onClose={() => setPlaying(undefined)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         aria-labelledby="mod-play-title"
+        slotProps={{
+          paper: {
+            sx: {
+              m: { xs: 1.5, sm: 4 },
+              width: { xs: "calc(100% - 24px)", sm: "calc(100% - 64px)" },
+              maxHeight: "calc(100dvh - 24px)",
+              overflowWrap: "anywhere",
+              "& .MuiButton-root, & .MuiToggleButton-root": { minHeight: 44 },
+            },
+          },
+        }}
       >
         <DialogTitle id="mod-play-title">
           Play {playing?.pack.title}
         </DialogTitle>
         <DialogContent>
-          {playing &&
-            modValidationDiagnostics(playing.pack).map((diagnostic, index) => (
-              <Alert
-                key={`${diagnostic.path}:${index}`}
-                severity={diagnostic.severity}
-                sx={{ mb: 1 }}
-              >
-                {diagnostic.message}
-              </Alert>
-            ))}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Modded run · unranked · no achievements
           </Typography>
-          <DifficultyPicker
-            variant="toggle"
-            value={difficulty}
-            onChange={setDifficulty}
-            showDescription
-          />
+          <Box className="difficultyPicker">
+            <DifficultyPicker
+              variant="toggle"
+              value={difficulty}
+              onChange={setDifficulty}
+              showDescription
+            />
+          </Box>
+          <Box sx={{ mt: 2 }}>
+            {playing && playingDetails?.scenario && (
+              <ModDetails
+                scenario={playingDetails.scenario}
+                objectiveIntent={playing.pack.objectives.mode}
+                diagnostics={diagnosticsByEntry.get(playing.key)}
+              />
+            )}
+            {playingDetails?.error && (
+              <Alert severity="error">{playingDetails.error}</Alert>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPlaying(undefined)}>Cancel</Button>
-          <Button variant="contained" onClick={startPlaying}>
+          <Button
+            variant="contained"
+            onClick={startPlaying}
+            disabled={!playingDetails?.scenario}
+          >
             {coop ? "Choose for everyone" : "Start"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!authoring}
+        onClose={() => setAuthoring(undefined)}
+        fullWidth
+        maxWidth="md"
+        aria-labelledby="mod-author-report-title"
+        slotProps={{
+          paper: {
+            sx: {
+              m: { xs: 1.5, sm: 4 },
+              width: { xs: "calc(100% - 24px)", sm: "calc(100% - 64px)" },
+              maxHeight: "calc(100dvh - 24px)",
+              overflowWrap: "anywhere",
+              "& .MuiButton-root, & .MuiToggleButton-root": { minHeight: 44 },
+            },
+          },
+        }}
+      >
+        <DialogTitle id="mod-author-report-title">
+          Author validation report: {authoring?.pack.title}
+        </DialogTitle>
+        <DialogContent>
+          <Alert
+            severity={authorReport?.valid ? "info" : "error"}
+            sx={{ mb: 2 }}
+          >
+            Author tools show every rule, including hidden surprises. Player
+            previews hide surprises.
+          </Alert>
+          <Box
+            className="difficultyPicker"
+            sx={{
+              mb: 2,
+              "& .MuiToggleButtonGroup-root .MuiToggleButton-root": {
+                flex: "1 1 auto",
+                whiteSpace: "nowrap",
+              },
+            }}
+          >
+            <Typography
+              component="h3"
+              variant="subtitle1"
+              sx={{ fontWeight: 600, mb: 1 }}
+            >
+              Inspect difficulty
+            </Typography>
+            <DifficultyPicker
+              variant="toggle"
+              value={authorDifficulty}
+              onChange={setAuthorDifficulty}
+            />
+          </Box>
+          {authorReport && !authorReport.difficulties[authorDifficulty] && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Complete facts for this difficulty are unavailable because
+              validation failed. Review the diagnostics below.
+            </Alert>
+          )}
+          {authorFacts && <ModFacts facts={authorFacts} author />}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            autoFocus
+            variant="contained"
+            onClick={() => setAuthoring(undefined)}
+          >
+            Close report
           </Button>
         </DialogActions>
       </Dialog>

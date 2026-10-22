@@ -9,6 +9,11 @@ const {
   ModValidationError,
   packageDigest,
 } = require("../src/mods/ModSchema.js");
+const { createAuthoringTemplate } = require("../src/mods/ModRecipes.js");
+const { createModEditorSchema } = require("../src/mods/ModEditorSchema.js");
+const {
+  validatePublicationDescription,
+} = require("../src/mods/ModPublication.js");
 const { atomicWriteAsync } = require("./storage.cjs");
 const { itemId } = require("./steam-workshop.cjs");
 const MAX_PACKAGES = 32;
@@ -463,7 +468,12 @@ class ModStore {
       case "refresh":
         return this.refresh(library);
       case "publish":
-        return this.publish(library, find(), input.packageDigest);
+        return this.publish(
+          library,
+          find(),
+          input.packageDigest,
+          input.rulesDescription,
+        );
       default:
         throw new Error("Unknown mod action.");
     }
@@ -512,32 +522,18 @@ class ModStore {
   }
 
   async template() {
-    const pack = validateMod({
-      schemaVersion: 1,
-      gameApi: MOD_API_VERSION,
-      id: "my-grid",
-      title: "My Grid",
-      creator: "Your name",
-      version: "1.0.0",
-      seed: 42,
-      baseScenarioId: 999,
-      description: "Plan your grid through a changing electricity market.",
-      objectives: { mode: "inherit" },
-      officialArcs: [{ scenarioId: 100, includeChoices: true }],
-      scenario: { durationMonths: 240 },
-      facilities: { Solar: { buildCost: 0.8 } },
-      programs: { efficiency: 0.8 },
-      events: [
-        {
-          id: "first-year",
-          startMonth: 12,
-          title: "First year",
-          message: "Review your grid before the next year.",
-        },
-      ],
-    });
+    const pack = validateMod(createAuthoringTemplate());
     const filename = await this.chooseSave();
     if (!filename) return {};
+    if (path.basename(filename) === "scenario.schema.json")
+      throw new Error(
+        "Choose scenario.json or another package filename; scenario.schema.json is reserved for its paired editor schema.",
+      );
+    await fs.promises.writeFile(
+      path.join(path.dirname(filename), "scenario.schema.json"),
+      JSON.stringify(createModEditorSchema(), null, 2) + "\n",
+      { mode: 0o600 },
+    );
     await fs.promises.writeFile(
       filename,
       JSON.stringify(pack, null, 2) + "\n",
@@ -641,7 +637,7 @@ class ModStore {
     };
   }
 
-  async publish(library, entry, validatedDigest) {
+  async publish(library, entry, validatedDigest, rulesDescription) {
     const pack = validateMod(entry.pack);
     if (
       typeof validatedDigest !== "string" ||
@@ -650,6 +646,7 @@ class ModStore {
       throw new Error(
         "The package digest differs from the package validated for publishing. Review and validate it again.",
       );
+    const description = validatePublicationDescription(rulesDescription, pack);
     if (entry.source !== "local")
       throw new Error("Only your own local mods can be published.");
     if (entry.pack.gameApi !== MOD_API_VERSION)
@@ -693,6 +690,7 @@ class ModStore {
     try {
       result = await workshop.publish(record.workshopId, entry.pack, stage, {
         setVisibility: !record.uploaded,
+        description,
       });
     } finally {
       this.uploading = false;

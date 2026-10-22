@@ -460,11 +460,18 @@ export function scenarioRuleChoiceEnvelope(
   graph: ScenarioRuleChoiceGraph,
   month: number,
   factors: readonly RuleChoiceFactor[],
+  algebra: {
+    neutral: () => RuleChoiceEnvelope;
+    combine: (
+      left: RuleChoiceEnvelope,
+      right: RuleChoiceEnvelope,
+    ) => RuleChoiceEnvelope;
+  } = { neutral, combine: multiply },
 ): RuleChoiceEnvelope {
   const weights = new Map<ScenarioRuleChoiceNode, RuleChoiceFactor[]>();
-  let result = neutral();
+  let result = algebra.neutral();
   factors.forEach((factor) => {
-    if (!factor.requiresChoice) result = multiply(result, factor);
+    if (!factor.requiresChoice) result = algebra.combine(result, factor);
     else {
       const node = graph.byReference.get(referenceKey(factor.requiresChoice));
       // A deferred arc is checked after compilation assembles its detached choices.
@@ -477,16 +484,16 @@ export function scenarioRuleChoiceEnvelope(
   const visit = (node: ScenarioRuleChoiceNode): RuleChoiceEnvelope => {
     const cached = memo.get(node);
     if (cached) return cached;
-    if (node.choice.dueMonth > month || node.deferred) return neutral();
+    if (node.choice.dueMonth > month || node.deferred) return algebra.neutral();
     const outcomes = optionsFor(node.choice).map((option) => {
-      let outcome = neutral();
+      let outcome = algebra.neutral();
       (weights.get(node) ?? []).forEach((factor) => {
         if (factor.requiresChoice!.optionIds.includes(option.id))
-          outcome = multiply(outcome, factor);
+          outcome = algebra.combine(outcome, factor);
       });
       node.children.forEach((child) => {
         if (child.choice.requiresChoice!.optionIds.includes(option.id))
-          outcome = multiply(outcome, visit(child));
+          outcome = algebra.combine(outcome, visit(child));
       });
       return outcome;
     });
@@ -498,12 +505,12 @@ export function scenarioRuleChoiceEnvelope(
             ...outcomes.map((outcome) => outcome.positiveMin),
           ),
         }
-      : neutral();
+      : algebra.neutral();
     memo.set(node, result);
     return result;
   };
   graph.roots.forEach((root) => {
-    result = multiply(result, visit(root));
+    result = algebra.combine(result, visit(root));
   });
   return result;
 }

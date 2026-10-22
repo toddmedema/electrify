@@ -1,0 +1,51 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "effect-recipes",
+  "title": "Timed effect recipes",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
+  "seed": 42,
+  "baseScenarioId": 999,
+  "officialArcs": [],
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 6,
+    "startingCustomers": 10000,
+    "cash": 1000000000
+  },
+  "objectives": { "mode": "none" },
+  "events": [
+    {
+      "id": "planning-window",
+      "title": "Planning window",
+      "message": "Your grid faces new operating conditions.",
+      "preview": "Operating conditions will change for months 2–3.",
+      "startMonth": 2,
+      "durationMonths": 2,
+      "effects": {
+        "fuelPriceMultipliers": { "Natural Gas": 1.1 },
+        "outputMultipliersByFuel": { "Natural Gas": 0.95 },
+        "demandMultiplier": 1.05,
+        "temperatureOffsetC": 1,
+        "hydroInflowMultiplier": 1,
+        "constructionCostMultipliersByFuel": { "Natural Gas": 0.9 },
+        "operatingCostMultipliersByFuel": { "Natural Gas": 1.1 },
+        "operatingExpenseDollarsPerMonth": 1000,
+        "transactions": [
+          { "kind": "grant", "amountDollars": 10000 },
+          { "kind": "charge", "amountDollars": 1000 }
+        ],
+        "carbonFeeDollarsPerTonneCO2e": 25,
+        "outputMultipliersBySelector": [
+          {
+            "target": { "selector": "largestOperating" },
+            "outputMultiplier": 0.99
+          }
+        ]
+      }
+    }
+  ]
+}

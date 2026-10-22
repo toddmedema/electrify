@@ -7,7 +7,7 @@ const { CoopSaveStore } = require("./coop-storage.cjs");
 const {
   isRuleJson,
   RULE_LIMITS,
-} = require("../src/helpers/ScenarioRulesSchema");
+} = require("../src/helpers/ScenarioRulesSchema.js");
 
 // Valve flat API, the SDK bundled with steamworks.js. No second callback consumer.
 const DECLARATIONS = {

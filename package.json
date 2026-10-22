@@ -98,7 +98,11 @@
     "desktop:verify": "node scripts/desktop-verify.js",
     "test:desktop:native": "node --test electron/*.test.cjs",
     "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts",
-    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts"
+    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts",
+    "mods:validate": "node scripts/mods-validate.js",
+    "premods:validate": "npm run compatibility:generate",
+    "mods:schema": "node scripts/mods-schema.js",
+    "mods:recipes": "node scripts/mods-recipes.js"
   },
   "eslintConfig": {
     "extends": [

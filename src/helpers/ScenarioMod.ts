@@ -377,6 +377,7 @@ export function validScenarioMod(
         "creator",
         "version",
         "description",
+        "objectiveMode",
         "workshopId",
       ]) ||
       typeof source.id !== "string" ||
@@ -386,6 +387,9 @@ export function validScenarioMod(
       !safeText(source.creator, 100) ||
       !safeText(source.version, 40) ||
       !safeText(source.description, 2000) ||
+      !["inherit", "replace", "none"].includes(
+        source.objectiveMode as string,
+      ) ||
       (source.workshopId !== undefined &&
         (typeof source.workshopId !== "string" ||
           !/^[1-9][0-9]{0,19}$/.test(source.workshopId)))
@@ -413,6 +417,12 @@ export function validScenarioMod(
       return false;
     if (!validCompiledScenarioRules(value.rules)) return false;
     const rules = value.rules;
+    if (
+      (source.objectiveMode === "none" && rules.objectives.length !== 0) ||
+      (source.objectiveMode === "replace" &&
+        rules.objectives.some((goal) => goal.inherited))
+    )
+      return false;
     if (
       rules.namespace.kind !== "mod" ||
       rules.namespace.id !== source.id ||

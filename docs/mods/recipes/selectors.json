@@ -1,0 +1,68 @@
+{
+  "$schema": "../scenario.schema.json",
+  "schemaVersion": 1,
+  "gameApi": 1,
+  "id": "selector-recipes",
+  "title": "Original asset target recipes",
+  "creator": "Electrify examples",
+  "version": "1",
+  "description": "Edit one bounded planning rule at a time, then validate and simulate it.",
+  "seed": 42,
+  "baseScenarioId": 999,
+  "officialArcs": [],
+  "scenario": {
+    "startingYear": 2020,
+    "durationMonths": 6,
+    "startingCustomers": 10000,
+    "cash": 1000000000
+  },
+  "objectives": { "mode": "none" },
+  "events": [
+    {
+      "id": "target-window",
+      "title": "Target window",
+      "message": "Output falls at the selected original generators.",
+      "preview": "Selected original generator output will fall in month 2.",
+      "startMonth": 2,
+      "durationMonths": 1,
+      "effects": {
+        "outputMultipliersBySelector": [
+          {
+            "target": { "selector": "largestOperating", "fuel": "Natural Gas" },
+            "outputMultiplier": 0.99
+          },
+          {
+            "target": {
+              "selector": "oldestOperating",
+              "fuel": "Natural Gas",
+              "count": 1
+            },
+            "outputMultiplier": 0.99
+          },
+          {
+            "target": {
+              "selector": "seededOperatingCapacityShare",
+              "targetCapacityShare": 0.5
+            },
+            "outputMultiplier": 0.99
+          },
+          {
+            "target": {
+              "selector": "operatingAtLeastAge",
+              "fuel": "Natural Gas",
+              "minAgeYears": 0
+            },
+            "outputMultiplier": 0.99
+          },
+          {
+            "target": {
+              "selector": "startingAsset",
+              "assetId": "scenario-999-natural-gas-peaker"
+            },
+            "outputMultiplier": 0.99
+          }
+        ]
+      }
+    }
+  ]
+}
