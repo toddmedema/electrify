@@ -4,6 +4,10 @@ const path = require("node:path");
 const { atomicWriteAsync, readJson } = require("./storage.cjs");
 const { nativeLibraryPath } = require("./steam-native.cjs");
 const { CoopSaveStore } = require("./coop-storage.cjs");
+const {
+  isRuleJson,
+  RULE_LIMITS,
+} = require("../src/helpers/ScenarioRulesSchema");
 
 // Valve flat API, the SDK bundled with steamworks.js. No second callback consumer.
 const DECLARATIONS = {
@@ -96,15 +100,33 @@ const MESSAGES_PER_RECEIVE = 16;
 // itself whenever the host changes the scenario, difficulty or custom settings, and the saved
 // company they claimed while resuming a multiplayer save.
 const MEMBER_KEYS = new Set(["ready", "slot"]);
-const MEMBER_VALUE = /^[a-zA-Z0-9:|._-]{0,64}$/;
+const MEMBER_VALUE = /^[a-zA-Z0-9:|._-]{0,256}$/;
 // The host's mirrored scenario selection; a complete custom game fits well within this.
 const MAX_BROWSE_BYTES = 16 * 1024;
 const MAX_CAMPAIGN_BYTES = 4 * 1024;
+const MAX_SCENARIO_BYTES = RULE_LIMITS.compiledBytes;
+const MAX_SCENARIO_ENVELOPE_BYTES = 1024;
+const SCENARIO_SELECTION = /^[a-zA-Z0-9:|._-]{1,256}$/;
 
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_COMPRESSED = 4 * 1024 * 1024;
 const CHUNK = 32 * 1024;
 const HEADER = 52;
+const MESSAGE_KINDS = new Set([
+  "heartbeat",
+  "checkpoint",
+  "saved",
+  "command",
+  "save-request",
+  "save-result",
+  "browse",
+  "campaign",
+  "keepalive",
+  "view",
+  "scenario",
+]);
+const MESSAGE_MAGIC = "ELM2";
+const SCENARIO_MAGIC = "ELS1";
 const ID = /^[0-9]{17}$/;
 const LOBBY_ID = /^[0-9]{17,20}$/;
 function lobbyFromArgs(args) {
@@ -143,7 +165,17 @@ function loadMultiplayerFunctions(
   );
 }
 function encode(payload) {
-  const json = stringify(payload);
+  if (!payload || !MESSAGE_KINDS.has(payload.kind))
+    throw new Error("Invalid co-op message kind");
+  if (payload.kind === "scenario") validScenarioMessage(payload);
+  // The kind is always the first, literal key. The receiver checks it on the first
+  // decompressed chunk, before allowing the larger world-message budget.
+  const { kind, ...body } = payload;
+  const json = stringify(
+    kind === "scenario"
+      ? { kind, selectionKey: payload.selectionKey, scenario: payload.scenario }
+      : { kind, ...body },
+  );
   if (Buffer.byteLength(json) > MAX_BYTES)
     throw new Error("Co-op message is too large");
   const bytes = zlib.deflateRawSync(json);
@@ -154,6 +186,7 @@ function encode(payload) {
     hash: crypto.createHash("sha256").update(bytes).digest(),
     id: crypto.randomBytes(8),
     offset: 0,
+    magic: kind === "scenario" ? SCENARIO_MAGIC : MESSAGE_MAGIC,
   };
 }
 function chunk(message) {
@@ -162,7 +195,7 @@ function chunk(message) {
   const result = Buffer.alloc(
     HEADER + Math.min(CHUNK, message.bytes.length - index * CHUNK),
   );
-  result.write("ELM1");
+  result.write(message.magic);
   message.id.copy(result, 4);
   result.writeUInt16LE(index, 12);
   result.writeUInt16LE(count, 14);
@@ -173,11 +206,15 @@ function chunk(message) {
 }
 function assemble(incoming, bytes, now = Date.now()) {
   for (const [key, value] of incoming)
-    if (now - value.created > 15000) incoming.delete(key);
+    if (now - value.created > 15000) {
+      value.inflater?.destroy(new Error("Co-op message expired"));
+      incoming.delete(key);
+    }
+  const magic = bytes.toString("latin1", 0, 4);
   if (
     bytes.length < HEADER ||
     bytes.length > HEADER + CHUNK ||
-    bytes.toString("ascii", 0, 4) !== "ELM1"
+    ![MESSAGE_MAGIC, SCENARIO_MAGIC].includes(magic)
   )
     throw new Error("Invalid co-op frame");
   const key = bytes.subarray(4, 12).toString("hex"),
@@ -197,28 +234,127 @@ function assemble(incoming, bytes, now = Date.now()) {
   if (!transfer) {
     if (incoming.size >= 4)
       throw new Error("Too many incomplete co-op messages");
-    transfer = { created: now, count, length, hash, chunks: new Map() };
+    transfer = { created: now, count, length, hash, magic, chunks: new Map() };
     incoming.set(key, transfer);
   }
   if (
     transfer.count !== count ||
     transfer.length !== length ||
-    transfer.hash !== hash
+    transfer.hash !== hash ||
+    transfer.magic !== magic ||
+    transfer.inflater
   )
     throw new Error("Inconsistent co-op message");
   transfer.chunks.set(index, Buffer.from(bytes.subarray(HEADER)));
   if (transfer.chunks.size !== count) return;
-  incoming.delete(key);
   const compressed = Buffer.concat(
     Array.from({ length: count }, (_, i) => transfer.chunks.get(i)),
   );
-  if (crypto.createHash("sha256").update(compressed).digest("hex") !== hash)
+  if (crypto.createHash("sha256").update(compressed).digest("hex") !== hash) {
+    incoming.delete(key);
     throw new Error("Co-op checksum failed");
-  return parse(
-    zlib
-      .inflateRawSync(compressed, { maxOutputLength: MAX_BYTES })
-      .toString("utf8"),
-  );
+  }
+  // Keep active inflaters in the same four-transfer budget as unfinished chunks.
+  // Unlike a synchronous 16MiB inflate followed by a kind check, streaming stops a
+  // snapshot bomb while decompressing and rejects a relabelled generic frame early.
+  return inflateMessage(compressed, transfer).finally(() => {
+    if (incoming.get(key) === transfer) incoming.delete(key);
+  });
+}
+
+function validScenarioMessage(payload) {
+  if (
+    !isRuleJson(payload) ||
+    Object.keys(payload).length !== 3 ||
+    payload.kind !== "scenario" ||
+    typeof payload.selectionKey !== "string" ||
+    !SCENARIO_SELECTION.test(payload.selectionKey) ||
+    !payload.scenario ||
+    typeof payload.scenario !== "object" ||
+    Array.isArray(payload.scenario)
+  )
+    throw new Error("Invalid co-op scenario message");
+  const scenarioBytes = Buffer.byteLength(JSON.stringify(payload.scenario));
+  const messageBytes = Buffer.byteLength(JSON.stringify(payload));
+  if (scenarioBytes > MAX_SCENARIO_BYTES)
+    throw new Error("Co-op scenario is too large");
+  if (messageBytes - scenarioBytes > MAX_SCENARIO_ENVELOPE_BYTES)
+    throw new Error("Co-op scenario envelope is too large");
+}
+
+function inflateMessage(compressed, transfer) {
+  const scenario = transfer.magic === SCENARIO_MAGIC;
+  let limit = scenario
+    ? MAX_SCENARIO_BYTES + MAX_SCENARIO_ENVELOPE_BYTES
+    : MAX_BYTES;
+  return new Promise((resolve, reject) => {
+    const inflater = zlib.createInflateRaw({ chunkSize: 16 * 1024 });
+    transfer.inflater = inflater;
+    const chunks = [];
+    let length = 0,
+      prefix = "",
+      scenarioPrefix,
+      kind;
+    inflater.on("error", reject);
+    inflater.on("data", (part) => {
+      length += part.length;
+      if (!kind || (scenario && !scenarioPrefix)) {
+        prefix += part
+          .subarray(0, Math.max(0, (scenario ? 512 : 64) - prefix.length))
+          .toString("latin1");
+        const match = /^\{"kind":"([a-z-]{1,32})"(?=[,}])/.exec(prefix);
+        if (match) {
+          kind = match[1];
+          if (!MESSAGE_KINDS.has(kind) || (kind === "scenario") !== scenario) {
+            inflater.destroy(
+              new Error("Co-op frame kind does not match its message"),
+            );
+            return;
+          }
+        } else if (prefix.length >= 64) {
+          inflater.destroy(new Error("Invalid co-op frame kind prefix"));
+          return;
+        }
+        if (scenario) {
+          scenarioPrefix =
+            /^\{"kind":"scenario","selectionKey":"[a-zA-Z0-9:|._-]{1,256}","scenario":/.exec(
+              prefix,
+            );
+          if (scenarioPrefix) {
+            // This canonical envelope has one closing brace after the scenario.
+            // Deriving its exact size keeps even a one-byte snapshot overrun from
+            // being hidden in the reserved envelope allowance until JSON parsing.
+            limit = scenarioPrefix[0].length + MAX_SCENARIO_BYTES + 1;
+          } else if (prefix.length >= 512) {
+            inflater.destroy(
+              new Error("Invalid co-op scenario envelope prefix"),
+            );
+            return;
+          }
+        }
+      }
+      if (length > limit) {
+        inflater.destroy(new Error("Co-op decompression limit exceeded"));
+        return;
+      }
+      chunks.push(part);
+    });
+    inflater.on("end", () => {
+      try {
+        const json = new TextDecoder("utf-8", { fatal: true }).decode(
+          Buffer.concat(chunks, length),
+        );
+        const payload = scenario ? JSON.parse(json) : parse(json);
+        if (!kind || payload?.kind !== kind || (scenario && !scenarioPrefix))
+          throw new Error("Co-op frame kind does not match its message");
+        if (scenario) validScenarioMessage(payload);
+        resolve(payload);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    inflater.end(compressed);
+  });
 }
 
 class SteamMultiplayer {
@@ -457,6 +593,9 @@ class SteamMultiplayer {
   }
   drop(handle) {
     const connection = this.connections.get(handle);
+    for (const transfer of connection?.incoming?.values() ?? [])
+      transfer.inflater?.destroy(new Error("Co-op connection closed"));
+    connection?.incoming?.clear();
     this.api.close(
       this.sockets,
       handle,
@@ -641,6 +780,7 @@ class SteamMultiplayer {
           MAX_CAMPAIGN_BYTES)
     )
       throw new Error("Invalid campaign selection");
+    if (payload.kind === "scenario") validScenarioMessage(payload);
     if (payload.kind === "command") {
       const envelope = payload.envelope;
       if (
@@ -707,6 +847,7 @@ class SteamMultiplayer {
       for (let i = 0; i < count; i++) {
         const pointer = pointers.readBigUInt64LE(i * 8);
         try {
+          if (this.connections.get(handle) !== c || !c.connected) continue;
           const prefix = Buffer.from(
             this.koffi.decode(pointer, "uint8_t", MESSAGE_PREFIX_SIZE),
           );
@@ -716,9 +857,33 @@ class SteamMultiplayer {
           const bytes = Buffer.from(
             this.koffi.decode(prefix.readBigUInt64LE(0), "uint8_t", length),
           );
-          const payload = assemble(c.incoming, bytes);
-          if (payload)
-            void this.receive(c.id, payload).catch(() => this.drop(handle));
+          const completion = assemble(c.incoming, bytes);
+          if (completion) {
+            // Inflation finishes asynchronously, sometimes out of order. Keep reliable
+            // delivery ordered, including an awaited checkpoint write, and observe errors
+            // immediately so a later failed decode never becomes an unhandled rejection.
+            const decoded = completion.then(
+              (payload) => ({ payload }),
+              (error) => ({ error }),
+            );
+            if ((c.deliveryCount ?? 0) >= 64)
+              throw new Error("Too many pending co-op messages");
+            c.deliveryCount = (c.deliveryCount ?? 0) + 1;
+            c.delivery = (c.delivery ?? Promise.resolve())
+              .then(async () => {
+                const result = await decoded;
+                // A completed inflate must not revive a departed or replaced connection.
+                if (this.connections.get(handle) !== c || !c.connected) return;
+                if (result.error) throw result.error;
+                await this.receive(c.id, result.payload);
+              })
+              .catch(() => {
+                if (this.connections.get(handle) === c) this.drop(handle);
+              })
+              .finally(() => {
+                c.deliveryCount--;
+              });
+          }
         } catch {
           this.drop(handle);
         } finally {
@@ -776,6 +941,7 @@ class SteamMultiplayer {
           !this.lobby ||
           !MEMBER_KEYS.has(input.key) ||
           typeof input.value !== "string" ||
+          input.value.length > (input.key === "ready" ? 256 : 64) ||
           !MEMBER_VALUE.test(input.value)
         )
           throw new Error("Invalid lobby member data");

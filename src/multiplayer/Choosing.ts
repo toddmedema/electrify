@@ -1,12 +1,14 @@
 import { DIFFICULTY_LABELS } from "../Constants";
 import { getScenario } from "../data/Scenarios";
-import type { AppStateType, CoopSelectionType } from "../Types";
+import type { AppStateType, CoopSelectionType, ScenarioType } from "../Types";
 import {
   BROWSE_CARDS,
   selectionKey,
   type BrowseCard,
   type BrowseState,
+  type HostBrowseSelection,
 } from "./Browse";
+import { modBrowseSummary } from "./ModBrowse";
 import type { SessionState } from "./Session";
 
 export const isBrowseCard = (name: string): name is BrowseCard =>
@@ -16,6 +18,9 @@ export const isBrowseCard = (name: string): name is BrowseCard =>
 function viewing(browse?: BrowseState): string | undefined {
   if (!browse) return undefined;
   const difficulty = DIFFICULTY_LABELS[browse.difficulty];
+  if (browse.mod)
+    return `${browse.mod.title} on ${difficulty} · Modded · Unranked`;
+  if (browse.card === "MODS") return "Choosing a community scenario…";
   if (browse.card === "CUSTOM_GAME") return `Custom game on ${difficulty}`;
   const name =
     browse.card === "NEW_GAME_DETAILS" && browse.scenarioId !== undefined
@@ -28,11 +33,14 @@ function viewing(browse?: BrowseState): string | undefined {
 export function coopSelection(
   session: SessionState,
   custom?: CoopSelectionType["custom"],
+  modScenario?: ScenarioType,
 ): CoopSelectionType {
   const { lobby, browse, view, busy, library } = session;
   const host = lobby.hostId === lobby.selfId;
   const key = browse ? selectionKey(browse) : "";
-  const readyFor = (value?: string) => !!key && value === key;
+  const receivingScenario = !!browse?.mod && !session.scenarioSnapshot;
+  const readyFor = (value?: string) =>
+    !receivingScenario && !!key && value === key;
   return {
     role: host ? "host" : "guest",
     hostName:
@@ -51,6 +59,9 @@ export function coopSelection(
     ),
     starting: !view && (busy || browse?.phase === "playing"),
     custom,
+    modScenario: host ? modScenario : session.scenarioSnapshot,
+    modSummary: browse?.mod,
+    receivingScenario,
     viewing: viewing(browse),
     ...(host && {
       lobbyId: lobby.lobbyId,
@@ -62,12 +73,16 @@ export function coopSelection(
 /** The host's selection as it would be mirrored, or undefined off the scenario screens. */
 export function hostSelection(
   state: AppStateType,
-): Omit<BrowseState, "session" | "revision"> | undefined {
+): HostBrowseSelection | undefined {
   const card = state.card.name;
   if (!isBrowseCard(card)) return undefined;
+  const snapshot = card === "MODS" ? state.ui.coop?.modScenario : undefined;
   return {
     phase: "browsing",
     card,
+    ...(snapshot?.mod
+      ? { mod: modBrowseSummary(snapshot), scenarioSnapshot: snapshot }
+      : {}),
     scenarioId:
       card === "NEW_GAME_DETAILS" ? state.ui.scenarioPreview : undefined,
     difficulty: state.ui.previewDifficulty ?? state.game.difficulty,

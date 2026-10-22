@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -14,6 +15,13 @@ import {
 import { useAppSelector } from "../Store";
 import { formatMoneyConcise, formatPercent } from "../helpers/Format";
 import { formatLargeMassValueConcise, largeMassUnit } from "../helpers/Units";
+import {
+  objectiveObservedText,
+  objectiveStatusText,
+  objectiveTargetText,
+  objectiveWindowText,
+} from "../helpers/ObjectivePresentation";
+import { KeepModCopy } from "../components/views/CoopModPreview";
 import type { CompanyOutcomeType } from "../Types";
 
 const OUTCOME_LABELS: Record<CompanyOutcomeType["outcome"], string> = {
@@ -51,6 +59,8 @@ export default function CoopResult({
   const results = useAppSelector(
     (state) => state.game.multiplayer?.results ?? [],
   );
+  const startingYear = useAppSelector((state) => state.game.startingYear);
+  const scenario = useAppSelector((state) => state.game.customScenario);
   const units = useAppSelector((state) => state.settings.units);
   const title = complete
     ? "Match complete"
@@ -117,6 +127,60 @@ export default function CoopResult({
             </TableBody>
           </Table>
         </div>
+        {results
+          .filter((result) => result.objectiveResults?.length)
+          .map((company) => (
+            <Box
+              component="section"
+              aria-label={`${company.name} objective results`}
+              key={company.id}
+              sx={{ mt: 2, overflowWrap: "anywhere" }}
+            >
+              <Typography component="h3" variant="subtitle1">
+                {company.name} · Objectives
+              </Typography>
+              {company.objectiveResults?.map((result) => (
+                <Box
+                  key={result.id}
+                  sx={{ mt: 1.5 }}
+                  data-objective-status={result.status}
+                >
+                  <Typography variant="subtitle2">
+                    {result.label} · {result.required ? "Required" : "Optional"}{" "}
+                    · {objectiveStatusText[result.status]}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {result.definition}
+                  </Typography>
+                  <Typography variant="body2">
+                    {objectiveTargetText(result.objective)} ·{" "}
+                    {objectiveWindowText(
+                      result.objective,
+                      startingYear,
+                      scenario?.durationMonths ??
+                        ("throughMonth" in result.objective
+                          ? result.objective.throughMonth + 1
+                          : result.objective.deadlineMonth +
+                            result.requiredMonths),
+                    )}
+                  </Typography>
+                  <Typography variant="body2">
+                    {objectiveObservedText(result)}
+                  </Typography>
+                  {result.reason && (
+                    <Typography variant="body2" color="text.secondary">
+                      {result.reason}
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          ))}
+        {!host && scenario?.mod && (
+          <Box sx={{ mt: 2 }}>
+            <KeepModCopy scenario={scenario} />
+          </Box>
+        )}
         {complete && !host && (
           <Typography role="status" sx={{ mt: 2 }}>
             Waiting for {hostName} to choose the next game.

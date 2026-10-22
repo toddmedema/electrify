@@ -34,7 +34,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onCommunityScenarios:
       process.env.REACT_APP_DESKTOP === "true" && getDesktop()?.mods
         ? () => {
-            if (!coop()) dispatch(navigate("MODS"));
+            if (!guest()) dispatch(navigate("MODS"));
           }
         : undefined,
     onDetails: (d: Partial<GameType>) => {

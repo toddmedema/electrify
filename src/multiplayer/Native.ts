@@ -1,3 +1,4 @@
+import type { ScenarioType } from "../Types";
 import type { BrowseState } from "./Browse";
 import type { CommandEnvelope, RoomView, Seat, World } from "./Types";
 /** A lobby member, with the selection they last marked Ready for (see selectionKey). */
@@ -44,6 +45,7 @@ export type WireMessage =
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }
   | { kind: "browse"; browse: BrowseState }
+  | { kind: "scenario"; selectionKey: string; scenario: ScenarioType }
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type NativeRequest =
   | {

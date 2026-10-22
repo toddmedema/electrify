@@ -1314,6 +1314,7 @@ export interface CompanyOutcomeType {
 }
 /** One row of the co-op result table. */
 export interface CompanyResultType extends CompanyOutcomeType {
+  objectiveResults?: ObjectiveResult[];
   id: string;
   name: string;
   cash: number;
@@ -1659,6 +1660,11 @@ export interface CoopSelectionType {
   starting: boolean;
   /** The custom game the host is setting up, mirrored to guests. */
   custom?: ScenarioType;
+  /** A selected, validated community snapshot; separate from the Custom Game editor. */
+  modScenario?: ScenarioType;
+  /** Summary while the separate host scenario transfer is arriving. */
+  modSummary?: import("./multiplayer/ModBrowse").ModBrowseSummary;
+  receivingScenario?: boolean;
   /** What the host has open, in words, such as "Deep Freeze on Easy". */
   viewing?: string;
   /** Host only: the code friends can enter to join. */

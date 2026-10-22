@@ -24,6 +24,13 @@ export default function ScenarioChoiceDialog() {
       ? pendingScenarioChoice(game)
       : undefined;
   if (!decision) return null;
+  const company = game.multiplayer?.clock?.players.find(
+    (player) => player.id === game.multiplayer?.seat,
+  )?.name;
+  const deciding =
+    game.multiplayer?.clock?.players
+      .filter((player) => player.pauseReason === "Choosing a response")
+      .map((player) => player.name) ?? [];
   const cash = currentCash(game);
   const options = decision.options.map((option) => {
     const cost = option.cost(game.difficulty);
@@ -81,6 +88,22 @@ export default function ScenarioChoiceDialog() {
         </span>
       </DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: 3 }}>
+        {company && (
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Your company: {company}
+          </Typography>
+        )}
+        {!!deciding.length && (
+          <Typography
+            role="status"
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2 }}
+          >
+            Still deciding: {deciding.join(", ")}. Each company chooses for its
+            own grid.
+          </Typography>
+        )}
         <Typography
           id="scenarioChoiceDescription"
           sx={{ mb: 2, overflowWrap: "anywhere" }}

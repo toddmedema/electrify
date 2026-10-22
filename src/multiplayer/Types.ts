@@ -78,6 +78,8 @@ export interface GridView {
   retired?: boolean;
 }
 export interface RoomView {
+  /** Modded wire views reference the separately validated scenario instead of repeating definitions. */
+  scenarioDigest?: string;
   game?: GameType;
   speed: SpeedType;
   readyRequired: boolean;

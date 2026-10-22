@@ -109,6 +109,13 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
   const operations = isPaneLayout() && !!props.game;
+  const multiplayer = props.game?.multiplayer;
+  const companyName =
+    multiplayer?.clock?.players.find((player) => player.id === multiplayer.seat)
+      ?.name ??
+    multiplayer?.results?.find((result) => result.id === multiplayer.seat)
+      ?.name ??
+    "your company";
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
   const openedForEvidence = React.useRef(!!evidenceRequest);
   const evidenceAnchor = React.useRef<HTMLDivElement>(null);
@@ -220,6 +227,15 @@ export default function EventLog(props: Props): React.JSX.Element {
                   Ongoing events
                 </Typography>
               </header>
+              {props.game?.multiplayer && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  Events for {companyName}.
+                </Typography>
+              )}
               <ul className="eventLogList">
                 {ongoing.map((event) => (
                   <StoryEventCard
@@ -246,6 +262,15 @@ export default function EventLog(props: Props): React.JSX.Element {
                   Upcoming events
                 </Typography>
               </header>
+              {props.game?.multiplayer && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  Events for {companyName}.
+                </Typography>
+              )}
               <ul className="eventLogList">
                 {upcoming.map((event) => (
                   <StoryEventCard
@@ -369,6 +394,11 @@ export default function EventLog(props: Props): React.JSX.Element {
                   : activeFilters.length === 1
                     ? activeFilters[0].emptyMessage
                     : "No events match the selected types yet."}
+              </Typography>
+            )}
+            {props.game?.multiplayer && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Events for {companyName}.
               </Typography>
             )}
             <ul className="eventLogList">

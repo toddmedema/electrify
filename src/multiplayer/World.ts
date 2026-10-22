@@ -26,6 +26,8 @@ import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
+import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import { validScenarioMod } from "../helpers/ScenarioMod";
 import { summarizeHistory } from "../helpers/DateTime";
 import { publicRateCap } from "../helpers/Customers";
 import { storyHash } from "../data/WorldEvents";
@@ -144,11 +146,38 @@ function commandResult(before: GameType, after: GameType): GameType {
   const recorded = currentTick(before),
     updated = currentTick(result);
   // A build/slider reforecast estimates future human supply as zero. Keep the completed
-  // shared tick's energy and settlement intact; only the immediate purchase changes cash.
+  // shared tick's energy and settlement intact; immediate company transfers still book here.
   if (recorded && updated) {
     const { cash, netWorth } = updated;
+    const previousReceipts = new Set(
+      before.worldEvents.occurrences.map((event) => event.key),
+    );
+    // Reforecasting estimates customer sales and peer energy again, but a response's new
+    // receipts are actual company transfers. Retain those transfers in the settled frame so
+    // month-close revenue, affordability and expenses agree with its changed cash balance.
+    const transfers = after.worldEvents.occurrences.reduce(
+      (sum, event) => {
+        if (
+          previousReceipts.has(event.key) ||
+          event.startsMinute !== after.date.minute ||
+          (event.attributes.scenarioChoice !== true &&
+            event.attributes.ruleEvent !== true)
+        )
+          return sum;
+        sum.grant += Number(event.attributes.upfrontGrant ?? 0);
+        sum.cost += Number(event.attributes.cost ?? 0);
+        return sum;
+      },
+      { grant: 0, cost: 0 },
+    );
     // The reducer froze the recorded tick's nested objects; the live grid is mutated in place.
-    Object.assign(updated, cloneDeep(recorded), { cash, netWorth });
+    Object.assign(updated, cloneDeep(recorded), {
+      cash,
+      netWorth,
+      revenue: recorded.revenue + transfers.grant,
+      revenueGrants: (recorded.revenueGrants ?? 0) + transfers.grant,
+      expensesOM: recorded.expensesOM + transfers.cost,
+    });
   }
   result.transmission?.lines.forEach((line) => {
     const previous = before.transmission?.lines.find((l) => l.id === line.id);
@@ -169,7 +198,10 @@ export function matchScenario(spec: MatchSpec): {
   if (
     !scenario ||
     scenario.tutorialSteps ||
-    scenario.mod !== undefined ||
+    scenario.id !== spec.scenarioId ||
+    (scenario.mod !== undefined &&
+      (!validScenarioMod(scenario.mod, scenario) ||
+        scenario.mod.parameters.difficulty !== spec.difficulty)) ||
     (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined) ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
@@ -191,6 +223,8 @@ export function createWorld(
     new Set(seats.map((s) => s.id)).size !== seats.length
   )
     throw new Error("A shared game needs two to four players");
+  // A running match owns its selection; later library edits cannot replace its snapshot.
+  spec = cloneDeep(spec);
   const { scenario, location } = matchScenario(spec);
   // Every company plays the scenario as authored, on one seed, so weather and stories match.
   const seed = scenario.seed ?? storyHash(matchId) >>> 0;
@@ -610,6 +644,7 @@ function companyResults(world: World): CompanyResultType[] {
         kgco2e: summary.kgco2e,
         reliability:
           summary.demandWh > 0 ? summary.supplyWh / summary.demandWh : 1,
+        objectiveResults: cloneDeep(gameObjectiveResults(grid)),
       },
     ];
   });
@@ -656,10 +691,10 @@ export function roomView(world: World, seatId: string): RoomView {
         name: seat.name,
         selectedSpeed: world.selectedSpeeds[seat.id],
         pauseReason:
-          world.activities[seat.id] ||
           (pendingScenarioChoice(world.grids[world.seats.indexOf(seat)])
             ? "Choosing a response"
             : undefined) ||
+          world.activities[seat.id] ||
           (world.readyRequired && !world.ready.includes(seat.id)
             ? "Paused"
             : undefined),
@@ -1097,5 +1132,6 @@ export function savedMatchSpec(value: unknown): MatchSpec {
     );
   if (!raw?.spec || ![2, 3].includes(raw.schema!))
     throw new Error(INCOMPLETE_SAVE);
+  matchScenario(raw.spec);
   return raw.spec;
 }

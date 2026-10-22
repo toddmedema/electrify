@@ -1,5 +1,9 @@
 import { test, expect, Page, Browser } from "@playwright/test";
 import { gzipSync } from "node:zlib";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
+import { openPane } from "./layout";
 import type {
   LobbyState,
   NativeEvent,
@@ -16,6 +20,8 @@ type SteamTestWindow = typeof window & {
   receivedMockSteamEvent?: unknown;
   mockSteamGeneration?: number;
   mockSharedSaveRequests?: number;
+  mockScoreSubmissions?: number;
+  mockAchievementSubmissions?: number;
 };
 
 test.afterEach(async ({ browser }) => {
@@ -161,7 +167,34 @@ const STEAM_NAMES = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
 const steamName = (id: string) => STEAM_NAMES[Number(id.slice(-1)) - 1];
 
 class SteamRoom {
-  constructor(private readonly createTransport = createSteamTransport) {}
+  constructor(
+    private readonly createTransport = createSteamTransport,
+    private readonly installedMods: InstalledMod[][] = [],
+  ) {}
+  modEntries = new Map<string, InstalledMod[]>();
+  modRequests = new Map<string, ModRequest[]>();
+  subscriptions = new Map<string, Set<string>>();
+  heldScenarios = new Set<string>();
+  pendingScenarios = new Map<string, NativeEvent>();
+  async releaseScenario(id: string) {
+    this.heldScenarios.delete(id);
+    const pending = this.pendingScenarios.get(id);
+    this.pendingScenarios.delete(id);
+    if (pending) await this.event(id, pending);
+  }
+  async mods(id: string, input: ModRequest): Promise<ModLibrary> {
+    this.modRequests.get(id)!.push(structuredClone(input));
+    let entries = this.modEntries.get(id)!;
+    if (input.kind === "enable")
+      entries = entries.map((entry) =>
+        entry.key === input.key ? { ...entry, enabled: input.enabled } : entry,
+      );
+    if (input.kind === "remove")
+      entries = entries.filter((entry) => entry.key !== input.key);
+    if (input.kind === "subscribe") this.subscriptions.get(id)!.add(input.id);
+    this.modEntries.set(id, entries);
+    return { entries: structuredClone(entries) };
+  }
   private info = test.info();
   transportErrors: string[] = [];
   audioRequests: string[] = [];
@@ -217,6 +250,14 @@ class SteamRoom {
     };
   }
   async event(id: string, event: NativeEvent) {
+    if (
+      event.kind === "message" &&
+      event.payload.kind === "scenario" &&
+      this.heldScenarios.has(id)
+    ) {
+      this.pendingScenarios.set(id, event);
+      return;
+    }
     // Native leave closes peer channels; unsent frames cannot enter a departed renderer.
     if (
       event.kind === "message" &&
@@ -335,6 +376,8 @@ class SteamRoom {
       this.members = this.members.filter((m) => m.id !== id);
       this.pendingViews.delete(id);
       this.heldViews.delete(id);
+      this.pendingScenarios.delete(id);
+      this.heldScenarios.delete(id);
       await this.transports.get(id)!.reset();
       if (this.members.some((member) => member.id === this.host))
         await this.event(this.host, { kind: "disconnected", sender: id });
@@ -349,6 +392,17 @@ class SteamRoom {
     openLobby = true,
   ) {
     const id = `7656119800000000${index + 1}`;
+    const initialMods = structuredClone(this.installedMods[index] ?? []);
+    this.modEntries.set(id, initialMods);
+    this.modRequests.set(id, []);
+    this.subscriptions.set(
+      id,
+      new Set(
+        initialMods.flatMap((entry) =>
+          entry.workshopId ? [entry.workshopId] : [],
+        ),
+      ),
+    );
     const context = await browser.newContext({
       viewport: mobile
         ? { width: 390, height: 844 }
@@ -372,6 +426,9 @@ class SteamRoom {
     await page.exposeBinding(
       "mockSteamRequest",
       (_source, input: NativeRequest) => this.request(id, input),
+    );
+    await page.exposeBinding("mockModsRequest", (_source, input: ModRequest) =>
+      this.mods(id, input),
     );
     await page.addInitScript(
       ({ id }) => {
@@ -410,7 +467,28 @@ class SteamRoom {
           }),
           writeSaveLibrary: async () => ({ cloudState: "disabled" }),
           getLeaderboard: async () => [],
-          submitScore: async () => {},
+          submitScore: async () => {
+            const target = window as SteamTestWindow;
+            target.mockScoreSubmissions =
+              (target.mockScoreSubmissions ?? 0) + 1;
+          },
+          readAchievements: async () => ({
+            version: 1,
+            earned: [],
+            tutorials: [],
+            wins: [],
+          }),
+          submitAchievements: async () => {
+            const target = window as SteamTestWindow;
+            target.mockAchievementSubmissions =
+              (target.mockAchievementSubmissions ?? 0) + 1;
+          },
+          mods: (input) =>
+            (
+              window as unknown as {
+                mockModsRequest: (input: ModRequest) => Promise<ModLibrary>;
+              }
+            ).mockModsRequest(input),
           openFriends: async () => {},
           setActivity: async () => {},
           addTimelineEvent: async () => {},
@@ -1785,4 +1863,402 @@ for (const count of [2, 4]) {
       expect(room.audioRequests).toEqual([]);
     },
   );
+}
+
+const cooperativeMod = (published: boolean): InstalledMod => ({
+  key: "local:cooperative-grid",
+  source: "local",
+  enabled: true,
+  ...(published ? { workshopId: "777" } : {}),
+  pack: {
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "cooperative-grid",
+    title: "Cooperative Grid",
+    creator: "Community engineer",
+    version: "1.0",
+    description: "Choose funding for your grid before its first month begins.",
+    seed: 42,
+    baseScenarioId: 999,
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      startingCustomers: 10000,
+      cash: 1000000000,
+      dollarsPerkWh: 0.2,
+    },
+    objectives: {
+      mode: "replace",
+      items: [
+        {
+          id: "serve-customers",
+          label: "Keep your grid reliable",
+          metric: "monthlyReliability",
+          minDemandServedShare: 0.5,
+          fromMonth: 1,
+          throughMonth: 6,
+        },
+      ],
+    },
+    choices: [
+      {
+        id: "funding",
+        title: "Grid funding",
+        prompt: "Choose whether your company accepts support.",
+        dueMonth: 1,
+        options: [
+          {
+            id: "accept",
+            label: "Accept funding",
+            description: "Receive support for your own grid.",
+            message: "Your company accepted funding.",
+            grantDollars: 1000000,
+          },
+          {
+            id: "decline",
+            label: "Keep the current plan",
+            description: "Keep your current plan without a grant.",
+            message: "Your company kept its current plan.",
+            costDollars: 0,
+          },
+        ],
+      },
+    ],
+    events: [
+      {
+        id: "announced-support",
+        title: "Opening grid support",
+        message: "Operating costs fall for your grid.",
+        preview: "Operating costs will fall for your grid.",
+        startMonth: 1,
+        durationMonths: 2,
+        effects: { operatingCostMultipliersByFuel: { "Natural Gas": 0.9 } },
+      },
+      {
+        id: "hidden-change",
+        title: "Private surprise",
+        message: "Supply conditions change for your grid.",
+        startMonth: 4,
+        durationMonths: 1,
+        visibility: "surprise",
+        effects: { outputMultipliersByFuel: { "Natural Gas": 0.9 } },
+      },
+    ],
+  },
+});
+
+for (const width of [1280, 390, 360]) {
+  test(`a shared mod needs no guest setup and survives library removal at ${width}px`, async ({
+    browser,
+  }) => {
+    const hostEntry = cooperativeMod(width !== 390);
+    const guestEntry: InstalledMod = {
+      ...cooperativeMod(true),
+      key: "workshop:888",
+      source: "workshop",
+      workshopId: "888",
+      pack: {
+        ...hostEntry.pack,
+        id: "guest-only-grid",
+        title: "Guest's own grid",
+        version: "different installed version",
+      },
+    };
+    const disabledEntry: InstalledMod = {
+      ...hostEntry,
+      key: "local:disabled-grid",
+      enabled: false,
+      pack: { ...hostEntry.pack, id: "disabled-grid", title: "Disabled Grid" },
+    };
+    const room = new SteamRoom(createSteamTransport, [
+      [hostEntry, disabledEntry],
+      [guestEntry],
+    ]);
+    const hostId = room.host;
+    const guestId = "76561198000000002";
+    const host = await room.player(browser, 0, width < 600);
+    const guest = await room.player(browser, 1, width < 600);
+    const errors: string[] = [];
+    for (const page of [host, guest]) {
+      page.on("pageerror", (error) => errors.push(error.message));
+      await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+    }
+    const guestLibrary = structuredClone(room.modEntries.get(guestId));
+    const guestSubscriptions = [...room.subscriptions.get(guestId)!];
+    const unchangedGuest = () => {
+      expect(room.modEntries.get(guestId)).toEqual(guestLibrary);
+      expect([...room.subscriptions.get(guestId)!]).toEqual(guestSubscriptions);
+      expect(room.modRequests.get(guestId)).toEqual([]);
+    };
+    const capture = async (name: string, page: Page) => {
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+      await fs.mkdir(process.env.REVIEW_SCREENSHOT_DIR, { recursive: true });
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await page.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `coop-mod-${width}-${name}.png`,
+        ),
+        animations: "disabled",
+        style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+      });
+    };
+    await hostGame(host);
+    await joinGame(guest, room);
+    await host.getByTestId("community-scenarios").click();
+    await expect(
+      host.getByRole("button", { name: "Play Cooperative Grid", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      host.getByRole("button", { name: "Play Disabled Grid", exact: true }),
+    ).toHaveCount(0);
+    room.heldScenarios.add(guestId);
+    const choose = async (difficulty: "Easy" | "Medium") => {
+      await host
+        .getByRole("button", { name: "Play Cooperative Grid", exact: true })
+        .click();
+      const dialog = host.getByRole("dialog", {
+        name: "Play Cooperative Grid",
+        exact: true,
+      });
+      await dialog
+        .getByRole("button", { name: difficulty, exact: true })
+        .click();
+      await dialog
+        .getByRole("button", { name: "Choose for everyone", exact: true })
+        .click();
+    };
+    await choose("Easy");
+    await expect(
+      guest.getByRole("button", { name: "Receiving scenario…", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => room.pendingScenarios.has(guestId)).toBe(true);
+    const originalSelection = room.pendingScenarios.get(guestId)!;
+    await capture("receiving-dark", guest);
+    unchangedGuest();
+    await room.releaseScenario(guestId);
+    await expect(
+      guest.getByRole("button", { name: "I'm ready", exact: true }),
+    ).toBeEnabled();
+    for (const page of [host, guest]) {
+      const preview = page.locator(".coopModPreview");
+      await expect(
+        preview.getByRole("heading", { name: "Cooperative Grid", exact: true }),
+      ).toBeVisible();
+      await expect(preview).toContainText("By Community engineer · v1.0");
+      await expect(preview).toContainText(
+        "Modded · Unranked · No achievements",
+      );
+      await expect(preview).toContainText("Keep your grid reliable");
+      await expect(preview).toContainText(
+        "Delivered customer electricity divided by customer demand each completed month.",
+      );
+      await expect(preview).toContainText("Grid funding");
+      await expect(preview).not.toContainText("Private surprise");
+      expect(
+        await preview.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+    }
+    if (hostEntry.workshopId)
+      await expect(
+        guest.getByRole("button", {
+          name: "Keep a copy from Workshop",
+          exact: true,
+        }),
+      ).toBeVisible();
+    else
+      await expect(
+        guest.getByText("This is the host's local mod.", { exact: true }),
+      ).toBeVisible();
+    await guest.getByRole("button", { name: "I'm ready", exact: true }).click();
+    await expect(
+      guest.getByRole("button", { name: "Ready", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    // A newly frozen difficulty is a new agreement, even when the package is unchanged.
+    await host
+      .getByRole("button", {
+        name: "Choose another community scenario",
+        exact: true,
+      })
+      .click();
+    room.heldScenarios.add(guestId);
+    await choose("Medium");
+    await expect(
+      guest.getByRole("button", { name: "Receiving scenario…", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => room.pendingScenarios.has(guestId)).toBe(true);
+    expect(room.pendingScenarios.get(guestId)).not.toEqual(originalSelection);
+    await room.releaseScenario(guestId);
+    const readyButton = guest.getByRole("button", {
+      name: "I'm ready",
+      exact: true,
+    });
+    await expect(readyButton).toHaveAttribute("aria-pressed", "false");
+    await readyButton.focus();
+    await guest.keyboard.press("Enter");
+    await expect(
+      guest.getByRole("button", { name: "Ready", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const start = host.getByRole("button", {
+      name: "Start for everyone",
+      exact: true,
+    });
+    await expect(start).toBeEnabled();
+    await start.scrollIntoViewIfNeeded();
+    await capture("preview-light", host);
+    await capture("preview-dark", guest);
+    unchangedGuest();
+    await start.click();
+    const hostChoice = host.getByRole("dialog", { name: /Grid funding/ });
+    const guestChoice = guest.getByRole("dialog", { name: /Grid funding/ });
+    for (const [page, dialog, companyName] of [
+      [host, hostChoice, "SolarSam"],
+      [guest, guestChoice, "WindyWren"],
+    ] as const) {
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText(`Your company: ${companyName}`);
+      await expect(dialog).toContainText("Still deciding: SolarSam, WindyWren");
+      await expect(dialog).toContainText("One-time grant: $1M");
+      const bounds = await dialog.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      expect(
+        await dialog.evaluate(
+          (element) => element.scrollWidth - element.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(1);
+      for (const button of await dialog.getByRole("button").all())
+        expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await capture(page === host ? "choice-light" : "choice-dark", page);
+    }
+    await expect(
+      hostChoice.getByRole("button", { name: "Accept funding", exact: true }),
+    ).toBeFocused();
+    await host.keyboard.press("Enter");
+    await expect(hostChoice).toBeHidden();
+    await expect(guestChoice).toContainText("Still deciding: WindyWren");
+    await ready(host);
+    await expect
+      .poll(
+        () =>
+          room.views
+            .get(guestId)
+            ?.game?.multiplayer?.clock?.players.find(
+              (player) => player.id === guestId,
+            )?.pauseReason,
+      )
+      .toBe("Choosing a response");
+    expect(room.views.get(guestId)?.speed).toBe("PAUSED");
+    expect(room.views.get(guestId)?.game?.date.minute).toBe(0);
+    await expect(
+      guestChoice.getByRole("button", { name: "Accept funding", exact: true }),
+    ).toBeFocused();
+    await guest.keyboard.press("Tab");
+    await expect(
+      guestChoice.getByRole("button", {
+        name: "Keep the current plan",
+        exact: true,
+      }),
+    ).toBeFocused();
+    await guest.keyboard.press("Space");
+    await expect(guestChoice).toBeHidden();
+    await ready(guest);
+    await expect
+      .poll(() => room.views.get(guestId)?.game?.date.minute ?? 0)
+      .toBeGreaterThan(0);
+    await clock(host)
+      .getByRole("button", { name: "pause", exact: true })
+      .click();
+    const scenarioPanel = guest.getByRole("region", {
+      name: "Scenario",
+      exact: true,
+    });
+    await openPane(
+      scenarioPanel,
+      guest.getByRole("button", { name: "Scenario", exact: true }),
+    );
+    await expect(scenarioPanel).toContainText("Keep your grid reliable");
+    await guest.keyboard.press("Escape");
+    await saveAndQuit(guest);
+    await saveAndQuit(host);
+    const checkpoint = structuredClone(room.checkpoint!);
+    const digest = checkpoint.spec.customScenario!.mod!.runtimeDigest;
+    expect(checkpoint.spec.customScenario!.mod!.parameters.difficulty).toBe(
+      "Manager",
+    );
+    checkpoint.grids.forEach((grid, index) => {
+      expect(grid.scenarioId).toBe(999);
+      expect(grid.runIdentity).toBeUndefined();
+      expect(grid.customScenario!.mod!.runtimeDigest).toBe(digest);
+      const receipts = grid.worldEvents.occurrences.filter(
+        (event) => event.key === "mod:cooperative-grid:funding",
+      );
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0].attributes.choice).toBe(
+        index === 0 ? "accept" : "decline",
+      );
+      expect(receipts[0].attributes.upfrontGrant).toBe(
+        index === 0 ? 1000000 : 0,
+      );
+    });
+    unchangedGuest();
+    // Simulate removing the host's installed package while its frozen match is closed.
+    room.modEntries.set(hostId, []);
+    await host
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await hostGame(host);
+    await loadSave(host, room.campaignName);
+    await guest
+      .getByRole("button", { name: "Play with friends", exact: true })
+      .click();
+    await joinGame(guest, room);
+    await expect(
+      host.getByRole("button", { name: "Resume game", exact: true }),
+    ).toBeEnabled();
+    await host
+      .getByRole("button", { name: "Resume game", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expect(
+        page.getByRole("dialog", { name: /Grid funding/ }),
+      ).toBeHidden();
+      await expect(
+        page.locator("iframe#webpack-dev-server-client-overlay"),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(() => ({
+          scores: (window as SteamTestWindow).mockScoreSubmissions ?? 0,
+          achievements:
+            (window as SteamTestWindow).mockAchievementSubmissions ?? 0,
+        })),
+      ).toEqual({ scores: 0, achievements: 0 });
+    }
+    await expect
+      .poll(() => room.views.get(guestId)?.game?.date)
+      .toEqual(checkpoint.grids[1].date);
+    await expect
+      .poll(() => room.views.get(guestId)?.scenarioDigest)
+      .toBe(digest);
+    expect(room.modEntries.get(hostId)).toEqual([]);
+    unchangedGuest();
+    expect(errors).toEqual([]);
+    expect(room.transportErrors).toEqual([]);
+  });
 }

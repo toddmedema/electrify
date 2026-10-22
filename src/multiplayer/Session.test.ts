@@ -1,3 +1,7 @@
+import { modScenario } from "../mods/ModScenario";
+import { modBrowseSummary } from "./ModBrowse";
+import { selectionKey, validBrowseState } from "./Browse";
+import { utf8Bytes } from "../helpers/RuleIdentity";
 import { HOST_LEFT, MultiplayerSession } from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
@@ -83,6 +87,17 @@ function fixture(isHost = false, deferLeave = false) {
           lobbyId: "new-lobby",
           members: [{ id: selfId, name: "Host" }],
           connected: [],
+        };
+      if (request.kind === "member")
+        return {
+          ...session.getSnapshot().lobby,
+          members: session
+            .getSnapshot()
+            .lobby.members.map((member) =>
+              member.id === selfId
+                ? { ...member, [request.key]: request.value }
+                : member,
+            ),
         };
       if (request.kind === "lock" && failLock) throw new Error("Lock failed");
       if (request.kind === "leave" && deferLeave)
@@ -728,7 +743,7 @@ test("worker keepalives relay only to connected guests without replacing the hos
     epoch: "epoch",
     revision: 1,
   };
-  f.worker.onmessage?.({ data } as MessageEvent<WorkerResponse>);
+  f.worker.onmessage?.({ data } as unknown as MessageEvent<WorkerResponse>);
   expect(f.requests.at(-1)).toEqual({ kind: "send", to: guest, payload: data });
   expect(f.session.getSnapshot()).toBe(previous);
   f.session.dispose();
@@ -941,7 +956,7 @@ test.each(["lock", "factory", "response", "onerror"] as const)(
       if (failure === "response")
         f.worker.onmessage!({
           data: { kind: "error", message: "Initialization failed" },
-        } as MessageEvent<WorkerResponse>);
+        } as unknown as MessageEvent<WorkerResponse>);
       else f.worker.onerror!(new Event("error"));
     }
     const state = f.session.getSnapshot();
@@ -975,7 +990,7 @@ test.each(["lock", "factory", "response", "onerror"] as const)(
     expect(f.session.getSnapshot().view?.epoch).toBe("epoch");
     stale?.({
       data: { kind: "error", message: "Late failure" },
-    } as MessageEvent<WorkerResponse>);
+    } as unknown as MessageEvent<WorkerResponse>);
     expect(f.session.getSnapshot().error).toBeUndefined();
     f.session.dispose();
   },
@@ -987,7 +1002,7 @@ test("a worker error after its first view preserves the established match", asyn
   await f.session.start({ spec: COOP_TEST_SPEC });
   f.worker.onmessage!({
     data: { kind: "error", message: "Runtime failed" },
-  } as MessageEvent<WorkerResponse>);
+  } as unknown as MessageEvent<WorkerResponse>);
   expect(f.session.getSnapshot().view).toBeDefined();
   expect(f.session.getSnapshot().error).toBe("Runtime failed");
   expect(f.worker.terminate).not.toHaveBeenCalled();
@@ -1199,11 +1214,423 @@ test("a guest's finished match closes when the host goes back to choosing, and R
   });
   expect(f.session.getSnapshot().view).toBeUndefined();
   expect(f.session.getSnapshot().browse?.card).toBe("NEW_GAME");
+  sendBrowse(f, browse({ revision: 2 }));
   await f.session.setReady("101|Employee|");
   expect(f.requests.at(-1)).toEqual({
     kind: "member",
     key: "ready",
     value: "101|Employee|",
   });
+  f.session.dispose();
+});
+
+function communityScenario(
+  seed = 2468,
+  difficulty: import("../Types").DifficultyType = "Employee",
+) {
+  return modScenario(
+    {
+      schemaVersion: 1,
+      gameApi: 1,
+      id: "shared-grid",
+      title: "Shared grid",
+      creator: "Fixture author",
+      version: "1",
+      description: "Each company chooses its own route.",
+      seed,
+      baseScenarioId: 999,
+      scenario: { startingYear: 2020, durationMonths: 6 },
+      officialArcs: [],
+      objectives: { mode: "none" },
+      events: [
+        {
+          id: "hidden",
+          title: "Secret event",
+          message: "A hidden event arrives.",
+          visibility: "surprise",
+          startMonth: 3,
+          durationMonths: 1,
+        },
+      ],
+    },
+    undefined,
+    difficulty,
+  );
+}
+const communityBrowse = (
+  scenario: import("../Types").ScenarioType,
+  revision = 1,
+): BrowseState =>
+  browse({
+    card: "MODS",
+    scenarioId: undefined,
+    difficulty: scenario.mod!.parameters.difficulty,
+    mod: modBrowseSummary(scenario),
+    revision,
+  });
+function sendBrowse(f: ReturnType<typeof fixture>, value: BrowseState) {
+  f.event({
+    kind: "message",
+    sender: host,
+    payload: { kind: "browse", browse: value },
+  });
+}
+function sendScenario(
+  f: ReturnType<typeof fixture>,
+  scenario: import("../Types").ScenarioType,
+  key = selectionKey(communityBrowse(scenario)),
+  sender = host,
+) {
+  f.event({
+    kind: "message",
+    sender,
+    payload: { kind: "scenario", selectionKey: key, scenario },
+  });
+}
+
+test("community browse contains bounded safe facts and never the full or hidden rules", () => {
+  const scenario = communityScenario();
+  const selected = communityBrowse(scenario);
+  expect(validBrowseState(selected)).toBe(true);
+  expect(JSON.stringify(selected)).not.toMatch(
+    /Secret event|hidden|rules|description/,
+  );
+  expect(utf8Bytes(JSON.stringify(selected)).length).toBeLessThan(16 * 1024);
+  expect(validBrowseState({ ...selected, custom: scenario })).toBe(false);
+  expect(validBrowseState({ ...selected, scenarioSnapshot: scenario })).toBe(
+    false,
+  );
+  expect(
+    validBrowseState({
+      ...selected,
+      mod: { ...selected.mod, title: "<img src=x>" },
+    }),
+  ).toBe(false);
+  expect(
+    validBrowseState({
+      ...selected,
+      mod: { ...selected.mod, creator: "https://unsafe.example" },
+    }),
+  ).toBe(false);
+  expect(validBrowseState({ ...selected, difficulty: "CEO" })).toBe(false);
+  expect(
+    validBrowseState({
+      ...selected,
+      mod: { ...selected.mod, title: "é".repeat(16000) },
+    }),
+  ).toBe(false);
+});
+
+test("a host transfers a selected snapshot separately, including late joins and reconnects", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const scenario = communityScenario();
+  const {
+    session: _session,
+    revision: _revision,
+    ...selection
+  } = communityBrowse(scenario);
+  f.session.publishBrowse({ ...selection, scenarioSnapshot: scenario });
+  jest.advanceTimersByTime(200);
+  const sent = f.requests.filter((request) => request.kind === "send");
+  expect(
+    sent.some(
+      (request) =>
+        request.kind === "send" &&
+        request.payload.kind === "scenario" &&
+        request.payload.scenario.mod?.runtimeDigest ===
+          scenario.mod?.runtimeDigest,
+    ),
+  ).toBe(true);
+  const published = f.session.getSnapshot().browse!;
+  expect(JSON.stringify(published)).not.toMatch(/rules|Secret event/);
+  const connected = (ids: string[]) =>
+    f.event({
+      kind: "state",
+      state: {
+        ...f.session.getSnapshot().lobby,
+        connected: ids,
+        members: [
+          { id: host, name: "Host" },
+          { id: guest, name: "Guest" },
+          { id: "late", name: "Late" },
+        ],
+      },
+    });
+  connected([guest, "late"]);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: "late",
+    payload: { kind: "scenario" },
+  });
+  connected(["late"]);
+  connected([guest, "late"]);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: { kind: "scenario" },
+  });
+  // Detaching protects the accepted run from changes to the caller's package/library object.
+  scenario.mod!.source.title = "Changed outside session";
+  expect(f.session.getSnapshot().scenarioSnapshot?.mod?.source.title).toBe(
+    "Shared grid",
+  );
+  f.session.dispose();
+});
+
+test("Ready requires the host's matching validated snapshot and selection changes clear consent", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const first = communityScenario();
+  sendBrowse(f, communityBrowse(first));
+  const key = selectionKey(f.session.getSnapshot().browse!);
+  expect(coopSelection(f.session.getSnapshot()).receivingScenario).toBe(true);
+  await expect(f.session.setReady(key)).rejects.toThrow(/Receiving scenario/);
+  sendScenario(f, first, key, "stranger");
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  const forged = JSON.parse(JSON.stringify(first));
+  forged.mod.rules.durationMonths = 7;
+  sendScenario(f, forged, key);
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  sendScenario(f, first, `${key}wrong`);
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  sendScenario(f, first, key);
+  expect(coopSelection(f.session.getSnapshot()).receivingScenario).toBe(false);
+  expect(coopSelection(f.session.getSnapshot()).modScenario).toEqual(first);
+  expect(coopSelection(f.session.getSnapshot()).custom).toBeUndefined();
+  await f.session.setReady(key);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "member",
+    key: "ready",
+    value: key,
+  });
+  const next = communityScenario(9753, "Manager");
+  sendBrowse(f, communityBrowse(next, 2));
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  expect(coopSelection(f.session.getSnapshot()).ready).toBe(false);
+  sendScenario(f, first, key);
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  sendScenario(f, next);
+  expect(f.session.getSnapshot().scenarioSnapshot?.seed).toBe(9753);
+  // An old transfer arriving later cannot replace the active matching snapshot.
+  sendScenario(f, first, key);
+  expect(f.session.getSnapshot().scenarioSnapshot?.seed).toBe(9753);
+  f.session.dispose();
+});
+
+test("a snapshot arriving before browse is held privately until the advertised selection matches", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const scenario = communityScenario();
+  sendScenario(f, scenario);
+  expect(f.session.getSnapshot().scenarioSnapshot).toBeUndefined();
+  sendBrowse(f, communityBrowse(scenario));
+  expect(f.session.getSnapshot().scenarioSnapshot).toEqual(scenario);
+  f.session.dispose();
+});
+
+function communityView(
+  scenario: import("../Types").ScenarioType,
+  update: Partial<RoomView> = {},
+): Partial<RoomView> {
+  return {
+    scenarioDigest: scenario.mod!.runtimeDigest,
+    game: {
+      scenarioId: 999,
+      seed: scenario.seed,
+      difficulty: scenario.mod!.parameters.difficulty,
+      startingYear: scenario.startingYear,
+    } as import("../Types").GameType,
+    ...update,
+  };
+}
+test("wire views hydrate only pinned definitions and reject smuggled or different mod snapshots", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const scenario = communityScenario();
+  sendBrowse(f, communityBrowse(scenario));
+  sendScenario(f, scenario);
+  deliver(f, communityView(scenario));
+  expect(f.session.getSnapshot().view?.game?.customScenario).toBe(
+    f.session.getSnapshot().scenarioSnapshot,
+  );
+  const accepted = f.session.getSnapshot().view;
+  const changed = JSON.parse(JSON.stringify(scenario));
+  changed.mod.rules.events[0].message = "Forged contents";
+  deliver(
+    f,
+    communityView(scenario, {
+      revision: 2,
+      game: { ...accepted!.game!, customScenario: changed },
+    }),
+  );
+  expect(f.session.getSnapshot().view).toBe(accepted);
+  deliver(
+    f,
+    communityView(scenario, {
+      revision: 3,
+      scenarioDigest: communityScenario(9).mod!.runtimeDigest,
+    }),
+  );
+  expect(f.session.getSnapshot().view).toBe(accepted);
+  deliver(
+    f,
+    communityView(scenario, {
+      revision: 4,
+      game: { ...accepted!.game!, customScenario: undefined, seed: 111 },
+    }),
+  );
+  expect(f.session.getSnapshot().view).toBe(accepted);
+  deliver(f, communityView(scenario, { revision: 5 }));
+  expect(f.session.getSnapshot().view?.revision).toBe(5);
+  expect(
+    f.session.getSnapshot().view?.game?.customScenario?.mod?.rules.events[0]
+      .message,
+  ).toBe("A hidden event arrives.");
+  f.session.dispose();
+});
+
+test("a resumed mod view waits for its separately validated snapshot without any library lookup", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  const scenario = communityScenario();
+  deliver(f, communityView(scenario));
+  expect(f.session.getSnapshot().view).toBeUndefined();
+  sendScenario(f, scenario);
+  expect(f.session.getSnapshot().view?.game?.customScenario).toEqual(scenario);
+  expect(
+    f.requests.some(
+      (request) => !["state", "send", "member"].includes(request.kind),
+    ),
+  ).toBe(false);
+  f.session.dispose();
+});
+
+test.each([2468, 1357])(
+  "a campaign transition discards stale definitions before a paused resume (seed %i)",
+  async (seed) => {
+    const f = fixture();
+    await f.session.initialize();
+    const old = communityScenario();
+    sendScenario(f, old);
+    sendBrowse(f, communityBrowse(old));
+    sendBrowse(f, browse({ revision: 2, card: "NEW_GAME" }));
+    f.event({
+      kind: "message",
+      sender: host,
+      payload: { kind: "campaign", campaign },
+    });
+    const resumed = communityScenario(seed);
+    deliver(
+      f,
+      communityView(resumed, {
+        matchId: "resumed",
+        epoch: "resumed-epoch",
+        revision: 7,
+      }),
+    );
+    expect(f.session.getSnapshot().view).toBeUndefined();
+    sendScenario(f, resumed);
+    expect(f.session.getSnapshot().view?.matchId).toBe("resumed");
+    expect(f.session.getSnapshot().view?.game?.customScenario?.seed).toBe(seed);
+    f.session.dispose();
+  },
+);
+
+test("new matches and reconnects resend a frozen mod while ordinary views carry only its digest", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const scenario = communityScenario();
+  const {
+    session: _session,
+    revision: _revision,
+    ...selected
+  } = communityBrowse(scenario);
+  f.session.publishBrowse({ ...selected, scenarioSnapshot: scenario });
+  const key = selectionKey(f.session.getSnapshot().browse!);
+  await expect(
+    f.session.start({
+      spec: {
+        scenarioId: 999,
+        difficulty: "Employee",
+        customScenario: scenario,
+      },
+    }),
+  ).rejects.toThrow(/mark Ready/);
+  f.event({
+    kind: "state",
+    state: {
+      ...f.session.getSnapshot().lobby,
+      members: [
+        { id: host, name: "Host" },
+        { id: guest, name: "Guest", ready: key },
+      ],
+    },
+  });
+  const sentSnapshots = () =>
+    f.requests.filter(
+      (request) =>
+        request.kind === "send" &&
+        request.to === guest &&
+        request.payload.kind === "scenario",
+    ).length;
+  const publish = async (revision: number) => {
+    f.worker.onmessage?.({
+      data: {
+        kind: "views",
+        views: {
+          [guest]: view({
+            ...communityView(scenario),
+            game: {
+              ...communityView(scenario).game!,
+              customScenario: scenario,
+            },
+            revision,
+          }),
+        },
+      },
+    } as unknown as MessageEvent<WorkerResponse>);
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+  await f.session.start({
+    spec: { scenarioId: 999, difficulty: "Employee", customScenario: scenario },
+  });
+  const before = sentSnapshots();
+  await publish(2);
+  expect(sentSnapshots()).toBe(before + 1);
+  const sent = f.requests.at(-1);
+  expect(sent).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: {
+      kind: "view",
+      view: { scenarioDigest: scenario.mod!.runtimeDigest },
+    },
+  });
+  if (sent?.kind !== "send" || sent.payload.kind !== "view")
+    throw new Error("Expected a wire view");
+  expect(sent.payload.view.game?.customScenario).toBeUndefined();
+  await publish(3);
+  expect(sentSnapshots()).toBe(before + 1);
+  f.event({
+    kind: "state",
+    state: { ...f.session.getSnapshot().lobby, connected: [] },
+  });
+  f.event({
+    kind: "state",
+    state: { ...f.session.getSnapshot().lobby, connected: [guest] },
+  });
+  const reconnect = sentSnapshots();
+  await publish(4);
+  expect(sentSnapshots()).toBe(reconnect + 1);
+  await f.session.backToLobby();
+  f.session.publishBrowse({ ...selected, scenarioSnapshot: scenario });
+  await f.session.start({
+    spec: { scenarioId: 999, difficulty: "Employee", customScenario: scenario },
+  });
+  const resumed = sentSnapshots();
+  await publish(5);
+  expect(sentSnapshots()).toBe(resumed + 1);
   f.session.dispose();
 });

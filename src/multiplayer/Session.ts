@@ -16,7 +16,15 @@ import type {
   SharedSaveLibrary,
 } from "./Native";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
-import { validBrowseState, type BrowseState } from "./Browse";
+import {
+  selectionKey,
+  validBrowseState,
+  type BrowseState,
+  type HostBrowseSelection,
+} from "./Browse";
+import { modBrowseSummary, validSelectedMod } from "./ModBrowse";
+import type { ScenarioType } from "../Types";
+import { validScenarioMod } from "../helpers/ScenarioMod";
 import { resumeBlocker, resumeSeats, slotClaim } from "./Slots";
 import {
   BROWSE_RESEND_MS,
@@ -74,6 +82,8 @@ export interface SessionState {
   error?: string;
   /** The scenario selection the lobby is browsing; the host authors it, guests follow it. */
   browse?: BrowseState;
+  /** Validated, detached scenario; never written into the installed library. */
+  scenarioSnapshot?: ScenarioType;
   pendingCampaign?: PendingCampaign;
   /** The host's multiplayer saves, loaded when it opens a lobby. */
   library?: SharedSaveLibrary;
@@ -121,6 +131,9 @@ export class MultiplayerSession {
   private browseTimer?: ReturnType<typeof setTimeout>;
   private lastBrowseSend = 0;
   private browsePeers = new Set<string>();
+  private pendingScenarioView?: RoomView;
+  private outboundScenario = new Map<string, string>();
+  private receivedScenario?: { key: string; scenario: ScenarioType };
   constructor(
     private bridge: DesktopBridge,
     private workerFactory: () => Promise<Worker>,
@@ -216,6 +229,9 @@ export class MultiplayerSession {
           (id) => !this.browsePeers.has(id),
         );
         this.browsePeers = new Set(event.state.connected);
+        for (const id of this.outboundScenario.keys())
+          if (!event.state.connected.includes(id))
+            this.outboundScenario.delete(id);
         if (joined.length) {
           this.sendBrowse(joined);
           this.sendCampaign(joined);
@@ -266,11 +282,23 @@ export class MultiplayerSession {
         if (
           event.payload.campaign === undefined ||
           validPendingCampaign(event.payload.campaign)
-        )
+        ) {
+          this.receivedScenario = undefined;
+          this.pendingScenarioView = undefined;
           this.update({
             pendingCampaign: event.payload.campaign,
             browse: undefined,
+            scenarioSnapshot: undefined,
           });
+        }
+        return;
+      }
+      if (
+        !this.worker &&
+        event.sender === this.state.lobby.hostId &&
+        event.payload.kind === "scenario"
+      ) {
+        this.acceptScenario(event.payload.selectionKey, event.payload.scenario);
         return;
       }
       if (
@@ -333,7 +361,56 @@ export class MultiplayerSession {
       }
     }
   }
-  private acceptView(view: RoomView) {
+  private acceptView(input: RoomView, trustedWorker = false) {
+    let view = input;
+    const game = input.game;
+    if (!trustedWorker && game) {
+      const selected = this.state.browse?.mod;
+      const pinned =
+        this.state.scenarioSnapshot ??
+        (!selected ? this.receivedScenario?.scenario : undefined);
+      const modded =
+        !!selected ||
+        !!input.scenarioDigest ||
+        !!game.customScenario?.mod ||
+        !!this.state.view?.game?.customScenario?.mod;
+      if (modded) {
+        // A view cannot introduce definitions through the larger world-message channel.
+        if (
+          game.customScenario !== undefined ||
+          !input.scenarioDigest ||
+          !/^sha256-[a-f0-9]{64}$/.test(input.scenarioDigest)
+        ) {
+          this.update({
+            error: "The host's game does not match the validated scenario.",
+          });
+          return;
+        }
+        if (!pinned) {
+          if (!selected || selected.runtimeDigest === input.scenarioDigest)
+            this.pendingScenarioView = input;
+          else
+            this.update({
+              error: "The host's game does not match the selected scenario.",
+            });
+          return;
+        }
+        const parameters = pinned.mod!.parameters;
+        if (
+          input.scenarioDigest !== pinned.mod!.runtimeDigest ||
+          game.scenarioId !== 999 ||
+          game.seed !== parameters.seed ||
+          game.difficulty !== parameters.difficulty ||
+          game.startingYear !== parameters.startingYear
+        ) {
+          this.update({
+            error: "The host's game does not match the validated scenario.",
+          });
+          return;
+        }
+        view = { ...input, game: { ...game, customScenario: pinned } };
+      }
+    }
     const previous = this.state.view;
     if (
       previous &&
@@ -691,6 +768,8 @@ export class MultiplayerSession {
           scenarioId: browse.scenarioId,
           difficulty: browse.difficulty,
           custom: browse.custom,
+          mod: browse.mod,
+          scenarioSnapshot: this.state.scenarioSnapshot,
         });
       if (locked)
         this.startupCleanup = this.request({ kind: "unlock" }).catch(
@@ -712,6 +791,22 @@ export class MultiplayerSession {
       if ("saved" in choice && !world)
         throw new Error("No multiplayer save on this computer yet");
       const { members } = this.state.lobby;
+      if ("spec" in choice && choice.spec.customScenario?.mod) {
+        const browse = this.state.browse;
+        if (
+          !browse?.mod ||
+          !validSelectedMod(browse.mod, choice.spec.customScenario) ||
+          choice.spec.difficulty !== browse.difficulty ||
+          members.some(
+            (member) =>
+              member.id !== this.state.lobby.selfId &&
+              member.ready !== selectionKey(browse),
+          )
+        )
+          throw new Error(
+            "Wait for every player to receive the scenario and mark Ready.",
+          );
+      }
       const campaign = this.state.pendingCampaign;
       if (
         world &&
@@ -733,6 +828,7 @@ export class MultiplayerSession {
         return;
       }
       // A previous start can fail inside the worker; never leave that thread running.
+      this.outboundScenario.clear();
       this.worker?.terminate();
       const worker = await this.workerFactory();
       if (!current()) {
@@ -786,13 +882,55 @@ export class MultiplayerSession {
             .map((g) => g.seat.id);
           if (id === this.state.lobby.selfId) {
             receivedView = true;
-            this.acceptView(view);
-          } else if (this.state.lobby.connected.includes(id))
-            void this.request({
-              kind: "send",
-              to: id,
-              payload: { kind: "view", view },
-            }).catch(() => this.post({ kind: "disconnect", sender: id }));
+            this.acceptView(view, true);
+          } else if (this.state.lobby.connected.includes(id)) {
+            const scenario = view.game?.customScenario;
+            const digest = scenario?.mod?.runtimeDigest;
+            const wireView =
+              digest && scenario && view.game
+                ? {
+                    ...view,
+                    scenarioDigest: digest,
+                    game: { ...view.game, customScenario: undefined },
+                  }
+                : view;
+            const send = async () => {
+              if (
+                digest &&
+                scenario &&
+                this.outboundScenario.get(id) !== digest
+              ) {
+                const summary = modBrowseSummary(scenario);
+                const key = selectionKey({
+                  session: "match",
+                  revision: 0,
+                  phase: "playing",
+                  card: "MODS",
+                  difficulty: summary.difficulty,
+                  mod: summary,
+                });
+                this.outboundScenario.set(id, digest);
+                try {
+                  await this.request({
+                    kind: "send",
+                    to: id,
+                    payload: { kind: "scenario", selectionKey: key, scenario },
+                  });
+                } catch (error) {
+                  this.outboundScenario.delete(id);
+                  throw error;
+                }
+              }
+              await this.request({
+                kind: "send",
+                to: id,
+                payload: { kind: "view", view: wireView },
+              });
+            };
+            void send().catch(() =>
+              this.post({ kind: "disconnect", sender: id }),
+            );
+          }
         }
       };
       this.worker.onerror = () => {
@@ -900,9 +1038,13 @@ export class MultiplayerSession {
       this.browseSession = undefined;
       this.publishedSelection = undefined;
       this.browsePeers = new Set();
+      this.receivedScenario = undefined;
+      this.pendingScenarioView = undefined;
+      this.outboundScenario.clear();
       ++this.libraryRequest;
       this.update({
         browse: undefined,
+        scenarioSnapshot: undefined,
         pendingCampaign: undefined,
         library: undefined,
         loadingSaves: false,
@@ -934,14 +1076,32 @@ export class MultiplayerSession {
    * The host mirrors what it is looking at. Changes coalesce to the view rate; an unchanged
    * selection is not resent except as the periodic catch-up.
    */
-  publishBrowse(selection: Omit<BrowseState, "session" | "revision">) {
+  publishBrowse(input: HostBrowseSelection) {
     if (!this.isHost()) return;
+    const { scenarioSnapshot, ...selection } = input;
     const body = JSON.stringify(selection);
     if (body === this.publishedSelection) return;
+    const next: BrowseState = {
+      ...selection,
+      session: this.browseSession ?? "pending",
+      revision: this.browseRevision + 1,
+    };
+    if (
+      !validBrowseState(next) ||
+      (selection.mod &&
+        (!scenarioSnapshot ||
+          !validSelectedMod(selection.mod, scenarioSnapshot)))
+    ) {
+      this.update({ error: "This scenario selection could not be validated." });
+      return;
+    }
     this.publishedSelection = body;
     this.browseSession ??= crypto.randomUUID();
     this.update({
       pendingCampaign: undefined,
+      scenarioSnapshot: selection.mod
+        ? JSON.parse(JSON.stringify(scenarioSnapshot))
+        : undefined,
       browse: {
         ...selection,
         session: this.browseSession,
@@ -957,13 +1117,31 @@ export class MultiplayerSession {
     const { browse, lobby } = this.state;
     if (!browse || !this.isHost()) return;
     this.lastBrowseSend = Date.now();
-    for (const id of to ?? lobby.connected)
-      if (id !== lobby.selfId)
+    for (const id of to ?? lobby.connected) {
+      if (id === lobby.selfId) continue;
+      void this.request({
+        kind: "send",
+        to: id,
+        payload: { kind: "browse", browse },
+      }).catch(() => {});
+      const scenario = this.state.scenarioSnapshot;
+      if (
+        browse.mod &&
+        scenario &&
+        (to ||
+          lobby.members.find((member) => member.id === id)?.ready !==
+            selectionKey(browse))
+      )
         void this.request({
           kind: "send",
           to: id,
-          payload: { kind: "browse", browse },
+          payload: {
+            kind: "scenario",
+            selectionKey: selectionKey(browse),
+            scenario,
+          },
         }).catch(() => {});
+    }
   }
   private sendCampaign(to?: string[], clear = false) {
     const { pendingCampaign, lobby } = this.state;
@@ -995,10 +1173,84 @@ export class MultiplayerSession {
     if (!this.state.view) this.lastHostMessage = Date.now();
     // Back in the lobby after a match: the finished match's view goes, and the guest follows on.
     if (browse.phase === "browsing" && this.state.view) this.endLocalMatch();
-    this.update({ browse, pendingCampaign: undefined });
+    this.pendingScenarioView = undefined;
+    const received = this.receivedScenario;
+    const snapshot =
+      browse.mod &&
+      received?.key === selectionKey(browse) &&
+      validSelectedMod(browse.mod, received.scenario)
+        ? received.scenario
+        : undefined;
+    this.update({
+      browse,
+      scenarioSnapshot: snapshot,
+      pendingCampaign: undefined,
+    });
+    if (
+      browse.mod &&
+      !snapshot &&
+      this.state.lobby.members.find(
+        (member) => member.id === this.state.lobby.selfId,
+      )?.ready
+    )
+      void this.setReady("").catch(() => undefined);
+  }
+  private acceptScenario(key: string, value: unknown) {
+    if (
+      typeof key !== "string" ||
+      key.length > 256 ||
+      !value ||
+      typeof value !== "object"
+    )
+      return;
+    const scenario = value as ScenarioType;
+    if (!validScenarioMod(scenario.mod, scenario)) {
+      this.update({
+        error:
+          "The host's scenario could not be validated. Ask the host to choose it again.",
+      });
+      return;
+    }
+    const summary = modBrowseSummary(scenario);
+    const stamp = selectionKey({
+      session: "snapshot",
+      revision: 0,
+      phase: "browsing",
+      card: "MODS",
+      difficulty: summary.difficulty,
+      mod: summary,
+    });
+    if (key !== stamp) {
+      this.update({
+        error: "The host's scenario does not match the selected content.",
+      });
+      return;
+    }
+    const detached = JSON.parse(JSON.stringify(scenario)) as ScenarioType;
+    this.receivedScenario = { key, scenario: detached };
+    const browse = this.state.browse;
+    if (
+      browse?.mod &&
+      selectionKey(browse) === key &&
+      validSelectedMod(browse.mod, detached)
+    )
+      this.update({ scenarioSnapshot: detached, error: undefined });
+    const pending = this.pendingScenarioView;
+    if (pending && pending.scenarioDigest === detached.mod?.runtimeDigest) {
+      this.pendingScenarioView = undefined;
+      this.acceptView(pending);
+    }
   }
   /** Marks Ready for exactly this selection; any later change by the host clears it. */
   async setReady(key: string) {
+    const browse = this.state.browse;
+    if (
+      key &&
+      (!browse ||
+        key !== selectionKey(browse) ||
+        (browse.mod && !this.state.scenarioSnapshot))
+    )
+      throw new Error("Receiving scenario…");
     this.update({
       lobby: (await this.request({
         kind: "member",
@@ -1021,6 +1273,9 @@ export class MultiplayerSession {
     }
   }
   private endLocalMatch() {
+    this.receivedScenario = undefined;
+    this.pendingScenarioView = undefined;
+    this.outboundScenario.clear();
     this.startGeneration++;
     this.worker?.terminate();
     this.worker = undefined;
@@ -1040,6 +1295,9 @@ export class MultiplayerSession {
     });
   }
   dispose() {
+    this.receivedScenario = undefined;
+    this.pendingScenarioView = undefined;
+    this.outboundScenario.clear();
     clearTimeout(this.browseTimer);
     this.lifecycle++;
     this.campaignGeneration++;

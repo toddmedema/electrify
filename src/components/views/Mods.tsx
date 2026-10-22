@@ -19,7 +19,7 @@ import { getDesktop } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigateBack } from "../../reducers/Card";
-import { snackbarOpen } from "../../reducers/UI";
+import { delta as uiDelta, snackbarOpen } from "../../reducers/UI";
 import { launchCustomScenario } from "../../reducers/Game";
 import { POLICIES } from "../../data/Policies";
 import {
@@ -40,6 +40,8 @@ import type {
   ModRequest,
 } from "../../mods/Types";
 import { useWorkshopRefresh } from "../../mods/useWorkshopRefresh";
+import CoopModPreview from "./CoopModPreview";
+import CoopBrowseBar from "../base/CoopBrowseBar";
 import type { DifficultyType } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
 import DifficultyPicker from "../base/DifficultyPicker";
@@ -94,6 +96,14 @@ type PeakPreparation = {
 
 /** Installed scenario mods: play them, get more, and share your own. */
 export default function Mods(): React.JSX.Element {
+  const coop = useAppSelector((state) => state.ui.coop);
+  return coop && (coop.role === "guest" || coop.modScenario?.mod) ? (
+    <CoopModPreview coop={coop} />
+  ) : (
+    <ModsLibrary />
+  );
+}
+function ModsLibrary(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const coop = useAppSelector((state) => state.ui.coop);
   const chosenDifficulty = useAppSelector(
@@ -450,6 +460,15 @@ export default function Mods(): React.JSX.Element {
       return;
     }
     setPlaying(undefined);
+    if (coop?.role === "host") {
+      dispatch(
+        uiDelta({
+          previewDifficulty: difficulty,
+          coop: { ...coop, modScenario: scenario },
+        }),
+      );
+      return;
+    }
     startWithSaveGuard(dispatch, () =>
       launchCustomScenario(dispatch, scenario, difficulty),
     );
@@ -462,7 +481,7 @@ export default function Mods(): React.JSX.Element {
       className="keyboardMenu"
       id="gameCard"
       {...menuKeys}
-      title="Mods"
+      title={coop ? "Community scenarios" : "Mods"}
       onBack={onBack}
     >
       <Box className="scrollable" sx={{ width: "100%", overflowY: "auto" }}>
@@ -476,6 +495,7 @@ export default function Mods(): React.JSX.Element {
             pb: "max(24px, env(safe-area-inset-bottom))",
           }}
         >
+          <CoopBrowseBar coop={coop} />
           <Typography color="text.secondary">
             Community scenarios with their own rules and events. Modded runs are
             unranked and don&apos;t earn achievements.
@@ -599,7 +619,8 @@ export default function Mods(): React.JSX.Element {
             ))}
           {coop && (
             <Alert severity="info" role="status">
-              Leave co-op to play a modded scenario.
+              Choose an enabled scenario for everyone. Friends receive its rules
+              automatically.
             </Alert>
           )}
           {library.uploading && !uploading && (
@@ -741,13 +762,12 @@ export default function Mods(): React.JSX.Element {
                           variant="contained"
                           data-mod-primary
                           aria-label={`Play ${p.title}`}
-                          disabled={!!coop}
                           onClick={() => {
                             setDifficulty(chosenDifficulty);
                             setPlaying(entry);
                           }}
                         >
-                          Play
+                          {coop ? "Choose" : "Play"}
                         </Button>
                       )}
                       <FormControlLabel
@@ -1030,7 +1050,7 @@ export default function Mods(): React.JSX.Element {
         <DialogActions>
           <Button onClick={() => setPlaying(undefined)}>Cancel</Button>
           <Button variant="contained" onClick={startPlaying}>
-            Start
+            {coop ? "Choose for everyone" : "Start"}
           </Button>
         </DialogActions>
       </Dialog>
