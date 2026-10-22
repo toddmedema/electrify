@@ -93,9 +93,10 @@ test("reproduction commands use the matching local gate for each Playwright proj
       "Math › pow rounds",
     ]),
     [
-      "npm run test:e2e -- e2e/game-workspace.spec.ts:124 --project=mobile-390px",
       "npm run check -- --steps multiplayer",
       "e2e/desktop.spec.ts:180 runs only in CI (native windows); read its trace in the diagnostics artifact",
+      "npm run build",
+      "npm run test:e2e:production -- e2e/game-workspace.spec.ts:124 --project=mobile-390px",
     ],
   );
 });
@@ -107,8 +108,56 @@ test("reproduction supports specs outside the CI allowlist and unnamed projects"
       "e2e/scenario-details.spec.ts:20:5 › shows goals",
     ]),
     [
-      "npm run test:e2e -- e2e/scenario-details.spec.ts:12 --project=desktop-1440px",
-      "npm run test:e2e -- e2e/scenario-details.spec.ts:20",
+      "npm run build",
+      "npm run test:e2e:production -- e2e/scenario-details.spec.ts:12 --project=desktop-1440px",
+      "npm run test:e2e:production -- e2e/scenario-details.spec.ts:20",
+    ],
+  );
+});
+
+test("Jest durations, interleaved progress and timeout/assertion messages retain the failing gate", () => {
+  const job = "Linux x64 tests";
+  const summary = summarize(
+    [
+      line(job, "··FAIL src/components/views/Insights.test.tsx (164.975 s)"),
+      line(job, "  ● Insights layers › zooms and pans every insight chart"),
+      line(job, '    thrown: "Exceeded timeout of 15000 ms for a test.'),
+      line(
+        job,
+        '    Use jest.setTimeout(newTimeout) to increase the timeout value."',
+      ),
+      line(
+        job,
+        "FAIL src/components/views/BuildGenerators.test.tsx (51.953 s)",
+      ),
+      line(job, "    expect(received).toBeNull()"),
+      line(job, '    Received: <div role="dialog">still open</div>'),
+    ].join("\n"),
+  ).get(job);
+  assert(summary.tests.includes("src/components/views/Insights.test.tsx"));
+  assert(
+    summary.tests.includes("src/components/views/BuildGenerators.test.tsx"),
+  );
+  assert(
+    summary.errors.some((error) => error.includes("Exceeded timeout of 15000")),
+  );
+  assert(summary.errors.includes("expect(received).toBeNull()"));
+  assert(summary.errors.some((error) => error.includes("still open")));
+  assert.deepEqual(reproduce(summary.tests), [
+    "npm run check -- --steps tests",
+  ]);
+});
+
+test("simulation and all desktop-renderer failures select their actual local gates", () => {
+  assert.deepEqual(
+    reproduce([
+      "src/testing/GoldenOutputs.sim.test.tsx",
+      "e2e/mods.spec.ts:183:5 › desktop keyboard journey",
+      "e2e/steam-input.spec.ts:200:5 › controller input",
+    ]),
+    [
+      "npm run check -- --steps simulations",
+      "npm run check -- --steps multiplayer",
     ],
   );
 });

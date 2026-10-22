@@ -60,7 +60,7 @@ test("PR CI has exactly five jobs including all native targets and the required 
   assert.match(native, /workers: 1/);
   assert.match(native, /test-results\/desktop/);
   assert.match(
-    fs.readFileSync("e2e/ci.playwright.config.ts", "utf8"),
+    fs.readFileSync("e2e/production.playwright.config.ts", "utf8"),
     /test-results\/browser/,
   );
 });

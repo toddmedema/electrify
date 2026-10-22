@@ -75,8 +75,10 @@ function summarize(log) {
     const gate = /^(.+): FAILED$/.exec(trimmed);
     if (gate) add(found.gates, gate[1]);
     // Jest prints "FAIL <suite>"; the bundle and benchmark gates print "FAIL <metric> ...".
-    else if (/^FAIL \S+\.(test|spec)\.\w+$/.test(trimmed))
-      add(found.tests, trimmed.slice(5));
+    else if (
+      /^[·.]*FAIL (src\/\S+\.(test|spec)\.\w+)(?: \([\d.]+ s\))?$/.test(trimmed)
+    )
+      add(found.tests, trimmed.match(/FAIL (\S+)/)[1]);
     else if (/^FAIL /.test(trimmed)) add(found.errors, trimmed);
     else if (/^(Shrink the bundle|Bundle size regressed)/.test(trimmed))
       add(found.errors, trimmed);
@@ -86,13 +88,17 @@ function summarize(log) {
     // Playwright repeats each failed title as "1) [project] › ..." above its error.
     if (/^\d+\) (\[|e2e)/.test(trimmed)) continue;
     if (
-      /^(Error(?! Context)|TypeError|AssertionError)\b|(?:Test|Worker teardown) timeout|Timeout \d+ms exceeded/.test(
+      /^(Error(?! Context)|TypeError|AssertionError)\b|^thrown:|^expect\(|(?:Test|Worker teardown) timeout|Timeout \d+ms exceeded/.test(
         trimmed,
       )
     )
       excerpt = 6;
     if (excerpt > 0 && trimmed && !trimmed.startsWith("##[error]")) {
-      add(found.errors, trimmed);
+      // A failed DOM matcher can print the entire application on one line.
+      add(
+        found.errors,
+        trimmed.length > 500 ? trimmed.slice(0, 500) + "…" : trimmed,
+      );
       excerpt--;
     }
     // Annotations repeat Playwright titles; keep only other runner errors, such as timeouts.
@@ -110,7 +116,16 @@ function summarize(log) {
 // single unnamed project omit the bracket.
 function reproduce(tests) {
   const commands = new Set();
+  const browserCommands = new Set();
   for (const test of tests) {
+    if (/^src\/.*\.(test|spec)\.[jt]sx?$/.test(test)) {
+      // Preserve instrumentation, coverage floors and suite interactions. An isolated
+      // test:once pass is not evidence for a covered-unit failure.
+      commands.add(
+        `npm run check -- --steps ${test.includes(".sim.test.") ? "simulations" : "tests"}`,
+      );
+      continue;
+    }
     const match = /^(?:\[([\w-]+)\] › )?(e2e\/[\w.-]+\.spec\.ts):(\d+)/.exec(
       test,
     );
@@ -120,14 +135,26 @@ function reproduce(tests) {
       commands.add(
         `${spec}:${line} runs only in CI (native windows); read its trace in the diagnostics artifact`,
       );
-    else if (spec === "e2e/multiplayer.spec.ts")
+    else if (
+      [
+        "e2e/multiplayer.spec.ts",
+        "e2e/steam-input.spec.ts",
+        "e2e/mods.spec.ts",
+      ].includes(spec)
+    )
       commands.add("npm run check -- --steps multiplayer");
-    else
-      commands.add(
-        `npm run test:e2e -- ${spec}:${line}${project ? ` --project=${project}` : ""}`,
+    else {
+      browserCommands.add(
+        `npm run test:e2e:production -- ${spec}:${line}${project ? ` --project=${project}` : ""}`,
       );
+    }
   }
-  return [...commands];
+  // The multiplayer gate leaves a desktop renderer in build/. Rebuild web after it,
+  // regardless of the order in which the failed jobs/tests appeared in the log.
+  return [
+    ...commands,
+    ...(browserCommands.size ? ["npm run build", ...browserCommands] : []),
+  ];
 }
 
 function findRun(argv) {
@@ -228,7 +255,7 @@ function main(argv = process.argv.slice(2)) {
     for (const test of found.flaky)
       print(`  ~ flaky (passed on retry): ${test}`);
     for (const error of found.errors.slice(0, 24)) print(`    ${error}`);
-    allTests.push(...found.tests);
+    allTests.push(...found.tests, ...found.flaky);
   }
   const commands = reproduce(allTests);
   if (commands.length) {

@@ -44,6 +44,110 @@ platform behavior, stale UI journeys and genuine bundle regressions require thei
 own fixes; serial scheduling does not make those failures disappear. Remote CI
 must establish the resulting reliability under hosted-runner load.
 
+## Follow-up: why a local pass was insufficient
+
+This review starts from `b4afcd80`, after the scheduler fix above was merged. It
+independently inspected the latest 80 workflow runs available on October 22
+(October 17–22): **60 successes, 17 failures, three cancellations**. All 17 failed
+runs were read through `ci:failures`; representative raw logs were also checked
+because the summarizer omitted some Jest failures. Excluding cancellations,
+17/77 runs failed (22%). This overlaps the earlier 100-run sample; do not add the
+counts together. A later successful run does not prove that an earlier failure
+was unrelated or flaky, and the logs do not establish which local command ran
+against each exact pushed commit.
+
+| Failure family       | Failed runs | Why local results could differ                                                                                                                                                       | Status on this base                                                                                                                                                                                                                                          |
+| -------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Covered React tests  |           7 | CI overlapped Jest, simulations and Electron; local checks serialized them. Repeated DOM queries also competed with transition timers.                                               | Scheduling is already fixed in `5a020bf6`; dialog removal is fixed in `9ffa635f`.                                                                                                                                                                            |
+| Packaged Electron    |           6 | The local windowless check cannot exercise native fullscreen/focus, process teardown, or target-specific packaged bytes. Some renderer journeys were also only run through Electron. | Fullscreen readiness (`47d07a9d`), focus handoff (`f5398d69`), retained process ownership (`0ea2f73b`), runtime preparation (`27b06e4d`), target notice verification (`076059a1`), and a headless desktop keyboard journey (`9724de36`) are already present. |
+| Production browser   |           3 | Some UI changes left CI journeys stale. The diagnostic tool suggested the development server, and successful retries could be hidden in the local check's output.                    | The production reproduction path and retry acceptance policy are repaired in this follow-up.                                                                                                                                                                 |
+| Multiplayer renderer |           1 | CI uses the desktop production bundle; a web/dev-only check does not exercise that boundary.                                                                                         | The local multiplayer gate already builds the desktop renderer. Keep the observed speed disagreement separate from the Jest contention diagnosis.                                                                                                            |
+| Build prerequisite   |           1 | A warm local Electron installation concealed a missing distribution in a clean build.                                                                                                | Explicit runtime preparation is already present.                                                                                                                                                                                                             |
+
+The categories overlap in the Mods run, which failed both covered tests and the
+native keyboard journey. Fan-in/coverage jobs repeating upstream failures are
+not additional root causes. This sample contained no bundle-ceiling failure;
+the earlier sample did, and a real bundle regression needs a size fix.
+
+### What the evidence establishes
+
+- [Insights on the wildfire PR](https://github.com/toddmedema/electrify/actions/runs/39805411120)
+  exceeded 15 seconds while covered tests, simulations and Electron overlapped.
+  [The scheduler-only follow-up](https://github.com/toddmedema/electrify/actions/runs/39811928114)
+  passed all five jobs; the Insights suite fell from 165 to 70 seconds. A local
+  isolated, instrumented zoom/pan run in this review passed in 994 ms. Isolation
+  is evidence of the pressure difference, not proof of immunity to future flakes.
+- [The Mods failure](https://github.com/toddmedema/electrify/actions/runs/39731522677)
+  expected Settings to have focus after an arrow press that now selected Mods.
+  It failed on all three native platforms. That was a stale journey, not a slow
+  runner; increasing the focus timeout would never fix it. The existing headless
+  desktop-bridge test now covers that same journey locally.
+- [Native quit tests](https://github.com/toddmedema/electrify/actions/runs/39573431898)
+  called `app.process()` after Playwright had disposed its app proxy. The fix
+  retains the process before shutdown. [Fullscreen/focus failures](https://github.com/toddmedema/electrify/actions/runs/39488670840)
+  likewise need native lifecycle synchronization, not longer arbitrary waits.
+- [The clean build](https://github.com/toddmedema/electrify/actions/runs/39642311317)
+  lacked `node_modules/electron/dist`.
+  [The Windows notice mismatch](https://github.com/toddmedema/electrify/actions/runs/39653467213)
+  compared Windows runtime bytes with a Linux-built manifest. These are artifact
+  preparation/ownership problems, not test timing problems.
+- [The browser failures](https://github.com/toddmedema/electrify/actions/runs/39065510670)
+  included old dock-position/visibility expectations, while
+  [another run](https://github.com/toddmedema/electrify/actions/runs/39363777755)
+  recorded a chart tooltip that passed on retry. These are distinct from the
+  covered-unit timeouts. The current local runner sets `CI=true`, enabling two
+  retries, and discards successful command output. Playwright normally exits zero
+  after a passed retry, so a local “ok Production browser” did not mean every
+  attempt passed. The available history does not prove that a particular local
+  validation actually retried; the acceptance defect is reproduced directly.
+
+### Changes made by this follow-up
+
+Production browser runs now share one configuration for the real static server,
+worker policy, timeouts, retry behavior and acceptance criteria. Both hosted CI
+and local `check:ci` retain two retries for diagnostics but fail if any test is
+flaky. A stable test passes; a deliberately failing first attempt followed by a
+successful retry returns exit code 1. This prevents an intermittent defect from
+being silently reported as a clean local check. It may initially expose more red
+runs; those failures require investigation, not automatic retries or relaxed gates.
+
+`ci:failures` now retains Jest suite paths with duration suffixes/interleaved
+progress, timeout messages and matcher failures. Covered-unit failures point to
+the covered local gate; simulations point to their separate gate. All three
+desktop-renderer spec families (multiplayer, Steam Input and mods) point to the
+desktop-renderer gate. Failed and flaky browser cases point to a web production
+build followed by `test:e2e:production`, which can select a spec outside the CI
+smoke allowlist without starting a dev compiler. Web rebuilding comes after any
+multiplayer reproduction because both editions write `build/`.
+
+For example, with an unused task-specific `E2E_PORT` already set:
+
+```sh
+npm run build
+npm run test:e2e:production -- e2e/game-workspace.spec.ts:31 --project=desktop-chromium
+```
+
+The regression tests exercise Playwright's actual resolved configurations and
+exit codes. Disabling the new flaky-test policy reproduces the false-green exit
+and fails the regression; restoring the old diagnostics implementation fails the
+Jest and production-reproduction regressions. These checks keep the existing
+browser matrix, assertions, coverage floors, simulation outputs and deadlines.
+
+Native Electron remains a necessary CI-only boundary under the repository's
+windowless-local-testing rule. A Windows local pass cannot establish macOS native
+correctness. CI also tests the PR merge checkout, which can include base changes
+absent from a local branch; the run's `headSha` identifies the PR head, not proof
+that GitHub checked out that exact tree. None of these changes makes every CI-only
+failure impossible. They remove the demonstrated hidden-retry and reproduction
+mismatches while retaining the already merged resource-isolation fix.
+
+Validation of this follow-up: the integrated `npm run check:ci` ran all 14 gates.
+Thirteen passed, including the stricter production browser matrix and multiplayer.
+The unchanged benchmark initially measured Immer overhead at 1.67 against its
+1.63 ceiling; one isolated `npm run check -- --steps bench` rerun passed without
+any source or baseline change. All 14 gates therefore have passing results, with
+that benchmark retry recorded rather than described as a clean first run.
+
 ## Original test inventory review, October 15, 2026
 
 Reviewed the complete tracked test inventory at master commit `0f71ec68` on October 15, 2026: **358 executable test files plus the golden-output snapshot**. Three subagents reviewed browser tests, React components, simulation/domain tests, and the remaining runtime/platform suites. The primary agent also reviewed saves, achievements, audio, native runtime, Firestore rules, CI tooling and the combined diff.
