@@ -3,6 +3,8 @@ import { gzipSync } from "node:zlib";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
+import type { GameType } from "../src/Types";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { openPane } from "./layout";
 import type {
   LobbyState,
@@ -22,6 +24,16 @@ type SteamTestWindow = typeof window & {
   mockSharedSaveRequests?: number;
   mockScoreSubmissions?: number;
   mockAchievementSubmissions?: number;
+  nativeWorkerSequence?: number;
+  nativeForecasts?: {
+    id: string;
+    scenarioId: number;
+    hasCustomScenario: boolean;
+    seed: number;
+    loads: GameType["loadAdditions"];
+    responses: { key: string; optionId: string }[];
+  }[];
+  nativeForecastReplies?: string[];
 };
 
 test.afterEach(async ({ browser }) => {
@@ -2261,4 +2273,509 @@ for (const width of [1280, 390, 360]) {
     expect(errors).toEqual([]);
     expect(room.transportErrors).toEqual([]);
   });
+}
+
+/** Observe the real projection worker boundary; requests and replies are passed through intact. */
+async function observeNativeForecasts(page: Page) {
+  await page.addInitScript(() => {
+    const target = window as SteamTestWindow;
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      private readonly observationId: number;
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.observationId = target.nativeWorkerSequence =
+          (target.nativeWorkerSequence ?? 0) + 1;
+        this.addEventListener("message", (event) => {
+          if (event.data.transport)
+            (target.nativeForecastReplies ??= []).push(
+              `${this.observationId}:${event.data.requestId}`,
+            );
+        });
+      }
+      postMessage(
+        message: unknown,
+        options?: Transferable[] | StructuredSerializeOptions,
+      ) {
+        if (
+          message &&
+          typeof message === "object" &&
+          "game" in message &&
+          "now" in message &&
+          "requestId" in message
+        ) {
+          const request = message as { requestId: number; game: GameType };
+          (target.nativeForecasts ??= []).push({
+            id: `${this.observationId}:${request.requestId}`,
+            scenarioId: request.game.scenarioId,
+            hasCustomScenario: request.game.customScenario !== undefined,
+            seed: request.game.seed,
+            loads: request.game.loadAdditions.map((load) => ({ ...load })),
+            responses: request.game.worldEvents.occurrences
+              .filter((event) => typeof event.attributes.choice === "string")
+              .map((event) => ({
+                key: event.key,
+                optionId: String(event.attributes.choice),
+              })),
+          });
+        }
+        if (Array.isArray(options)) super.postMessage(message, options);
+        else super.postMessage(message, options);
+      }
+    };
+  });
+}
+
+async function buyNativeBackup(page: Page, peakW: number, rate: number) {
+  await page.locator(".button-buildFacility").click();
+  await page.locator(".button-buildGenerator").click();
+  const capacity = page.getByRole("slider", { name: /^Capacity/ });
+  await capacity.press("Home");
+  for (let tick = 0; tick < wToSliderTick(peakW); tick++)
+    await capacity.press("ArrowRight");
+  await expect(page.locator("#construction-capacity")).toContainText(
+    peakW === 50e6 ? /50\s?MW/ : /2\s?GW/,
+  );
+  await page
+    .getByRole("button", {
+      name: "Review purchase of Natural Gas Peaker",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Take loan", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  await openPane(
+    programs,
+    page.getByRole("button", { name: "Programs", exact: true }),
+  );
+  const price = programs.getByRole("slider", {
+    name: "The rate you charge for electricity generation",
+    exact: true,
+  });
+  const opening = Number(await price.getAttribute("aria-valuenow"));
+  for (let tick = 0; tick < Math.round((rate - opening) / 0.01); tick++)
+    await price.press("ArrowRight");
+  if (rate === 0.1) {
+    expect(Number(await price.getAttribute("aria-valuenow"))).toBeCloseTo(
+      0.1,
+      12,
+    );
+    await expect(price).toHaveAttribute(
+      "aria-valuetext",
+      /^\$0\.1 per kilowatt hour/,
+    );
+  } else await expect(price).toHaveAttribute("aria-valuenow", String(rate));
+  await page.keyboard.press("Escape");
+}
+
+for (const scenarioId of [106, 107] as const) {
+  for (const width of [1280, 390, 360]) {
+    test(`native ${scenarioId} companies choose independently and preserve rules on resume at ${width}px`, async ({
+      browser,
+    }) => {
+      test.setTimeout(240000);
+      const room = new SteamRoom(async (page) => {
+        await observeNativeForecasts(page);
+        return createSteamTransport(page);
+      });
+      room.campaignName = `Official ${scenarioId} campaign`;
+      const host = await room.player(browser, 0, width < 600);
+      const guest = await room.player(browser, 1, width < 600);
+      const guestId = "76561198000000002";
+      const pages = [host, guest];
+      const errors: string[] = [];
+      for (const page of pages) {
+        page.on("pageerror", (error) => errors.push(error.message));
+        await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+      }
+      const capture = async (name: string, page: Page) => {
+        await expect(
+          page.locator("iframe#webpack-dev-server-client-overlay"),
+        ).toHaveCount(0);
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          ),
+        ).toBeLessThanOrEqual(1);
+        if (!process.env.REVIEW_SCREENSHOT_DIR) return;
+        await fs.mkdir(process.env.REVIEW_SCREENSHOT_DIR, { recursive: true });
+        await page.mouse.move(0, 0);
+        await expect(page.getByRole("tooltip")).toBeHidden();
+        await expect(page.locator(".snackbarContent")).toBeHidden();
+        await page.screenshot({
+          path: path.join(process.env.REVIEW_SCREENSHOT_DIR, name),
+          animations: "disabled",
+          style: ".MuiTouchRipple-root { visibility: hidden !important; }",
+        });
+      };
+      const goal =
+        scenarioId === 106
+          ? "Retain the community"
+          : "Keep the lights on through the freeze";
+      const scenarioPanel = (page: Page) =>
+        page.getByRole("region", { name: "Scenario", exact: true });
+      const showGoal = async (page: Page) => {
+        const panel = scenarioPanel(page);
+        await openPane(
+          panel,
+          page.getByRole("button", { name: "Scenario", exact: true }),
+        );
+        await expect(panel).toContainText(goal);
+        await expect(panel).not.toContainText("Modded");
+        return panel;
+      };
+      await hostGame(host);
+      await joinGame(guest, room);
+      await host.getByTestId(`mission-row-${scenarioId}`).click();
+      const easy = host.getByRole("button", { name: "Easy", exact: true });
+      await easy.focus();
+      await host.keyboard.press("Enter");
+      await expect(easy).toHaveAttribute("aria-pressed", "true");
+      await expect(guest.getByText("Following SolarSam").last()).toBeVisible();
+      const readyButton = guest.getByRole("button", {
+        name: "I'm ready",
+        exact: true,
+      });
+      await readyButton.focus();
+      await guest.keyboard.press("Enter");
+      await expect(
+        guest.getByRole("button", { name: "Ready", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      for (const page of pages)
+        await expect(page.locator(".coopModPreview")).toHaveCount(0);
+      await host
+        .getByRole("button", { name: "Start for everyone", exact: true })
+        .click();
+      await expect
+        .poll(() => room.views.get(guestId)?.game?.scenarioId)
+        .toBe(scenarioId);
+      expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
+      expect(room.views.get(guestId)!.game!.difficulty).toBe("Employee");
+      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
+      const seed = room.views.get(guestId)!.game!.seed;
+      if (scenarioId === 107) expect(seed).toBe(268107);
+      await test.info().attach("Native shared seed and paid route", {
+        body: JSON.stringify({
+          scenarioId,
+          seed,
+          width,
+          difficulty: "Employee",
+          backupW: scenarioId === 106 ? 50e6 : 2e9,
+          financed: true,
+          rate: scenarioId === 106 ? 0.12 : 0.1,
+        }),
+        contentType: "application/json",
+      });
+      for (const page of pages) {
+        await expect(page.locator(".facilities:visible")).toBeVisible();
+        await buyNativeBackup(
+          page,
+          scenarioId === 106 ? 50e6 : 2e9,
+          scenarioId === 106 ? 0.12 : 0.1,
+        );
+        await expect(await showGoal(page)).toContainText(
+          "0/1 months completed",
+        );
+        await page.keyboard.press("Escape");
+      }
+      for (const page of pages)
+        await clock(page)
+          .getByRole("button", { name: "ultra speed", exact: true })
+          .click();
+      const dueMonth = scenarioId === 106 ? 48 : 36;
+      const choiceTitle =
+        scenarioId === 106
+          ? "Negotiate the data-center connection"
+          : "Prepare for the deep freeze";
+      const dialogs = pages.map((page) =>
+        page.getByRole("dialog", { name: new RegExp(choiceTitle) }),
+      );
+      await expect(dialogs[0]).toBeVisible({ timeout: 120000 });
+      await expect(dialogs[1]).toBeVisible();
+      await expect
+        .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed)
+        .toBe(dueMonth);
+      await expect
+        .poll(() =>
+          room.checkpoint?.grids.map((game) => game.date.monthsElapsed),
+        )
+        .toEqual([dueMonth, dueMonth]);
+      const pending = structuredClone(room.checkpoint!);
+      const decisionKey =
+        scenarioId === 106
+          ? "story:106:data-center-boom:connection"
+          : "story:107:texas-deep-freeze:winterization";
+      for (const game of pending.grids) {
+        expect(game.scenarioId).toBe(scenarioId);
+        expect(game.customScenario).toBeUndefined();
+        expect(game.runIdentity).toBeUndefined();
+        expect(game.seed).toBe(seed);
+        expect(game.facilities).toContainEqual(
+          expect.objectContaining({
+            name: "Natural Gas Peaker",
+            peakW: scenarioId === 106 ? 50e6 : 2e9,
+          }),
+        );
+        expect(
+          game.worldEvents.occurrences.some(
+            (event) => event.key === decisionKey,
+          ),
+        ).toBe(false);
+        expect(game.monthlyHistory).toHaveLength(dueMonth);
+      }
+      for (const [index, dialog] of dialogs.entries()) {
+        await expect(dialog).toContainText(
+          `Your company: ${index === 0 ? "SolarSam" : "WindyWren"}`,
+        );
+        await expect(dialog).toContainText(
+          "Each company chooses for its own grid.",
+        );
+        for (const button of await dialog.getByRole("button").all()) {
+          const bounds = (await button.boundingBox())!;
+          expect(bounds.height).toBeGreaterThanOrEqual(44);
+          expect(bounds.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+        }
+      }
+      await guest.keyboard.press("Escape");
+      await expect(dialogs[1]).toBeVisible();
+      if (scenarioId === 106 && [1280, 360].includes(width))
+        await capture(
+          `native-106-${width}-choice-${width === 1280 ? "light" : "dark"}.png`,
+          width === 1280 ? host : guest,
+        );
+      const responses =
+        scenarioId === 106
+          ? ["fast-track", "phased"]
+          : ["winterize", "standard"];
+      const buttons =
+        scenarioId === 106
+          ? [/^Accept funded connection$/, /^Require phased connections$/]
+          : [/^Fund winterization/, /^Keep construction budget$/];
+      await dialogs[0].getByRole("button", { name: buttons[0] }).focus();
+      await host.keyboard.press("Enter");
+      await expect(dialogs[0]).toBeHidden();
+      await expect(dialogs[1]).toContainText("Still deciding: WindyWren");
+      // Keep the shared clock paused after the second commitment while its forecast is inspected.
+      await clock(host)
+        .getByRole("button", { name: "pause", exact: true })
+        .click();
+      await dialogs[1].getByRole("button", { name: buttons[1] }).focus();
+      await guest.keyboard.press("Enter");
+      await expect(dialogs[1]).toBeHidden();
+      for (const [index, page] of pages.entries()) {
+        await openPane(
+          page.locator(".insights"),
+          page.getByRole("button", { name: "Insights", exact: true }),
+        );
+        await expect
+          .poll(
+            () =>
+              page.evaluate(
+                ({ key, response }) => {
+                  const target = window as SteamTestWindow;
+                  return target.nativeForecasts?.some(
+                    (request) =>
+                      request.responses.some(
+                        (choice) =>
+                          choice.key === key && choice.optionId === response,
+                      ) && target.nativeForecastReplies?.includes(request.id),
+                  );
+                },
+                { key: decisionKey, response: responses[index] },
+              ),
+            { timeout: 60000 },
+          )
+          .toBe(true);
+        const request = await page.evaluate(
+          ({ key, response }) =>
+            (window as SteamTestWindow).nativeForecasts!.findLast((request) =>
+              request.responses.some(
+                (choice) => choice.key === key && choice.optionId === response,
+              ),
+            ),
+          { key: decisionKey, response: responses[index] },
+        );
+        expect(request!.scenarioId).toBe(scenarioId);
+        expect(request!.hasCustomScenario).toBe(false);
+        expect(request!.seed).toBe(seed);
+        if (scenarioId === 106)
+          expect(
+            request!.loads.map((load) => ({
+              peakW: load.peakW,
+              year: load.startsYear,
+            })),
+          ).toEqual(
+            index === 0
+              ? [{ peakW: 100e6, year: 2026 }]
+              : [
+                  { peakW: 50e6, year: 2026 },
+                  { peakW: 50e6, year: 2028 },
+                ],
+          );
+        const chart = page
+          .locator(".insights:visible")
+          .getByRole("img", { name: /^(Chart of|Monthly ranges of)/ })
+          .first();
+        await expect(chart).toBeVisible({ timeout: 60000 });
+        await expect(chart).toHaveAttribute("aria-label", /demand|supply/i);
+        await page.keyboard.press("Escape");
+      }
+      await expect
+        .poll(() =>
+          room.checkpoint?.grids.map(
+            (game) =>
+              game.worldEvents.occurrences.find(
+                (event) => event.key === decisionKey,
+              )?.attributes.choice,
+          ),
+        )
+        .toEqual(responses);
+      for (const [index, game] of room.checkpoint!.grids.entries()) {
+        const receipt = game.worldEvents.occurrences.find(
+          (event) => event.key === decisionKey,
+        )!;
+        expect(receipt.attributes.cost).toBe(
+          scenarioId === 107 && index === 0 ? 90e6 : 0,
+        );
+        expect(receipt.attributes.upfrontGrant).toBe(
+          scenarioId === 106 && index === 0 ? 15e6 : 0,
+        );
+        expect(game.date.monthsElapsed).toBe(dueMonth);
+      }
+      if (scenarioId === 107) {
+        for (const page of pages)
+          await clock(page)
+            .getByRole("button", { name: "ultra speed", exact: true })
+            .click();
+        await expect
+          .poll(() => room.views.get(guestId)?.game?.date.monthsElapsed, {
+            timeout: 60000,
+          })
+          .toBeGreaterThanOrEqual(50);
+        await clock(host)
+          .getByRole("button", { name: "pause", exact: true })
+          .click();
+        const keepWatching = guest.getByRole("button", {
+          name: "Keep watching",
+          exact: true,
+        });
+        if (await keepWatching.isVisible()) await keepWatching.click();
+        for (const page of pages) {
+          const panel = await showGoal(page);
+          await expect(panel).toContainText("1/1 months completed");
+          await expect(panel.getByText("Met", { exact: true })).toBeVisible();
+          await page.keyboard.press("Escape");
+        }
+        if (width === 390) {
+          const panel = await showGoal(guest);
+          const title = panel.getByText(goal, { exact: true });
+          const observed = panel.getByText(/1\/1 months completed/);
+          await title.scrollIntoViewIfNeeded();
+          await observed.scrollIntoViewIfNeeded();
+          await expect(title).toBeInViewport();
+          await expect(observed).toBeInViewport();
+          await expect(
+            panel.getByText("Met", { exact: true }),
+          ).toBeInViewport();
+          await capture("native-107-390-goal-dark.png", guest);
+          await guest.keyboard.press("Escape");
+        }
+      } else {
+        await expect(await showGoal(guest)).toContainText(
+          "0/1 months completed",
+        );
+        await guest.keyboard.press("Escape");
+      }
+      await saveAndQuit(guest);
+      await saveAndQuit(host);
+      const saved = structuredClone(room.checkpoint!);
+      if (scenarioId === 107)
+        for (const game of saved.grids) {
+          const february = game.monthlyHistory.find(
+            (month) => month.year === 2021 && month.month === 2,
+          )!;
+          expect(february).toBeDefined();
+          expect(february.demandWh).toBeGreaterThan(0);
+          expect(
+            game.objectiveProgress!.entries.find(
+              (entry) => entry.id === "reliability",
+            )!.observations,
+          ).toEqual([[49, february.supplyWh, february.demandWh]]);
+        }
+      const facts = (game: GameType) => ({
+        date: game.date,
+        history: game.monthlyHistory,
+        facilities: game.facilities,
+        events: game.worldEvents,
+        progress: game.objectiveProgress,
+        rate: game.dollarsPerkWh,
+      });
+      await host
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .click();
+      await hostGame(host);
+      await loadSave(host, room.campaignName);
+      await guest
+        .getByRole("button", { name: "Play with friends", exact: true })
+        .click();
+      await joinGame(guest, room);
+      await expect(
+        host.getByRole("button", { name: "Resume game", exact: true }),
+      ).toBeEnabled();
+      await host
+        .getByRole("button", { name: "Resume game", exact: true })
+        .click();
+      for (const page of pages) {
+        await expect(page.locator(".facilities:visible")).toBeVisible();
+        await expect(
+          page.getByRole("dialog", { name: new RegExp(choiceTitle) }),
+        ).toBeHidden();
+        await expect(
+          page.locator("iframe#webpack-dev-server-client-overlay"),
+        ).toHaveCount(0);
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          ),
+        ).toBeLessThanOrEqual(1);
+        expect(
+          await page.evaluate(() => ({
+            scores: (window as SteamTestWindow).mockScoreSubmissions ?? 0,
+            achievements:
+              (window as SteamTestWindow).mockAchievementSubmissions ?? 0,
+          })),
+        ).toEqual({ scores: 0, achievements: 0 });
+      }
+      await expect
+        .poll(
+          () =>
+            room.views.get(guestId)?.game &&
+            facts(room.views.get(guestId)!.game!),
+        )
+        .toEqual(facts(saved.grids[1]));
+      await expect
+        .poll(() => room.checkpoint?.grids.map(facts))
+        .toEqual(saved.grids.map(facts));
+      expect(room.checkpoint!.spec).toEqual({
+        scenarioId,
+        difficulty: "Employee",
+      });
+      expect(room.views.get(guestId)!.game!.customScenario).toBeUndefined();
+      expect(room.views.get(guestId)!.scenarioDigest).toBeUndefined();
+      expect(errors).toEqual([]);
+      expect(room.transportErrors).toEqual([]);
+    });
+  }
 }

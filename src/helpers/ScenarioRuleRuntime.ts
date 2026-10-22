@@ -1,3 +1,8 @@
+import { isOfficialCatalogRules } from "./ScenarioRules";
+import {
+  officialPresentation,
+  presentOfficialRuleOccurrence,
+} from "./ScenarioRulePresentation";
 import type {
   CompiledRuleEvent,
   CompiledScenarioRules,
@@ -47,6 +52,7 @@ export function scenarioRuleProtectionFactor(
   rules: CompiledScenarioRules,
   occurrences: readonly ActiveWorldEventType[],
   locationId: string,
+  receivingScenarioId?: number,
 ): number {
   if (!event.protection) return 0;
   const choiceId =
@@ -71,7 +77,12 @@ export function scenarioRuleProtectionFactor(
           `mod:${rules.namespace.kind === "mod" ? rules.namespace.id : ""}:arc:${source?.scenarioId}:choice:${choiceId}`),
   );
   const regional =
-    event.protection.kind === "wildfirePreparedness"
+    event.protection.kind === "wildfirePreparedness" &&
+    !(
+      rules.namespace.kind === "official" &&
+      rules.namespace.scenarioId === 111 &&
+      receivingScenarioId !== 999
+    )
       ? 0.5 *
         wildfirePreparednessEffectiveness(
           prior,
@@ -156,9 +167,36 @@ export function ruleEffectsForOccurrence(
   event: ActiveWorldEventType,
   context: StoryContextType,
 ): WorldEventEffectsType {
-  if (event.attributes.ruleEvent !== true || !context.rules)
-    return event.effects;
+  if (!context.rules) return event.effects;
   const definition = ruleEvents(context.rules).find((e) => e.key === event.key);
+  if (event.attributes.ruleEvent !== true) {
+    if (
+      context.rules.namespace.kind !== "official" ||
+      !definition?.targets.length
+    )
+      return event.effects;
+    const effects = { ...event.effects };
+    const originalAsset =
+      definition.targets.length === 1 &&
+      definition.targets[0].target.selector === "startingAsset"
+        ? definition.targets[0].target.assetId
+        : undefined;
+    // Monthly activation runs before commands at that opening. A newly commissioned identity
+    // at or after the onset cannot be the recorded target, including reuse of a sold integer ID.
+    effects.facilityOutputMultipliersById = Object.fromEntries(
+      Object.entries(effects.facilityOutputMultipliersById ?? {}).filter(
+        ([id]) =>
+          context.snapshot.facilities.some(
+            (facility) =>
+              String(facility.id) === id &&
+              (facility.minuteCreated ?? 0) < event.startsMinute &&
+              (originalAsset === undefined ||
+                facility.startingAssetId === originalAsset),
+          ),
+      ),
+    );
+    return effects;
+  }
   if (!definition) return {};
   const effects: WorldEventEffectsType = { ...definition.effects };
   const protection = Number(event.attributes.ruleProtectionFactor ?? 0);
@@ -251,33 +289,26 @@ export function officialRuleOccurrence(
     event.targets.length ||
     event.transactions.length ||
     event.protection ||
-    event.report ||
-    event.endReport ||
-    event.reports?.length
+    officialPresentation(event)?.nativeReview
   )
     return undefined;
-  return {
-    key: event.key,
-    definitionId: `${event.source.arcId}:${event.source.phaseId}`,
-    startsMinute: event.startMonth * MINUTES_PER_MONTH,
-    endsMinute:
-      Math.min(rules.durationMonths, event.startMonth + event.durationMonths) *
-      MINUTES_PER_MONTH,
-    forecastable: event.visibility === "surprise" ? false : undefined,
-    kind: event.source.kind ?? "WORLD_EVENT",
-    title: preview ? (event.source.previewTitle ?? event.title) : event.title,
-    message: preview ? (event.preview ?? event.message) : event.message,
-    ...(event.source.concept ? { concept: event.source.concept } : {}),
-    ...(event.source.importance ? { importance: event.source.importance } : {}),
-    ...(event.source.actionTarget
-      ? { actionTarget: event.source.actionTarget }
-      : {}),
-    ...(event.source.turningPointPriority === undefined
-      ? {}
-      : { turningPointPriority: event.source.turningPointPriority }),
-    attributes: { scheduledMonth: event.startMonth },
-    effects: event.effects,
-  };
+  return presentOfficialRuleOccurrence(
+    event,
+    rules,
+    {
+      key: event.key,
+      definitionId: event.id,
+      startsMinute: event.startMonth * MINUTES_PER_MONTH,
+      endsMinute: (event.startMonth + event.durationMonths) * MINUTES_PER_MONTH,
+      title: event.title,
+      message: event.message,
+      attributes: {},
+      effects: event.effects,
+      kind: event.source.kind ?? "WORLD_EVENT",
+    },
+    undefined,
+    preview,
+  );
 }
 
 function resolveEvent(
@@ -285,8 +316,6 @@ function resolveEvent(
   context: StoryContextType,
   preview = false,
 ): Occurrence {
-  const official = officialRuleOccurrence(event, context.rules!, preview);
-  if (official) return official;
   const prior = context.occurrences?.find((o) => o.key === event.key);
   if (prior && !preview)
     return {
@@ -299,18 +328,26 @@ function resolveEvent(
     ...f,
     minuteCreated: f.minuteCreated ?? 0,
   }));
-  const targets = preview
-    ? []
-    : scenarioRuleTargetOperations(event).map((operation) =>
-        resolveScenarioRuleTargets(operation.target, {
-          seed: context.seed,
-          eventKey: event.key,
-          facilities,
-          ...(event.source?.drawKey
-            ? { officialDrawKey: event.source.drawKey }
-            : {}),
-        }),
-      );
+  const targets =
+    preview && context.rules!.namespace.kind === "mod"
+      ? []
+      : scenarioRuleTargetOperations(event).map((operation) =>
+          resolveScenarioRuleTargets(
+            context.scenarioId === 999 &&
+              context.rules!.namespace.kind === "official" &&
+              operation.target.selector === "startingAsset"
+              ? { selector: "largestOperating", fuel: "Uranium" }
+              : operation.target,
+            {
+              seed: context.seed,
+              eventKey: event.key,
+              facilities,
+              ...(event.source?.drawKey
+                ? { officialDrawKey: event.source.drawKey }
+                : {}),
+            },
+          ),
+        );
   const noMatch = targets.some((target) => target.noMatch);
   const grant = event.transactions
     .filter((t) => t.kind === "grant")
@@ -323,6 +360,7 @@ function resolveEvent(
     context.rules!,
     context.occurrences ?? [],
     context.location.id,
+    context.scenarioId,
   );
   const reportContext = {
     ...context,
@@ -405,6 +443,17 @@ function resolveEvent(
   };
   occurrence.effects = ruleEffectsForOccurrence(occurrence, context);
   if (
+    context.scenarioId === 999 &&
+    context.rules!.namespace.kind === "official" &&
+    context.rules!.namespace.scenarioId !== 999 &&
+    event.source &&
+    occurrence.effects.operatingExpensePerMonth !== undefined
+  )
+    occurrence.effects.operatingExpensePerMonth *=
+      context.customEvents?.find(
+        (arc) => arc.scenarioId === event.source!.scenarioId,
+      )?.moneyScale ?? 1;
+  if (
     context.rules!.namespace.kind === "mod" &&
     event.source &&
     (event.protection || event.effects.operatingExpensePerMonth !== undefined)
@@ -420,7 +469,15 @@ function resolveEvent(
       .filter(Boolean)
       .join(" ");
   }
-  return occurrence;
+  return (
+    presentOfficialRuleOccurrence(
+      event,
+      context.rules!,
+      occurrence,
+      context,
+      preview,
+    ) ?? occurrence
+  );
 }
 
 /** Pure resolution: activation facts are returned to the existing world-event owner to persist. */
@@ -495,11 +552,35 @@ export function upcomingScenarioRuleEvents(
             ),
         )
         .map((event) => resolveEvent(event, context, true))
+        .sort(
+          (a, b) =>
+            a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
+        )
     : [];
 }
 
-function ruleObservationKey(rules: CompiledScenarioRules, month: number) {
+export function ruleObservationKey(
+  rules: CompiledScenarioRules,
+  month: number,
+) {
   return `${rules.namespace.kind === "mod" ? `mod:${rules.namespace.id}` : `story:${rules.namespace.scenarioId}:${rules.namespace.arcId}`}:observation:${month}`;
+}
+
+export function scenarioRuleCapacityReportMonths(
+  rules: CompiledScenarioRules,
+): number[] {
+  return [
+    ...rules.debriefReports,
+    ...ruleEvents(rules).flatMap((event) =>
+      [event.report, event.endReport, ...(event.reports ?? [])].filter(
+        (report): report is RuleReport => !!report,
+      ),
+    ),
+  ].flatMap((report) =>
+    report.kind === "firmCoverage" || report.kind === "storageCoverage"
+      ? [report.throughMonth]
+      : [],
+  );
 }
 
 /** Capture only the capacity facts required by reports, at the exact close of their window. */
@@ -508,24 +589,14 @@ export function captureRuleReportObservation(
   context: StoryContextType,
 ) {
   const rules = context.rules;
-  if (!rules || context.date.monthsElapsed <= 0) return;
-  const month = context.date.monthsElapsed - 1;
-  const reports = [
-    ...rules.debriefReports,
-    ...ruleEvents(rules).flatMap((event) =>
-      [event.report, event.endReport, ...(event.reports ?? [])].filter(
-        (r): r is RuleReport => !!r,
-      ),
-    ),
-  ];
   if (
-    !reports.some(
-      (report) =>
-        (report.kind === "firmCoverage" || report.kind === "storageCoverage") &&
-        report.throughMonth === month,
-    )
+    !rules ||
+    isOfficialCatalogRules(rules) ||
+    context.date.monthsElapsed <= 0
   )
     return;
+  const month = context.date.monthsElapsed - 1;
+  if (!scenarioRuleCapacityReportMonths(rules).includes(month)) return;
   const key = ruleObservationKey(rules, month);
   if (game.worldEvents.occurrences.some((event) => event.key === key)) return;
   game.worldEvents.occurrences.push({

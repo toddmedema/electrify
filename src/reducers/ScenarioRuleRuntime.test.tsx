@@ -1,12 +1,9 @@
 import cloneDeep from "lodash.clonedeep";
 import { DIFFICULTY_IDS, TICKS_PER_MONTH } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
-import {
-  resolveStoryAtDate,
-  STORY_ARC_DEFINITIONS,
-  upcomingStoryPhases,
-} from "../data/WorldEvents";
+import { resolveStoryAtDate, upcomingStoryPhases } from "../data/WorldEvents";
 import type { RuleEvent } from "../data/ScenarioRules";
+import * as officialCatalog from "../data/OfficialScenarioRules";
 import {
   getDateFromMinute,
   getTimeFromTimeline,
@@ -568,27 +565,18 @@ test("a same-minute ID-reusing replacement is detached even when the original wa
   expect(state.timeline.some((tick) => tick.supplyW > 0)).toBe(true);
 });
 
-test("compiled imported arcs activate, forecast and resume with every installed catalog callback unavailable", () => {
+test("compiled imported arcs activate, forecast and resume with installed catalog lookup unavailable", () => {
   const input = pack();
   input.baseScenarioId = 101;
   input.officialArcs = [{ scenarioId: 101, includeChoices: false }];
   input.scenario!.durationMonths = 144;
   const scenario = modScenario(input);
-  const phases = STORY_ARC_DEFINITIONS.flatMap((arc) => arc.phases);
-  const callbacks = phases.map((phase) => ({
-    phase,
-    describe: phase.describe,
-    preview: phase.preview,
-  }));
-  try {
-    phases.forEach((phase) => {
-      phase.describe = () => {
-        throw new Error("Detached rules invoked catalog description");
-      };
-      phase.preview = () => {
-        throw new Error("Detached rules invoked catalog preview");
-      };
+  const lookup = jest
+    .spyOn(officialCatalog, "officialScenarioRuleDefinition")
+    .mockImplementation(() => {
+      throw new Error("Detached rules invoked the installed catalog");
     });
+  try {
     const state = createGame({
       scenarioId: 999,
       scenario,
@@ -617,10 +605,7 @@ test("compiled imported arcs activate, forecast and resume with every installed 
     tickState(resumed);
     expect(recorded(resumed)).toEqual(recorded(state));
   } finally {
-    callbacks.forEach(({ phase, describe, preview }) => {
-      phase.describe = describe;
-      phase.preview = preview;
-    });
+    lookup.mockRestore();
   }
 });
 

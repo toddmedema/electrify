@@ -16,7 +16,8 @@ import { STARTING_ASSET_IDS } from "../data/StartingAssetIds";
 import { DIFFICULTY_IDS } from "../Constants";
 import { matchScenario } from "../multiplayer/World";
 import { validBrowseState } from "../multiplayer/Browse";
-import { launchCustomScenario } from "../reducers/Game";
+import { launchCustomScenario, tickState } from "../reducers/Game";
+import { prepareCustomScenario } from "./CustomScenarioEvents";
 import { createGame } from "../testing/Simulator";
 import { parseSave, serializeSave } from "../SaveGame";
 import type { RuleEvent, ScenarioRuleDefinitions } from "../data/ScenarioRules";
@@ -70,6 +71,34 @@ const rules = (events: RuleEvent[] = [event()]): ScenarioRuleDefinitions => ({
   debriefReports: [
     { id: "review", kind: "reliability", fromMonth: 13, throughMonth: 24 },
   ],
+});
+
+test("ordinary custom compilation caches actual run parameters without serializing changing game state", () => {
+  const scenario = prepareCustomScenario({
+    ...DEFAULT_CUSTOM_SCENARIO,
+    eventScenarioIds: [103, 110],
+  });
+  const game = createGame({
+    scenarioId: 999,
+    scenario,
+    seed: 42,
+    difficulty: "Employee",
+  });
+  const original = scenarioRules(scenario, game)!;
+  expect(original.seed).toBe(42);
+  expect(original.difficulty).toBe(game.difficulty);
+  tickState(game);
+  expect(scenarioRules(scenario, game)).toBe(original);
+  const changedSeed = scenarioRules(scenario, { ...game, seed: 43 })!;
+  expect(changedSeed).not.toBe(original);
+  expect(changedSeed.seed).toBe(43);
+  const changedDifficulty = scenarioRules(scenario, {
+    ...game,
+    difficulty: "CEO",
+  })!;
+  expect(changedDifficulty).not.toBe(original);
+  expect(changedDifficulty.difficulty).toBe("CEO");
+  expect(scenarioRules(scenario, game)).toBe(original);
 });
 
 test("compiles author months and human units once, preserving meaningful zeros", () => {

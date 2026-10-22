@@ -1,12 +1,54 @@
-import type { DifficultyType, ScenarioType } from "../Types";
+import { OFFICIAL_EFFECT_SCENARIO_RULES } from "./OfficialScenarioEffectRules";
+import { OFFICIAL_TARGET_SCENARIO_RULES } from "./OfficialScenarioTargetRules";
+import type {
+  DifficultyType,
+  ScenarioType,
+  StoryAttributeValueType,
+} from "../Types";
 import type {
   CompiledRuleEvent,
+  RuleNumber,
+  RuleReport,
   ScenarioRuleDefinitions,
 } from "./ScenarioRules";
 
 export interface OfficialRulePresentation {
   messageByDifficulty?: Record<DifficultyType, string>;
+  titleByDifficulty?: Record<DifficultyType, string>;
   previewTitle?: string;
+  hidePreview?: true;
+  attributes?: Record<string, StoryAttributeValueType>;
+  attributesByDifficulty?: Record<
+    DifficultyType,
+    Record<string, StoryAttributeValueType>
+  >;
+  nativeReview?:
+    | "shaleNormalization"
+    | "paradiseReview"
+    | "renewablesReview"
+    | "deepFreezeThaw"
+    | "deepFreezeOnset"
+    | "agingWarning"
+    | "agingDerate"
+    | "coalTransitionReview"
+    | "hurricaneOutlook"
+    | "hurricaneLandfall"
+    | "hurricaneRestoration"
+    | "wildfireOnset"
+    | "wildfireRestoration"
+    | "nuclearContingency"
+    | "nuclearTrip";
+  protection?: CompiledRuleEvent["protection"];
+  reports?: RuleReport[];
+  relativeReports?: Array<{
+    id: string;
+    kind: "reliability";
+    monthsBefore: RuleNumber;
+    minDemandServedShare?: number;
+  }>;
+  scheduleRandomKey?: string;
+  scheduleAddress?: string;
+  scheduleOffsetMonths?: RuleNumber;
   source: Omit<
     NonNullable<CompiledRuleEvent["source"]>,
     "scenarioId" | "arcId" | "phaseId"
@@ -189,7 +231,11 @@ export const LOAD_SHEDDING_RULES: OfficialScenarioRuleDefinition = {
 };
 
 export const OFFICIAL_SCENARIO_RULES: readonly OfficialScenarioRuleDefinition[] =
-  [LOAD_SHEDDING_RULES];
+  [
+    LOAD_SHEDDING_RULES,
+    ...OFFICIAL_EFFECT_SCENARIO_RULES,
+    ...OFFICIAL_TARGET_SCENARIO_RULES,
+  ];
 export const officialScenarioRuleDefinition = (scenarioId: number) =>
   OFFICIAL_SCENARIO_RULES.find((entry) => entry.scenarioId === scenarioId);
 
@@ -206,9 +252,25 @@ export function officialReliabilityMetadata(
   return {
     year: startingYear + Math.floor((goal.fromMonth - 1) / 12),
     month: ((goal.fromMonth - 1) % 12) + 1,
-    durationMonths: goal.throughMonth - goal.fromMonth + 1,
+    ...(goal.throughMonth > goal.fromMonth
+      ? { durationMonths: goal.throughMonth - goal.fromMonth + 1 }
+      : {}),
     minimumDemandServed: goal.minDemandServedShare,
     label: entry.reliabilityNoun ?? goal.label,
     goal: goal.label,
   };
+}
+
+/** Catalog setup keeps the shared goal's display value without a second threshold. */
+export function officialRetentionMetadata(
+  scenarioId: number,
+): number | undefined {
+  const goal = officialScenarioRuleDefinition(
+    scenarioId,
+  )?.definitions.objectives.find(
+    (objective) => objective.metric === "customerRetention",
+  );
+  return goal?.metric === "customerRetention"
+    ? goal.minRetainedShare
+    : undefined;
 }

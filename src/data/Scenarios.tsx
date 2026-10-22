@@ -1,4 +1,7 @@
-import { officialReliabilityMetadata } from "./OfficialScenarioRules";
+import {
+  officialReliabilityMetadata,
+  officialRetentionMetadata,
+} from "./OfficialScenarioRules";
 import { beginIntertieStress } from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
@@ -1076,7 +1079,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Coal's high emissions mean higher fees. You don't have much cash to replace it.",
     },
     ownership: "Investor",
-    minimumCustomerRetention: 0.8,
+    minimumCustomerRetention: officialRetentionMetadata(100),
     startingYear: 2020,
     cash: 330000000,
     feePerKgCO2e: 50 / 1000,
@@ -1114,7 +1117,7 @@ export const SCENARIOS: ScenarioType[] = [
       threat: "Gas prices can rise long before a new plant pays for itself.",
     },
     ownership: "Investor",
-    minimumCustomerRetention: 0.8,
+    minimumCustomerRetention: officialRetentionMetadata(103),
     startingYear: 2006,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -1145,7 +1148,7 @@ export const SCENARIOS: ScenarioType[] = [
         "If your plants can't meet demand, there's no neighboring grid to help.",
     },
     ownership: "Investor",
-    minimumCustomerRetention: 0.8,
+    minimumCustomerRetention: officialRetentionMetadata(105),
     startingYear: 2003,
     cash: 275000000,
     feePerKgCO2e: 0,
@@ -1188,7 +1191,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Build now and you may overpay. Wait too long and you may not have enough power.",
     },
     ownership: "Investor",
-    minimumCustomerRetention: 0.8,
+    minimumCustomerRetention: officialRetentionMetadata(101),
     startingYear: 2002,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -1271,7 +1274,7 @@ export const SCENARIOS: ScenarioType[] = [
         "Your plants are aging and competitors are moving in. Replacements take years to build.",
     },
     ownership: "Investor",
-    minimumCustomerRetention: 0.8,
+    minimumCustomerRetention: officialRetentionMetadata(102),
     startingYear: 1980,
     // The authored coal derate temporarily avoids loss-making generation. Keep the original
     // CEO balance gate intact: a passive fleet still runs out of runway before year twenty.
@@ -1330,7 +1333,7 @@ export const SCENARIOS: ScenarioType[] = [
     startingDemandScale: 7.7,
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
-    minimumCustomerRetention: 0.9,
+    minimumCustomerRetention: officialRetentionMetadata(106),
     // Manassas City Utilities' researched average tariff. The two researched public-utility
     // scenarios keep their calibrated full tariffs rather than the 60% generation-share convention
     // (docs/facilities-economics.md): their demand, fleet and choice balance are fitted to them.
@@ -1404,13 +1407,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: {
-      year: 2021,
-      month: 2,
-      minimumDemandServed: 0.995,
-      label: "February 2021 freeze",
-      goal: "Keep the lights on through the freeze",
-    },
+    reliabilityObjective: officialReliabilityMetadata(107, 2017),
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
     // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
     // share with wind; the published 3,827 MW total is unchanged.
@@ -1487,14 +1484,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.24,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    reliabilityObjective: {
-      year: 2026,
-      month: 6,
-      durationMonths: 3,
-      minimumDemandServed: 0.995,
-      label: "2026 heatwave and drought",
-      goal: "Keep the lights on through the heatwave",
-    },
+    reliabilityObjective: officialReliabilityMetadata(108, 2023),
     // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
@@ -1576,16 +1566,9 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.14,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    reliabilityObjective: {
-      // The trip can occur from July 2026 through January 2027. Requiring the whole window and
-      // its aftermath keeps the hidden seeded month out of the objective text.
-      year: 2026,
-      month: 7,
-      durationMonths: 18,
-      minimumDemandServed: 0.995,
-      label: "reactor shutdown window and recovery",
-      goal: "Keep the lights on through the reactor shutdown",
-    },
+    // The trip can occur from July 2026 through January 2027. Requiring the whole window and
+    // its aftermath keeps the hidden seeded month out of the objective text.
+    reliabilityObjective: officialReliabilityMetadata(110, 2023),
     facilities: [
       {
         assetId: "scenario-110-grand-nuclear-unit",
@@ -1652,14 +1635,7 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.17,
     cash: 50000000,
     feePerKgCO2e: 50 / 1000,
-    reliabilityObjective: {
-      year: 2025,
-      month: 1,
-      durationMonths: 2,
-      minimumDemandServed: 0.995,
-      label: "January and February 2025 wildfire emergency",
-      goal: "Keep the lights on through the wildfire emergency",
-    },
+    reliabilityObjective: officialReliabilityMetadata(111, 2022),
     // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
     // resources using its 2024 power-content mix as the portfolio anchor.
     // https://www.ladwp.com/who-we-are/power-system/power-content-label
@@ -1860,20 +1836,13 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.05,
     cash: 90000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: {
-      year: 2016,
-      month: 1,
-      durationMonths: 12,
-      // The only objective in the set that is not a flat 100%. Every other scenario asks the
-      // player to prevent a shortage; this one asks them to hold a grid together through one,
-      // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
-      // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
-      // that is grading the weather rather than the decisions. Passive play sheds 86% in the
-      // October of this year, so this stays a long way from a formality.
-      minimumDemandServed: 0.98,
-      label: "2016 drought",
-      goal: "Keep the grid running through the drought",
-    },
+    // The only objective in the set that is not a flat 100%. Every other scenario asks the
+    // player to prevent a shortage; this one asks them to hold a grid together through one,
+    // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
+    // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
+    // that is grading the weather rather than the decisions. Passive play sheds 86% in the
+    // October of this year, so this stays a long way from a formality.
+    reliabilityObjective: officialReliabilityMetadata(114, 2012),
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
     // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
@@ -1952,15 +1921,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.08,
     cash: 120000000,
     feePerKgCO2e: 0,
-    reliabilityObjective: {
-      // Delhi set an all-time peak of 8,656MW on 19 June 2024 after weeks above 45C.
-      year: 2024,
-      month: 5,
-      durationMonths: 3,
-      minimumDemandServed: 0.995,
-      label: "record summer of 2024",
-      goal: "Keep the lights on through the record summer",
-    },
+    // Delhi set an all-time peak of 8,656MW on 19 June 2024 after weeks above 45C.
+    reliabilityObjective: officialReliabilityMetadata(115, 2018),
     // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
     // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop
     // and allocated solar that had been built by then.

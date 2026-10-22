@@ -94,6 +94,8 @@ npm run sim -- --mod path/to/scenario.json --free-fallback --seeds 1,2 --difficu
 Packages are data only, at most 256 KiB, with timed effects, consequential choices,
 explicit measurable goals and optional imported challenge arcs. The compiler
 reports independent errors and warnings; warnings alone do not block publishing.
+All 14 bundled challenges use the same plain rules, compiler and interpreter as
+community scenarios; importing an arc does not grant official eligibility.
 Saves and co-op campaigns retain their frozen rules after a package update or
 removal. Importing the same local ID offers Update, Keep both or Cancel.
 

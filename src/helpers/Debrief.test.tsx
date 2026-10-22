@@ -227,3 +227,136 @@ it("surfaces the researched Uri outcome metrics", () => {
     }),
   ]);
 });
+
+it("retains native connection metrics before and after arrival without waiting for the full term", () => {
+  const scenario = SCENARIOS.find((candidate) => candidate.id === 106)!;
+  const row = (
+    year: number,
+    month: number,
+    patch: Partial<MonthlyHistoryType> = {},
+  ) => ({ ...summary, year, month, demandWh: 100, supplyWh: 100, ...patch });
+  const debrief = (months: MonthlyHistoryType[]) =>
+    buildVictoryDebrief(scenario, summary, [], [], months, 0.12)
+      .scenarioMetrics;
+  expect(debrief([row(2025, 12)])).toEqual([
+    {
+      label: "Months with blackouts after Data Centers arrived",
+      value: "Not reached",
+      concept: "blackout",
+    },
+    {
+      label: "Electricity rate",
+      value: "$0.1/kWh → $0.12/kWh",
+      concept: "rate",
+    },
+  ]);
+  expect(
+    debrief([
+      row(2026, 2),
+      row(2026, 1, { supplyWh: 90 }),
+      row(2025, 12, { supplyWh: 0 }),
+    ]),
+  ).toEqual([
+    {
+      label: "Months with blackouts after Data Centers arrived",
+      value: "1",
+      concept: "blackout",
+    },
+    {
+      label: "Electricity rate",
+      value: "$0.1/kWh → $0.12/kWh",
+      concept: "rate",
+    },
+  ]);
+});
+
+it("retains each native Uri observation when a run ends before recovery", () => {
+  const scenario = SCENARIOS.find((candidate) => candidate.id === 107)!;
+  const row = (month: number, patch: Partial<MonthlyHistoryType> = {}) => ({
+    ...summary,
+    year: 2021,
+    month,
+    supplyWh: 1e9,
+    demandWh: 1e9,
+    revenue: 90000,
+    cash: 1e8,
+    minimumSupplyMarginW: 0,
+    ...patch,
+  });
+  const before = row(1),
+    impact = row(2, { supplyWh: 9e8, minimumSupplyMarginW: -1e8 });
+  const result = buildVictoryDebrief(
+    scenario,
+    summary,
+    [],
+    [],
+    [impact, before],
+  ).scenarioMetrics;
+  expect(result).toEqual([
+    {
+      label: "Demand not met during Winter Storm Uri · Feb 2021",
+      value: "100MWh",
+      concept: "blackout",
+    },
+    {
+      label: "Largest shortage during Winter Storm Uri",
+      value: "100MW",
+      concept: "supply",
+    },
+    {
+      label: "Electricity rate · before → after",
+      value: "Not reached",
+      concept: "rate",
+    },
+    {
+      label: "Cash stayed above $0 through Mar 2021",
+      value: "Not reached",
+      concept: "money",
+    },
+  ]);
+  const unreached = buildVictoryDebrief(
+    scenario,
+    summary,
+    [],
+    [],
+    [before],
+  ).scenarioMetrics;
+  expect(unreached).toHaveLength(4);
+  expect(unreached!.every((metric) => metric.value === "Not reached")).toBe(
+    true,
+  );
+});
+
+it("derives native review dates from the resolved starting year", () => {
+  const scenario = {
+    ...SCENARIOS.find((candidate) => candidate.id === 107)!,
+    startingYear: 2037,
+  };
+  const months = [1, 2, 3].map((month) => ({
+    ...summary,
+    year: 2041,
+    month,
+    supplyWh: 1e9,
+    demandWh: 1e9,
+    revenue: 90000,
+    cash: 1e8,
+    minimumSupplyMarginW: 0,
+  }));
+  const metrics = buildVictoryDebrief(
+    scenario,
+    summary,
+    [],
+    [],
+    months,
+  ).scenarioMetrics;
+  expect(metrics).toContainEqual({
+    label: "Demand not met during Winter Storm Uri · Feb 2041",
+    value: "0Wh",
+    concept: "blackout",
+  });
+  expect(metrics).toContainEqual({
+    label: "Cash stayed above $0 through Mar 2041",
+    value: "Yes",
+    concept: "money",
+  });
+});

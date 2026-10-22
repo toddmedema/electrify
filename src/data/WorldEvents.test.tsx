@@ -10,16 +10,16 @@ import {
   PARADISE_BALANCE,
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
-  resolveStoryScheduleMonth,
-  STORY_ARC_DEFINITIONS,
-  StoryArcDefinitionType,
-  storyPhaseKey,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
   WILDFIRE_DECISION_KEY,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
 import { SCENARIO_PREPARATION_MONTHS } from "./ScenarioPreparation";
+import { OFFICIAL_SCENARIO_RULES } from "./OfficialScenarioRules";
+import { getScenario } from "./Scenarios";
+import type { RuleEvent, ScenarioRuleDefinitions } from "./ScenarioRules";
+import { compileScenarioRules, scenarioRules } from "../helpers/ScenarioRules";
 
 const EMPTY_SNAPSHOT: StorySnapshotType = {
   deliveredWhByFuel12m: {},
@@ -33,39 +33,87 @@ const EMPTY_SNAPSHOT: StorySnapshotType = {
   facilities: [],
 };
 
-const definition: StoryArcDefinitionType = {
-  id: "test-arc",
-  scenarioId: 103,
-  phases: [
-    {
-      id: "warning",
-      schedule: { atMonth: 2 },
-      preview: () => null,
-      describe: () => ({ kind: "FUEL_PRICE", message: "Warning" }),
-    },
+const definition: ScenarioRuleDefinitions = {
+  objectives: [],
+  events: [
+    { id: "warning", title: "Warning", message: "Warning", startMonth: 3 },
     {
       id: "onset",
-      schedule: {
-        seededMonthRange: { firstMonth: 4, lastMonth: 8 },
-        randomKey: "onset-month",
-      },
+      title: "Prices change",
+      message: "Prices change.",
+      startMonth: { from: 5, to: 9 },
       durationMonths: 3,
-      preview: () => ({ message: "Prices will change." }),
-      describe: (_context, random) => {
-        const size = Math.round(10 + random("size") * 90);
-        return {
-          kind: "FUEL_PRICE",
-          message: `Change ${size}`,
-          attributes: { size },
-          effects: {
-            demandMultiplier: 1.1,
-            fuelPriceMultipliers: { "Natural Gas": 0.75 },
+      preview: "Prices will change.",
+      effects: {
+        demandMultiplier: 1.1,
+        fuelPriceMultipliers: { "Natural Gas": 0.75 },
+        outputMultipliersBySelector: [
+          {
+            target: {
+              selector: "seededOperatingCapacityShare",
+              targetCapacityShare: 0.5,
+            },
+            outputMultiplier: 0.5,
           },
-        };
+        ],
       },
     },
   ],
 };
+const compile = (seed = 12345, events = definition.events!) =>
+  compileScenarioRules(
+    { ...definition, events },
+    {
+      namespace: { kind: "official", scenarioId: 103, arcId: "test-arc" },
+      difficulty: "Manager",
+      seed,
+      startingYear: 2006,
+      durationMonths: 24,
+      startingPeakW: 300,
+      startingAssetIds: [],
+    },
+  );
+const onsetMonth = (seed = 12345) =>
+  compile(seed).events.find((event) => event.id === "onset")!.startMonth;
+const scheduledMonth = (scenarioId: number, phaseId: string, seed = 12345) =>
+  scenarioRules(getScenario(scenarioId), {
+    difficulty: "Manager",
+    seed,
+  })!.events.find((event) => event.id === phaseId)!.startMonth -
+  (SCENARIO_PREPARATION_MONTHS[scenarioId] ?? 0);
+const fixtureContext = (month: number, rules = compile()) => ({
+  ...context(month, 103, rules.seed),
+  rules,
+  snapshot: {
+    ...EMPTY_SNAPSHOT,
+    facilities: [
+      {
+        id: 1,
+        name: "Coal",
+        fuel: "Coal" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+      {
+        id: 2,
+        name: "Gas",
+        fuel: "Natural Gas" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+      {
+        id: 3,
+        name: "Wind",
+        fuel: "Wind" as const,
+        ageYears: 10,
+        peakW: 100,
+        operational: true,
+      },
+    ],
+  },
+});
 
 function context(month: number, scenarioId = 103, seed = 12345) {
   return {
@@ -84,85 +132,74 @@ function context(month: number, scenarioId = 103, seed = 12345) {
 
 describe("deterministic story schedules", () => {
   it("resolves fixed months relative to the scenario start", () => {
-    const result = resolveStoryAtDate(context(2), [definition]);
+    const result = resolveStoryAtDate(fixtureContext(2));
     expect(result.occurrences.map((event) => event.key)).toEqual([
       "story:103:test-arc:warning",
     ]);
   });
 
-  it("keeps seeded timing and attributes stable for a seed", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
-    );
-    const first = resolveStoryAtDate(context(month), [definition]);
-    const second = resolveStoryAtDate(context(month), [definition]);
+  it("keeps seeded timing and target attributes stable for a seed", () => {
+    const month = onsetMonth();
+    const first = resolveStoryAtDate(fixtureContext(month));
+    const second = resolveStoryAtDate(fixtureContext(month));
     expect(first).toEqual(second);
+    expect(first.occurrences[0].attributes.selectedFacilityIds).toHaveLength(2);
     expect(month).toBeGreaterThanOrEqual(4);
     expect(month).toBeLessThanOrEqual(8);
   });
 
   it("varies a seeded schedule across a seed sample", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
     const months = new Set(
-      Array.from({ length: 20 }, (_, seed) =>
-        resolveStoryScheduleMonth(definition.phases[1].schedule, seed + 1, key),
-      ),
+      Array.from({ length: 20 }, (_, seed) => onsetMonth(seed + 1)),
     );
     expect(months.size).toBeGreaterThan(1);
   });
 
   it("is independent of definition order", () => {
-    const other: StoryArcDefinitionType = {
+    const other: RuleEvent = {
       id: "unrelated",
-      scenarioId: 103,
-      phases: [
-        {
-          id: "phase",
-          schedule: {
-            seededMonthRange: { firstMonth: 1, lastMonth: 20 },
-            randomKey: "other",
-          },
-          preview: () => ({ message: "Another change will arrive." }),
-          describe: () => ({ kind: "FUEL_PRICE", message: "Other" }),
-        },
-      ],
+      title: "Other",
+      message: "Other",
+      startMonth: { from: 2, to: 21 },
+      preview: "Another change will arrive.",
     };
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
+    const events = [...definition.events!, other];
+    const month = onsetMonth();
+    const expected = resolveStoryAtDate(
+      fixtureContext(month, compile(12345, events)),
     );
-    const expected = resolveStoryAtDate(context(month), [definition, other]);
-    const reordered = resolveStoryAtDate(context(month), [other, definition]);
+    const reordered = resolveStoryAtDate(
+      fixtureContext(month, compile(12345, [...events].reverse())),
+    );
     expect(reordered).toEqual(expected);
   });
 
-  it("scopes definitions to their authored scenario, including custom games", () => {
+  it("scopes authored rules to their scenario and explicitly selected custom arcs", () => {
     expect(
-      resolveStoryAtDate(context(2, 100), [definition]).occurrences,
-    ).toEqual([]);
+      resolveStoryAtDate(context(48, 103)).effects.fuelPriceMultipliers,
+    ).toEqual({ "Natural Gas": 0.75 });
+    const otherScenario = resolveStoryAtDate(context(48, 100));
     expect(
-      resolveStoryAtDate(context(2, 999), [definition]).occurrences,
-    ).toEqual([]);
+      otherScenario.occurrences.some((event) =>
+        event.key.startsWith("story:103:"),
+      ),
+    ).toBe(false);
+    expect(otherScenario.effects.fuelPriceMultipliers).toBeUndefined();
+    expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
+    expect(
+      resolveStoryAtDate({
+        ...context(48, 999),
+        customEvents: [{ scenarioId: 103, moneyScale: 1 }],
+      }).effects.fuelPriceMultipliers,
+    ).toEqual({ "Natural Gas": 0.75 });
   });
 
   it("returns the same scheduled effect throughout its forecast window", () => {
-    const key = storyPhaseKey(103, "test-arc", "onset");
-    const month = resolveStoryScheduleMonth(
-      definition.phases[1].schedule,
-      12345,
-      key,
+    const month = onsetMonth();
+    expect(resolveStoryAtDate(fixtureContext(month)).effects).toEqual(
+      resolveStoryAtDate(fixtureContext(month + 2)).effects,
     );
-    expect(resolveStoryAtDate(context(month), [definition]).effects).toEqual(
-      resolveStoryAtDate(context(month + 2), [definition]).effects,
-    );
-    expect(
-      resolveStoryAtDate(context(month + 3), [definition]).effects,
-    ).toEqual({});
+    expect(resolveStoryAtDate(fixtureContext(month + 3)).effects).toEqual({});
   });
 });
 
@@ -308,7 +345,7 @@ describe("The Shale Boom pilot arc", () => {
       "summer-outlook",
     ]);
 
-    STORY_ARC_DEFINITIONS.forEach((arc) => {
+    OFFICIAL_SCENARIO_RULES.forEach((arc) => {
       const upcomingIds = upcomingStoryPhases(context(0, arc.scenarioId)).map(
         (phase) => phase.key.split(":").at(-1),
       );
@@ -318,7 +355,7 @@ describe("The Shale Boom pilot arc", () => {
 });
 
 describe("authored upcoming-event previews", () => {
-  it.each(STORY_ARC_DEFINITIONS.map((arc) => [arc.id, arc] as const))(
+  it.each(OFFICIAL_SCENARIO_RULES.map((arc) => [arc.arcId, arc] as const))(
     "%s hides exact outcomes in native and custom forecasts",
     (_id, arc) => {
       const difficulties: DifficultyType[] = [
@@ -373,22 +410,30 @@ describe("authored upcoming-event previews", () => {
           ).toEqual(
             events.map(({ key, title, message }) => ({ key, title, message })),
           );
-          const hiddenIds = arc.phases
+          const hiddenIds = (arc.definitions.events ?? [])
             .filter(
-              (phase) =>
-                phase.forecastable === false ||
-                phase.preview(start, () => 0.5) === null,
+              (event) =>
+                event.visibility === "surprise" ||
+                arc.presentation[event.id]?.hidePreview ||
+                !event.preview,
             )
-            .map((phase) => phase.id);
+            .map((event) => event.id);
           expect(
             events.filter((event) =>
               hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
             ),
           ).toEqual([]);
-          const previews = arc.phases.flatMap((phase) => {
-            const preview = phase.preview(start, () => 0.5);
-            return preview ? [preview] : [];
-          });
+          const previews = (arc.definitions.events ?? []).flatMap((event) =>
+            event.preview
+              ? [
+                  {
+                    title:
+                      arc.presentation[event.id]?.previewTitle ?? event.title,
+                    message: event.preview,
+                  },
+                ]
+              : [],
+          );
           for (const preview of previews) {
             // Also review the opening phase, which may already be active at month zero.
             expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
@@ -534,6 +579,7 @@ describe("generation and storage reliability scenarios", () => {
         {
           id: 7,
           name: "Grand Nuclear Unit",
+          startingAssetId: "scenario-110-grand-nuclear-unit",
           fuel: "Uranium",
           ageYears: 22,
           peakW: 500_000_000,
@@ -546,13 +592,7 @@ describe("generation and storage reliability scenarios", () => {
     expect(
       upcomingStoryPhases(before).some((phase) => phase.key.endsWith(":trip")),
     ).toBe(false);
-    const arc = STORY_ARC_DEFINITIONS.find((item) => item.scenarioId === 110)!;
-    const tripPhase = arc.phases.find((phase) => phase.id === "trip")!;
-    const month = resolveStoryScheduleMonth(
-      tripPhase.schedule,
-      77,
-      storyPhaseKey(110, arc.id, tripPhase.id),
-    );
+    const month = scheduledMonth(110, "trip", 77);
     expect(month).toBeGreaterThanOrEqual(30);
     expect(month).toBeLessThanOrEqual(36);
     const trip = resolveStoryAtDate({
@@ -742,12 +782,7 @@ describe("remaining scored story arcs", () => {
         },
       ],
     };
-    const landfallMonth = resolveStoryScheduleMonth(
-      STORY_ARC_DEFINITIONS.find((arc) => arc.scenarioId === 104)!.phases[1]
-        .schedule,
-      77,
-      storyPhaseKey(104, "hurricane-2008", "landfall"),
-    );
+    const landfallMonth = scheduledMonth(104, "landfall", 77);
     const resolve = (facilities: StorySnapshotType["facilities"]) =>
       resolveStoryAtDate({
         ...context(landfallMonth, 104, 77),
@@ -764,14 +799,7 @@ describe("remaining scored story arcs", () => {
   });
 
   it("reports exact hurricane restoration-window totals", () => {
-    const hurricane = STORY_ARC_DEFINITIONS.find(
-      (arc) => arc.scenarioId === 104,
-    )!;
-    const landfallMonth = resolveStoryScheduleMonth(
-      hurricane.phases[1].schedule,
-      77,
-      storyPhaseKey(104, "hurricane-2008", "landfall"),
-    );
+    const landfallMonth = scheduledMonth(104, "landfall", 77);
     const restoration = resolveStoryAtDate({
       ...context(landfallMonth + 4, 104, 77),
       periodSnapshots: {

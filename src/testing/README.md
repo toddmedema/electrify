@@ -140,6 +140,21 @@ not prove an objective impossible or a late phase reached. The
 [coverage matrix](../../docs/mods/coverage-matrix.md) maps trust, save/replay,
 forecast, choice and co-op boundaries to their owning regressions.
 
+All 14 official challenges use the same catalog definitions and interpreter as
+imported arcs. [Independent phase parity](OfficialScenarioPhaseParity.test.tsx)
+compares frozen old setup, timing, previews, effects, targets and review facts
+across all difficulties and seeded onset neighbors.
+[Native execution](../reducers/OfficialScenarioExecution.sim.test.tsx) exercises
+legal full campaigns, live/catch-up boundaries, forecast transport, saves and
+official replay; [two-company parity](../multiplayer/OfficialWorldParity.sim.test.tsx)
+compares independently captured complete Worlds. Keep the old fixture hashes
+unchanged. These are separate from the ordinary all-scenario sweep: an early bot
+failure cannot establish parity at a later event or goal window. The
+[multiplayer browser suite](../../e2e/multiplayer.spec.ts) adds native 106/107
+selection, separate company responses, real forecasts, goals and ordinary
+save/resume at 1280, 390 and 360 px. Consult the current validation report for
+which commands and reached assertions have actually passed.
+
 Maintainers regenerate the editor schema and recipes with `npm run mods:schema`
 and `npm run mods:recipes`; add `-- --check` to detect drift. The generated
 [arc reference](../../docs/mods/arc-reference.md) comes from actual imported

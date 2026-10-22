@@ -5,6 +5,7 @@ import {
   interpretRuleReport,
   RuleReportContext,
   RuleReportResult,
+  validRuleReportReceipt,
 } from "./ScenarioRuleReports";
 
 function month(
@@ -37,6 +38,86 @@ function metric(result: RuleReportResult, id: string) {
   expect(found).toBeDefined();
   return found!;
 }
+
+test.each<RuleReport>([
+  { id: "reliability", kind: "reliability", fromMonth: 0, throughMonth: 2 },
+  { id: "affected", kind: "affectedFacilities", eventId: "onset" },
+  {
+    id: "mix",
+    kind: "fuelMix",
+    fromMonth: 0,
+    throughMonth: 2,
+    fuels: ["Coal"],
+  },
+  { id: "firm", kind: "firmCoverage", fromMonth: 0, throughMonth: 2 },
+  { id: "storage", kind: "storageCoverage", fromMonth: 0, throughMonth: 2 },
+  { id: "profit", kind: "profitLoss", fromMonth: 0, throughMonth: 2 },
+  { id: "data-center", kind: "dataCenter", fromMonth: 0, throughMonth: 2 },
+  { id: "freeze", kind: "deepFreeze", fromMonth: 0, throughMonth: 2 },
+])(
+  "$kind ending receipts accept real report facts and reject injected instructions",
+  (report) => {
+    const inputs = context(
+      [0, 1, 2].map((index) =>
+        month(index, {
+          revenue: 10,
+          deliveredWhByFuel: { Coal: 50, Wind: 50 },
+        }),
+      ),
+      {
+        startingRateDollarsPerKWh: 0.1,
+        endingRateDollarsPerKWh: 0.12,
+        snapshotMonth: 2,
+        snapshot: { firmPeakW: 100, storagePeakW: 50, storagePeakWh: 500 },
+        eventKeys: { onset: "observed-onset" },
+        occurrences: [
+          {
+            key: "observed-onset",
+            definitionId: "onset",
+            startsMinute: 0,
+            endsMinute: MINUTES_PER_MONTH,
+            attributes: { selectedFacilityNames: ["Original plant"] },
+            effects: {},
+          },
+        ],
+      },
+    );
+    const result = interpretRuleReport(report, inputs);
+    expect(result.available).toBe(true);
+    expect(
+      validRuleReportReceipt(
+        report,
+        result.attributes,
+        result.importance,
+        result.turningPointPriority,
+      ),
+    ).toBe(true);
+    for (const attributes of [
+      { ...result.attributes, upfrontGrant: 1e9 },
+      { ...result.attributes, [Object.keys(result.attributes)[0]]: undefined },
+    ])
+      expect(
+        validRuleReportReceipt(
+          report,
+          attributes,
+          result.importance,
+          result.turningPointPriority,
+        ),
+      ).toBe(false);
+    expect(
+      validRuleReportReceipt(
+        report,
+        result.attributes,
+        "CRITICAL",
+        result.turningPointPriority,
+      ),
+    ).toBe(false);
+    expect(
+      validRuleReportReceipt(report, result.attributes, result.importance, 999),
+    ).toBe(false);
+    expect(validRuleReportReceipt(report, {}, "ROUTINE", 0)).toBe(true);
+  },
+);
 
 const reliability: RuleReport = {
   id: "reliability",
@@ -634,5 +715,161 @@ describe("deep-freeze debrief feedback", () => {
       interpretRuleReport({ ...report, throughMonth: 1 }, context(rows))
         .available,
     ).toBe(false);
+  });
+});
+
+describe("catalog debrief observations before the term ends", () => {
+  const report: RuleReport = {
+    id: "data-center-review",
+    kind: "dataCenter",
+    fromMonth: 0,
+    throughMonth: 5,
+  };
+  const rates = {
+    startingRateDollarsPerKWh: 0.1,
+    endingRateDollarsPerKWh: 0.12,
+  };
+  const freeze: RuleReport = {
+    id: "freeze-review",
+    label: "Winter Storm Uri",
+    kind: "deepFreeze",
+    fromMonth: 0,
+    throughMonth: 2,
+  };
+  const before = month(0, { supplyWh: 1000, demandWh: 1000, revenue: 90 });
+  const impact = month(1, {
+    supplyWh: 900,
+    demandWh: 1000,
+    minimumSupplyMarginW: -25,
+  });
+  const after = month(2, {
+    supplyWh: 1000,
+    demandWh: 1000,
+    revenue: 160,
+    revenueExports: 10,
+    revenueGrants: 50,
+  });
+
+  it("counts reached data-center months while preserving the strict complete-window neighbor", () => {
+    const inputs = context([month(0), month(1, { supplyWh: 90 })], {
+      ...rates,
+      completedMonths: 2,
+    });
+    const partial = interpretRuleReport(report, {
+      ...inputs,
+      catalogDebrief: true,
+    });
+    expect(metric(partial, "blackoutMonths")).toMatchObject({
+      available: true,
+      value: 1,
+    });
+    expect(metric(partial, "electricityRate")).toMatchObject({
+      available: true,
+      value: "$0.1/kWh → $0.12/kWh",
+    });
+    const strict = interpretRuleReport(report, inputs);
+    expect(strict.available).toBe(false);
+    expect(strict.metrics).toEqual([]);
+  });
+
+  it("keeps known data-center rates when the connection is unreached or a reached month is missing", () => {
+    for (const [definition, history, completedMonths] of [
+      [{ ...report, fromMonth: 2 }, [month(0)], 1],
+      [report, [month(1)], 2],
+      [report, [month(0), month(0)], 1],
+    ] as const) {
+      const result = interpretRuleReport(
+        definition,
+        context([...history], {
+          ...rates,
+          completedMonths,
+          catalogDebrief: true,
+        }),
+      );
+      expect(metric(result, "blackoutMonths").available).toBe(false);
+      expect(metric(result, "electricityRate")).toMatchObject({
+        available: true,
+        value: "$0.1/kWh → $0.12/kWh",
+      });
+    }
+  });
+
+  it("keeps recorded freeze shortages while the recovery rate and cash window remain unreached", () => {
+    const inputs = context([impact, before], { completedMonths: 2 });
+    const result = interpretRuleReport(freeze, {
+      ...inputs,
+      catalogDebrief: true,
+    });
+    expect(metric(result, "unservedWh")).toMatchObject({
+      label: "Demand not met during Winter Storm Uri · Feb 2020",
+      available: true,
+      value: 100,
+    });
+    expect(metric(result, "maximumDeficitW")).toMatchObject({
+      label: "Largest shortage during Winter Storm Uri",
+      available: true,
+      value: 25,
+    });
+    expect(metric(result, "electricityRate").available).toBe(false);
+    expect(metric(result, "cashStayedPositive")).toMatchObject({
+      label: "Cash stayed above $0 through Mar 2020",
+      available: false,
+    });
+    expect(interpretRuleReport(freeze, inputs).metrics).toEqual([]);
+  });
+
+  it("derives native labels from the actual report calendar and excludes grants and exports from billed rates", () => {
+    const shifted = [before, impact, after].map((row) => ({
+      ...row,
+      year: 2040,
+    }));
+    const result = interpretRuleReport(
+      freeze,
+      context(shifted, { startingYear: 2040, catalogDebrief: true }),
+    );
+    expect(result.available).toBe(true);
+    expect(metric(result, "unservedWh").label).toBe(
+      "Demand not met during Winter Storm Uri · Feb 2040",
+    );
+    expect(metric(result, "cashStayedPositive")).toMatchObject({
+      label: "Cash stayed above $0 through Mar 2040",
+      value: true,
+    });
+    expect(metric(result, "electricityRate").value).toBe("$90/kWh → $100/kWh");
+    const strict = interpretRuleReport(
+      freeze,
+      context(shifted, { startingYear: 2040 }),
+    );
+    expect(strict.available).toBe(true);
+    expect(metric(strict, "unservedWh").label).toBe(
+      "Demand not met during the freeze",
+    );
+  });
+
+  it("never turns an absent, duplicate, future or invalid impact observation into a zero shortage", () => {
+    for (const history of [
+      [before],
+      [before, impact, impact],
+      [before, { ...impact, minimumSupplyMarginW: Number.NaN }],
+    ]) {
+      const result = interpretRuleReport(
+        freeze,
+        context(history, { completedMonths: 2, catalogDebrief: true }),
+      );
+      expect(metric(result, "maximumDeficitW").available).toBe(false);
+    }
+    const future = interpretRuleReport(
+      freeze,
+      context([before, impact], { completedMonths: 1, catalogDebrief: true }),
+    );
+    expect(metric(future, "unservedWh").available).toBe(false);
+    const valid = interpretRuleReport(
+      freeze,
+      context([before, impact, { ...after, cash: 0 }], {
+        catalogDebrief: true,
+      }),
+    );
+    expect(metric(valid, "maximumDeficitW").value).toBe(25);
+    expect(metric(valid, "cashStayedPositive").value).toBe(false);
   });
 });

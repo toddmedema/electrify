@@ -6,19 +6,7 @@ import type {
   RuleDiagnostic,
   RuleReport,
 } from "../data/ScenarioRules";
-import {
-  resolveStoryPhase,
-  resolveStoryScheduleMonth,
-  STORY_ARC_DEFINITIONS,
-  storyPhaseKey,
-} from "../data/WorldEvents";
-import type {
-  StoryArcDefinitionType,
-  StoryContextType,
-  StoryPhaseDefinitionType,
-} from "../data/WorldEvents";
 import { SCENARIOS } from "../data/Scenarios";
-import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { inEraMoney } from "../data/FuelPrices";
 import type {
@@ -29,7 +17,6 @@ import type {
   ScenarioType,
   StoryActionTargetType,
 } from "../Types";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { getScenarioLocation } from "./Locations";
 import { isRuleJson, UNSAFE_TEXT, UNSAFE_MARKUP } from "./ScenarioRulesSchema";
 export { relocateOfficialArcMonth } from "./ScenarioArcTiming";
@@ -94,79 +81,7 @@ const detached = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const eventId = (scenarioId: number, phaseId: string) =>
   `arc-${scenarioId}-${phaseId}`;
 
-function reportsFor(
-  arc: StoryArcDefinitionType,
-  phase: StoryPhaseDefinitionType,
-  startMonth: number,
-  events: readonly CompiledOfficialArcEvent[],
-): RuleReport[] {
-  const id = eventId(arc.scenarioId, phase.id);
-  const window = (months = 12) => ({
-    fromMonth: Math.max(0, startMonth - months),
-    throughMonth: startMonth - 1,
-  });
-  const reliability = (months = 12): RuleReport => ({
-    id: `${id}-reliability`,
-    kind: "reliability",
-    ...window(months),
-    minDemandServedShare: 0.999,
-  });
-  const affected = (phaseId: string): RuleReport => ({
-    id: `${id}-affected`,
-    kind: "affectedFacilities",
-    eventId: eventId(arc.scenarioId, phaseId),
-  });
-  const mix = (
-    fuels: Extract<RuleReport, { kind: "fuelMix" }>["fuels"],
-  ): RuleReport => ({
-    id: `${id}-fuel-mix`,
-    kind: "fuelMix",
-    ...window(),
-    fuels,
-    basis: "customerDemand",
-  });
-  switch (`${arc.scenarioId}:${phase.id}`) {
-    case "103:normalization":
-      return [mix(["Natural Gas"]), reliability()];
-    case "105:local-energy-review":
-      return [
-        mix(["Coal", "Natural Gas", "Oil", "Uranium", "Biomass"]),
-        reliability(),
-      ];
-    case "101:integration-review":
-      return [
-        mix(["Sun", "Wind", "Offshore Wind", "Airborne Wind"]),
-        reliability(),
-        { id: `${id}-firm-coverage`, kind: "firmCoverage", ...window() },
-        { id: `${id}-storage-coverage`, kind: "storageCoverage", ...window() },
-      ];
-    case "102:successor-review":
-      return [
-        mix(["Coal"]),
-        reliability(),
-        { id: `${id}-profit-loss`, kind: "profitLoss", ...window() },
-        { id: `${id}-firm-coverage`, kind: "firmCoverage", ...window() },
-      ];
-    case "104:landfall":
-    case "111:firestorm":
-    case "102:aging-derate":
-    case "110:trip":
-      return [affected(phase.id)];
-    case "104:restoration": {
-      const onset = events.find((event) => event.source.phaseId === "landfall");
-      return [affected("landfall"), reliability(onset?.durationMonths ?? 0)];
-    }
-    case "111:restoration-complete":
-      return [affected("firestorm"), reliability(2)];
-    case "107:thaw":
-      // March has not completed at thaw onset. The full before/impact/after review is a debrief.
-      return [reliability(1)];
-    default:
-      return [];
-  }
-}
-
-/** Trusted callbacks are used only while compiling catalog content, never by the interpreter. */
+/** Catalog definitions use the common compiler. Adapt only receiving-grid units, keys and copy. */
 export function compileOfficialArcEvents(
   params: OfficialArcCompileParameters,
   scenarioIds: readonly number[],
@@ -174,8 +89,15 @@ export function compileOfficialArcEvents(
   const results: CompiledOfficialArcEvent[] = [];
   const diagnostics = params.diagnostics ?? [];
   for (const scenarioId of [...new Set(scenarioIds)].sort((a, b) => a - b)) {
-    const source = SCENARIOS.find((scenario) => scenario.id === scenarioId);
-    if (!source || source.tutorialSteps) {
+    const source = SCENARIOS.find(
+      (scenario) => scenario.id === scenarioId && !scenario.tutorialSteps,
+    );
+    const shared =
+      source &&
+      officialScenarioRules(source, params, {
+        startingYear: params.startingYear,
+      });
+    if (!source || !shared) {
       diagnostics.push({
         code: "unknown-arc",
         path: `rules.officialArcs[${scenarioId}]`,
@@ -184,286 +106,92 @@ export function compileOfficialArcEvents(
       });
       continue;
     }
-    const shared = officialScenarioRules(source, params, {
-      startingYear: params.startingYear,
-    });
-    if (shared) {
-      for (const compiled of shared.events) {
-        const startMonth = compiled.startMonth;
-        const imported = params.namespace.kind === "mod";
-        const changes = scenarioEffectsSummary(compiled.effects);
-        const event: CompiledOfficialArcEvent = {
-          ...detached(compiled),
-          id: eventId(scenarioId, compiled.source!.phaseId),
-          key: imported
-            ? `mod:${params.namespace.kind === "mod" ? params.namespace.id : ""}:arc:${scenarioId}:${compiled.source!.arcId}:${compiled.source!.phaseId}`
-            : compiled.key,
-          message: imported
-            ? `${getScenarioLocation(params.receivingScenario)!.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`
-            : compiled.message,
-          durationMonths: Math.max(
-            0,
-            Math.min(
-              compiled.durationMonths,
-              params.durationMonths - startMonth,
-            ),
-          ),
-          source: detached(compiled.source!),
-        };
-        if (startMonth >= params.durationMonths)
-          diagnostics.push({
-            code: "outside-term",
-            path: `rules.officialArcs[${scenarioId}].${compiled.source!.phaseId}`,
-            severity: "error",
-            message: `${event.title} can occur in month ${startMonth + 1}, after this run ends in month ${params.durationMonths}. Extend the term or remove this arc.`,
-          });
-        if (
-          startMonth + compiled.durationMonths > params.durationMonths &&
-          compiled.durationMonths > 0
-        )
-          diagnostics.push({
-            code: "duration-truncated",
-            path: `rules.officialArcs[${scenarioId}].${compiled.source!.phaseId}.durationMonths`,
-            severity: "warning",
-            message: `${event.title}'s duration is truncated at the end of the run.`,
-          });
-        results.push(event);
-      }
-      continue;
-    }
     const imported = params.namespace.kind === "mod";
     const location = getScenarioLocation(
       imported ? params.receivingScenario : source,
-    );
-    if (!location)
-      throw new Error(`Official arc ${scenarioId} has no receiving location.`);
-    const context: StoryContextType = {
-      seed: params.seed,
-      scenarioId: imported ? 999 : scenarioId,
-      difficulty: params.difficulty,
-      date: getDateFromMinute(0, params.startingYear),
-      location,
-      snapshot: {
-        deliveredWhByFuel12m: {},
-        demandWh12m: 0,
-        unservedWh12m: 0,
-        netIncome12m: 0,
-        peakDemandW12m: 0,
-        firmPeakW: 0,
-        storagePeakW: 0,
-        storagePeakWh: 0,
-        facilities: [],
-      },
-      ...(imported
-        ? {
-            customEvents: [
-              {
-                scenarioId,
-                moneyScale: 1,
-              },
-            ],
-          }
-        : {}),
-    };
-    for (const arc of STORY_ARC_DEFINITIONS.filter(
-      (definition) => definition.scenarioId === scenarioId,
-    )) {
-      const arcResults: CompiledOfficialArcEvent[] = [];
-      for (const phase of arc.phases) {
-        const resolved = resolveStoryPhase(arc, phase, context);
-        const originalDuration =
-          (resolved.endsMinute - resolved.startsMinute) / MINUTES_PER_MONTH;
-        const offset =
-          typeof phase.scheduleOffsetMonths === "function"
-            ? phase.scheduleOffsetMonths(context)
-            : (phase.scheduleOffsetMonths ?? 0);
-        const shift = (month: number) =>
-          relocateOfficialArcMonth(scenarioId, month + offset, "phase");
-        const startMonth = shift(
-          officialArcScheduleMonth(arc, phase, params.seed),
+    )!;
+    for (const compiled of shared.events) {
+      const { report, reports, ...base } = detached(compiled);
+      const phaseId = compiled.source!.phaseId;
+      const id = eventId(scenarioId, phaseId);
+      const effects = { ...compiled.effects };
+      if (imported && effects.operatingExpensePerMonth !== undefined)
+        effects.operatingExpensePerMonth = officialArcMoneyAmount(
+          effects.operatingExpensePerMonth,
+          source,
+          params.receivingScenario,
         );
-        const possibleStartMonths =
-          "atMonth" in phase.schedule
-            ? {
-                from: shift(phase.schedule.atMonth),
-                to: shift(phase.schedule.atMonth),
-              }
-            : {
-                from: shift(phase.schedule.seededMonthRange.firstMonth),
-                to: shift(phase.schedule.seededMonthRange.lastMonth),
-              };
-        const id = eventId(scenarioId, phase.id);
-        const key =
-          params.namespace.kind === "mod"
-            ? `mod:${params.namespace.id}:arc:${scenarioId}:${arc.id}:${phase.id}`
-            : resolved.key;
-        const event: CompiledOfficialArcEvent = {
-          id,
-          key,
-          title: resolved.title ?? "Scenario event",
-          message: resolved.message,
-          startMonth,
-          possibleStartMonths,
-          durationMonths: Math.max(
-            0,
-            Math.min(originalDuration, params.durationMonths - startMonth),
+      const changes = scenarioEffectsSummary(effects);
+      const event: CompiledOfficialArcEvent = {
+        ...base,
+        effects,
+        id,
+        key: imported
+          ? `mod:${params.namespace.kind === "mod" ? params.namespace.id : ""}:arc:${scenarioId}:${compiled.source!.arcId}:${phaseId}`
+          : compiled.key,
+        title: imported
+          ? compiled.title.replace(
+              /\b(?:19|20)\d{2}\b/g,
+              String(
+                params.startingYear + Math.floor(compiled.startMonth / 12),
+              ),
+            )
+          : compiled.title,
+        message: imported
+          ? `${location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`
+          : compiled.message,
+        durationMonths: Math.max(
+          0,
+          Math.min(
+            compiled.durationMonths,
+            params.durationMonths - compiled.startMonth,
           ),
-          visibility: phase.forecastable === false ? "surprise" : "forecast",
-          effects: detached(resolved.effects),
-          targets: [],
-          transactions: [],
-          source: {
-            scenarioId,
-            arcId: arc.id,
-            phaseId: phase.id,
-            kind: resolved.kind,
-            ...(resolved.concept ? { concept: resolved.concept } : {}),
-            ...(resolved.importance ? { importance: resolved.importance } : {}),
-            ...(resolved.actionTarget
-              ? { actionTarget: detached(resolved.actionTarget) }
-              : {}),
-            ...(resolved.turningPointPriority !== undefined
-              ? { turningPointPriority: resolved.turningPointPriority }
-              : {}),
-          },
-        };
-        if (imported && event.effects.operatingExpensePerMonth !== undefined)
-          event.effects.operatingExpensePerMonth = officialArcMoneyAmount(
-            event.effects.operatingExpensePerMonth,
-            source,
-            params.receivingScenario,
-          );
-        const preview = phase.preview(context, (attribute) => {
-          // Current catalog previews do not draw. Keep the trusted resolver's addressed draw if one does.
-          const probe: StoryPhaseDefinitionType = {
-            ...phase,
-            describe: (_context, random) => ({
-              kind: "WORLD_EVENT",
-              message: "",
-              attributes: { value: random(attribute) },
-            }),
-          };
-          return Number(
-            resolveStoryPhase(arc, probe, context).attributes.value,
-          );
-        });
-        if (preview && phase.forecastable !== false)
-          event.preview = preview.message;
+        ),
+        source: detached(compiled.source!),
+      };
+      const observations = [
+        ...(reports ?? []),
+        ...(report ? [report] : []),
+      ].map((observation) => ({
+        ...observation,
+        id: observation.id.startsWith(`arc-${scenarioId}-`)
+          ? observation.id
+          : `arc-${scenarioId}-${observation.id}`,
+        ...(observation.kind === "affectedFacilities"
+          ? { eventId: eventId(scenarioId, observation.eventId) }
+          : {}),
+      }));
+      if (observations.length) event.reports = observations;
+      for (const operation of event.targets)
         if (
-          (scenarioId === 104 && phase.id === "landfall") ||
-          (scenarioId === 111 && phase.id === "firestorm")
-        ) {
-          event.targets = [
-            {
-              target: {
-                selector: "seededOperatingCapacityShare",
-                targetCapacityShare: Number(
-                  resolved.attributes.targetCapacityShare,
-                ),
-              },
-              outputMultiplier: Number(resolved.attributes.outputMultiplier),
-            },
-          ];
-          event.source.drawKey = resolved.key;
-          delete event.effects.facilityOutputMultipliersById;
-          event.message =
-            scenarioId === 104
-              ? `Storm damage reduces affected generator output to ${Math.round(event.targets[0].outputMultiplier * 100)}% for ${originalDuration} months. Oil prices rise ${Math.round(((event.effects.fuelPriceMultipliers?.Oil ?? 1) - 1) * 100)}%.`
-              : `Safety shutoffs disconnect ${Math.round((1 - (event.effects.demandMultiplier ?? 1)) * 100)}% of demand and reduce affected generator output. Repairs continue for ${originalDuration} months.`;
-          if (scenarioId === 111)
-            event.protection = { kind: "wildfirePreparedness" };
-        }
-        if (scenarioId === 102 && phase.id === "aging-derate") {
-          event.targets = [
-            {
-              target: {
-                selector: "operatingAtLeastAge",
-                fuel: "Coal",
-                minAgeYears: 30,
-              },
-              outputMultiplier: Number(resolved.attributes.outputMultiplier),
-            },
-          ];
-          delete event.effects.facilityOutputMultipliersById;
-          event.message = `Operating coal plants at least 30 years old are down to ${Math.round(event.targets[0].outputMultiplier * 100)}% output for ${originalDuration} months.`;
-        }
-        if (scenarioId === 102 && phase.id === "aging-warning")
-          event.message =
-            "Coal plants that reach 30 years of age in two years will face a temporary output limit. Prepare replacement power.";
-        if (scenarioId === 110 && phase.id === "trip") {
-          const assetId = source.facilities?.find(
-            (facility) => facility.label === "Grand Nuclear Unit",
-          )?.assetId;
-          if (!assetId)
-            throw new Error(
-              "Nuclear trip catalog asset is missing its stable identity.",
-            );
-          if (!params.startingAssetIds.includes(assetId))
-            diagnostics.push({
-              code: "missing-starting-asset",
-              path: `rules.officialArcs[${scenarioId}]`,
-              severity: "error",
-              message: `Sudden Nuclear Shutdown requires starting asset ${assetId}. Choose its original base scenario or remove this arc.`,
-            });
-          event.targets = [
-            {
-              target: { selector: "startingAsset", assetId },
-              outputMultiplier: 0,
-            },
-          ];
-          delete event.effects.facilityOutputMultipliersById;
-          event.title = "Grand Nuclear Unit shuts down";
-          event.message =
-            "The original Grand Nuclear Unit is offline while it remains owned. Replace its power with generation, storage or imports.";
-        }
-        if (scenarioId === 107 && phase.id === "uri")
-          event.protection = { kind: "deepFreezeWinterization" };
-        if (
-          [
-            "normalization",
-            "integration-review",
-            "successor-review",
-            "local-energy-review",
-          ].includes(phase.id)
+          operation.target.selector === "startingAsset" &&
+          !params.startingAssetIds.includes(operation.target.assetId)
         )
-          event.message =
-            "Review the grid's recorded results for the previous twelve months.";
-        if (scenarioId === 104 && phase.id === "restoration")
-          event.message =
-            "Storm repairs finish. Affected generator output and oil prices return to normal.";
-        if (scenarioId === 111 && phase.id === "restoration-complete")
-          event.message =
-            "Safety shutoffs end and repairs finish. Affected generators return to normal.";
-        if (scenarioId === 107 && phase.id === "thaw")
-          event.message =
-            "The freeze ends. Normal plant output and gas prices return as the cold eases.";
-        if (possibleStartMonths.to >= params.durationMonths)
           diagnostics.push({
-            code: "outside-term",
-            path: `rules.officialArcs[${scenarioId}].${phase.id}`,
+            code: "missing-starting-asset",
+            path: `rules.officialArcs[${scenarioId}]`,
             severity: "error",
-            message: `${event.title} can occur in month ${possibleStartMonths.to + 1}, after this run ends in month ${params.durationMonths}. Extend the term or remove this arc.`,
+            message: `Sudden Nuclear Shutdown requires starting asset ${operation.target.assetId}. Choose its original base scenario or remove this arc.`,
           });
-        if (
-          possibleStartMonths.to + originalDuration > params.durationMonths &&
-          originalDuration > 0
-        )
-          diagnostics.push({
-            code: "duration-truncated",
-            path: `rules.officialArcs[${scenarioId}].${phase.id}.durationMonths`,
-            severity: "warning",
-            message: `${event.title}'s duration is truncated at the end of the run.`,
-          });
-        arcResults.push(event);
-      }
-      for (const event of arcResults) {
-        const phase = arc.phases.find(
-          (definition) => definition.id === event.source.phaseId,
-        )!;
-        const reports = reportsFor(arc, phase, event.startMonth, arcResults);
-        if (reports.length) event.reports = reports;
-      }
-      results.push(...arcResults);
+      if (event.possibleStartMonths.to >= params.durationMonths)
+        diagnostics.push({
+          code: "outside-term",
+          path: `rules.officialArcs[${scenarioId}].${phaseId}`,
+          severity: "error",
+          message: `${event.title} can occur in month ${event.possibleStartMonths.to + 1}, after this run ends in month ${params.durationMonths}. Extend the term or remove this arc.`,
+        });
+      if (
+        event.possibleStartMonths.to + compiled.durationMonths >
+          params.durationMonths &&
+        compiled.durationMonths > 0
+      )
+        diagnostics.push({
+          code: "duration-truncated",
+          path: `rules.officialArcs[${scenarioId}].${phaseId}.durationMonths`,
+          severity: "warning",
+          message: `${event.title}'s duration is truncated at the end of the run.`,
+        });
+      results.push(event);
     }
   }
   if (
@@ -476,7 +204,6 @@ export function compileOfficialArcEvents(
         .map((diagnostic) => diagnostic.message)
         .join("\n"),
     );
-  // No authored function, source object, activation fact or installed-library reference escapes.
   return detached(
     results.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
   );
@@ -606,18 +333,5 @@ export function validOfficialArcMetadata(value: unknown): boolean {
   return (
     value.reports === undefined ||
     (Array.isArray(value.reports) && value.reports.length <= 4)
-  );
-}
-
-/** Resolve the trusted linked schedule without exposing a caller-selected stream or random key. */
-export function officialArcScheduleMonth(
-  arc: StoryArcDefinitionType,
-  phase: StoryPhaseDefinitionType,
-  seed: number,
-): number {
-  return resolveStoryScheduleMonth(
-    phase.schedule,
-    seed,
-    storyPhaseKey(arc.scenarioId, arc.id, phase.scheduleAddress ?? phase.id),
   );
 }

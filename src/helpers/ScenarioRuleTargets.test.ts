@@ -6,12 +6,13 @@ import {
 import {
   CALIFORNIA_WILDFIRE_BALANCE,
   HURRICANE_BALANCE,
-  resolveStoryPhase,
-  STORY_ARC_DEFINITIONS,
+  resolveStoryAtDate,
   type StoryContextType,
 } from "../data/WorldEvents";
+import { getScenario } from "../data/Scenarios";
+import { scenarioRules } from "./ScenarioRules";
 import { DIFFICULTY_IDS, LOCATIONS } from "../Constants";
-import { getDateFromMinute } from "./DateTime";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import type { ResolvedRuleSelector } from "../data/ScenarioRules";
 
 const facility = (
@@ -252,19 +253,24 @@ describe.each([
   "trusted official $scenarioId addresses",
   ({ scenarioId, arcId, phaseId, balance }) => {
     test.each(DIFFICULTY_IDS)(
-      "preserves %s targets from the real authored story resolver",
+      "preserves %s target integration in the compiled native story resolver",
       (difficulty) => {
-        const arc = STORY_ARC_DEFINITIONS.find(
-          (a) => a.scenarioId === scenarioId,
-        )!;
-        const phase = arc.phases.find((p) => p.id === phaseId)!;
         const key = `story:${scenarioId}:${arcId}:${phaseId}`;
         for (const seed of [1, 42, 12345]) {
+          const rules = scenarioRules(getScenario(scenarioId), {
+            difficulty,
+            seed,
+          })!;
+          const event = rules.events.find((item) => item.key === key)!;
           const context: StoryContextType = {
+            rules,
             seed,
             scenarioId,
             difficulty,
-            date: getDateFromMinute(0, 2000),
+            date: getDateFromMinute(
+              event.startMonth * MINUTES_PER_MONTH,
+              rules.startingYear,
+            ),
             location: LOCATIONS.SF,
             snapshot: {
               facilities: fleet,
@@ -278,7 +284,9 @@ describe.each([
               storagePeakWh: 1000,
             },
           };
-          const legacy = resolveStoryPhase(arc, phase, context);
+          const current = resolveStoryAtDate(context).occurrences.find(
+            (item) => item.key === key,
+          )!;
           const result = resolveScenarioRuleTargets(
             {
               selector: "seededOperatingCapacityShare",
@@ -292,10 +300,10 @@ describe.each([
             },
           );
           expect(result.targets.map((t) => t.id)).toEqual(
-            legacy.attributes.selectedFacilityIds,
+            current.attributes.selectedFacilityIds,
           );
           expect(result.targets.map((t) => t.name)).toEqual(
-            legacy.attributes.selectedFacilityNames,
+            current.attributes.selectedFacilityNames,
           );
           expect(
             resolveScenarioRuleTargets(

@@ -186,10 +186,12 @@ const definitionsCache = new WeakMap<
 /** Trusted setup fields and frozen mod rules enter the same objective evaluator. */
 export function scenarioObjectiveDefinitions(
   scenario?: ScenarioType,
+  parameters?: Pick<GameType, "difficulty" | "seed">,
 ): CompiledRuleObjective[] {
   if (!scenario || scenario.tutorialSteps) return [];
-  const compiled = scenarioRules(scenario);
-  if (compiled) return compiled.objectives;
+  const compiled = scenarioRules(scenario, parameters);
+  if (compiled && (scenario.id !== 999 || scenario.mod))
+    return compiled.objectives;
   const cached = definitionsCache.get(scenario);
   if (
     cached &&
@@ -257,10 +259,17 @@ const definitionIdentity = new WeakMap<
   { key: string; definitions: CompiledRuleObjective[]; digest: string }
 >();
 export function objectiveContextForGame(
-  game: Pick<GameType, "seed" | "startingYear" | "date" | "customerMarketSize">,
+  game: Pick<
+    GameType,
+    "seed" | "startingYear" | "date" | "customerMarketSize"
+  > &
+    Partial<Pick<GameType, "difficulty">>,
   scenario: ScenarioType,
 ): ObjectiveContext {
-  const definitions = scenarioObjectiveDefinitions(scenario);
+  const definitions = scenarioObjectiveDefinitions(scenario, {
+    difficulty: game.difficulty ?? "Employee",
+    seed: game.seed,
+  });
   const key = `${game.seed}:${game.startingYear}:${scenario.durationMonths}:${scenario.ownership}`;
   let identity = definitionIdentity.get(scenario);
   if (identity?.key !== key || identity.definitions !== definitions) {
@@ -399,11 +408,15 @@ function historyObjectiveResults(
     completedMonths: number;
     startingCustomers?: number;
     marketSize?: number;
+    difficulty?: DifficultyType;
     seed?: number;
     retentionAtBoundary?: boolean;
   },
 ): ObjectiveResult[] {
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, {
+    difficulty: options.difficulty ?? "Employee",
+    seed: options.seed ?? scenario.seed ?? 0,
+  });
   const context: ObjectiveContext = {
     rulesDigest: ruleDigest(objectives),
     startingYear: scenario.startingYear,
@@ -463,12 +476,12 @@ function historyObjectiveResults(
 
 const resultCache = new WeakMap<
   ObjectiveProgress,
-  { completedMonths: number; results: ObjectiveResult[] }
+  { completedMonths: number; rulesDigest: string; results: ObjectiveResult[] }
 >();
 export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return [];
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return [];
   const context = objectiveContextForGame(game, scenario);
   const progress =
@@ -481,7 +494,10 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
         game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER,
     );
   const cached = resultCache.get(progress);
-  if (cached?.completedMonths === context.completedMonths)
+  if (
+    cached?.completedMonths === context.completedMonths &&
+    cached.rulesDigest === context.rulesDigest
+  )
     return cached.results;
   const results = inheritedResultReasons(
     evaluateScenarioObjectives(objectives, progress, context),
@@ -491,6 +507,7 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   );
   resultCache.set(progress, {
     completedMonths: context.completedMonths,
+    rulesDigest: context.rulesDigest,
     results,
   });
   return results;
@@ -498,7 +515,7 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
 
 export function initializeGameObjectiveProgress(game: GameType): void {
   const scenario = getScenario(game.scenarioId, game.customScenario);
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, game);
   game.objectiveProgress =
     scenario && objectives.length
       ? createObjectiveProgress(
@@ -515,7 +532,7 @@ export function recordGameObjectiveMonth(
 ): void {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return;
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return;
   const context = objectiveContextForGame(game, scenario);
   const month =
@@ -564,7 +581,7 @@ export function recordGameObjectiveMonth(
 export function validGameObjectiveProgress(game: GameType): boolean {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return game.objectiveProgress === undefined;
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return game.objectiveProgress === undefined;
   if (!game.objectiveProgress) return !scenario.mod;
   const context = objectiveContextForGame(game, scenario);
@@ -666,6 +683,7 @@ export function runFailure(
   const termMonths = scenario.durationMonths || 12 * 20;
   const context = objectiveContextForGame(
     {
+      difficulty: game.difficulty,
       seed: game.seed ?? scenario.seed ?? 0,
       startingYear: game.startingYear ?? scenario.startingYear,
       date: game.date,
@@ -674,7 +692,10 @@ export function runFailure(
     scenario,
   );
   // The exact current accounting frame only supplies solvency; objectives consume completed facts.
-  const objectives = scenarioObjectiveDefinitions(scenario);
+  const objectives = scenarioObjectiveDefinitions(scenario, {
+    difficulty: game.difficulty,
+    seed: game.seed ?? scenario.seed ?? 0,
+  });
   const progress =
     game.objectiveProgress ??
     historyProgress(

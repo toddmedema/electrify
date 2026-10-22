@@ -1,4 +1,6 @@
 import { OFFICIAL_SCENARIO_RULES } from "../data/OfficialScenarioRules";
+import * as officialCatalog from "../data/OfficialScenarioRules";
+import { scenarioRules } from "./ScenarioRules";
 import {
   compileOfficialArcEvents,
   officialArcLoadScale,
@@ -7,20 +9,13 @@ import {
   validOfficialArcMetadata,
   type OfficialArcCompileParameters,
 } from "./ScenarioRuleArcs";
-import {
-  resolveStoryPhase,
-  STORY_ARC_DEFINITIONS,
-  type StoryContextType,
-} from "../data/WorldEvents";
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
 import { DIFFICULTY_IDS } from "../Constants";
-import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import {
   resolveScenarioRuleTargets,
   type ScenarioRuleTargetFacility,
 } from "./ScenarioRuleTargets";
 import { prepareCustomScenario } from "./CustomScenarioEvents";
-import { getScenarioLocation } from "./Locations";
 import type { RuleDiagnostic } from "../data/ScenarioRules";
 
 const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
@@ -43,36 +38,14 @@ const compile = (
   patch: Partial<OfficialArcCompileParameters> = {},
 ) => compileOfficialArcEvents(params(patch), ids);
 
-function context(scenarioId: number, settings = params()): StoryContextType {
-  return {
-    seed: settings.seed,
-    scenarioId,
-    difficulty: settings.difficulty,
-    date: getDateFromMinute(0, settings.startingYear),
-    location: getScenarioLocation(source(scenarioId))!,
-    snapshot: {
-      deliveredWhByFuel12m: {},
-      demandWh12m: 0,
-      unservedWh12m: 0,
-      netIncome12m: 0,
-      peakDemandW12m: 0,
-      firmPeakW: 0,
-      storagePeakW: 0,
-      storagePeakWh: 0,
-      facilities: [],
-    },
-  };
-}
-
 test("all fourteen importable challenges compile detached JSON and data-center keeps its load-only arc", () => {
   expect(challenges).toHaveLength(14);
   const events = compile(challenges.map((scenario) => scenario.id));
   expect(events).toHaveLength(
-    STORY_ARC_DEFINITIONS.reduce((total, arc) => total + arc.phases.length, 0) +
-      OFFICIAL_SCENARIO_RULES.reduce(
-        (total, arc) => total + (arc.definitions.events?.length ?? 0),
-        0,
-      ),
+    OFFICIAL_SCENARIO_RULES.reduce(
+      (total, arc) => total + (arc.definitions.events?.length ?? 0),
+      0,
+    ),
   );
   expect(compile([106])).toEqual([]);
   expect(JSON.parse(JSON.stringify(events))).toEqual(events);
@@ -82,17 +55,17 @@ test("all fourteen importable challenges compile detached JSON and data-center k
     expect(event.effects.facilityOutputMultipliersById).toBeUndefined();
     expect(event.reports?.length ?? 0).toBeLessThanOrEqual(4);
   }
-  const arc = STORY_ARC_DEFINITIONS[0];
-  const original = arc.phases[0].describe;
-  try {
-    arc.phases[0].describe = () => {
+  const lookup = jest
+    .spyOn(officialCatalog, "officialScenarioRuleDefinition")
+    .mockImplementation(() => {
       throw new Error("Installed catalog is no longer available");
-    };
+    });
+  try {
     expect(
       JSON.parse(JSON.stringify(events)).every(validOfficialArcMetadata),
     ).toBe(true);
   } finally {
-    arc.phases[0].describe = original;
+    lookup.mockRestore();
   }
 });
 
@@ -126,7 +99,7 @@ test("trusted pilot forecast titles survive transfer while hostile metadata is r
 });
 
 test.each(DIFFICULTY_IDS)(
-  "preserves every phase's trusted schedule and static effects on %s",
+  "native and imported arcs share every compiled schedule, selector and static effect on %s",
   (difficulty) => {
     for (const scenario of challenges) {
       const settings = params({
@@ -140,32 +113,35 @@ test.each(DIFFICULTY_IDS)(
         receivingScenario: scenario,
       });
       const events = compileOfficialArcEvents(settings, [scenario.id]);
-      for (const arc of STORY_ARC_DEFINITIONS.filter(
-        (item) => item.scenarioId === scenario.id,
-      )) {
-        for (const phase of arc.phases) {
-          const legacy = resolveStoryPhase(
-            arc,
-            phase,
-            context(scenario.id, settings),
-          );
-          const event = events.find(
-            (item) => item.source.phaseId === phase.id,
-          )!;
-          const effects = { ...legacy.effects };
-          delete effects.facilityOutputMultipliersById;
-          expect(event.key).toBe(legacy.key);
-          expect(event.startMonth * MINUTES_PER_MONTH).toBe(
-            legacy.startsMinute,
-          );
-          expect(event.durationMonths * MINUTES_PER_MONTH).toBe(
-            legacy.endsMinute - legacy.startsMinute,
-          );
-          expect(event.effects).toEqual(effects);
-          expect(event.visibility).toBe(
-            phase.forecastable === false ? "surprise" : "forecast",
-          );
-        }
+      const native = scenarioRules(scenario, {
+        difficulty,
+        seed: settings.seed,
+      })!;
+      expect(native).toBeDefined();
+      expect(events.map((event) => event.source.phaseId).sort()).toEqual(
+        native.events.map((event) => event.id).sort(),
+      );
+      for (const definition of native.events) {
+        const event = events.find(
+          (item) => item.source.phaseId === definition.id,
+        )!;
+        expect(event.key).toBe(definition.key);
+        expect(event.startMonth).toBe(definition.startMonth);
+        expect(event.possibleStartMonths).toEqual(
+          definition.possibleStartMonths,
+        );
+        expect(event.durationMonths).toBe(
+          Math.max(
+            0,
+            Math.min(
+              definition.durationMonths,
+              settings.durationMonths - definition.startMonth,
+            ),
+          ),
+        );
+        expect(event.effects).toEqual(definition.effects);
+        expect(event.targets).toEqual(definition.targets);
+        expect(event.visibility).toBe(definition.visibility);
       }
     }
   },

@@ -319,6 +319,12 @@ Omitting it imports the challenge base's own arc; base `999` defaults to none.
 `[]` explicitly imports none. The base and arc list are independent: removing an
 arc does not remove an inherited objective or an initial industrial load.
 
+All 14 bundled challenges are authored in the shared plain rule catalog. Native
+play, ordinary custom games with selected arcs, and community imports use the
+same compiler and interpreter. Native presentation retains the challenge's
+recorded review wording and facts. Importing an arc does not import its native
+objectives or grant official scores and achievements.
+
 The [generated arc reference](mods/arc-reference.md) lists each importable phase's
 relocated offset/range, choice/option IDs, load IDs and automatic free answer.
 Preparation months are included in relocated phase/choice offsets. Source load

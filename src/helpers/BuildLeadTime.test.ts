@@ -1,20 +1,20 @@
-import { STORY_ARC_DEFINITIONS, StoryScheduleType } from "../data/WorldEvents";
+import { getScenario } from "../data/Scenarios";
+import { scenarioRules } from "./ScenarioRules";
 import {
   buildLeadTimeHint,
   naturalGasYearsToBuild,
   referenceBuildMonths,
 } from "./BuildLeadTime";
 
-const firstMonth = (schedule: StoryScheduleType) =>
-  "atMonth" in schedule
-    ? schedule.atMonth
-    : schedule.seededMonthRange.firstMonth;
-
 function leadMonths(scenarioId: number, warning: string, event: string) {
-  const arc = STORY_ARC_DEFINITIONS.find((a) => a.scenarioId === scenarioId)!;
-  const phase = (id: string) => arc.phases.find((p) => p.id === id)!;
+  const rules = scenarioRules(getScenario(scenarioId), {
+    difficulty: "CEO",
+    seed: 12345,
+  })!;
+  const phase = (id: string) => rules.events.find((item) => item.id === id)!;
   return (
-    firstMonth(phase(event).schedule) - firstMonth(phase(warning).schedule)
+    phase(event).possibleStartMonths.from -
+    phase(warning).possibleStartMonths.from
   );
 }
 

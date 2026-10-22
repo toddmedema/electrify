@@ -3,7 +3,8 @@ import { DIFFICULTY_IDS, TICKS_PER_MONTH } from "../Constants";
 import { SCENARIOS } from "../data/Scenarios";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { inEraMoney } from "../data/FuelPrices";
-import { STORY_ARC_DEFINITIONS, resolveStoryAtDate } from "../data/WorldEvents";
+import { resolveStoryAtDate } from "../data/WorldEvents";
+import * as officialCatalog from "../data/OfficialScenarioRules";
 import type { CompiledRuleChoice } from "../data/ScenarioRules";
 import {
   getDateFromMinute,
@@ -538,15 +539,8 @@ test.each(catalog)(
   },
 );
 
-test("a saved imported choice executes with source callbacks unavailable", () => {
+test("a saved imported choice executes with catalog lookup and source price callbacks unavailable", () => {
   const scenario = modScenario(pack(107));
-  const phaseCallbacks = STORY_ARC_DEFINITIONS.flatMap((arc) =>
-    arc.phases.map((phase) => ({
-      phase,
-      describe: phase.describe,
-      preview: phase.preview,
-    })),
-  );
   const choiceCallbacks = SCENARIO_CHOICES.flatMap((choice) =>
     choice.options.map((option) => ({
       option,
@@ -557,11 +551,10 @@ test("a saved imported choice executes with source callbacks unavailable", () =>
   const unavailable = () => {
     throw new Error("The installed catalog callbacks are unavailable.");
   };
+  const lookup = jest
+    .spyOn(officialCatalog, "officialScenarioRuleDefinition")
+    .mockImplementation(unavailable);
   try {
-    phaseCallbacks.forEach(({ phase }) => {
-      phase.describe = unavailable;
-      phase.preview = unavailable;
-    });
     choiceCallbacks.forEach(({ option }) => {
       option.cost = unavailable;
       option.upfrontGrant = unavailable;
@@ -588,10 +581,7 @@ test("a saved imported choice executes with source callbacks unavailable", () =>
       after.worldEvents.occurrences,
     );
   } finally {
-    phaseCallbacks.forEach(({ phase, describe, preview }) => {
-      phase.describe = describe;
-      phase.preview = preview;
-    });
+    lookup.mockRestore();
     choiceCallbacks.forEach(({ option, cost, grant }) => {
       option.cost = cost;
       option.upfrontGrant = grant;

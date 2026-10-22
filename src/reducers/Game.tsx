@@ -5,7 +5,11 @@ import {
 } from "../helpers/StartingFacilities";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
-import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
+import {
+  scenarioRules,
+  scenarioRulesIdentity,
+  isOfficialCatalogRules,
+} from "../helpers/ScenarioRules";
 import { canonicalRuleJson } from "../helpers/RuleIdentity";
 import { getScenarioLocation } from "../helpers/Locations";
 import { getStartingCustomers } from "../data/LocationProfiles";
@@ -209,11 +213,7 @@ import {
   demandByTypeAt,
   temperatureDemandWattsPerCustomer,
 } from "../data/DemandProfiles";
-import {
-  combineStoryEffects,
-  resolveStoryAtDate,
-  STORY_ARC_DEFINITIONS,
-} from "../data/WorldEvents";
+import { combineStoryEffects, resolveStoryAtDate } from "../data/WorldEvents";
 import {
   getMonthlyClimatology,
   getRawSolarIrradianceWM2,
@@ -817,8 +817,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       getScenario(state.scenarioId, state.customScenario),
       state,
     ) &&
-      !state.customScenario?.eventScenarioIds?.length &&
-      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
+      !state.customScenario?.eventScenarioIds?.length)
   ) {
     return storyPriceFuels;
   }
@@ -1461,13 +1460,7 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     !!scenarioRules(
       getScenario(state.scenarioId, state.customScenario),
       state,
-    ) ||
-    !!state.customScenario?.eventScenarioIds?.length ||
-    state.scenarioId === 104 ||
-    state.scenarioId === 111 ||
-    (state.scenarioId === 102 &&
-      date.monthsElapsed >= 72 &&
-      date.monthsElapsed < 96);
+    ) || !!state.customScenario?.eventScenarioIds?.length;
   const fleetKey = fleetSensitive
     ? state.facilities
         .map((facility) =>
@@ -1539,16 +1532,13 @@ function storyEffectsAt(date: DateType, state: GameType) {
       (event) =>
         date.minute >= event.startsMinute && date.minute < event.endsMinute,
     )
-    .map((event) =>
-      event.attributes.ruleEvent === true
-        ? { ...event, effects: ruleEffectsForOccurrence(event, context) }
-        : event,
-    );
+    .map((event) => ({
+      ...event,
+      effects: ruleEffectsForOccurrence(event, context),
+    }));
   if (
     state.storyEffectsDisabled ||
-    (!context.rules &&
-      !state.customScenario?.eventScenarioIds?.length &&
-      !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId))
+    (!context.rules && !state.customScenario?.eventScenarioIds?.length)
   ) {
     const effects = combineStoryEffects(persisted);
     storyEffectsCache.set(cacheKey, effects);
@@ -2060,7 +2050,7 @@ export const gameSlice = createSlice({
 
       desktopSimulationHooks()?.initialize(state);
       const rules = scenarioRules(scenario, state);
-      if (rules) {
+      if (rules && !isOfficialCatalogRules(rules)) {
         updateWorldEvents(state);
         const opening = state.timeline[0];
         const transaction = openingRuleTransactions(state);
@@ -3264,7 +3254,7 @@ function applyCompiledScenarioResponse(
       cost: option.cost,
       upfrontGrant: option.grant,
       scenarioChoice: true,
-      ...(sharedStoryRules
+      ...(rules.namespace.kind === "mod" || !decision.source
         ? { ruleChoice: true, automatic: !!decision.automatic }
         : {}),
     },
@@ -3286,7 +3276,8 @@ function applyCompiledScenarioResponse(
       before: "undecided",
       after: option.id,
     });
-  if (sharedStoryRules) updateWorldEvents(state);
+  if (sharedStoryRules && (rules.namespace.kind === "mod" || !decision.source))
+    updateWorldEvents(state);
   for (const event of state.worldEvents.occurrences) {
     if (
       before.has(event.key) ||

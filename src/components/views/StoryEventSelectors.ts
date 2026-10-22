@@ -7,7 +7,6 @@ import {
 } from "../../Types";
 import {
   WILDFIRE_DECISION_KEY,
-  STORY_ARC_DEFINITIONS,
   upcomingStoryPhases,
 } from "../../data/WorldEvents";
 import {
@@ -53,18 +52,8 @@ export function selectUpcomingStoryEvents(
     game,
   );
   const customEvents = customEventContext(game.customScenario);
-  if (
-    !game.loadAdditions?.length &&
-    !rules &&
-    !STORY_ARC_DEFINITIONS.some(
-      (arc) =>
-        arc.scenarioId === game.scenarioId ||
-        (game.scenarioId === 999 &&
-          customEvents?.some((event) => event.scenarioId === arc.scenarioId)),
-    )
-  ) {
+  if (!game.loadAdditions?.length && !rules && !customEvents?.length)
     return NO_UPCOMING;
-  }
   const fleetKey = game.facilities
     .map((facility) =>
       [

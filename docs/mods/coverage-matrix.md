@@ -48,18 +48,31 @@ pre/post-decision and target saves, official replay, and two-company worlds.
 Temporarily changing an event month, selector or transfer must make the owning
 comparison fail for the intended reason; restore the mutation afterward.
 
-The first fully declarative official pilot is Load Shedding (`113`). Its bounded
-[legacy phase parity fixture](../../src/testing/LoadSheddingLegacyParity.sim.test.tsx)
-retains independently captured old facts; the [live boundary suite](../../src/reducers/LoadSheddingRules.test.tsx)
-checks every difficulty's setup, strong/weak/unavailable phase contexts, opening
-and catch-up ticks, worker transport, saves/replay and hostile receipts. The
-[native two-company World](../../src/multiplayer/LoadSheddingWorld.sim.test.tsx)
-reaches all five phases through the full 2022 goal window in both 84-month
-companies and resumes a native-codec month-36 checkpoint. Pilot boundary tests
-also reject forged active copy and preserve receipts beyond the rolling
-2,400-entry regional journal bound. The
-remaining official callback migrations are a separate increment; the existence
-of a generated arc row is not evidence of a completed official conversion.
+All 14 bundled challenges (`100`, `101`, `102`, `103`, `104`, `105`, `106`, `107`,
+`108`, `110`, `111`, `113`, `114`, `115`) now consume the shared plain catalog,
+compiler and interpreter. Native, ordinary custom and imported arc execution
+share effect, selector, choice and objective owners. Native presentation retains
+the original event and review facts; saved imports retain their frozen rules.
+
+| Native boundary                                                                                                                                                          | Owning regression                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Complete setup, all difficulties, seeded onset neighbors, phase effects/targets/previews and strong/weak/unavailable review contexts against immutable old facts         | [independent phase parity](../../src/testing/OfficialScenarioPhaseParity.test.tsx), [frozen phase fixture](../../src/testing/fixtures/OfficialScenarioLegacyPhases.json)     |
+| Legal full campaigns, live/catch-up ticks, real forecast transport, native saves/replay and original target identity                                                     | [native execution](../../src/reducers/OfficialScenarioExecution.sim.test.tsx), [target lifetime](../../src/helpers/ScenarioRuleTargets.test.ts)                              |
+| Every full-term two-company challenge and split company outcomes, strict native checkpoint restore and unchanged monthly physical/accounting facts                       | [independent World parity](../../src/multiplayer/OfficialWorldParity.sim.test.tsx), [legal World routes](../../src/testing/OfficialWorldRoutes.ts)                           |
+| Native 106/107 partial and complete debrief labels, known observations and shifted calendar windows; strict imported reports still require complete evidence             | [debrief](../../src/helpers/Debrief.test.tsx), [shared reports](../../src/helpers/ScenarioRuleReports.test.ts)                                                               |
+| Native 106/107 official selection/Ready, independent keyboard choices, actual worker replies, goal progress and ordinary save/resume in both palettes at 1280/390/360 px | [multiplayer browser journeys](../../e2e/multiplayer.spec.ts)                                                                                                                |
+| Older frozen community arc DTOs retain their own compiled effects, metadata, saves and internal replay without consulting the installed catalog                          | [frozen imported arcs](../../src/reducers/FrozenLegacyArcs.test.tsx), [immutable old snapshots](../../src/testing/fixtures/FrozenLegacyArcSnapshots.json)                    |
+| Ordinary custom controls, all fourteen selected arcs, original nuclear selector policy and regional wildfire preparation preserve independently captured full campaigns  | [ordinary custom parity](../../src/testing/OrdinaryCustomLegacyParity.sim.test.tsx), [immutable custom facts](../../src/testing/fixtures/OrdinaryCustomLegacyReference.json) |
+| End/recovery and closing-capacity receipts survive strict saves while forged effects, payment markers, timings, windows and duplicate/active observations are rejected   | [secondary receipt saves](../../src/reducers/ScenarioRuleSecondaryReceipts.test.tsx)                                                                                         |
+
+Load Shedding's initial [phase fixture](../../src/testing/LoadSheddingLegacyParity.sim.test.tsx),
+[live boundary suite](../../src/reducers/LoadSheddingRules.test.tsx) and
+[two-company World](../../src/multiplayer/LoadSheddingWorld.sim.test.tsx) remain
+focused regressions for all five phases, the complete 2022 goal window, hostile
+receipts and journal trimming beyond 2,400 regional entries. A generated arc row
+alone is not evidence of completed conversion or reached execution. The rows
+above describe checks; the change's validation report must separately identify
+passed, failed and unrun commands, including pending browser verification.
 
 ## Maximum-content measurements
 
