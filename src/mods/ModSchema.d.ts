@@ -42,7 +42,17 @@ export interface ModPackage {
   notifications?: ScenarioNoticeType[];
 }
 
-export class ModValidationError extends Error {}
+export interface ModDiagnostic {
+  code: string;
+  path: string;
+  severity: "error" | "warning";
+  message: string;
+}
+export class ModValidationError extends Error {
+  constructor(diagnostics: ModDiagnostic[]);
+  diagnostics: ModDiagnostic[];
+}
+export function modDiagnostics(value: unknown): ModDiagnostic[];
 export const MOD_API_VERSION: number;
 export const MAX_MOD_BYTES: number;
 export const MOD_SCENARIO_IDS: readonly number[];

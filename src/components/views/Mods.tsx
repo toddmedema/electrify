@@ -22,7 +22,11 @@ import { navigateBack } from "../../reducers/Card";
 import { snackbarOpen } from "../../reducers/UI";
 import { launchCustomScenario } from "../../reducers/Game";
 import { POLICIES } from "../../data/Policies";
-import { modIssue, modScenario } from "../../mods/ModScenario";
+import {
+  modIssue,
+  modScenario,
+  modValidationDiagnostics,
+} from "../../mods/ModScenario";
 import type { ModPackage, ModProgramId } from "../../mods/ModSchema";
 import type { InstalledMod, ModLibrary, ModRequest } from "../../mods/Types";
 import type { DifficultyType } from "../../Types";
@@ -83,9 +87,29 @@ export default function Mods(): React.JSX.Element {
   const publishCancel = React.useRef<HTMLButtonElement>(null);
   const autoRefreshed = React.useRef(false);
   const entries = library.entries;
-  const issues = React.useMemo(
-    () => new Map(entries.map((entry) => [entry.key, modIssue(entry.pack)])),
+  const diagnosticsByEntry = React.useMemo(
+    () =>
+      new Map(
+        entries.map((entry) => [
+          entry.key,
+          modValidationDiagnostics(entry.pack),
+        ]),
+      ),
     [entries],
+  );
+  const issues = React.useMemo(
+    () =>
+      new Map(
+        entries.map((entry) => [
+          entry.key,
+          diagnosticsByEntry
+            .get(entry.key)
+            ?.filter((d) => d.severity === "error")
+            .map((d) => d.message)
+            .join("\n") || undefined,
+        ]),
+      ),
+    [entries, diagnosticsByEntry],
   );
 
   // Focus moves once the list has re-rendered, after any closing dialog has let go of it.
@@ -219,6 +243,11 @@ export default function Mods(): React.JSX.Element {
   };
   const confirmPublish = () => {
     if (!publishing) return;
+    const issue = modIssue(publishing.pack);
+    if (issue) {
+      dispatch(snackbarOpen(issue));
+      return;
+    }
     void request(`publish:${publishing.key}`, {
       kind: "publish",
       key: publishing.key,
@@ -236,7 +265,7 @@ export default function Mods(): React.JSX.Element {
     if (!playing) return;
     let scenario;
     try {
-      scenario = modScenario(playing.pack, playing.workshopId);
+      scenario = modScenario(playing.pack, playing.workshopId, difficulty);
     } catch (error) {
       dispatch(
         snackbarOpen(
@@ -277,6 +306,15 @@ export default function Mods(): React.JSX.Element {
             Community scenarios with their own rules and events. Modded runs are
             unranked and don&apos;t earn achievements.
           </Typography>
+          {library.diagnostics?.map((diagnostic, index) => (
+            <Alert
+              key={`${diagnostic.path}:${index}`}
+              severity={diagnostic.severity}
+            >
+              <strong>{diagnostic.path}</strong>:{" "}
+              <span>{diagnostic.message}</span>
+            </Alert>
+          ))}
           {coop && (
             <Alert severity="info" role="status">
               Leave co-op to play a modded scenario.
@@ -320,6 +358,7 @@ export default function Mods(): React.JSX.Element {
               {entries.map((entry) => {
                 const p = entry.pack;
                 const issue = issues.get(entry.key);
+                const diagnostics = diagnosticsByEntry.get(entry.key) || [];
                 const summary = modifierSummary(p);
                 const playable = entry.enabled && !issue;
                 const offlineWorkshop =
@@ -355,11 +394,16 @@ export default function Mods(): React.JSX.Element {
                         {summary}
                       </Typography>
                     )}
-                    {issue && (
-                      <Alert severity="warning" sx={{ mt: 1 }}>
-                        {issue}
+                    {diagnostics.map((diagnostic, index) => (
+                      <Alert
+                        key={`${diagnostic.path}:${index}`}
+                        severity={diagnostic.severity}
+                        sx={{ mt: 1 }}
+                      >
+                        <strong>{diagnostic.path}</strong>:{" "}
+                        <span>{diagnostic.message}</span>
                       </Alert>
-                    )}
+                    ))}
                     {offlineWorkshop && (
                       <Typography
                         variant="body2"
@@ -539,6 +583,16 @@ export default function Mods(): React.JSX.Element {
           Play {playing?.pack.title}
         </DialogTitle>
         <DialogContent>
+          {playing &&
+            modValidationDiagnostics(playing.pack).map((diagnostic, index) => (
+              <Alert
+                key={`${diagnostic.path}:${index}`}
+                severity={diagnostic.severity}
+                sx={{ mb: 1 }}
+              >
+                {diagnostic.message}
+              </Alert>
+            ))}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Modded run · unranked · no achievements
           </Typography>

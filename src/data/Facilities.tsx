@@ -12,7 +12,7 @@ import { hasFuelPrices } from "./FuelPrices";
 import { getCostTableDeflator, getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { costBetween } from "../helpers/Math";
-import { facilityModifier } from "../helpers/ScenarioMod";
+import { facilityModifier, modScaledValue } from "../helpers/ScenarioMod";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getAirborneWindCapacityFactor,
@@ -795,9 +795,21 @@ export function GENERATORS(
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
     const mod = facilityModifier(state, g.name);
-    g.buildCost *= mod?.buildCost ?? 1;
-    g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
-    g.yearsToBuild *= mod?.yearsToBuild ?? 1;
+    g.buildCost = modScaledValue(
+      g.buildCost,
+      mod?.buildCost,
+      `facilities.${g.name}.buildCost`,
+    );
+    g.annualOperatingCost = modScaledValue(
+      g.annualOperatingCost,
+      mod?.annualOperatingCost,
+      `facilities.${g.name}.annualOperatingCost`,
+    );
+    g.yearsToBuild = modScaledValue(
+      g.yearsToBuild,
+      mod?.yearsToBuild,
+      `facilities.${g.name}.yearsToBuild`,
+    );
     g.buildCost *= difficulty.buildCost * inflation;
     g.buildCost *=
       currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
@@ -809,6 +821,12 @@ export function GENERATORS(
       g.costPerStart *= difficulty.expensesOM * inflation;
     }
     g.yearsToBuild *= difficulty.buildTime;
+    if (
+      ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
+        Number.isFinite,
+      )
+    )
+      throw new Error(`Nonfinite facility quote for ${g.name}.`);
     // Priced on the scaled cost so the option's share is exact; cold-climate gas is winterized by
     // default. The build dialog can then toggle it with withResilienceOption.
     Object.assign(g, applyDefaultResilience(g, state));
@@ -923,12 +941,30 @@ export function STORAGE(state: GameType, peakWh: number) {
   const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
     const mod = facilityModifier(state, g.name);
-    g.buildCost *= mod?.buildCost ?? 1;
-    g.annualOperatingCost *= mod?.annualOperatingCost ?? 1;
-    g.yearsToBuild *= mod?.yearsToBuild ?? 1;
+    g.buildCost = modScaledValue(
+      g.buildCost,
+      mod?.buildCost,
+      `facilities.${g.name}.buildCost`,
+    );
+    g.annualOperatingCost = modScaledValue(
+      g.annualOperatingCost,
+      mod?.annualOperatingCost,
+      `facilities.${g.name}.annualOperatingCost`,
+    );
+    g.yearsToBuild = modScaledValue(
+      g.yearsToBuild,
+      mod?.yearsToBuild,
+      `facilities.${g.name}.yearsToBuild`,
+    );
     g.buildCost *= difficulty.buildCost * inflation;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
+    if (
+      ![g.buildCost, g.annualOperatingCost, g.yearsToBuild].every(
+        Number.isFinite,
+      )
+    )
+      throw new Error(`Nonfinite facility quote for ${g.name}.`);
     return g.available;
   });
 

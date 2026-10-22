@@ -109,6 +109,38 @@ test("validation errors name the field and how to fix it", () => {
   );
 });
 
+test("import errors return all structured diagnostics", async (t) => {
+  const { root, store } = setup(t);
+  const filename = path.join(root, "invalid.json");
+  fs.writeFileSync(
+    filename,
+    JSON.stringify(
+      fixture({
+        facilities: { Solar: { buildCost: 100 } },
+        programs: { solar: 0 },
+      }),
+    ),
+  );
+  store.chooseFile = async () => filename;
+  const result = await store.request({ kind: "import" });
+  assert.deepEqual(
+    result.diagnostics.map(({ code, path, severity }) => ({
+      code,
+      path,
+      severity,
+    })),
+    [
+      {
+        code: "number-bounds",
+        path: "facilities.Solar.buildCost",
+        severity: "error",
+      },
+      { code: "number-bounds", path: "programs.solar", severity: "error" },
+    ],
+  );
+  assert.deepEqual(result.entries, []);
+});
+
 test("imports persist offline, enable state survives updates, removal leaves snapshots intact", async (t) => {
   const { root, file, store } = setup(t);
   const first = await store.request({ kind: "import" });

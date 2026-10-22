@@ -4,7 +4,7 @@ import { validBrowseState } from "../multiplayer/Browse";
 import { quit, tickState } from "../reducers/Game";
 import { TICKS_PER_MONTH } from "../Constants";
 import { TextEncoder } from "util";
-import { modIssue, modScenario } from "./ModScenario";
+import { modIssue, modScenario, modValidationDiagnostics } from "./ModScenario";
 import { MOD_API_VERSION, ModPackage, validateMod } from "./ModSchema";
 import { createGame } from "../testing/Simulator";
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
@@ -17,7 +17,7 @@ import { serializeSave, parseSave } from "../SaveGame";
 import { getStore } from "../StoreRegistry";
 import { startAchievements } from "../desktop/AchievementObserver";
 import * as User from "../reducers/User";
-import type { GameType } from "../Types";
+import type { GameType, ScenarioModType } from "../Types";
 Object.assign(global, { TextEncoder });
 const fixture = (): ModPackage => ({
   schemaVersion: 1,
@@ -103,15 +103,15 @@ test("money the author left unset follows a changed starting year", () => {
   const authored = modScenario({
     ...fixture(),
     baseScenarioId: 114,
-    scenario: { startingYear: 1980 },
+    scenario: { startingYear: 2000 },
   });
-  expect(authored.cash).toBe(inEraMoney(base.cash, 1980, base.startingYear));
+  expect(authored.cash).toBe(inEraMoney(base.cash, 2000, base.startingYear));
   expect(authored.dollarsPerkWh).toBe(
-    inEraRate(base.dollarsPerkWh, 1980, base.startingYear),
+    inEraRate(base.dollarsPerkWh, 2000, base.startingYear),
   );
   expect(authored.dollarsPerkWh).not.toBe(base.dollarsPerkWh);
   expect(authored.feePerKgCO2e).toBe(
-    inEraMoney(base.feePerKgCO2e, 1980, base.startingYear),
+    inEraMoney(base.feePerKgCO2e, 2000, base.startingYear),
   );
   const unchanged = modScenario({ ...fixture(), baseScenarioId: 114 });
   expect(unchanged.cash).toBe(base.cash);
@@ -198,23 +198,21 @@ test("facility and program modifiers are run-local and survive save loading", ()
   expect(parseSave(invalid)).toBeNull();
 });
 
-test("modded saves stay loadable when the catalog or authoring schema later changes", () => {
-  const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
-  // A facility a future build retired, and a field the authoring schema would now reject.
-  save.game.customScenario.mod.facilities["Retired Plant"] = { buildCost: 2 };
-  save.game.customScenario.mod.programs.retiredProgram = 2;
-  save.game.customScenario.mod.source.title = "x".repeat(500);
-  const restored = parseSave(save);
-  expect(restored).not.toBeNull();
-  expect(
-    GENERATORS(restored!.game, 1e8, [10], [100]).find(
-      (g) => g.name === "Solar",
-    )!.buildCost,
-  ).toBe(
-    GENERATORS(moddedGame(), 1e8, [10], [100]).find((g) => g.name === "Solar")!
-      .buildCost,
-  );
-  const wrongId = JSON.parse(JSON.stringify(save));
+test("first-release runtime snapshots reject unknown names, oversized text and forged official identity", () => {
+  for (const mutate of [
+    (mod: ScenarioModType) =>
+      Object.assign(mod.facilities!, { "Retired Plant": { buildCost: 2 } }),
+    (mod: ScenarioModType) =>
+      Object.assign(mod.programs!, { retiredProgram: 2 }),
+    (mod: ScenarioModType) => {
+      mod.source.title = "x".repeat(500);
+    },
+  ]) {
+    const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+    mutate(save.game.customScenario.mod);
+    expect(parseSave(save)).toBeNull();
+  }
+  const wrongId = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
   wrongId.game.customScenario.id = 100;
   expect(parseSave(wrongId)).toBeNull();
 });
@@ -301,3 +299,116 @@ test("mod runs cannot enter co-op through custom setup or the wire", () => {
   expect(validBrowseState(browse)).toBe(true);
   expect(validBrowseState({ ...browse, custom: customScenario })).toBe(false);
 });
+
+test("D1 rejects every unavailable inherited asset before launch", () => {
+  expect(() =>
+    modScenario({
+      ...fixture(),
+      baseScenarioId: 108,
+      scenario: { startingYear: 1980 },
+    }),
+  ).toThrow(/unavailable/);
+  expect(() =>
+    modScenario({ ...fixture(), baseScenarioId: 108 }),
+  ).not.toThrow();
+});
+
+test("D2 rejects an inherited reliability window outside the term, including its final month", () => {
+  for (const durationMonths of [6, 59]) {
+    expect(() =>
+      modScenario({
+        ...fixture(),
+        baseScenarioId: 114,
+        scenario: { durationMonths },
+      }),
+    ).toThrow(/inherited.*reliability/i);
+  }
+  expect(() =>
+    modScenario({
+      ...fixture(),
+      baseScenarioId: 114,
+      scenario: { durationMonths: 60 },
+    }),
+  ).not.toThrow();
+});
+
+test("D4 rejects edited saved factors beyond the package bounds", () => {
+  const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+  save.game.customScenario.mod.facilities.Solar.buildCost = 1e308;
+  expect(parseSave(save)).toBeNull();
+  save.game.customScenario.mod.facilities.Solar.buildCost = 10;
+  expect(parseSave(save)).not.toBeNull();
+});
+
+test("diagnostics retain every independently unavailable asset and objective path", () => {
+  const diagnostics = modValidationDiagnostics({
+    ...fixture(),
+    baseScenarioId: 108,
+    scenario: { startingYear: 1980, durationMonths: 6 },
+    notifications: [
+      { month: 12, title: "Review", message: "Review the grid." },
+    ],
+  });
+  expect(
+    diagnostics
+      .filter((d) => d.code === "starting-asset-unavailable")
+      .map((d) => d.path),
+  ).toHaveLength(3);
+  for (const asset of ["Solar", "Natural Gas CC", "Battery"])
+    expect(
+      diagnostics.some(
+        (d) =>
+          d.code === "starting-asset-unavailable" && d.message.includes(asset),
+      ),
+    ).toBe(true);
+  expect(diagnostics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "objective-outside-term",
+        path: "scenario.reliabilityObjective",
+        severity: "error",
+      }),
+      expect.objectContaining({
+        code: "notice-outside-term",
+        path: "notifications[0].month",
+        severity: "error",
+      }),
+    ]),
+  );
+});
+
+test("runtime snapshots enforce notice count, month and text limits and safe metadata", () => {
+  for (const notifications of [
+    Array.from({ length: 101 }, () => ({
+      month: 1,
+      title: "Review",
+      message: "Check grid.",
+    })),
+    [{ month: 0, title: "Review", message: "Check grid." }],
+    [{ month: 1201, title: "Review", message: "Check grid." }],
+    [{ month: 1, title: "x".repeat(101), message: "Check grid." }],
+    [{ month: 1, title: "Review", message: "x".repeat(501) }],
+    [{ month: 1, title: "Unsafe\u202e", message: "Check grid." }],
+  ]) {
+    const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+    save.game.customScenario.mod.notifications = notifications;
+    expect(parseSave(save)).toBeNull();
+  }
+});
+
+test("launch rechecks the inherited fleet instead of silently dropping assets", () => {
+  const scenario = modScenario({ ...fixture(), baseScenarioId: 108 });
+  scenario.startingYear = 1980;
+  expect(() =>
+    createGame({ scenarioId: 999, scenario, seed: 42, difficulty: "Manager" }),
+  ).toThrow(/unavailable in 1980/);
+});
+
+test.each(SCENARIOS.filter((s) => !s.tutorialSteps))(
+  "the bundled $name setup is a launchable valid neighbor",
+  (base) => {
+    expect(() =>
+      modScenario({ ...fixture(), baseScenarioId: base.id }),
+    ).not.toThrow();
+  },
+);

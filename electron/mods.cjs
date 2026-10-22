@@ -5,6 +5,7 @@ const {
   validateMod,
   MAX_MOD_BYTES,
   MOD_API_VERSION,
+  ModValidationError,
 } = require("../src/mods/ModSchema.js");
 const { atomicWriteAsync } = require("./storage.cjs");
 const { itemId } = require("./steam-workshop.cjs");
@@ -208,7 +209,14 @@ class ModStore {
         ...result,
         entries: this.view(library),
         uploading: this.uploading,
-        ...(failure ? { error: reason(failure) } : {}),
+        ...(failure
+          ? {
+              error: reason(failure),
+              ...(failure instanceof ModValidationError
+                ? { diagnostics: failure.diagnostics }
+                : {}),
+            }
+          : {}),
       };
     } catch (error) {
       return {

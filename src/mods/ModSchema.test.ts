@@ -1,6 +1,9 @@
 import { TextEncoder } from "util";
 import {
   FACILITY_MODIFIER_KEYS,
+  modDiagnostics,
+  validateMod,
+  ModValidationError,
   FACILITY_NAMES,
   MOD_API_VERSION,
   MOD_SCENARIO_IDS,
@@ -119,5 +122,79 @@ test("the version 1 mod contract keeps every name packages may rely on", () => {
     expect.arrayContaining([
       100, 101, 102, 103, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115,
     ]),
+  );
+});
+
+test("independent structural failures retain stable diagnostic paths", () => {
+  const pack = {
+    schemaVersion: 1,
+    gameApi: 1,
+    id: "valid-grid",
+    title: "Valid",
+    creator: "Creator",
+    version: "1",
+    seed: 1,
+    baseScenarioId: 999,
+    facilities: { Solar: { buildCost: 1e308, yearsToBuild: 0 } },
+    programs: { solar: 11 },
+    notifications: [{ month: 0, title: "", message: "Review." }],
+  };
+  const diagnostics = modDiagnostics(pack);
+  expect(diagnostics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "number-bounds",
+        path: "facilities.Solar.buildCost",
+        severity: "error",
+      }),
+      expect.objectContaining({ path: "facilities.Solar.yearsToBuild" }),
+      expect.objectContaining({ path: "programs.solar" }),
+      expect.objectContaining({ path: "notifications[0].month" }),
+      expect.objectContaining({ path: "notifications[0].title" }),
+    ]),
+  );
+  expect(() => validateMod(pack)).toThrow(ModValidationError);
+  expect(() =>
+    modDiagnostics({
+      ...pack,
+      scenario: null,
+      notifications: [null],
+      facilities: { Solar: null },
+    }),
+  ).not.toThrow();
+  expect(
+    modDiagnostics({
+      ...pack,
+      facilities: { Solar: { buildCost: 0.1, yearsToBuild: 10 } },
+      programs: { solar: 1 },
+      notifications: [],
+    }),
+  ).toEqual([]);
+});
+
+test("bad multipliers and nonfinite results are rejected at the quote owner", () => {
+  expect(() => ScenarioMod.modScaledValue(1, 1e308, "cost")).toThrow(
+    /0.1 to 10/,
+  );
+  expect(() => ScenarioMod.modScaledValue(1e308, 10, "cost")).toThrow(
+    /nonfinite/,
+  );
+  expect(ScenarioMod.modScaledValue(5, 10, "cost")).toBe(50);
+  const game = createGame({ scenarioId: 100, seed: 1, difficulty: "Manager" });
+  game.customScenario = {
+    ...SCENARIOS.find((s) => s.id === 100)!,
+    id: 999,
+    mod: {
+      source: {
+        id: "bad-grid",
+        title: "Grid",
+        creator: "Author",
+        version: "1",
+      },
+      facilities: { Solar: { buildCost: 1e308 } },
+    },
+  };
+  expect(() => GENERATORS(game, 1e8, [], [])).toThrow(
+    /Invalid mod facility modifier/,
   );
 });

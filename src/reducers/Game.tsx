@@ -1,5 +1,10 @@
+import {
+  matchesStartingFacility,
+  startingFacilitySearch,
+  startingFacilityQuote,
+} from "../helpers/StartingFacilities";
 import { customEventContext } from "../helpers/CustomScenarioEvents";
-import { modNotificationsDue } from "../helpers/ScenarioMod";
+import { modNotificationsDue, validScenarioMod } from "../helpers/ScenarioMod";
 import { desktopSimulationHooks } from "../achievements/SimulationHooks";
 import {
   gasConversionQuote,
@@ -125,7 +130,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
+import { arrayMove, newSeed } from "../helpers/Math";
 import {
   computeScoreBreakdown,
   startingDollarRevenue,
@@ -1743,6 +1748,16 @@ export const gameSlice = createSlice({
         startingFacilities,
         getHydroInventoryKey(state),
       );
+      if (scenario.mod) {
+        const missing = startingFacilities.flatMap((search, index) =>
+          startingFacilityQuote(state, search)
+            ? []
+            : [
+                `Starting asset ${index + 1} (${search.label || search.name || search.fuel || "facility"}) is unavailable in ${scenario.startingYear}.`,
+              ],
+        );
+        if (missing.length) throw new Error(missing.join("\n"));
+      }
       if (scenario.startingYear <= 1882 && hydroAssignments.some(Boolean))
         throw new Error(
           "Starting Hydro technology is unavailable before 1883.",
@@ -1761,38 +1776,18 @@ export const gameSlice = createSlice({
           // Age is scenario metadata rather than a catalog property, so exclude it from the exact
           // technology match and pass it to the completed operating asset separately.
           const {
-            hydroSiteId: _hydroSiteId,
             initialAgeYears = 0,
             initialReservoirFraction,
             label,
-            ...facilitySearch
           } = search;
-          // Scenario research may carry more precision than is useful to a player. Resolve the
-          // catalog quote from the rounded size so its costs and technology-derived fields agree
-          // with the two-significant-digit nameplate the operating facility receives.
-          if (
-            facilitySearch.peakW !== undefined &&
-            facilitySearch.name !== "Hydro" &&
-            facilitySearch.fuel !== "Hydro"
-          ) {
-            facilitySearch.peakW = roundToSignificantDigits(
-              facilitySearch.peakW,
-              2,
-            );
-          }
-          if (facilitySearch.peakWh !== undefined) {
-            facilitySearch.peakWh = roundToSignificantDigits(
-              facilitySearch.peakWh,
-              2,
-            );
-          }
+          const facilitySearch = startingFacilitySearch(search);
           const generator = GENERATORS(
             state,
             facilitySearch.peakW || 1000000,
             [],
             [],
           ).find((g: FacilityShoppingType) =>
-            matchesFacilitySearch(g, facilitySearch),
+            matchesStartingFacility(g, facilitySearch),
           );
           if (hydroAssignments[startingIndex] && !generator)
             throw new Error(
@@ -1822,7 +1817,7 @@ export const gameSlice = createSlice({
               state,
               facilitySearch.peakWh || 1000000,
             ).find((g: FacilityShoppingType) =>
-              matchesFacilitySearch(g, facilitySearch),
+              matchesStartingFacility(g, facilitySearch),
             );
             if (storage) {
               const existingIds = new Set(state.facilities.map(({ id }) => id));
@@ -2355,18 +2350,6 @@ export default gameSlice.reducer;
  * reproduce the original run rather than an approximation of it: there is one implementation of
  * "the player built a plant", not two that have to be kept in step.
  */
-function matchesFacilitySearch(
-  candidate: FacilityShoppingType,
-  search: Partial<FacilityShoppingType>,
-): boolean {
-  if (candidate.viableLocationsRemaining === 0) {
-    return false;
-  }
-  return (Object.keys(search) as Array<keyof FacilityShoppingType>).every(
-    (property) => candidate[property] === search[property],
-  );
-}
-
 function refreshInterestRate(
   state: GameType,
   cash: number,
@@ -3324,6 +3307,10 @@ export function launchCustomScenario(
   scenario: ScenarioType,
   difficulty: DifficultyType,
 ) {
+  if (scenario.mod && !validScenarioMod(scenario.mod))
+    throw new Error(
+      "This mod's runtime snapshot is invalid. Reimport a valid package before playing.",
+    );
   dispatch(quit());
   dispatch(delta({ difficulty }));
   dispatch(delta({ scenarioId: CUSTOM_SCENARIO_ID, customScenario: scenario }));

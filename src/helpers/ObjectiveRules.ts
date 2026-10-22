@@ -155,6 +155,18 @@ export function scenarioObjectiveFailure(
   const reliability = reliabilityFailure(scenario, history);
   if (reliability) return reliability;
 
+  const objective = scenario.reliabilityObjective;
+  if (objective) {
+    const months = reliabilityMonths(scenario, history);
+    const required = objective.durationMonths || 1;
+    const observed = new Set(
+      months.map((month) => absoluteMonth(month.year, month.month)),
+    );
+    if (months.length !== required || observed.size !== required) {
+      return `The ${objective.label} is unverifiable: exactly one completed record is required for each of its ${required} months (${objective.month}/${objective.year} through ${((objective.month - 1 + required - 1) % 12) + 1}/${objective.year + Math.floor((objective.month - 1 + required - 1) / 12)}).`;
+    }
+  }
+
   if (
     scenario.minimumCustomerRetention !== undefined &&
     startingCustomers !== undefined &&

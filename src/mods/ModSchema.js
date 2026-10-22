@@ -70,89 +70,112 @@ const NOTIFICATION_KEYS = ["month", "title", "message"];
 const UNSAFE_TEXT = /[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩]/;
 const ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 
-class ModValidationError extends Error {}
+class ModValidationError extends Error {
+  constructor(diagnostics) {
+    super(diagnostics.map((item) => item.message).join("\n"));
+    this.name = "ModValidationError";
+    this.diagnostics = diagnostics;
+  }
+}
+function diagnostic(code, path, reason) {
+  return { code, path, severity: "error", message: `${path} ${reason}` };
+}
 function fail(path, reason) {
-  throw new ModValidationError(`${path} ${reason}`);
+  throw new ModValidationError([diagnostic("invalid-package", path, reason)]);
 }
 function plainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
-function object(value, path, keys, noun = "field") {
-  if (!plainObject(value)) fail(path, "must be an object.");
-  for (const key of Object.keys(value))
-    if (!keys.includes(key))
-      fail(
-        path ? `${path}.${key}` : key,
-        `is not a supported ${noun}. Use one of: ${keys.join(", ")}.`,
-      );
-}
-function text(value, path, max) {
-  if (typeof value !== "string" || !value.trim())
-    fail(path, "must be non-empty text.");
-  if (value.length > max) fail(path, `must be at most ${max} characters.`);
-  if (UNSAFE_TEXT.test(value))
-    fail(path, "must not contain control or text-direction characters.");
-}
 const formatNumber = (value) => value.toLocaleString("en-US");
-function number(value, path, min, max, integer = false) {
-  if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    value < min ||
-    value > max ||
-    (integer && !Number.isInteger(value))
-  )
-    fail(
-      path,
-      `must be ${integer ? "a whole number" : "a number"} from ${formatNumber(min)} to ${formatNumber(max)}.`,
-    );
-}
-function required(value, key, path = key) {
-  if (value[key] === undefined) fail(path, "is required.");
-}
 
-/** Validates an already-decoded package and returns a detached copy. */
-function validateMod(value) {
-  let p;
-  try {
-    p = JSON.parse(JSON.stringify(value));
-  } catch {
-    fail("Package", "must be plain JSON data.");
-  }
-  if (!plainObject(p)) fail("Package", "must be a JSON object.");
+/** Collect independent failures without traversing malformed parent values. */
+function modDiagnostics(p) {
+  const diagnostics = [];
+  const add = (code, path, reason) =>
+    diagnostics.push(diagnostic(code, path, reason));
+  const object = (value, path, keys, noun = "field") => {
+    if (!plainObject(value)) {
+      add("invalid-object", path || "Package", "must be an object.");
+      return false;
+    }
+    for (const key of Object.keys(value))
+      if (!keys.includes(key))
+        add(
+          "unknown-field",
+          path ? `${path}.${key}` : key,
+          `is not a supported ${noun}. Use one of: ${keys.join(", ")}.`,
+        );
+    return true;
+  };
+  const text = (value, path, max) => {
+    if (value === undefined) {
+      add("missing-field", path, "is required.");
+      return;
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      add("invalid-text", path, "must be non-empty text.");
+      return;
+    }
+    if (value.length > max)
+      add("text-limit", path, `must be at most ${max} characters.`);
+    if (UNSAFE_TEXT.test(value))
+      add(
+        "unsafe-text",
+        path,
+        "must not contain control or text-direction characters.",
+      );
+  };
+  const number = (value, path, min, max, integer = false) => {
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < min ||
+      value > max ||
+      (integer && !Number.isInteger(value))
+    )
+      add(
+        "number-bounds",
+        path,
+        `must be ${integer ? "a whole number" : "a number"} from ${formatNumber(min)} to ${formatNumber(max)}.`,
+      );
+  };
+  if (!object(p, "", PACKAGE_KEYS)) return diagnostics;
   if (p.schemaVersion !== 1)
-    fail("schemaVersion", "must be 1. Export a new authoring template.");
-  object(p, "", PACKAGE_KEYS);
-  for (const key of [
-    "schemaVersion",
-    "gameApi",
-    "id",
-    "title",
-    "creator",
-    "version",
-    "seed",
-    "baseScenarioId",
-  ])
-    required(p, key);
+    add(
+      "schema-version",
+      "schemaVersion",
+      "must be 1. Export a new authoring template.",
+    );
   number(p.gameApi, "gameApi", 1, 1000, true);
   if (typeof p.id !== "string" || !ID_PATTERN.test(p.id))
-    fail(
+    add(
+      "invalid-id",
       "id",
       "must be 1–64 lowercase letters, digits or hyphens, starting and ending with a letter or digit.",
     );
   text(p.title, "title", 100);
-  if (new TextEncoder().encode(p.title).length > MAX_TITLE_BYTES)
-    fail("title", `must fit Steam's ${MAX_TITLE_BYTES}-byte title limit.`);
+  if (
+    typeof p.title === "string" &&
+    new TextEncoder().encode(p.title).length > MAX_TITLE_BYTES
+  )
+    add(
+      "title-bytes",
+      "title",
+      `must fit Steam's ${MAX_TITLE_BYTES}-byte title limit.`,
+    );
   text(p.creator, "creator", 100);
   text(p.version, "version", 40);
   number(p.seed, "seed", 0, 4294967295, true);
   if (p.baseScenarioId !== 999 && !MOD_SCENARIO_IDS.includes(p.baseScenarioId))
-    fail(
+    add(
+      "unknown-base",
       "baseScenarioId",
       `is not a scenario. Use 999 or one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
     );
-  if (p.scenario !== undefined) {
-    object(p.scenario, "scenario", SCENARIO_OVERRIDE_KEYS);
+  if (
+    p.scenario !== undefined &&
+    object(p.scenario, "scenario", SCENARIO_OVERRIDE_KEYS)
+  ) {
     const bounds = {
       cash: [0, 1e12],
       startingYear: [1980, 2100, true],
@@ -169,50 +192,88 @@ function validateMod(value) {
       p.scenario.ownership !== undefined &&
       !["Investor", "Public"].includes(p.scenario.ownership)
     )
-      fail("scenario.ownership", "must be Investor or Public.");
+      add(
+        "invalid-ownership",
+        "scenario.ownership",
+        "must be Investor or Public.",
+      );
     for (const key of ["endTitle", "endMessage"])
       if (p.scenario[key] !== undefined)
         text(p.scenario[key], `scenario.${key}`, 500);
     const ids = p.scenario.eventScenarioIds;
     if (ids !== undefined) {
       if (!Array.isArray(ids) || ids.length > 20)
-        fail("scenario.eventScenarioIds", "must be a list of at most 20 IDs.");
-      if (new Set(ids).size !== ids.length)
-        fail("scenario.eventScenarioIds", "must not repeat an ID.");
-      ids.forEach((id, index) => {
-        if (!MOD_SCENARIO_IDS.includes(id))
-          fail(
-            `scenario.eventScenarioIds[${index}]`,
-            `is not a scenario. Use one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
+        add(
+          "list-limit",
+          "scenario.eventScenarioIds",
+          "must be a list of at most 20 IDs.",
+        );
+      if (Array.isArray(ids)) {
+        if (new Set(ids).size !== ids.length)
+          add(
+            "duplicate-id",
+            "scenario.eventScenarioIds",
+            "must not repeat an ID.",
           );
-      });
+        ids.forEach((id, index) => {
+          if (!MOD_SCENARIO_IDS.includes(id))
+            add(
+              "unknown-arc",
+              `scenario.eventScenarioIds[${index}]`,
+              `is not a scenario. Use one of: ${MOD_SCENARIO_IDS.join(", ")}.`,
+            );
+        });
+      }
     }
   }
-  if (p.facilities !== undefined) {
-    object(p.facilities, "facilities", FACILITY_NAMES, "facility");
+  if (
+    p.facilities !== undefined &&
+    object(p.facilities, "facilities", FACILITY_NAMES, "facility")
+  )
     for (const [name, value] of Object.entries(p.facilities)) {
-      object(value, `facilities.${name}`, FACILITY_MODIFIER_KEYS);
-      for (const [key, factor] of Object.entries(value))
-        number(factor, `facilities.${name}.${key}`, 0.1, 10);
+      if (object(value, `facilities.${name}`, FACILITY_MODIFIER_KEYS))
+        for (const [key, factor] of Object.entries(value))
+          if (FACILITY_MODIFIER_KEYS.includes(key))
+            number(factor, `facilities.${name}.${key}`, 0.1, 10);
     }
-  }
-  if (p.programs !== undefined) {
-    object(p.programs, "programs", PROGRAM_KEYS, "program");
+  if (
+    p.programs !== undefined &&
+    object(p.programs, "programs", PROGRAM_KEYS, "program")
+  )
     for (const [key, factor] of Object.entries(p.programs))
-      number(factor, `programs.${key}`, 0.1, 10);
-  }
+      if (PROGRAM_KEYS.includes(key))
+        number(factor, `programs.${key}`, 0.1, 10);
   if (p.notifications !== undefined) {
     if (!Array.isArray(p.notifications) || p.notifications.length > 100)
-      fail("notifications", "must be a list of at most 100 notifications.");
-    p.notifications.forEach((n, index) => {
-      const path = `notifications[${index}]`;
-      object(n, path, NOTIFICATION_KEYS);
-      for (const key of NOTIFICATION_KEYS) required(n, key, `${path}.${key}`);
-      number(n.month, `${path}.month`, 1, 1200, true);
-      text(n.title, `${path}.title`, 100);
-      text(n.message, `${path}.message`, 500);
-    });
+      add(
+        "list-limit",
+        "notifications",
+        "must be a list of at most 100 notifications.",
+      );
+    if (Array.isArray(p.notifications))
+      p.notifications.forEach((n, index) => {
+        const path = `notifications[${index}]`;
+        if (!object(n, path, NOTIFICATION_KEYS)) return;
+        number(n.month, `${path}.month`, 1, 1200, true);
+        text(n.title, `${path}.title`, 100);
+        text(n.message, `${path}.message`, 500);
+      });
   }
+  return diagnostics;
+}
+
+/** Validates an already-decoded package and returns a detached copy. */
+function validateMod(value) {
+  let p;
+  try {
+    p = JSON.parse(JSON.stringify(value));
+  } catch {
+    fail("Package", "must be plain JSON data.");
+  }
+  const diagnostics = modDiagnostics(p);
+  if (diagnostics.length) throw new ModValidationError(diagnostics);
+  if (new TextEncoder().encode(JSON.stringify(p)).length > MAX_MOD_BYTES)
+    fail("Package", "must be at most 256 KiB.");
   return p;
 }
 
@@ -234,6 +295,7 @@ function parseMod(input) {
 }
 
 module.exports = {
+  modDiagnostics,
   parseMod,
   validateMod,
   ModValidationError,

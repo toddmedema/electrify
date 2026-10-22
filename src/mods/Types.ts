@@ -1,4 +1,4 @@
-import type { ModPackage } from "./ModSchema";
+import type { ModDiagnostic, ModPackage } from "./ModSchema";
 export interface InstalledMod {
   key: string;
   source: "local" | "workshop";
@@ -14,6 +14,7 @@ export interface ModLibrary {
   /** Partial success, such as one Workshop item skipped during refresh. */
   warning?: string;
   error?: string;
+  diagnostics?: ModDiagnostic[];
   /** The library file can't be read; offer a reset. */
   unreadable?: boolean;
   /** A Workshop upload is still running. */
