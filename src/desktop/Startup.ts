@@ -40,8 +40,18 @@ export function failDesktopStartup(retry: () => void, quit: () => void): void {
  * completion gate.
  */
 export function finishStartup(): void {
+  // Only a successful app commit counts; read the visit decision made before first paint.
+  try {
+    localStorage.setItem("electrify-startup-complete", "true");
+  } catch {
+    // Storage restrictions must never prevent the menu from becoming usable.
+  }
   const entrance = document.getElementById("appStartup");
   if (!entrance) return;
+  if (document.documentElement.dataset.startupVisit === "returning") {
+    entrance.remove();
+    return;
+  }
   const menu = document.querySelector("#menuCard");
   const logo = menu?.querySelector(".homeLogo");
   const before = entrance.querySelector(".homeLogo")?.getBoundingClientRect();
@@ -72,13 +82,13 @@ export function finishStartup(): void {
           },
           { transform: "none" },
         ],
-        { duration: 300, easing: "ease-out" },
+        { duration: 900, easing: "ease-out" },
       );
     }
     menu
       ?.querySelector("#centeredMenu")
       ?.animate([{ opacity: 0.65 }, { opacity: 1 }], {
-        duration: 240,
+        duration: 720,
         easing: "ease-out",
       });
   }

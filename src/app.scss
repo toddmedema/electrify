@@ -4558,7 +4558,7 @@ $homeSmokeCycle: 5.6s;
   animation-delay: $homeSmokeCycle * -0.5;
 }
 
-@media (prefers-reduced-motion: reduce) {
+@mixin staticHomeLogo {
   // Named as specifically as the circle's growth rule, or that one still wins
   .homeEnergyPulse,
   .homeSmokePuff,
@@ -4579,6 +4579,14 @@ $homeSmokeCycle: 5.6s;
       transform: scale(0.7);
     }
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @include staticHomeLogo;
+}
+
+html[data-startup-visit="returning"] #appStartup {
+  @include staticHomeLogo;
 }
 
 #appStartup {
