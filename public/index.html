@@ -9,6 +9,16 @@
       (function () {
         // Scripts run: show the startup entrance below instead of the no-JS summary.
         document.documentElement.classList.add("js");
+        let returningVisit = false;
+        try {
+          returningVisit =
+            localStorage.getItem("electrify-startup-complete") === "true";
+        } catch (_) {
+          // Without storage, treat this as a first visit and keep loading normally.
+        }
+        document.documentElement.dataset.startupVisit = returningVisit
+          ? "returning"
+          : "first";
         let choice;
         try {
           choice = localStorage.getItem("theme");

@@ -5,7 +5,7 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
+  waitForElementToBeRemoved,
   within,
 } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
@@ -218,10 +218,11 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
   expect(screen.queryByText("Time to build")).not.toBeInTheDocument();
 
-  fireEvent.click(
-    within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
-  );
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "close" }));
+  // Watch this element leave after MUI's exit transition; repeated role searches can
+  // starve its timer on a busy CI worker.
+  await waitForElementToBeRemoved(dialog);
 }, 15000);
 
 it("shows Coal's start charge without the representative-day breakdown", () => {
