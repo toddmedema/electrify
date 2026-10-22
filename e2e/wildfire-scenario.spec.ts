@@ -56,9 +56,24 @@ for (const theme of ["light", "dark"] as const) {
     const line = page.locator(".transmissionLine").filter({
       has: page.getByRole("button", { name: /Inspect Northern intertie/ }),
     });
-    await expect(
-      line.getByText("Wildfire limit 4MW", { exact: true }),
-    ).toBeVisible();
+    const limit = line.getByLabel(
+      "Temporarily limited to 10% of rated capacity",
+    );
+    await expect(limit).toBeVisible();
+    await expect(limit).toHaveText("10% limit");
+    const name = line.getByText("Northern intertie", { exact: true });
+    const [nameBox, limitBox] = await Promise.all([
+      name.boundingBox(),
+      limit.boundingBox(),
+    ]);
+    expect(nameBox).not.toBeNull();
+    expect(limitBox).not.toBeNull();
+    expect(limitBox!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width);
+    expect(
+      Math.abs(
+        nameBox!.y + nameBox!.height / 2 - limitBox!.y - limitBox!.height / 2,
+      ),
+    ).toBeLessThanOrEqual(2);
     const inspect = line.getByRole("button", {
       name: /Inspect Northern intertie/,
     });

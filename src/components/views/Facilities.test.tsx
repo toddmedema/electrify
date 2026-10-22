@@ -861,6 +861,35 @@ describe("unified connections", () => {
     return game;
   }
 
+  it.each([
+    [55, 0, 1],
+    [90, 0, 1],
+    [95, 0, 0],
+    [55, 1, 0],
+  ] as const)(
+    "labels an operating intertie at %d%% capacity with %d years of construction left",
+    (percent, yearsToBuildLeft, badgeCount) => {
+      const game = connectedGame();
+      const line = game.transmission!.lines[0];
+      line.yearsToBuildLeft = yearsToBuildLeft;
+      getTimeFromTimeline(
+        game.date.minute,
+        game.timeline,
+      )!.transmissionCapacityLimitsWByCorridor = {
+        [line.corridorId]: (line.capacityW * percent) / 100,
+      };
+      renderFacilities(game, null);
+      expect(screen.queryAllByText(`${percent}% limit`)).toHaveLength(
+        badgeCount,
+      );
+      expect(
+        screen.queryAllByLabelText(
+          `Temporarily limited to ${percent}% of rated capacity`,
+        ),
+      ).toHaveLength(badgeCount);
+    },
+  );
+
   it("keeps connections outside dispatch and reports network flow only once", async () => {
     const game = connectedGame();
     renderFacilities(game, null);

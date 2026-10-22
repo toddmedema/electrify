@@ -24,6 +24,7 @@ import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   Box,
   Button,
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -902,7 +903,20 @@ export default function TransmissionPanel({
                               >
                                 {reorderDisabled && icon}
                                 <span className="transmissionLineText">
-                                  <span>{line.name}</span>
+                                  <span className="transmissionLineName">
+                                    <span className="facilityName">
+                                      {line.name}
+                                    </span>
+                                    {restricted && !building && (
+                                      <Chip
+                                        className="storyDerateBadge"
+                                        color="warning"
+                                        size="small"
+                                        label={`${Math.round(retainedCapacity * 100)}% limit`}
+                                        aria-label={`Temporarily limited to ${Math.round(retainedCapacity * 100)}% of rated capacity`}
+                                      />
+                                    )}
+                                  </span>
                                   <Typography
                                     component="span"
                                     variant="body2"
@@ -918,15 +932,6 @@ export default function TransmissionPanel({
                                       </span>
                                     )}
                                   </Typography>
-                                  {restricted && !building && (
-                                    <Typography
-                                      component="span"
-                                      variant="body2"
-                                      color="error"
-                                    >
-                                      Wildfire limit {formatWatts(routeLimitW!)}
-                                    </Typography>
-                                  )}
                                   {building && (
                                     <span
                                       className="constructionProgress"

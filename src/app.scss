@@ -5530,7 +5530,12 @@ html[data-startup-visit="returning"] #appStartup {
 .transmissionLine .facilityDisclosure .transmissionListIcon {
   margin-right: 8px;
 }
-.transmissionLine .transmissionLineText > span:first-child {
+.transmissionLine .transmissionLineName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
   font-size: var(--font-size-subtitle);
   font-weight: 600;
 }
