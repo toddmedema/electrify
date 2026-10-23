@@ -3,6 +3,8 @@ import uPlot from "uplot";
 import UPlotChart from "./UPlotChart";
 import { ChartViewportContext } from "./ChartViewportContext";
 import { setThemeMode } from "../../Theme";
+import { applyTextSize } from "../../TextSize";
+import TutorialHud from "./TutorialHud";
 
 jest.mock("uplot", () => {
   const MockUPlot = jest.fn();
@@ -77,8 +79,28 @@ describe("UPlotChart resizing", () => {
   });
 
   afterEach(() => {
+    act(() => applyTextSize("standard"));
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it("rebuilds a mounted canvas when text size changes without a window resize", () => {
+    render(
+      <UPlotChart
+        ariaLabel="Text size chart"
+        state={{}}
+        data={[
+          [0, 1],
+          [2, 3],
+        ]}
+        buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+      />,
+    );
+    expect(uPlot).toHaveBeenCalledTimes(1);
+    act(() => applyTextSize("larger"));
+    expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
+    expect(uPlot).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("img", { name: /Text size chart/ })).toBeVisible();
   });
 
   it("uses Escape for an open chart tooltip, then lets Back leave the chart", () => {
@@ -111,6 +133,54 @@ describe("UPlotChart resizing", () => {
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(false);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(fireEvent.keyDown(chart, { key: "Escape" })).toBe(true);
+  });
+
+  it("continues a chart tutorial once when Confirm inspects a point", async () => {
+    const next = jest.fn();
+    render(
+      <>
+        <UPlotChart
+          id="tutorial-chart"
+          ariaLabel="Tutorial demand chart"
+          state={{}}
+          interactiveTooltip
+          tooltip={(index) => `Point ${index}`}
+          data={[
+            [0, 1],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+        <TutorialHud
+          desktop
+          step={{
+            card: "FACILITIES",
+            action: "Tap the chart",
+            content: <p>Inspect demand</p>,
+            continueOnClick: "#tutorial-chart",
+          }}
+          stepIndex={1}
+          totalSteps={3}
+          canGoBack
+          onBack={jest.fn()}
+          onExit={jest.fn()}
+          onNext={next}
+        />
+      </>,
+    );
+    const plot = currentPlot();
+    plot.valToPos = jest.fn((value: number) => value);
+    plot.setCursor = jest.fn();
+    const chart = screen.getByRole("img", { name: /Tutorial demand chart/ });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    expect(next).not.toHaveBeenCalled();
+    fireEvent.keyDown(chart, { key: "Enter" });
+    await act(async () => jest.runAllTicks());
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("Point 1");
+    fireEvent.keyDown(chart, { key: "Enter" });
+    await act(async () => jest.runAllTicks());
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it("remeasures a plot when the bundled font finishes loading after its first draw", async () => {

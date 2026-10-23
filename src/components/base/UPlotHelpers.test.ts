@@ -5,7 +5,33 @@ import {
   eventMarkersPlugin,
   spansBelow,
   splitPastProjected,
+  chartFont,
+  chartScale,
+  xAxis,
+  yAxis,
 } from "./UPlotHelpers";
+import { applyTextSize } from "../../TextSize";
+
+it("enlarges canvas labels and their reserved chart space with the text preference", () => {
+  const values = () => ["100MW"];
+  try {
+    applyTextSize("standard");
+    const standardScale = chartScale(350);
+    const standardAxis = xAxis(standardScale, { values });
+    expect(chartFont()).toMatch(/^12px /);
+    applyTextSize("larger");
+    const largerScale = chartScale(350);
+    expect(chartFont()).toMatch(/^15px /);
+    expect(chartFont(2)).toMatch(/^30px /);
+    expect(largerScale).toBeGreaterThan(standardScale);
+    expect(xAxis(largerScale, { values }).size).toBeGreaterThan(
+      standardAxis.size as number,
+    );
+    expect(yAxis(largerScale, { values, size: 60 }).size).toBe(75);
+  } finally {
+    applyTextSize("standard");
+  }
+});
 
 describe("anchored forecast dashes", () => {
   class RecordedPath {

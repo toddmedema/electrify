@@ -5828,7 +5828,7 @@ $programs_column: 800px;
   gap: $space-2;
 
   h2 {
-    font-size: 24px;
+    font-size: 1.5rem;
     line-height: 1.25;
     letter-spacing: -0.02em;
     font-weight: 600;
@@ -5858,7 +5858,7 @@ $programs_column: 800px;
   }
   dd {
     margin: 0;
-    font-size: 20px;
+    font-size: 1.25rem;
     line-height: 1.35;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -5902,7 +5902,7 @@ $programs_column: 800px;
     }
     &::after {
       content: "›";
-      font-size: 24px;
+      font-size: 1.5rem;
     }
   }
   &[open] > summary::after {
@@ -5924,13 +5924,13 @@ $programs_column: 800px;
 }
 @media screen and (max-width: 599px) {
   .customerProgramHeading h2 {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   .customerProgramFacts {
     gap: $space-3;
   }
   .customerProgramFact dd {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .customerProgramFact[data-wide] dd,
   .customerProgramFactsSecondary dd {
@@ -6329,7 +6329,7 @@ $programs_column: 800px;
     align-items: baseline;
     gap: $space-2;
     margin: 0;
-    font-size: 32px;
+    font-size: 2rem;
     font-weight: 600;
     line-height: 1.2;
     letter-spacing: -0.01em;
@@ -6552,7 +6552,7 @@ $programs_column: 800px;
 // Catalog rows open detail screens; the chevron carries their blue interaction affordance.
 .rowChevron.MuiSvgIcon-root {
   color: var(--interactive-strong);
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 // The Manual: entries within a group join into one grouped section rather than floating cards
@@ -6641,7 +6641,7 @@ $programs_column: 800px;
   background: transparent;
 
   .MuiSvgIcon-root {
-    font-size: 24px;
+    font-size: 1.5rem;
   }
 }
 
@@ -6743,7 +6743,7 @@ $programs_column: 800px;
   line-height: 0;
 
   .gridHealthStableBolt {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
 
   // A ring in the row's own surface colour cuts the check out of the bolt behind it.
@@ -6751,7 +6751,7 @@ $programs_column: 800px;
     position: absolute;
     right: -5px;
     bottom: -3px;
-    font-size: 14px;
+    font-size: 0.875rem;
     border-radius: 50%;
     background: var(--bg-raised);
     box-shadow: 0 0 0 1.5px var(--bg-raised);
@@ -7426,7 +7426,7 @@ $programs_column: 800px;
   }
 
   .coopBrowseState {
-    font-size: 16px;
+    font-size: 1rem;
     color: var(--font-color-faded);
   }
 

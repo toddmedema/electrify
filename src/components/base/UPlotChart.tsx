@@ -3,6 +3,8 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
+import { getTextScale, subscribeTextSize } from "../../TextSize";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 import {
   ChartViewportContext,
@@ -176,6 +178,7 @@ export default function UPlotChart<S>(
   props: UPlotChartProps<S>,
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
+  const controllerInput = useControllerInput();
   const annotations = React.useContext(ChartAnnotationsContext);
   const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -259,6 +262,11 @@ export default function UPlotChart<S>(
     subscribeThemeMode,
     getThemeVersion,
     getThemeVersion,
+  );
+  const textScale = React.useSyncExternalStore(
+    subscribeTextSize,
+    getTextScale,
+    getTextScale,
   );
   const [fontReady, setFontReady] = React.useState(
     () => !document.fonts || document.fonts.check("14px Inter"),
@@ -392,7 +400,7 @@ export default function UPlotChart<S>(
     };
     // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey, themeVersion, fontReady]);
+  }, [width, height, structureKey, themeVersion, textScale, fontReady]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -408,7 +416,15 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width, height, structureKey, themeVersion, fontReady]);
+  }, [
+    viewport,
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    textScale,
+    fontReady,
+  ]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -599,7 +615,15 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, height, structureKey, themeVersion, viewportEnabled, fontReady]);
+  }, [
+    width,
+    height,
+    structureKey,
+    themeVersion,
+    textScale,
+    viewportEnabled,
+    fontReady,
+  ]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();
@@ -625,8 +649,9 @@ export default function UPlotChart<S>(
     <div className="accessibleChart">
       {props.interactiveTooltip && (
         <span id={instructionsId} className="srOnly">
-          Hover or press Enter to inspect a time. Use Left and Right arrows,
-          Home and End to read points. Escape closes the tooltip.
+          {controllerInput
+            ? "Select to inspect a time. Use Left and Right to read points. Back closes the tooltip."
+            : "Hover or press Enter to inspect a time. Use Left and Right arrows, Home and End to read points. Escape closes the tooltip."}
         </span>
       )}
       <div
@@ -659,6 +684,14 @@ export default function UPlotChart<S>(
                 } else if (event.key in points) {
                   event.preventDefault();
                   selectPoint(points[event.key]);
+                  // Match pointer activation for the tutorial and other control owners. The
+                  // root click does not reach uPlot's inner pointer surface or move the cursor.
+                  if (
+                    event.key === "Enter" &&
+                    plotRef.current &&
+                    data[0].length
+                  )
+                    event.currentTarget.click();
                 }
               }
             : undefined

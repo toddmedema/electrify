@@ -6,6 +6,8 @@ import type {
   DesktopInputAction as InputAction,
   DesktopInputFrame as InputFrame,
 } from "../src/Desktop";
+import type { InstalledMod } from "../src/mods/Types";
+import type { LobbyState } from "../src/multiplayer/Native";
 import { readSaveRecords } from "./save-fixture";
 
 const glyphs: InputFrame["glyphs"] = {
@@ -73,16 +75,16 @@ async function select(
       );
   const expectedSurfaces = await popupSurfaces();
   for (let index = 0; index < limit; index++) {
+    if (await control.evaluate((element) => element === document.activeElement))
+      return;
     expect(
-      await popupSurfaces(),
+      expectedSurfaces,
       "directional focus traversal must not open an unexpected popup",
-    ).toEqual(expectedSurfaces);
+    ).toEqual(expect.arrayContaining(await popupSurfaces()));
     expect(
       await control.count(),
       "the target must remain available during navigation",
     ).toBe(1);
-    if (await control.evaluate((element) => element === document.activeElement))
-      return;
     await input(page, action);
   }
   await expect(
@@ -114,13 +116,82 @@ test.beforeEach(async ({ page }) => {
       actions: [],
       glyphs,
     };
+    const selfId = "76561198000000001";
+    let entries: InstalledMod[] = [
+      {
+        key: "workshop:777",
+        source: "workshop",
+        workshopId: "777",
+        enabled: true,
+        pack: {
+          schemaVersion: 1,
+          gameApi: 1,
+          id: "deck-grid",
+          title: "Deck Grid",
+          creator: "QA",
+          version: "1.0.0",
+          seed: 42,
+          baseScenarioId: 999,
+        },
+      },
+    ];
+    let lobby: LobbyState = {
+      available: true,
+      selfId,
+      members: [],
+      connected: [],
+    };
     window.electrifyDesktop = {
       apiVersion: 1,
       getState: async () => ({
         display,
-        steam: { available: true, online: true, cloudEnabled: false },
+        steam: {
+          available: true,
+          online: true,
+          cloudEnabled: false,
+          steamId: selfId,
+          displayName: "Deck player",
+        },
       }),
       setDisplay: async () => display,
+      mods: async (request) => {
+        document.documentElement.dataset.mockModRequest = request.kind;
+        if (request.kind === "enable")
+          entries = entries.map((entry) =>
+            entry.key === request.key
+              ? { ...entry, enabled: request.enabled }
+              : entry,
+          );
+        return { entries };
+      },
+      multiplayerRequest: async (request) => {
+        document.documentElement.dataset.mockMultiplayerRequest = request.kind;
+        if (request.kind === "list-saves")
+          return { slots: [], cloudState: "disabled" };
+        if (request.kind === "join") {
+          document.documentElement.dataset.mockJoinedLobby = request.lobbyId;
+          lobby = {
+            ...lobby,
+            lobbyId: request.lobbyId,
+            hostId: "76561198000000002",
+            members: [
+              { id: selfId, name: "Deck player" },
+              { id: "76561198000000002", name: "Friend" },
+            ],
+            connected: ["76561198000000002"],
+          };
+        }
+        if (request.kind === "create")
+          lobby = {
+            ...lobby,
+            lobbyId: "10977524123456789",
+            hostId: selfId,
+            members: [{ id: selfId, name: "Deck player" }],
+            connected: [],
+          };
+        return lobby;
+      },
+      onMultiplayerEvent: noop,
       onStateChanged: noop,
       onGameFocusChanged: noop,
       onBeforeQuit: noop,
@@ -219,9 +290,10 @@ test("controller text entry searches the manual, cancels and restores field focu
   await expect(search).not.toBeFocused();
 });
 
-test("semantic actions play, build, adjust pricing, inspect charts and save without a mouse", async ({
+test("semantic actions play, build, adjust pricing, inspect charts and save at Larger text size", async ({
   page,
 }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem("textSize", "larger"));
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute(
     "data-mock-input-context",
@@ -274,6 +346,24 @@ test("semantic actions play, build, adjust pricing, inspect charts and save with
   await expect(purchase).toHaveCount(0);
   await expect(build).toHaveCount(0);
 
+  // Confirm lifts a reorder handle; directions must move the row rather than leave it.
+  const rows = page.locator(".facilities:visible .facilityRow");
+  const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
+  const grip = rows.first().getByRole("button", { name: /^Reorder / });
+  await select(page, grip);
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
+  await input(page, "down");
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
+  await input(page, "up");
+  await input(page, "back");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+
   // From the fleet the pane ring reaches Build, then Programs at every viewport width.
   await input(page, "nextPane");
   await input(page, "nextPane");
@@ -300,7 +390,8 @@ test("semantic actions play, build, adjust pricing, inspect charts and save with
       () => document.documentElement.scrollWidth - innerWidth,
     ),
   ).toBeLessThanOrEqual(1);
-  if (process.env.REVIEW_SCREENSHOT_DIR)
+  if (process.env.REVIEW_SCREENSHOT_DIR) {
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
     await page.screenshot({
       path: path.join(
         process.env.REVIEW_SCREENSHOT_DIR,
@@ -308,6 +399,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save with
       ),
       animations: "disabled",
     });
+  }
   // Programs → Insights → Events → Scenario → Fleet closes every retained side pane.
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
@@ -357,6 +449,36 @@ test("semantic actions play, build, adjust pricing, inspect charts and save with
     "data-mock-input-context",
     "Menu",
   );
+  await select(
+    page,
+    page.getByRole("button", { name: "Saved games", exact: true }),
+  );
+  await input(page, "confirm");
+  await select(
+    page,
+    page.getByRole("button", { name: /^Actions for / }).first(),
+  );
+  await input(page, "confirm");
+  await select(
+    page,
+    page.getByRole("menuitem", { name: "Rename", exact: true }),
+  );
+  await input(page, "confirm");
+  await select(
+    page,
+    page.getByRole("textbox", { name: "Save name", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-text-input",
+    /Save name/,
+  );
+  await submitText(page, "Deck renamed save");
+  await select(page, page.getByRole("button", { name: "Rename", exact: true }));
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("article", { name: "Deck renamed save", exact: true }),
+  ).toBeVisible();
 });
 
 test("controller hints follow the active device without blocking keyboard navigation", async ({
@@ -386,4 +508,220 @@ test("controller hints follow the active device without blocking keyboard naviga
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
+});
+
+async function submitText(page: Page, text: string) {
+  await page.evaluate((text) => {
+    window.dispatchEvent(
+      new CustomEvent("mockSteamTextResult", {
+        detail: { status: "submitted", text },
+      }),
+    );
+  }, text);
+}
+
+async function chooseNewGame(page: Page) {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await select(
+    page,
+    page.getByRole("button", { name: "Start playing", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("heading", { name: "Choose a game", exact: true }),
+  ).toBeVisible();
+}
+
+test("controller chooses an autocomplete city and starts a custom game", async ({
+  page,
+}) => {
+  await chooseNewGame(page);
+  await select(
+    page,
+    page.getByRole("button", { name: "View Custom Game details", exact: true }),
+  );
+  await input(page, "confirm");
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await select(page, search);
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-text-input",
+    /Search playable cities/,
+  );
+  await submitText(page, "Paris");
+  await expect(
+    page.getByRole("option", { name: "Paris, France", exact: true }),
+  ).toBeVisible();
+  await input(page, "down");
+  await input(page, "confirm");
+  await expect(search).toHaveValue("Paris, France");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await select(page, page.locator('.worldMapMarker[tabindex="0"]'));
+  await input(page, "back");
+  await expect(
+    page.getByRole("group", { name: "Map zoom controls" }).locator(":focus"),
+  ).toHaveCount(1);
+  await select(page, page.getByRole("button", { name: "Play", exact: true }));
+  await input(page, "confirm");
+  await expect(page.locator("#appbar:visible")).toBeVisible();
+  await expect.poll(async () => (await readSaveRecords(page)).length).toBe(1);
+  const save = decodeSave(
+    (await readSaveRecords(page))[0].save,
+  ) as SaveGameType;
+  expect(save.game.location.name).toBe("Paris, France");
+});
+
+test("controller changes text size, keeps settings reachable and persists it", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await select(
+    page,
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
+  await input(page, "confirm");
+  const larger = page.getByRole("button", { name: "Larger", exact: true });
+  await select(
+    page,
+    page.getByRole("button", { name: "Standard", exact: true }),
+  );
+  await input(page, "right");
+  await input(page, "right");
+  await expect(larger).toBeFocused();
+  await input(page, "confirm");
+  await expect(larger).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveCSS("font-size", "20px");
+  await expect(page.getByText(/F11 or Alt\+Enter/)).toHaveCount(0);
+  await expect(
+    page.getByRole("complementary", { name: "Controller controls" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+  if (process.env.REVIEW_SCREENSHOT_DIR)
+    await page.screenshot({
+      path: path.join(
+        process.env.REVIEW_SCREENSHOT_DIR,
+        `text-size-${testInfo.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+  await input(page, "back");
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  await select(
+    page,
+    page.getByRole("button", { name: "Settings", exact: true }),
+  );
+  await input(page, "confirm");
+  await expect(larger).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => localStorage.getItem("textSize"))).toBe(
+    "larger",
+  );
+});
+
+test("controller opens Workshop and enters a multiplayer invite with Steam text entry", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await select(page, page.getByRole("button", { name: "Mods", exact: true }));
+  await input(page, "confirm");
+  const enabled = page.getByRole("switch", {
+    name: "Deck Grid enabled",
+    exact: true,
+  });
+  await select(
+    page,
+    page.getByRole("button", { name: "Play Deck Grid", exact: true }),
+  );
+  await input(page, "right");
+  await expect(enabled).toBeFocused();
+  await input(page, "confirm");
+  await expect(enabled).not.toBeChecked();
+  await input(page, "confirm");
+  await expect(enabled).toBeChecked();
+  const browse = page.getByRole("button", {
+    name: "Browse Workshop",
+    exact: true,
+  });
+  await select(page, browse);
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-mod-request",
+    "browse",
+  );
+  await input(page, "back");
+  await select(
+    page,
+    page.getByRole("button", { name: "Play with friends", exact: true }),
+  );
+  await input(page, "confirm");
+  const code = page.getByRole("textbox", { name: "Invite code", exact: true });
+  await select(page, code);
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-text-input",
+    /Invite code/,
+  );
+  await submitText(page, "10977524123456789");
+  await expect(code).toHaveValue("10977524123456789");
+  await select(page, page.getByRole("button", { name: "Join", exact: true }));
+  await input(page, "confirm");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-joined-lobby",
+    "10977524123456789",
+  );
+  await expect(
+    page.getByText("Waiting for Friend to choose a game…", { exact: true }),
+  ).toBeVisible();
+});
+
+test("controller advances the first tutorial through inspection, chart and clock", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.removeItem("plays"));
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await input(page, "confirm");
+  const hud = page.locator(".tutorialHud");
+  await expect(hud).toBeVisible();
+  await select(
+    page,
+    page.getByRole("button", { name: "Inspect Coal", exact: true }),
+  );
+  await input(page, "confirm");
+  const chart = page.locator('#chartSupplyDemand [role="img"]');
+  await select(page, chart);
+  await input(page, "confirm");
+  await expect(hud).toContainText("Demand rises as the city wakes up.");
+  await select(page, page.getByRole("button", { name: "pause", exact: true }));
+  await input(page, "right");
+  await expect(
+    page.getByRole("button", { name: "slow speed", exact: true }),
+  ).toBeFocused();
+  await input(page, "confirm");
+  await expect(hud).toContainText(
+    "Watch coal output climb slowly as sunlight fades.",
+  );
+  // Tutorial-hidden actions must stay unavailable through controller shortcuts too.
+  await input(page, "build");
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
 });

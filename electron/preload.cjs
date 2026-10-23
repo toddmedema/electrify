@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld(
     onInput: (callback) => subscribe("desktop:input-event", callback),
     showTextInput: (input) => ipcRenderer.invoke("desktop:text-input", input),
     onStateChanged: (callback) => subscribe("desktop:state-changed", callback),
+    onPowerStateChanged: (callback) =>
+      subscribe("desktop:power-changed", callback),
+    readyAfterResume: (generation) =>
+      ipcRenderer.invoke("desktop:resume-ready", generation),
     onBeforeQuit: (callback) => subscribe("desktop:before-quit", callback),
     onGameFocusChanged: (callback) =>
       subscribe("desktop:focus-changed", callback),

@@ -1,5 +1,6 @@
 import type { AppStore } from "./Store";
 import { flushShutdownCheckpoints } from "./desktop/Shutdown";
+import type { DesktopPowerState } from "./Desktop";
 import { getDesktop } from "./Desktop";
 import {
   DesktopSaveTransport,
@@ -10,6 +11,7 @@ import {
   saveRepository,
   checkpointForDesktopExit,
   releaseDesktopSaveWriter,
+  renewDesktopSaveWriter,
   refreshSavedGames,
 } from "./SaveSession";
 import { sessionChanged } from "./SaveLibrary";
@@ -77,7 +79,7 @@ export function startDesktopSaves(store: AppStore): () => void {
       });
     return backupTail;
   };
-  const reportDiskFailure = () =>
+  const reportDiskFailure = () => {
     store.dispatch(
       sessionChanged({
         saveState: "failed",
@@ -85,6 +87,7 @@ export function startDesktopSaves(store: AppStore): () => void {
           "The desktop backup couldn't be written. Your game remains in device storage. Retry saving before quitting.",
       }),
     );
+  };
   const changed = () => {
     // A scheduled write captures every change made before it runs.
     if (backupTimer !== undefined) return;
@@ -177,6 +180,52 @@ export function startDesktopSaves(store: AppStore): () => void {
   const unsubscribeRepository = saveRepository.subscribe(changed);
   const unsubscribeRequests = subscribeCloudSaveRequests(() => void run());
   const unsubscribeState = desktop.onStateChanged(() => void run());
+  let powerGeneration = -1;
+  let powerTail = Promise.resolve();
+  const powerChanged = (power: DesktopPowerState) => {
+    if (power.generation <= powerGeneration || power.phase === "awake") return;
+    powerGeneration = power.generation;
+    const resume = power.phase === "resuming";
+    powerTail = powerTail
+      .catch(() => undefined)
+      .then(async () => {
+        if (stopped) return;
+        const shared = resume
+          ? Promise.resolve()
+          : flushShutdownCheckpoints("suspend");
+        // Observe both failures immediately; one participant must not skip another's checkpoint.
+        const sharedResult = shared.then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        try {
+          if (resume) await renewDesktopSaveWriter();
+          await checkpointForDesktopExit();
+          cancelBackup();
+          await persist();
+          if (await sharedResult) reportDiskFailure();
+        } catch {
+          if (!store.getState().saves.saveError) reportDiskFailure();
+        } finally {
+          if (resume && !stopped && powerGeneration === power.generation) {
+            await refreshSavedGames().catch(() => undefined);
+            // Main rejects this acknowledgement if another sleep has started in the meantime.
+            await desktop.readyAfterResume?.(power.generation);
+            void run();
+          }
+        }
+      })
+      .catch(() => {
+        reportDiskFailure();
+      });
+  };
+  const unsubscribePower = desktop.onPowerStateChanged?.(powerChanged);
+  void desktop
+    .getState()
+    .then((state) => {
+      if (state.power) powerChanged(state.power);
+    })
+    .catch(() => undefined);
   const beforeQuit = desktop.onBeforeQuit(() => {
     store.dispatch(pageHidden());
     void (async () => {
@@ -226,6 +275,7 @@ export function startDesktopSaves(store: AppStore): () => void {
     unsubscribeRepository();
     unsubscribeRequests();
     unsubscribeState();
+    unsubscribePower?.();
     beforeQuit();
     window.removeEventListener("focus", wake);
   };

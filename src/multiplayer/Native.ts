@@ -40,7 +40,7 @@ export type WireMessage =
   | { kind: "heartbeat" }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }
   | { kind: "view"; view: RoomView }
-  | { kind: "save-request"; requestId: string }
+  | { kind: "save-request"; requestId: string; suspended?: boolean }
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }
   | { kind: "browse"; browse: BrowseState }

@@ -14,6 +14,10 @@ const {
 const { SteamActivity } = require("./steam-activity.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  SteamNativeDialogs,
+  loadDialogFunctions,
+} = require("./steam-dialog.cjs");
 const { SteamDispatcher } = require("./steam-dispatch.cjs");
 const { SteamAchievements } = require("./steam-achievements.cjs");
 const {
@@ -46,6 +50,7 @@ class SteamService {
       this.activity?.dispose();
       this.input?.dispose();
       this.textInput?.dispose();
+      this.dialogs?.dispose();
       this.stopped = true;
       this.leaderboards?.dispose();
       this.dispatcher?.dispose();
@@ -104,6 +109,14 @@ class SteamService {
       } catch (error) {
         console.warn(`Steam text input unavailable: ${error.message}`);
       }
+      this.dialogs = new SteamNativeDialogs(
+        loadDialogFunctions(),
+        () => this.onOverlayChanged?.(this.overlayActive),
+        (error) =>
+          console.warn(
+            `Steam native dialog input unavailable: ${error.message}`,
+          ),
+      );
       this.leaderboards = new SteamLeaderboards(this.native, this.dispatcher);
     } catch (error) {
       console.warn(
@@ -112,6 +125,10 @@ class SteamService {
       // Successful identity/cloud initialization remains useful if a leaderboard interface fails.
       if (!this.identity.steamId) this.client = null;
     }
+  }
+
+  withNativeDialog(open) {
+    return this.dialogs ? this.dialogs.run(open) : open();
   }
 
   state() {

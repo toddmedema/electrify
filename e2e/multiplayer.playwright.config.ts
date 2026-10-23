@@ -21,12 +21,12 @@ if (productionRoot) {
   }
 }
 // Desktop-renderer specs that replace the native bridge with an in-memory one: Steam
-// multiplayer, Steam Input and mod management (Workshop and local packages). The name is
+// multiplayer and mod management (Workshop and local packages). The name is
 // historical. The real gameplay, input navigation, host worker and checkpoint protocol still run.
 // CI reuses its verified production desktop artifact; local dev remains available by default.
 export default defineConfig({
   testDir: ".",
-  testMatch: ["multiplayer.spec.ts", "steam-input.spec.ts", "mods.spec.ts"],
+  testMatch: ["multiplayer.spec.ts", "mods.spec.ts"],
   outputDir: "../test-results/multiplayer",
   fullyParallel: false,
   workers: 1,

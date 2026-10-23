@@ -299,8 +299,12 @@ export default function MultiplayerRoot() {
     };
   }, [session, syncCoop, leaveLobby, invite, copyCode]);
   useEffect(() => {
-    if (!hasView || state.lobby.hostId !== state.lobby.selfId) return;
-    return registerShutdownCheckpoint(() => session.save(true));
+    if (!hasView) return;
+    return registerShutdownCheckpoint((reason) => {
+      if (reason === "quit" && state.lobby.hostId !== state.lobby.selfId)
+        return Promise.resolve();
+      return session.save(true, reason === "suspend");
+    });
   }, [session, hasView, state.lobby.hostId, state.lobby.selfId]);
   useEffect(() => {
     const error = state.error || state.lobby.error;

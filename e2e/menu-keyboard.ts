@@ -54,6 +54,23 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   await expect(light).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("ArrowDown");
+  const sizes = page.getByRole("group", { name: "Text size", exact: true });
+  const standard = sizes.getByRole("button", { name: "Standard", exact: true });
+  const large = sizes.getByRole("button", { name: "Large", exact: true });
+  await expect(standard).toBeFocused();
+  await expect(standard).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(large).toBeFocused();
+  await expect(standard).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Enter");
+  await expect(large).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveCSS("font-size", "18px");
+  await page.keyboard.press("ArrowLeft");
+  await expect(standard).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(standard).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveCSS("font-size", "16px");
+  await page.keyboard.press("ArrowDown");
   const sound = page.getByRole("switch", { name: "Sound", exact: true });
   await expect(sound).toBeFocused();
   await expect(sound).not.toBeChecked();

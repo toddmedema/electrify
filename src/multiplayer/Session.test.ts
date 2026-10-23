@@ -1207,3 +1207,104 @@ test("a guest's finished match closes when the host goes back to choosing, and R
   });
   f.session.dispose();
 });
+
+test("a host sleep checkpoint keeps its session open for an explicit resume", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  await f.session.save(true, true);
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "checkpoint",
+    pause: true,
+    suspended: true,
+  });
+  const before = f.posts.length;
+  f.session.command({ kind: "speed", speed: "NORMAL" });
+  expect(f.posts.slice(before)).toContainEqual(
+    expect.objectContaining({
+      kind: "command",
+      envelope: expect.objectContaining({
+        command: { kind: "speed", speed: "NORMAL" },
+      }),
+    }),
+  );
+  f.session.dispose();
+});
+
+test("a sleep checkpoint discards unsent readiness while retaining an in-flight economic command", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  const rate = f.session.submit({ kind: "rate", value: 0.2 });
+  const ready = f.session
+    .submit({ kind: "ready" })
+    .catch((error: Error) => error.message);
+  const speed = f.session
+    .submit({ kind: "speed", speed: "NORMAL" })
+    .catch((error: Error) => error.message);
+  await f.session.save(true, true);
+  f.worker.onmessage!({
+    data: {
+      kind: "views",
+      views: {
+        [host]: view({
+          revision: 2,
+          lastSequence: 1,
+          receipt: { sequence: 1 },
+        }),
+      },
+    },
+  } as unknown as MessageEvent<WorkerResponse>);
+  await rate;
+  expect(f.posts.filter((request) => request.kind === "command")).toHaveLength(
+    1,
+  );
+  await expect(ready).resolves.toContain("sleep");
+  await expect(speed).resolves.toContain("sleep");
+  f.session.command({ kind: "speed", speed: "NORMAL" });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "command",
+    envelope: { command: { kind: "speed", speed: "NORMAL" } },
+  });
+  f.session.dispose();
+});
+
+test("a guest sleep requests an immediate authoritative pause even with an economic command in flight", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  deliver(f, {});
+  f.session.command({ kind: "rate", value: 0.2 });
+  const sleeping = f.session.save(true, true);
+  const request = f.requests.at(-1);
+  expect(request).toMatchObject({
+    kind: "send",
+    to: host,
+    payload: { kind: "save-request", suspended: true },
+  });
+  if (request?.kind !== "send" || request.payload.kind !== "save-request")
+    throw new Error("No save request");
+  f.event({
+    kind: "message",
+    sender: host,
+    payload: { kind: "save-result", requestId: request.payload.requestId },
+  });
+  await sleeping;
+  f.session.dispose();
+});
+
+test("a host treats a guest sleep save request as a safety stop requiring fresh readiness", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  f.event({
+    kind: "message",
+    sender: guest,
+    payload: { kind: "save-request", requestId: "sleep", suspended: true },
+  });
+  expect(f.posts.at(-1)).toMatchObject({
+    kind: "checkpoint",
+    pause: true,
+    suspended: true,
+  });
+  f.session.dispose();
+});

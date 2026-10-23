@@ -66,3 +66,20 @@ it("persists optional desktop preferences independently of the sound switch", ()
     steamTimelineEnabled: true,
   });
 });
+
+it("restores text size locally and rejects unsupported persisted and runtime choices", () => {
+  localStorage.setItem("textSize", "larger");
+  expect(settings().initialSettings.textSize).toBe("larger");
+  localStorage.setItem("textSize", "300%");
+  const { default: reducer, initialSettings, change } = settings();
+  expect(initialSettings.textSize).toBe("standard");
+  const large = reducer(initialSettings, change({ textSize: "large" }));
+  expect(large.textSize).toBe("large");
+  expect(settings().initialSettings.textSize).toBe("large");
+  const invalid = reducer(
+    large,
+    change({ textSize: "300%" } as unknown as Parameters<typeof change>[0]),
+  );
+  expect(invalid.textSize).toBe("standard");
+  expect(localStorage.getItem("textSize")).toBe("standard");
+});

@@ -15,7 +15,14 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronDownGlyph } from "../base/Glyphs";
-import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
+import {
+  SettingsType,
+  TextSizeType,
+  ThemeChoiceType,
+  UnitSystemType,
+} from "../../Types";
+import { TEXT_SIZES, TEXT_SIZE_LABELS } from "../../TextSize";
+import { useControllerInput } from "../../desktop/InputPresentation";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
@@ -52,6 +59,7 @@ export interface DispatchProps {
   onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
+  onTextSizeChange: (change: TextSizeType) => void;
   onManageSaves: () => void;
   onBack: () => void;
 }
@@ -190,6 +198,7 @@ export default function Settings(props: Props): React.JSX.Element {
   const canInstallApp = useCanInstallApp();
   const desktopApp = process.env.REACT_APP_DESKTOP === "true" && isDesktopApp();
   const desktop = useDesktopState();
+  const controllerInput = useControllerInput();
   const onBack = () => {
     if (document.activeElement instanceof HTMLElement)
       document.activeElement.blur();
@@ -260,6 +269,38 @@ export default function Settings(props: Props): React.JSX.Element {
                   {THEME_CHOICES.map((choice: ThemeChoiceType) => (
                     <ToggleButton value={choice} key={choice}>
                       {choice === "system" ? "System" : THEME_LABELS[choice]}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </SettingRow>
+
+              <SettingRow
+                label="Text size"
+                description="Enlarge text, chart labels and controls on this device."
+                stackOnMobile
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={props.settings.textSize ?? "standard"}
+                  aria-label="Text size"
+                  onChange={(
+                    _e: React.MouseEvent<HTMLElement>,
+                    value: TextSizeType | null,
+                  ) => value && props.onTextSizeChange(value)}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    "& .MuiToggleButton-root": {
+                      flex: { xs: 1, sm: "0 0 auto" },
+                      minWidth: { sm: 76 },
+                      px: { xs: 1, sm: 1.5 },
+                      textTransform: "none",
+                    },
+                  }}
+                >
+                  {TEXT_SIZES.map((size) => (
+                    <ToggleButton value={size} key={size}>
+                      {TEXT_SIZE_LABELS[size]}
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
@@ -472,38 +513,40 @@ export default function Settings(props: Props): React.JSX.Element {
             </SettingsGroup>
           )}
 
-          <SettingsGroup id="keyboard-settings" title="Keyboard shortcuts">
-            <Accordion
-              disableGutters
-              elevation={0}
-              sx={{
-                "&::before": { display: "none" },
-                backgroundColor: "transparent",
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ChevronDownGlyph className="rowChevron" />}
-                aria-controls="keyboard-shortcuts-content"
-                id="keyboard-shortcuts-summary"
-                sx={{ minHeight: 56, px: 2 }}
+          {!controllerInput && (
+            <SettingsGroup id="keyboard-settings" title="Keyboard shortcuts">
+              <Accordion
+                disableGutters
+                elevation={0}
+                sx={{
+                  "&::before": { display: "none" },
+                  backgroundColor: "transparent",
+                }}
               >
-                <Box>
-                  <Typography sx={{ fontWeight: 600 }}>
-                    Keys for faster play
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    View {SHORTCUTS.length} shortcuts
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails
-                id="keyboard-shortcuts-content"
-                sx={{ px: 2, pt: 0 }}
-              >
-                <KeyboardShortcuts />
-              </AccordionDetails>
-            </Accordion>
-          </SettingsGroup>
+                <AccordionSummary
+                  expandIcon={<ChevronDownGlyph className="rowChevron" />}
+                  aria-controls="keyboard-shortcuts-content"
+                  id="keyboard-shortcuts-summary"
+                  sx={{ minHeight: 56, px: 2 }}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      Keys for faster play
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View {SHORTCUTS.length} shortcuts
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails
+                  id="keyboard-shortcuts-content"
+                  sx={{ px: 2, pt: 0 }}
+                >
+                  <KeyboardShortcuts />
+                </AccordionDetails>
+              </Accordion>
+            </SettingsGroup>
+          )}
 
           <Stack
             component="footer"

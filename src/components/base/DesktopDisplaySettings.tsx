@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Switch, Typography } from "@mui/material";
 import { DesktopDisplay, getDesktop } from "../../Desktop";
 import { useDesktopState } from "../../DesktopState";
+import { useControllerInput } from "../../desktop/InputPresentation";
 
 const sameDisplay = (left: DesktopDisplay, right: DesktopDisplay) =>
   left.fullscreen === right.fullscreen &&
@@ -10,6 +11,7 @@ const sameDisplay = (left: DesktopDisplay, right: DesktopDisplay) =>
 
 export default function DesktopDisplaySettings(): React.JSX.Element {
   const state = useDesktopState();
+  const controllerInput = useControllerInput();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [choice, setChoice] = useState<DesktopDisplay>();
@@ -89,8 +91,8 @@ export default function DesktopDisplaySettings(): React.JSX.Element {
         <Box>
           <Typography sx={{ fontWeight: 600 }}>Fullscreen</Typography>
           <Typography variant="body2" color="text.secondary">
-            Use the monitor's native resolution. F11 or Alt+Enter also toggles
-            fullscreen.
+            Use the monitor's native resolution.
+            {!controllerInput && " F11 or Alt+Enter also toggles fullscreen."}
           </Typography>
         </Box>
         <Switch

@@ -68,6 +68,8 @@ export const chooseScenarioResponse = createAction<{
  */
 export const pageHidden = createAction("game/pageHidden");
 export const pageVisible = createAction("game/pageVisible");
+/** System sleep discards every automatic speed restoration; waking needs fresh player input. */
+export const systemSuspend = createAction("game/systemSuspend");
 export const cloudSavePromptVisible = createAction<boolean>(
   "game/cloudSavePromptVisible",
 );

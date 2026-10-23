@@ -22,21 +22,34 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 90000,
-  projects: base
-    .projects!.filter((project) =>
-      ["desktop-chromium", "mobile-390px", "mobile-360px"].includes(
-        project.name!,
-      ),
-    )
-    .map((project) => ({
-      ...project,
+  projects: [
+    ...([800, 720] as const).flatMap((height) =>
+      (["light", "dark"] as const).map((colorScheme) => ({
+        name: `deck-${height}-${colorScheme}`,
+        use: {
+          browserName: "chromium" as const,
+          viewport: { width: 1280, height },
+          colorScheme,
+        },
+      })),
+    ),
+    {
+      name: "docked-light",
       use: {
-        ...project.use,
-        colorScheme: project.name!.startsWith("mobile-")
-          ? ("dark" as const)
-          : ("light" as const),
+        browserName: "chromium",
+        viewport: { width: 1920, height: 1080 },
+        colorScheme: "light",
       },
-    })),
+    },
+    ...base
+      .projects!.filter((project) =>
+        ["mobile-390px", "mobile-360px"].includes(project.name!),
+      )
+      .map((project) => ({
+        ...project,
+        use: { ...project.use, colorScheme: "dark" as const },
+      })),
+  ],
   use: { ...base.use, baseURL: `http://127.0.0.1:${port}` },
   webServer: {
     command: productionRoot ? "node scripts/ci/serve.js" : "npm start",

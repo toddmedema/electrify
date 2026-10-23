@@ -4,6 +4,7 @@ const { EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { SteamNativeDialogs } = require("./steam-dialog.cjs");
 
 const settle = () => new Promise(setImmediate);
 
@@ -19,9 +20,20 @@ async function startup(
   const writes = [];
   const errors = [];
   const handlers = new Map();
+  const powerMonitor = new EventEmitter();
+  const messages = [];
+  const inputEnabled = [];
   const appRoot = path.resolve(".tmp", "main-startup-app");
   const display = { workAreaSize: { width: 1920, height: 1080 } };
   let game;
+  let modOptions;
+  const nativeDialogs = [];
+  const launcherChanges = [];
+  const openNativeDialog = () => {
+    const pending = Promise.withResolvers();
+    nativeDialogs.push(pending);
+    return pending.promise;
+  };
 
   class BrowserWindow extends EventEmitter {
     constructor(options) {
@@ -35,7 +47,7 @@ async function startup(
       this.webContents = Object.assign(new EventEmitter(), {
         mainFrame: { url: "electrify://app/index.html" },
         setWindowOpenHandler() {},
-        send() {},
+        send: (channel, value) => messages.push([channel, value]),
       });
       calls.push({ kind: "construct", visible: this.visible });
       // A hidden macOS window does not confirm the constructor's fullscreen intent.
@@ -123,18 +135,37 @@ async function startup(
     state() {
       return { online: false };
     }
-    initialize() {}
+    initialize() {
+      this.dialogs = new SteamNativeDialogs(
+        {
+          utils: () => "utils",
+          launcher: (_utils, active) => launcherChanges.push(active),
+        },
+        () => this.onOverlayChanged?.(),
+      );
+    }
+    withNativeDialog(open) {
+      return this.dialogs.run(open);
+    }
     configureScoreQueue() {}
     configureAchievements() {}
     configureInput() {}
-    setInputEnabled() {}
+    setInputEnabled(enabled) {
+      inputEnabled.push(enabled);
+    }
     flushScores() {}
   }
   const electron = {
     app,
+    powerMonitor,
     BrowserWindow,
     ipcMain,
-    dialog: { showErrorBox: (_title, error) => errors.push(error) },
+    dialog: {
+      showErrorBox: (_title, error) => errors.push(error),
+      showOpenDialog: openNativeDialog,
+      showSaveDialog: openNativeDialog,
+      showMessageBox: openNativeDialog,
+    },
     protocol: { registerSchemesAsPrivileged() {} },
     screen: {
       getPrimaryDisplay: () => display,
@@ -175,6 +206,9 @@ async function startup(
     // and in memory while the real main/display/runtime own the display lifecycle.
     "./mods.cjs": {
       ModStore: class {
+        constructor(_directory, options) {
+          modOptions = options;
+        }
         cleanupStages() {
           return Promise.resolve();
         }
@@ -217,8 +251,20 @@ async function startup(
   return {
     game,
     calls,
+    powerMonitor,
+    messages,
+    inputEnabled,
     writes,
     errors,
+    nativeDialogs,
+    launcherChanges,
+    modOptions,
+    send: (channel, ...args) =>
+      ipcMain.emit(
+        channel,
+        { sender: game.webContents, senderFrame: game.webContents.mainFrame },
+        ...args,
+      ),
     shown: shown.promise,
     failed: failed.promise,
     request: (channel, ...args) =>
@@ -325,4 +371,87 @@ test("main rolls a rejected first fullscreen entry back to actual windowed state
   });
   assert.deepEqual(fixture.game.getContentSize(), [800, 600]);
   assert.equal(fixture.game.visible, true);
+});
+
+test("system sleep gates focused input until the matching wake checkpoint completes", async (t) => {
+  const f = await startup(t);
+  f.game.emit("ready-to-show");
+  await f.shown;
+  await f.request("desktop:state");
+  assert.equal(f.game.isFocused(), true);
+  assert.equal(f.inputEnabled.at(-1), true);
+  f.powerMonitor.emit("suspend");
+  assert.equal(f.request("desktop:text-input", {}).status, "unavailable");
+  assert.equal(f.inputEnabled.at(-1), false);
+  assert.equal((await f.request("desktop:state")).power.phase, "suspended");
+  f.powerMonitor.emit("resume");
+  const firstWake = (await f.request("desktop:state")).power;
+  assert.equal(firstWake.phase, "resuming");
+  assert.equal(f.request("desktop:text-input", {}).status, "unavailable");
+  assert.equal(f.inputEnabled.at(-1), false);
+  f.powerMonitor.emit("suspend");
+  await f.request("desktop:resume-ready", firstWake.generation);
+  assert.equal((await f.request("desktop:state")).power.phase, "suspended");
+  f.powerMonitor.emit("resume");
+  const secondWake = (await f.request("desktop:state")).power;
+  assert.throws(
+    () => f.request("desktop:resume-ready", -1),
+    /Invalid power generation/,
+  );
+  await f.request("desktop:resume-ready", firstWake.generation);
+  assert.equal(f.inputEnabled.at(-1), false);
+  await f.request("desktop:resume-ready", secondWake.generation);
+  assert.equal((await f.request("desktop:state")).power.phase, "awake");
+  assert.equal(f.inputEnabled.at(-1), true);
+  assert.equal(
+    f.messages.some(
+      ([channel, focused]) =>
+        channel === "desktop:focus-changed" && focused === false,
+    ),
+    true,
+  );
+});
+
+test("native mod choosers translate controller input and cannot override a sleep gate", async (t) => {
+  const f = await startup(t);
+  f.game.emit("ready-to-show");
+  await f.shown;
+  f.request("desktop:state");
+  const choosing = f.modOptions.chooseFile();
+  assert.equal(f.game.isFocused(), true);
+  assert.deepEqual(f.launcherChanges, [true]);
+  assert.equal(f.inputEnabled.at(-1), false);
+  assert.equal(f.request("desktop:text-input", {}).status, "unavailable");
+  f.powerMonitor.emit("suspend");
+  f.nativeDialogs[0].resolve({ canceled: true, filePaths: [] });
+  assert.equal(await choosing, undefined);
+  assert.deepEqual(f.launcherChanges, [true, false]);
+  assert.equal(f.inputEnabled.at(-1), false);
+  f.powerMonitor.emit("resume");
+  f.request(
+    "desktop:resume-ready",
+    f.request("desktop:state").power.generation,
+  );
+  assert.equal(f.inputEnabled.at(-1), true);
+  const saving = f.modOptions.chooseSave();
+  f.nativeDialogs[1].reject(new Error("Portal closed"));
+  await assert.rejects(saving, /Portal closed/);
+  assert.deepEqual(f.launcherChanges, [true, false, true, false]);
+  assert.equal(f.inputEnabled.at(-1), true);
+});
+
+test("the native save recovery warning translates controller input while quit remains gated", async (t) => {
+  const f = await startup(t);
+  f.game.emit("ready-to-show");
+  await f.shown;
+  f.request("desktop:state");
+  f.request("desktop:quit");
+  f.send("desktop:ready-to-quit", false);
+  assert.deepEqual(f.launcherChanges, [true]);
+  assert.equal(f.inputEnabled.at(-1), false);
+  // Return to game: the warning's finally resets launcher mode before the quit gate is removed.
+  f.nativeDialogs[0].resolve({ response: 1 });
+  await settle();
+  assert.deepEqual(f.launcherChanges, [true, false]);
+  assert.equal(f.inputEnabled.at(-1), true);
 });

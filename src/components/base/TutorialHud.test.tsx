@@ -4,6 +4,12 @@ import * as React from "react";
 import { TutorialStepType } from "../../Types";
 import TutorialHud, { TutorialHudProps } from "./TutorialHud";
 import TutorialPrompt from "./TutorialPrompt";
+import {
+  resetInputPresentation,
+  updateInputPresentation,
+} from "../../desktop/InputPresentation";
+
+afterEach(() => resetInputPresentation());
 
 function objective(
   overrides: Partial<TutorialStepType> = {},
@@ -32,6 +38,48 @@ function props(overrides: Partial<TutorialHudProps> = {}): TutorialHudProps {
 }
 
 describe("TutorialHud", () => {
+  it("uses controller wording in the objective and its teaching prompt", () => {
+    act(() => updateInputPresentation({ active: true, connected: true }));
+    render(
+      <TutorialHud
+        {...props({
+          step: objective({
+            content: (
+              <TutorialPrompt text="Tap Build to inspect construction." />
+            ),
+          }),
+        })}
+      />,
+    );
+    expect(screen.getByText("Select the target")).toBeInTheDocument();
+    expect(
+      screen.getByText("Select Build to inspect construction."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("TouchAppOutlinedIcon"),
+    ).not.toBeInTheDocument();
+    act(() => updateInputPresentation({ active: false }));
+    expect(screen.getByText("Tap the target")).toBeInTheDocument();
+  });
+  it("asks controller players to move sliders rather than drag them", () => {
+    act(() => updateInputPresentation({ active: true, connected: true }));
+    render(
+      <TutorialHud
+        {...props({
+          step: objective({
+            action: "Drag the rate slider below the market price",
+            content: <TutorialPrompt text="Then drag it back and tap 1×." />,
+          }),
+        })}
+      />,
+    );
+    expect(
+      screen.getByText("Move the rate slider below the market price"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Then move it back and select 1×."),
+    ).toBeInTheDocument();
+  });
   it("names a deliberate challenge transition without advancing from unrelated controls", async () => {
     const user = userEvent.setup();
     const hudProps = props({

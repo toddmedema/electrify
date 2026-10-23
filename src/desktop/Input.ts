@@ -19,56 +19,20 @@ import {
   applyTextInput,
   availableTextControl,
   focusedTextControl,
+  highlightedTextOption,
   textInputRequest,
 } from "./InputText";
 
-interface InputPresentation {
-  active: boolean;
-  connected: boolean;
-  pausedAfterDisconnect: boolean;
-  context: DesktopInputContext;
-  glyphs: DesktopInputFrame["glyphs"];
-}
-const initial: InputPresentation = {
-  active: false,
-  connected: false,
-  pausedAfterDisconnect: false,
-  context: "Menu",
-  glyphs: {},
-};
-let presentation = initial;
-const listeners = new Set<() => void>();
-export const getInputPresentation = () => presentation;
-export const subscribeInputPresentation = (listener: () => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-function present(update: Partial<InputPresentation>) {
-  const next = { ...presentation, ...update };
-  const glyphs = Object.entries(next.glyphs);
-  const sameGlyphs =
-    next.glyphs === presentation.glyphs ||
-    (glyphs.length === Object.keys(presentation.glyphs).length &&
-      glyphs.every(([action, glyph]) => {
-        const previous = presentation.glyphs[action as DesktopInputAction];
-        return (
-          previous?.label === glyph.label && previous?.image === glyph.image
-        );
-      }));
-  if (
-    sameGlyphs &&
-    next.active === presentation.active &&
-    next.connected === presentation.connected &&
-    next.pausedAfterDisconnect === presentation.pausedAfterDisconnect &&
-    next.context === presentation.context
-  )
-    return;
-  if (sameGlyphs) next.glyphs = presentation.glyphs;
-  presentation = next;
-  listeners.forEach((listener) => listener());
-}
+import {
+  getInputPresentation,
+  resetInputPresentation,
+  updateInputPresentation as present,
+} from "./InputPresentation";
+export {
+  getInputPresentation,
+  subscribeInputPresentation,
+} from "./InputPresentation";
+
 const overlay = (scope: HTMLElement) =>
   scope.matches(
     '[role="dialog"],[role="menu"],[role="listbox"],.MuiModal-root,[data-manual-help],[data-scenario-choice],[data-data-center-guide]',
@@ -91,6 +55,7 @@ export function startDesktopInput(
   let previousState = store.getState();
   let chartFrame: number | undefined;
   let editingText = false;
+  let choosingTextOption: HTMLElement | null = null;
   const gameplay = () =>
     !!document.querySelector(".base_main:not([inert]) .gameWorkspace");
   const controls = () => visibleControls(inputScope());
@@ -117,7 +82,7 @@ export function startDesktopInput(
     present({
       connected: frame.connected,
       glyphs: frame.glyphs,
-      active: frame.connected && presentation.active,
+      active: frame.connected && getInputPresentation().active,
     });
     if (frame.disconnected) pauseDisconnected();
   };
@@ -244,11 +209,26 @@ export function startDesktopInput(
   const act = (action: DesktopInputAction) => {
     const scope = inputScope();
     if (["up", "down", "left", "right"].includes(action)) {
+      const textControl = focusedTextControl();
       moveInputFocus(action as "up" | "down" | "left" | "right");
+      choosingTextOption =
+        (action === "up" || action === "down") &&
+        textControl &&
+        highlightedTextOption(textControl)
+          ? textControl
+          : null;
       feedback("select");
     } else if (action === "confirm") {
       const textControl = focusedTextControl();
-      if (textControl && desktop.showTextInput) {
+      if (
+        textControl &&
+        desktop.showTextInput &&
+        !(
+          choosingTextOption === textControl &&
+          highlightedTextOption(textControl)
+        )
+      ) {
+        choosingTextOption = null;
         editingText = true;
         const request = textInputRequest(textControl);
         void desktop
@@ -260,8 +240,10 @@ export function startDesktopInput(
               !availableTextControl(textControl)
             )
               return;
-            if (result.status === "submitted")
+            if (result.status === "submitted") {
               applyTextInput(textControl, result.text);
+              choosingTextOption = textControl;
+            }
           })
           .catch(() => {
             // Steam/Big Picture may be unavailable. Physical text entry still works.
@@ -279,10 +261,12 @@ export function startDesktopInput(
         return;
       }
       const target = document.activeElement as HTMLElement | null;
+      choosingTextOption = null;
       if (target && speedButtons().includes(target)) releasePause();
       confirmInput();
       feedback("confirm");
     } else if (action === "back") {
+      choosingTextOption = null;
       const blocked = overlay(scope);
       const cardBefore = store.getState().card;
       if (!backInput() && !blocked && store.getState().card === cardBefore) {
@@ -379,6 +363,7 @@ export function startDesktopInput(
   });
   const pointer = (event: Event) => {
     if (!event.isTrusted) return;
+    choosingTextOption = null;
     delete document.documentElement.dataset.controllerInput;
     present({ active: false });
   };
@@ -418,6 +403,6 @@ export function startDesktopInput(
     document.removeEventListener("keydown", keyboard, true);
     document.removeEventListener("click", click, true);
     delete document.documentElement.dataset.controllerInput;
-    present(initial);
+    resetInputPresentation();
   };
 }

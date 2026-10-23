@@ -551,3 +551,25 @@ test("players may set only their Ready selection and saved company, and only the
     mp.dispose();
   }
 });
+
+test("guest sleep checkpoint requests carry only a validated boolean safety flag", async () => {
+  const { mp, events } = fixture();
+  try {
+    await mp.receive("76561198000000002", {
+      kind: "save-request",
+      requestId: "sleep",
+      suspended: true,
+    });
+    assert.equal(events.at(-1).payload.suspended, true);
+    await assert.rejects(
+      mp.receive("76561198000000002", {
+        kind: "save-request",
+        requestId: "sleep",
+        suspended: "yes",
+      }),
+      /Invalid save request/,
+    );
+  } finally {
+    mp.dispose();
+  }
+});

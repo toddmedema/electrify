@@ -49,6 +49,21 @@ export function focusedTextControl(): TextControl | null {
   return availableTextControl(document.activeElement);
 }
 
+/** A navigated autocomplete option belongs to Confirm rather than to text entry. */
+export function highlightedTextOption(element: TextControl): boolean {
+  if (!element.matches('[role="combobox"][aria-expanded="true"]')) return false;
+  const option = document.getElementById(
+    element.getAttribute("aria-activedescendant") ?? "",
+  );
+  const listbox = option?.closest('[role="listbox"]');
+  const owned = `${element.getAttribute("aria-controls") ?? ""} ${element.getAttribute("aria-owns") ?? ""}`;
+  return !!(
+    option?.matches('[role="option"]:not([aria-disabled="true"])') &&
+    listbox?.id &&
+    owned.split(/\s+/).includes(listbox.id)
+  );
+}
+
 export function textInputRequest(element: TextControl): DesktopTextInput {
   const labelledBy = (element.getAttribute("aria-labelledby") ?? "")
     .split(/\s+/)

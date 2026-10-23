@@ -66,6 +66,8 @@ export const multiplayerMiddleware: Middleware<object, AppStateType> =
         kind: "speed",
         speed: data.payload as AppStateType["game"]["speed"],
       });
+    if (name === "systemSuspend")
+      runtime.command({ kind: "speed", speed: "PAUSED" });
     if (name === "pageHidden") hidden = true;
     if (name === "pageVisible") hidden = false;
     const result = next(action);
