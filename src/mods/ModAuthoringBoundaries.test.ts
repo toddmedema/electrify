@@ -10,48 +10,46 @@ import {
 } from "./ModAuthoring";
 import { modResolvedSetup, modScenario } from "./ModScenario";
 import { packageDigest } from "./ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import type { ModPackage } from "./ModSchema";
 
-const pack = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "authoring-boundaries",
-  title: "Authoring boundaries",
-  creator: "Fixture author",
-  version: "1",
-  description: "Plan your grid around the announced repair.",
-  seed: 1357,
-  baseScenarioId: 999,
-  officialArcs: [],
-  scenario: {
-    startingYear: 2020,
-    durationMonths: 6,
-    startingCustomers: 10000,
-    cash: 1e9,
-    dollarsPerkWh: 0.2,
-  },
-  events: [
-    {
-      id: "announced-repair",
-      title: "Announced repair",
-      message: "Your announced repair increases costs.",
-      preview: "Your announced repair will increase costs.",
-      startMonth: 2,
-      durationMonths: 1,
-      visibility: "forecast",
-      effects: { operatingExpenseDollarsPerMonth: 1234 },
+const pack = (): ModPackage =>
+  modPackage({
+    id: "authoring-boundaries",
+    title: "Authoring boundaries",
+    creator: "Fixture author",
+    description: "Plan your grid around the announced repair.",
+    seed: 1357,
+    officialArcs: [],
+    scenario: {
+      startingYear: 2020,
+      durationMonths: 6,
+      startingCustomers: 10000,
+      cash: 1e9,
+      dollarsPerkWh: 0.2,
     },
-    {
-      id: "private-turbine-loss",
-      title: "Private turbine loss",
-      message: "Your gas output falls unexpectedly.",
-      startMonth: 5,
-      durationMonths: 1,
-      visibility: "surprise",
-      effects: { outputMultipliersByFuel: { "Natural Gas": 0.371 } },
-    },
-  ],
-});
+    events: [
+      {
+        id: "announced-repair",
+        title: "Announced repair",
+        message: "Your announced repair increases costs.",
+        preview: "Your announced repair will increase costs.",
+        startMonth: 2,
+        durationMonths: 1,
+        visibility: "forecast",
+        effects: { operatingExpenseDollarsPerMonth: 1234 },
+      },
+      {
+        id: "private-turbine-loss",
+        title: "Private turbine loss",
+        message: "Your gas output falls unexpectedly.",
+        startMonth: 5,
+        durationMonths: 1,
+        visibility: "surprise",
+        effects: { outputMultipliersByFuel: { "Natural Gas": 0.371 } },
+      },
+    ],
+  });
 
 function prepared(input = pack()): ScenarioType {
   const location = getScenarioLocation(modResolvedSetup(input));

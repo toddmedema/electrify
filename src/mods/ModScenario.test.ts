@@ -19,6 +19,7 @@ import { getStore } from "../StoreRegistry";
 import { startAchievements } from "../desktop/AchievementObserver";
 import * as User from "../reducers/User";
 import type { GameType, ScenarioModType } from "../Types";
+import { roundTrip } from "../testing/SaveForgery";
 Object.assign(global, { TextEncoder });
 const fixture = (): ModPackage => ({
   schemaVersion: 1,
@@ -228,11 +229,11 @@ test("first-release runtime snapshots reject unknown names, oversized text and f
       mod.source.title = "x".repeat(500);
     },
   ]) {
-    const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+    const save = roundTrip(moddedGame());
     mutate(save.game.customScenario.mod);
     expect(parseSave(save)).toBeNull();
   }
-  const wrongId = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+  const wrongId = roundTrip(moddedGame());
   wrongId.game.customScenario.id = 100;
   expect(parseSave(wrongId)).toBeNull();
 });
@@ -256,7 +257,7 @@ test("mod notifications are committed once and survive save loading", () => {
   expect(
     game.eventLog.filter((event) => event.title === "Review grid"),
   ).toHaveLength(1);
-  const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!;
+  const restored = parseSave(roundTrip(game))!;
   expect(restored.game.reportedEventKeys).toContain(
     "mod:test-grid:review-grid",
   );
@@ -365,7 +366,7 @@ test("D2 rejects an inherited reliability window outside the term, including its
 });
 
 test("D4 rejects edited saved factors beyond the package bounds", () => {
-  const save = JSON.parse(JSON.stringify(serializeSave(moddedGame())));
+  const save = roundTrip(moddedGame());
   save.game.customScenario.mod.facilities.Solar.buildCost = 1e308;
   save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
     save.game.customScenario.mod,
@@ -456,7 +457,7 @@ test("runtime snapshots reject edited event count, month and text even with a fr
       mod.rules.events[0].title = "Unsafe\u202e";
     },
   ]) {
-    const save = JSON.parse(JSON.stringify(serializeSave(original)));
+    const save = roundTrip(original);
     mutate(save.game.customScenario.mod);
     save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
       save.game.customScenario.mod,

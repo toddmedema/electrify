@@ -6,7 +6,7 @@ import { currentTick } from "../helpers/GameSelectors";
 import { gameObjectiveResults } from "../helpers/ObjectiveRules";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { modScenario } from "../mods/ModScenario";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import {
   modExampleRoute,
   modExampleScenario,
@@ -15,6 +15,7 @@ import { createGame } from "../testing/Simulator";
 import type { GameType } from "../Types";
 import reducer, { reprioritizeFacility, tickState } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
+import { roundTrip } from "../testing/SaveForgery";
 
 function advance(input: GameType, month: number): GameType {
   let game = input;
@@ -58,8 +59,7 @@ function answer(game: GameType, optionId: string): GameType {
     reducer(game, chooseScenarioResponse({ decisionId: choice!.id, optionId })),
   );
 }
-const envelope = (game: GameType) =>
-  JSON.parse(JSON.stringify(serializeSave(game)));
+const envelope = (game: GameType) => roundTrip(game);
 function restore(value: ReturnType<typeof envelope>) {
   const saved = parseSave(value);
   expect(saved).not.toBeNull();

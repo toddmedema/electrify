@@ -4,7 +4,6 @@ import { getScenarioLocation } from "./Locations";
 import {
   baselineScenario,
   calculateScenarioStartingPeak,
-  dataReady,
 } from "./ScenarioStartingPeakCalculation";
 import type { ScenarioStartingPeakResponse } from "./ScenarioStartingPeakCalculation";
 export type { ScenarioStartingPeakResponse } from "./ScenarioStartingPeakCalculation";
@@ -19,17 +18,6 @@ function cacheKey(
   seed: number,
 ): string {
   return JSON.stringify([baseline, difficulty, seed]);
-}
-
-/** Cached first-year peaks remain valid after another location replaces loaded weather. */
-export function scenarioStartingPeakReady(scenario: ScenarioType): boolean {
-  const baseline = baselineScenario(scenario);
-  const seed = scenario.seed ?? 0;
-  return (
-    DIFFICULTY_IDS.every((difficulty) =>
-      peaks.has(cacheKey(baseline, difficulty, seed)),
-    ) || dataReady(baseline)
-  );
 }
 
 /**

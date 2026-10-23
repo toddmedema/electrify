@@ -15,6 +15,7 @@ import {
 } from "../helpers/ScenarioMod";
 import { modResolvedSetup, modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
 import { loadSimData } from "../testing/SimData";
@@ -25,21 +26,19 @@ import {
 } from "../testing/Simulator";
 import type { ScenarioType } from "../Types";
 import { tickState } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
-const pack = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "inherited-hydro",
-  title: "Inherited Hydro",
-  creator: "Fixture author",
-  version: "1",
-  description: "Operate the inherited Lusaka grid through its first months.",
-  seed: 42,
-  baseScenarioId: 114,
-  scenario: { durationMonths: 6 },
-  officialArcs: [],
-  objectives: [],
-});
+const pack = (): ModPackage =>
+  modPackage({
+    id: "inherited-hydro",
+    title: "Inherited Hydro",
+    creator: "Fixture author",
+    description: "Operate the inherited Lusaka grid through its first months.",
+    baseScenarioId: 114,
+    scenario: { durationMonths: 6 },
+    officialArcs: [],
+    objectives: [],
+  });
 function scenario(): ScenarioType {
   const input = pack();
   const location = getScenarioLocation(modResolvedSetup(input));
@@ -74,7 +73,7 @@ test("a mod inherits its base's researched Hydro inventory through ticks, saves 
   ).toContain("victoria-falls-zmb");
   tickState(game);
   expect(validHydroClaims(game)).toBe(true);
-  const saved = JSON.parse(JSON.stringify(serializeSave(game)));
+  const saved = roundTrip(game);
   const restored = parseSave(saved);
   expect(restored).not.toBeNull();
   expect(getHydroInventoryKey(restored!.game)).toBe("scenario:114");
@@ -117,7 +116,7 @@ test("ordinary custom Lusaka games retain their local inventory and cannot injec
   ).not.toContain("victoria-falls-zmb");
   game.customScenario!.hydroInventoryKey = "scenario:114";
   expect(validHydroClaims(game)).toBe(false);
-  expect(parseSave(JSON.parse(JSON.stringify(serializeSave(game))))).toBeNull();
+  expect(parseSave(roundTrip(game))).toBeNull();
 });
 
 test("edited inherited inventory metadata is rejected even after setup and runtime digests are recomputed", () => {
@@ -177,9 +176,7 @@ test("inheriting a researched inventory still rejects forged claims, capacity an
     const forged = cloneDeep(game);
     edit(forged);
     expect(validHydroClaims(forged)).toBe(false);
-    expect(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(forged)))),
-    ).toBeNull();
+    expect(parseSave(roundTrip(forged))).toBeNull();
   }
   expect(validHydroClaims(game)).toBe(true);
 });

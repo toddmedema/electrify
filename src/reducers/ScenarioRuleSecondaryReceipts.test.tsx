@@ -6,10 +6,11 @@ import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { createGame } from "../testing/Simulator";
 import type { GameType } from "../Types";
 import { tickState } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
 const events: RuleEvent[] = [
   {
@@ -89,13 +90,11 @@ function withGame(kind: "official" | "mod", inspect: (game: GameType) => void) {
 }
 function accepted(game: GameType) {
   expect(validScenarioRuleState(game)).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
+  expect(parseSave(roundTrip(game))).not.toBeNull();
 }
 function rejected(game: GameType) {
   expect(validScenarioRuleState(game)).toBe(false);
-  expect(parseSave(JSON.parse(JSON.stringify(serializeSave(game))))).toBeNull();
+  expect(parseSave(roundTrip(game))).toBeNull();
 }
 
 test.each(["official", "mod"] as const)(
@@ -192,9 +191,7 @@ test.each(["official", "mod"] as const)(
         rejected(forged);
       }
       accepted(game);
-      const restored = parseSave(
-        JSON.parse(JSON.stringify(serializeSave(game))),
-      )!.game;
+      const restored = parseSave(roundTrip(game))!.game;
       tickState(restored);
       expect(restored.worldEvents.occurrences).toEqual(
         game.worldEvents.occurrences,

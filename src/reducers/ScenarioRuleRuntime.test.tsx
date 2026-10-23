@@ -14,6 +14,7 @@ import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
 import { scenarioRuleTargetOperations } from "../helpers/ScenarioRuleRuntime";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame, runSimulation } from "../testing/Simulator";
 import type { DifficultyType, GameType, GeneratorShoppingType } from "../Types";
@@ -25,28 +26,24 @@ import reducer, {
   tickState,
   togglePauseFacility,
 } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
-const pack = (events: RuleEvent[] = []): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "runtime-fixture",
-  title: "Runtime fixture",
-  creator: "Fixture",
-  version: "1",
-  description: "A small grid for event boundaries.",
-  seed: 42,
-  baseScenarioId: 999,
-  objectives: [],
-  officialArcs: [],
-  scenario: {
-    durationMonths: 6,
-    cash: 1e9,
-    startingCustomers: 10000,
-    dollarsPerkWh: 0.2,
-    feePerKgCO2e: 0.1,
-  },
-  events,
-});
+const pack = (events: RuleEvent[] = []): ModPackage =>
+  modPackage({
+    id: "runtime-fixture",
+    title: "Runtime fixture",
+    description: "A small grid for event boundaries.",
+    objectives: [],
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      cash: 1e9,
+      startingCustomers: 10000,
+      dollarsPerkWh: 0.2,
+      feePerKgCO2e: 0.1,
+    },
+    events,
+  });
 const event = (patch: Partial<RuleEvent> = {}): RuleEvent => ({
   id: "change",
   title: "Grid change",
@@ -204,7 +201,7 @@ function context(state: GameType, month = state.date.monthsElapsed) {
   };
 }
 function restore(state: GameType) {
-  const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
+  const saved = parseSave(roundTrip(state));
   expect(saved).not.toBeNull();
   return cloneDeep(saved!.game);
 }

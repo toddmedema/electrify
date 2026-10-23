@@ -23,41 +23,38 @@ import {
 } from "../helpers/Scoring";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { createGame, runSimulation } from "../testing/Simulator";
 
-const pack = (startingYear = 2040): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "objective-accounting",
-  title: "Objective accounting",
-  creator: "Fixture",
-  version: "1",
-  description: "Observe customer bills and closing loan principal.",
-  seed: 42,
-  baseScenarioId: 101,
-  officialArcs: [],
-  objectives: [],
-  scenario: {
-    startingYear,
-    durationMonths: 24,
-    cash: 1e9,
-    startingCustomers: 10000,
-    dollarsPerkWh: 0.2,
-  },
-  events: [
-    {
-      id: "company-grant",
-      title: "Company grant",
-      message: "Company funding arrives.",
-      preview: "Company funding will arrive.",
-      startMonth: 13,
-      durationMonths: 1,
-      effects: {
-        transactions: [{ kind: "grant", amountDollars: 500000000 }],
-      },
+const pack = (startingYear = 2040): ModPackage =>
+  modPackage({
+    id: "objective-accounting",
+    title: "Objective accounting",
+    description: "Observe customer bills and closing loan principal.",
+    baseScenarioId: 101,
+    officialArcs: [],
+    objectives: [],
+    scenario: {
+      startingYear,
+      durationMonths: 24,
+      cash: 1e9,
+      startingCustomers: 10000,
+      dollarsPerkWh: 0.2,
     },
-  ],
-});
+    events: [
+      {
+        id: "company-grant",
+        title: "Company grant",
+        message: "Company funding arrives.",
+        preview: "Company funding will arrive.",
+        startMonth: 13,
+        durationMonths: 1,
+        effects: {
+          transactions: [{ kind: "grant", amountDollars: 500000000 }],
+        },
+      },
+    ],
+  });
 const simulate = (
   input: ModPackage,
   objective?: RuleObjective,

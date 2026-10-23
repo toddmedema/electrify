@@ -10,42 +10,39 @@ import {
   modValidationDiagnostics,
 } from "./ModScenario";
 import type { ModPackage } from "./ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 
-const pack = (id: string): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id,
-  title: "Cached operating plan",
-  creator: "Fixture author",
-  version: "1",
-  description: "A small operating plan with all difficulty values.",
-  seed: 42,
-  baseScenarioId: 999,
-  officialArcs: [],
-  scenario: { durationMonths: 12 },
-  objectives: [],
-  events: [
-    {
-      id: "conditions",
-      title: "Operating conditions",
-      message: "The operating conditions apply.",
-      preview: "The operating conditions will apply.",
-      startMonth: 2,
-      durationMonths: "untilEnd",
-      effects: {
-        demandMultiplier: {
-          byDifficulty: {
-            Intern: 0.9,
-            Employee: 1,
-            Manager: 1.1,
-            VP: 1.2,
-            CEO: 1.3,
+const pack = (id: string): ModPackage =>
+  modPackage({
+    id,
+    title: "Cached operating plan",
+    creator: "Fixture author",
+    description: "A small operating plan with all difficulty values.",
+    officialArcs: [],
+    scenario: { durationMonths: 12 },
+    objectives: [],
+    events: [
+      {
+        id: "conditions",
+        title: "Operating conditions",
+        message: "The operating conditions apply.",
+        preview: "The operating conditions will apply.",
+        startMonth: 2,
+        durationMonths: "untilEnd",
+        effects: {
+          demandMultiplier: {
+            byDifficulty: {
+              Intern: 0.9,
+              Employee: 1,
+              Manager: 1.1,
+              VP: 1.2,
+              CEO: 1.3,
+            },
           },
         },
       },
-    },
-  ],
-});
+    ],
+  });
 beforeAll(() =>
   loadSimData(getScenarioLocation(modResolvedSetup(pack("cache-setup")))!),
 );

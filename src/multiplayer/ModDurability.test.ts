@@ -8,6 +8,7 @@ import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { projectAuthoredRunReference } from "../helpers/RunIdentity";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
 import type { Command, World } from "./Types";
@@ -20,93 +21,91 @@ import {
   stepWorld,
 } from "./World";
 
-const packageData = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "durable-companies",
-  title: "Durable companies",
-  creator: "Fixture author",
-  version: "1",
-  description: "A company decides whether to accept local connection funding.",
-  seed: 2468,
-  baseScenarioId: 999,
-  officialArcs: [],
-  scenario: {
-    durationMonths: 6,
-    startingYear: 2020,
-    startingCustomers: 10000,
-    cash: 1e9,
-    dollarsPerkWh: 0.2,
-  },
-  objectives: [
-    {
-      id: "reliable",
-      label: "Serve demand",
-      metric: "monthlyReliability",
-      fromMonth: 1,
-      throughMonth: 6,
-      minDemandServedShare: 1,
+const packageData = (): ModPackage =>
+  modPackage({
+    id: "durable-companies",
+    title: "Durable companies",
+    creator: "Fixture author",
+    description:
+      "A company decides whether to accept local connection funding.",
+    seed: 2468,
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      startingCustomers: 10000,
+      cash: 1e9,
+      dollarsPerkWh: 0.2,
     },
-    {
-      id: "free-bills",
-      label: "Offer free electricity",
-      metric: "monthlyBilledRate",
-      fromMonth: 1,
-      throughMonth: 6,
-      maxDollarsPerKWh: 0,
-      required: false,
-    },
-  ],
-  events: [
-    {
-      id: "opening-funds",
-      title: "Opening funds",
-      message: "Your grid receives opening funds.",
-      preview: "Your grid will receive opening funds.",
-      startMonth: 1,
-      durationMonths: 1,
-      effects: {
-        transactions: [{ kind: "grant", amountDollars: 5000 }],
+    objectives: [
+      {
+        id: "reliable",
+        label: "Serve demand",
+        metric: "monthlyReliability",
+        fromMonth: 1,
+        throughMonth: 6,
+        minDemandServedShare: 1,
       },
-    },
-    {
-      id: "connection-funds",
-      title: "Connection funds",
-      message: "Your grid receives the connection contribution.",
-      preview: "Your grid will receive the connection contribution.",
-      startMonth: 3,
-      durationMonths: 1,
-      requiresChoice: { choiceId: "funding", optionIds: ["accept"] },
-      effects: {
-        transactions: [{ kind: "grant", amountDollars: 20000 }],
+      {
+        id: "free-bills",
+        label: "Offer free electricity",
+        metric: "monthlyBilledRate",
+        fromMonth: 1,
+        throughMonth: 6,
+        maxDollarsPerKWh: 0,
+        required: false,
       },
-    },
-  ],
-  choices: [
-    {
-      id: "funding",
-      title: "Connection funding",
-      prompt: "Choose whether your grid accepts the contribution.",
-      dueMonth: 2,
-      options: [
-        {
-          id: "accept",
-          label: "Accept funding",
-          description: "Receive funding now and a contribution next month.",
-          message: "Funding accepted.",
-          grantDollars: 10000,
+    ],
+    events: [
+      {
+        id: "opening-funds",
+        title: "Opening funds",
+        message: "Your grid receives opening funds.",
+        preview: "Your grid will receive opening funds.",
+        startMonth: 1,
+        durationMonths: 1,
+        effects: {
+          transactions: [{ kind: "grant", amountDollars: 5000 }],
         },
-        {
-          id: "decline",
-          label: "Decline funding",
-          description: "Continue without contributions.",
-          message: "Funding declined.",
-          costDollars: 0,
+      },
+      {
+        id: "connection-funds",
+        title: "Connection funds",
+        message: "Your grid receives the connection contribution.",
+        preview: "Your grid will receive the connection contribution.",
+        startMonth: 3,
+        durationMonths: 1,
+        requiresChoice: { choiceId: "funding", optionIds: ["accept"] },
+        effects: {
+          transactions: [{ kind: "grant", amountDollars: 20000 }],
         },
-      ],
-    },
-  ],
-});
+      },
+    ],
+    choices: [
+      {
+        id: "funding",
+        title: "Connection funding",
+        prompt: "Choose whether your grid accepts the contribution.",
+        dueMonth: 2,
+        options: [
+          {
+            id: "accept",
+            label: "Accept funding",
+            description: "Receive funding now and a contribution next month.",
+            message: "Funding accepted.",
+            grantDollars: 10000,
+          },
+          {
+            id: "decline",
+            label: "Decline funding",
+            description: "Continue without contributions.",
+            message: "Funding declined.",
+            costDollars: 0,
+          },
+        ],
+      },
+    ],
+  });
 
 function command(world: World, seat: string, action: Command) {
   return applyCommand(world, seat, {

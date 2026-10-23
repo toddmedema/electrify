@@ -12,6 +12,7 @@ import { checkMonth, InvariantCollector } from "../testing/Invariants";
 import { playOfficialExecution } from "../testing/OfficialScenarioExecutionFixtures";
 import type { GameType } from "../Types";
 import { tickState } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
@@ -89,7 +90,7 @@ test("operating original coal retains a nonempty warning through save/import and
   expect(receipt.attributes.selectedFacilityIds).toContain(original.id);
   expect(receipt.attributes.selectedFacilityNames).toContain(original.name);
   expect(validScenarioRuleState(game)).toBe(true);
-  const envelope = JSON.parse(JSON.stringify(serializeSave(game)));
+  const envelope = roundTrip(game);
   const restored = parseSave(cloneDeep(envelope));
   expect(restored).not.toBeNull();
   expect(restored!.game.worldEvents).toEqual(game.worldEvents);
@@ -103,9 +104,7 @@ test("operating original coal retains a nonempty warning through save/import and
   )!;
   expect(derate.attributes.selectedFacilityIds).toContain(original.id);
   expect(validScenarioRuleState(game)).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
+  expect(parseSave(roundTrip(game))).not.toBeNull();
   const duplicate = cloneDeep(envelope) as ReturnType<typeof serializeSave>;
   for (const event of [
     ...duplicate.game.worldEvents.occurrences,

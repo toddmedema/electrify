@@ -414,36 +414,3 @@ export function validOfficialArcChoiceMetadata(value: unknown): boolean {
     )
   );
 }
-
-/** Generated stable references for author validation and the eventual arc reference table. */
-export function officialArcChoiceReferences() {
-  return SCENARIO_CHOICE_RULES.map((entry) => ({
-    scenarioId: entry.scenarioId,
-    arcId: entry.arcId,
-    choiceId: entry.choice.id,
-    key: catalogChoiceKey(entry),
-    dueMonth:
-      relocateOfficialArcMonth(
-        entry.scenarioId,
-        entry.choice.dueMonth - 1,
-        "choice",
-      ) + 1,
-    optionIds: entry.choice.options.map((option) => option.id).sort(),
-    loadIds: [
-      ...new Set(
-        entry.choice.options.flatMap((option) =>
-          option.replaceLoad
-            ? [
-                option.replaceLoad.loadId,
-                ...option.replaceLoad.with.map((load) => load.id),
-              ]
-            : [],
-        ),
-      ),
-    ].sort(),
-  })).sort(
-    (a, b) =>
-      a.scenarioId - b.scenarioId ||
-      (a.choiceId < b.choiceId ? -1 : a.choiceId > b.choiceId ? 1 : 0),
-  );
-}

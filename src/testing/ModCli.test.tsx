@@ -1,5 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import { packageDigest } from "../mods/ModSchema";
+import { modPackage } from "./ModFixtures";
 import type { ModPackage } from "../mods/ModSchema";
 import {
   formatModSimulation,
@@ -8,73 +9,70 @@ import {
   runModSimulation,
 } from "./ModCli";
 
-const pack = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "cli-grid",
-  title: "CLI grid",
-  creator: "Fixture author",
-  version: "1",
-  description: "Explicit decisions for your grid.",
-  seed: 2468,
-  baseScenarioId: 999,
-  officialArcs: [],
-  objectives: [],
-  scenario: {
-    durationMonths: 6,
-    startingYear: 2020,
-    cash: 1e9,
-    startingCustomers: 10000,
-    dollarsPerkWh: 0.2,
-  },
-  choices: [
-    {
-      id: "funding",
-      title: "Funding",
-      prompt: "Choose funding.",
-      dueMonth: 1,
-      options: [
-        {
-          id: "accept",
-          label: "Accept",
-          description: "Receive funding.",
-          message: "Funding received.",
-          grantDollars: 10000,
-        },
-        {
-          id: "decline",
-          label: "Decline",
-          description: "Keep your current plan.",
-          message: "Current plan kept.",
-          costDollars: 0,
-        },
-      ],
+const pack = (): ModPackage =>
+  modPackage({
+    id: "cli-grid",
+    title: "CLI grid",
+    creator: "Fixture author",
+    description: "Explicit decisions for your grid.",
+    seed: 2468,
+    officialArcs: [],
+    objectives: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      cash: 1e9,
+      startingCustomers: 10000,
+      dollarsPerkWh: 0.2,
     },
-    {
-      id: "follow-up",
-      title: "Follow-up",
-      prompt: "Choose your follow-up.",
-      dueMonth: 3,
-      requiresChoice: { choiceId: "funding", optionIds: ["accept"] },
-      options: [
-        {
-          id: "keep",
-          label: "Keep",
-          description: "Keep the contribution.",
-          message: "Contribution kept.",
-          costDollars: 0,
-        },
-        {
-          id: "return",
-          label: "Return",
-          description: "Return the contribution.",
-          message: "Contribution returned.",
-          costDollars: 10000,
-        },
-      ],
-    },
-  ],
-});
+    choices: [
+      {
+        id: "funding",
+        title: "Funding",
+        prompt: "Choose funding.",
+        dueMonth: 1,
+        options: [
+          {
+            id: "accept",
+            label: "Accept",
+            description: "Receive funding.",
+            message: "Funding received.",
+            grantDollars: 10000,
+          },
+          {
+            id: "decline",
+            label: "Decline",
+            description: "Keep your current plan.",
+            message: "Current plan kept.",
+            costDollars: 0,
+          },
+        ],
+      },
+      {
+        id: "follow-up",
+        title: "Follow-up",
+        prompt: "Choose your follow-up.",
+        dueMonth: 3,
+        requiresChoice: { choiceId: "funding", optionIds: ["accept"] },
+        options: [
+          {
+            id: "keep",
+            label: "Keep",
+            description: "Keep the contribution.",
+            message: "Contribution kept.",
+            costDollars: 0,
+          },
+          {
+            id: "return",
+            label: "Return",
+            description: "Return the contribution.",
+            message: "Contribution returned.",
+            costDollars: 10000,
+          },
+        ],
+      },
+    ],
+  });
 const responses = (
   ...items: { choiceId: string; optionId: string; arc?: number }[]
 ) => ({ responses: items });

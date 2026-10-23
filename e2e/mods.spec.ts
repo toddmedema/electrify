@@ -775,9 +775,8 @@ test("cold share-load preparation stays isolated when another mod starts", async
 test("a mod choice blocks, explains funding and updates the saved forecast", async ({
   page,
 }) => {
-  const theme = "light" as const;
   test.setTimeout(120000);
-  await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   const entry: InstalledMod = {
     key: "local:choice-grid",
     source: "local",
@@ -851,7 +850,7 @@ test("a mod choice blocks, explains funding and updates the saved forecast", asy
       ],
     }),
   };
-  await mockDesktop(page, false, theme, [entry]);
+  await mockDesktop(page, false, "light", [entry]);
   await page.goto("/");
   await page.getByRole("button", { name: "Mods", exact: true }).click();
   await playAndCheckRun(page, "Choice Grid", "Grid investment");
@@ -888,10 +887,7 @@ test("a mod choice blocks, explains funding and updates the saved forecast", asy
   ).toHaveLength(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
-  await screenshot(
-    page,
-    `mod-choice-${page.viewportSize()!.width}-${theme}.png`,
-  );
+  await screenshot(page, `mod-choice-${page.viewportSize()!.width}-light.png`);
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   dialog = page.getByRole("dialog", { name: /Grid investment/ });
@@ -937,7 +933,7 @@ test("a mod choice blocks, explains funding and updates the saved forecast", asy
   ).toHaveCount(0);
   await screenshot(
     page,
-    `mod-eight-options-${page.viewportSize()!.width}-${theme}.png`,
+    `mod-eight-options-${page.viewportSize()!.width}-light.png`,
   );
   await page.keyboard.press("Enter");
   await expect(
@@ -1437,8 +1433,7 @@ test("empty mod library offers Workshop first and template results in the shared
 test("an empty library finishes its first Workshop subscription on overlay return", async ({
   page,
 }) => {
-  const theme = "light" as const;
-  await mockDesktop(page, true, theme, []);
+  await mockDesktop(page, true, "light", []);
   await page.goto("/");
   await page.getByRole("button", { name: "Mods", exact: true }).click();
   const root = page.locator(".modsScreen");
@@ -1471,8 +1466,7 @@ test("an empty library finishes its first Workshop subscription on overlay retur
 test("library recovery remains actionable after its toast is dismissed", async ({
   page,
 }) => {
-  const theme = "light" as const;
-  await mockDesktop(page, false, theme, []);
+  await mockDesktop(page, false, "light", []);
   await page.addInitScript(() => {
     const previous = window.electrifyDesktop!.mods!;
     let broken = true;
@@ -1512,7 +1506,6 @@ test("library recovery remains actionable after its toast is dismissed", async (
 test("mod details distinguish player rules from the complete author report", async ({
   page,
 }) => {
-  const theme = "light" as const;
   const entry: InstalledMod = {
     key: "local:read-the-rules",
     source: "local",
@@ -1614,8 +1607,8 @@ test("mod details distinguish player rules from the complete author report", asy
       ],
     }),
   };
-  await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-  await mockDesktop(page, false, theme, [entry]);
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await mockDesktop(page, false, "light", [entry]);
   await page.addInitScript(() => {
     let frame: DesktopInputFrame = {
       connected: false,
@@ -1738,10 +1731,7 @@ test("mod details distinguish player rules from the complete author report", asy
       exact: true,
     }),
   ).toBeInViewport({ ratio: 1 });
-  await screenshot(
-    page,
-    `mod-details-${page.viewportSize()!.width}-${theme}.png`,
-  );
+  await screenshot(page, `mod-details-${page.viewportSize()!.width}-light.png`);
   await page.keyboard.press("Escape");
   await expect(details).toBeHidden();
   const author = page.getByRole("button", {
@@ -1804,7 +1794,7 @@ test("mod details distinguish player rules from the complete author report", asy
   ).toHaveCount(0);
   await screenshot(
     page,
-    `mod-author-difficulty-${page.viewportSize()!.width}-${theme}.png`,
+    `mod-author-difficulty-${page.viewportSize()!.width}-light.png`,
   );
   const complete = report.getByRole("button", {
     name: "Complete event and decision timeline",
@@ -1843,7 +1833,7 @@ test("mod details distinguish player rules from the complete author report", asy
     await fs.writeFile(
       path.join(
         process.env.REVIEW_SCREENSHOT_DIR,
-        `mod-author-geometry-${page.viewportSize()!.width}-${theme}.json`,
+        `mod-author-geometry-${page.viewportSize()!.width}-light.json`,
       ),
       JSON.stringify(scroller, null, 2),
     );
@@ -1853,7 +1843,7 @@ test("mod details distinguish player rules from the complete author report", asy
   expect(await noHorizontalScroll(page)).toBe(true);
   await screenshot(
     page,
-    `mod-author-report-${page.viewportSize()!.width}-${theme}.png`,
+    `mod-author-report-${page.viewportSize()!.width}-light.png`,
   );
   const expert = report.getByRole("button", { name: "Expert", exact: true });
   await expert.focus();

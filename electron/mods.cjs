@@ -57,30 +57,6 @@ function libraryEntry(value) {
   throw new Error("Invalid mod entry.");
 }
 
-// Quarantine is data for recovery only; none of these records can reach the runtime.
-const UNSAFE_DISPLAY_TEXT =
-  // eslint-disable-next-line no-control-regex
-  /[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g;
-const safeText = (value, fallback, max = 100) =>
-  typeof value === "string"
-    ? value.replace(UNSAFE_DISPLAY_TEXT, "").slice(0, max).trim() || fallback
-    : fallback;
-function quarantine(value, error) {
-  const raw = JSON.stringify(value) ?? "null";
-  const bytes = Buffer.from(raw);
-  let original = bytes.subarray(0, MAX_MOD_BYTES).toString("utf8");
-  while (Buffer.byteLength(original) > MAX_MOD_BYTES)
-    original = original.slice(0, -1);
-  return {
-    key: `quarantine:${crypto.createHash("sha256").update(raw).digest("hex")}`,
-    title: safeText(value?.pack?.title, "Invalid mod"),
-    creator: safeText(value?.pack?.creator, "Unknown creator"),
-    version: safeText(value?.pack?.version, "Unknown version", 40),
-    original,
-    ...(bytes.length > MAX_MOD_BYTES ? { originalTruncated: true } : {}),
-    diagnostic: safeText(reason(error), "Invalid mod entry.", 4000),
-  };
-}
 const metadata = (pack) =>
   Object.fromEntries(
     ["id", "title", "creator", "version"].map((key) => [key, pack[key]]),
@@ -141,7 +117,7 @@ class ModStore {
 
   async readFile(filename) {
     const stat = await fs.promises.stat(filename);
-    if (stat.size > MAX_PACKAGES * (2 * MAX_MOD_BYTES + 4096) + 64 * 1024)
+    if (stat.size > MAX_PACKAGES * (MAX_MOD_BYTES + 1024) + 64 * 1024)
       throw new Error("Mod library exceeds its size limit.");
     const data = JSON.parse(await fs.promises.readFile(filename, "utf8"));
     // Version 1 libraries were a bare list of entries.
@@ -155,47 +131,9 @@ class ModStore {
       library.entries.length > MAX_PACKAGES
     )
       throw new Error("Invalid mod library.");
-    const entries = [];
-    const quarantined = [];
-    for (const value of library.entries) {
-      try {
-        const entry = libraryEntry(value);
-        if (entries.some((previous) => previous.key === entry.key))
-          throw new Error("Duplicate installed mod identity.");
-        entries.push(entry);
-      } catch (error) {
-        quarantined.push(quarantine(value, error));
-      }
-    }
-    if (library.quarantined !== undefined) {
-      if (
-        !Array.isArray(library.quarantined) ||
-        library.quarantined.length + library.entries.length > MAX_PACKAGES
-      )
-        throw new Error("Invalid quarantine container.");
-      for (const value of library.quarantined) {
-        try {
-          if (
-            !value ||
-            typeof value.original !== "string" ||
-            Buffer.byteLength(value.original) > MAX_MOD_BYTES ||
-            !/^quarantine:[a-f0-9]{64}$/.test(value.key)
-          )
-            throw new Error("Invalid quarantined entry.");
-          quarantined.push({
-            key: value.key,
-            title: safeText(value.title, "Invalid mod"),
-            creator: safeText(value.creator, "Unknown creator"),
-            version: safeText(value.version, "Unknown version", 40),
-            original: value.original,
-            ...(value.originalTruncated ? { originalTruncated: true } : {}),
-            diagnostic: safeText(value.diagnostic, "Invalid mod entry.", 4000),
-          });
-        } catch (error) {
-          quarantined.push(quarantine(value, error));
-        }
-      }
-    }
+    const entries = library.entries.map(libraryEntry);
+    if (new Set(entries.map((entry) => entry.key)).size !== entries.length)
+      throw new Error("Invalid mod library.");
     const published = {};
     const records = library.published ?? {};
     if (!records || typeof records !== "object" || Array.isArray(records))
@@ -207,25 +145,15 @@ class ModStore {
         typeof record !== "object" ||
         typeof record.uploaded !== "boolean"
       )
-        continue;
-      try {
-        itemId(record.workshopId);
-        published[id] = {
-          workshopId: record.workshopId,
-          uploaded: record.uploaded,
-          ...(record.agreement ? { agreement: true } : {}),
-        };
-      } catch {
-        // A damaged mapping cannot make healthy installed packages disappear.
-      }
+        throw new Error("Invalid mod library.");
+      itemId(record.workshopId);
+      published[id] = {
+        workshopId: record.workshopId,
+        uploaded: record.uploaded,
+        ...(record.agreement ? { agreement: true } : {}),
+      };
     }
-    return {
-      entries,
-      published,
-      quarantined: [
-        ...new Map(quarantined.map((entry) => [entry.key, entry])).values(),
-      ],
-    };
+    return { entries, published };
   }
 
   async read() {
@@ -251,10 +179,7 @@ class ModStore {
   }
 
   async write(library) {
-    if (
-      library.entries.length + (library.quarantined?.length || 0) >
-      MAX_PACKAGES
-    )
+    if (library.entries.length > MAX_PACKAGES)
       throw new Error(
         `Electrify can install at most ${MAX_PACKAGES} mods. Remove one first.`,
       );
@@ -262,7 +187,6 @@ class ModStore {
       version: 2,
       entries: library.entries,
       published: library.published,
-      quarantined: library.quarantined || [],
     });
     if (await this.exists(this.filename)) {
       if ((await fs.promises.readFile(this.filename, "utf8")) === serialized)
@@ -307,7 +231,6 @@ class ModStore {
       return {
         ...result,
         entries: this.view(library),
-        quarantined: library.quarantined || [],
         agreements: Object.values(library.published)
           .filter((record) => record.agreement)
           .map((record) => record.workshopId),
@@ -429,18 +352,6 @@ class ModStore {
         await this.write(library);
         return {};
       }
-      case "discard": {
-        const next = (library.quarantined || []).filter(
-          (e) => e.key !== input.key,
-        );
-        if (next.length === (library.quarantined || []).length)
-          throw new Error("That quarantined mod is no longer present.");
-        library.quarantined = next;
-        await this.write(library);
-        return {
-          message: "Discarded the invalid mod. Healthy mods were kept.",
-        };
-      }
       case "enable": {
         if (typeof input.enabled !== "boolean")
           throw new Error("Invalid enabled state.");
@@ -560,10 +471,7 @@ class ModStore {
     for (const id of subscribed) {
       const key = `workshop:${id}`;
       const index = next.findIndex((e) => e.key === key);
-      if (
-        index < 0 &&
-        next.length + (library.quarantined?.length || 0) >= MAX_PACKAGES
-      ) {
+      if (index < 0 && next.length >= MAX_PACKAGES) {
         overLimit++;
         downloads.push({
           id,

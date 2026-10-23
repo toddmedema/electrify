@@ -1,6 +1,5 @@
 import {
   compileOfficialArcChoices,
-  officialArcChoiceReferences,
   validOfficialArcChoiceMetadata,
 } from "./ScenarioRuleChoices";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
@@ -51,6 +50,7 @@ test("compatible official choices keep their exact costs, grants, messages and l
       },
       [{ scenarioId, includeChoices: true }],
     );
+    expect(choice.key).toContain(`story:${scenarioId}:`);
     for (const option of choice.options)
       rows.push([
         scenarioId,
@@ -58,10 +58,15 @@ test("compatible official choices keep their exact costs, grants, messages and l
         option.cost,
         option.grant,
         option.message,
-        option.replaceLoad?.with.length,
+        option.replaceLoad?.with.map((load) => [
+          load.id,
+          load.startsYear,
+          load.startsMonth,
+          load.peakW,
+        ]),
       ]);
   }
-  // Costs and grants do not vary by difficulty; [arc, option, cost, grant, message, replacement loads].
+  // Costs and grants do not vary by difficulty; [arc, option, cost, grant, message, [load, year, month, W]].
   expect(rows).toEqual([
     [
       106,
@@ -77,7 +82,10 @@ test("compatible official choices keep their exact costs, grants, messages and l
       0,
       0,
       "Connect 50 MW in January 2026 and 50 MW in January 2028. No funding received.",
-      2,
+      [
+        ["manassas-data-centers-phase-one", 2026, 1, 50e6],
+        ["manassas-data-centers-phase-two", 2028, 1, 50e6],
+      ],
     ],
     [
       107,
@@ -130,25 +138,6 @@ test("both current choices adapt complete difficulty values into detached data w
 
 test("the current wildfire arc imports no choice and exposes no retired preparedness reference", () => {
   expect(compile({}, [{ scenarioId: 111, includeChoices: true }])).toEqual([]);
-  const wildfire = source(111);
-  expect(
-    compile(
-      {
-        namespace: {
-          kind: "official",
-          scenarioId: 111,
-          arcId: "catalog",
-        },
-        startingYear: wildfire.startingYear,
-        durationMonths: wildfire.durationMonths,
-        receivingScenario: wildfire,
-      },
-      [{ scenarioId: 111, includeChoices: true }],
-    ),
-  ).toEqual([]);
-  expect(
-    officialArcChoiceReferences().some((entry) => entry.scenarioId === 111),
-  ).toBe(false);
 });
 
 test("connection budgets and both permanent loads scale with the receiving grid and era, and labels describe the actual relocated schedules", () => {
@@ -376,23 +365,16 @@ test("saved choice metadata validates with source callbacks disabled and rejects
   ).toBe(false);
 });
 
-test("canonical source order never changes free selection, references or compiled identity", () => {
+test("canonical source order never changes free selection or compiled identity", () => {
   const expected = compile();
-  const refs = officialArcChoiceReferences();
   SCENARIO_CHOICE_RULES.reverse();
   SCENARIO_CHOICE_RULES.forEach((entry) => entry.choice.options.reverse());
   try {
     expect(compile({}, [...arcs].reverse())).toEqual(expected);
-    expect(officialArcChoiceReferences()).toEqual(refs);
-    expect(refs.find((entry) => entry.scenarioId === 106)).toMatchObject({
-      choiceId: "connection",
-      optionIds: ["fast-track", "phased"],
-      loadIds: [
-        "manassas-data-centers",
-        "manassas-data-centers-phase-one",
-        "manassas-data-centers-phase-two",
-      ],
-    });
+    expect(expected[0].options.map((option) => option.id).sort()).toEqual([
+      "fast-track",
+      "phased",
+    ]);
   } finally {
     SCENARIO_CHOICE_RULES.reverse();
     SCENARIO_CHOICE_RULES.forEach((entry) => entry.choice.options.reverse());

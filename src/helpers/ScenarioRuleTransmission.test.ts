@@ -6,6 +6,7 @@ import type { RuleEvent, RuleNumber } from "../data/ScenarioRules";
 import { createModEditorSchema } from "../mods/ModEditorSchema";
 import { modScenario } from "../mods/ModScenario";
 import { modDiagnostics, type ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { parseSave, serializeSave } from "../SaveGame";
 import { tickState } from "../reducers/Game";
 import { checkMonth, InvariantCollector } from "../testing/Invariants";
@@ -38,21 +39,17 @@ const event = (limit: RuleNumber = 4): RuleEvent => ({
     transmissionCapacityLimitsMWByCorridor: { "california-north": limit },
   },
 });
-const pack = (events = [event()]): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "route-limits",
-  title: "Route limits",
-  creator: "Fixture",
-  version: "1",
-  description: "Plan around a temporary transmission restriction.",
-  seed: 42,
-  baseScenarioId: 111,
-  officialArcs: [],
-  objectives: [],
-  scenario: { durationMonths: 6, cash: 1e9 },
-  events,
-});
+const pack = (events = [event()]): ModPackage =>
+  modPackage({
+    id: "route-limits",
+    title: "Route limits",
+    description: "Plan around a temporary transmission restriction.",
+    baseScenarioId: 111,
+    officialArcs: [],
+    objectives: [],
+    scenario: { durationMonths: 6, cash: 1e9 },
+    events,
+  });
 
 test("editor and import parser enforce bounded corridor maps with zero and difficulty neighbors", () => {
   const editor = new Ajv({ allErrors: true, unicode: false }).compile(

@@ -16,7 +16,6 @@ import { getScenarioLocation } from "./Locations";
 import {
   prepareScenarioStartingPeak,
   resolvedScenarioStartingPeak,
-  scenarioStartingPeakReady,
   ScenarioStartingPeakResponse,
 } from "./ScenarioStartingPeak";
 
@@ -195,7 +194,6 @@ describe("starting peak data readiness", () => {
         .spyOn(forecast, "forecastCustomGameTimeline")
         .mockReturnValue(fakeTimeline(500));
       const setup = scenario();
-      expect(scenarioStartingPeakReady(setup)).toBe(false);
       expect(
         resolvedScenarioStartingPeak(setup, "Manager", 42),
       ).toBeUndefined();
@@ -229,7 +227,6 @@ describe("starting peak data readiness", () => {
     await first;
     expect(worker.terminate).toHaveBeenCalledTimes(1);
     jest.mocked(weather.hasWeather).mockReturnValue(false);
-    expect(scenarioStartingPeakReady(setup)).toBe(true);
     for (const [index, difficulty] of DIFFICULTY_IDS.entries())
       expect(resolvedScenarioStartingPeak(setup, difficulty, 42)).toBe(
         4200 + index,

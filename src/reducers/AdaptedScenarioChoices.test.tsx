@@ -16,7 +16,7 @@ import { buildStorySnapshot } from "../helpers/Story";
 import { runFailure } from "../helpers/ObjectiveRules";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import {
   createGame,
@@ -26,6 +26,7 @@ import {
 import type { DifficultyType, GameType } from "../Types";
 import reducer, { delta, generateNewTimeline, tickState } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
+import { roundTrip } from "../testing/SaveForgery";
 
 // Independent pre-conversion values: the existing public choices, not the new compiler's output.
 const catalog = [
@@ -117,7 +118,7 @@ function advance(state: GameType, month: number) {
   expect(state.date.monthsElapsed).toBe(month);
 }
 function restore(state: GameType): GameType {
-  const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
+  const saved = parseSave(roundTrip(state));
   expect(saved).not.toBeNull();
   return cloneDeep(saved!.game);
 }

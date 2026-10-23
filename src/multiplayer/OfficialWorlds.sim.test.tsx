@@ -173,7 +173,15 @@ test("two real official companies reach every Load Shedding step and final windo
   }
 });
 
-/** Both companies build one quoted peaker, then answer each choice with their own seat's option. */
+const PEAKER = { name: "Natural Gas Peaker", peakW: 100e6 };
+/** Per-scenario builds by seat; the reactor shutdown needs a large first seat and a small second. */
+const BUILDS: Record<number, { name: string; peakW: number }[]> = {
+  110: [
+    { name: "Natural Gas Peaker", peakW: 700e6 },
+    { name: "Oil", peakW: 300e6 },
+  ],
+};
+/** Both companies build one quoted generator, then answer each choice with their own seat's option. */
 function playWorld(scenarioId: number) {
   const scenario = getScenario(scenarioId)!;
   loadSimData(getScenarioLocation(scenario)!);
@@ -186,12 +194,13 @@ function playWorld(scenarioId: number) {
   const initial = cloneDeep(world);
   for (const [index, seat] of world.seats.entries()) {
     const game = world.grids[index];
+    const build = (BUILDS[scenarioId] ?? [PEAKER, PEAKER])[index];
     const facility = GENERATORS(
       game,
-      100e6,
+      build.peakW,
       game.timeline.map((tick) => tick.windKph),
       game.timeline.map((tick) => tick.solarIrradianceWM2),
-    ).find((quote) => quote.name === "Natural Gas Peaker" && quote.available)!;
+    ).find((quote) => quote.name === build.name && quote.available)!;
     command(world, seat.id, {
       kind: "action",
       name: "buildFacility",

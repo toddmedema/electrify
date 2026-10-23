@@ -12,6 +12,7 @@ import { modRuntimeDigest, validScenarioMod } from "./ScenarioMod";
 import { DIFFICULTY_IDS } from "../Constants";
 import * as dependencies from "./ScenarioRuleDependencies";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import type {
   RuleChoice,
   RuleEvent,
@@ -214,18 +215,15 @@ test("author month ranges compose the same static and timed costs, including unc
   ).toContainEqual(expect.objectContaining({ code: "composed-static-factor" }));
 });
 
-const pack = (baseScenarioId: number): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "detached-arc",
-  title: "Detached arc",
-  creator: "Creator",
-  description: "A detached official arc.",
-  version: "1",
-  seed: 42,
-  baseScenarioId,
-  objectives: [],
-});
+const pack = (baseScenarioId: number): ModPackage =>
+  modPackage({
+    id: "detached-arc",
+    title: "Detached arc",
+    creator: "Creator",
+    description: "A detached official arc.",
+    baseScenarioId,
+    objectives: [],
+  });
 
 test("all fourteen imported arcs validate as complete detached snapshots in every difficulty", () => {
   for (const id of [

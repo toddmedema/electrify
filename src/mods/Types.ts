@@ -7,16 +7,6 @@ export interface InstalledMod {
   enabled: boolean;
   pack: ModPackage;
 }
-export interface QuarantinedMod {
-  key: string;
-  title: string;
-  creator: string;
-  version: string;
-  /** Recovery data only. Never compiled, enabled, or published. */
-  original: string;
-  originalTruncated?: boolean;
-  diagnostic: string;
-}
 export interface ModImportConflict {
   token: string;
   existing: Pick<ModPackage, "id" | "title" | "creator" | "version">;
@@ -30,7 +20,6 @@ export interface ModDownload {
 /** Every mod request resolves with this; failures arrive as player-facing `error` text. */
 export interface ModLibrary {
   entries: InstalledMod[];
-  quarantined?: QuarantinedMod[];
   recovered?: boolean;
   agreements?: string[];
   downloads?: ModDownload[];
@@ -53,7 +42,6 @@ export type ModRequest =
   | { kind: "browse"; workshopId?: string }
   | { kind: "subscribe"; id: string }
   | { kind: "dismissAgreement"; workshopId: string }
-  | { kind: "discard"; key: string }
   | {
       kind: "resolveImport";
       token: string;

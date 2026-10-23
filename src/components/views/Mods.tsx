@@ -708,8 +708,7 @@ function ModsLibrary(): React.JSX.Element {
             {loaded &&
               !entries.length &&
               !library.unreadable &&
-              !Object.values(notices).some((notice) => notice.result.error) &&
-              !library.quarantined?.length && (
+              !Object.values(notices).some((notice) => notice.result.error) && (
                 <Typography color="text.secondary">
                   Install your first mod below
                 </Typography>
@@ -883,38 +882,6 @@ function ModsLibrary(): React.JSX.Element {
                 );
               })}
             </Stack>
-            {library.quarantined?.map((entry) => (
-              <Alert
-                key={entry.key}
-                severity="error"
-                sx={{ mt: 1, overflowWrap: "anywhere" }}
-              >
-                <Typography component="h3">
-                  {entry.title} — quarantined
-                </Typography>
-                <Typography variant="body2">
-                  by {entry.creator} · {versionLabel(entry.version)}
-                </Typography>
-                <Typography variant="body2">{entry.diagnostic}</Typography>
-                <Typography variant="body2">
-                  This entry cannot run. Reimport a corrected package, or
-                  discard the retained invalid entry.
-                </Typography>
-                <Box className="settingsKeyboardRow">
-                  <Button
-                    disabled={!!pending}
-                    onClick={() =>
-                      act(`discard:${entry.key}`, {
-                        kind: "discard",
-                        key: entry.key,
-                      })
-                    }
-                  >
-                    Discard invalid entry
-                  </Button>
-                </Box>
-              </Alert>
-            ))}
             {!entries.length && library.unreadable && (
               <Typography color="text.secondary">
                 Reset the library to install mods again.

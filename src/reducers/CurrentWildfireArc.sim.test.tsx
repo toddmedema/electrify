@@ -15,6 +15,7 @@ import {
 } from "../testing/Simulator";
 import type { GameType } from "../Types";
 import { tickState } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
 const input: ModPackage = {
   schemaVersion: 1,
@@ -67,7 +68,7 @@ test("current111 community rules have no choice and preserve the cap, goals, sav
     }
   };
   advance(original, 35);
-  const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(original))));
+  const saved = parseSave(roundTrip(original));
   const replay = decodeReplay(encodeReplay(serializeReplay(original)!));
   expect(saved).not.toBeNull();
   expect(replay).not.toBeNull();

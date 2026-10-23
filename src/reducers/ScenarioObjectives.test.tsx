@@ -15,9 +15,10 @@ import {
   validObjectiveProgress,
 } from "../helpers/ScenarioObjectives";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { modScenario, modValidationDiagnostics } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { createGame, runSimulation } from "../testing/Simulator";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import type { GameType } from "../Types";
@@ -29,27 +30,23 @@ import reducer, {
   tickState,
   togglePauseFacility,
 } from "./Game";
+import { roundTrip } from "../testing/SaveForgery";
 
-const pack = (items: RuleObjective[] = []): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "objective-boundaries",
-  title: "Objective boundaries",
-  creator: "Fixture",
-  version: "1",
-  description: "Observe actual completed months.",
-  seed: 42,
-  baseScenarioId: 999,
-  officialArcs: [],
-  scenario: {
-    durationMonths: 6,
-    startingYear: 2020,
-    cash: 1e9,
-    startingCustomers: 10000,
-    dollarsPerkWh: 0.2,
-  },
-  objectives: items,
-});
+const pack = (items: RuleObjective[] = []): ModPackage =>
+  modPackage({
+    id: "objective-boundaries",
+    title: "Objective boundaries",
+    description: "Observe actual completed months.",
+    officialArcs: [],
+    scenario: {
+      durationMonths: 6,
+      startingYear: 2020,
+      cash: 1e9,
+      startingCustomers: 10000,
+      dollarsPerkWh: 0.2,
+    },
+    objectives: items,
+  });
 const window = { fromMonth: 1, throughMonth: 6 };
 const goals: RuleObjective[] = [
   {
@@ -118,7 +115,7 @@ const game = (input = pack(goals)): GameType =>
     seed: input.seed,
   });
 const restore = (state: GameType) => {
-  const parsed = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
+  const parsed = parseSave(roundTrip(state));
   expect(parsed).not.toBeNull();
   return cloneDeep(parsed!.game);
 };
@@ -336,7 +333,7 @@ test("forecasts do not record or complete objectives", () => {
 test("save validation rejects missing, edited, mismatched and contradictory objective evidence atomically", () => {
   const state = game();
   runMonths(state, 1);
-  const serialized = () => JSON.parse(JSON.stringify(serializeSave(state)));
+  const serialized = () => roundTrip(state);
   const edits = [
     (value: ReturnType<typeof serialized>) => {
       delete value.game.objectiveProgress;
@@ -388,9 +385,7 @@ test("a self-consistent forged progress chain cannot contradict retained account
   expect(
     validObjectiveProgress(state.objectiveProgress, objectives, context),
   ).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(state)))),
-  ).toBeNull();
+  expect(parseSave(roundTrip(state))).toBeNull();
 });
 
 test("absent-fuel retirement is a warning that never blocks launching", () => {
@@ -433,9 +428,7 @@ test("save validation rejects a consistent progress chain omitting a known retai
   expect(
     validObjectiveProgress(state.objectiveProgress, objectives, context),
   ).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(state)))),
-  ).toBeNull();
+  expect(parseSave(roundTrip(state))).toBeNull();
 });
 
 test("omitted and replaced goals use common results without retaining replaced official requirements", () => {

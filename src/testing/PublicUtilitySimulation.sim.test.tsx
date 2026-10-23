@@ -3,7 +3,7 @@ import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { EMPTY_HISTORY } from "../helpers/DateTime";
 import { scenarioObjectiveFailure } from "../reducers/Game";
 import { serializeReplay } from "../Replay";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { DifficultyType, ScenarioType } from "../Types";
 import {
   expectNoViolations,
@@ -11,6 +11,7 @@ import {
   runSimulationOnce,
 } from "./SimulationTestHelpers";
 import { createGame, createGameFromReplay, runSimulation } from "./Simulator";
+import { roundTrip } from "./SaveForgery";
 
 jest.setTimeout(120000);
 
@@ -41,9 +42,7 @@ describe("researched public-utility scenarios", () => {
     expect(
       state.timeline.every((tick) => tick.demandByType["Data Centers"] === 0),
     ).toBe(true);
-    const restored = parseSave(
-      JSON.parse(JSON.stringify(serializeSave(state))),
-    )!.game;
+    const restored = parseSave(roundTrip(state))!.game;
     expect(restored.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
     const replayed = createGameFromReplay(serializeReplay(state)!);
@@ -63,9 +62,7 @@ describe("researched public-utility scenarios", () => {
     runMonths(uninterrupted, 73);
     const boundary = createGame({ scenarioId: 106 });
     runMonths(boundary, 71); // December 2025, immediately before the authored load arrives
-    const restored = parseSave(
-      JSON.parse(JSON.stringify(serializeSave(boundary))),
-    )!.game;
+    const restored = parseSave(roundTrip(boundary))!.game;
     runMonths(restored, 2);
     expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
 
@@ -184,9 +181,7 @@ describe("researched public-utility scenarios", () => {
       );
     });
 
-    const restored = parseSave(
-      JSON.parse(JSON.stringify(serializeSave(event))),
-    )!.game;
+    const restored = parseSave(roundTrip(event))!.game;
     expect(restored.startingDemandScale).toBe(event.startingDemandScale);
     expect(restored.loadAdditions).toEqual(event.loadAdditions);
     expect(restored.worldEvents).toEqual(event.worldEvents);

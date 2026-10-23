@@ -191,52 +191,6 @@ test("imports persist offline, enable state survives updates, removal leaves sna
   assert.equal(snapshot.version, "1");
 });
 
-test("one damaged entry is quarantined without rolling healthy siblings or publication mappings back", async (t) => {
-  const { store } = setup(t);
-  const healthy = {
-    key: "local:test-grid",
-    source: "local",
-    enabled: false,
-    pack: fixture({ version: "2" }),
-  };
-  await store.write({
-    entries: [healthy],
-    published: { "test-grid": { workshopId: "456", uploaded: true } },
-  });
-  const original = {
-    ...healthy,
-    key: "local:bad-grid",
-    pack: fixture({
-      id: "bad-grid",
-      title: "Unsafe\u202etitle",
-      facilities: { Solar: { buildCost: 1e308 } },
-    }),
-  };
-  fs.writeFileSync(
-    store.filename,
-    JSON.stringify({
-      entries: [healthy, original],
-      published: { "test-grid": { workshopId: "456", uploaded: true } },
-    }),
-  );
-  const result = await store.request({ kind: "list" });
-  assert.equal(result.unreadable, undefined);
-  assert.equal(result.entries[0].pack.version, "2");
-  assert.equal(result.entries[0].workshopId, "456");
-  assert.equal(result.quarantined.length, 1);
-  assert.doesNotMatch(result.quarantined[0].title, /\u202e/);
-  assert.deepEqual(JSON.parse(result.quarantined[0].original), original);
-  assert.match(result.quarantined[0].diagnostic, /buildCost/);
-  await store.request({ kind: "enable", key: healthy.key, enabled: true });
-  assert.equal((await store.request({ kind: "list" })).quarantined.length, 1);
-  const discarded = await store.request({
-    kind: "discard",
-    key: result.quarantined[0].key,
-  });
-  assert.deepEqual(discarded.quarantined, []);
-  assert.equal(discarded.entries[0].workshopId, "456");
-});
-
 test("a collision is reviewed before Update or Install as copy, and copies never inherit publication identity", async (t) => {
   const { file, store } = setup(t);
   await store.request({ kind: "import" });
@@ -871,9 +825,7 @@ test("library entries are rebuilt from known fields and must be self-consistent"
     fs.mkdirSync(store.directory, { recursive: true });
     fs.writeFileSync(store.filename, JSON.stringify(bad));
     fs.rmSync(`${store.filename}.previous`, { force: true });
-    const result = await store.request({ kind: "list" });
-    assert.equal(result.unreadable, undefined);
-    assert.equal(result.quarantined.length, 1);
+    assert.equal((await store.request({ kind: "list" })).unreadable, true);
   }
   fs.writeFileSync(
     store.filename,
@@ -939,36 +891,6 @@ test("packaged builds include every repository file the main process loads outsi
       .readFileSync(path.join(__dirname, file), "utf8")
       .matchAll(/require\("\.\.\/(src\/[^"]+)"\)/g))
       assert.ok(files.includes(target), `${file} requires ${target}`);
-});
-
-test("malformed quarantine siblings and oversized entries retain bounded originals without rolling back healthy mods", async (t) => {
-  const { store } = setup(t);
-  const healthy = {
-    key: "local:test-grid",
-    source: "local",
-    enabled: true,
-    pack: fixture({ version: "newest" }),
-  };
-  fs.mkdirSync(store.directory, { recursive: true });
-  fs.writeFileSync(
-    store.filename,
-    JSON.stringify({
-      entries: [
-        healthy,
-        { pack: fixture({ unknown: "x".repeat(MAX_MOD_BYTES) }) },
-      ],
-      quarantined: [null],
-      published: {},
-    }),
-  );
-  const result = await store.request({ kind: "list" });
-  assert.equal(result.unreadable, undefined);
-  assert.equal(result.entries[0].pack.version, "newest");
-  assert.equal(result.quarantined.length, 2);
-  assert.equal(result.quarantined[0].originalTruncated, true);
-  for (const entry of result.quarantined)
-    assert.ok(Buffer.byteLength(entry.original) <= MAX_MOD_BYTES);
-  assert.equal(result.quarantined[1].original, "null");
 });
 
 test("Workshop-agreement actions survive reopening and can be explicitly dismissed", async (t) => {

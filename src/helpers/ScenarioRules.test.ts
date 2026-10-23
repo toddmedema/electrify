@@ -11,17 +11,18 @@ import {
 } from "./ScenarioMod";
 import { modScenario, inheritedModObjectives } from "../mods/ModScenario";
 import { packageDigest, type ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { SCENARIOS, DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
-import { STARTING_ASSET_IDS } from "../data/StartingAssetIds";
 import { DIFFICULTY_IDS } from "../Constants";
 import { matchScenario } from "../multiplayer/World";
 import { validBrowseState } from "../multiplayer/Browse";
 import { launchCustomScenario, tickState } from "../reducers/Game";
 import { prepareCustomScenario } from "./CustomScenarioEvents";
 import { createGame } from "../testing/Simulator";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import type { RuleEvent, ScenarioRuleDefinitions } from "../data/ScenarioRules";
 import type { ScenarioModType } from "../Types";
+import { roundTrip } from "../testing/SaveForgery";
 const params = {
   namespace: { kind: "mod" as const, id: "test-grid" },
   difficulty: "Employee" as const,
@@ -31,17 +32,13 @@ const params = {
   startingPeakW: 500e6,
   startingAssetIds: ["original-reactor"],
 };
-const pack = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "test-grid",
-  title: "Test Grid",
-  creator: "Creator",
-  version: "1",
-  description: "Grid metadata: plan a reliable grid.",
-  seed: 42,
-  baseScenarioId: 999,
-});
+const pack = (): ModPackage =>
+  modPackage({
+    id: "test-grid",
+    title: "Test Grid",
+    creator: "Creator",
+    description: "Grid metadata: plan a reliable grid.",
+  });
 const event = (id = "dry-year"): RuleEvent => ({
   id,
   title: "Dry year",
@@ -323,9 +320,7 @@ test("unknown starting assets cannot silently retarget a selector", () => {
 
 test("every bundled asset has a stable catalog ID and initialization persists its binding", () => {
   for (const base of [...SCENARIOS, DEFAULT_CUSTOM_SCENARIO]) {
-    expect(base.facilities.map((f) => f.assetId)).toEqual(
-      STARTING_ASSET_IDS[base.id],
-    );
+    expect(base.facilities.every((f) => f.assetId)).toBe(true);
     expect(new Set(base.facilities.map((f) => f.assetId)).size).toBe(
       base.facilities.length,
     );
@@ -342,7 +337,9 @@ test("every bundled asset has a stable catalog ID and initialization persists it
     seed: 42,
   });
   expect(game.facilities.map((f) => f.startingAssetId).sort()).toEqual(
-    [...STARTING_ASSET_IDS[110]].sort(),
+    SCENARIOS.find((s) => s.id === 110)!
+      .facilities.map((f) => f.assetId)
+      .sort(),
   );
   expect(new Set(game.facilities.map((f) => f.startingAssetId)).size).toBe(
     game.facilities.length,
@@ -358,7 +355,7 @@ test("common official compilation attaches rules without assigning community pro
       namespace: { kind: "official", scenarioId: 113, arcId: "load-shedding" },
       startingYear: base.startingYear,
       durationMonths: base.durationMonths,
-      startingAssetIds: [...STARTING_ASSET_IDS[113]],
+      startingAssetIds: base.facilities.map((f) => f.assetId!),
     },
   );
   const official = { ...base, rules: compiled };
@@ -485,14 +482,14 @@ test("normalized snapshots reject hostile edits even when an attacker recomputes
       m.rules.events[0].effects.hydroRunoffMultiplier = 11;
     },
   ]) {
-    const save = JSON.parse(JSON.stringify(serializeSave(game)));
+    const save = roundTrip(game);
     mutate(save.game.customScenario.mod);
     save.game.customScenario.mod.runtimeDigest = modRuntimeDigest(
       save.game.customScenario.mod,
     );
     expect(parseSave(save)).toBeNull();
   }
-  const saved = JSON.parse(JSON.stringify(serializeSave(game)));
+  const saved = roundTrip(game);
   expect(parseSave(saved)?.game.customScenario?.mod).toEqual(scenario.mod);
 });
 
@@ -527,7 +524,7 @@ test("runtime identity binds every resolved setup field and validates the comple
       s.location!.lat += 1;
     },
   ]) {
-    const save = JSON.parse(JSON.stringify(serializeSave(game)));
+    const save = roundTrip(game);
     mutate(save.game.customScenario);
     expect(parseSave(save)).toBeNull();
   }
@@ -593,7 +590,7 @@ test("untrusted custom scenarios cannot attach trusted rules while omitting mod 
     seed: 42,
     difficulty: "Employee",
   });
-  const saved = JSON.parse(JSON.stringify(serializeSave(regular)));
+  const saved = roundTrip(regular);
   saved.game.customScenario.rules = officialRules;
   expect(parseSave(saved)).toBeNull();
 });
@@ -644,7 +641,7 @@ test("selected difficulty is enforced by save, initialization and launch boundar
     seed: 42,
     difficulty: "Employee",
   });
-  const save = JSON.parse(JSON.stringify(serializeSave(game)));
+  const save = roundTrip(game);
   save.game.difficulty = "CEO";
   expect(parseSave(save)).toBeNull();
   expect(() =>

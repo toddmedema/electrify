@@ -2,6 +2,7 @@ import cloneDeep from "lodash.clonedeep";
 import type { ScenarioType } from "../Types";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
+import { modPackage } from "../testing/ModFixtures";
 import { createGame } from "../testing/Simulator";
 import {
   accessContextForGame,
@@ -22,19 +23,17 @@ import {
   validOfficialArcIds,
 } from "./CustomScenarioEvents";
 
-const pack = (): ModPackage => ({
-  schemaVersion: 1,
-  gameApi: 1,
-  id: "frozen-intertie",
-  title: "Frozen intertie",
-  creator: "Test",
-  version: "1",
-  description: "Prepare a replacement supply.",
-  seed: 7,
-  baseScenarioId: 111,
-  officialArcs: [],
-  objectives: [],
-});
+const pack = (): ModPackage =>
+  modPackage({
+    id: "frozen-intertie",
+    title: "Frozen intertie",
+    creator: "Test",
+    description: "Prepare a replacement supply.",
+    seed: 7,
+    baseScenarioId: 111,
+    officialArcs: [],
+    objectives: [],
+  });
 test("fresh base-111 community setup freezes the native40MW connection and access rather than the500MW regional route", () => {
   const scenario = modScenario(pack(), undefined, "Employee", 1e8);
   expect(validScenarioMod(scenario.mod, scenario)).toBe(true);

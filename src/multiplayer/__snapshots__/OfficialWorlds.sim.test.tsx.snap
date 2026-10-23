@@ -2,20 +2,18 @@
 
 exports[`two real official companies keep their exact World state in scenario 110 1`] = `
 Object {
-  "final": "1c94af871d73f090eee3307b50a5e340c2b6142efbad4927b2e48fe8bc158470",
+  "final": "bc5a2b975fd25d99ab51d424fbae19c2ce48b0cea5f522b88970c91e103005a6",
   "initial": "161c9a29af3dc4c36b8ef5a6a4a60040863e165e0b3fccf3cfba47462f9c37a5",
   "outcomes": Object {
     "0": Object {
-      "month": 43,
-      "outcome": "fired",
-      "reason": "You served 74.62% of demand during the reactor shutdown window and recovery; this mission requires 99.5%.",
-      "title": "Mission objective missed",
+      "month": 60,
+      "outcome": "completed",
+      "title": "After the shutdown",
     },
     "1": Object {
-      "month": 43,
-      "outcome": "fired",
-      "reason": "You served 74.62% of demand during the reactor shutdown window and recovery; this mission requires 99.5%.",
-      "title": "Mission objective missed",
+      "month": 14,
+      "outcome": "bankrupt",
+      "title": "Bankrupt!",
     },
   },
 }

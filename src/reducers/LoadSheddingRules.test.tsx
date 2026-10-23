@@ -36,8 +36,8 @@ import { buildStorySnapshot } from "../helpers/Story";
 import { serializeReplay } from "../Replay";
 import { canonical, digest } from "../testing/CanonicalHash";
 import { STANDARD_BALANCE_PLAYS } from "../testing/BalancePlaybooks";
-import { parseSave, serializeSave } from "../SaveGame";
-import { expectSaveForgeries } from "../testing/SaveForgery";
+import { parseSave } from "../SaveGame";
+import { expectSaveForgeries, roundTrip } from "../testing/SaveForgery";
 import {
   createGame,
   createGameFromReplay,
@@ -275,7 +275,7 @@ test("an actual onset preserves plain, Immer batch, worker, save and internal re
       event.key.endsWith("availability-step-1"),
     ),
   ).toBe(true);
-  const restored = parseSave(JSON.parse(JSON.stringify(serializeSave(plain))));
+  const restored = parseSave(roundTrip(plain));
   expect(restored).not.toBeNull();
   expect(restored!.game.worldEvents).toEqual(
     JSON.parse(JSON.stringify(plain.worldEvents)),
@@ -368,9 +368,7 @@ test("rolling regional journal retention cannot discard declared official onset 
       event.key.startsWith("story:113:load-shedding:"),
     ),
   );
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
+  expect(parseSave(roundTrip(game))).not.toBeNull();
   game.worldEvents.occurrences.push(
     ...Array.from({ length: 2500 }, (_, index) => ({
       key: `regional-fixture:${index}`,
@@ -389,9 +387,7 @@ test("rolling regional journal retention cannot discard declared official onset 
     ),
   ).toEqual(original);
   expect(validScenarioRuleState(game)).toBe(true);
-  expect(
-    parseSave(JSON.parse(JSON.stringify(serializeSave(game)))),
-  ).not.toBeNull();
+  expect(parseSave(roundTrip(game))).not.toBeNull();
 });
 
 test("report close captures capacity facts once and leaves history-only reliability receipts unchanged", () => {

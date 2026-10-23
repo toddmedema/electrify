@@ -11,7 +11,7 @@ import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import { selectUpcomingStoryEvents } from "../components/views/StoryEventSelectors";
 import { modScenario } from "../mods/ModScenario";
 import type { ModPackage } from "../mods/ModSchema";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { createGame, runSimulation } from "../testing/Simulator";
 import type { AppStateType, DifficultyType, GameType } from "../Types";
 import reducer, {
@@ -21,6 +21,7 @@ import reducer, {
   tickState,
 } from "./Game";
 import { chooseScenarioResponse } from "./GameActions";
+import { roundTrip } from "../testing/SaveForgery";
 
 const choice = (id = "response", dueMonth = 1): RuleChoice => ({
   id,
@@ -81,7 +82,7 @@ const now = (state: GameType) =>
 const answer = (id: string, optionId: string) =>
   chooseScenarioResponse({ decisionId: `mod:choice-grid:${id}`, optionId });
 const restore = (state: GameType) => {
-  const saved = parseSave(JSON.parse(JSON.stringify(serializeSave(state))));
+  const saved = parseSave(roundTrip(state));
   expect(saved).not.toBeNull();
   return cloneDeep(saved!.game);
 };
@@ -192,7 +193,7 @@ test("simultaneous decisions stay reachable after funding and a same-month condi
   expect(restore(live).worldEvents.occurrences).toEqual(
     live.worldEvents.occurrences,
   );
-  const forged = JSON.parse(JSON.stringify(serializeSave(live)));
+  const forged = roundTrip(live);
   const conditional = forged.game.worldEvents.occurrences.pop();
   forged.game.worldEvents.occurrences.unshift(conditional);
   expect(parseSave(forged)).toBeNull();
@@ -299,12 +300,12 @@ test("load replacement cancels only its future load and cannot be reintroduced a
 
 test("late unanswered clocks, forged receipts and duplicate answers are rejected on import", () => {
   const before = game();
-  const raw = () => JSON.parse(JSON.stringify(serializeSave(before)));
+  const raw = () => roundTrip(before);
   const late = raw();
   late.game.date = getDateFromMinute(10, before.startingYear);
   expect(parseSave(late)).toBeNull();
   const answered = reducer(before, answer("response", "accept"));
-  const saved = () => JSON.parse(JSON.stringify(serializeSave(answered)));
+  const saved = () => roundTrip(answered);
   for (const edit of [
     (value: ReturnType<typeof saved>) => {
       value.game.worldEvents.occurrences[0].attributes.upfrontGrant = 10001;

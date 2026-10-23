@@ -8,7 +8,7 @@ import {
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
 } from "../helpers/DateTime";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { decodeReplay, encodeReplay, serializeReplay } from "../Replay";
 import {
   DATA_CENTER_DECISION_KEY,
@@ -20,6 +20,7 @@ import {
   resolveStoryAtDate,
 } from "../data/WorldEvents";
 import { buildStorySnapshot } from "../helpers/Story";
+import { roundTrip } from "../testing/SaveForgery";
 
 function ready(scenarioId: number, month: number) {
   const game = createGame({ scenarioId, difficulty: "Intern", seed: 2468 });
@@ -168,9 +169,7 @@ test.each([
     };
     advance(live, month);
     live = cloneDeep(reducer(live, choose(decisionId, optionId)));
-    const saved = cloneDeep(
-      parseSave(JSON.parse(JSON.stringify(serializeSave(live))))!.game,
-    );
+    const saved = cloneDeep(parseSave(roundTrip(live))!.game);
     const replayed = createGameFromReplay(
       decodeReplay(encodeReplay(serializeReplay(live)!))!,
     );

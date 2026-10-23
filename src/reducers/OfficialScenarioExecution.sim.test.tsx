@@ -22,7 +22,7 @@ import {
 } from "../helpers/ScenarioRules";
 import { buildStorySnapshot } from "../helpers/Story";
 import { serializeReplay } from "../Replay";
-import { parseSave, serializeSave } from "../SaveGame";
+import { parseSave } from "../SaveGame";
 import { getStore } from "../StoreRegistry";
 import {
   OFFICIAL_EXECUTION_IDS,
@@ -31,9 +31,9 @@ import {
   officialQuote,
   playOfficialExecution,
 } from "../testing/OfficialScenarioExecutionFixtures";
-import { expectSaveForgeries } from "../testing/SaveForgery";
+import { expectSaveForgeries, roundTrip } from "../testing/SaveForgery";
 import { createGameFromReplay } from "../testing/Simulator";
-import type { GameType } from "../Types";
+import type { ActiveWorldEventType, GameType } from "../Types";
 import { canonical, digest } from "../testing/CanonicalHash";
 import {
   intertieContextForGame,
@@ -126,7 +126,7 @@ function expectSavedQuoteCells(actual: GameType, original: GameType) {
   );
 }
 function expectSave(game: GameType, label: string) {
-  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  const raw = roundTrip(game);
   const restored = parseSave(raw);
   expect({ label, valid: restored !== null }).toEqual({ label, valid: true });
   expect(restored!.game.scenarioId).toBe(game.scenarioId);
@@ -482,12 +482,17 @@ test.each([
       { cost: 1 },
       { ruleEvent: true, upfrontGrant: 1000000000, cost: 0 },
     ],
+    () => undefined,
   ],
   [
     "the restoration review rejects a forged reportAvailable flag",
     104,
     "restoration",
     [{ reportAvailable: true }],
+    (original: ActiveWorldEventType) => {
+      expect(original.attributes.reportAvailable).toBeUndefined();
+      expect(original.attributes.reliability).toBeGreaterThan(0);
+    },
   ],
   [
     "the aging warning rejects malformed or duplicate selected IDs",
@@ -502,8 +507,13 @@ test.each([
       [Infinity],
       [Number.MAX_SAFE_INTEGER + 1],
     ].map((selectedFacilityIds) => ({ selectedFacilityIds })),
+    (original: ActiveWorldEventType) => {
+      // This legal route has sold the qualifying old coal plant; its empty warning stays valid.
+      expect(original.attributes.selectedFacilityIds).toEqual([]);
+      expect(original.attributes.selectedFacilityNames).toEqual([]);
+    },
   ],
-])("native %s", (_name, scenarioId, eventId, patches) => {
+])("native %s", (_name, scenarioId, eventId, patches, baseline) => {
   const event = scenarioRules(getScenario(scenarioId), {
     difficulty: "CEO",
     seed: 12345,
@@ -511,6 +521,9 @@ test.each([
   const { game } = playOfficialExecution(scenarioId, {
     throughMonth: event.startMonth,
   });
+  baseline(
+    game.worldEvents.occurrences.find((receipt) => receipt.key === event.key)!,
+  );
   const unchanged = digest(physical(game));
   expectSave(game, `intact ${eventId}`);
   // Both copies are edited so this checks the receipt owner, not an active-copy mismatch.
