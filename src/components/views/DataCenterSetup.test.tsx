@@ -18,7 +18,8 @@ import { DataCenterSetupRequest } from "../../helpers/DataCenterSetup";
 import { ScenarioType } from "../../Types";
 import DataCenterSetup from "./DataCenterSetup";
 
-// Full map and native year options make these interaction tests slower under coverage.
+// Keep the real map and year options, but avoid repeatedly computing their accessibility
+// styles when a control has an explicit label, keeping coverage runs responsive on CI.
 jest.setTimeout(30000);
 
 jest.mock("../../helpers/DataCenterSetupClient", () => ({
@@ -51,6 +52,7 @@ const mockCreateWorker = createDataCenterSetupWorker as jest.MockedFunction<
 >;
 
 beforeEach(() => {
+  jest.useFakeTimers();
   worker = {
     onmessage: null,
     onerror: null,
@@ -61,6 +63,11 @@ beforeEach(() => {
   } as unknown as Worker;
   mockCreateWorker.mockReturnValue(worker);
   mockInitCustomers.mockResolvedValue(loadDataCenterCustomerSources());
+});
+
+afterEach(() => {
+  act(() => jest.runOnlyPendingTimers());
+  jest.useRealTimers();
 });
 
 function preparedScenario(): ScenarioType {
@@ -94,9 +101,7 @@ async function chooseCity(name: string) {
   const callsBefore = (worker.postMessage as jest.Mock).mock.calls.length;
   const clear = screen.queryByRole("button", { name: "Clear" });
   if (clear) fireEvent.click(clear);
-  const input = screen.getByRole("combobox", {
-    name: "Select a city",
-  });
+  const input = screen.getByLabelText("Select a city");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: name } });
   fireEvent.click(
@@ -116,16 +121,22 @@ function reply(scenario: ScenarioType) {
   );
 }
 
+async function renderSetup(onStart = jest.fn()) {
+  render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
+  // initCities resolves through a finally callback. Wait for readiness before interacting.
+  await screen.findByText("2 available cities");
+}
+
 const startButton = () =>
-  screen.getByRole("button", { name: "Start exploring" });
+  screen.getByText("Start exploring", { selector: "button" });
 const expectStartHidden = () =>
   expect(
-    screen.queryByRole("button", { name: "Start exploring" }),
+    screen.queryByText("Start exploring", { selector: "button" }),
   ).not.toBeInTheDocument();
 
 it("waits for an explicit location and a prepared grid, then starts paired scenarios with the same seed", async () => {
   const onStart = jest.fn();
-  render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
+  await renderSetup(onStart);
   expectStartHidden();
   expect(
     screen.queryByRole("combobox", { name: "Start year" }),
@@ -143,6 +154,7 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
   const growth = preparedScenario();
   reply(growth);
   expect(startButton()).toBeEnabled();
+  expect(startButton()).toHaveAccessibleName("Start exploring");
   expect(
     screen.getByRole("heading", { name: "How much extra power?" }),
   ).toBeVisible();
@@ -164,18 +176,14 @@ it("waits for an explicit location and a prepared grid, then starts paired scena
 
 it("keeps demand and arrival edits out of calibration and validates all inputs", async () => {
   const onStart = jest.fn();
-  render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
+  await renderSetup(onStart);
   expect(
     screen.getByRole("group", { name: "Playable locations map" }),
   ).toBeVisible();
   await chooseCity("San Francisco");
   reply(preparedScenario());
-  const demand = screen.getByRole("slider", {
-    name: "Power needed",
-  });
-  const arrival = screen.getByRole("combobox", {
-    name: "Data centers open",
-  });
+  const demand = screen.getByLabelText("Power needed");
+  const arrival = screen.getByLabelText("Data centers open");
   expect(demand).toHaveAttribute("aria-valuetext", "100MW");
   expect(screen.queryByRole("spinbutton", { name: /Power needed/ })).toBeNull();
   for (const [tick, watts] of [
@@ -195,40 +203,42 @@ it("keeps demand and arrival edits out of calibration and validates all inputs",
   }
   onStart.mockClear();
   fireEvent.change(demand, { target: { value: "19" } });
-  expect(within(arrival).queryByRole("option", { name: "2051" })).toBeNull();
+  expect(
+    within(arrival).queryByText("2051", { selector: "option" }),
+  ).toBeNull();
   fireEvent.change(arrival, { target: { value: "2040" } });
   fireEvent.click(startButton());
   const scenario: ScenarioType = onStart.mock.calls[0][0];
   expect(scenario.loadAdditions?.[0]).toEqual(
     expect.objectContaining({ peakW: 200000000, startsYear: 2040 }),
   );
+  // Let every queued debounce expire: demand and arrival edits must not prepare another grid.
+  act(() => jest.runOnlyPendingTimers());
   expect(worker.postMessage).toHaveBeenCalledTimes(1);
-  const year = screen.getByRole("combobox", { name: "Start year" });
-  expect(within(year).queryByRole("option", { name: "2009" })).toBeNull();
-  expect(within(year).queryByRole("option", { name: "2050" })).toBeNull();
+  const year = screen.getByLabelText("Start year");
+  expect(within(year).queryByText("2009", { selector: "option" })).toBeNull();
+  expect(within(year).queryByText("2050", { selector: "option" })).toBeNull();
   fireEvent.change(year, { target: { value: "2045" } });
   expectStartHidden();
   await waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(2));
   reply(preparedScenario());
-  expect(
-    screen.getByRole("combobox", { name: "Data centers open" }),
-  ).toHaveValue("2046");
-  expect(screen.getByRole("slider", { name: "Power needed" })).toHaveValue(
-    "19",
-  );
+  expect(arrival).toHaveValue("2046");
+  expect(screen.getByLabelText("Power needed")).toHaveValue("19");
   expect(startButton()).toBeEnabled();
   fireEvent.change(year, { target: { value: "2049" } });
   expect(arrival).toHaveValue("2050");
   expect(within(arrival).getAllByRole("option")).toHaveLength(1);
   fireEvent.change(year, { target: { value: "2010" } });
-  expect(within(arrival).queryByRole("option", { name: "2010" })).toBeNull();
   expect(
-    within(arrival).getByRole("option", { name: "2011" }),
+    within(arrival).queryByText("2010", { selector: "option" }),
+  ).toBeNull();
+  expect(
+    within(arrival).getByText("2011", { selector: "option" }),
   ).toBeInTheDocument();
 });
 
 it("selects a community using the map", async () => {
-  render(<DataCenterSetup onBack={jest.fn()} onStart={jest.fn()} />);
+  await renderSetup();
   for (let zoom = 0; zoom < 5; zoom += 1) {
     const cluster = screen.queryByRole("button", {
       name: /Zoom to.*locations near/,
@@ -246,7 +256,7 @@ it("selects a community using the map", async () => {
 
 it("recalibrates edited account counts, preserving demand and resetting accounts for another location", async () => {
   const onStart = jest.fn();
-  render(<DataCenterSetup onBack={jest.fn()} onStart={onStart} />);
+  await renderSetup(onStart);
   await chooseCity("San Francisco");
   reply(preparedScenario());
   fireEvent.change(screen.getByRole("slider", { name: "Power needed" }), {
@@ -290,7 +300,7 @@ it("recalibrates edited account counts, preserving demand and resetting accounts
 });
 
 it("blocks starting and offers retry after a worker error", async () => {
-  render(<DataCenterSetup onBack={jest.fn()} onStart={jest.fn()} />);
+  await renderSetup();
   await chooseCity("San Francisco");
   expectStartHidden();
   act(() =>
@@ -310,7 +320,7 @@ it("blocks starting and offers retry after a worker error", async () => {
 
 it("offers retry when local utility data cannot load", async () => {
   mockInitCustomers.mockRejectedValueOnce(new Error("offline"));
-  render(<DataCenterSetup onBack={jest.fn()} onStart={jest.fn()} />);
+  await renderSetup();
   const input = screen.getByRole("combobox", { name: "Select a city" });
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "San Francisco" } });

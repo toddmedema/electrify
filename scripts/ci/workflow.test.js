@@ -3,7 +3,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const { parse } = require("yaml");
-const { commands, cpuSuites, execute } = require("./platform-tests");
+const {
+  commands,
+  cpuSuites,
+  execute,
+  planForRun,
+} = require("./platform-tests");
 const { names } = require("./wait-native");
 const { partition } = require("./jest-filter");
 
@@ -168,6 +173,28 @@ test(
     ]);
   },
 );
+
+test("CI's CPU shards can be reproduced locally without native windows or excess workers", () => {
+  for (const index of [1, 2]) {
+    const local = planForRun(index, true, { GITHUB_ACTIONS: "false" }, 20);
+    assert.deepEqual(local.ui, []);
+    assert.deepEqual(local.cpu, cpuSuites(index, 4));
+    assert(local.cpu.every(({ args }) => args.includes("--maxWorkers=2")));
+  }
+  assert.deepEqual(
+    planForRun(1, true, { GITHUB_ACTIONS: "false" }, 2).cpu,
+    cpuSuites(1, 2),
+  );
+  assert.deepEqual(
+    planForRun(1, true, { GITHUB_ACTIONS: "true" }, 8).cpu,
+    cpuSuites(1, 8),
+  );
+  assert.throws(() => planForRun(1, false, {}, 4), /only for GitHub Actions/);
+  assert.deepEqual(
+    planForRun(1, false, { GITHUB_ACTIONS: "true" }, 4),
+    commands(1, 4),
+  );
+});
 
 test("optional capacity balancing stays complete for unequal workers", () => {
   const files = Array.from({ length: 40 }, (_, index) => `test-${index}`);
