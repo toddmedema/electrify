@@ -158,6 +158,7 @@ test("simulation and all desktop-renderer failures select their actual local gat
     [
       "npm run check -- --steps simulations",
       "npm run check -- --steps multiplayer",
+      "npm run check -- --steps steam-input",
     ],
   );
 });

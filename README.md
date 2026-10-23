@@ -44,7 +44,7 @@ changes. For prose-only Markdown changes, review the text and run `git diff --ch
 
 Each check invocation prints a report path under `.tmp/check-runs/`. The report records
 its source commit and working-tree fingerprint, runtime, selected gates, pass/fail/skip
-results, and retained command logs. Production browser and multiplayer reports preserve
+results, and retained command logs. Production browser, multiplayer, and controller reports preserve
 individual attempts, including successful runs and retries. A changed source fingerprint
 at completion invalidates that run; partial runs remain separate evidence. Native packaged Electron and
 Firestore rules checks are reported as outside the local runner's scope.

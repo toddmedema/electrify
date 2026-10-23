@@ -46,6 +46,7 @@ test("full checks retain every gate; partial checks reject unknown or injected n
       "test:e2e:ci",
       "desktop:build",
       "test:multiplayer",
+      "test:steam-input",
     ],
   );
   assert(isFullCheck(selectSteps([])));
@@ -59,6 +60,10 @@ test("full checks retain every gate; partial checks reject unknown or injected n
   assert.deepEqual(
     selectSteps(["--steps", "bundle"]).map((step) => step.id),
     ["build", "bundle"],
+  );
+  assert.deepEqual(
+    selectSteps(["--steps", "steam-input"]).map((step) => step.id),
+    ["desktop-build", "steam-input"],
   );
   for (const args of [
     ["--steps", ""],

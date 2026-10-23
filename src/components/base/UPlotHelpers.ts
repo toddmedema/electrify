@@ -1,5 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, INTERFACE_FONT_FAMILY, withAlpha } from "../../Theme";
+import { getTextScale } from "../../TextSize";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
 import {
   axisTicksAreYearly,
@@ -34,7 +35,7 @@ export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {
-  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE);
+  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE) * getTextScale();
 }
 
 export const CHART_FONT_FAMILY = INTERFACE_FONT_FAMILY;
@@ -97,8 +98,8 @@ export const FORECAST_AXIS_RIGHT = 48;
 export const FORECAST_RIGHT_PAD = 24;
 
 /** Tick labels: the app's small caption, whatever the chart's width. */
-export const CHART_TICK_PX = 11;
-/** Legends and annotations: one step up from the ticks. */
+export const CHART_TICK_PX = 12;
+/** Legends and annotations share caption-sized type. */
 export const CHART_LABEL_PX = 12;
 
 /**
@@ -112,7 +113,7 @@ export const CHART_LABEL_PX = 12;
  * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
  */
 export function chartFont(pxRatio = 1, sizePx = CHART_TICK_PX): string {
-  return `${Math.max(1, Math.round(sizePx * pxRatio))}px ${CHART_FONT_FAMILY}`;
+  return `${Math.max(1, Math.round(sizePx * getTextScale() * pxRatio))}px ${CHART_FONT_FAMILY}`;
 }
 
 /**
@@ -276,7 +277,7 @@ export function forecastMonthAxis(
  */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
   const font = chartFont();
-  const fontSize = CHART_TICK_PX;
+  const fontSize = CHART_TICK_PX * getTextScale();
   const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
@@ -596,7 +597,8 @@ export function eventMarkersPlugin(
           u.ctx.fill();
           u.ctx.stroke();
           u.ctx.fillStyle = palette.interactive;
-          u.ctx.font = chartFont(1, Math.round(10 * scale));
+          // The badge geometry already contains the selected text scale.
+          u.ctx.font = chartFont(1, (10 * scale) / getTextScale());
           u.ctx.textAlign = "center";
           u.ctx.textBaseline = "middle";
           u.ctx.fillText(String(marker.number), x, badgeY);

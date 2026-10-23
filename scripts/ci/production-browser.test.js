@@ -113,3 +113,29 @@ test("a failed first attempt cannot become a green production gate on retry", (t
     ],
   );
 });
+
+test("controller journeys retain their own attempt report after leaving multiplayer", (t) => {
+  const parent = path.resolve(".tmp", "controller-policy-tests");
+  fs.mkdirSync(parent, { recursive: true });
+  const directory = fs.mkdtempSync(path.join(parent, "run-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const result = playwright(
+    ["--config=e2e/steam-input.playwright.config.ts", "--list"],
+    { ELECTRIFY_E2E_OUTPUT_DIR: directory, STEAM_INPUT_BUILD_DIR: "" },
+    true,
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const report = JSON.parse(
+    fs.readFileSync(path.join(directory, "results.json"), "utf8"),
+  );
+  assert(
+    report.config.projects.every(({ outputDir }) => outputDir === directory),
+  );
+  assert.equal(report.config.failOnFlakyTests, true);
+  assert(report.suites.length > 0);
+  assert(report.suites.every(({ file }) => file === "steam-input.spec.ts"));
+  assert.deepEqual(
+    require("../check").steps.find(({ id }) => id === "steam-input").reports,
+    ["results.json"],
+  );
+});

@@ -23,7 +23,12 @@ export type WorkerRequest =
       allowReady?: boolean;
     }
   | { kind: "disconnect"; sender: string }
-  | { kind: "checkpoint"; requestId?: string; pause?: boolean };
+  | {
+      kind: "checkpoint";
+      requestId?: string;
+      pause?: boolean;
+      suspended?: boolean;
+    };
 export type WorkerResponse =
   | { kind: "views"; views: Record<string, RoomView> }
   | { kind: "keepalive"; matchId: string; epoch: string; revision: number }

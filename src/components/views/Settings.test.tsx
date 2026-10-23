@@ -7,6 +7,7 @@ import Settings, { Props } from "./Settings";
 import { clearAppCache } from "../../helpers/Cache";
 import settingsReducer from "../../reducers/Settings";
 import type { DesktopBridge } from "../../Desktop";
+import { updateInputPresentation } from "../../desktop/InputPresentation";
 
 jest.mock("../../AppVersion", () => ({ APP_VERSION: "26sept26-1507" }));
 
@@ -35,6 +36,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
+    onTextSizeChange: () => undefined,
     onManageSaves: () => undefined,
     onBack: () => undefined,
     ...overrides,
@@ -52,6 +54,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
 
 describe("Settings", () => {
   afterEach(() => {
+    act(() => updateInputPresentation({ active: false }));
     delete window.electrifyDesktop;
     localStorage.removeItem("controllerVibrationEnabled");
     localStorage.removeItem("steamTimelineEnabled");
@@ -149,6 +152,38 @@ describe("Settings", () => {
 
     expect(onThemeChange).toHaveBeenCalledWith("dark");
     expect(onUnitsChange).toHaveBeenCalledWith("imperial");
+  });
+
+  it("offers a standard default and explicit larger text sizes", async () => {
+    const onTextSizeChange = jest.fn();
+    renderSettings({ onTextSizeChange });
+    const sizes = screen.getByRole("group", { name: "Text size" });
+    expect(
+      within(sizes).getByRole("button", { name: "Standard" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(
+      within(sizes).getByRole("button", { name: /^Large$/ }),
+    );
+    await userEvent.click(
+      within(sizes).getByRole("button", { name: /^Larger$/ }),
+    );
+    expect(onTextSizeChange.mock.calls).toEqual([["large"], ["larger"]]);
+  });
+
+  it("keeps physical keyboard shortcuts out of active controller help", () => {
+    renderSettings();
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
+    act(() => updateInputPresentation({ active: true }));
+    expect(
+      screen.queryByRole("heading", { name: "Keyboard shortcuts" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Text size" })).toBeVisible();
+    act(() => updateInputPresentation({ active: false }));
+    expect(
+      screen.getByRole("heading", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
   });
 
   it("controls independent volumes while sound is enabled and hides them otherwise", () => {

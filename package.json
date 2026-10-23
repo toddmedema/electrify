@@ -99,7 +99,9 @@
     "desktop:verify": "node scripts/desktop-verify.js",
     "test:desktop:native": "node --test electron/*.test.cjs",
     "test:desktop": "playwright test --config e2e/desktop.playwright.config.ts",
-    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts"
+    "test:multiplayer": "playwright test --config e2e/multiplayer.playwright.config.ts",
+    "test:steam-input": "playwright test --config e2e/steam-input.playwright.config.ts",
+    "pretest:steam-input": "npm run compatibility:generate && npm run icons:generate"
   },
   "eslintConfig": {
     "extends": [

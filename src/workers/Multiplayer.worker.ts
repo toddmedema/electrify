@@ -178,7 +178,12 @@ function handle(request: WorkerRequest, running: World) {
     requestViews({ force: true });
   } else if (request.kind === "checkpoint") {
     if (request.pause) {
-      pauseWorld(running, "Host saved and stopped the match");
+      pauseWorld(
+        running,
+        request.suspended
+          ? "A device went to sleep. Ready up before resuming."
+          : "Host saved and stopped the match",
+      );
     }
     // Reconnects need a full baseline even when a paused revision is unchanged.
     requestViews({ force: true });

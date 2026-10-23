@@ -90,6 +90,15 @@ const steps = [
     env: { MULTIPLAYER_BUILD_DIR: "build" },
     reports: ["results.json"],
   },
+  {
+    id: "steam-input",
+    name: "Controller journeys",
+    script: "test:steam-input",
+    ci: true,
+    needs: "desktop-build",
+    env: { STEAM_INPUT_BUILD_DIR: "build" },
+    reports: ["results.json"],
+  },
 ];
 const usage = `Usage: npm run check -- [--ci] [--steps ${steps.map((step) => step.id).join(",")}]`;
 

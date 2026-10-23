@@ -1,6 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { Button, Dialog, MenuItem, Select, Slider } from "@mui/material";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import ConfirmDialog from "../components/base/ConfirmDialog";
 import {
   backInput,
@@ -372,3 +373,57 @@ it("lets MUI own Back dismissal and does not choose a dialog action", () => {
   act(() => backInput());
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+it.each(["cancel", "drop"] as const)(
+  "can %s a real dispatch reorder using the controller",
+  async (finish) => {
+    const moved = jest.fn();
+    render(
+      <main className="base_main">
+        <DragDropContext onDragEnd={moved}>
+          <Droppable droppableId="dispatch">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                <Draggable
+                  draggableId="solar"
+                  index={0}
+                  disableInteractiveElementBlocking
+                >
+                  {(draggable, snapshot) => (
+                    <div ref={draggable.innerRef} {...draggable.draggableProps}>
+                      <button {...draggable.dragHandleProps}>
+                        Reorder Solar
+                      </button>
+                      <output>
+                        {snapshot.isDragging ? "Reordering" : "Idle"}
+                      </output>
+                    </div>
+                  )}
+                </Draggable>
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+        <button>Next action</button>
+      </main>,
+    );
+    const handle = screen.getByRole("button", { name: "Reorder Solar" });
+    handle.focus();
+    await act(async () => confirmInput());
+    expect(screen.getByRole("status")).toHaveTextContent("Reordering");
+    act(() => moveInputFocus("down"));
+    expect(handle).toHaveFocus();
+    await act(async () => {
+      if (finish === "cancel") backInput();
+      else confirmInput();
+    });
+    expect(moved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: finish === "cancel" ? "CANCEL" : "DROP",
+      }),
+      expect.anything(),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Idle");
+  },
+);

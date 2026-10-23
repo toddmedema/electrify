@@ -135,13 +135,9 @@ function reproduce(tests) {
       commands.add(
         `${spec}:${line} runs only in CI (native windows); read its trace in the diagnostics artifact`,
       );
-    else if (
-      [
-        "e2e/multiplayer.spec.ts",
-        "e2e/steam-input.spec.ts",
-        "e2e/mods.spec.ts",
-      ].includes(spec)
-    )
+    else if (spec === "e2e/steam-input.spec.ts")
+      commands.add("npm run check -- --steps steam-input");
+    else if (["e2e/multiplayer.spec.ts", "e2e/mods.spec.ts"].includes(spec))
       commands.add("npm run check -- --steps multiplayer");
     else {
       browserCommands.add(
@@ -149,7 +145,7 @@ function reproduce(tests) {
       );
     }
   }
-  // The multiplayer gate leaves a desktop renderer in build/. Rebuild web after it,
+  // Desktop-renderer gates leave a desktop build in build/. Rebuild web after them,
   // regardless of the order in which the failed jobs/tests appeared in the log.
   return [
     ...commands,

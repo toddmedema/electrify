@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import DesktopDisplaySettings from "./DesktopDisplaySettings";
 import { DesktopBridge, DesktopState } from "../../Desktop";
+import { updateInputPresentation } from "../../desktop/InputPresentation";
 
 let update: ((state: DesktopState) => void) | undefined;
 const state: DesktopState = {
@@ -35,7 +36,18 @@ beforeEach(() => {
   } as unknown as DesktopBridge;
 });
 afterEach(() => {
+  act(() => updateInputPresentation({ active: false }));
   delete window.electrifyDesktop;
+});
+it("keeps fullscreen instructions appropriate to the active input device", async () => {
+  render(<DesktopDisplaySettings />);
+  await waitFor(() =>
+    expect(screen.getByRole("switch", { name: "Fullscreen" })).toBeEnabled(),
+  );
+  expect(screen.getByText(/F11 or Alt\+Enter/)).toBeInTheDocument();
+  act(() => updateInputPresentation({ active: true }));
+  expect(screen.queryByText(/F11 or Alt\+Enter/)).not.toBeInTheDocument();
+  expect(screen.getByText(/monitor's native resolution/)).toBeInTheDocument();
 });
 it("describes native fullscreen and saves a window size through the preload bridge", async () => {
   render(<DesktopDisplaySettings />);
