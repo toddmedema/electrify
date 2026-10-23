@@ -16,7 +16,7 @@ const {
 const object = (
   properties,
   required = [],
-  description = "A bounded data-only object; unsupported fields are rejected.",
+  description = "Only listed fields are allowed.",
 ) => ({
   type: "object",
   properties,
@@ -34,7 +34,7 @@ const numeric = (
   type: integer ? "integer" : "number",
   minimum,
   maximum,
-  description: `${unit}; ${integer ? "whole numbers" : "finite numbers"} ${minimum}–${maximum}. Resolved only in the declared scope.`,
+  description: `${unit}; ${integer ? "integer" : "number"} ${minimum}–${maximum}.`,
 });
 const boolean = (description) => ({ type: "boolean", description });
 const id = () => ({
@@ -53,13 +53,13 @@ const text = (
   minLength: 1,
   maxLength,
   pattern: safeTextPattern,
-  description: `${description} At most ${maxLength} UTF-16 code units; the parser also enforces UTF-8 byte ceilings.`,
+  description: `${description} Up to ${maxLength} UTF-16 code units.`,
 });
 const list = (
   items,
   maxItems,
   minItems = 0,
-  description = "Bounded list; referenced identities must be unique and valid in this package.",
+  description = "References must be unique and valid in this package.",
 ) => ({ type: "array", items, minItems, maxItems, description });
 const magnitude = (
   min,
@@ -76,20 +76,20 @@ const magnitude = (
           byDifficulty: object(
             Object.fromEntries(RULE_DIFFICULTIES.map((d) => [d, scalar])),
             RULE_DIFFICULTIES,
-            "Complete difficulty table; every named difficulty is required and independently validated.",
+            "Supply a value for every difficulty.",
           ),
         },
         ["byDifficulty"],
       ),
     ],
-    description: `${scalar.description} A scalar or one complete byDifficulty table; no nesting or expressions.`,
+    description: `${scalar.description} Use a number or a complete byDifficulty table.`,
   };
 };
 const month = () =>
   numeric(
     1,
     1200,
-    "One-based playable month (month 1 opens at monthsElapsed 0); must lie within the resolved term",
+    "Playable month, starting at 1 and within the scenario term",
     true,
   );
 const fuel = () =>
@@ -114,14 +114,14 @@ const condition = () =>
       optionIds: { ...list(id(), 8, 1), uniqueItems: true },
     },
     ["choiceId", "optionIds"],
-    "Active only after this choice selects any one listed option. Same-month choice resolves before effects; dependencies must form an acyclic reachable forest.",
+    "Active when the choice selects any listed option. Same-month choices resolve before effects; dependencies cannot contain cycles.",
   );
 const selector = () => ({
   oneOf: [
     object(
       { selector: { const: "largestOperating" }, fuel: fuel() },
       ["selector"],
-      "Largest operating generator at onset; optional fuel restricts the candidates. Stable identity persists after sale.",
+      "Largest operating generator at onset, optionally restricted by fuel. Replacements never inherit its target.",
     ),
     object(
       {
@@ -147,7 +147,7 @@ const selector = () => ({
         ),
       },
       ["selector", "targetCapacityShare"],
-      "Seeded operating capacity-share targets bind original facility identities once; replacements never inherit targets.",
+      "Select generators once at onset using the seed and capacity share. Replacements never inherit targets.",
     ),
     object(
       {
@@ -164,7 +164,7 @@ const selector = () => ({
     ),
   ],
   description:
-    "One whitelisted target selector, resolved at event onset. Ties use stable facility IDs; targets are persisted for save/replay.",
+    "Select targets at event onset. Ties use facility IDs; targets stay fixed for the event.",
 });
 const report = () => ({
   oneOf: REPORT_KINDS.map((kind) => {
@@ -195,11 +195,11 @@ const report = () => ({
     return object(
       props,
       required,
-      "Engine-generated observation from completed recorded facts only. Inclusive windows must be ordered and within term; missing facts report unavailable.",
+      "Report on completed months in an inclusive window within the term. Missing observations are unavailable.",
     );
   }),
   description:
-    "Whitelisted engine report; no authored formulas. At most one onset and one expiry report per event; at most 16 debrief reports.",
+    "Choose a built-in report: one at onset and one at expiry per event, plus up to 16 debrief reports.",
 });
 const load = () => ({
   ...object(
@@ -214,15 +214,11 @@ const load = () => ({
       supplementsBackground: boolean(
         "Whether this permanent load supplements the ordinary background load.",
       ),
-      peakMW: numeric(
-        0.001,
-        100000,
-        "Peak MW; 100 means 100 MW, converted once to watts",
-      ),
+      peakMW: numeric(0.001, 100000, "Peak capacity in MW"),
       peakShareOfStartingPeak: numeric(
         0.000001,
         1,
-        "Share of the real engine's resolved starting peak; 100 MW on 500 MW is 0.2",
+        "Share of starting peak demand; 0.2 means 100 MW on a 500 MW grid",
       ),
     },
     ["id", "startMonth", "demandType", "loadFactor"],
@@ -240,9 +236,9 @@ const effects = () => {
     minProperties: 1,
     maxProperties: 64,
     propertyNames: { type: "string", pattern: ID_PATTERN.source },
-    additionalProperties: magnitude(0, 1e6),
+    additionalProperties: magnitude(0, 1e6, "Capacity cap in MW"),
     description:
-      "Surviving corridor nameplate in MW, including upgrades. Zero closes the route in both directions; overlapping caps use the smallest limit.",
+      "Corridor capacity cap in MW, including upgrades. Zero closes both directions; overlapping caps use the smallest value.",
   };
   for (const [key, min, max, names] of [
     [
@@ -258,7 +254,7 @@ const effects = () => {
     props[key] = object(
       Object.fromEntries(names.map((name) => [name, magnitude(min, max)])),
       [],
-      `${key} by bundled fuel. Multipliers compose with simultaneous timed and static factors; owned costs are not rewritten.`,
+      `${key} by fuel. Simultaneous factors multiply; committed purchase costs stay fixed.`,
     );
   for (const [key, min, max, unit] of [
     ["demandMultiplier", 0.1, 10, "Demand factor"],
@@ -295,7 +291,7 @@ const effects = () => {
         outputMultiplier: magnitude(
           0,
           1,
-          "Output factor for bound target identities",
+          "Output factor for selected facilities",
         ),
       },
       ["target", "outputMultiplier"],
@@ -308,7 +304,7 @@ const effects = () => {
       {
         kind: enumeration(
           ["charge", "grant"],
-          "One-time company accounting transaction at event opening.",
+          "One-time charge or grant at event onset.",
         ),
         amountDollars: magnitude(
           0,
@@ -324,7 +320,7 @@ const effects = () => {
   return object(
     props,
     [],
-    "Timed whitelisted effects only. Numeric quantities convert once during compilation. No scripts, property paths or expressions.",
+    "Built-in timed effects. Scripts and expressions are unsupported.",
   );
 };
 const event = () => ({
@@ -446,7 +442,7 @@ const objective = () => ({
       label: text(100),
       metric: { const: metric, description: definition },
       required: boolean(
-        "Defaulttrue. Required failure may end the company run; optional goals never end/fail it.",
+        "Defaults to true. Set false for an optional goal that cannot end the run.",
       ),
     };
     const required = ["id", "label", "metric"];
@@ -477,14 +473,14 @@ const objective = () => ({
         budgetTonnesCO2e: numeric(
           0,
           1e12,
-          "TonnesCO₂e summed once over inclusive completed-month window",
+          "Total tonnes CO₂e over the inclusive window",
         ),
       },
       emissionsPerDeliveredMWh: {
         maxKgCO2ePerMWh: numeric(
           0,
           1e6,
-          "kgCO₂e per delivered customerMWh; ratio of sums",
+          "Total kg CO₂e per delivered customer MWh over the window",
         ),
       },
       localFuelShare: {
@@ -492,7 +488,7 @@ const objective = () => ({
         minShare: numeric(
           0,
           1,
-          "Share of local fuel-deliveredWh; imports/storage excluded",
+          "Share of local fuel-delivered Wh; imports and storage excluded",
         ),
       },
       fuelRetirement: { fuel: fuel() },
@@ -500,14 +496,14 @@ const objective = () => ({
         maxDollarsPerKWh: numeric(
           0,
           100,
-          "Starting-year dollars per deliveredkWh; monthly billed customer revenue excludes grants/exports",
+          "Billed starting-year dollars per delivered kWh; excludes grants and exports",
         ),
       },
       monthEndDebt: {
         maxDebtDollars: numeric(
           0,
           1e12,
-          "Month-close loan principal ceiling in starting-year dollars; not interest",
+          "Month-end loan principal limit in starting-year dollars; excludes interest",
         ),
       },
     }[metric];
@@ -516,11 +512,11 @@ const objective = () => ({
     return object(
       props,
       required,
-      `${definition} Exactly one observation per required completed month; no empty-window or zero-denominator success.`,
+      `${definition} Requires completed-month observations.`,
     );
   }),
   description:
-    "One of eight measured goals. Inclusive one-based windows/deadlines must lie inside the resolved term. No rewards, Boolean expressions or triggered actions.",
+    "Choose a goal metric and an inclusive window or deadline within the term. Goals cannot trigger rewards or actions.",
 });
 function createModEditorSchema() {
   const objectives = list(objective(), RULE_LIMITS.objectives);
@@ -532,16 +528,15 @@ function createModEditorSchema() {
         pattern:
           "^[^\\x00-\\x1f\\x7f-\\x9f\\u200b-\\u200f\\u202a-\\u202e\\u2066-\\u2069]*$",
         description:
-          "Offline editor schema reference, normally ./scenario.schema.json; ignored by simulation and digests.",
+          "Editor schema path, usually ./scenario.schema.json. Does not affect gameplay.",
       },
       schemaVersion: {
         const: 1,
-        description: "First-release JSON shape version; authors set exactly 1.",
+        description: "Package format version. Set to 1.",
       },
       gameApi: {
         const: 1,
-        description:
-          "First-release game contract version; authors set exactly 1. Runtime versions/digests are computed, never authored.",
+        description: "Game API version. Set to 1.",
       },
       id: id(),
       title: text(
@@ -549,7 +544,7 @@ function createModEditorSchema() {
         "Scenario title, also limited to 128 UTF-8 bytes for Steam.",
       ),
       creator: text(100),
-      version: text(40, "Creator's label, with no compatibility meaning."),
+      version: text(40, "Your package version label."),
       description: text(
         2000,
         "Author description only. Publishing appends a generated Rules section; never paste that section here.",
@@ -557,7 +552,7 @@ function createModEditorSchema() {
       seed: numeric(0, 4294967295, "Deterministic run seed", true),
       baseScenarioId: enumeration(
         [999, ...RULE_SCENARIO_IDS],
-        "Bundled setup to inherit; 999 is Custom Game. Community runs always launch as 999 and stay unranked.",
+        "Starting grid to inherit; 999 is Custom Game. Community runs remain unranked.",
       ),
       scenario: object(
         {
@@ -636,7 +631,7 @@ function createModEditorSchema() {
               "Importable bundled challenge arc; never grants official status or objectives.",
             ),
             includeChoices: boolean(
-              "True prompts each company;false automatically selects each adapted free option at due month.",
+              "True prompts each company; false automatically selects the free option at its due month.",
             ),
           },
           ["scenarioId", "includeChoices"],
@@ -675,7 +670,7 @@ function createModEditorSchema() {
               mode: {
                 const: "replace",
                 description:
-                  "Replace all base goals with items;--explain prints replace-ready inheritedJSON.",
+                  "Replace base goals with items. Use --explain to get inherited goals as editable JSON.",
               },
               items: objectives,
             },
@@ -686,14 +681,14 @@ function createModEditorSchema() {
               mode: {
                 const: "none",
                 description:
-                  "No scenario goals; survive to finalmonth, while ordinary game failures still apply.",
+                  "No scenario goals. Reach the final month and avoid ordinary game failures.",
               },
             },
             ["mode"],
           ),
         ],
         description:
-          "Required explicit goal intent; arcs never add goals implicitly.",
+          "Choose whether to keep, replace or remove base goals. Imported arcs do not add goals.",
       },
       debriefReports: list(report(), RULE_LIMITS.debriefReports),
     },
@@ -709,7 +704,7 @@ function createModEditorSchema() {
       "baseScenarioId",
       "objectives",
     ],
-    "Electrify data-only scenario package. 256 KiB UTF-8 maximum; 32 installs. Units, bounds and scope are stated per field. The production compiler additionally checks term windows, references, reachability, composed factors, starting assets and byte ceilings.",
+    "Electrify scenario package, at most 256 KiB of UTF-8 JSON. Run mods:validate to check timing, references, combined effects, assets and byte limits.",
   );
   const document = {
     $schema: "http://json-schema.org/draft-07/schema#",
@@ -720,7 +715,7 @@ function createModEditorSchema() {
     if (!node || typeof node !== "object") return;
     for (const [key, value] of Object.entries(node.properties ?? {})) {
       if (!value.description)
-        value.description = `Field ${key}; ${value.const === undefined ? "bounded by this rule variant" : `must be ${JSON.stringify(value.const)}`}. No unit; applies only to the enclosing declared operation.`;
+        value.description = `${value.const === undefined ? `Values for ${key}` : `Must be ${JSON.stringify(value.const)}`}.`;
     }
     Object.values(node).forEach((value) => {
       if (Array.isArray(value)) value.forEach(documentFields);

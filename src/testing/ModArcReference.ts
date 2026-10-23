@@ -132,13 +132,13 @@ export function formatModArcReference(arcs: ArcReference[]): string {
     from === to ? String(from) : `${from}–${to}`;
   const escape = (text: string) => text.replaceAll("|", "\\|");
   return [
-    "# Imported official arc reference",
+    "# Official arc reference",
     "",
-    "Generated from the actual package resolver and detached imported rules. Regenerate with `npm run mods:arcs`; use `-- --check` to detect drift.",
+    "Use these phase, choice and load IDs when importing bundled challenge arcs with `officialArcs`.",
     "",
-    "Offsets are zero-based from the receiving January opening, including each arc's preparation lead. Playable months are offsets +1. Seeded ranges list every possible opening, not just the reference seed. Source loads already include their preparation lead. Effect magnitudes and duration values below resolve on Easy (Employee); use the author report for every difficulty's complete facts and your receiving grid's load MW and money.",
+    "Month 1 is the receiving grid's January opening; offsets start at 0. Dates include preparation time, and ranges show every possible onset. Durations use Easy (Employee); check Author report for other difficulties and your grid's resolved load sizes and costs.",
     "",
-    "Choice references use `{arc: scenarioId, choiceId, optionIds}`. Load references use `{arc: scenarioId, loadId}`; load IDs below are the stable catalog IDs, before internal runtime prefixes. `includeChoices: false` commits the listed zero-cost response automatically, including a grant when that response carries one. It does not remove the associated rules.",
+    "Conditions use `{arc: scenarioId, choiceId, optionIds}`; load replacements use `{arc: scenarioId, loadId}`. With `includeChoices: false`, each choice takes its listed free response automatically, including any grant and associated rules.",
     "",
     ...arcs.flatMap((arc) => [
       `## ${arc.id} · ${escape(arc.name)}`,
@@ -151,7 +151,7 @@ export function formatModArcReference(arcs: ArcReference[]): string {
             "| --- | --- | --- | --- |",
             ...arc.phases.map(
               (phase) =>
-                `| \`${phase.id}\` | ${range(phase.offset.from, phase.offset.to)} | ${range(phase.offset.from + 1, phase.offset.to + 1)} | ${phase.untilEnd ? "Through run end" : phase.durationMonths ? `${phase.durationMonths} month${phase.durationMonths === 1 ? "" : "s"}` : "Message opening only"} |`,
+                `| \`${phase.id}\` | ${range(phase.offset.from, phase.offset.to)} | ${range(phase.offset.from + 1, phase.offset.to + 1)} | ${phase.untilEnd ? "Through run end" : phase.durationMonths ? `${phase.durationMonths} month${phase.durationMonths === 1 ? "" : "s"}` : "Message only"} |`,
             ),
           ]
         : [
@@ -167,7 +167,7 @@ export function formatModArcReference(arcs: ArcReference[]): string {
                 `| \`${choice.id}\` | ${choice.dueMonth} | ${choice.options.map((id) => `\`${id}\``).join(", ")} | \`${choice.automaticResponse}\` |`,
             ),
           ]
-        : ["This arc has no consequential choices."]),
+        : ["No choices."]),
       "",
       ...(arc.loads.length
         ? [
@@ -175,10 +175,10 @@ export function formatModArcReference(arcs: ArcReference[]): string {
             "| --- | --- | --- |",
             ...arc.loads.map(
               (load) =>
-                `| \`${load.id}\` | ${load.month} | ${load.branch ? `\`${load.branch}\`` : "Base schedule; a named choice may replace it"} |`,
+                `| \`${load.id}\` | ${load.month} | ${load.branch ? `\`${load.branch}\`` : "Base schedule; replaceable by a choice"} |`,
             ),
           ]
-        : ["This arc introduces no permanent industrial load."]),
+        : ["No permanent loads."]),
       "",
     ]),
   ].join("\n");

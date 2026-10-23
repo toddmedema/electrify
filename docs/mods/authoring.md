@@ -1,114 +1,73 @@
-# Scenario authoring tools
+# Create a scenario
 
-Save an authoring template from **Mods → Save authoring template**. The game writes
-the package and `scenario.schema.json` together. Keep them in the same folder: the
-package's `$schema: "./scenario.schema.json"` works in an offline editor. `$schema`
-does not affect package identity or a saved game's rules.
+## Start from a template or example
 
-Validate before importing or publishing:
+In **Mods**, choose **Save authoring template**. Keep `scenario.json` beside the
+exported `scenario.schema.json` for offline editor validation and autocomplete.
+You can also copy a [complete scenario example](examples/README.md).
 
-```sh
-npm run mods:validate -- path/to/scenario.json
-npm run mods:validate -- path/to/scenario.json --explain
-npm run mods:validate -- path/to/scenario.json --json --explain
-```
-
-Errors exit nonzero; warnings alone do not. The compiler checks every difficulty,
-not just the selected one. `--explain` includes inherited content, real engine
-starting peak MW, month/calendar windows, all possible seeded openings, composed
-monthly effect bounds, imported IDs, choice dependencies, selector semantics,
-absolute carbon fees and the recorded facts behind each report. The app's
-**Author validation report** uses the same report. It includes surprise events;
-player previews and generated Workshop Rules include forecast events only.
-
-The [editor schema](scenario.schema.json) provides field units, numeric bounds,
-union shapes and unknown-field checks. Production validation additionally checks
-references, term-relative windows, reachability, composed effects, starting assets
-and UTF-8 byte limits. Text limits count UTF-16 code units in the parser; editors
-can count Unicode code points instead. Always run the production validator.
+Set your own `id`, `title`, `creator`, `version` and `description`. Keep
+`schemaVersion: 1` and `gameApi: 1`. Choose a `baseScenarioId` for the starting grid,
+then edit its setup, events, choices and goals using the [format reference](../mods.md).
 
 ## Executable recipes
 
-Each recipe is a complete six-month package. Copy it next to the schema and keep
-its relative `$schema` path correct. These are unit and boundary examples; the
-large cash reserve makes each mechanism easy to exercise independently.
+These six-month packages demonstrate individual features. They start with ample
+cash so you can explore each feature before balancing a full challenge. Keep the
+relative `$schema` path correct when copying them.
 
-| Recipe                                     | Mechanisms                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [effects.json](recipes/effects.json)       | Every timed effect, both transaction kinds and a targeted generator loss.                  |
-| [choices.json](recipes/choices.json)       | Cost/grant choices, a conditional event, replacement load and explicit cancellation.       |
-| [objectives.json](recipes/objectives.json) | All eight objective metrics, including required and optional goals.                        |
-| [selectors.json](recipes/selectors.json)   | Largest, oldest, seeded capacity share, minimum age and original starting-asset selection. |
+| Recipe                                     | Demonstrates                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| [effects.json](recipes/effects.json)       | Timed effects, charges, grants and a targeted output loss.                                            |
+| [choices.json](recipes/choices.json)       | Paid and funded options, a conditional event, and load replacement or cancellation.                   |
+| [objectives.json](recipes/objectives.json) | All eight goal metrics, with required and optional goals.                                             |
+| [selectors.json](recipes/selectors.json)   | Targeting generators by size, age or seeded capacity share, and selecting an original starting asset. |
 
-Multipliers use `1` for unchanged: `0.9` means 10% less, not 90% less. Fuel price,
-construction and operating cost factors are `0.1–10`; output is `0–1`. Demand is
-`0.1–10`. Hydro inflow allows `0` (no inflow); positive composed inflow must stay
-`0.1–10`. Static and simultaneous timed costs compose, so static `5` with timed `2`
-is the valid upper boundary `10`; static `5.01` with timed `2` is rejected.
+When adapting a recipe:
 
-| Effect                                   | Unit and boundary example                                                                                                                                                                                                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `temperatureOffsetC`                     | Additive °C, `-30–30` per event. The recipe adds `1 °C`.                                                                                                                                                                                                                        |
-| `operatingExpenseDollarsPerMonth`        | `0–1e12` starting-year dollars per active month; `1000` adds $1,000/month.                                                                                                                                                                                                      |
-| `transactions`                           | One-time `grant` or `charge`, `0–1e12` starting-year dollars. `10000` grants $10,000 once at onset.                                                                                                                                                                             |
-| `carbonFeeDollarsPerTonneCO2e`           | Absolute `0–100000` dollars/tonne CO₂e. `25` replaces the initial fee with $25/tonne while active; `0` explicitly waives it. Co-reachable overlapping overrides are rejected.                                                                                                   |
-| `outputMultipliersBySelector`            | Bind original facilities at onset, then apply `0–1` output. `0` disables output; `1` leaves it unchanged. A sold original never transfers its target identity to a replacement.                                                                                                 |
-| `transmissionCapacityLimitsMWByCorridor` | Map registered corridor IDs to absolute `0–1e6` MW caps. `{"california-north":4}` limits the northern route to 4 MW, including upgrades, before weather derating. `0` closes it in both directions. Overlapping caps take the smallest value; independent routes are unchanged. |
-| Permanent `loads`                        | `peakMW: 100` means 100 MW, converted once to watts. Alternatively, `peakShareOfStartingPeak: 0.2` means 100 MW on a 500 MW baseline. Choose exactly one sizing field. Load factor is `0.01–1`.                                                                                 |
+- Months start at `1`. An event starting in month `2` for `2` months is active in
+  months 2–3 and expires at the opening of month 4. `"untilEnd"` includes the final
+  month. Permanent loads remain connected after an event ends.
+- Multipliers use `1` for unchanged: `0.9` means 10% less. Overlapping factors
+  multiply, including static and timed cost modifiers. See the
+  [units and bounds](../mods.md#units-and-numeric-bounds).
+- A choice resolves before its due month runs. Every choice needs a free option;
+  each option declares exactly one `costDollars` or `grantDollars`.
+- Use `requiresChoice` to enable an event for named options. Add `arc` when
+  referring to an imported choice. Replace or cancel a load before it starts;
+  `with: []` cancels it.
+- Match goal and report windows to the event. Monthly reliability goals must pass
+  in every month of their window. The [goal reference](../mods.md#goals-are-explicit)
+  explains each metric.
+- Transmission caps affect an operating connection; they do not build a line or
+  grant access to imports.
 
-Operating selectors consider generators. `startingAsset` can also reference an
-original storage asset: its multiplier limits discharge and responsive output,
-while charging keeps its usual power limit.
+## Validate and inspect
 
-Months are one-based: month `1` opens before the first tick. The six-month recipe
-uses an event starting at month `2` for `2` months, active in months `2–3` and expired
-at month `4`. A seeded `{ "from": 2, "to": 3 }` start can open in either month.
-`"untilEnd"` lasts through the final playable month. A load's start is independent
-of event duration; permanent loads survive event expiry.
+From a source checkout, run:
 
-A corridor cap changes an existing connection's physical rating; it does not build
-a line or grant import access. The northern-route example has no physical effect
-until that route is operating. Native Wildfire supplies an operating northern
-intertie; a community scenario based on it freezes its researched access limits
-with the starting connection. Run-local snapshots retain resolved access terms and compiled effects after
-library updates or removal.
+```sh
+npm run mods:validate -- path/to/scenario.json --explain
+```
 
-A choice resolves before its due month's simulation. Each option has exactly one
-`costDollars` or `grantDollars`, including a free `costDollars: 0` response. The
-choices recipe either grants $100,000 and replaces the future 0.1 MW campus, or
-forgoes funding and cancels that load with `with: []`. Replacement must occur before
-the original load starts. `requiresChoice` uses stable choice/option IDs; add `arc`
-only when referring to an imported official choice.
+Fix errors before importing or publishing. Warnings allow both, but may identify
+an unintended rule. Validation checks every difficulty. `--explain` shows the
+resolved setup, dates, effects, inherited goals and imported IDs; add `--json` for
+machine-readable output.
 
-## Objective units and windows
+Import the file and open **Author report** to inspect the same details in the game.
+The report includes surprise events that player previews and Workshop Rules hide.
+Use the validator even if your editor accepts the file: it also checks references,
+timing, combined effects, starting assets and byte limits.
 
-The schema, author report and game UI use the evaluator's shared
-[definition sentences](objective-definitions.md). That table is generated from the
-same owner; the recipe demonstrates all metrics:
+## Try each branch
 
-| Metric                     | Target and observation boundary                                                                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `monthlyReliability`       | Minimum customer demand served share `0–1` in **every** completed month of the inclusive window. `1` requires full service; averaging good and bad months does not pass it.                  |
-| `customerRetention`        | Minimum retained starting-customer share `0–1`, measured at the deadline. `1` means the initial customer count.                                                                              |
-| `emissionsBudget`          | Total electricity and construction emissions in tonnes CO₂e, `0–1e12`, over the inclusive window, including imports and exports. `0` permits none.                                           |
-| `emissionsPerDeliveredMWh` | Total kg CO₂e, including imports, exports and construction, per delivered customer MWh, `0–1e6`, over the inclusive window.                                                                  |
-| `localFuelShare`           | Minimum declared fuel share `0–1` of the declared local-generation denominator. Imports and storage discharge have no fuel provenance.                                                       |
-| `fuelRetirement`           | Own no asset of the named fuel, including paused and unfinished assets, at the deadline and every later month close. An absent starting fuel produces a warning, not an invented retirement. |
-| `monthlyBilledRate`        | Maximum realized billed dollars/kWh, `0–100`, in every completed month of the inclusive window; tariff settings alone are not the measurement.                                               |
-| `monthEndDebt`             | Maximum owned outstanding facility/transmission loan principal, `0–1e12` starting-year dollars, at each completed month close in the inclusive window. Interest is excluded.                 |
-
-`inherit` retains base goals and accepts `add`; `replace` takes only `items`; `none`
-declares no scenario goals. Empty `replace` and empty `inherit` retain those distinct
-intentions. Ordinary game failures still apply. The author report supplies inherited
-goals as replacement-ready JSON with their resolved window offsets.
-
-## Simulate explicit decisions
+Play through each decision and goal window. To simulate a package from a source
+checkout:
 
 ```sh
 npm run sim -- --mod docs/mods/recipes/effects.json
 npm run sim -- --mod docs/mods/recipes/choices.json --responses responses.json
-npm run sim -- --mod docs/mods/recipes/choices.json --free-fallback
-npm run sim -- --mod docs/mods/recipes/choices.json --free-fallback --seeds 1,2 --difficulties Intern,CEO
 ```
 
 For the choices recipe, `responses.json` can contain:
@@ -117,27 +76,32 @@ For the choices recipe, `responses.json` can contain:
 { "responses": [{ "choiceId": "funding", "optionId": "accept" }] }
 ```
 
-The choice reference matches `requiresChoice`; `optionId` selects exactly one
-option and `arc` optionally names its imported official arc. A reached decision without a response is an
-error unless `--free-fallback` was explicit; each fallback is printed. Known
-responses that the actual run never reaches produce warnings. Unknown choices or
-options are errors. Use `--seeds` and `--difficulties` for at most 20 combinations.
-`--mod` cannot be combined with `--scenario`, `--year`, `--location`, `--all` or the
-ordinary scenario matrix. A shortened `--months` run reports incomplete progress.
+Use `choiceId` and `optionId` from your package; add `arc` for an imported choice.
+A reached choice without an answer is an error. To select free options
+automatically, pass `--free-fallback` instead of a responses file.
 
-Simulation uses the real reducer and prints seed, difficulty, package/runtime
-digests, reached responses, objective results, outcome and invariants. Re-import an
-edited package to begin a new run; existing saves retain their frozen rules.
+Use `--seeds` and `--difficulties` to try up to 20 combinations:
 
-## Publish
+```sh
+npm run sim -- --mod docs/mods/recipes/choices.json --free-fallback --seeds 1,2 --difficulties Intern,CEO
+```
 
-Edit only the authored `description`. Each upload regenerates the public Rules
-from the validated package: base, duration, objective definitions and forecast
-events/decisions. Surprise facts and private author-report sections are omitted.
-Steam allows 7,999 UTF-8 bytes of description text after reserving its terminator;
-an oversized description is rejected with an actionable message rather than
-truncated. The uploaded package remains `scenario.json` only.
+Review the outcome, goal results and any reported violations. A shortened
+`--months` run does not establish that the full challenge can be completed. See
+the [simulator guide](../../src/testing/README.md#validate-and-simulate-a-json-mod)
+for CLI restrictions and output details.
 
-Maintainers regenerate checked-in artifacts with `npm run mods:schema` and
-`npm run mods:recipes`; append `-- --check` to detect drift. Tests validate and
-simulate all recipes and every consequential choice branch.
+After editing, reimport the package and start a new run. Existing saves keep the
+rules they started with.
+
+## Publish and update
+
+Connect to Steam, import your package, then choose **Publish** and confirm the
+upload. Complete Steam's Workshop agreement if prompted. To update an item, change
+its `version`, reimport it with the same `id`, then choose **Upload update**.
+You can also share the JSON file directly.
+
+Write only your scenario's introduction in `description`. Each upload appends a
+generated **Rules** section with the setup, goals and announced events and choices.
+Surprise events stay hidden. The combined description must fit Steam's 7,999-byte
+UTF-8 limit; shorten your introduction if the upload reports that it is too long.

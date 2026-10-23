@@ -71,43 +71,24 @@ components and assets with separate license notices retain their own licenses.
 ## Modding
 
 Community scenarios work in solo play and co-op in the Steam/desktop edition.
-Open **Mods** in the main menu or Choose a game, or **Community scenarios** while
-hosting. Local JSON and installed Workshop copies work offline. Guests receive
-the host's validated rules without installing or subscribing to the package.
-Modded companies are unranked and earn no official scores or achievements.
+Open **Mods** to import a JSON file or browse Steam Workshop. Choose **Play** to
+review a scenario's setup, goals and announced events before starting. Co-op guests
+receive the host's scenario without installing it. Modded games are unranked and
+earn no official scores or achievements.
 
-Choose **Play** to inspect the actual setup, objectives and announced consequences
-before starting. **Author report** shows all rules, including surprises and the
-resolved facts at every difficulty. Its inspection control does not change the
-launch difficulty. Each company answers its own choices and owns its own results.
+Installed scenarios work offline. Updates apply to new games; existing saves keep
+their rules even if you update or remove the package.
 
-To author a scenario, choose **Save authoring template** and keep the paired local
-JSON Schema beside the package. Edit JSON, validate all difficulties and simulate
-explicit branches before importing:
+To create a scenario, choose **Save authoring template**, edit the JSON, then
+reimport it to try your changes. You can change costs, schedule events, offer
+choices, set goals and reuse bundled challenge arcs. Packages contain data only;
+scripts and custom media are unsupported.
 
-```sh
-npm run mods:validate -- path/to/scenario.json --explain
-npm run sim -- --mod path/to/scenario.json --responses responses.json
-npm run sim -- --mod path/to/scenario.json --free-fallback --seeds 1,2 --difficulties Employee,Manager
-```
+Start with the [authoring guide](docs/mods/authoring.md) and
+[example packages](docs/mods/examples/README.md). Use the
+[format reference](docs/mods.md) for fields and limits, and the
+[arc reference](docs/mods/arc-reference.md) for reusable challenge content.
 
-Packages are data only, at most 256 KiB, with timed effects, consequential choices,
-explicit measurable goals and optional imported challenge arcs. The compiler
-reports independent errors and warnings; warnings alone do not block publishing.
-All 14 bundled challenges use the same plain rules, compiler and interpreter as
-community scenarios; importing an arc does not grant official eligibility.
-Saves and co-op campaigns retain their frozen rules after a package update or
-removal. Importing the same local ID offers Update, Keep both or Cancel.
-
-Read the [mod contract and worked timeline](docs/mods.md),
-[balanced example packages and viable routes](docs/mods/examples/README.md),
-[offline authoring tools and mechanism recipes](docs/mods/authoring.md), and
-[generated arc reference](docs/mods/arc-reference.md). The schema and production
-compiler own field shapes, units and limits; obsolete `notifications` and
-`scenario.eventScenarioIds` fields are not part of this contract.
-
-To share, connect to Steam, import the package, choose **Publish** and confirm.
-Later uploads of the same package update its Workshop item. Each upload appends a
-fresh generated Rules section to the authored description; hidden surprises stay
-private. Steam's full description limit is 7,999 UTF-8 bytes, with actionable
-validation rather than truncation. Complete Steam's agreement when prompted.
+To share, send the JSON file directly or connect to Steam and choose **Publish**.
+After editing, reimport with the same `id` and choose **Upload update** to update
+its Workshop item. Complete Steam's Workshop agreement if prompted.

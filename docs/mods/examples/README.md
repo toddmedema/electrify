@@ -1,185 +1,72 @@
-# Complete scenario examples
+# Scenario examples
 
-These four importable packages use the public scenario-mod format, the regular
-simulation and the normal player controls. They keep the base scenario's researched
-location, inherited fleet and ages. They are longer challenges than the short
+Copy one of these packages to start your own scenario. Each combines a starting
+grid, events or imported challenge arcs, choices, goals and a final report. For
+smaller examples of individual features, use the
 [mechanism recipes](../authoring.md#executable-recipes).
 
-Start with **Easy** (`Employee`); **Medium** (`Manager`) is also tested. Import a
-JSON file from this directory through **Mods**, inspect its rules, then launch it.
-The seed in the file makes each recommended route reproducible. A package's
-`seed + 1` is a second tested weather/outage draw, not a promise about every seed
-or the three other difficulties.
+Give your copy a new `id`, `title`, `creator` and `description`. Keep its `$schema`
+path pointed at [scenario.schema.json](../scenario.schema.json), then import the
+file through **Mods** to try it. The [authoring guide](../authoring.md) covers
+editing, simulation and publishing; the [format reference](../../mods.md) lists
+fields and limits.
 
-All months below are the author's one-based playable months: month 1 is the
-opening month. A command scheduled for engine month 24 happens at the opening of
-playable month 25. Pause before changing dispatch or ordering construction.
-Capacity is in MW and prices are dollars per kWh. Facility quotes, loan interest
-and construction times still use the selected difficulty, starting year and the
-ordinary game economy; these routes do not inject money or a completed plant.
-
-| Package                                                                 | Based on                | Months | Tested seeds   | Main decision                                                               |
-| ----------------------------------------------------------------------- | ----------------------- | -----: | -------------- | --------------------------------------------------------------------------- |
-| [Funded or phased connection](funded-or-phased-connection.json)         | 106, Data Center Boom   |    108 | 12345, 12346   | Take a grant and connect 100 MW at once, or connect two 50 MW phases.       |
-| [Prepare before the freeze](prepare-before-freeze.json)                 | 107, Deep Freeze        |     60 | 268107, 268108 | Pay for winterization or fund more reserve capacity.                        |
-| [Two dry years](two-dry-years.json)                                     | 114, The River Runs Dry |     48 | 42, 43         | Pay for conservation or accept fuel support independently in each year.     |
-| [Retire coal without a bill shock](retire-coal-without-bill-shock.json) | 102, The End of an Era  |     36 | 12345, 12346   | Replace inherited coal while meeting the bill, debt and reliability limits. |
+| Package                                                                 | Use it to learn                                                                     |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [Funded or phased connection](funded-or-phased-connection.json)         | Import a challenge's choices and loads, then set your own goals.                    |
+| [Prepare before the freeze](prepare-before-freeze.json)                 | Keep a challenge's goals and add a report around its main event.                    |
+| [Two dry years](two-dry-years.json)                                     | Write timed effects and choices that enable conditional events.                     |
+| [Retire coal without a bill shock](retire-coal-without-bill-shock.json) | Change construction costs and combine retirement, bill, debt and reliability goals. |
 
 ## Funded or phased connection
 
-This package imports scenario 106's complete connection arc, including its
-blocking decision. At month 49, **Accept funded connection** grants $15 million and
-adds the full 100 MW data-center load from month 73. **Require phased connections** grants
-nothing and adds 50 MW from month 73, then 50 MW from month 97. The load factor is
-90%; a 100 MW connection therefore consumes 90 MW on average. Each company makes
-its own choice.
+`baseScenarioId: 106` supplies the Data Center Boom starting grid.
+`officialArcs` imports its connection choice: accept funding and connect the full
+100 MW load, or connect two 50 MW phases.
 
-The goals require at least **99.5% demand served in every month 73–108** and at
-least **90% of starting residential customers retained at month 108**. The
-data-center debrief counts months with blackouts during months 73–108 and compares
-the recorded starting and ending electricity tariffs.
+The package uses `objectives.mode: "replace"` to require reliable service after
+connection and customer retention at the end. Its `dataCenter` debrief reports
+blackouts and the change in electricity tariffs.
 
-A winning route for either branch on both tested seeds:
-
-1. Before starting the clock, finance a **100 MW Natural Gas Peaker** and set the
-   electricity rate to **$0.12/kWh**.
-2. Keep it available as reserve; its default dispatch position is suitable.
-3. At month 49, answer either connection option and continue through month 108.
-
-For the package's original seed **12345**, a financed **50 MW** peaker also wins
-both branches on Easy and Medium. The browser journey and the two-company test
-exercise that smaller route. In the two-company match, one company fast-tracks
-and the other phases; their grant and connected-load schedules remain independent.
-
-The downside is playable too: on Easy, seed 12345, set the same $0.12 rate,
-**build nothing**, and choose fast-track. The unchanged reliability goal fails
-at month **73** (about **90.11%** demand served). This is a real required-goal
-failure, rather than a substituted target or a debug ending.
+Adapt the goal windows and thresholds to change the challenge. Use the
+[arc reference](../arc-reference.md#106--data-center-boom) for imported choice and
+load IDs if you want to add conditions or replace a future load.
 
 ## Prepare before the freeze
 
-The imported scenario 107 arc keeps the January 2020 decision (month **37**),
-February 2021 freeze (month **50**) and month **51** thaw. Winterization costs
-**$90 million**. During the freeze it raises the story's gas-output factor from
-**62% to 81%**; gas prices still rise to **2.8 times** baseline. Recurring cold
-hazards and ordinary outages also remain active.
+`baseScenarioId: 107` and `officialArcs` bring in Deep Freeze's starting grid,
+winterization choice and freeze. `objectives.mode: "inherit"` keeps its reliability
+goal.
 
-The inherited goal is unchanged: serve at least **99.5%** of demand in February
-2021, exactly month 50. The three-month deep-freeze report covers month 49 before
-the event, month 50 during it and month 51 after it. It does not substitute an
-average over the whole run for that required month.
-
-A winning preparation route for either branch on both tested seeds:
-
-1. At the opening, finance **3,000 MW of Natural Gas Peakers** and set the rate to
-   **$0.091/kWh**.
-2. Before advancing, move the original Natural Gas CC up one dispatch position,
-   then the original Nuclear plant up one, then the new Peaker up one. The
-   resulting priority is **Natural Gas CC, Wind, Nuclear, new Peaker, Coal**.
-3. At the opening of month **25**, buy a second peaker **for cash**: **1,000 MW**
-   if you intend to winterize, or **1,500 MW** if you intend to keep standard
-   equipment. Leave its default dispatch position.
-4. At month **37**, choose **Fund winterization** or **Keep construction budget** to match
-   the construction plan. Continue through month 60.
-
-Paying for protection reduces the backup capacity needed by this route. Keeping
-standard equipment saves the upfront response cost but requires a larger paid
-reserve. The route deliberately buys reserve before the warning, rather than
-assuming a plant ordered during the freeze can commission in time.
+The `deepFreeze` debrief covers three consecutive months: before, during and after
+the freeze. This is a starting point for adding feedback to an existing challenge.
+Keep the report window aligned with the event if you change its timing.
 
 ## Two dry years
 
-This package keeps Lusaka's inherited **435 MW Hydro**, **16 MW Oil** and **6 MW
-Solar**, including the full starting reservoir and the 65 MW mining connection.
-It replaces the original arc with two declared twelve-month phases:
+`baseScenarioId: 114` keeps The River Runs Dry's starting grid. `officialArcs: []`
+removes its original event arc so the package can define two droughts of its own.
 
-| Window       | Hydro inflow | Decision                      | Conservation alternative                               | Funding alternative                         |
-| ------------ | -----------: | ----------------------------- | ------------------------------------------------------ | ------------------------------------------- |
-| Months 13–24 |          50% | First response, due month 12  | Pay $5 million, then $125,000/month; demand falls 10%. | Receive $5 million; demand stays unchanged. |
-| Months 25–36 |          25% | Second response, due month 25 | Pay $3 million, then $125,000/month; demand falls 10%. | Receive $3 million; demand stays unchanged. |
+Each drought uses `hydroInflowMultiplier` for twelve months. Separate conservation
+events use `requiresChoice` to apply a demand reduction and monthly expense only
+when the company chooses conservation. The other option grants fuel funding.
+The second year's choice is independent of the first.
 
-The second answer is independent of the first: all four answer combinations are
-playable and tested. Each conservation condition uses `requiresChoice` with the
-option set `["conserve"]`. The first conservation expense and demand effect end
-at the opening of month **25**; the second end at month **37**. The second
-drought also ends at month 37. Effects are per company, while weather comes from
-the shared location.
-
-The reliability goal requires **98% demand served each month 13–36**. The
-emissions goal allows **1,000,000 tonnes CO2e over months 13–48**, including
-construction and purchased electricity. The reliability and profit/loss debriefs
-use their declared windows and recorded monthly totals.
-
-A winning route for every answer combination on both tested seeds:
-
-1. At the opening, finance **200 MW Oil** and set the rate to **$0.10/kWh**.
-   This is the opening public-utility rate cap, twice the inherited $0.05 rate.
-2. Before the clock advances, move the original Solar plant up one dispatch
-   position, then Hydro up one, then the original 16 MW Oil up one. The final
-   priority is **Solar, Hydro, old Oil, new Oil**. Keeping the new diesel reserve
-   below Hydro avoids paying for diesel as baseload.
-3. Answer both prompts, independently choosing conservation or fuel support.
-   Keep the reserve available through month 48; avoid raising demand with new
-   connections or moving diesel ahead of the dam.
-
-Conservation pays a real upfront and recurring expense to reduce the amount of
-backup fuel needed. Fuel support improves cash immediately but leaves the larger
-load and emissions to manage. A serialized save after the first decision and
-several events, with the second prompt pending, resumes the same physics,
-receipts, progress and final accounting after the installed package is updated,
-removed or unavailable. The saved run carries its original version 1 rules.
+Use this pattern for repeated crises with a fresh decision each time. Keep each
+choice due before or at the start of its conditional event, and align the
+reliability and emissions goals with the period you want players to manage.
 
 ## Retire coal without a bill shock
 
-This package starts the inherited scenario 102 coal fleet in **2020** and keeps
-its original sizes and ages. Static facility modifiers make Natural Gas CC
-construction cost **80%** and build time **50%** of its ordinary quote; Solar
-construction cost is 80%. These are multipliers, not a price of $0.80 per watt
-or a six-month build time. Difficulty, the cost era and ordinary inflation still
-apply. The original aging-coal story is deliberately omitted with
-`officialArcs: []`.
+`baseScenarioId: 102` supplies the inherited coal fleet. The package moves its
+starting year to 2020, omits the original arc with `officialArcs: []`, and reduces
+replacement construction costs through `facilities` multipliers. `buildCost: 0.8`
+means 20% cheaper; `yearsToBuild: 0.5` halves construction time.
 
-Four required goals operate together:
+Four goals require the player to retire coal while limiting bills and debt and
+maintaining reliable service. `fuelMix` and `profitLoss` debriefs cover the period
+after retirement.
 
-- Own no Coal from month **25** through the end; a paused or unfinished Coal
-  plant still counts as owned.
-- Keep the recorded billed electricity rate at or below **$0.11/kWh** in every
-  month **1–36**. Grants do not count as customer electricity payments.
-- Keep outstanding loan principal at or below **$300 million** at every month
-  end **1–36**.
-- Serve at least **99.5%** of demand in each month **25–36**.
-
-A winning route on both tested seeds:
-
-1. At the opening, finance **400 MW Natural Gas CC**. Keep the package's
-   **$0.10/kWh** rate.
-2. At the opening of month **7**, buy another **200 MW Natural Gas CC for cash**.
-   Confirm the order exists; a cash purchase is rejected if you cannot afford
-   it.
-3. At the opening of month **25**, sell **both inherited Coal plants**. In a new
-   run these are facility IDs 1 and 2. Keep both replacement gas plants.
-4. Continue through month 36. The fuel-mix and profit/loss reports cover only
-   the post-retirement months 25–36.
-
-Financing every replacement risks the debt limit; funding all replacement from
-cash can delay commissioning. The tested route combines one loan with one later
-cash purchase while preserving the full retirement, bill and supply targets.
-
-## Verification
-
-The checked-in suite runs the real reducer through `Simulator`, with economic
-and physical invariants enabled. It covers **36 complete winning runs**: two
-difficulties, two seeds, every connection/freeze branch, all four drought answer
-combinations and the retirement package. It separately proves the unchanged
-connection goal can fail. Dedicated reducer and two-company World tests cover
-choice durability, independent company accounting and save restoration.
-
-```sh
-npm run test:once -- ModExamples.sim.test.tsx ModExamples.test.ts ModExampleDurability.test.tsx --runInBand
-```
-
-The exact paid actions are in
-[`ModExampleFixtures.ts`](../../../src/testing/ModExampleFixtures.ts), and
-[`ModExamples.sim.test.tsx`](../../../src/testing/ModExamples.sim.test.tsx)
-checks every branch. These are reproducible examples of viable play, not a free
-bot or a guarantee that an unchanged plan wins every difficulty and seed.
+Use this pattern to make a transition involve several tradeoffs. Leave enough
+time to build replacements before the retirement deadline; paused and unfinished
+coal plants still count as owned.

@@ -88,33 +88,25 @@ at face value after initialization; the competing market's baseline still follow
 
 ## Validate and simulate a JSON mod
 
-Use the same production parser, compiler and objective definitions as desktop play:
-
 ```sh
 npm run mods:validate -- docs/mods/examples/two-dry-years.json --explain
-npm run mods:validate -- docs/mods/examples/two-dry-years.json --json --explain
 npm run sim -- --mod docs/mods/examples/two-dry-years.json --responses responses.json
 npm run sim -- --mod docs/mods/examples/two-dry-years.json --free-fallback --seeds 1,2 --difficulties Employee,Manager
 ```
 
-The validator aggregates independent errors and warnings across all five
-difficulties; warnings alone exit 0. `--json` writes one parseable report to stdout.
-`--explain` adds resolved setup/peak MW, every possible seeded opening and calendar
-month, composed effect ranges, load MW, inherited replacement-ready goal JSON,
-imported choice/option/load IDs, dependencies, selectors, carbon fee windows and
-report observations. The app's Author report exposes these same facts at every
-difficulty. Load simulation data before calling its resolver directly in a test;
-the CLI does this through the owning setup/location API.
+Validation checks every difficulty. Errors exit nonzero; warnings alone do not.
+`--explain` adds resolved setup, dates, effects, goals and imported IDs. Add `--json`
+for one machine-readable report on stdout. The game's **Author report** shows the
+same information.
 
-`--mod` defaults to the package's seed. It rejects ordinary setup ownership flags
-`--scenario`, `--year`, `--location`, `--all` and the story `--matrix`.
-`--seeds`/`--difficulties` allow at most 20 combinations and do not modify the
-ordinary all-scenario sweep. A shorter `--months` run reports `inProgress` rather
-than completion. Output includes seed/difficulty/digests, actual reached branch
-receipts, objective measurements/outcome and every invariant violation.
+`--mod` defaults to the package's seed. It cannot be combined with `--scenario`,
+`--year`, `--location`, `--all` or `--matrix`. `--seeds` and `--difficulties` allow up
+to 20 combinations. A shortened `--months` run reports `inProgress`. Output includes
+seed, difficulty, package/runtime digests, reached choices, goal results, outcome
+and invariant violations.
 
-A package with choices requires an explicit responses file or `--free-fallback`.
-For example, an authored choice and an imported choice use these shapes:
+Packages with choices require `--responses` or `--free-fallback`. A responses file
+can contain authored and imported choice references:
 
 ```json
 {
@@ -125,59 +117,21 @@ For example, an authored choice and an imported choice use these shapes:
 }
 ```
 
-Use the IDs reported by the actual package. Unknown options/references and
-duplicate answers are errors. A reached missing answer is an error unless
-fallback was requested; fallback commits the named zero-cost option and prints
-it. A known response never reached by the real run is a warning. Normal simulation
-retains its existing free-response bot; strict mode is opt-in authoring behavior.
+Use IDs from the package's author report. Unknown choices/options and duplicate
+answers are errors. Reached choices without answers fail unless `--free-fallback`
+selects their free options; each fallback is printed. Valid answers that the run
+never reaches produce warnings. Ordinary simulations keep their free-response bot.
 
-The [balanced examples](../../docs/mods/examples/README.md) document winning
-UI-legal routes and branch tradeoffs. Their `*.sim.test.tsx` suites drive the real
-reducer and `Invariants`; the two-company test drives `World`. The six-month
-[mechanism recipes](../../docs/mods/authoring.md#executable-recipes) separately
-exercise each effect/selector/choice/objective. A passive bot losing early does
-not prove an objective impossible or a late phase reached. The
-[coverage matrix](../../docs/mods/coverage-matrix.md) maps trust, save/replay,
-forecast, choice and co-op boundaries to their owning regressions.
+See the [authoring guide](../../docs/mods/authoring.md) and
+[example packages](../../docs/mods/examples/README.md) for building mods. Maintainers
+can find parser, runtime, save/replay and co-op tests in the
+[verification map](../../docs/mods/coverage-matrix.md). Load simulation data before
+calling a resolver directly in a test; the CLI handles this automatically.
 
-All 14 official challenges use the same catalog definitions and interpreter as
-imported arcs. [Independent phase parity](OfficialScenarioPhaseParity.test.tsx)
-compares frozen old setup, timing, previews, effects, targets and review facts
-across all difficulties and seeded onset neighbors.
-[Native execution](../reducers/OfficialScenarioExecution.sim.test.tsx) exercises
-legal full campaigns, live/catch-up boundaries, forecast transport, saves and
-official replay; [two-company parity](../multiplayer/OfficialWorldParity.sim.test.tsx)
-compares independently captured complete Worlds. Keep the old fixture hashes
-unchanged. These are separate from the ordinary all-scenario sweep: an early bot
-failure cannot establish parity at a later event or goal window. The
-[multiplayer browser suite](../../e2e/multiplayer.spec.ts) adds native 106/107
-selection, separate company responses, real forecasts, goals and ordinary
-save/resume at 1280, 390 and 360 px. Consult the current validation report for
-which commands and reached assertions have actually passed.
-
-Maintainers regenerate the editor schema and recipes with `npm run mods:schema`
-and `npm run mods:recipes`; add `-- --check` to detect drift. The generated
-[arc reference](../../docs/mods/arc-reference.md) comes from actual imported
-compiled definitions, not a second schedule. Performance work starts with
-[docs/perf-plan.md](../../docs/perf-plan.md), including maximum permitted mod
-content and 1200-month histories. Run its explicit workload with
-`npm run perf:bench -- --mods --runs 1 --json`; retain the normal `perf:bench`
-ratio gates and production `perf:bundle` byte ceilings. Functional fake-clock
-browser journeys make no wall-time performance claims.
-
-A local Node 24.14 maximum-content measurement (three samples, October 2026)
-used 100 events, 32 choices with eight options, 400 loads, 16 goals and four
-companies with complete 1,200-month histories. All invariants passed. Cold
-compilation across all five difficulties took 1.994 s; repeated compilation took
-17.04 ms. At the final month, median ordinary ticks were 0.099 ms plain / 0.229 ms
-Immer, with rollovers 14.94 / 18.17 ms. Native MessagePort transfer exercised the
-production worker snapshot, buffer pack and decoder. The four-company save was
-16,247,427 bytes, with a 3,067,278-byte compressed checkpoint, below the existing
-bounds. Strict restoration took **17.47 s**: this maximum stress case can visibly
-delay resumption, and these machine-specific measurements are not a universal
-latency promise. The fixture deliberately funds its stress workload; it is not a
-balanced challenge. Normal 240-month performance ratio gates passed separately,
-with their existing ceilings unchanged.
+Regenerate authoring references with `npm run mods:schema`, `npm run mods:recipes`
+and `npm run mods:arcs`; add `-- --check` to detect drift. For maximum-content
+benchmarks, use `npm run perf:bench -- --mods --runs 1 --json` and follow the
+[performance plan](../../docs/perf-plan.md).
 
 ## What it checks
 
